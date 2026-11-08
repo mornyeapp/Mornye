@@ -47,7 +47,23 @@ class PlayerMetadataController extends ChangeNotifier {
         return;
       }
       _requestKey = null;
-      await load(_item);
+      final item = _item;
+      if (item == null) return;
+      // A document plays from a copy made before the change, so reloading
+      // through the copy would read the old tags back. Read the document
+      // itself instead; normal loads still prefer the copy.
+      if (changed.startsWith('content://') &&
+          item.extras?['resolvedSource'] != null) {
+        await load(
+          item.copyWith(extras: {...?item.extras, 'resolvedSource': null}),
+          inspectUnresolvedContentUri: true,
+        );
+      } else {
+        await load(
+          item,
+          inspectUnresolvedContentUri: changed.startsWith('content://'),
+        );
+      }
     });
   }
 
@@ -156,11 +172,18 @@ class PlayerMetadataController extends ChangeNotifier {
 
   /// Embeds [raw] in the original audio file and shows it. Throws when the
   /// file can't be written, leaving the current lyrics in place.
-  Future<void> saveEditedLyrics(String raw) async {
-    final source = this.source;
-    if (_disposed || _item == null || source == null) {
+  ///
+  /// [item] pins the save to the track the editor was opened for: playback
+  /// may have moved to another track while editing, and the edited lyrics
+  /// must still land in the file they were written for, never in the song
+  /// that happens to be playing when Save is pressed.
+  Future<void> saveEditedLyrics(String raw, {MediaItem? item}) async {
+    final target = item ?? _item;
+    final source = target?.extras?['source']?.toString() ?? this.source;
+    if (_disposed || target == null || source == null || source.isEmpty) {
       throw StateError('No editable track is loaded');
     }
+    final currentSource = this.source;
     final generation = _generation;
     final parsed = raw.trim().isEmpty
         ? ParsedLyrics.empty
@@ -174,7 +197,11 @@ class PlayerMetadataController extends ChangeNotifier {
     } finally {
       _savingLyricsSources.remove(source);
     }
-    if (_disposed || generation != _generation) return;
+    // The file is written either way; only adopt the lyrics as the shown
+    // ones when the player still shows the track they belong to.
+    if (_disposed || generation != _generation || currentSource != source) {
+      return;
+    }
     _metadata = Map.unmodifiable({...?_metadata, 'lyrics': raw});
     _lyrics = parsed;
     _lyricsRaw = raw;

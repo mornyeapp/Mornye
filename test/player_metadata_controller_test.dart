@@ -196,6 +196,33 @@ void main() {
   });
 
   test(
+    'a tag change reloads a document from its URI, not its playback copy',
+    () async {
+      final events = SourceMetadataEvents();
+      final paths = <String>[];
+      const source = 'content://library/song.flac';
+      final controller = PlayerMetadataController(
+        metadataEvents: events,
+        readMetadata: (path) async {
+          paths.add(path);
+          return {
+            'lyrics': path == source ? '[00:02.00]Fresh' : '[00:01.00]Copy',
+          };
+        },
+      );
+      addTearDown(controller.dispose);
+      await controller.load(
+        _item('a', source: source, resolved: '/tmp/song.flac'),
+        inspectUnresolvedContentUri: true,
+      );
+      expect(controller.lyrics.lines.single.text, 'Copy');
+      await events.publish(source);
+      expect(paths.last, source);
+      expect(controller.lyrics.lines.single.text, 'Fresh');
+    },
+  );
+
+  test(
     'disposal prevents outstanding reads from notifying or mutating',
     () async {
       final read = Completer<Map<String, dynamic>>();
@@ -518,6 +545,25 @@ void main() {
         );
         await controller.searchOnline();
         expect(saves, [source]);
+      },
+    );
+
+    test(
+      'an editor save lands on its opened track after a track change',
+      () async {
+        final saves = <String>[];
+        final controller = controllerFor(
+          (_) async => '',
+          save: (source, _) async => saves.add(source),
+        );
+        await controller.load(_item('a'));
+        final opened = controller.item!;
+        await controller.load(_item('b'));
+        await controller.saveEditedLyrics('[00:01.00]Synced', item: opened);
+        expect(saves, ['/music/a.flac']);
+        // The lyrics belong to a.flac; the shown track keeps its own (none).
+        expect(controller.lyrics.isEmpty, isTrue);
+        expect(controller.rawLyrics, isEmpty);
       },
     );
 
