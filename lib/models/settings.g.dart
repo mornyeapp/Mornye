@@ -38,9 +38,9 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       ? 'track'
       : playbackNormalizationModeFromJson(json['playbackNormalizationMode']),
   pauseOnMute: json['pauseOnMute'] as bool? ?? true,
-  playOnHeadphonesConnected:
-      json['playOnHeadphonesConnected'] as bool? ?? false,
-  resumeOnOutputReconnect: json['resumeOnOutputReconnect'] as bool? ?? false,
+  headphoneResume: readHeadphoneResume(json, 'headphoneResume') == null
+      ? 'off'
+      : headphoneResumeFromJson(readHeadphoneResume(json, 'headphoneResume')),
   gaplessPlayback: json['gaplessPlayback'] as bool? ?? true,
   autoMix: json['autoMix'] as bool? ?? false,
   autoMixDuration: json['autoMixDuration'] == null
@@ -251,8 +251,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'playbackNormalizationPreamp': instance.playbackNormalizationPreamp,
   'playbackNormalizationMode': instance.playbackNormalizationMode,
   'pauseOnMute': instance.pauseOnMute,
-  'playOnHeadphonesConnected': instance.playOnHeadphonesConnected,
-  'resumeOnOutputReconnect': instance.resumeOnOutputReconnect,
+  'headphoneResume': instance.headphoneResume,
   'gaplessPlayback': instance.gaplessPlayback,
   'autoMix': instance.autoMix,
   'autoMixDuration': instance.autoMixDuration,

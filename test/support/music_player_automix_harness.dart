@@ -304,7 +304,7 @@ void setPlaybackAutomationOptions({
   musicPlayerRuntime.settings.copyWith(
     playerMode: enabled ? 'internal' : 'external',
     pauseOnMute: pauseOnMute,
-    playOnHeadphonesConnected: playOnHeadphonesConnected,
+    headphoneResume: playOnHeadphonesConnected ? 'always' : 'off',
   ),
 );
 

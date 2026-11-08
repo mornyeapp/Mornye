@@ -45,7 +45,6 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/automix_effect_renderer.dart';
 import 'package:mornye/services/automix_status.dart';
 import 'package:mornye/services/music_haptics.dart';
-import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/playback_artwork.dart';
@@ -267,9 +266,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     if ((previous.playerMode == 'internal') !=
             (settings.playerMode == 'internal') ||
         previous.pauseOnMute != settings.pauseOnMute ||
-        previous.playOnHeadphonesConnected !=
-            settings.playOnHeadphonesConnected ||
-        previous.resumeOnOutputReconnect != settings.resumeOnOutputReconnect ||
+        previous.headphoneResume != settings.headphoneResume ||
         previous.usbBitPerfect != settings.usbBitPerfect) {
       _refreshPlaybackAutomation();
     }
@@ -760,18 +757,16 @@ class MusicPlayerHandler extends BaseAudioHandler
         _settings.playerMode == 'internal' &&
         _settings.pauseOnMute &&
         !_settings.usbBitPerfect;
-    final playOnHeadphonesConnected =
+    // Android and iOS, Android TV included: TVs pair Bluetooth or USB
+    // headphones too.
+    final headphoneResume =
         !_cast.active &&
-        !isDesktopPlatform &&
-        _settings.playerMode == 'internal' &&
-        _settings.playOnHeadphonesConnected;
-    // Phones and tablets only: a TV's outputs are not personal headphones.
-    final resumeAfterNoisyPause =
-        !_cast.active &&
-        !isDesktopPlatform &&
-        !isAndroidTv &&
-        _settings.playerMode == 'internal' &&
-        _settings.resumeOnOutputReconnect;
+            !isDesktopPlatform &&
+            _settings.playerMode == 'internal'
+        ? _settings.headphoneResume
+        : 'off';
+    final playOnHeadphonesConnected = headphoneResume == 'always';
+    final resumeAfterNoisyPause = headphoneResume == 'after_disconnect';
     final watchDevices = playOnHeadphonesConnected || resumeAfterNoisyPause;
     unawaited(
       _playbackAutomation.configure(

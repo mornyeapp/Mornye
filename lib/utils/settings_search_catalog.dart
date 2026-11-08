@@ -434,22 +434,18 @@ class SettingsSearchCatalog {
           subtitle: l10n.playbackPauseOnMuteDescription,
           keywords: const ['mute', 'volume', 'pause', 'resume'],
         ),
-        SettingsSearchEntry(
-          icon: Icons.headphones_outlined,
-          title: l10n.playbackOnHeadphonesConnected,
-          subtitle: l10n.playbackOnHeadphonesConnectedDescription,
-          keywords: const ['earphone', 'headphone', 'bluetooth', 'connect'],
-        ),
-        if (!isDesktopPlatform && !isAndroidTv)
+        if (!isDesktopPlatform)
           SettingsSearchEntry(
-            icon: Icons.bluetooth_audio_outlined,
-            title: l10n.playbackResumeOnReconnect,
-            subtitle: l10n.playbackResumeOnReconnectDescription,
+            icon: Icons.headphones_outlined,
+            title: l10n.playbackOnHeadphonesConnected,
+            subtitle: l10n.playbackHeadphonesChoices,
             keywords: const [
               'earphone',
               'headphone',
               'bluetooth',
+              'connect',
               'reconnect',
+              'disconnect',
               'resume',
               'car',
             ],

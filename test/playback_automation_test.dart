@@ -72,14 +72,14 @@ void main() {
     final defaults = AppSettings.fromJson({});
     expect(const AppSettings().pauseOnMute, isTrue);
     expect(defaults.pauseOnMute, isTrue);
-    expect(defaults.playOnHeadphonesConnected, isFalse);
+    expect(defaults.headphoneResume, 'off');
     final settings = defaults.copyWith(
       pauseOnMute: false,
-      playOnHeadphonesConnected: true,
+      headphoneResume: 'always',
     );
     final restored = AppSettings.fromJson(settings.toJson());
     expect(restored.pauseOnMute, isFalse);
-    expect(restored.playOnHeadphonesConnected, isTrue);
+    expect(restored.headphoneResume, 'always');
     expect(restored.copyWith(autoMix: true).pauseOnMute, isFalse);
   });
 
@@ -349,11 +349,76 @@ void main() {
   );
 
   group('resume when headphones reconnect', () {
-    test('the setting defaults to off and round-trips through JSON', () {
-      expect(const AppSettings().resumeOnOutputReconnect, isFalse);
-      expect(AppSettings.fromJson(const {}).resumeOnOutputReconnect, isFalse);
-      final on = const AppSettings().copyWith(resumeOnOutputReconnect: true);
-      expect(AppSettings.fromJson(on.toJson()).resumeOnOutputReconnect, true);
+    test('the choice defaults to off and round-trips through JSON', () {
+      expect(const AppSettings().headphoneResume, 'off');
+      expect(AppSettings.fromJson(const {}).headphoneResume, 'off');
+      for (final mode in headphoneResumeModes) {
+        final saved = const AppSettings().copyWith(headphoneResume: mode);
+        expect(AppSettings.fromJson(saved.toJson()).headphoneResume, mode);
+      }
+    });
+
+    test('settings from before the choice migrate', () {
+      AppSettings read(Map<String, dynamic> json) => AppSettings.fromJson(json);
+      // The old switch on means Always, whatever the unreleased one held.
+      expect(
+        read({'playOnHeadphonesConnected': true}).headphoneResume,
+        'always',
+      );
+      expect(
+        read({
+          'playOnHeadphonesConnected': true,
+          'resumeOnOutputReconnect': true,
+        }).headphoneResume,
+        'always',
+      );
+      expect(
+        read({
+          'playOnHeadphonesConnected': false,
+          'resumeOnOutputReconnect': true,
+        }).headphoneResume,
+        'after_disconnect',
+      );
+      expect(read({'playOnHeadphonesConnected': false}).headphoneResume, 'off');
+      // A saved choice wins over the old keys it writes for older builds.
+      expect(
+        read({
+          'headphoneResume': 'after_disconnect',
+          'playOnHeadphonesConnected': false,
+        }).headphoneResume,
+        'after_disconnect',
+      );
+      expect(
+        read({
+          'headphoneResume': 'off',
+          'playOnHeadphonesConnected': true,
+        }).headphoneResume,
+        'off',
+      );
+      // Unknown values fall back to the old keys, then off.
+      expect(read({'headphoneResume': 'sometimes'}).headphoneResume, 'off');
+      expect(
+        read({
+          'headphoneResume': 42,
+          'playOnHeadphonesConnected': true,
+        }).headphoneResume,
+        'always',
+      );
+    });
+
+    test('older builds and backups still read the old switch', () {
+      for (final (mode, old) in [
+        ('off', false),
+        ('after_disconnect', false),
+        ('always', true),
+      ]) {
+        final json = const AppSettings()
+            .copyWith(headphoneResume: mode)
+            .toJson();
+        expect(json['headphoneResume'], mode);
+        expect(json['playOnHeadphonesConnected'], old);
+        expect(json.containsKey('resumeOnOutputReconnect'), isFalse);
+      }
     });
 
     test('the window keeps recent pauses and drops old or future ones', () {

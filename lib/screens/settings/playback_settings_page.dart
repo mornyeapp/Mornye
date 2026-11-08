@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/settings.dart' show headphoneResumeModes;
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/alsa_output_devices.dart';
@@ -17,6 +18,7 @@ import 'package:mornye/services/music_player_service.dart'
 import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
+import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -30,6 +32,7 @@ import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/beta_badge.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/discord_presence_settings.dart';
@@ -403,37 +406,13 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                   onChanged: (value) =>
                       ref.read(settingsProvider.notifier).setPauseOnMute(value),
                 ),
-                SettingsSwitchItem(
-                  icon: Icons.headphones_outlined,
-                  title: context.l10n.playbackOnHeadphonesConnected,
-                  subtitle:
-                      context.l10n.playbackOnHeadphonesConnectedDescription,
-                  value: settings.playOnHeadphonesConnected,
+                _HeadphoneResumeChoice(
+                  mode: settings.headphoneResume,
                   enabled: settings.playerMode == 'internal',
-                  onChanged: (value) => ref
+                  onChanged: (mode) => ref
                       .read(settingsProvider.notifier)
-                      .setPlayOnHeadphonesConnected(value),
-                  showDivider: !isAndroidTv,
+                      .setHeadphoneResume(mode),
                 ),
-                // A TV's outputs are not headphones someone walks away with.
-                if (!isAndroidTv)
-                  SettingsSwitchItem(
-                    icon: Icons.bluetooth_audio_outlined,
-                    title: context.l10n.playbackResumeOnReconnect,
-                    subtitle: settings.playOnHeadphonesConnected
-                        ? '${context.l10n.playbackResumeOnReconnectDescription}'
-                              '\n\n'
-                              '${context.l10n.playbackResumeOnReconnectCovered}'
-                        : context.l10n.playbackResumeOnReconnectDescription,
-                    value: settings.resumeOnOutputReconnect,
-                    enabled:
-                        settings.playerMode == 'internal' &&
-                        !settings.playOnHeadphonesConnected,
-                    onChanged: (value) => ref
-                        .read(settingsProvider.notifier)
-                        .setResumeOnOutputReconnect(value),
-                    showDivider: false,
-                  ),
               ],
             ),
           ...settingsSectionSlivers(
@@ -752,6 +731,111 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
         ],
       ),
     );
+  }
+}
+
+/// When connecting headphones resumes playback: one of [headphoneResumeModes],
+/// a three-way choice under its title and the current choice's description.
+class _HeadphoneResumeChoice extends StatelessWidget {
+  const _HeadphoneResumeChoice({
+    required this.mode,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String mode;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final title = l10n.playbackOnHeadphonesConnected;
+    final labels = {
+      'off': l10n.playbackHeadphonesOff,
+      'after_disconnect': l10n.playbackHeadphonesAfterDisconnect,
+      'always': l10n.playbackHeadphonesAlways,
+    };
+    final description = switch (mode) {
+      'after_disconnect' => l10n.playbackResumeOnReconnectDescription,
+      'always' => l10n.playbackOnHeadphonesConnectedDescription,
+      _ => l10n.playbackHeadphonesOffDescription,
+    };
+    final showIcon = !context.isMornye;
+    final choice = context.isMornye
+        ? MornyeSegmentedControl(
+            labels: labels.values.toList(),
+            selectedIndex: labels.keys.toList().indexOf(mode),
+            onChanged: (index) => onChanged(labels.keys.elementAt(index)),
+            samplesBackdrop: false,
+          )
+        : SettingsSegmentedChoice<String>(
+            selected: mode,
+            onChanged: onChanged,
+            semanticLabel: title,
+            options: [
+              for (final MapEntry(:key, :value) in labels.entries)
+                SettingsSegmentOption(value: key, label: value),
+            ],
+          );
+    final content = Opacity(
+      opacity: enabled ? 1 : 0.5,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: context.tokens.rowPaddingH,
+          vertical: context.tokens.rowPaddingVCompact,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (showIcon) ...[
+                  AppIcon(
+                    Icons.headphones_outlined,
+                    color: enabled
+                        ? colorScheme.onSurfaceVariant
+                        : colorScheme.outline,
+                    size: 24,
+                  ),
+                  SizedBox(width: context.tokens.rowIconGap),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: enabled ? null : colorScheme.outline,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        description,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: enabled
+                              ? colorScheme.onSurfaceVariant
+                              : colorScheme.outline,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            IgnorePointer(
+              ignoring: !enabled,
+              child: ExcludeSemantics(excluding: !enabled, child: choice),
+            ),
+          ],
+        ),
+      ),
+    );
+    return SettingsSearchTarget(label: title, child: content);
   }
 }
 

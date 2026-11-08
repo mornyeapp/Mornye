@@ -9119,14 +9119,29 @@
   "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
   "playbackOnHeadphonesConnected": "Play when headphones connect",
   "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
-  "playbackResumeOnReconnect": "Resume when headphones reconnect",
-  "@playbackResumeOnReconnect": {
-    "description": "Playback setting: resume only a recent pause caused by headphones or a Bluetooth output disconnecting"
+  "@playbackOnHeadphonesConnectedDescription": {
+    "description": "Description of the Always choice of Play when headphones connect"
   },
   "playbackResumeOnReconnectDescription": "If headphones or a Bluetooth device disconnect while music plays, playback resumes when one connects again within 30 minutes. Songs you paused stay paused. Built-in player only.",
-  "playbackResumeOnReconnectCovered": "Play when headphones connect is on and already resumes on every connection.",
-  "@playbackResumeOnReconnectCovered": {
-    "description": "Added to the Resume when headphones reconnect subtitle while the broader Play when headphones connect setting is on"
+  "@playbackResumeOnReconnectDescription": {
+    "description": "Description of the After disconnect choice of Play when headphones connect"
+  },
+  "playbackHeadphonesOff": "Off",
+  "@playbackHeadphonesOff": {
+    "description": "Play when headphones connect choice: connecting headphones never starts playback. Keep it short; three choices share one row"
+  },
+  "playbackHeadphonesAfterDisconnect": "Reconnect",
+  "@playbackHeadphonesAfterDisconnect": {
+    "description": "Play when headphones connect choice: resume only a recent pause caused by headphones disconnecting. Keep it short; three choices share one row"
+  },
+  "playbackHeadphonesAlways": "Always",
+  "@playbackHeadphonesAlways": {
+    "description": "Play when headphones connect choice: resume on every connection and pause on disconnect. Keep it short; three choices share one row"
+  },
+  "playbackHeadphonesOffDescription": "Connecting headphones does not start playback.",
+  "playbackHeadphonesChoices": "Off, after a disconnect, or every time headphones connect.",
+  "@playbackHeadphonesChoices": {
+    "description": "Settings search summary of the Play when headphones connect choices"
   },
   "appearanceCustomFont": "Custom font",
   "appearanceCustomFontSubtitle": "Import a TTF or OTF file (up to 10 MB). Overrides the theme and system font.",
