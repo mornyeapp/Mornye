@@ -694,11 +694,15 @@ final class RustCoreBackend: CoreBackend {
             scope?.close()
             return nil
         case "initExtensionRepo": try initializeRepository(string("cache_dir")); return nil
-        case "getRepoRegistryUrl": return try repositoryOwner().registryUrl()
-        case "setRepoRegistryUrl": try repositoryOwner().setRegistryUrl(url: string("registry_url")); return nil
-        case "clearRepoRegistryUrl": try repositoryOwner().clearRegistryUrl(); return nil
-        case "getRepoExtensions": return try repositoryOwner().extensions(forceRefresh: args["force_refresh"] as? Bool ?? false)
-        case "downloadRepoExtension": return try repositoryOwner().download(extensionId: string("extension_id"), destinationDirectory: string("dest_dir"))
+        case "setRepoRegistryUrls":
+            guard let urls = args["registry_urls"] as? [String] else {
+                throw failure("Expected registry_urls string list")
+            }
+            try repositoryOwner().setRegistryUrls(registryUrls: urls)
+            return nil
+        case "resolveRepoRegistryUrl": return try repositoryOwner().resolveRegistryUrl(registryUrl: string("registry_url"))
+        case "getRepoCatalog": return try repositoryOwner().catalog(forceRefresh: args["force_refresh"] as? Bool ?? false)
+        case "downloadRepoExtension": return try repositoryOwner().download(extensionId: string("extension_id"), destinationDirectory: string("dest_dir"), registryUrl: string("registry_url"))
         case "cleanupExtensions": shutdownOwner(); return nil
         case "buildFilename": return try buildFilename(template: string("template"), metadataJson: string("metadata", "{}"))
         case "sanitizeFilename": return sanitizeFilename(filename: string("filename"))
