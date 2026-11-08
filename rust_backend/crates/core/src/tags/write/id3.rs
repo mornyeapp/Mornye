@@ -133,6 +133,23 @@ fn edit_header(
             }
         }
     }
+    if fields.contains_key("lyrics") {
+        // The reader takes the first lyrics source in file order, so a stale
+        // user-text lyrics frame would shadow the USLT written above forever.
+        for description in [
+            "LYRICS",
+            "LYRIC",
+            "UNSYNCEDLYRICS",
+            "UNSYNCED LYRICS",
+            "SYNCEDLYRICS",
+            "SYNCED LYRICS",
+            "USLT",
+            "SYLT",
+            "LRC",
+        ] {
+            drop_descriptions.insert(description.to_owned());
+        }
+    }
     if let Some(cover) = cover {
         drop.insert(b"APIC".to_vec());
         let mime = if let Some(mime) = mime_override {
@@ -408,5 +425,63 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn source_tag(frames: Vec<Frame>) -> Vec<u8> {
+        let mut body = Vec::new();
+        for frame in &frames {
+            body.extend(&frame.id);
+            body.extend(syncsafe(frame.data.len()));
+            body.extend([0, 0]);
+            body.extend(&frame.data);
+        }
+        let mut tag = b"ID3\x04\0\0".to_vec();
+        tag.extend(syncsafe(body.len()));
+        tag.extend(body);
+        tag.extend(b"audio");
+        tag
+    }
+
+    fn txxx(description: &str, value: &str) -> Frame {
+        let mut data = text(description);
+        data.push(0);
+        data.extend(value.as_bytes());
+        frame("TXXX", data)
+    }
+
+    #[test]
+    fn writing_lyrics_purges_stale_user_text_lyrics() {
+        let source = source_tag(vec![
+            txxx("UNSYNCEDLYRICS", "old plain"),
+            frame("TIT2", text("Song")),
+        ]);
+        let fields: Fields = [("lyrics".to_owned(), "[00:01.00]new synced".to_owned())]
+            .into_iter()
+            .collect();
+        let (tag, _) = header(&mut Cursor::new(source), &fields, None, &|| Ok(())).unwrap();
+        let (frames, _) = read_frames(&mut Cursor::new(&tag), &|| Ok(())).unwrap();
+        assert!(frames.iter().any(|frame| frame.id == b"TIT2"));
+        for frame in &frames {
+            if frame.id == b"TXXX" {
+                let description = uppercase(user_text(&frame.data).0.trim());
+                assert!(
+                    !matches!(
+                        description.as_str(),
+                        "LYRICS"
+                            | "LYRIC"
+                            | "UNSYNCEDLYRICS"
+                            | "UNSYNCED LYRICS"
+                            | "SYNCEDLYRICS"
+                            | "SYNCED LYRICS"
+                            | "USLT"
+                            | "SYLT"
+                            | "LRC"
+                    ),
+                    "stale user-text lyrics frame survived: {description}"
+                );
+            }
+        }
+        let metadata = crate::tags::id3::read(&mut Cursor::new(&tag)).unwrap();
+        assert_eq!(metadata.lyrics, "[00:01.00]new synced");
     }
 }
