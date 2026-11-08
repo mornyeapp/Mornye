@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/lastfm/lastfm_api.dart';
 import 'package:mornye/services/lastfm/lastfm_service.dart';
+import 'package:mornye/services/scrobbling/scrobbler.dart';
 
 import 'support/lastfm_fakes.dart';
 
@@ -216,7 +217,7 @@ void main() {
     expect(service.awaitingAuthorization, isTrue);
     await service.finishConnection();
     expect(service.connected, isFalse);
-    expect(service.problem, LastfmProblem.pending);
+    expect(service.problem, ScrobbleProblem.pending);
     api.sessionError = null;
     await service.finishConnection();
     expect(service.connected, isTrue);
@@ -239,13 +240,13 @@ void main() {
         openBrowser: (_) async => opened,
       );
       await service.beginConnection();
-      expect(service.problem, LastfmProblem.connection);
+      expect(service.problem, ScrobbleProblem.connection);
       expect(service.awaitingAuthorization, isFalse);
       opened = true;
       await service.beginConnection();
       await tester.pump(const Duration(hours: 1));
       await service.finishConnection();
-      expect(service.problem, LastfmProblem.expired);
+      expect(service.problem, ScrobbleProblem.expired);
       expect(service.connected, isFalse);
       await service.beginConnection();
       await service.finishConnection();
@@ -284,7 +285,7 @@ void main() {
     await service.beginConnection();
     leaveAndReturn(tester);
     await tester.pump();
-    expect(service.problem, LastfmProblem.pending);
+    expect(service.problem, ScrobbleProblem.pending);
     expect(service.awaitingAuthorization, isTrue);
     api.sessionError = null;
     leaveAndReturn(tester);
@@ -400,7 +401,7 @@ void main() {
       final service = create(tester, api, MemoryLastfmStore()..session = null);
       await service.beginConnection();
       await service.finishConnection();
-      expect(service.problem, LastfmProblem.connection);
+      expect(service.problem, ScrobbleProblem.connection);
       expect(service.awaitingAuthorization, isTrue);
       api.sessionError = null;
       await service.finishConnection();
@@ -453,7 +454,7 @@ void main() {
       final service = create(tester, api, store);
       await service.initialize();
       await service.flush();
-      expect(service.problem, LastfmProblem.reauthenticate);
+      expect(service.problem, ScrobbleProblem.reauthenticate);
       expect(service.connected, isFalse);
       expect(store.queue, hasLength(1));
       expect(store.session, isNull);
@@ -491,7 +492,7 @@ void main() {
       final api = FakeLastfmApi();
       final service = create(tester, api, store);
       await service.initialize();
-      expect(service.problem, LastfmProblem.storage);
+      expect(service.problem, ScrobbleProblem.storage);
       expect(store.writes, 0);
       store.failRead = false;
       await service.retry();
@@ -532,7 +533,7 @@ void main() {
         MemoryLastfmStore()..session = null,
       );
       await unavailable.beginConnection();
-      expect(unavailable.problem, LastfmProblem.unavailable);
+      expect(unavailable.problem, ScrobbleProblem.unavailable);
       expect(unavailableApi.tokenRequests, 0);
     },
   );

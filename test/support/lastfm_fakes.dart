@@ -1,19 +1,20 @@
 import 'dart:async';
 
 import 'package:mornye/services/lastfm/lastfm_api.dart';
-import 'package:mornye/services/lastfm/lastfm_listening.dart';
 import 'package:mornye/services/lastfm/lastfm_store.dart';
+import 'package:mornye/services/scrobbling/scrobble_listening.dart';
+import 'package:mornye/services/scrobbling/scrobble_store.dart';
 
 const lastfmTestSession = LastfmSession(
   username: 'listener',
   key: 'session-key',
 );
 
-LastfmScrobble lastfmQueued(int id, {String username = 'listener'}) =>
-    LastfmScrobble(
+QueuedScrobble lastfmQueued(int id, {String username = 'listener'}) =>
+    QueuedScrobble(
       id: '$id',
       username: username,
-      track: const LastfmTrack(
+      track: const ScrobbleTrack(
         title: 'Song',
         artist: 'Artist',
         duration: Duration(minutes: 4),
@@ -25,7 +26,7 @@ class MemoryLastfmStore implements LastfmStore {
   LastfmSession? session = lastfmTestSession;
   bool enabled = true;
   bool nowPlaying = true;
-  List<LastfmScrobble> queue = [];
+  List<QueuedScrobble> queue = [];
   LastfmAuthorization? authorization;
   bool failRead = false, failWrite = false;
   int writes = 0;
@@ -51,8 +52,7 @@ class MemoryLastfmStore implements LastfmStore {
   }
 
   @override
-  Future<({bool enabled, bool nowPlaying, List<LastfmScrobble> queue})>
-  read() async {
+  Future<ScrobbleState> read() async {
     if (failRead) throw StateError('Storage unavailable');
     return (enabled: enabled, nowPlaying: nowPlaying, queue: List.of(queue));
   }
@@ -61,7 +61,7 @@ class MemoryLastfmStore implements LastfmStore {
   Future<void> write({
     required bool enabled,
     required bool nowPlaying,
-    required List<LastfmScrobble> queue,
+    required List<QueuedScrobble> queue,
   }) async {
     if (failWrite) throw StateError('Storage unavailable');
     writes++;

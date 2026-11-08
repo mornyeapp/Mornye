@@ -34,6 +34,7 @@ import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/discord_presence_settings.dart';
 import 'package:mornye/widgets/lastfm_settings.dart';
+import 'package:mornye/widgets/scrobble_settings.dart';
 import 'package:mornye/widgets/automix_settings.dart';
 import 'package:mornye/widgets/autoplay_randomness_slider.dart';
 import 'package:mornye/widgets/music_haptics_settings.dart';
@@ -525,6 +526,23 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
           SliverToBoxAdapter(
             child: LastfmSettings(
               service: ref.read(musicPlayerRuntimeProvider).lastfm,
+            ),
+          ),
+          const SliverToBoxAdapter(
+            child: SettingsSectionHeader(title: 'Libre.fm'),
+          ),
+          SliverToBoxAdapter(
+            child: LastfmSettings(
+              service: ref.read(musicPlayerRuntimeProvider).librefm,
+              serviceName: 'Libre.fm',
+            ),
+          ),
+          const SliverToBoxAdapter(
+            child: SettingsSectionHeader(title: 'ListenBrainz'),
+          ),
+          SliverToBoxAdapter(
+            child: ListenBrainzSettings(
+              service: ref.read(musicPlayerRuntimeProvider).listenBrainz,
             ),
           ),
           if (isDesktopPlatform)

@@ -144,6 +144,51 @@ void main() {
     },
   );
 
+  test('Libre.fm uses the same signed flow on its own server', () async {
+    final requests = <http.Request>[];
+    final api = LastfmApi(
+      server: LastfmServer.librefm,
+      client: MockClient((request) async {
+        requests.add(request);
+        return switch (request.bodyFields['method']) {
+          'auth.getToken' => http.Response('{"token":"request-token"}', 200),
+          'auth.getSession' => http.Response(
+            '{"session":{"name":"listener","key":"session-key",'
+            '"subscriber":0}}',
+            200,
+          ),
+          // Its server reports the counts as strings.
+          _ => http.Response(
+            '{"scrobbles":{"@attr":{"accepted":"1","ignored":"0"},'
+            '"scrobble":{}}}',
+            200,
+          ),
+        };
+      }),
+    );
+    addTearDown(api.close);
+    expect(api.credentials.configured, isTrue);
+    expect(api.credentials.apiKey, hasLength(32));
+    final token = await api.requestToken();
+    final approval = api.authorizationUrl(token);
+    expect(approval.scheme, 'https');
+    expect(approval.host, 'libre.fm');
+    expect(approval.path, '/api/auth/');
+    expect(approval.queryParameters['token'], 'request-token');
+    final session = await api.session(token);
+    await api.scrobble(session, [
+      {'track': 'Song', 'artist': 'Artist', 'timestamp': '1700000000'},
+    ]);
+    expect(requests, hasLength(3));
+    for (final request in requests) {
+      expect(request.url.toString(), 'https://libre.fm/2.0/');
+      expect(
+        request.bodyFields['api_sig'],
+        lastfmSignature(request.bodyFields, api.credentials.apiSecret),
+      );
+    }
+  });
+
   test('unconfigured builds make no network requests', () async {
     final api = LastfmApi(
       credentials: const LastfmCredentials(apiKey: '', apiSecret: ''),
