@@ -230,7 +230,7 @@ jobs:
         run: dart scripts/prepare_flutter_sdk.dart
 
       - name: Prepare pinned Discord SDK
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && secrets.DISCORD_MOBILE_SDK_PASSPHRASE != ''
         uses: ./.github/actions/discord-sdk
         with:
           passphrase: ${{ secrets.DISCORD_MOBILE_SDK_PASSPHRASE }}
@@ -310,7 +310,7 @@ jobs:
 
       # Fork PRs cannot access repository secrets and exercise the Lite build.
       - name: Prepare pinned Discord SDK
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && secrets.DISCORD_MOBILE_SDK_PASSPHRASE != ''
         uses: ./.github/actions/discord-sdk
         with:
           passphrase: ${{ secrets.DISCORD_MOBILE_SDK_PASSPHRASE }}

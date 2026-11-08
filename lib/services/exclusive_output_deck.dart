@@ -243,16 +243,9 @@ class ExclusiveOutputDeck implements PlaybackDeck, QueuedPlaybackDeck {
     Map<String, String>? headers,
   }) {
     _queueRevision++;
-    _source = (deck) => deck.setNetworkSource(
-      url,
-      arriving: arriving,
-      headers: headers,
-    );
-    return _active.setNetworkSource(
-      url,
-      arriving: arriving,
-      headers: headers,
-    );
+    _source = (deck) =>
+        deck.setNetworkSource(url, arriving: arriving, headers: headers);
+    return _active.setNetworkSource(url, arriving: arriving, headers: headers);
   }
 
   @override

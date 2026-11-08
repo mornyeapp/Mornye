@@ -125,7 +125,7 @@ download() {
   local url="$1" dest="$2"
   if [[ ! -f "$dest" ]]; then
     echo "Downloading $url"
-    curl -fL --retry 3 -o "$dest.part" "$url"
+    curl -fL --retry 5 --retry-delay 2 -o "$dest.part" "$url"
     mv "$dest.part" "$dest"
   fi
 }
@@ -151,7 +151,7 @@ fetch_btbn() {
     windows-arm64) platform=winarm64 ext=zip ;;
   esac
   asset="${MORNYE_FFMPEG_BTBN_ASSET:-ffmpeg-n$BTBN_BRANCH-latest-$platform-lgpl-$BTBN_BRANCH.$ext}"
-  base="https://github.com/BtbN/FFmpeg-Builds/releases/download/$BTBN_TAG"
+  base="https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/$BTBN_TAG"
 
   # "latest" moves; always fetch the checksums that match the archive.
   rm -f "$WORK_DIR/$asset" "$WORK_DIR/checksums.sha256"

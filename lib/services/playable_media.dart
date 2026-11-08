@@ -238,8 +238,11 @@ PlayableMedia playableFromOnlineTrack({
   final dur = (durationMs != null && durationMs > 0)
       ? Duration(milliseconds: durationMs)
       : (track.duration > 0 ? Duration(seconds: track.duration) : null);
+  final providerName = track.source?.trim().isNotEmpty == true
+      ? track.source!.trim()
+      : 'online';
   return PlayableMedia(
-    id: 'stream://${track.provider ?? 'online'}/${track.id}',
+    id: 'stream://$providerName/${track.id}',
     source: streamUrl,
     title: track.name,
     artist: track.artistName,

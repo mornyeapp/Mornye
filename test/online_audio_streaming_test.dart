@@ -12,14 +12,16 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('PlayableMedia Online Streaming', () {
-    test('playableFromOnlineTrack constructs valid online media with headers', () {
+    test(
+      'playableFromOnlineTrack constructs valid online media with headers',
+      () {
       final track = Track(
         id: 'track-123',
         name: 'Online Song',
         artistName: 'Online Artist',
         albumName: 'Online Album',
         duration: 210,
-        provider: 'jiosaavn',
+        source: 'jiosaavn',
         coverUrl: 'https://example.com/cover.jpg',
       );
 
@@ -65,6 +67,7 @@ void main() {
         id: 'track-456',
         name: 'Stream Song',
         artistName: 'Stream Artist',
+        albumName: 'Stream Album',
         duration: 180,
       );
 
@@ -130,7 +133,9 @@ void main() {
       expect(engine.calls, contains(['seek', '0:00:45.000000']));
     });
 
-    test('loads remote HTTP stream without headers when not required', () async {
+    test(
+      'loads remote HTTP stream without headers when not required',
+      () async {
       await deck.setNetworkSource('https://stream.example.com/direct.mp3');
 
       expect(

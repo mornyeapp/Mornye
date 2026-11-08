@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/models/streaming_source.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -102,11 +103,24 @@ class PlaybackController extends Notifier<PlaybackState> {
     _log.i('Resolving online stream for "${track.name}" by ${track.artistName}');
     try {
       final settings = ref.read(settingsProvider);
-      final payload = DownloadRequestPayload.fromTrack(
-        track,
-        service: track.provider ?? '',
-        source: track.source ?? '',
+      final serviceName = track.source ?? '';
+      final payload = DownloadRequestPayload(
+        service: serviceName,
+        source: serviceName,
+        downloadProvider: serviceName,
+        providerTrackId: track.id,
+        spotifyId: track.id,
+        trackName: track.name,
+        artistName: track.artistName,
+        albumName: track.albumName,
+        durationMs: track.duration > 0 ? track.duration * 1000 : 0,
+        isrc: track.isrc ?? '',
+        coverUrl: track.coverUrl ?? '',
         quality: settings.preferredDownloadQuality,
+        outputDir: '',
+        filenameFormat: '',
+        useExtensions: true,
+        useFallback: true,
       );
 
       final result = await PlatformBridge.resolveStreamUrl(
@@ -138,7 +152,8 @@ class PlaybackController extends Notifier<PlaybackState> {
         await ref.read(musicPlayerControllerProvider).playSingle(media);
         return true;
       } else {
-        final error = result['error']?.toString() ?? 'Unable to resolve online stream';
+        final error =
+            result['error']?.toString() ?? 'Unable to resolve online stream';
         _log.w('Could not stream track online: $error');
         if (context != null && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

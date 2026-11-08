@@ -252,7 +252,11 @@ impl Backend {
                 let reason = text(&availability, "reason").trim();
                 last = Some(failure(
                     &id,
-                    if reason.is_empty() { "Not available from this provider" } else { reason },
+                    if reason.is_empty() {
+                        "Not available from this provider"
+                    } else {
+                        reason
+                    },
                     "",
                     0,
                 ));
@@ -272,18 +276,31 @@ impl Backend {
             prepared.insert("host_track".into(), host_track(&attempt));
 
             // 1. Direct getDownloadUrl / getStreamUrl
-            match self.try_resolve_direct_url(&id, &track_id, &attempt.quality, &prepared, lease.clone()) {
+            match self.try_resolve_direct_url(
+                &id,
+                &track_id,
+                &attempt.quality,
+                &prepared,
+                lease.clone(),
+            ) {
                 Ok(Some(stream_info)) => return Ok(stream_info),
-                Ok(None) => {},
+                Ok(None) => {}
                 Err(err) => {
                     self.log_provider_failure(&id, "direct stream resolve", &err);
                 }
             }
 
             // 2. Stream capture via download()
-            match self.try_resolve_via_stream_capture(&id, &track_id, &attempt, &manifest, prepared, lease.clone()) {
+            match self.try_resolve_via_stream_capture(
+                &id,
+                &track_id,
+                &attempt,
+                &manifest,
+                prepared,
+                lease.clone(),
+            ) {
                 Ok(Some(stream_info)) => return Ok(stream_info),
-                Ok(None) => {},
+                Ok(None) => {}
                 Err(err) => {
                     self.log_provider_failure(&id, "captured stream resolve", &err);
                     last = Some(failure(&id, &err, "", 0));
@@ -295,7 +312,10 @@ impl Backend {
         Ok(match last {
             Some(last) => failure(
                 text(&last, "service"),
-                &format!("All online streaming providers failed. Last error: {}", text(&last, "error")),
+                &format!(
+                    "All online streaming providers failed. Last error: {}",
+                    text(&last, "error")
+                ),
                 text(&last, "error_type"),
                 0,
             ),
@@ -320,9 +340,12 @@ impl Backend {
             track_id,
             quality,
             { "preparedContext": prepared }
-        ]).to_string();
+        ])
+        .to_string();
         for method in ["getDownloadUrl", "getStreamUrl"] {
-            if let Ok(val) = self.provider_call_value(id, method, &args, Some(lease.clone()), 20_000) {
+            if let Ok(val) =
+                self.provider_call_value(id, method, &args, Some(lease.clone()), 20_000)
+            {
                 if val.get("decryption").is_some_and(|d| !d.is_null()) {
                     return Ok(None);
                 }
@@ -384,7 +407,9 @@ impl Backend {
             Some(lease.clone()),
         );
 
-        let parsed: Option<Value> = response.ok().and_then(|raw| serde_json::from_str(&raw).ok());
+        let parsed: Option<Value> = response
+            .ok()
+            .and_then(|raw| serde_json::from_str(&raw).ok());
         if let Some(res) = &parsed {
             if res.get("decryption").is_some_and(|d| !d.is_null()) {
                 return Ok(None);
@@ -393,8 +418,12 @@ impl Backend {
 
         if let Some(captured) = guard.take() {
             if captured.url.starts_with("http://") || captured.url.starts_with("https://") {
-                let format = captured.format
-                    .or_else(|| parsed.as_ref().and_then(|p| p.get("actual_extension").and_then(|e| e.as_str().map(String::from))));
+                let format = captured.format.or_else(|| {
+                    parsed.as_ref().and_then(|p| {
+                        p.get("actual_extension")
+                            .and_then(|e| e.as_str().map(String::from))
+                    })
+                });
                 return Ok(Some(json!({
                     "success": true,
                     "url": captured.url,

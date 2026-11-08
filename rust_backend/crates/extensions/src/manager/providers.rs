@@ -214,32 +214,32 @@ impl ExtensionManager {
     ) -> Result<Value, ManagerError> {
         let entry = self.get(id)?;
         let manifest = &entry.manifest;
-        let requirement =
-            match method {
-                "getTrack" | "getAlbum" | "getPlaylist" | "getArtist" | "getConcert"
-                | "searchTracks" | "enrichTrack" => (!manifest.has_type("metadata_provider"))
-                    .then_some("is not a metadata provider"),
-                "checkAvailability" | "getDownloadUrl" | "getStreamUrl" => (!manifest
-                    .has_type("download_provider"))
-                .then_some("is not a download provider"),
-                "fetchLyrics" => {
-                    (!manifest.has_type("lyrics_provider")).then_some("is not a lyrics provider")
-                }
-                "customSearch" => (!manifest
-                    .search_behavior
-                    .as_ref()
-                    .is_some_and(|config| config.enabled))
-                .then_some("does not support custom search"),
-                "handleUrl" => (!manifest
-                    .url_handler
-                    .as_ref()
-                    .is_some_and(|config| config.enabled && !config.patterns.is_empty()))
-                .then_some("does not support URL handling"),
-                "getHomeFeed" => None,
-                "getRelatedTracks" => (!manifest.has_capability("relatedTracks"))
-                    .then_some("does not suggest related tracks"),
-                _ => return Err(error(format!("unsupported provider method: {method}"))),
-            };
+        let requirement = match method {
+            "getTrack" | "getAlbum" | "getPlaylist" | "getArtist" | "getConcert"
+            | "searchTracks" | "enrichTrack" => {
+                (!manifest.has_type("metadata_provider")).then_some("is not a metadata provider")
+            }
+            "checkAvailability" | "getDownloadUrl" | "getStreamUrl" => {
+                (!manifest.has_type("download_provider")).then_some("is not a download provider")
+            }
+            "fetchLyrics" => {
+                (!manifest.has_type("lyrics_provider")).then_some("is not a lyrics provider")
+            }
+            "customSearch" => (!manifest
+                .search_behavior
+                .as_ref()
+                .is_some_and(|config| config.enabled))
+            .then_some("does not support custom search"),
+            "handleUrl" => (!manifest
+                .url_handler
+                .as_ref()
+                .is_some_and(|config| config.enabled && !config.patterns.is_empty()))
+            .then_some("does not support URL handling"),
+            "getHomeFeed" => None,
+            "getRelatedTracks" => (!manifest.has_capability("relatedTracks"))
+                .then_some("does not suggest related tracks"),
+            _ => return Err(error(format!("unsupported provider method: {method}"))),
+        };
         if let Some(requirement) = requirement {
             return Err(error(format!("extension '{id}' {requirement}")));
         }
