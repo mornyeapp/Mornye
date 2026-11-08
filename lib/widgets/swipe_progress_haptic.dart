@@ -12,8 +12,9 @@ import 'package:mornye/services/music_haptics.dart';
 /// the commit pulse, arms again once the swipe falls back [hysteresis]
 /// below it, so hovering on a boundary stays quiet.
 ///
-/// Pulses go through the native haptics channel ([nativeHapticPulse]),
-/// which renders intensity and sharpness. Where it is missing or fails,
+/// Pulses go through the native haptics channel as touch feedback
+/// ([nativeTouchHapticPulse]), which renders intensity and sharpness and on
+/// Android follows the touch feedback setting. Where it is missing or fails,
 /// [HapticFeedback] takes over: a selection click per tick and a medium
 /// impact at the commit point. Haptics stay on under reduced motion: they
 /// replace motion rather than add to it.
@@ -24,7 +25,7 @@ class SwipeProgressHaptic {
     this.steps = const [0.3, 0.55, 0.8],
     this.minInterval = const Duration(milliseconds: 70),
     this.hysteresis = 0.1,
-  }) : _pulse = pulse ?? nativeHapticPulse,
+  }) : _pulse = pulse ?? nativeTouchHapticPulse,
        _clock = clock ?? _stopwatchClock();
 
   /// Progress points (0 to 1 of the commit distance) that tick on the way.

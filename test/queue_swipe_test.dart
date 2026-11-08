@@ -25,6 +25,9 @@ void main() {
   /// Intensities sent to the native pulse channel.
   late List<double> haptics;
 
+  /// The usage each pulse asked for; null means media.
+  late List<Object?> usages;
+
   /// Whether a pulse at or above the commit strength was sent.
   bool committedPulse() =>
       haptics.any((value) => value >= SwipeProgressHaptic.commitIntensity);
@@ -32,10 +35,13 @@ void main() {
   setUp(() {
     queued = [];
     haptics = [];
+    usages = [];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(hapticsChannel, (call) async {
           if (call.method == 'pulse') {
-            haptics.add((call.arguments as Map)['intensity'] as double);
+            final arguments = call.arguments as Map;
+            haptics.add(arguments['intensity'] as double);
+            usages.add(arguments['usage']);
           }
           return null;
         });
@@ -168,6 +174,8 @@ void main() {
       // The ramp's ticks depend on the real clock's throttle; the commit
       // pulse comes last, once.
       expect(haptics.last, SwipeProgressHaptic.commitIntensity);
+      // UI feedback: Android follows the touch feedback setting.
+      expect(usages, everyElement('touch'));
       expect(
         haptics.where((value) => value >= SwipeProgressHaptic.commitIntensity),
         hasLength(1),
