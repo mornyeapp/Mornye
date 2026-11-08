@@ -121,6 +121,7 @@ wire_struct!(RepoExtension {
     icon_url_alt: String => "iconUrl",
     min_app_version_alt: String => "minAppVersion",
     checksum_alt: String => "checksumSha256",
+    runtime: String => "runtime",
 });
 
 fn first<'a>(values: &[&'a str]) -> &'a str {
@@ -148,6 +149,14 @@ impl RepoExtension {
             self.checksum_sha256.trim(),
             self.checksum_alt.trim(),
         ])
+    }
+
+    /// Registries may also list packages for other Mornye hosts (for example
+    /// Mornye-Python, `"runtime": "python"`). This app only runs JavaScript
+    /// extensions, so entries with any other runtime are hidden and refused.
+    pub fn is_supported_runtime(&self) -> bool {
+        let runtime = self.runtime.trim();
+        runtime.is_empty() || runtime.eq_ignore_ascii_case("javascript")
     }
 
     pub fn download_url(&self) -> &str {
@@ -209,6 +218,7 @@ impl Registry {
         let query = lowercase(query);
         self.extensions
             .iter()
+            .filter(|entry| entry.is_supported_runtime())
             .filter(|entry| category.is_empty() || entry.category == category)
             .map(|entry| entry.response(installed))
             .filter(|entry| {
@@ -300,5 +310,25 @@ mod tests {
         assert_eq!(registry.extensions[0].id, "a");
         assert_eq!(registry.extensions[0].display_name_alt, "A");
         assert_eq!(registry.extensions[0].checksum_sha256, "x");
+    }
+
+    #[test]
+    fn responses_hide_entries_for_other_runtimes() {
+        let registry = Registry::parse(
+            br#"{"version":1,"extensions":[
+                {"id":"plain","name":"Plain"},
+                {"id":"js","name":"JS","runtime":"JavaScript"},
+                {"id":"py","name":"Py","runtime":"python"},
+                {"id":"other","name":"Other","runtime":"lua"}
+            ]}"#,
+        )
+        .unwrap();
+        let ids: Vec<_> = registry
+            .responses(&BTreeMap::new(), "", "")
+            .into_iter()
+            .map(|entry| entry["id"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ids, ["plain", "js"]);
+        assert!(registry.responses(&BTreeMap::new(), "py", "").is_empty());
     }
 }
