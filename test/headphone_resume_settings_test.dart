@@ -201,20 +201,36 @@ void main() {
     });
   }
 
-  testWidgets('Android TV and desktop hide it', (tester) async {
+  testWidgets('Android TV shows and saves the choice like a phone', (
+    tester,
+  ) async {
     debugAndroidTvOverride = true;
-    await _pumpPage(tester);
-    await tester.scrollUntilVisible(
-      find.text('Pause when muted'),
-      200,
-      scrollable: find.byType(Scrollable).first,
+    final container = await _pumpPage(
+      tester,
+      settings: AppSettings.fromJson(const {'playOnHeadphonesConnected': true}),
     );
-    expect(find.text(_title), findsNothing);
-    expect(find.text('Reconnect'), findsNothing);
-    expect(await _searchTitles(tester), isNot(contains(_title)));
+    await _scrollToChoice(tester);
+    expect(find.text(_title), findsOneWidget);
+    expect(find.textContaining('Disconnecting pauses'), findsOneWidget);
+    await tester.tap(_option('Reconnect'));
+    await tester.pumpAndSettle();
+    expect(
+      container.read(settingsProvider).headphoneResume,
+      'after_disconnect',
+    );
+    expect(await _searchTitles(tester), contains(_title));
+  });
 
-    debugAndroidTvOverride = null;
+  testWidgets('desktop hides it', (tester) async {
     debugDesktopPlatformOverride = true;
+    await _pumpPage(tester);
+    // Walk the whole page; rows below the fold are built lazily.
+    for (var page = 0; page < 30; page++) {
+      expect(find.text(_title), findsNothing);
+      expect(find.text('Reconnect'), findsNothing);
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));
+      await tester.pumpAndSettle();
+    }
     expect(await _searchTitles(tester), isNot(contains(_title)));
   });
 

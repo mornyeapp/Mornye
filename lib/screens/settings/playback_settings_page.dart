@@ -404,17 +404,14 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                       !settings.usbBitPerfect,
                   onChanged: (value) =>
                       ref.read(settingsProvider.notifier).setPauseOnMute(value),
-                  showDivider: !isAndroidTv,
                 ),
-                // A TV's outputs are not headphones someone walks away with.
-                if (!isAndroidTv)
-                  _HeadphoneResumeChoice(
-                    mode: settings.headphoneResume,
-                    enabled: settings.playerMode == 'internal',
-                    onChanged: (mode) => ref
-                        .read(settingsProvider.notifier)
-                        .setHeadphoneResume(mode),
-                  ),
+                _HeadphoneResumeChoice(
+                  mode: settings.headphoneResume,
+                  enabled: settings.playerMode == 'internal',
+                  onChanged: (mode) => ref
+                      .read(settingsProvider.notifier)
+                      .setHeadphoneResume(mode),
+                ),
               ],
             ),
           ...settingsSectionSlivers(

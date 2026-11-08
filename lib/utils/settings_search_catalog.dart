@@ -407,7 +407,7 @@ class SettingsSearchCatalog {
           subtitle: l10n.playbackPauseOnMuteDescription,
           keywords: const ['mute', 'volume', 'pause', 'resume'],
         ),
-        if (!isDesktopPlatform && !isAndroidTv)
+        if (!isDesktopPlatform)
           SettingsSearchEntry(
             icon: Icons.headphones_outlined,
             title: l10n.playbackOnHeadphonesConnected,

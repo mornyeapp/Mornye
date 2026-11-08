@@ -2568,20 +2568,50 @@ void main() {
       expect(decks.single.state, PlaybackDeckState.playing);
     });
 
-    for (final mode in ['after_disconnect', 'always']) {
-      test('hidden from Android TV: nothing resumes there ($mode)', () async {
-        debugAndroidTvOverride = true;
-        addTearDown(() => debugAndroidTvOverride = null);
-        final (handler, session, decks) = await start(mode: mode);
+    group('Android TV behaves like a phone', () {
+      setUp(() => debugAndroidTvOverride = true);
+      tearDown(() => debugAndroidTvOverride = null);
+
+      test('Reconnect resumes a route-loss pause', () async {
+        final (_, session, decks) = await start();
+        await unplug(session);
+        expect(decks.single.state, PlaybackDeckState.paused);
+        session.route({car});
+        await _settle();
+        await _settle();
+        expect(decks.single.state, PlaybackDeckState.playing);
+      });
+
+      test('Reconnect leaves a user pause paused', () async {
+        final (handler, session, decks) = await start();
+        await handler.pause();
+        await unplug(session);
+        session.route({car});
+        await _settle();
+        await _settle();
+        expect(decks.single.state, PlaybackDeckState.paused);
+      });
+
+      test('Always resumes a song the user paused', () async {
+        final (handler, session, decks) = await start(mode: 'always');
         await handler.pause();
         session.route({});
         await _settle();
         session.route({car});
         await _settle();
         await _settle();
+        expect(decks.single.state, PlaybackDeckState.playing);
+      });
+
+      test('Off leaves it paused', () async {
+        final (_, session, decks) = await start(mode: 'off');
+        await unplug(session);
+        session.route({car});
+        await _settle();
+        await _settle();
         expect(decks.single.state, PlaybackDeckState.paused);
       });
-    }
+    });
   });
 
   test('denied or failed audio focus cannot resume a paused source', () async {
