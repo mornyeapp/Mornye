@@ -13,6 +13,7 @@ import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/spatial_audio.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -100,6 +101,7 @@ Future<SettingsSwitchItem> _scrollToRow(WidgetTester tester) async {
 void main() {
   tearDown(() {
     debugAndroidAudioSettingsOverride = null;
+    debugAndroidTvOverride = null;
     debugSpatialAudioPlatformOverride = null;
     debugDesktopPlatformOverride = null;
     usbAudioStatus.value = const UsbAudioStatus();
@@ -132,12 +134,15 @@ void main() {
       });
     }
 
-    test('settings search lists it except on Windows and Linux', () {
+    test('settings search lists it except on Windows, Linux and TV', () {
       bool listed({bool androidAudio = false}) => SettingsSearchCatalog(
         _l10n,
         androidAudio: androidAudio,
       ).playback.any((entry) => entry.title == _l10n.spatialAudio);
       expect(listed(androidAudio: true), isTrue);
+      debugAndroidTvOverride = true;
+      expect(listed(androidAudio: true), isFalse);
+      debugAndroidTvOverride = null;
       expect(listed(), isFalse);
       debugSpatialAudioPlatformOverride = SpatialAudioPlatform.ios;
       expect(listed(), isTrue);
@@ -379,6 +384,21 @@ void main() {
         'Spatial audio is off in system settings.',
       ].join('\n\n'),
     );
+  });
+
+  testWidgets('Android TV has no row', (tester) async {
+    debugAndroidAudioSettingsOverride = true;
+    debugAndroidTvOverride = true;
+    _mockState(_android(stereo: true));
+    await _pumpPage(tester, mornye: false);
+    // The direct USB row follows it in the Audio output group.
+    await tester.scrollUntilVisible(
+      find.text(_l10n.usbBitPerfect),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(_row, findsNothing);
   });
 
   testWidgets('a state change updates the status line', (tester) async {

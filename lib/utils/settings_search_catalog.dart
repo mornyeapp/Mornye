@@ -506,8 +506,11 @@ class SettingsSearchCatalog {
             targetLabel: l10n.usbBitPerfect,
           ),
         ],
-        // Windows and Linux leave spatial audio to the system.
-        if (androidAudio || spatialAudioPlatform != SpatialAudioPlatform.none)
+        // Windows and Linux leave spatial audio to the system; Android TV
+        // output is HDMI or a soundbar.
+        if ((androidAudio ||
+                spatialAudioPlatform != SpatialAudioPlatform.none) &&
+            !isAndroidTv)
           SettingsSearchEntry(
             icon: Icons.spatial_audio_outlined,
             title: l10n.spatialAudio,

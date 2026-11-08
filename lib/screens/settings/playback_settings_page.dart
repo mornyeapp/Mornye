@@ -610,7 +610,11 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                         .read(settingsProvider.notifier)
                         .setSkipSilence(value),
                   ),
-                const _SpatialAudioItem(platform: SpatialAudioPlatform.android),
+                // TV output is HDMI or a soundbar, outside the spatializer.
+                if (!isAndroidTv)
+                  const _SpatialAudioItem(
+                    platform: SpatialAudioPlatform.android,
+                  ),
                 ValueListenableBuilder<UsbAudioStatus>(
                   valueListenable: usbAudioStatus,
                   builder: (context, status, _) => SettingsSwitchItem(
