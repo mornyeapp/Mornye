@@ -2,6 +2,9 @@ name: Desktop
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/online-audio-streaming
   pull_request:
     paths:
       - "macos/**"
