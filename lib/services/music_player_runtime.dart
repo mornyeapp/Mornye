@@ -26,6 +26,7 @@ import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/lastfm/lastfm_service.dart';
+import 'package:mornye/services/listenbrainz/listenbrainz_service.dart';
 import 'package:mornye/services/lock_screen_lyrics.dart';
 import 'package:mornye/services/media3_playback_deck.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
@@ -45,6 +46,7 @@ import 'package:mornye/services/playback_output_volume.dart';
 import 'package:mornye/services/player_widget_service.dart';
 import 'package:mornye/services/remote_media_session.dart';
 import 'package:mornye/services/remote_playback.dart';
+import 'package:mornye/services/scrobbling/scrobbler.dart';
 import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/source_metadata_events.dart';
@@ -325,8 +327,13 @@ class MusicPlayerRuntime {
   }) : _settings = settings;
 
   final PlaybackDependencies dependencies;
-  LastfmService? _lastfm;
+  LastfmService? _lastfm, _librefm;
+  ListenBrainzService? _listenBrainz;
   LastfmService get lastfm => _lastfm ??= LastfmService();
+  LastfmService get librefm => _librefm ??= LastfmService.librefm();
+  ListenBrainzService get listenBrainz =>
+      _listenBrainz ??= ListenBrainzService();
+  List<Scrobbler?> get _createdScrobblers => [_lastfm, _librefm, _listenBrainz];
   AutoplayPersonalization? _personalization;
   // What learning observes also teaches [taste] what plays together and
   // [ranker] how much each part of a score counts.
@@ -575,7 +582,9 @@ class MusicPlayerRuntime {
 
   void detach(MusicPlayerHandler handler) {
     if (!identical(_handler, handler)) return;
-    _lastfm?.bind(null);
+    for (final scrobbler in _createdScrobblers) {
+      scrobbler?.bind(null);
+    }
     _unsubscribeSourceDeletion?.call();
     _unsubscribeSourceDeletion = null;
     _unsubscribeSourceMetadata?.call();
@@ -622,11 +631,14 @@ class MusicPlayerRuntime {
       if (dependencies.isAndroid || dependencies.isIOS || isDesktopPlatform) {
         DiscordPresenceService.instance.bind(handler);
       }
-      lastfm.bind(
-        handler,
-        unknownTitle: () => unknownTitle,
-        unknownArtist: () => unknownArtist,
-      );
+      // Every service counts the same listen and keeps its own queue.
+      for (final scrobbler in <Scrobbler>[lastfm, librefm, listenBrainz]) {
+        scrobbler.bind(
+          handler,
+          unknownTitle: () => unknownTitle,
+          unknownArtist: () => unknownArtist,
+        );
+      }
       return handler;
     } catch (error, stack) {
       _log.e('Failed to initialize playback', error, stack);
@@ -718,7 +730,10 @@ class MusicPlayerRuntime {
     _remoteSession?.dispose();
     _remoteSession = null;
     await _handler?.dispose();
-    await _lastfm?.close();
+    await Future.wait([
+      for (final scrobbler in _createdScrobblers)
+        if (scrobbler != null) scrobbler.close(),
+    ]);
     try {
       await _initFuture;
     } catch (_) {

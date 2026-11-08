@@ -1,20 +1,28 @@
 import 'package:audio_service/audio_service.dart';
 
-class LastfmTrack {
-  const LastfmTrack({
+/// What every scrobbling service is told about a song. The saved form keeps
+/// the Last.fm parameter names so queues written before other services
+/// existed still load.
+class ScrobbleTrack {
+  const ScrobbleTrack({
     required this.title,
     required this.artist,
     this.album = '',
     this.duration,
+    this.isrc,
+    this.trackNumber,
   });
 
-  factory LastfmTrack.fromJson(Map<String, dynamic> json) {
+  factory ScrobbleTrack.fromJson(Map<String, dynamic> json) {
     final seconds = int.tryParse('${json['duration']}');
-    return LastfmTrack(
+    final isrc = json['isrc'];
+    return ScrobbleTrack(
       title: json['track'] as String,
       artist: json['artist'] as String,
       album: json['album'] as String? ?? '',
       duration: seconds == null ? null : Duration(seconds: seconds),
+      isrc: isrc is String && isrc.isNotEmpty ? isrc : null,
+      trackNumber: int.tryParse('${json['trackNumber']}'),
     );
   }
 
@@ -22,20 +30,45 @@ class LastfmTrack {
   final String artist;
   final String album;
   final Duration? duration;
+  final String? isrc;
+  final int? trackNumber;
 
-  Map<String, String> toJson() => {
+  /// The fields Last.fm-compatible services receive.
+  Map<String, String> get lastfmParameters => {
     'track': title,
     'artist': artist,
     if (album.isNotEmpty) 'album': album,
     if (duration != null) 'duration': '${duration!.inSeconds}',
   };
+
+  Map<String, String> toJson() => {
+    ...lastfmParameters,
+    'isrc': ?isrc,
+    if (trackNumber != null) 'trackNumber': '$trackNumber',
+  };
+}
+
+/// An ISRC or track number from the song's tags, when the player has them.
+({String? isrc, int? trackNumber}) _identifiers(MediaItem? item) {
+  final tags = item?.extras?['displayMetadata'];
+  if (tags is! Map) return (isrc: null, trackNumber: null);
+  final isrc = '${tags['isrc'] ?? ''}'.replaceAll('-', '').trim();
+  final number = int.tryParse(
+    '${tags['track_number'] ?? tags['track'] ?? ''}'.split('/').first.trim(),
+  );
+  return (
+    isrc: RegExp(r'^[A-Za-z]{2}[A-Za-z0-9]{3}\d{7}$').hasMatch(isrc)
+        ? isrc.toUpperCase()
+        : null,
+    trackNumber: number != null && number > 0 ? number : null,
+  );
 }
 
 /// Measures time spent playing, independently of the seek slider. The player
 /// publishes a stable playback instance so repeat-one starts a new listen
 /// while metadata updates, pause and seek retain the existing one.
-class LastfmListening {
-  LastfmListening({
+class ScrobbleListening {
+  ScrobbleListening({
     required this.elapsed,
     required this.now,
     required this.onNowPlaying,
@@ -44,10 +77,10 @@ class LastfmListening {
 
   final Duration Function() elapsed;
   final DateTime Function() now;
-  final void Function(LastfmTrack track) onNowPlaying;
-  final void Function(LastfmTrack track, DateTime started) onScrobble;
+  final void Function(ScrobbleTrack track) onNowPlaying;
+  final void Function(ScrobbleTrack track, DateTime started) onScrobble;
   Object? _instance;
-  LastfmTrack? _track;
+  ScrobbleTrack? _track;
   Duration? _mark;
   Duration _listened = Duration.zero;
   DateTime? _started;
@@ -75,17 +108,20 @@ class LastfmListening {
     }
     final title = item?.title.trim() ?? '';
     final artist = item?.artist?.trim() ?? '';
+    final identifiers = _identifiers(item);
     _track =
         title.isEmpty ||
             artist.isEmpty ||
             title == unknownTitle ||
             artist == unknownArtist
         ? null
-        : LastfmTrack(
+        : ScrobbleTrack(
             title: title,
             artist: artist,
             album: item?.album?.trim() ?? '',
             duration: item?.duration,
+            isrc: identifiers.isrc,
+            trackNumber: identifiers.trackNumber,
           );
     _playing =
         enabled &&

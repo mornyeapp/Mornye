@@ -10593,6 +10593,94 @@
       "count": { "type": "int" }
     }
   },
+  "scrobbleServiceDescription": "Track your listening and show what is playing on {service}.",
+  "@scrobbleServiceDescription": {
+    "description": "Settings row subtitle of a scrobbling service such as Libre.fm or ListenBrainz",
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceConnect": "Connect {service}",
+  "@scrobbleServiceConnect": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceConnecting": "Connecting to {service}...",
+  "@scrobbleServiceConnecting": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceScrobblingDescription": "Send songs you listen to in the built-in player to {service}.",
+  "@scrobbleServiceScrobblingDescription": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceNowPlayingDescription": "Show the current song on your {service} profile.",
+  "@scrobbleServiceNowPlayingDescription": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceDisconnect": "Disconnect {service}",
+  "@scrobbleServiceDisconnect": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceConnectionError": "{service} could not be reached. Saved scrobbles will be retried automatically.",
+  "@scrobbleServiceConnectionError": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceStorageError": "{service} settings could not be saved. Check access to this device's secure storage and try again.",
+  "@scrobbleServiceStorageError": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceReauthenticate": "Your {service} connection expired. Connect again to resume scrobbling.",
+  "@scrobbleServiceReauthenticate": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceUnavailable": "{service} is not accepting scrobbles from Mornye right now.",
+  "@scrobbleServiceUnavailable": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceRejected": "{service} rejected a scrobble. Check the song's title and artist tags.",
+  "@scrobbleServiceRejected": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "listenBrainzConnectHelp": "Paste the user token from your ListenBrainz settings page.",
+  "@listenBrainzConnectHelp": {
+    "description": "Subtitle of the sheet that signs in to ListenBrainz"
+  },
+  "listenBrainzToken": "User token",
+  "listenBrainzOpenSettings": "Open ListenBrainz settings",
+  "@listenBrainzOpenSettings": {
+    "description": "Button in the sign-in sheet that opens the ListenBrainz web page showing the user token"
+  },
+  "listenBrainzServer": "Server address (optional)",
+  "listenBrainzServerHelp": "Leave empty to use ListenBrainz, or enter the address of a compatible server.",
+  "listenBrainzServerInvalid": "Enter an address that starts with http:// or https://.",
+  "listenBrainzServerSubtitle": "Server: {server}",
+  "@listenBrainzServerSubtitle": {
+    "description": "Subtitle of the connected ListenBrainz account when it uses a self-hosted server",
+    "placeholders": {
+      "server": { "type": "String", "example": "https://music.example.com" }
+    }
+  },
+  "listenBrainzInvalidToken": "This token was not accepted. Check it and try again.",
+  "listenBrainzReauthenticate": "Your ListenBrainz token no longer works. Connect again with a new token to resume scrobbling.",
   "audioOutputSystem": "This device and Bluetooth",
   "audioOutputCast": "Cast to TV",
   "audioOutputCastDescription": "Google Cast devices on the same Wi-Fi network",

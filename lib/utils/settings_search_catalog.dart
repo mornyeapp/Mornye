@@ -277,6 +277,26 @@ class SettingsSearchCatalog {
           keywords: const ['lastfm', 'scrobble', 'scrobbling', 'now playing'],
         ),
         SettingsSearchEntry(
+          icon: Icons.history_rounded,
+          title: 'Libre.fm',
+          subtitle: l10n.scrobbleServiceDescription('Libre.fm'),
+          keywords: const ['librefm', 'libre fm', 'scrobble', 'scrobbling'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.history_rounded,
+          title: 'ListenBrainz',
+          subtitle: l10n.scrobbleServiceDescription('ListenBrainz'),
+          keywords: const [
+            'listenbrainz',
+            'listen brainz',
+            'musicbrainz',
+            'scrobble',
+            'scrobbling',
+            'listens',
+            'token',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.equalizer,
           title: l10n.equalizerTitle,
           subtitle: l10n.equalizerDescription,
