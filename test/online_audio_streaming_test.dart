@@ -137,9 +137,7 @@ void main() {
       expect(
         engine.calls.any(
           (call) =>
-              call.length == 2 &&
-              call[0] == 'seek' &&
-              call[1] == '0:00:45.000000',
+              call.length == 2 && call[0] == 'seek' && call[1] == '45000',
         ),
         isTrue,
       );

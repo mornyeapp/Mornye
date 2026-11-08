@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mornye/models/streaming_source.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -312,14 +311,15 @@ class PlaybackController extends Notifier<PlaybackState> {
       if (skippedCueVirtualTrack) {
         throw Exception(cueVirtualTrackRequiresSplitMessage);
       }
-      // If no local files were found for this list, attempt direct online playback
-      // for the selected start track.
+      // If no local files were found for this list, attempt direct online
+      // playback for the selected start track.
       final startTrack = tracks[safeStart];
       final onlinePlayed = await playOnlineTrack(startTrack);
       if (onlinePlayed) return;
 
       throw Exception(
-        'No local audio file is available to play and online stream could not be resolved.',
+        'No local audio file is available to play and online stream '
+        'could not be resolved.',
       );
     }
 

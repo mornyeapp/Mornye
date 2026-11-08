@@ -140,7 +140,13 @@ jobs:
         run: flutter pub get
 
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed lib test integration_test scripts/prepare_flutter_sdk.dart
+        run: |
+          dart format --output=none --set-exit-if-changed lib test integration_test scripts/prepare_flutter_sdk.dart || {
+            echo "::error::dart format detected unformatted files. Showing diff:"
+            dart format lib test integration_test scripts/prepare_flutter_sdk.dart
+            git diff
+            exit 1
+          }
 
       - name: Analyze
         run: flutter analyze
