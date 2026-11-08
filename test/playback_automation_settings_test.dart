@@ -47,6 +47,8 @@ void main() {
       );
       final muted = find.text('Pause when muted');
       final connected = find.text('Play when headphones connect');
+      // The connected button group lays a label out more than once.
+      final always = find.text('Always').first;
       await tester.scrollUntilVisible(
         muted,
         200,
@@ -55,36 +57,32 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(muted);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(connected);
+      await tester.ensureVisible(always);
       await tester.pumpAndSettle();
-      await tester.tap(connected);
+      await tester.tap(always);
       await tester.pumpAndSettle();
       expect(container.read(settingsProvider).pauseOnMute, isTrue);
-      expect(
-        container.read(settingsProvider).playOnHeadphonesConnected,
-        isTrue,
-      );
+      expect(container.read(settingsProvider).headphoneResume, 'always');
       final prefs = await SharedPreferences.getInstance();
       final saved = AppSettings.fromJson(
         jsonDecode(prefs.getString('app_settings')!) as Map<String, dynamic>,
       );
       expect(saved.pauseOnMute, isTrue);
-      expect(saved.playOnHeadphonesConnected, isTrue);
+      expect(saved.headphoneResume, 'always');
 
       container.read(settingsProvider.notifier).setPlayerMode('external');
       await tester.pump();
-      final automationControls = tester.widgetList<SettingsSwitchItem>(
+      final muteSwitch = tester.widget<SettingsSwitchItem>(
         find.byWidgetPredicate(
           (widget) =>
               widget is SettingsSwitchItem &&
-              const [
-                'Pause when muted',
-                'Play when headphones connect',
-              ].contains(widget.title),
+              widget.title == 'Pause when muted',
         ),
       );
-      expect(automationControls, hasLength(2));
-      expect(automationControls.every((widget) => !widget.enabled), isTrue);
+      expect(muteSwitch.enabled, isFalse);
+      await tester.tap(find.text('Off').first, warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(container.read(settingsProvider).headphoneResume, 'always');
       expect(tester.takeException(), isNull);
 
       final l10n = AppLocalizations.of(tester.element(connected));

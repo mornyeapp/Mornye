@@ -647,11 +647,10 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setPauseOnMute(bool enabled) =>
       _commit(state.copyWith(pauseOnMute: enabled));
 
-  void setPlayOnHeadphonesConnected(bool enabled) =>
-      _commit(state.copyWith(playOnHeadphonesConnected: enabled));
-
-  void setResumeOnOutputReconnect(bool enabled) =>
-      _commit(state.copyWith(resumeOnOutputReconnect: enabled));
+  void setHeadphoneResume(String mode) {
+    if (!headphoneResumeModes.contains(mode)) return;
+    _commit(state.copyWith(headphoneResume: mode));
+  }
 
   void setGaplessPlayback(bool enabled) =>
       _commit(state.copyWith(gaplessPlayback: enabled));

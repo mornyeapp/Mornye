@@ -2482,15 +2482,12 @@ void main() {
     );
 
     Future<(MusicPlayerHandler, _Session, List<_Deck>)> start({
-      bool enabled = true,
+      String mode = 'after_disconnect',
     }) async {
       final session = _Session()..devices = {car};
       final decks = <_Deck>[];
       final handler = await _runtime(
-        settings: AppSettings(
-          pauseOnMute: false,
-          resumeOnOutputReconnect: enabled,
-        ),
+        settings: AppSettings(pauseOnMute: false, headphoneResume: mode),
         session: session,
         decks: decks,
       ).initialize();
@@ -2538,7 +2535,7 @@ void main() {
     });
 
     test('off: the output returning leaves it paused', () async {
-      final (_, session, decks) = await start(enabled: false);
+      final (_, session, decks) = await start(mode: 'off');
       await unplug(session);
       session.route({car});
       await _settle();
@@ -2546,16 +2543,45 @@ void main() {
       expect(decks.single.state, PlaybackDeckState.paused);
     });
 
-    test('hidden from Android TV: nothing resumes there', () async {
-      debugAndroidTvOverride = true;
-      addTearDown(() => debugAndroidTvOverride = null);
-      final (_, session, decks) = await start();
-      await unplug(session);
-      session.route({car});
+    test('Always still resumes a song the user paused', () async {
+      final (handler, session, decks) = await start(mode: 'always');
+      await handler.pause();
+      session.route({});
       await _settle();
       await _settle();
       expect(decks.single.state, PlaybackDeckState.paused);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.playing);
     });
+
+    test('Always pauses on disconnect and resumes on connect', () async {
+      final (_, session, decks) = await start(mode: 'always');
+      session.route({});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.playing);
+    });
+
+    for (final mode in ['after_disconnect', 'always']) {
+      test('hidden from Android TV: nothing resumes there ($mode)', () async {
+        debugAndroidTvOverride = true;
+        addTearDown(() => debugAndroidTvOverride = null);
+        final (handler, session, decks) = await start(mode: mode);
+        await handler.pause();
+        session.route({});
+        await _settle();
+        session.route({car});
+        await _settle();
+        await _settle();
+        expect(decks.single.state, PlaybackDeckState.paused);
+      });
+    }
   });
 
   test('denied or failed audio focus cannot resume a paused source', () async {

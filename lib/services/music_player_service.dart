@@ -267,9 +267,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     if ((previous.playerMode == 'internal') !=
             (settings.playerMode == 'internal') ||
         previous.pauseOnMute != settings.pauseOnMute ||
-        previous.playOnHeadphonesConnected !=
-            settings.playOnHeadphonesConnected ||
-        previous.resumeOnOutputReconnect != settings.resumeOnOutputReconnect ||
+        previous.headphoneResume != settings.headphoneResume ||
         previous.usbBitPerfect != settings.usbBitPerfect) {
       _refreshPlaybackAutomation();
     }
@@ -760,18 +758,17 @@ class MusicPlayerHandler extends BaseAudioHandler
         _settings.playerMode == 'internal' &&
         _settings.pauseOnMute &&
         !_settings.usbBitPerfect;
-    final playOnHeadphonesConnected =
+    // Phones and tablets only: a TV's outputs are not personal headphones,
+    // and its settings do not offer the choice.
+    final headphoneResume =
         !_cast.active &&
-        !isDesktopPlatform &&
-        _settings.playerMode == 'internal' &&
-        _settings.playOnHeadphonesConnected;
-    // Phones and tablets only: a TV's outputs are not personal headphones.
-    final resumeAfterNoisyPause =
-        !_cast.active &&
-        !isDesktopPlatform &&
-        !isAndroidTv &&
-        _settings.playerMode == 'internal' &&
-        _settings.resumeOnOutputReconnect;
+            !isDesktopPlatform &&
+            !isAndroidTv &&
+            _settings.playerMode == 'internal'
+        ? _settings.headphoneResume
+        : 'off';
+    final playOnHeadphonesConnected = headphoneResume == 'always';
+    final resumeAfterNoisyPause = headphoneResume == 'after_disconnect';
     final watchDevices = playOnHeadphonesConnected || resumeAfterNoisyPause;
     unawaited(
       _playbackAutomation.configure(

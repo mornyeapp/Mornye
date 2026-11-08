@@ -20,6 +20,24 @@ double playbackNormalizationPreampFromJson(Object? value) =>
 String playbackNormalizationModeFromJson(Object? value) =>
     value == 'album' ? 'album' : 'track';
 
+/// When connecting headphones resumes playback: never, only a recent pause
+/// caused by headphones or Bluetooth going away, or on every connection
+/// (which also pauses on disconnect).
+const headphoneResumeModes = ['off', 'after_disconnect', 'always'];
+
+/// Older builds stored two switches. The broad one wins, then the narrow
+/// one; an unknown value reads as off.
+Object? readHeadphoneResume(Map<dynamic, dynamic> json, String key) {
+  final value = json[key];
+  if (headphoneResumeModes.contains(value)) return value;
+  if (json['playOnHeadphonesConnected'] == true) return 'always';
+  if (json['resumeOnOutputReconnect'] == true) return 'after_disconnect';
+  return 'off';
+}
+
+String headphoneResumeFromJson(Object? value) =>
+    headphoneResumeModes.contains(value) ? value! as String : 'off';
+
 double musicHapticsLevelFromJson(Object? value) =>
     value is num && value.isFinite ? value.toDouble().clamp(0, 1) : 0.5;
 
@@ -105,9 +123,9 @@ class AppSettings {
   @JsonKey(fromJson: playbackNormalizationModeFromJson)
   final String playbackNormalizationMode; // 'track' or 'album'
   final bool pauseOnMute;
-  final bool playOnHeadphonesConnected;
-  // Resume only a recent pause caused by headphones or Bluetooth going away.
-  final bool resumeOnOutputReconnect;
+  // One of [headphoneResumeModes].
+  @JsonKey(readValue: readHeadphoneResume, fromJson: headphoneResumeFromJson)
+  final String headphoneResume;
   // Start the next song the moment one ends; AutoMix replaces it while on.
   final bool gaplessPlayback;
   final bool autoMix;
@@ -399,8 +417,7 @@ class AppSettings {
     this.playbackNormalizationPreamp = 0,
     this.playbackNormalizationMode = 'track',
     this.pauseOnMute = true,
-    this.playOnHeadphonesConnected = false,
-    this.resumeOnOutputReconnect = false,
+    this.headphoneResume = 'off',
     this.gaplessPlayback = true,
     this.autoMix = false,
     this.autoMixDuration = 0,
@@ -577,8 +594,7 @@ class AppSettings {
     double? playbackNormalizationPreamp,
     String? playbackNormalizationMode,
     bool? pauseOnMute,
-    bool? playOnHeadphonesConnected,
-    bool? resumeOnOutputReconnect,
+    String? headphoneResume,
     bool? gaplessPlayback,
     bool? autoMix,
     int? autoMixDuration,
@@ -734,10 +750,7 @@ class AppSettings {
       playbackNormalizationMode:
           playbackNormalizationMode ?? this.playbackNormalizationMode,
       pauseOnMute: pauseOnMute ?? this.pauseOnMute,
-      playOnHeadphonesConnected:
-          playOnHeadphonesConnected ?? this.playOnHeadphonesConnected,
-      resumeOnOutputReconnect:
-          resumeOnOutputReconnect ?? this.resumeOnOutputReconnect,
+      headphoneResume: headphoneResume ?? this.headphoneResume,
       gaplessPlayback: gaplessPlayback ?? this.gaplessPlayback,
       autoMix: autoMix ?? this.autoMix,
       autoMixDuration: autoMixDuration ?? this.autoMixDuration,
@@ -925,5 +938,10 @@ class AppSettings {
       }.toList(),
     );
   }
-  Map<String, dynamic> toJson() => _$AppSettingsToJson(this);
+  Map<String, dynamic> toJson() => {
+    ..._$AppSettingsToJson(this),
+    // Builds before [headphoneResume] read this switch, so a downgrade or
+    // a backup opened by one keeps Always.
+    'playOnHeadphonesConnected': headphoneResume == 'always',
+  };
 }
