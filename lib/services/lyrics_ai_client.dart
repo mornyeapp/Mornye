@@ -177,6 +177,13 @@ class LyricsAiRequest {
 /// Chat completions parameters differ between classic and reasoning models.
 enum OpenAiStyle { classic, reasoning }
 
+/// How much of the optional Gemini request shape is sent. Many models in
+/// the Gemini catalog reject a field the flagship models accept (a
+/// thinking level, the system instruction, JSON mode), so a rejected
+/// request is retried with less of it: first without the generation
+/// options, then bare, with the system prompt inside the user turn.
+enum GeminiRequestShape { full, noGenerationOptions, bare }
+
 /// Reasoning models reject `temperature` and `max_tokens`.
 OpenAiStyle openAiStyleFor(LyricsAiConfig config) {
   if (config.provider == LyricsAiProvider.openRouter) {
@@ -280,6 +287,7 @@ LyricsAiRequest buildLyricsTranslationRequest(
   List<LyricsAiItem> items, {
   required String systemPrompt,
   OpenAiStyle? openAiStyle,
+  GeminiRequestShape geminiShape = GeminiRequestShape.full,
   List<String> context = const [],
 }) {
   final user = jsonEncode([for (final item in items) item.toJson()]);
@@ -297,6 +305,7 @@ LyricsAiRequest buildLyricsTranslationRequest(
       // Gemini 3 and later are tuned for their default temperature and
       // think by default; a low thinking level keeps short jobs quick.
       final modern = major != null && major >= 3;
+      final bare = geminiShape == GeminiRequestShape.bare;
       return LyricsAiRequest(
         Uri.parse(
           '$_geminiBase/models/${Uri.encodeComponent(config.model)}'
@@ -304,27 +313,31 @@ LyricsAiRequest buildLyricsTranslationRequest(
         ),
         {'Content-Type': 'application/json', 'x-goog-api-key': config.apiKey},
         {
-          'systemInstruction': {
-            'parts': [
-              {'text': systemPrompt},
-            ],
-          },
+          if (!bare)
+            'systemInstruction': {
+              'parts': [
+                {'text': systemPrompt},
+              ],
+            },
           'contents': [
             {
               'role': 'user',
               'parts': [
+                if (bare) {'text': systemPrompt},
                 if (songContext != null) {'text': songContext},
                 {'text': user},
               ],
             },
           ],
-          'generationConfig': {
-            'responseMimeType': 'application/json',
-            if (modern)
-              'thinkingConfig': {'thinkingLevel': 'low'}
-            else
-              'temperature': _temperature,
-          },
+          if (!bare)
+            'generationConfig': {
+              'responseMimeType': 'application/json',
+              if (geminiShape == GeminiRequestShape.full)
+                if (modern)
+                  'thinkingConfig': {'thinkingLevel': 'low'}
+                else
+                  'temperature': _temperature,
+            },
         },
       );
     case LyricsAiProvider.anthropic:
@@ -647,6 +660,23 @@ Object? _decode(String text) {
 
 /// Maps an HTTP failure to a typed error. [body] is only inspected for
 /// provider error codes; it is not shown to the user.
+/// The provider's own error message from a JSON error body, for logs.
+/// Plain-text bodies are skipped: they can echo the request, key included.
+String? _providerErrorMessage(String body) {
+  try {
+    final json = jsonDecode(body);
+    if (json is! Map) return null;
+    final error = json['error'];
+    final message = error is Map
+        ? error['message']?.toString()
+        : error?.toString();
+    if (message == null || message.trim().isEmpty) return null;
+    return message.length > 200 ? message.substring(0, 200) : message;
+  } on FormatException {
+    return null;
+  }
+}
+
 LyricsAiException lyricsAiErrorForResponse(
   LyricsAiProvider provider,
   int status,
@@ -654,7 +684,10 @@ LyricsAiException lyricsAiErrorForResponse(
   Map<String, String> headers = const {},
 }) {
   final lower = body.toLowerCase();
-  final detail = 'HTTP $status';
+  final providerMessage = _providerErrorMessage(body);
+  final detail = providerMessage == null
+      ? 'HTTP $status'
+      : 'HTTP $status: $providerMessage';
   if (status == 401 ||
       status == 403 ||
       (provider == LyricsAiProvider.gemini &&
@@ -735,6 +768,7 @@ class LyricsAiClient {
   final Future<void> Function(Duration) _delay;
   final Duration timeout;
   OpenAiStyle? _style;
+  GeminiRequestShape _geminiShape = GeminiRequestShape.full;
 
   static const _rateLimitRetries = 2;
   static const _maxRetryWait = Duration(seconds: 20);
@@ -778,6 +812,7 @@ class LyricsAiClient {
         items,
         systemPrompt: systemPrompt,
         openAiStyle: style,
+        geminiShape: _geminiShape,
         context: context,
       );
       final response = await _send(
@@ -805,6 +840,18 @@ class LyricsAiClient {
         body,
         headers: response.headers,
       );
+      // A Gemini 400 that maps to no specific kind is the model rejecting
+      // part of the optional request shape; retry with less of it before
+      // giving up, and keep the shape that the model accepted.
+      if (config.provider == LyricsAiProvider.gemini &&
+          response.statusCode == 400 &&
+          error.kind == LyricsAiErrorKind.service &&
+          _geminiShape != GeminiRequestShape.bare) {
+        _geminiShape = _geminiShape == GeminiRequestShape.full
+            ? GeminiRequestShape.noGenerationOptions
+            : GeminiRequestShape.bare;
+        continue;
+      }
       final retryable =
           error.kind == LyricsAiErrorKind.rateLimited ||
           response.statusCode == 503 ||

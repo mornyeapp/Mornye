@@ -182,6 +182,40 @@ void main() {
       expect((older.body['generationConfig']! as Map)['temperature'], 0.2);
     });
 
+    test('Gemini fallback shapes drop the optional request fields', () {
+      final config = _config(
+        LyricsAiProvider.gemini,
+        model: 'gemini-3.5-flash-lite',
+      );
+
+      final noOptions = buildLyricsTranslationRequest(
+        config,
+        _items,
+        systemPrompt: 'system',
+        geminiShape: GeminiRequestShape.noGenerationOptions,
+      );
+      expect(noOptions.body['systemInstruction'], {
+        'parts': [
+          {'text': 'system'},
+        ],
+      });
+      expect(noOptions.body['generationConfig'], {
+        'responseMimeType': 'application/json',
+      });
+
+      final bare = buildLyricsTranslationRequest(
+        config,
+        _items,
+        systemPrompt: 'system',
+        geminiShape: GeminiRequestShape.bare,
+      );
+      expect(bare.body.containsKey('systemInstruction'), isFalse);
+      expect(bare.body.containsKey('generationConfig'), isFalse);
+      final parts =
+          ((bare.body['contents'] as List).single as Map)['parts'] as List;
+      expect((parts.first as Map)['text'], 'system');
+    });
+
     test('Anthropic uses the Messages API headers without sampling', () {
       final request = buildLyricsTranslationRequest(
         _config(LyricsAiProvider.anthropic, model: 'claude-haiku-5-5'),
@@ -601,6 +635,69 @@ void main() {
       });
       expect(bodies, hasLength(2));
       expect(bodies.last.containsKey('max_completion_tokens'), isTrue);
+    });
+
+    test('retries a rejected Gemini request in the fallback shapes', () async {
+      final bodies = <Map<String, dynamic>>[];
+      final client = LyricsAiClient(
+        _config(LyricsAiProvider.gemini, model: 'gemini-3.5-flash'),
+        client: MockClient((request) async {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          bodies.add(body);
+          if (body.containsKey('generationConfig') &&
+              (body['generationConfig'] as Map).containsKey('thinkingConfig')) {
+            return http.Response(
+              '{"error":{"message":"Thinking is not supported for this '
+              'model","status":"INVALID_ARGUMENT"}}',
+              400,
+            );
+          }
+          if (body.containsKey('systemInstruction')) {
+            return http.Response(
+              '{"error":{"message":"Developer instruction is not enabled '
+              'for this model","status":"INVALID_ARGUMENT"}}',
+              400,
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'candidates': [
+                {
+                  'content': {
+                    'parts': [
+                      {'text': '{"lines":[{"id":0,"text":"Uno"}]}'},
+                    ],
+                  },
+                  'finishReason': 'STOP',
+                },
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+      expect(await client.translate(_items, systemPrompt: 's'), {
+        0: (
+          text: 'Uno',
+          romanization: null,
+          alignment: const <LyricsTranslationChunk>[],
+          romanizationAlignment: const <LyricsTranslationChunk>[],
+        ),
+      });
+      expect(bodies, hasLength(3));
+      expect(bodies.last.containsKey('systemInstruction'), isFalse);
+      expect(bodies.last.containsKey('generationConfig'), isFalse);
+    });
+
+    test('a Gemini error detail keeps the provider message for logs', () {
+      final error = lyricsAiErrorForResponse(
+        LyricsAiProvider.gemini,
+        400,
+        '{"error":{"message":"Thinking is not supported for this model",'
+        '"status":"INVALID_ARGUMENT"}}',
+      );
+      expect(error.kind, LyricsAiErrorKind.service);
+      expect(error.detail, contains('Thinking is not supported'));
     });
 
     test('network failures are typed', () async {
