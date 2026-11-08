@@ -18,7 +18,7 @@ import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
-import 'package:mornye/widgets/swipe_commit_haptic.dart';
+import 'package:mornye/widgets/swipe_progress_haptic.dart';
 
 /// What a sideways swipe on a song row queues.
 ///
@@ -87,13 +87,16 @@ QueueSwipeActions? mediaQueueSwipe(
 ///
 /// The row slides over a strip that names the action. Letting go past
 /// [commitDistance], or flinging past half of it, runs the action and
-/// confirms it with a snackbar; a haptic tick marks the point where letting
-/// go would commit. The drag must be clearly sideways, so vertical scrolling
-/// keeps every diagonal drag, and touches that start at a screen edge stay
-/// with the system and the iOS back swipe. Rows inside a sideways scroller
-/// (a pager, tabs, a carousel) skip the swipe so it never fights the page
-/// swipe. A [QueueSwipeSemantics] inside the row offers both actions to
-/// screen readers; the row's menus keep them reachable without a swipe.
+/// confirms it with a snackbar. Soft ticks grow on the way and a strong
+/// pulse marks the point where letting go would commit
+/// ([SwipeProgressHaptic]). The drag must be clearly sideways, so vertical
+/// scrolling keeps every diagonal drag, and touches that start at a screen
+/// edge stay with the system and the iOS back swipe. Rows inside a sideways
+/// scroller the user can drag (a carousel, a pager) skip the swipe so it
+/// never fights the page swipe; the Library pager stops dragging while
+/// rows swipe to queue. A [QueueSwipeSemantics] inside the row offers both
+/// actions to screen readers; the row's menus keep them reachable without
+/// a swipe.
 class QueueSwipe extends StatefulWidget {
   const QueueSwipe({
     super.key,
@@ -143,7 +146,7 @@ class _QueueSwipeState extends State<QueueSwipe>
   );
 
   late final _offset = AnimationController.unbounded(vsync: this);
-  final _haptic = SwipeCommitHaptic();
+  final _haptic = SwipeProgressHaptic();
   double _drag = 0;
   double _width = 0;
   bool? _insidePager;
@@ -234,7 +237,7 @@ class _QueueSwipeState extends State<QueueSwipe>
   void _onUpdate(DragUpdateDetails details) {
     _drag += details.primaryDelta ?? 0;
     _offset.value = _visualOffset(_drag);
-    _haptic.update(_drag.abs() >= _threshold);
+    _haptic.update(_drag / _threshold);
   }
 
   void _onEnd(DragEndDetails details) {
@@ -250,7 +253,7 @@ class _QueueSwipeState extends State<QueueSwipe>
   }
 
   void _settle() {
-    _haptic.update(false);
+    _haptic.reset();
     _drag = 0;
     if (!mounted) return;
     if (MediaQuery.disableAnimationsOf(context)) {
@@ -275,7 +278,7 @@ class _QueueSwipeState extends State<QueueSwipe>
   }
 
   void _reset() {
-    _haptic.update(false);
+    _haptic.reset();
     _drag = 0;
     _offset.stop();
     _offset.value = 0;

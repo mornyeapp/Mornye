@@ -13,21 +13,29 @@ import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
+import 'package:mornye/widgets/swipe_progress_haptic.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/fixed_settings.dart';
 
 void main() {
+  const hapticsChannel = MethodChannel('com.zarz.mornye/haptics');
   late List<bool> queued;
-  late List<Object?> haptics;
+
+  /// Intensities sent to the native pulse channel.
+  late List<double> haptics;
+
+  /// Whether a pulse at or above the commit strength was sent.
+  bool committedPulse() =>
+      haptics.any((value) => value >= SwipeProgressHaptic.commitIntensity);
 
   setUp(() {
     queued = [];
     haptics = [];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-          if (call.method == 'HapticFeedback.vibrate') {
-            haptics.add(call.arguments);
+        .setMockMethodCallHandler(hapticsChannel, (call) async {
+          if (call.method == 'pulse') {
+            haptics.add((call.arguments as Map)['intensity'] as double);
           }
           return null;
         });
@@ -37,7 +45,7 @@ void main() {
     debugDesktopPlatformOverride = null;
     debugAndroidTvOverride = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, null);
+        .setMockMethodCallHandler(hapticsChannel, null);
   });
 
   /// A song row whose swipe goes through the app's availability rule.
@@ -145,10 +153,11 @@ void main() {
       await slowDrag(tester, song(0), const Offset(100, 0));
       await slowDrag(tester, song(0), const Offset(-100, 0));
       expect(queued, isEmpty);
-      expect(haptics, isEmpty);
+      // Soft ticks on the way at most; never the commit pulse.
+      expect(committedPulse(), isFalse);
     });
 
-    testWidgets('crossing ticks once and shows the action; coming back '
+    testWidgets('crossing pulses once and shows the action; coming back '
         'before letting go cancels', (tester) async {
       await pumpList(tester);
       final gesture = await tester.startGesture(tester.getCenter(song(0)));
@@ -156,7 +165,14 @@ void main() {
         await gesture.moveBy(const Offset(10, 0));
         await tester.pump(const Duration(milliseconds: 16));
       }
-      expect(haptics, hasLength(1));
+      // The ramp's ticks depend on the real clock's throttle; the commit
+      // pulse comes last, once.
+      expect(haptics.last, SwipeProgressHaptic.commitIntensity);
+      expect(
+        haptics.where((value) => value >= SwipeProgressHaptic.commitIntensity),
+        hasLength(1),
+      );
+      final count = haptics.length;
       expect(find.text('Play next'), findsOneWidget);
       for (var i = 0; i < 15; i++) {
         await gesture.moveBy(const Offset(-10, 0));
@@ -166,7 +182,8 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
       expect(queued, isEmpty);
-      expect(haptics, hasLength(1));
+      // Dragging back gives nothing.
+      expect(haptics, hasLength(count));
     });
 
     testWidgets('a fling past half the threshold commits', (tester) async {
