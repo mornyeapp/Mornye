@@ -87,6 +87,17 @@ marks the next player as playing before reporting completion, so a later
 `resume` from Dart confirms its state without restarting it. A new source
 or a release drops the link; no `nextPlayerId` unlinks it.
 
+### Spatial audio
+
+A `setSpatialAudio` method (argument `enabled`) on the per-player method
+channel stores `WrappedPlayer.spatialAudio` (true by default). On Android
+12L (API 32) and later, `AudioContextAndroid.buildAttributes` then sets the
+spatialization behavior to auto (true) or never (false). MediaPlayer reads
+its attributes as a source loads, so `MediaPlayerWrapper.setSource` sets
+them again after its reset and a change applies from the next source. The
+pub-hosted platform interface is unchanged; the app calls the method on the
+channel directly, like `setEqualizer`.
+
 ### Error state
 
 `WrappedPlayer.onError` now marks the player as not prepared and not playing,
@@ -114,6 +125,7 @@ AGP 7.3.1 to 9.4.1, android-junit5 1.7.1.1 to 2.0.2, compileSdk 36 to 37,
 Compared against the pub.dev 5.3.0 package in the local pub cache:
 
 - `android/build.gradle`
+- `android/src/main/kotlin/xyz/luan/audioplayers/AudioContextAndroid.kt`
 - `android/src/main/kotlin/xyz/luan/audioplayers/AudioplayersPlugin.kt`
 - `android/src/main/kotlin/xyz/luan/audioplayers/player/MediaPlayerWrapper.kt`
 - `android/src/main/kotlin/xyz/luan/audioplayers/player/MixedOutput.kt` (new)

@@ -25,6 +25,8 @@ class UsbBitPerfectPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Even
     private lateinit var methods: MethodChannel
     private lateinit var events: EventChannel
     private lateinit var route: MethodChannel
+    private lateinit var spatialAudio: EventChannel
+    private var spatialAudioEvents: SpatialAudioEvents? = null
     private var engine: UsbPcmPlayback? = null
     private var direct: UsbDirectPlayback? = null
     private var useDirect = false
@@ -53,6 +55,8 @@ class UsbBitPerfectPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Even
                 }
             }.start()
         }
+        spatialAudio = EventChannel(binding.binaryMessenger, "com.zarz.mornye/spatial_audio")
+        spatialAudio.setStreamHandler(SpatialAudioEvents(appContext).also { spatialAudioEvents = it })
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -112,6 +116,9 @@ class UsbBitPerfectPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Even
         methods.setMethodCallHandler(null)
         events.setStreamHandler(null)
         route.setMethodCallHandler(null)
+        spatialAudio.setStreamHandler(null)
+        spatialAudioEvents?.onCancel(null)
+        spatialAudioEvents = null
         sink = null
         direct?.dispose()
         direct = null

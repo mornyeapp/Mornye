@@ -30,6 +30,13 @@ class WrappedPlayer internal constructor(
     /** The player MediaPlayer starts the moment this one completes. */
     private var next: WrappedPlayer? = null
 
+    /**
+     * Whether the platform may spatialize this player's audio (behavior auto)
+     * or must not (never). MediaPlayer reads its attributes as a source loads,
+     * so a change applies from the next source.
+     */
+    var spatialAudio = true
+
     fun setEqualizer(configuration: Map<String, Any?>) {
         val output = player as? MediaPlayerWrapper
         if (output != null) output.setEqualizer(configuration)

@@ -9,6 +9,8 @@ The tap processes decoded PCM only, never video artwork or other apps' audio.
 EQ is bypassed when disabled. Android's native bit-perfect paths bypass EQ.
 AVPlayer external playback is disabled, so AirPlay receives the processed
 audio route instead of a full-screen AirPlay video session.
+A `setSpatialAudio` method lets the system spatialize mono, stereo and
+multichannel audio (the default) or nothing, on the current and later items.
 
 The graphic EQ curve is approximate across output engines: Android uses
 DynamicsProcessing; Darwin uses cascaded RBJ peaking biquads. Preset gains and

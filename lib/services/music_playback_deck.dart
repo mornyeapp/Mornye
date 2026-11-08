@@ -159,6 +159,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     required String playerId,
     bool? nativeAvailable,
     bool? equalizerAvailable,
+    bool? spatialAudioAvailable,
   }) : _ordinary = AudioPlayer(playerId: playerId),
        // The Darwin fork's tap is shared source, so macOS has it as well.
        // isDesktopPlatform keeps host-run tests on the mobile default.
@@ -171,9 +172,16 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
            Platform.isAndroid ||
            Platform.isIOS ||
            (isDesktopPlatform && Platform.isMacOS),
+       // Both forks carry `setSpatialAudio`.
+       _spatialAudioAvailable =
+           spatialAudioAvailable ??
+           (Platform.isAndroid ||
+               Platform.isIOS ||
+               (isDesktopPlatform && Platform.isMacOS)),
        _nativeAvailable = nativeAvailable ?? Platform.isAndroid {
     playbackEqualizer.addListener(_equalizerChanged);
     playbackOutputVolume.addListener(_outputVolumeChanged);
+    playbackSpatialAudio.addListener(_spatialAudioChanged);
     _subscriptions.addAll([
       _ordinary.onPlayerStateChanged.listen((value) {
         if (!_direct) _states.add(_deckState(value));
@@ -264,6 +272,39 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
           'Equalizer is unavailable on this output: $error',
         );
       }
+    }
+  }
+
+  final bool _spatialAudioAvailable;
+
+  /// Both forks start a player with spatialization allowed; only a change
+  /// from that is sent.
+  bool _spatialAudioSent = true;
+  Future<void> _spatialAudioWrite = Future.value();
+
+  void _spatialAudioChanged() {
+    _spatialAudioWrite = _spatialAudioWrite.then((_) => _syncSpatialAudio());
+  }
+
+  /// Android's MediaPlayer takes it from the next source; the Darwin fork
+  /// also sets it on the current item.
+  Future<void> _syncSpatialAudio() async {
+    if (!_spatialAudioAvailable || _disposed) return;
+    final enabled = playbackSpatialAudio.value;
+    if (enabled == _spatialAudioSent) return;
+    _spatialAudioSent = enabled;
+    try {
+      // Public API waits for native player creation without changing playback.
+      await _ordinary.getDuration();
+      if (_disposed) return;
+      await _effects
+          .invokeMethod<void>('setSpatialAudio', {
+            'playerId': _ordinary.playerId,
+            'enabled': enabled,
+          })
+          .timeout(const Duration(seconds: 3));
+    } catch (error) {
+      _log.w('Spatial audio setting unavailable: $error');
     }
   }
 
@@ -486,6 +527,9 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     // /proc/self/fd number for a different SAF file, so URL equality must not
     // reuse the previous MediaPlayer or its pending preparation callbacks.
     await _ordinary.release();
+    // Android's MediaPlayer reads its audio attributes as the source loads.
+    _spatialAudioChanged();
+    await _spatialAudioWrite;
     _ordinaryError = null;
     final abandoned = _ordinaryPreparation = Completer<void>();
     try {
@@ -720,6 +764,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     _equalizerDisposed = true;
     playbackEqualizer.removeListener(_equalizerChanged);
     playbackOutputVolume.removeListener(_outputVolumeChanged);
+    playbackSpatialAudio.removeListener(_spatialAudioChanged);
     _equalizerTimer?.cancel();
     reportEqualizerError(_ordinary.playerId, null);
     await stop();

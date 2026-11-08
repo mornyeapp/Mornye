@@ -446,6 +446,7 @@ class MusicPlayerRuntime {
         settings.media3Engine &&
         !settings.autoMix &&
         dependencies.isAndroid;
+    playbackSpatialAudio.value = settings.spatialAudio;
     configureLockScreenLyrics(enabled: settings.lockScreenLyrics);
     _songAnalysis?.configure(settings);
     _handler?.applySettings(previous);

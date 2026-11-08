@@ -171,6 +171,9 @@ class AudioplayersPlugin : FlutterPlugin {
                         ?: error("Equalizer configuration is required")
                     player.setEqualizer(configuration)
                 }
+                "setSpatialAudio" -> {
+                    player.spatialAudio = call.argument<Boolean>("enabled") ?: error("enabled is required")
+                }
                 "setSourceUrl" -> {
                     val url = call.argument<String>("url") ?: error("url is required")
                     val isLocal = call.argument<Boolean>("isLocal") ?: false

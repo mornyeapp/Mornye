@@ -63,6 +63,11 @@ final playbackMedia3Engine = ValueNotifier<bool>(false);
 /// audioplayers decks ignore it.
 final playbackSkipSilence = ValueNotifier<bool>(false);
 
+/// The `spatialAudio` setting. True lets the platform spatialize songs (its
+/// default on Android); false asks it never to. media3 decks and the
+/// audioplayers forks apply it; libmpv decks ignore it.
+final playbackSpatialAudio = ValueNotifier<bool>(true);
+
 /// Linux: the ALSA device [playbackExclusiveOutput] opens, as an mpv device
 /// name. Empty until one is known; the output stays shared meanwhile.
 final playbackExclusiveDevice = ValueNotifier<String>('');

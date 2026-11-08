@@ -328,6 +328,43 @@
   "@skipSilenceAutoMix": {
     "description": "Added to the Skip silence subtitle while AutoMix is on, which suspends silence skipping"
   },
+  "spatialAudio": "Spatial audio",
+  "@spatialAudio": {
+    "description": "Playback setting (Android, iOS, macOS) that lets the system's own spatial audio process songs"
+  },
+  "spatialAudioDescription": "Lets the system spatialize songs on headphones and speakers that support it. Off plays every song without it.",
+  "spatialAudioNextSong": "With the old playback engine, a change applies from the next song.",
+  "@spatialAudioNextSong": {
+    "description": "Added to the Spatial audio subtitle on Android while the New playback engine is off"
+  },
+  "spatialAudioSystemOff": "Spatial audio is off in system settings.",
+  "@spatialAudioSystemOff": {
+    "description": "Spatial audio status: the setting is on in the app, but the phone's own spatial audio setting is off"
+  },
+  "spatialAudioUnavailable": "Not available on this device or output.",
+  "@spatialAudioUnavailable": {
+    "description": "Spatial audio status: the device or the connected output cannot spatialize"
+  },
+  "spatialAudioStereo": "Stereo music is spatialized.",
+  "spatialAudioStereoHeadTracking": "Stereo music is spatialized, with head tracking available.",
+  "spatialAudioMultichannelOnly": "Only multichannel songs (such as 5.1 or Dolby Atmos) are spatialized on this device.",
+  "@spatialAudioMultichannelOnly": {
+    "description": "Spatial audio status: the device spatializes only songs with more than two channels, not ordinary stereo music"
+  },
+  "spatialAudioDirectUsb": "Not used with direct USB output.",
+  "@spatialAudioDirectUsb": {
+    "description": "Spatial audio status while the hi-res direct USB output plays, which bypasses the system's spatial audio"
+  },
+  "spatialAudioDirectAAudio": "Not used with AAudio exclusive output.",
+  "spatialAudioExclusive": "Not used with exclusive output.",
+  "@spatialAudioExclusive": {
+    "description": "Spatial audio status on macOS while exclusive output (hog mode) is on, which bypasses the system's spatial audio"
+  },
+  "spatialAudioOutputOn": "Spatial audio is on for this output.",
+  "spatialAudioOutputOff": "Not available with this output, or turned off in Control Center.",
+  "@spatialAudioOutputOff": {
+    "description": "Spatial audio status on iOS: the current output has no spatial audio, or the user turned it off in Control Center"
+  },
   "sectionPlaybackQueue": "Queue",
   "@sectionPlaybackQueue": {
     "description": "Playback settings section for how the play queue behaves"

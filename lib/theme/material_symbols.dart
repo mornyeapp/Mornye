@@ -354,6 +354,7 @@ final Map<IconData, IconData> _outlinedSymbols = {
   Icons.share_outlined: Symbols.share_rounded,
   Icons.smart_display_outlined: Symbols.smart_display_rounded,
   Icons.source_outlined: Symbols.source_rounded,
+  Icons.spatial_audio_outlined: Symbols.spatial_audio_rounded,
   Icons.speaker_group_outlined: Symbols.speaker_group_rounded,
   Icons.speed_outlined: Symbols.speed_rounded,
   Icons.storage_outlined: Symbols.storage_rounded,

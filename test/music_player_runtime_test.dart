@@ -890,6 +890,15 @@ void main() {
     expect(playbackSkipSilence.value, isFalse);
   });
 
+  test('spatial audio follows the setting for the decks', () {
+    addTearDown(() => playbackSpatialAudio.value = true);
+    final runtime = _runtime(isAndroid: true);
+    runtime.configure(runtime.settings.copyWith(spatialAudio: false));
+    expect(playbackSpatialAudio.value, isFalse);
+    runtime.configure(runtime.settings.copyWith(spatialAudio: true));
+    expect(playbackSpatialAudio.value, isTrue);
+  });
+
   test('changing the engine drops a song queued on the old one', () async {
     final deck = _QueuedDeck();
     final runtime = _runtime(

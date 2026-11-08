@@ -10,8 +10,10 @@ import android.media.AudioMixerAttributes
 import android.media.MediaCodecList
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.media.Spatializer
 import android.net.Uri
 import android.os.Build
+import androidx.annotation.RequiresApi
 
 /**
  * Read-only route and stream facts for the player's audio information sheet.
@@ -86,15 +88,37 @@ internal object AudioRouteInfo {
         return values
     }
 
-    private fun spatializer(manager: AudioManager): Map<String, Any?>? {
+    /**
+     * The platform spatializer (Android 12L and later) for the current
+     * output: whether it exists and is on, and whether it would take
+     * ordinary stereo music or only multichannel (5.1) audio. Null before
+     * API 32, which has no spatializer.
+     */
+    fun spatializer(manager: AudioManager): Map<String, Any?>? {
         if (Build.VERSION.SDK_INT < 32) return null
         val spatializer = manager.spatializer
         return mapOf(
             "available" to spatializer.isAvailable,
             "enabled" to spatializer.isEnabled,
             "headTracking" to (Build.VERSION.SDK_INT >= 33 && spatializer.isHeadTrackerAvailable),
+            "stereo" to canSpatialize(spatializer, AudioFormat.CHANNEL_OUT_STEREO),
+            "multichannel" to canSpatialize(spatializer, AudioFormat.CHANNEL_OUT_5POINT1),
         )
     }
+
+    /** Independent of the system switch; it follows the routed device. */
+    @RequiresApi(32)
+    private fun canSpatialize(spatializer: Spatializer, channelMask: Int): Boolean = runCatching {
+        val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+            .setSpatializationBehavior(AudioAttributes.SPATIALIZATION_BEHAVIOR_AUTO)
+            .build()
+        val format = AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+            .setSampleRate(48_000)
+            .setChannelMask(channelMask)
+            .build()
+        spatializer.canBeSpatialized(attributes, format)
+    }.getOrDefault(false)
 
     /** What the platform extractor and decoder see for the playing file. */
     private fun stream(context: Context, path: String): Map<String, Any?>? {

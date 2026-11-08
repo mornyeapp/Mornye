@@ -65,6 +65,7 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     playbackEqualizer.addListener(_equalizerChanged);
     playbackOutputVolume.addListener(_outputVolumeChanged);
     playbackSkipSilence.addListener(_skipSilenceChanged);
+    playbackSpatialAudio.addListener(_spatialAudioChanged);
   }
 
   static const _channel = MethodChannel('com.zarz.mornye/media3_player');
@@ -113,6 +114,10 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   /// The native player starts with silence skipping off; only a change from
   /// that is sent.
   bool _skipSilenceSent = false;
+
+  /// The native player starts with spatialization allowed (auto); only a
+  /// change from that is sent.
+  bool _spatialAudioSent = true;
   Timer? _equalizerTimer;
   Future<void> _equalizerWrite = Future.value();
 
@@ -160,6 +165,38 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     // Before the first source, so its decoder starts in the mode silence
     // skipping needs.
     if (playbackSkipSilence.value) await _sendSkipSilence();
+    // Before the first source, so its output never opens spatialized.
+    if (!playbackSpatialAudio.value) await _sendSpatialAudio();
+  }
+
+  void _spatialAudioChanged() {
+    final created = _created;
+    if (_disposed || created == null) return;
+    unawaited(
+      created.then((_) async {
+        if (_disposed || playbackSpatialAudio.value == _spatialAudioSent) {
+          return;
+        }
+        await _sendSpatialAudio();
+      }, onError: (Object _) {}),
+    );
+  }
+
+  /// Applies live: the native side reopens its output at the current
+  /// position with the new spatialization behavior.
+  Future<void> _sendSpatialAudio() async {
+    final enabled = playbackSpatialAudio.value;
+    _spatialAudioSent = enabled;
+    try {
+      await _channel.invokeMethod<void>('setSpatialAudio', {
+        'playerId': playerId,
+        'enabled': enabled,
+      });
+    } on PlatformException catch (error) {
+      _log.w('Spatial audio setting unavailable: ${error.code}');
+    } on MissingPluginException {
+      // An older native player: the platform default (auto) stays.
+    }
   }
 
   void _skipSilenceChanged() {
@@ -555,6 +592,7 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     playbackEqualizer.removeListener(_equalizerChanged);
     playbackOutputVolume.removeListener(_outputVolumeChanged);
     playbackSkipSilence.removeListener(_skipSilenceChanged);
+    playbackSpatialAudio.removeListener(_spatialAudioChanged);
     _equalizerTimer?.cancel();
     reportEqualizerError(playerId, null);
     _disposed = true;
