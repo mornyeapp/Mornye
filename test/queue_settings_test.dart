@@ -87,5 +87,16 @@ void main() {
       for (final entry in SettingsSearchCatalog(l10n).playback) entry.title,
     };
     expect(titles, contains(l10n.queueNoDuplicates));
+    expect(titles, contains(l10n.queueLock));
+  });
+
+  testWidgets('Lock queue is in Playback settings too', (tester) async {
+    final container = await _pumpPage(tester, mornye: false);
+    final finder = _switch('Lock queue');
+    await _scrollTo(tester, finder);
+    await tester.tap(find.text('Lock queue'));
+    await tester.pumpAndSettle();
+    expect(container.read(settingsProvider).queueLocked, isTrue);
+    expect(tester.widget<SettingsSwitchItem>(finder).value, isTrue);
   });
 }

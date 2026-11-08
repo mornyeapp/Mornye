@@ -374,6 +374,14 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                 onChanged: (value) => ref
                     .read(settingsProvider.notifier)
                     .setQueueNoDuplicates(value),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.lock_outline,
+                title: context.l10n.queueLock,
+                subtitle: context.l10n.queueLockDescription,
+                value: settings.queueLocked,
+                onChanged: (value) =>
+                    ref.read(settingsProvider.notifier).setQueueLocked(value),
                 showDivider: false,
               ),
             ],

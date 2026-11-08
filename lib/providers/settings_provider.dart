@@ -748,6 +748,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setQueueNoDuplicates(bool enabled) =>
       _commit(state.copyWith(queueNoDuplicates: enabled));
 
+  void setQueueLocked(bool locked) =>
+      _commit(state.copyWith(queueLocked: locked));
+
   void setExclusiveOutput(bool enabled) =>
       _commit(state.copyWith(exclusiveOutput: enabled));
 

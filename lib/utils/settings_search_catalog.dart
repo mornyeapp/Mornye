@@ -322,6 +322,12 @@ class SettingsSearchCatalog {
           keywords: const ['duplicate', 'queue', 'twice', 'play next', 'once'],
         ),
         SettingsSearchEntry(
+          icon: Icons.lock_outline,
+          title: l10n.queueLock,
+          subtitle: l10n.queueLockDescription,
+          keywords: const ['lock', 'queue', 'reorder', 'swipe', 'accidental'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.insights_outlined,
           title: l10n.listeningStats,
           subtitle: l10n.listeningStatsDescription,

@@ -150,6 +150,10 @@ class AppSettings {
   /// of queueing a second copy. The current and played entries stay.
   final bool queueNoDuplicates;
 
+  /// The queue UIs stop reordering and swiping songs away; adding songs
+  /// from elsewhere still works. Toggled from the queue header too.
+  final bool queueLocked;
+
   /// Desktop: take the output device for the music player alone, bypassing
   /// the system mixer (WASAPI exclusive on Windows, hog mode on macOS, an
   /// ALSA `hw:` device on Linux). AutoMix and previews stay off while it is
@@ -411,6 +415,7 @@ class AppSettings {
     this.media3Engine = true,
     this.skipSilence = false,
     this.queueNoDuplicates = false,
+    this.queueLocked = false,
     this.exclusiveOutput = false,
     this.exclusiveOutputDevice = '',
     this.autoplay = false,
@@ -587,6 +592,7 @@ class AppSettings {
     bool? media3Engine,
     bool? skipSilence,
     bool? queueNoDuplicates,
+    bool? queueLocked,
     bool? exclusiveOutput,
     String? exclusiveOutputDevice,
     bool? autoplay,
@@ -744,6 +750,7 @@ class AppSettings {
       media3Engine: media3Engine ?? this.media3Engine,
       skipSilence: skipSilence ?? this.skipSilence,
       queueNoDuplicates: queueNoDuplicates ?? this.queueNoDuplicates,
+      queueLocked: queueLocked ?? this.queueLocked,
       exclusiveOutput: exclusiveOutput ?? this.exclusiveOutput,
       exclusiveOutputDevice:
           exclusiveOutputDevice ?? this.exclusiveOutputDevice,

@@ -31,6 +31,8 @@ class MornyePlayerQueue extends ConsumerWidget {
     final controller = ref.read(musicPlayerControllerProvider);
     final autoMix = ref.watch(settingsProvider.select((s) => s.autoMix));
     final autoplay = ref.watch(settingsProvider.select((s) => s.autoplay));
+    // Locked: no reordering or swiping songs away here; adding still works.
+    final locked = ref.watch(settingsProvider.select((s) => s.queueLocked));
     final type = Theme.of(context).textTheme;
     final repeatLabel = switch (playback.repeat) {
       AudioServiceRepeatMode.one => context.l10n.nowPlayingRepeatOne,
@@ -190,21 +192,55 @@ class MornyePlayerQueue extends ConsumerWidget {
                   ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        context.l10n.mornyeContinuePlaying,
-                        style: type.titleLarge?.copyWith(color: Colors.white),
-                      ),
-                      if (autoplay &&
-                          playback.repeat == AudioServiceRepeatMode.none)
-                        Text(
-                          context.l10n.autoplayFromLibrary,
-                          style: type.bodySmall?.copyWith(
-                            color: Colors.white70,
-                          ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.l10n.mornyeContinuePlaying,
+                              style: type.titleLarge?.copyWith(
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (autoplay &&
+                                playback.repeat == AudioServiceRepeatMode.none)
+                              Text(
+                                context.l10n.autoplayFromLibrary,
+                                style: type.bodySmall?.copyWith(
+                                  color: Colors.white70,
+                                ),
+                              ),
+                          ],
                         ),
+                      ),
+                      // A toggle: a fill marks it on, as on the mode buttons.
+                      Semantics(
+                        toggled: locked,
+                        child: IconButton(
+                          tooltip: locked
+                              ? context.l10n.queueUnlock
+                              : context.l10n.queueLock,
+                          isSelected: locked,
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size.square(44),
+                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.white.withValues(
+                              alpha: locked ? 0.3 : 0,
+                            ),
+                          ),
+                          icon: Icon(
+                            locked
+                                ? CupertinoIcons.lock_fill
+                                : CupertinoIcons.lock_open,
+                            size: 20,
+                          ),
+                          onPressed: () => ref
+                              .read(settingsProvider.notifier)
+                              .setQueueLocked(!locked),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -227,8 +263,11 @@ class MornyePlayerQueue extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             sliver: SliverReorderableList(
               itemCount: count,
-              onReorderItem: (oldIndex, newIndex) =>
-                  controller.moveQueueItem(start + oldIndex, start + newIndex),
+              onReorderItem: (oldIndex, newIndex) {
+                if (!locked) {
+                  controller.moveQueueItem(start + oldIndex, start + newIndex);
+                }
+              },
               proxyDecorator: (child, index, animation) => Material(
                 color: colorScheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(12),
@@ -238,6 +277,7 @@ class MornyePlayerQueue extends ConsumerWidget {
                 final item = queue[start + index];
                 return PlayerQueueDismissible(
                   key: ObjectKey(item),
+                  enabled: !locked,
                   onRemove: () => controller.removeQueuedItem(item),
                   child: ListTile(
                     contentPadding: const EdgeInsetsDirectional.only(start: 12),
@@ -266,19 +306,21 @@ class MornyePlayerQueue extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: type.bodySmall?.copyWith(color: Colors.white70),
                     ),
-                    trailing: ReorderableDragStartListener(
-                      index: index,
-                      child: const ColoredBox(
-                        color: Colors.transparent,
-                        child: SizedBox.square(
-                          dimension: 44,
-                          child: Icon(
-                            CupertinoIcons.line_horizontal_3,
-                            color: Colors.white38,
+                    trailing: locked
+                        ? null
+                        : ReorderableDragStartListener(
+                            index: index,
+                            child: const ColoredBox(
+                              color: Colors.transparent,
+                              child: SizedBox.square(
+                                dimension: 44,
+                                child: Icon(
+                                  CupertinoIcons.line_horizontal_3,
+                                  color: Colors.white38,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
                     onTap: () => controller.jumpTo(start + index),
                   ),
                 );
