@@ -120,6 +120,7 @@ List<Widget> scrobbleAccountRows(
           ScrobbleProblem.unavailable => labels.unavailable,
           ScrobbleProblem.rejected => labels.rejected,
           ScrobbleProblem.invalidToken => l10n.listenBrainzInvalidToken,
+          ScrobbleProblem.insecureServer => l10n.listenBrainzServerInsecure,
         },
         onTap: problem == ScrobbleProblem.storage
             ? () => unawaited(service.retry())
@@ -258,8 +259,14 @@ class _ListenBrainzConnectSheetState extends State<_ListenBrainzConnectSheet> {
     final token = _token.text.trim();
     final server = _server.text.trim();
     if (token.isEmpty) return;
-    if (normalizeListenBrainzServer(server) == null) {
-      setState(() => _serverError = context.l10n.listenBrainzServerInvalid);
+    final address = normalizeListenBrainzServer(server);
+    final error = address == null
+        ? context.l10n.listenBrainzServerInvalid
+        : !listenBrainzServerSecure(address)
+        ? context.l10n.listenBrainzServerInsecure
+        : null;
+    if (error != null) {
+      setState(() => _serverError = error);
       return;
     }
     Navigator.pop(context, (token, server));

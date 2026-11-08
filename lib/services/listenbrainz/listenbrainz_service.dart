@@ -39,10 +39,14 @@ class ListenBrainzService extends Scrobbler<ListenBrainzAccount> {
     if (closed || busy || !initialized) return;
     final value = token.trim();
     final address = normalizeListenBrainzServer(server);
-    if (value.isEmpty || address == null) {
+    if (value.isEmpty ||
+        address == null ||
+        !listenBrainzServerSecure(address)) {
       problem = value.isEmpty
           ? ScrobbleProblem.invalidToken
-          : ScrobbleProblem.connection;
+          : address == null
+          ? ScrobbleProblem.connection
+          : ScrobbleProblem.insecureServer;
       notify();
       return;
     }
@@ -75,6 +79,17 @@ class ListenBrainzService extends Scrobbler<ListenBrainzAccount> {
     }
   }
 
+  /// An account saved with a plain http:// address outside the local
+  /// network is signed out before anything is sent. Its listens stay
+  /// queued for the next sign-in.
+  @override
+  void didInitialize() {
+    if (session case final account?
+        when !listenBrainzServerSecure(account.server)) {
+      unawaited(endSession(ScrobbleProblem.insecureServer));
+    }
+  }
+
   @override
   Future<void> sendNowPlaying(
     ListenBrainzAccount session,
@@ -89,7 +104,9 @@ class ListenBrainzService extends Scrobbler<ListenBrainzAccount> {
 
   @override
   ScrobbleFailure classify(Object error) => switch (error) {
-    ListenBrainzException(statusCode: 401) => ScrobbleFailure.reauthenticate,
+    // Forgets a token that would otherwise be sent in the clear.
+    ListenBrainzException(statusCode: 401) ||
+    ListenBrainzInsecureServerException() => ScrobbleFailure.reauthenticate,
     ListenBrainzException(statusCode: 400 || 413) => ScrobbleFailure.rejected,
     _ => ScrobbleFailure.retry,
   };

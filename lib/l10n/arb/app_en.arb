@@ -10748,6 +10748,10 @@
   "listenBrainzServer": "Server address (optional)",
   "listenBrainzServerHelp": "Leave empty to use ListenBrainz, or enter the address of a compatible server.",
   "listenBrainzServerInvalid": "Enter an address that starts with http:// or https://.",
+  "listenBrainzServerInsecure": "Use an https:// address. Plain http:// works only for a server on this device or your local network.",
+  "@listenBrainzServerInsecure": {
+    "description": "Shown when a custom ListenBrainz server uses http:// outside the local network, since the user token would travel unencrypted"
+  },
   "listenBrainzServerSubtitle": "Server: {server}",
   "@listenBrainzServerSubtitle": {
     "description": "Subtitle of the connected ListenBrainz account when it uses a self-hosted server",

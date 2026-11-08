@@ -8549,6 +8549,7 @@
   "listenBrainzServer": "Alamat server (opsional)",
   "listenBrainzServerHelp": "Kosongkan untuk memakai ListenBrainz, atau masukkan alamat server yang kompatibel.",
   "listenBrainzServerInvalid": "Masukkan alamat yang diawali http:// atau https://.",
+  "listenBrainzServerInsecure": "Gunakan alamat https://. http:// biasa hanya bisa dipakai untuk server di perangkat ini atau jaringan lokal Anda.",
   "listenBrainzServerSubtitle": "Server: {server}",
   "listenBrainzInvalidToken": "Token ini tidak diterima. Periksa lalu coba lagi.",
   "listenBrainzReauthenticate": "Token ListenBrainz Anda tidak berlaku lagi. Hubungkan kembali dengan token baru untuk melanjutkan scrobbling.",

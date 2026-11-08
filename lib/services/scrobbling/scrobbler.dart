@@ -15,6 +15,9 @@ enum ScrobbleProblem {
   unavailable,
   rejected,
   invalidToken,
+
+  /// A plain http:// server outside the local network.
+  insecureServer,
 }
 
 /// How a service's failed request affects its queue.
@@ -65,6 +68,9 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
   AudioHandler? _handler;
   S? _session;
   final _queue = <QueuedScrobble>[];
+
+  /// Ids of queued listens from a refused batch, sent one per request.
+  final _isolated = <String>{};
   Future<void>? _initializing;
   Future<void>? _flushing;
   Future<void> _writes = Future.value();
@@ -104,7 +110,7 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
   @protected
   Future<void> readPendingConnection() async {}
 
-  /// Called once the saved state is loaded.
+  /// Called once the saved state is loaded, before queued listens are sent.
   @protected
   void didInitialize() {}
 
@@ -174,8 +180,8 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
       _initialized = true;
       _problem = null;
       _configure();
-      unawaited(flush());
       didInitialize();
+      unawaited(flush());
     } catch (_) {
       _problem = ScrobbleProblem.storage;
     } finally {
@@ -273,6 +279,7 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
     _session = null;
     _enabled = false;
     _queue.clear();
+    _isolated.clear();
     _configure();
     try {
       await _serialize(() => _store.writeSession(null));
@@ -389,26 +396,48 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
   }
 
   Future<void> _flush() async {
+    // A listen dropped in this run stays reported over later successes.
+    var dropped = false;
     while (_active && _durable) {
       final session = _session!;
       final generation = _generation;
-      final batch = _queue
-          .where((entry) => entry.username == session.username)
-          .take(batchSize)
-          .toList();
-      if (batch.isEmpty) return;
+      final pending = _queue.where(
+        (entry) => entry.username == session.username,
+      );
+      if (pending.isEmpty) return;
+      // Listens of a refused batch go one per request, so only the bad
+      // ones are dropped. Each such request removes its listen or ends the
+      // run, which leaves the rest to the retry timer.
+      final batch = _isolated.contains(pending.first.id)
+          ? [pending.first]
+          : pending
+                .takeWhile((entry) => !_isolated.contains(entry.id))
+                .take(batchSize)
+                .toList();
       try {
         await submit(session, batch);
       } catch (error) {
-        await _failed(error, batch, generation);
+        final failure = classify(error);
+        final current = !_closed && generation == _generation;
+        if (failure == ScrobbleFailure.rejected && current) {
+          if (batch.length > 1) {
+            _isolated.addAll(batch.map((entry) => entry.id));
+            continue;
+          }
+          dropped = true;
+          await _failed(failure, batch, generation);
+          continue;
+        }
+        await _failed(failure, batch, generation);
         return;
       }
       try {
         if (_closed) return;
         final acknowledged = batch.map((entry) => entry.id).toSet();
         _queue.removeWhere((entry) => acknowledged.contains(entry.id));
+        _isolated.removeAll(acknowledged);
         await _save();
-        if (generation == _generation) _problem = null;
+        if (generation == _generation && !dropped) _problem = null;
         notify();
       } catch (_) {
         if (!_closed && generation == _generation) {
@@ -421,11 +450,10 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
   }
 
   Future<void> _failed(
-    Object error,
+    ScrobbleFailure failure,
     List<QueuedScrobble> batch,
     int generation,
   ) async {
-    final failure = classify(error);
     if (failure == ScrobbleFailure.reauthenticate) {
       await _expiredSession(generation);
       return;
@@ -440,6 +468,7 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
       case ScrobbleFailure.rejected:
         final rejected = batch.map((entry) => entry.id).toSet();
         _queue.removeWhere((entry) => rejected.contains(entry.id));
+        _isolated.removeAll(rejected);
         _problem = ScrobbleProblem.rejected;
         await _saveSafely();
       case ScrobbleFailure.retry || ScrobbleFailure.reauthenticate:
@@ -450,7 +479,16 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
     }
   }
 
-  Future<void> _expiredSession(int generation) async {
+  Future<void> _expiredSession(int generation) =>
+      _endSession(generation, ScrobbleProblem.reauthenticate);
+
+  /// Forgets the saved session and reports [problem]. Queued listens stay
+  /// for the next sign-in to the same account.
+  @protected
+  Future<void> endSession(ScrobbleProblem problem) =>
+      _endSession(_generation, problem);
+
+  Future<void> _endSession(int generation, ScrobbleProblem problem) async {
     if (_closed || generation != _generation) return;
     _generation++;
     _busy = false;
@@ -458,7 +496,7 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
     _listening.reset();
     _session = null;
     _enabled = false;
-    _problem = ScrobbleProblem.reauthenticate;
+    _problem = problem;
     _configure();
     try {
       await _serialize(() => _store.writeSession(null));

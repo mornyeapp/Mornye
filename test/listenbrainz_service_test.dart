@@ -99,6 +99,47 @@ void main() {
     expect(service.connected, isFalse);
   });
 
+  serviceTest('a token is never sent over http outside the local network', (
+    tester,
+  ) async {
+    final server = FakeListenBrainzServer();
+    final store = MemoryScrobbleStore<ListenBrainzAccount>(enabled: false);
+    final service = create(tester, server, store);
+    await service.connect('test-token', server: 'http://music.example.test');
+    expect(service.problem, ScrobbleProblem.insecureServer);
+    expect(service.connected, isFalse);
+    expect(server.urls, isEmpty);
+    await service.connect('test-token', server: 'http://192.168.1.20:8080');
+    expect(service.connected, isTrue);
+    expect(server.urls.single.host, '192.168.1.20');
+  });
+
+  serviceTest('an older saved http address is signed out before sending', (
+    tester,
+  ) async {
+    final server = FakeListenBrainzServer();
+    final store = MemoryScrobbleStore(
+      session: const ListenBrainzAccount(
+        username: 'listener',
+        token: 'test-token',
+        server: 'http://music.example.test',
+      ),
+    )..queue = [lastfmQueued(1)];
+    final service = create(tester, server, store);
+    await service.initialize();
+    final handler = BaseAudioHandler();
+    service.bind(handler);
+    handler.mediaItem.add(song);
+    handler.playbackState.add(playing);
+    await tester.pump(const Duration(minutes: 3));
+    expect(server.urls, isEmpty);
+    expect(service.connected, isFalse);
+    expect(service.problem, ScrobbleProblem.insecureServer);
+    expect(store.session, isNull);
+    // The listen waits for the account to sign in again over HTTPS.
+    expect(store.queue, hasLength(1));
+  });
+
   serviceTest('a listen is announced, then submitted with its identifiers', (
     tester,
   ) async {
@@ -149,6 +190,40 @@ void main() {
       await tester.pump();
       expect(service.problem, ScrobbleProblem.rejected);
       expect(store.queue, isEmpty);
+    },
+  );
+
+  serviceTest(
+    'a refused import is resent one listen at a time, keeping the good ones',
+    (tester) async {
+      final server = FakeListenBrainzServer()
+        ..refuses = ((listen) =>
+            (listen['track_metadata'] as Map)['track_name'] == 'Bad');
+      final store = MemoryScrobbleStore(session: listenBrainzTestAccount)
+        ..queue = [
+          lastfmQueued(1),
+          lastfmQueued(2, title: 'Bad'),
+          lastfmQueued(3),
+        ];
+      final service = create(tester, server, store);
+      await service.initialize();
+      await service.flush();
+      expect(server.requests.map((body) => body['listen_type']), [
+        'import',
+        'single',
+        'single',
+        'single',
+      ]);
+      expect(
+        server.listens.map((listen) => listen['listened_at']),
+        [
+          lastfmQueued(1),
+          lastfmQueued(3),
+        ].map((entry) => entry.started.millisecondsSinceEpoch ~/ 1000),
+      );
+      expect(store.queue, isEmpty);
+      expect(service.problem, ScrobbleProblem.rejected);
+      expect(service.connected, isTrue);
     },
   );
 

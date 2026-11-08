@@ -95,6 +95,18 @@ void main() {
         );
         expect(server.urls, isEmpty);
 
+        await tester.enterText(fields.last, 'http://music.example.test');
+        await tester.tap(connect);
+        await tester.pumpAndSettle();
+        expect(
+          find.text(
+            'Use an https:// address. Plain http:// works only for a server '
+            'on this device or your local network.',
+          ),
+          findsOneWidget,
+        );
+        expect(server.urls, isEmpty);
+
         await tester.enterText(fields.last, 'https://music.example.test');
         await tester.tap(connect);
         await tester.pumpAndSettle();
