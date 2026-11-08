@@ -10,7 +10,10 @@ import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/widgets/extension_repo_card.dart';
+import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
+import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/expressive_button.dart';
@@ -28,15 +31,28 @@ class ExtensionDetailsScreen extends ConsumerStatefulWidget {
 
 class _ExtensionDetailsScreenState
     extends ConsumerState<ExtensionDetailsScreen> {
+  /// The repository picked to install from, while not installed.
+  String? _installSource;
+
   @override
   Widget build(BuildContext context) {
     final storeState = ref.watch(repoProvider);
 
-    final liveExtension =
+    final id = widget.extension.id.toLowerCase();
+    final merged =
         storeState.extensions
-            .where((e) => e.id == widget.extension.id)
+            .where((e) => e.id.toLowerCase() == id)
             .firstOrNull ??
         widget.extension;
+    final chosen = !merged.isInstalled && _installSource != null
+        ? merged.sourceEntry(_installSource!)
+        : null;
+    final liveExtension = chosen?.copyWith(sources: merged.sources) ?? merged;
+    final canChangeSource =
+        merged.sources.length > 1 ||
+        (merged.sourceMissing && merged.sources.isNotEmpty);
+    final showRepository =
+        storeState.hasMultipleRepositories || merged.sourceMissing;
 
     final isDownloading = storeState.downloadingId == liveExtension.id;
     final colorScheme = Theme.of(context).colorScheme;
@@ -46,6 +62,21 @@ class _ExtensionDetailsScreenState
         slivers: [
           _buildAppBar(context, liveExtension, colorScheme),
           _buildInfoCard(context, liveExtension, colorScheme, isDownloading),
+          if (merged.sourceMissing)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding:
+                    const EdgeInsets.fromLTRB(16, 0, 16, 16) +
+                    EdgeInsets.symmetric(horizontal: wideListInset(context)),
+                child: ErrorCard(
+                  key: const ValueKey('store-source-missing'),
+                  error: canChangeSource
+                      ? context.l10n.storeSourceMissing
+                      : context.l10n.storeSourceMissingNoOther,
+                  colorScheme: colorScheme,
+                ),
+              ),
+            ),
           _buildSectionHeader(
             context,
             context.l10n.aboutTitle,
@@ -70,7 +101,15 @@ class _ExtensionDetailsScreenState
             Icons.table_chart_outlined,
             colorScheme,
           ),
-          _buildMetadataTable(context, liveExtension, colorScheme),
+          _buildMetadataTable(
+            context,
+            liveExtension,
+            colorScheme,
+            showRepository: showRepository,
+            onChangeRepository: canChangeSource
+                ? () => _changeRepository(liveExtension)
+                : null,
+          ),
 
           _buildSectionHeader(
             context,
@@ -422,8 +461,10 @@ class _ExtensionDetailsScreenState
   Widget _buildMetadataTable(
     BuildContext context,
     RepoExtension ext,
-    ColorScheme colorScheme,
-  ) {
+    ColorScheme colorScheme, {
+    required bool showRepository,
+    VoidCallback? onChangeRepository,
+  }) {
     return SliverPadding(
       padding:
           const EdgeInsets.symmetric(horizontal: 16, vertical: 8) +
@@ -450,8 +491,20 @@ class _ExtensionDetailsScreenState
                 label: context.l10n.extensionMinAppVersion,
                 value: ext.minAppVersion ?? context.l10n.storeAnyVersion,
                 colorScheme: colorScheme,
-                isLast: true,
+                isLast: !showRepository,
               ),
+              if (showRepository)
+                _MetadataRow(
+                  key: const ValueKey('store-extension-repository'),
+                  label: context.l10n.storeExtensionRepository,
+                  value: ext.registryName.isEmpty
+                      ? ext.registryUrl
+                      : ext.registryName,
+                  colorScheme: colorScheme,
+                  isLast: true,
+                  onTap: onChangeRepository,
+                  tapLabel: context.l10n.storeChangeRepoTooltip,
+                ),
             ],
           ),
         ),
@@ -570,10 +623,55 @@ class _ExtensionDetailsScreenState
     }
   }
 
+  /// Picks another repository that lists the extension: an installed one
+  /// moves its pin (nothing is reinstalled), one not installed installs
+  /// from the picked repository.
+  Future<void> _changeRepository(RepoExtension ext) async {
+    await showAppChoiceSheet<String>(
+      context: context,
+      title: context.l10n.storeChangeRepoTooltip,
+      subtitle: ext.displayName,
+      selected: ext.registryUrl,
+      choices: [
+        for (final source in ext.sources)
+          AppChoice(
+            source.registryUrl,
+            Icons.link,
+            source.registryName.isEmpty
+                ? source.registryUrl
+                : source.registryName,
+            subtitle: 'v${source.version}',
+          ),
+      ],
+      onSelected: (url) async {
+        if (url == ext.registryUrl) return;
+        if (!ext.isInstalled) {
+          setState(() => _installSource = url);
+          return;
+        }
+        final l10n = context.l10n;
+        await ref
+            .read(repoProvider.notifier)
+            .changeExtensionSource(ext.id, url);
+        final name = ext.sourceEntry(url)?.registryName ?? url;
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            content: Text(l10n.storeRepositoryChanged(ext.displayName, name)),
+            behavior: SnackBarBehavior.floating,
+          );
+        }
+      },
+    );
+  }
+
   Future<void> _installExtension(RepoExtension ext) async {
     final success = await ref
         .read(repoProvider.notifier)
-        .installExtensionToDefaultPaths(ext.id);
+        .installExtensionToDefaultPaths(
+          ext.id,
+          registryUrl: ext.registryUrl.isEmpty ? null : ext.registryUrl,
+        );
 
     if (mounted) {
       showAppSnackBar(
@@ -676,44 +774,72 @@ class _MetadataRow extends StatelessWidget {
   final ColorScheme colorScheme;
   final bool isLast;
 
+  /// Makes the row a button (with a chevron) announced as [tapLabel].
+  final VoidCallback? onTap;
+  final String? tapLabel;
+
   const _MetadataRow({
+    super.key,
     required this.label,
     required this.value,
     required this.colorScheme,
     this.isLast = false,
+    this.onTap,
+    this.tapLabel,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 14,
-                ),
+    Widget row = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
               ),
-              Expanded(
-                child: Text(
-                  value,
-                  textAlign: TextAlign.end,
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (onTap != null) ...[
+            const SizedBox(width: 4),
+            Icon(
+              context.isMornye ? CupertinoIcons.forward : Icons.chevron_right,
+              size: 20,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ],
+      ),
+    );
+    if (onTap != null) {
+      row = Semantics(
+        button: true,
+        hint: tapLabel,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: context.tokens.minTouchTarget,
+            ),
+            child: row,
           ),
         ),
+      );
+    }
+    return Column(
+      children: [
+        row,
         // Material groups rows by the card alone; dividers are Mornye's.
         if (!isLast && context.isMornye)
           Divider(

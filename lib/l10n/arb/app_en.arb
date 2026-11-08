@@ -2530,7 +2530,50 @@
   },
   "storeChangeRepoTooltip": "Change repository",
   "@storeChangeRepoTooltip": {
-    "description": "Tooltip for the change-repository icon button in the app bar"
+    "description": "Extension store page - title of the sheet that picks which repository an extension installs or updates from"
+  },
+  "storeRepositoriesTitle": "Repositories",
+  "@storeRepositoriesTitle": {
+    "description": "Title of the page that lists the extension repositories, and tooltip of the store header button that opens it"
+  },
+  "storeRemoveRepoTooltip": "Remove repository",
+  "@storeRemoveRepoTooltip": {
+    "description": "Tooltip of the remove button on a repository row, and title of its confirmation dialog"
+  },
+  "storeRemoveRepoMessage": "{name} and its extensions leave the store. Installed extensions stay installed and get updates from another repository that lists them.",
+  "@storeRemoveRepoMessage": {
+    "description": "Confirmation message before removing an extension repository",
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "storeRepoAlreadyAdded": "This repository is already added",
+  "@storeRepoAlreadyAdded": {
+    "description": "Error when adding a repository that is already in the list"
+  },
+  "storeExtensionRepository": "Repository",
+  "@storeExtensionRepository": {
+    "description": "Extension store page - row label naming the repository the extension installs and updates from"
+  },
+  "storeSourceMissing": "This extension is no longer in its repository, so it gets no updates. Change the repository to one that lists it.",
+  "@storeSourceMissing": {
+    "description": "Extension store page notice when the repository the extension is pinned to no longer lists it, and another repository does"
+  },
+  "storeSourceMissingNoOther": "This extension is no longer in its repository, so it gets no updates.",
+  "@storeSourceMissingNoOther": {
+    "description": "Extension store page notice when the repository the extension is pinned to no longer lists it, and no other repository does"
+  },
+  "storeSourceMissingShort": "Not in its repository",
+  "@storeSourceMissingShort": {
+    "description": "Short label on a store row whose pinned repository no longer lists the extension"
+  },
+  "storeRepositoryChanged": "{name} now updates from {repository}",
+  "@storeRepositoryChanged": {
+    "description": "Snackbar after moving an installed extension to another repository",
+    "placeholders": {
+      "name": {"type": "String"},
+      "repository": {"type": "String"}
+    }
   },
   "storeRepoDialogTitle": "Extension Repository",
   "@storeRepoDialogTitle": {

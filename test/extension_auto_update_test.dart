@@ -113,7 +113,7 @@ class _Repo extends RepoNotifier {
     calls.add('initialize');
     state = state.copyWith(
       isInitialized: true,
-      registryUrl: _registryUrl,
+      registryUrls: const [_registryUrl],
       extensions: _store,
     );
   }
@@ -233,6 +233,38 @@ void main() {
         attemptedTargets: {'ext-failed@2.0.0'},
       );
       expect(picked.map(extensionUpdateTarget), ['ext-failed@2.1.0']);
+    });
+
+    test('updates come only from the pinned repository', () {
+      const pinned = 'https://example.com/pinned/registry.json';
+      const other = 'https://example.com/other/registry.json';
+      RepoExtension entry(String id, String url, String version) =>
+          RepoExtension.fromJson({
+            'id': id,
+            'name': id,
+            'version': version,
+            'is_installed': true,
+            'installed_version': '1.0.0',
+            'has_update': version != '1.0.0',
+            'registry_url': url,
+          });
+      final merged = mergeRepoCatalog(
+        entries: [
+          entry('ext-pinned', pinned, '1.0.0'),
+          entry('ext-pinned', other, '3.0.0'),
+          entry('ext-gone', other, '3.0.0'),
+        ],
+        sources: const [
+          RepoSource(registryUrl: pinned),
+          RepoSource(registryUrl: other),
+        ],
+        pins: {'ext-pinned': pinned, 'ext-gone': pinned},
+      ).extensions;
+      final picked = selectExtensionAutoUpdates(
+        storeExtensions: merged,
+        installed: [_installed('ext-pinned'), _installed('ext-gone')],
+      );
+      expect(picked, isEmpty);
     });
   });
 

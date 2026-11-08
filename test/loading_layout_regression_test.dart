@@ -15,7 +15,7 @@ class _LoadingRepo extends RepoNotifier {
   RepoState build() => const RepoState(
     isLoading: true,
     isInitialized: true,
-    registryUrl: 'https://example.invalid/registry.json',
+    registryUrls: ['https://example.invalid/registry.json'],
   );
 
   @override

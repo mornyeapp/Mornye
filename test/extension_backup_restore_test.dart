@@ -14,6 +14,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _registry = 'https://example.test/extensions/registry.json';
+const _second = 'https://example.test/second/registry.json';
 
 Map<String, dynamic> _manifest(String id, {bool enabled = true}) => {
   'id': id,
@@ -41,10 +42,14 @@ class _ReadyExtensions extends ExtensionNotifier {
 class _RepositoryTransport implements NativeBackendTransport {
   late NativeMessageListener _listener;
   bool initialized = false;
-  String registryUrl = '';
+  String cacheDir = '';
+  List<String> registryUrls = const [];
   final installed = <String, Map<String, dynamic>>{};
   final settings = <String, Map<String, dynamic>>{};
   final downloads = <String>[];
+
+  /// The registry URL each download asked for, by extension id.
+  final downloadSources = <String, String>{};
   final unavailable = <String>{};
 
   @override
@@ -79,11 +84,19 @@ class _RepositoryTransport implements NativeBackendTransport {
     switch (method) {
       case 'initExtensionRepo':
         initialized = true;
-      case 'getRepoRegistryUrl':
+        cacheDir = args['cache_dir'] as String;
+      case 'setRepoRegistryUrls':
         if (!initialized) throw StateError('Repository is not initialized');
-        return registryUrl;
-      case 'setRepoRegistryUrl':
-        registryUrl = args['registry_url'] as String;
+        registryUrls = (args['registry_urls'] as List).cast<String>();
+      case 'getRepoCatalog':
+        if (!initialized) throw StateError('Repository is not initialized');
+        return {
+          'sources': [
+            for (final url in registryUrls)
+              {'registry_url': url, 'name': url, 'error': ''},
+          ],
+          'extensions': const <Map<String, dynamic>>[],
+        };
       case 'getInstalledExtensions':
         return installed.values.toList();
       case 'getExtensionSettings':
@@ -94,9 +107,14 @@ class _RepositoryTransport implements NativeBackendTransport {
       case 'setExtensionEnabled':
         installed[id]!['enabled'] = args['enabled'];
       case 'downloadRepoExtension':
-        if (registryUrl.isEmpty) throw StateError('No registry configured');
+        if (registryUrls.isEmpty) throw StateError('No registry configured');
+        final source = args['registry_url'] as String? ?? '';
+        if (source.isNotEmpty && !registryUrls.contains(source)) {
+          throw StateError('Registry not configured');
+        }
         if (unavailable.contains(id)) throw StateError('Extension not in repo');
         downloads.add(id);
+        downloadSources[id] = source;
         return '${args['dest_dir']}/$id.sflx';
       case 'loadExtensionFromPath':
         final path = args['file_path'] as String;
@@ -153,28 +171,32 @@ void main() {
 
   ExtensionNotifier notifier() => container.read(extensionProvider.notifier);
 
-  for (final initialized in [false, true]) {
-    test('export keeps saved repository before Repo is opened '
-        '(native initialized=$initialized)', () async {
-      repository.initialized = initialized;
-      repository.installed['example-one'] = _manifest('example-one');
-      final data = await notifier().exportBackup(includeSecrets: false);
-      expect(data['registry_url'], _registry);
-      expect(((data['items'] as List).single as Map)['id'], 'example-one');
-      expect(repository.downloads, isEmpty);
-    });
-  }
+  test('export keeps the saved repository before Repo is opened', () async {
+    repository.installed['example-one'] = _manifest('example-one');
+    final data = await notifier().exportBackup(includeSecrets: false);
+    expect(data['registry_urls'], [_registry]);
+    expect(data['registry_url'], _registry);
+    expect(((data['items'] as List).single as Map)['id'], 'example-one');
+    expect(repository.downloads, isEmpty);
+  });
 
-  test(
-    'export prefers the active repository over an older preference',
-    () async {
-      repository
-        ..initialized = true
-        ..registryUrl = 'https://example.test/other/registry.json';
-      final data = await notifier().exportBackup(includeSecrets: false);
-      expect(data['registry_url'], repository.registryUrl);
-    },
-  );
+  test('export lists every repository and each extension pin', () async {
+    SharedPreferences.setMockInitialValues({
+      'store_registry_urls': jsonEncode([_registry, _second]),
+      'store_extension_sources': jsonEncode({'example-one': _second}),
+    });
+    repository.installed['example-one'] = _manifest('example-one');
+    repository.installed['example-two'] = _manifest('example-two');
+    final data = await notifier().exportBackup(includeSecrets: false);
+    expect(data['registry_urls'], [_registry, _second]);
+    expect(data['registry_url'], _registry);
+    final items = {
+      for (final item in (data['items'] as List).cast<Map<String, dynamic>>())
+        item['id']: item,
+    };
+    expect(items['example-one']!['registry_url'], _second);
+    expect(items['example-two']!.containsKey('registry_url'), isFalse);
+  });
 
   for (final includeSecrets in [false, true]) {
     test(
@@ -214,8 +236,9 @@ void main() {
       expect(result.installed, 1);
       expect(result.failedIds, isEmpty);
       expect(result.failed, 0);
-      expect(repository.registryUrl, _registry);
+      expect(repository.registryUrls, [_registry]);
       expect(repository.downloads, ['example-one']);
+      expect(repository.downloadSources['example-one'], '');
       expect(repository.installed['example-one']!['enabled'], isFalse);
       expect(repository.settings['example-one'], {'region': 'jp'});
     });
@@ -232,33 +255,68 @@ void main() {
     final result = await notifier().restoreFromBackup(backup);
     expect(result.installed, 1);
     expect(result.failed, 0);
-    expect(repository.registryUrl, _registry);
+    expect(repository.registryUrls, [_registry]);
     expect(repository.settings['example-one'], {'region': 'gb'});
-    expect(
-      (await SharedPreferences.getInstance()).getString('store_registry_url'),
-      _registry,
-    );
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('store_registry_urls'), jsonEncode([_registry]));
+    expect(prefs.getString('store_registry_url'), _registry);
+    // The store keeps its normal cache directory, not a restore temp one.
+    expect(repository.cacheDir, temporary.path);
   });
 
-  test(
-    'backup repository takes precedence over the device repository',
-    () async {
-      const backupUrl = 'https://example.test/backup/registry.json';
-      final result = await notifier().restoreFromBackup({
-        'registry_url': backupUrl,
-        'items': [
-          {'id': 'example-one'},
-        ],
-      });
-      expect(result.installed, 1);
-      expect(result.failed, 0);
-      expect(repository.registryUrl, backupUrl);
-      expect(
-        (await SharedPreferences.getInstance()).getString('store_registry_url'),
-        backupUrl,
-      );
-    },
-  );
+  test('backup repositories are added after the device ones', () async {
+    const backupUrl = 'https://example.test/backup/registry.json';
+    final result = await notifier().restoreFromBackup({
+      'registry_url': backupUrl,
+      'items': [
+        {'id': 'example-one'},
+      ],
+    });
+    expect(result.installed, 1);
+    expect(result.failed, 0);
+    expect(repository.registryUrls, [_registry, backupUrl]);
+    final prefs = await SharedPreferences.getInstance();
+    expect(
+      prefs.getString('store_registry_urls'),
+      jsonEncode([_registry, backupUrl]),
+    );
+    expect(prefs.getString('store_registry_url'), _registry);
+  });
+
+  test('restore installs from the pinned repository and keeps pins', () async {
+    repository.installed['example-two'] = _manifest('example-two');
+    final result = await notifier().restoreFromBackup({
+      'registry_urls': [_registry, _second],
+      'registry_url': _registry,
+      'items': [
+        {'id': 'example-one', 'registry_url': _second},
+        {'id': 'example-two', 'registry_url': _second},
+        {
+          'id': 'example-three',
+          'registry_url': 'https://example.test/gone/registry.json',
+        },
+      ],
+    });
+    expect(result.installed, 2);
+    expect(result.alreadyPresent, 1);
+    expect(repository.registryUrls, [_registry, _second]);
+    expect(repository.downloadSources, {
+      'example-one': _second,
+      // A pin to a repository that is not configured installs from the
+      // first repository that lists it.
+      'example-three': '',
+    });
+    final pins =
+        jsonDecode(
+              (await SharedPreferences.getInstance()).getString(
+                'store_extension_sources',
+              )!,
+            )
+            as Map<String, dynamic>;
+    expect(pins['example-one'], _second);
+    expect(pins['example-two'], _second);
+    expect(pins.containsKey('example-three'), isFalse);
+  });
 
   test(
     'installed extensions keep current secrets when omitted in backup',

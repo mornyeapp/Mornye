@@ -20,7 +20,9 @@ String extensionUpdateTarget(RepoExtension extension) =>
 /// Store extensions to update automatically, in store order: installed,
 /// enabled, with a newer store version this app can run, and not already
 /// attempted at that version ([attemptedTargets], see
-/// [extensionUpdateTarget]).
+/// [extensionUpdateTarget]). [storeExtensions] are the merged store
+/// entries, so each version comes from the extension's pinned repository;
+/// one whose repository no longer lists it is never updated.
 List<RepoExtension> selectExtensionAutoUpdates({
   required Iterable<RepoExtension> storeExtensions,
   required Iterable<Extension> installed,
@@ -32,6 +34,7 @@ List<RepoExtension> selectExtensionAutoUpdates({
       if (installedById[candidate.id] case final current?)
         if (current.enabled &&
             candidate.hasUpdate &&
+            !candidate.sourceMissing &&
             current.version != candidate.version &&
             !candidate.requiresNewerApp &&
             !attemptedTargets.contains(extensionUpdateTarget(candidate)))
@@ -104,7 +107,7 @@ class ExtensionAutoUpdateNotifier extends Notifier<ExtensionAutoUpdateNotice?> {
 
   Future<void> _run() async {
     try {
-      if (!await RepoNotifier.hasSavedRegistryUrl()) return;
+      if (!await RepoNotifier.hasSavedRegistryUrls()) return;
       await ref.read(extensionProvider.notifier).ensureInitialized();
       final repo = ref.read(repoProvider.notifier);
       if (ref.read(repoProvider).isInitialized) {

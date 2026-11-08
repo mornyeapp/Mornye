@@ -3062,38 +3062,45 @@ class PlatformBridge {
     await _invokeVoid('initExtensionRepo', {'cache_dir': cacheDir});
   }
 
-  static Future<void> setRepoRegistryUrl(String registryUrl) async {
-    _log.d('setRepoRegistryUrl: $registryUrl');
-    await _invokeVoid('setRepoRegistryUrl', {'registry_url': registryUrl});
+  /// Replaces the ordered list of store repositories.
+  static Future<void> setRepoRegistryUrls(List<String> registryUrls) async {
+    _log.d('setRepoRegistryUrls: ${registryUrls.length} repositories');
+    await _invokeVoid('setRepoRegistryUrls', {'registry_urls': registryUrls});
   }
 
-  static Future<String> getRepoRegistryUrl() async {
-    _log.d('getRepoRegistryUrl');
-    return await _invokeAs<String?>('getRepoRegistryUrl') ?? '';
+  /// Resolves a repository page or registry link to its registry URL,
+  /// without changing the configured repositories.
+  static Future<String> resolveRepoRegistryUrl(String registryUrl) async {
+    _log.d('resolveRepoRegistryUrl: $registryUrl');
+    return await _invokeAs<String?>('resolveRepoRegistryUrl', {
+          'registry_url': registryUrl,
+        }) ??
+        '';
   }
 
-  static Future<void> clearRepoRegistryUrl() async {
-    _log.d('clearRepoRegistryUrl');
-    await _invokeVoid('clearRepoRegistryUrl');
-  }
-
-  static Future<List<Map<String, dynamic>>> getRepoExtensions({
+  /// Every configured repository with its entries: `sources` and
+  /// `extensions`, in repository order.
+  static Future<Map<String, dynamic>> getRepoCatalog({
     bool forceRefresh = false,
   }) async {
-    _log.d('getRepoExtensions (forceRefresh: $forceRefresh)');
-    return _invokeDecoded(_decodeMapListResultAsync, 'getRepoExtensions', {
+    _log.d('getRepoCatalog (forceRefresh: $forceRefresh)');
+    return _invokeDecoded(_decodeRequiredMapResultAsync, 'getRepoCatalog', {
       'force_refresh': forceRefresh,
     });
   }
 
+  /// Downloads [extensionId] from [registryUrl], or from the first
+  /// repository that lists it when [registryUrl] is empty.
   static Future<String> downloadRepoExtension(
     String extensionId,
-    String destDir,
-  ) async {
+    String destDir, {
+    String registryUrl = '',
+  }) async {
     _log.i('downloadRepoExtension: $extensionId to $destDir');
     return _invokeAs('downloadRepoExtension', {
       'extension_id': extensionId,
       'dest_dir': destDir,
+      'registry_url': registryUrl,
     });
   }
 
