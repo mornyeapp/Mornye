@@ -171,6 +171,11 @@ class AppSettings {
   /// decodes to 16-bit, which its silence detection needs.
   final bool skipSilence;
 
+  /// Android, iOS and macOS: let the system spatialize songs (Android
+  /// spatialization behavior auto, Apple mono, stereo and multichannel).
+  /// Off asks the system never to spatialize them. The app renders nothing.
+  final bool spatialAudio;
+
   /// Adding a song already coming up in the queue moves that entry instead
   /// of queueing a second copy. The current and played entries stay.
   final bool queueNoDuplicates;
@@ -452,6 +457,7 @@ class AppSettings {
     this.dapExclusive = false,
     this.media3Engine = true,
     this.skipSilence = false,
+    this.spatialAudio = true,
     this.queueNoDuplicates = false,
     this.queueLocked = false,
     this.exclusiveOutput = false,
@@ -632,6 +638,7 @@ class AppSettings {
     bool? dapExclusive,
     bool? media3Engine,
     bool? skipSilence,
+    bool? spatialAudio,
     bool? queueNoDuplicates,
     bool? queueLocked,
     bool? exclusiveOutput,
@@ -792,6 +799,7 @@ class AppSettings {
       dapExclusive: dapExclusive ?? this.dapExclusive,
       media3Engine: media3Engine ?? this.media3Engine,
       skipSilence: skipSilence ?? this.skipSilence,
+      spatialAudio: spatialAudio ?? this.spatialAudio,
       queueNoDuplicates: queueNoDuplicates ?? this.queueNoDuplicates,
       queueLocked: queueLocked ?? this.queueLocked,
       exclusiveOutput: exclusiveOutput ?? this.exclusiveOutput,

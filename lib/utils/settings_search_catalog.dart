@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/services/spatial_audio.dart';
 import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/exclusive_output_labels.dart';
@@ -505,6 +506,24 @@ class SettingsSearchCatalog {
             targetLabel: l10n.usbBitPerfect,
           ),
         ],
+        // Windows and Linux leave spatial audio to the system; Android TV
+        // output is HDMI or a soundbar.
+        if ((androidAudio ||
+                spatialAudioPlatform != SpatialAudioPlatform.none) &&
+            !isAndroidTv)
+          SettingsSearchEntry(
+            icon: Icons.spatial_audio_outlined,
+            title: l10n.spatialAudio,
+            subtitle: l10n.spatialAudioDescription,
+            keywords: const [
+              'spatial',
+              'surround',
+              'head tracking',
+              'dolby atmos',
+              '3d',
+              'spasial',
+            ],
+          ),
         if (isDesktopPlatform)
           SettingsSearchEntry(
             icon: Icons.speaker_outlined,

@@ -137,6 +137,21 @@ private val cappedSpeedBufferSize =
     }
 
 /**
+ * Music attributes for the player. [spatialAudio] maps to the platform's
+ * spatialization behavior on Android 12L and later: auto lets the system
+ * spatialize what its spatializer supports, never keeps every song out of
+ * it. Earlier releases ignore it.
+ */
+internal fun media3AudioAttributes(spatialAudio: Boolean): AudioAttributes =
+    AudioAttributes.Builder()
+        .setUsage(C.USAGE_MEDIA)
+        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+        .setSpatializationBehavior(
+            if (spatialAudio) C.SPATIALIZATION_BEHAVIOR_AUTO else C.SPATIALIZATION_BEHAVIOR_NEVER,
+        )
+        .build()
+
+/**
  * One media3 player of the `com.zarz.mornye/media3_player` channel. Every
  * method runs on the plugin's playback looper, which also owns the player.
  * [emit] delivers events to Dart; [MethodChannel.Result] calls are expected
@@ -171,17 +186,14 @@ internal class Media3Player(
     /** Read by the renderer on media3's playback thread. */
     @Volatile private var skipSilence = false
 
+    /** Auto until Dart sends `setSpatialAudio`. */
+    private var spatialAudio = true
+
     init {
         exo = ExoPlayer.Builder(appContext, media3AudioRenderers(appContext) { skipSilence })
             .setLooper(looper)
             // The app owns focus (audio_session) and becoming-noisy handling.
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build(),
-                false,
-            )
+            .setAudioAttributes(media3AudioAttributes(spatialAudio), false)
             .setHandleAudioBecomingNoisy(false)
             // Off until Dart sends `setSkipSilence`.
             .setSkipSilenceEnabled(false)
@@ -250,6 +262,12 @@ internal class Media3Player(
                 exo.skipSilenceEnabled = enabled
                 result.success(null)
             }
+            "setSpatialAudio" -> {
+                val enabled = call.argument<Boolean>("enabled")
+                    ?: return invalid(result, "enabled is required")
+                setSpatialAudio(enabled)
+                result.success(null)
+            }
             "setEqualizer" -> {
                 val configuration = call.argument<Map<String, Any?>>("configuration")
                     ?: return invalid(result, "configuration is required")
@@ -306,6 +324,23 @@ internal class Media3Player(
         retire(queue.replace(item))
         pending = result
         exo.prepare()
+    }
+
+    /**
+     * Applies live. New attributes make the sink reopen its `AudioTrack`,
+     * which the platform attaches to the spatializer or not as it opens, and
+     * drop the audio it had buffered (up to 1 s, see [MAX_BUFFERED_SPEED]).
+     * Seeking to the current position decodes that audio again instead of
+     * skipping it, for a short pause rather than a jump.
+     */
+    private fun setSpatialAudio(enabled: Boolean) {
+        if (enabled == spatialAudio) return
+        spatialAudio = enabled
+        exo.setAudioAttributes(media3AudioAttributes(enabled), false)
+        val state = exo.playbackState
+        if (queue.current != null && pending == null && state != Player.STATE_IDLE && state != Player.STATE_ENDED) {
+            exo.seekTo(exo.currentPosition)
+        }
     }
 
     private fun play() {

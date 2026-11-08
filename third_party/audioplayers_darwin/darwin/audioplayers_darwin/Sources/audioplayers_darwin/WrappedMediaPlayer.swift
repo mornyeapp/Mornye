@@ -45,6 +45,23 @@ enum ReleaseMode: String {
       if player.currentItem === item { equalizerAttached = true }
     }
   }
+  /// Whether the system may spatialize this player's audio: mono, stereo
+  /// and multichannel when true, nothing when false. Applies to the current
+  /// item and every new one.
+  private var spatialAudio = true
+
+  func setSpatialAudio(_ enabled: Bool) {
+    spatialAudio = enabled
+    if let item = player.currentItem { Self.applySpatialAudio(enabled, to: item) }
+  }
+
+  /// Audio-only items otherwise default to multichannel only.
+  static func applySpatialAudio(_ enabled: Bool, to item: AVPlayerItem) {
+    if #available(iOS 14.0, macOS 11.0, *) {
+      item.allowedAudioSpatializationFormats = enabled ? .monoStereoAndMultichannel : []
+    }
+  }
+
   private var playbackRate: Double
   private var volume: Double
   private var url: String?
@@ -247,6 +264,7 @@ enum ReleaseMode: String {
     }
     let playerItem = AVPlayerItem(asset: AVURLAsset(url: assetUrl, options: options))
     playerItem.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithm.timeDomain
+    Self.applySpatialAudio(spatialAudio, to: playerItem)
     return playerItem
   }
 

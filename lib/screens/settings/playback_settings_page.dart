@@ -16,6 +16,7 @@ import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/music_player_service.dart'
     show resetAutoplayLearning;
 import 'package:mornye/services/song_analysis.dart';
+import 'package:mornye/services/spatial_audio.dart';
 import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/theme/app_tokens.dart';
@@ -164,6 +165,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
     final linuxDevice =
         settings.exclusiveOutput &&
         defaultTargetPlatform == TargetPlatform.linux;
+    final macSpatialAudio = spatialAudioPlatform == SpatialAudioPlatform.macos;
     final colorScheme = Theme.of(context).colorScheme;
     final coverStyle = settings.playerCoverStyleFor(mornye: context.isMornye);
     // The charging rule applies to Android's background sweep only.
@@ -551,12 +553,28 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                       onChanged: (value) => ref
                           .read(settingsProvider.notifier)
                           .setExclusiveOutput(value),
-                      showDivider: linuxDevice,
+                      showDivider: linuxDevice || macSpatialAudio,
                     );
                   },
                 ),
                 if (linuxDevice)
                   _AlsaDeviceItem(device: settings.exclusiveOutputDevice),
+                if (macSpatialAudio)
+                  const _SpatialAudioItem(
+                    platform: SpatialAudioPlatform.macos,
+                    showDivider: false,
+                  ),
+              ],
+            ),
+          // iOS has no other audio output setting.
+          if (spatialAudioPlatform == SpatialAudioPlatform.ios)
+            ...settingsSectionSlivers(
+              title: context.l10n.sectionAudioOutput,
+              children: const [
+                _SpatialAudioItem(
+                  platform: SpatialAudioPlatform.ios,
+                  showDivider: false,
+                ),
               ],
             ),
           if (androidAudio)
@@ -591,6 +609,11 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                     onChanged: (value) => ref
                         .read(settingsProvider.notifier)
                         .setSkipSilence(value),
+                  ),
+                // TV output is HDMI or a soundbar, outside the spatializer.
+                if (!isAndroidTv)
+                  const _SpatialAudioItem(
+                    platform: SpatialAudioPlatform.android,
                   ),
                 ValueListenableBuilder<UsbAudioStatus>(
                   valueListenable: usbAudioStatus,
@@ -899,6 +922,85 @@ class _AlsaDeviceItemState extends ConsumerState<_AlsaDeviceItem> {
                       .setExclusiveOutputDevice,
                 ),
           showDivider: false,
+        );
+      },
+    );
+  }
+}
+
+/// Spatial audio, with a line for what the system does with songs on the
+/// current output. The app renders nothing; the platform spatializes.
+class _SpatialAudioItem extends ConsumerStatefulWidget {
+  const _SpatialAudioItem({required this.platform, this.showDivider = true});
+
+  final SpatialAudioPlatform platform;
+  final bool showDivider;
+
+  @override
+  ConsumerState<_SpatialAudioItem> createState() => _SpatialAudioItemState();
+}
+
+class _SpatialAudioItemState extends ConsumerState<_SpatialAudioItem>
+    with WidgetsBindingObserver {
+  StreamSubscription<SpatialAudioState>? _states;
+  SpatialAudioState? _state;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _listen();
+  }
+
+  /// The native side reports the current state on listen, then each change.
+  void _listen() {
+    unawaited(_states?.cancel());
+    _states = spatialAudioStates(widget.platform).listen((state) {
+      if (mounted) setState(() => _state = state);
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Back from the system settings, where no listener may have fired.
+    if (state == AppLifecycleState.resumed) _listen();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_states?.cancel());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
+    return ValueListenableBuilder<UsbAudioStatus>(
+      valueListenable: usbAudioStatus,
+      builder: (context, usb, _) {
+        final status = spatialAudioStatus(
+          enabled: settings.spatialAudio,
+          platform: widget.platform,
+          state: _state,
+          usb: usb,
+          exclusiveOutput: settings.exclusiveOutput,
+        );
+        return SettingsSwitchItem(
+          icon: Icons.spatial_audio_outlined,
+          title: context.l10n.spatialAudio,
+          subtitle: [
+            context.l10n.spatialAudioDescription,
+            // MediaPlayer reads its attributes as each song loads.
+            if (widget.platform == SpatialAudioPlatform.android &&
+                !settings.media3Engine)
+              context.l10n.spatialAudioNextSong,
+            if (status != null) spatialAudioStatusLabel(context.l10n, status),
+          ].join('\n\n'),
+          value: settings.spatialAudio,
+          onChanged: (value) =>
+              ref.read(settingsProvider.notifier).setSpatialAudio(value),
+          showDivider: widget.showDivider,
         );
       },
     );

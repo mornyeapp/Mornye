@@ -63,6 +63,16 @@ without the precise key, from the URL without the fragment, so it starts
 at once; its seeks may be approximate until it plays again from the whole
 file.
 
+### Spatial audio
+
+A `setSpatialAudio` method (argument `enabled`) sets
+`allowedAudioSpatializationFormats` (iOS 14, macOS 11 and later) on the
+player's current item and on every item it creates afterwards:
+`.monoStereoAndMultichannel` when true (the default), none when false.
+Upstream leaves AVFoundation's audio-only default, multichannel only. A
+missing value returns a `DarwinAudioError`. AVFoundation does not document
+whether a change on an item already playing takes effect at once.
+
 ### Packaging
 
 - `darwin/audioplayers_darwin.podspec` adds

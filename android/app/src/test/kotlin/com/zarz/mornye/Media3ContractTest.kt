@@ -1,5 +1,6 @@
 package com.zarz.mornye
 
+import androidx.media3.common.C
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -123,5 +124,17 @@ class Media3ContractTest {
         assertEquals(listOf("f"), queue.clear())
         assertNull(queue.current)
         assertTrue(queue.clear().isEmpty())
+    }
+
+    @Test
+    fun spatialAudioMapsToTheSpatializationBehavior() {
+        val on = media3AudioAttributes(true)
+        val off = media3AudioAttributes(false)
+        assertEquals(C.SPATIALIZATION_BEHAVIOR_AUTO, on.spatializationBehavior)
+        assertEquals(C.SPATIALIZATION_BEHAVIOR_NEVER, off.spatializationBehavior)
+        for (attributes in listOf(on, off)) {
+            assertEquals(C.USAGE_MEDIA, attributes.usage)
+            assertEquals(C.AUDIO_CONTENT_TYPE_MUSIC, attributes.contentType)
+        }
     }
 }

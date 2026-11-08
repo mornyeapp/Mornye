@@ -142,6 +142,7 @@ IconData _cupertinoFor(IconData icon) {
     Icons.cloud || Icons.cloud_outlined => CupertinoIcons.cloud,
     Icons.cloud_upload_outlined => CupertinoIcons.cloud_upload,
     Icons.high_quality => CupertinoIcons.hifispeaker,
+    Icons.spatial_audio_outlined => CupertinoIcons.headphones,
     Icons.four_k => CupertinoIcons.waveform,
     Icons.dynamic_feed_outlined ||
     Icons.tab_outlined => CupertinoIcons.square_on_square,

@@ -747,6 +747,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setSkipSilence(bool enabled) =>
       _commit(state.copyWith(skipSilence: enabled));
 
+  void setSpatialAudio(bool enabled) =>
+      _commit(state.copyWith(spatialAudio: enabled));
+
   void setQueueNoDuplicates(bool enabled) =>
       _commit(state.copyWith(queueNoDuplicates: enabled));
 

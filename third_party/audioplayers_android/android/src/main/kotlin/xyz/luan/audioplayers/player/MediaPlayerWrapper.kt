@@ -53,7 +53,7 @@ class MediaPlayerWrapper(
                 if (!released) wrappedPlayer.onBuffering(percent)
             }
         }
-        wrappedPlayer.context.setAttributesOnPlayer(mediaPlayer)
+        wrappedPlayer.context.setAttributesOnPlayer(mediaPlayer, wrappedPlayer.spatialAudio)
         if (wrappedPlayer.context.stayAwake) {
             mediaPlayer.setWakeMode(wrappedPlayer.applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
         }
@@ -86,6 +86,8 @@ class MediaPlayerWrapper(
 
     override fun setSource(source: Source) {
         reset()
+        // Idle again, so the current spatialization choice applies to this source.
+        wrappedPlayer.context.setAttributesOnPlayer(mediaPlayer, wrappedPlayer.spatialAudio)
         source.setForMediaPlayer(mediaPlayer)
     }
 
@@ -126,7 +128,7 @@ class MediaPlayerWrapper(
     }
 
     override fun updateContext(context: AudioContextAndroid) {
-        context.setAttributesOnPlayer(mediaPlayer)
+        context.setAttributesOnPlayer(mediaPlayer, wrappedPlayer.spatialAudio)
         if (context.stayAwake) {
             mediaPlayer.setWakeMode(wrappedPlayer.applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
         }

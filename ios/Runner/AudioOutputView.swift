@@ -124,6 +124,54 @@ final class AudioRouteInfoBridge {
     }
 }
 
+/// `com.zarz.mornye/spatial_audio`: whether the current output port has
+/// spatial audio enabled, on listen and on every route or spatial capability
+/// change (spatial audio turned on or off in Control Center). Read-only.
+final class SpatialAudioBridge: NSObject, FlutterStreamHandler {
+    private let channel: FlutterEventChannel
+    private var sink: FlutterEventSink?
+    private var observers: [NSObjectProtocol] = []
+
+    init(messenger: FlutterBinaryMessenger) {
+        channel = FlutterEventChannel(name: "com.zarz.mornye/spatial_audio", binaryMessenger: messenger)
+        super.init()
+        channel.setStreamHandler(self)
+    }
+
+    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        sink = events
+        let center = NotificationCenter.default
+        observers = [
+            AVAudioSession.routeChangeNotification,
+            AVAudioSession.spatialPlaybackCapabilitiesChangedNotification,
+        ].map { name in
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.emit() }
+        }
+        emit()
+        return nil
+    }
+
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
+        sink = nil
+        return nil
+    }
+
+    private func emit() {
+        let outputs = AVAudioSession.sharedInstance().currentRoute.outputs
+        sink?([
+            "platform": "ios",
+            "enabled": outputs.contains { $0.isSpatialAudioEnabled },
+        ] as [String: Any])
+    }
+
+    deinit {
+        observers.forEach(NotificationCenter.default.removeObserver)
+        channel.setStreamHandler(nil)
+    }
+}
+
 /// `show` opens the system route picker (AirPlay, Bluetooth, this iPhone)
 /// from the app's own Audio output sheet, the counterpart of Android's
 /// output switcher on the same channel. It answers once the picker closes,

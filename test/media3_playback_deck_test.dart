@@ -436,6 +436,57 @@ void main() {
     expect(native.calls, isEmpty);
   });
 
+  test(
+    'spatial audio off reaches the player before its first source',
+    () async {
+      addTearDown(() => playbackSpatialAudio.value = true);
+      playbackSpatialAudio.value = false;
+      await deck.setFileSource('/song.flac');
+      final methods = native.methods;
+      expect(
+        methods.indexOf('setSpatialAudio'),
+        lessThan(methods.indexOf('setSource')),
+      );
+      expect(native.last('setSpatialAudio'), {
+        'playerId': 'one',
+        'enabled': false,
+      });
+
+      playbackSpatialAudio.value = true;
+      await _settle();
+      expect(native.last('setSpatialAudio'), {
+        'playerId': 'one',
+        'enabled': true,
+      });
+      expect(native.count('setSpatialAudio'), 2);
+    },
+  );
+
+  test('spatial audio is sent only when it differs from auto', () async {
+    addTearDown(() => playbackSpatialAudio.value = true);
+    await deck.setFileSource('/song.flac');
+    expect(native.methods, isNot(contains('setSpatialAudio')));
+
+    playbackSpatialAudio.value = false;
+    await _settle();
+    expect(native.last('setSpatialAudio')['enabled'], isFalse);
+
+    // An older native player without the method keeps playing.
+    native.replies['setSpatialAudio'] = (_) async =>
+        throw MissingPluginException();
+    playbackSpatialAudio.value = true;
+    await _settle();
+    await deck.resume();
+    expect(native.count('play'), 1);
+  });
+
+  test('a deck never created sends nothing for spatial audio', () async {
+    addTearDown(() => playbackSpatialAudio.value = true);
+    playbackSpatialAudio.value = false;
+    await _settle();
+    expect(native.calls, isEmpty);
+  });
+
   test('a disabled equalizer is never sent', () async {
     await deck.setFileSource('/song.flac');
     playbackEqualizer.value = const EqualizerSettings(preamp: 2);

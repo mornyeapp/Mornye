@@ -222,6 +222,12 @@ public class AudioplayersDarwinPlugin: NSObject, FlutterPlugin {
         result(FlutterError(code: "DarwinAudioError", message: "Equalizer is unavailable for this source", details: error.localizedDescription))
         return
       }
+    } else if method == "setSpatialAudio" {
+      guard let enabled = args["enabled"] as? Bool else {
+        result(FlutterError(code: "DarwinAudioError", message: "Missing spatial audio value", details: nil))
+        return
+      }
+      player.setSpatialAudio(enabled)
     } else if method == "setNextPlayer" {
       let nextId = args["nextPlayerId"] as? String
       player.next = nextId.flatMap { self.getPlayer(playerId: $0) }

@@ -27,6 +27,7 @@ import UniformTypeIdentifiers
     private var playbackNotification: PlaybackNotificationBridge?
     private var linkNowPlaying: LinkNowPlayingBridge?
     private var audioRouteInfo: AudioRouteInfoBridge?
+    private var spatialAudio: SpatialAudioBridge?
     private var musicHaptics: MusicHapticsBridge?
     private var audioOutput: AudioOutputBridge?
     private var castOutput: CastOutputPlugin?
@@ -174,6 +175,7 @@ import UniformTypeIdentifiers
         playbackNotification = PlaybackNotificationBridge(messenger: messenger)
         linkNowPlaying = LinkNowPlayingBridge(messenger: messenger)
         audioRouteInfo = AudioRouteInfoBridge(messenger: messenger)
+        spatialAudio = SpatialAudioBridge(messenger: messenger)
         musicHaptics = MusicHapticsBridge(messenger: messenger)
         audioOutput = AudioOutputBridge(messenger: messenger) { [weak self] in self?.activeWindow }
         castOutput = CastOutputPlugin(messenger: messenger)
