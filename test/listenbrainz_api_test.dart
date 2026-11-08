@@ -67,9 +67,9 @@ void main() {
       );
       addTearDown(api.close);
       final server = normalizeListenBrainzServer(
-        ' http://music.example.test:8080/apis/listenbrainz/1/ ',
+        ' http://192.168.1.20:8080/apis/listenbrainz/1/ ',
       )!;
-      expect(server, 'http://music.example.test:8080/apis/listenbrainz');
+      expect(server, 'http://192.168.1.20:8080/apis/listenbrainz');
       await api.validateToken('test-token', server: server);
       await api.nowPlaying(
         ListenBrainzAccount(
@@ -80,11 +80,82 @@ void main() {
         track,
       );
       expect(urls, [
-        'http://music.example.test:8080/apis/listenbrainz/1/validate-token',
-        'http://music.example.test:8080/apis/listenbrainz/1/submit-listens',
+        'http://192.168.1.20:8080/apis/listenbrainz/1/validate-token',
+        'http://192.168.1.20:8080/apis/listenbrainz/1/submit-listens',
       ]);
     },
   );
+
+  test('plain http is allowed only on this device or the local network', () {
+    final local = {
+      'localhost': 'http://localhost:42010',
+      'loopback IPv4': 'http://127.0.0.1',
+      'loopback IPv4 range': 'http://127.10.0.1',
+      'loopback IPv6': 'http://[::1]:8080',
+      'private 10/8': 'http://10.0.0.5',
+      'private 172.16/12 low': 'http://172.16.0.1',
+      'private 172.16/12 high': 'http://172.31.255.254',
+      'private 192.168/16': 'http://192.168.1.20',
+      'link-local IPv4': 'http://169.254.10.1',
+      'IPv6 unique local fc': 'http://[fc00::1]',
+      'IPv6 unique local fd': 'http://[fd12:3456::1]:8080',
+      'IPv6 link-local': 'http://[fe80::1]',
+      'IPv4-mapped private': 'http://[::ffff:192.168.1.20]',
+      '.local name': 'http://nas.local:8080',
+      '.local name, trailing dot': 'http://NAS.Local.',
+    };
+    final public = {
+      'public name': 'http://music.example.test',
+      'public IPv4': 'http://203.0.113.10',
+      'just outside 172.16/12 below': 'http://172.15.0.1',
+      'just outside 172.16/12 above': 'http://172.32.0.1',
+      'public IPv6': 'http://[2001:db8::1]',
+      'IPv4-mapped public': 'http://[::ffff:203.0.113.10]',
+      'single-label name': 'http://notlocal',
+      'localhost lookalike': 'http://localhost.example.test',
+      '.local inside a public name': 'http://nas.local.example.test',
+    };
+    for (final MapEntry(key: label, value: address) in local.entries) {
+      final server = normalizeListenBrainzServer(address);
+      expect(server, isNotNull, reason: label);
+      expect(listenBrainzServerSecure(server!), isTrue, reason: label);
+    }
+    for (final MapEntry(key: label, value: address) in public.entries) {
+      final server = normalizeListenBrainzServer(address);
+      expect(server, isNotNull, reason: label);
+      expect(listenBrainzServerSecure(server!), isFalse, reason: label);
+      // The same host is fine over HTTPS.
+      expect(
+        listenBrainzServerSecure(server.replaceFirst('http:', 'https:')),
+        isTrue,
+        reason: label,
+      );
+    }
+  });
+
+  test('nothing is sent to a plain http server on the internet', () async {
+    final api = ListenBrainzApi(
+      client: MockClient((_) async => fail('Unexpected network request')),
+    );
+    addTearDown(api.close);
+    const stored = ListenBrainzAccount(
+      username: 'listener',
+      token: 'test-token',
+      server: 'http://music.example.test',
+    );
+    await expectLater(
+      api.validateToken('test-token', server: stored.server),
+      throwsA(isA<ListenBrainzInsecureServerException>()),
+    );
+    await expectLater(
+      api.nowPlaying(stored, track),
+      throwsA(isA<ListenBrainzInsecureServerException>()),
+    );
+    await expectLater(
+      api.submit(stored, [queued(0)]),
+      throwsA(isA<ListenBrainzInsecureServerException>()),
+    );
+  });
 
   test('server addresses must be plain http or https', () {
     expect(normalizeListenBrainzServer(''), listenBrainzDefaultServer);

@@ -99,6 +99,47 @@ void main() {
     expect(service.connected, isFalse);
   });
 
+  serviceTest('a token is never sent over http outside the local network', (
+    tester,
+  ) async {
+    final server = FakeListenBrainzServer();
+    final store = MemoryScrobbleStore<ListenBrainzAccount>(enabled: false);
+    final service = create(tester, server, store);
+    await service.connect('test-token', server: 'http://music.example.test');
+    expect(service.problem, ScrobbleProblem.insecureServer);
+    expect(service.connected, isFalse);
+    expect(server.urls, isEmpty);
+    await service.connect('test-token', server: 'http://192.168.1.20:8080');
+    expect(service.connected, isTrue);
+    expect(server.urls.single.host, '192.168.1.20');
+  });
+
+  serviceTest('an older saved http address is signed out before sending', (
+    tester,
+  ) async {
+    final server = FakeListenBrainzServer();
+    final store = MemoryScrobbleStore(
+      session: const ListenBrainzAccount(
+        username: 'listener',
+        token: 'test-token',
+        server: 'http://music.example.test',
+      ),
+    )..queue = [lastfmQueued(1)];
+    final service = create(tester, server, store);
+    await service.initialize();
+    final handler = BaseAudioHandler();
+    service.bind(handler);
+    handler.mediaItem.add(song);
+    handler.playbackState.add(playing);
+    await tester.pump(const Duration(minutes: 3));
+    expect(server.urls, isEmpty);
+    expect(service.connected, isFalse);
+    expect(service.problem, ScrobbleProblem.insecureServer);
+    expect(store.session, isNull);
+    // The listen waits for the account to sign in again over HTTPS.
+    expect(store.queue, hasLength(1));
+  });
+
   serviceTest('a listen is announced, then submitted with its identifiers', (
     tester,
   ) async {

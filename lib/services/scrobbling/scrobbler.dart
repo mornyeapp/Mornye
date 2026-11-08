@@ -15,6 +15,9 @@ enum ScrobbleProblem {
   unavailable,
   rejected,
   invalidToken,
+
+  /// A plain http:// server outside the local network.
+  insecureServer,
 }
 
 /// How a service's failed request affects its queue.
@@ -107,7 +110,7 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
   @protected
   Future<void> readPendingConnection() async {}
 
-  /// Called once the saved state is loaded.
+  /// Called once the saved state is loaded, before queued listens are sent.
   @protected
   void didInitialize() {}
 
@@ -177,8 +180,8 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
       _initialized = true;
       _problem = null;
       _configure();
-      unawaited(flush());
       didInitialize();
+      unawaited(flush());
     } catch (_) {
       _problem = ScrobbleProblem.storage;
     } finally {
@@ -476,7 +479,16 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
     }
   }
 
-  Future<void> _expiredSession(int generation) async {
+  Future<void> _expiredSession(int generation) =>
+      _endSession(generation, ScrobbleProblem.reauthenticate);
+
+  /// Forgets the saved session and reports [problem]. Queued listens stay
+  /// for the next sign-in to the same account.
+  @protected
+  Future<void> endSession(ScrobbleProblem problem) =>
+      _endSession(_generation, problem);
+
+  Future<void> _endSession(int generation, ScrobbleProblem problem) async {
     if (_closed || generation != _generation) return;
     _generation++;
     _busy = false;
@@ -484,7 +496,7 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
     _listening.reset();
     _session = null;
     _enabled = false;
-    _problem = ScrobbleProblem.reauthenticate;
+    _problem = problem;
     _configure();
     try {
       await _serialize(() => _store.writeSession(null));

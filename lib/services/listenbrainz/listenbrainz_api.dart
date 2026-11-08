@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:mornye/constants/app_info.dart';
@@ -76,6 +77,50 @@ String? normalizeListenBrainzServer(String value) {
   return uri.replace(path: path).toString();
 }
 
+/// Whether the user token may be sent to [server]: any https:// address,
+/// and plain http:// only to this device or the local network, so the
+/// token never crosses the internet unencrypted.
+bool listenBrainzServerSecure(String server) {
+  final uri = Uri.tryParse(server);
+  if (uri == null) return false;
+  if (uri.isScheme('https')) return true;
+  return uri.isScheme('http') && isListenBrainzLocalHost(uri.host);
+}
+
+/// Loopback, private IPv4 (10/8, 172.16/12, 192.168/16), link-local, IPv6
+/// unique local addresses, `localhost` and `.local` names. Nothing is
+/// resolved: a public name stays public even if it points at a LAN.
+bool isListenBrainzLocalHost(String host) {
+  final name = host.toLowerCase().replaceFirst(RegExp(r'\.$'), '');
+  if (name == 'localhost' || name.endsWith('.local')) return true;
+  final address = InternetAddress.tryParse(name.split('%').first);
+  if (address == null) return false;
+  if (address.isLoopback || address.isLinkLocal) return true;
+  var bytes = address.rawAddress;
+  if (bytes.length == 16) {
+    final mapped =
+        bytes.take(10).every((byte) => byte == 0) &&
+        bytes[10] == 255 &&
+        bytes[11] == 255;
+    if (!mapped) return bytes[0] & 0xfe == 0xfc;
+    bytes = bytes.sublist(12);
+  }
+  return bytes[0] == 127 ||
+      bytes[0] == 10 ||
+      (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) ||
+      (bytes[0] == 192 && bytes[1] == 168) ||
+      (bytes[0] == 169 && bytes[1] == 254);
+}
+
+/// The server would receive the token over plain http:// outside the
+/// local network, so nothing was sent.
+class ListenBrainzInsecureServerException implements Exception {
+  const ListenBrainzInsecureServerException();
+
+  @override
+  String toString() => 'ListenBrainz server must use HTTPS';
+}
+
 /// ListenBrainz `track_metadata` for [track]. Unknown fields are left out.
 Map<String, Object> listenBrainzMetadata(ScrobbleTrack track) {
   final duration = track.duration;
@@ -103,7 +148,14 @@ class ListenBrainzApi {
   final http.Client _client;
   static const _timeout = Duration(seconds: 15);
 
-  Uri _endpoint(String server, String path) => Uri.parse('$server/1/$path');
+  /// Checked on every request, so an address saved by an older version
+  /// cannot send the token in the clear either.
+  Uri _endpoint(String server, String path) {
+    if (!listenBrainzServerSecure(server)) {
+      throw const ListenBrainzInsecureServerException();
+    }
+    return Uri.parse('$server/1/$path');
+  }
 
   /// The account name the token belongs to, or null when the server does
   /// not accept the token.
