@@ -250,7 +250,9 @@ Future<void> runLinkLibraryAction(
         );
         return;
       }
-      if (!await showReEnrichReviewSheet(context, previews: previews) ||
+      // The other device runs the job, so its songs keep their automatic
+      // results here.
+      if (await showReEnrichReviewSheet(context, previews: previews) == null ||
           !context.mounted) {
         return;
       }

@@ -4248,6 +4248,53 @@
   "@trackReEnrichApplyChanges": {
     "description": "Confirmation button in the batch metadata review sheet"
   },
+  "reEnrichBestMatches": "Best matches",
+  "@reEnrichBestMatches": {
+    "description": "Header above the online results that fit the song, in the re-enrich result picker"
+  },
+  "reEnrichOtherResults": "Other results",
+  "@reEnrichOtherResults": {
+    "description": "Header above online results that do not fit the song well, in the re-enrich result picker"
+  },
+  "reEnrichNoCloseMatch": "No close match",
+  "@reEnrichNoCloseMatch": {
+    "description": "Header in the re-enrich result picker when no online result fits the song well"
+  },
+  "reEnrichShowOtherResults": "Show {count, plural, =1{1 more result} other{{count} more results}}",
+  "@reEnrichShowOtherResults": {
+    "description": "Row that unfolds the online results that do not fit the song well",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "reEnrichMatchExact": "Same ISRC",
+  "@reEnrichMatchExact": {
+    "description": "Shown on an online result whose ISRC equals the song's"
+  },
+  "reEnrichMatchStrong": "Same title, artist and album",
+  "@reEnrichMatchStrong": {
+    "description": "Shown on an online result whose title, artist and album fit the song"
+  },
+  "reEnrichMatchWeak": "Same title and artist",
+  "@reEnrichMatchWeak": {
+    "description": "Shown on an online result whose title and artist fit the song, but not the album"
+  },
+  "reEnrichChooseMatch": "Choose a result",
+  "@reEnrichChooseMatch": {
+    "description": "Row in the re-enrich review for a song no online result fitted well enough to apply on its own"
+  },
+  "reEnrichChooseMatchSubtitle": "No result fitted well enough to apply on its own",
+  "@reEnrichChooseMatchSubtitle": {
+    "description": "Subtitle of the Choose a result row in the re-enrich review"
+  },
+  "reEnrichChangeMatch": "Change result",
+  "@reEnrichChangeMatch": {
+    "description": "Row in the re-enrich review that picks another online result for a song"
+  },
+  "reEnrichNoResults": "No results found online for this song",
+  "@reEnrichNoResults": {
+    "description": "Message when a re-enrich search finds nothing for one song"
+  },
   "trackReEnrichRefreshOnline": "Refresh from online",
   "@trackReEnrichRefreshOnline": {
     "description": "Proposed value when lyrics will be refreshed during re-enrich"

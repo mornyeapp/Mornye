@@ -11,10 +11,14 @@ class MetadataCandidateTile extends StatelessWidget {
   final Map<String, dynamic> candidate;
   final VoidCallback onTap;
 
+  /// Where the result comes from and how well it fits, as the last line.
+  final String? source;
+
   const MetadataCandidateTile({
     super.key,
     required this.candidate,
     required this.onTap,
+    this.source,
   });
 
   @override
@@ -35,6 +39,7 @@ class MetadataCandidateTile extends StatelessWidget {
       album,
       if (date.isNotEmpty) date,
       if (isrc.isNotEmpty) 'ISRC ${formatIsrcForDisplay(isrc)}',
+      ?source?.trim(),
     ].where((value) => value.isNotEmpty).join('\n');
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -44,7 +49,7 @@ class MetadataCandidateTile extends StatelessWidget {
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: subtitle.isEmpty
           ? null
-          : Text(subtitle, maxLines: 4, overflow: TextOverflow.ellipsis),
+          : Text(subtitle, maxLines: 5, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,
     );

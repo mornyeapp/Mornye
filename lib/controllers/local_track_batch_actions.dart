@@ -28,6 +28,7 @@ import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/batch_progress_dialog.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/re_enrich_field_dialog.dart';
+import 'package:mornye/widgets/re_enrich_candidate_sheet.dart';
 import 'package:mornye/widgets/re_enrich_review_sheet.dart';
 import 'package:mornye/widgets/link/link_library_actions.dart';
 import 'package:mornye/services/link/link_library_jobs.dart';
@@ -374,13 +375,49 @@ Future<void> reEnrichLocalTracks(
     return;
   }
 
-  final confirmed = await showReEnrichReviewSheet(context, previews: previews);
-  if (!confirmed || !context.mounted || !isActive()) {
+  final providerName = reEnrichProviderNames(ref.read(extensionProvider));
+  var reviewed = previews;
+  // One song goes straight to its results, as from its own page; the
+  // review then shows what the pick changes.
+  if (selected.length == 1 &&
+      previews.length == 1 &&
+      previews.single.candidates.isNotEmpty) {
+    final single = previews.single;
+    final candidate = await showReEnrichCandidateSheet(
+      context,
+      candidates: single.candidates,
+      title: context.l10n.trackReEnrich,
+      subtitle: [
+        single.item.trackName,
+        single.item.artistName,
+      ].where((value) => value.trim().isNotEmpty).join(' · '),
+      providerName: providerName,
+    );
+    if (candidate == null || !context.mounted || !isActive()) {
+      if (context.mounted && isActive()) onSelectionRestore();
+      return;
+    }
+    final picked = await runner.choose(single, candidate);
+    if (!context.mounted || !isActive()) return;
+    if (picked != null) reviewed = [picked];
+  }
+
+  final approved = await showReEnrichReviewSheet(
+    context,
+    previews: reviewed,
+    onChoose: runner.choose,
+    providerName: providerName,
+  );
+  final toApply = [
+    for (final preview in approved ?? const <BatchReEnrichPreview>[])
+      if (preview.changes.isNotEmpty) preview,
+  ];
+  if (toApply.isEmpty || !context.mounted || !isActive()) {
     if (context.mounted && isActive()) onSelectionRestore();
     return;
   }
 
-  final total = previews.length;
+  final total = toApply.length;
   cancelled = false;
   BatchProgressDialog.show(
     context: context,
@@ -396,7 +433,7 @@ Future<void> reEnrichLocalTracks(
   final lyricsSummary = ReEnrichLyricsSummary();
   final written = <String>{};
   final successCount = await runner.apply(
-    previews,
+    toApply,
     onResult: lyricsSummary.add,
     onWritten: (item) => written.add(item.id),
     shouldStop: () => cancelled || !context.mounted || !isActive(),
@@ -461,6 +498,39 @@ class BatchReEnrichRunner {
     this.saveMotionArtwork,
   });
 
+  /// The settings of the last preview, which picks reuse.
+  AppSettings? _previewSettings;
+
+  /// [preview] updated from [candidate], picked by hand, or null when the
+  /// lookup failed.
+  Future<BatchReEnrichPreview?> choose(
+    BatchReEnrichPreview preview,
+    Map<String, dynamic> candidate,
+  ) async {
+    final settings = _previewSettings ?? await beginPhase();
+    final result = await reEnrich(
+      buildBatchReEnrichRequest(
+        item: preview.item,
+        settings: settings,
+        updateFields: preview.updateFields,
+        previewOnly: true,
+        sourceTrackId: sourceTrackIds[preview.item.id],
+        selectedCandidate: candidate,
+      ),
+    );
+    final rawMetadata = result['enriched_metadata'];
+    if (result['method'] != 'preview' || rawMetadata is! Map) {
+      _reEnrichLog.w(
+        'Picked result failed for ${preview.item.id}: ${result['error'] ?? result['method']}',
+      );
+      return null;
+    }
+    return preview.withChoice(
+      candidate,
+      rawMetadata.map((key, value) => MapEntry(key.toString(), value)),
+    );
+  }
+
   Future<List<BatchReEnrichPreview>> preview(
     List<LocalLibraryItem> items,
     ReEnrichFieldSelection selection, {
@@ -469,6 +539,7 @@ class BatchReEnrichRunner {
   }) async {
     if (shouldStop()) return [];
     final settings = await beginPhase();
+    _previewSettings = settings;
     final previews = <BatchReEnrichPreview>[];
     for (var index = 0; index < items.length; index++) {
       if (shouldStop()) break;
@@ -489,6 +560,7 @@ class BatchReEnrichRunner {
             updateFields: fields,
             previewOnly: true,
             sourceTrackId: sourceTrackIds[item.id],
+            includeCandidates: true,
           ),
         );
         final rawMetadata = result['enriched_metadata'];
@@ -501,16 +573,18 @@ class BatchReEnrichRunner {
         final metadata = rawMetadata.map(
           (key, value) => MapEntry(key.toString(), value),
         );
-        final changes = buildReEnrichMetadataChanges(item, metadata, fields);
-        if (changes.isEmpty) continue;
-        previews.add(
-          BatchReEnrichPreview(
-            item: item,
-            updateFields: fields,
-            enrichedMetadata: metadata,
-            changes: changes,
-          ),
+        final preview = BatchReEnrichPreview(
+          item: item,
+          updateFields: fields,
+          enrichedMetadata: metadata,
+          changes: buildReEnrichMetadataChanges(item, metadata, fields),
+          match: ReEnrichMatch.fromWire(result['auto_match']),
+          candidates: reEnrichCandidates(result['candidates']),
         );
+        // A song nothing fitted well still goes to review when a result
+        // can be picked for it by hand.
+        if (preview.changes.isEmpty && !preview.needsChoice) continue;
+        previews.add(preview);
       } catch (error, stack) {
         _reEnrichLog.w('Metadata lookup failed for ${item.id}: $error');
         _reEnrichLog.d('$stack');

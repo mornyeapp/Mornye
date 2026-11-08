@@ -971,7 +971,42 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
         ),
       };
 
-      final result = await PlatformBridge.reEnrichFile(request);
+      // A common title also finds other songs, so the person picks the
+      // result instead of the search guessing for them.
+      final preview = await PlatformBridge.reEnrichFile({
+        ...request,
+        'preview_only': true,
+        'include_candidates': true,
+      });
+      if (!mounted) return;
+      messenger.hideCurrentSnackBar();
+      final candidates = reEnrichCandidates(preview['candidates']);
+      if (candidates.isEmpty) {
+        await showReEnrichResultDialog(
+          context,
+          message: l10n.reEnrichNoResults,
+        );
+        return;
+      }
+      final chosen = await showReEnrichCandidateSheet(
+        context,
+        candidates: candidates,
+        title: l10n.trackReEnrich,
+        subtitle: [
+          trackName,
+          artistName,
+        ].where((value) => value.trim().isNotEmpty).join(' · '),
+        providerName: reEnrichProviderNames(ref.read(extensionProvider)),
+      );
+      if (chosen == null || !mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.trackReEnrichProgress)),
+      );
+
+      final result = await PlatformBridge.reEnrichFile({
+        ...request,
+        'selected_candidate': chosen,
+      });
       final method = result['method'] as String?;
 
       final enriched = result['enriched_metadata'] as Map<String, dynamic>?;
