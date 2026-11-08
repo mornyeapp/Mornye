@@ -318,6 +318,110 @@ Future<int> clearLibraryCoverFiles(
   );
 }
 
+/// Marks the local Library rows whose cover file in [directory] is gone, so
+/// the next incremental scan reads those songs again and extracts their
+/// covers, with no full scan. Covers can disappear outside Settings: a
+/// system cleanup, a restored backup or a moved data folder. Rows keep the
+/// scan's spelling of the folder, so a file is matched by its path inside
+/// it. Returns the number of marked rows.
+Future<int> markLibraryRowsWithMissingCovers(
+  Directory directory,
+  Database libraryDatabase,
+) async {
+  final present = <String>{};
+  if (await directory.exists()) {
+    await for (final entry in directory.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      if (entry is! File) continue;
+      present.add(
+        p.relative(entry.path, from: directory.path).replaceAll(r'\', '/'),
+      );
+    }
+  }
+  final rows = await libraryDatabase.rawQuery(
+    'SELECT DISTINCT cover_path FROM library '
+    'WHERE audio_metadata_scan_version > ? '
+    r"AND cover_path GLOB '*[/\]library_covers[/\]*' "
+    "AND file_path NOT LIKE 'network://%'",
+    [libraryLyricsMetadataScanVersion],
+  );
+  final missing = [
+    for (final row in rows)
+      if (row['cover_path'] case final String path
+          when !present.contains(_libraryCoverName(path)))
+        path,
+  ];
+  var marked = 0;
+  for (var start = 0; start < missing.length; start += 500) {
+    final chunk = missing.skip(start).take(500).toList(growable: false);
+    marked += await sqlite.transactionWithBusyRetry(
+      libraryDatabase,
+      (txn) => txn.rawUpdate(
+        'UPDATE library SET audio_metadata_scan_version = ? '
+        'WHERE audio_metadata_scan_version > ? '
+        'AND cover_path IN (${List.filled(chunk.length, '?').join(', ')})',
+        [
+          libraryLyricsMetadataScanVersion,
+          libraryLyricsMetadataScanVersion,
+          ...chunk,
+        ],
+      ),
+    );
+  }
+  return marked;
+}
+
+/// The path of a cover file inside its `library_covers` folder, with `/`.
+String _libraryCoverName(String path) {
+  final normalized = path.replaceAll(r'\', '/');
+  const folder = '/library_covers/';
+  final at = normalized.lastIndexOf(folder);
+  return at < 0 ? normalized : normalized.substring(at + folder.length);
+}
+
+const _coverlessRereadKey = 'coverless_reread_v1';
+
+/// Marks the local Library rows without a cover for one reread, so the next
+/// incremental scan looks for a folder image beside each song. Scans before
+/// folder images were read left those songs without one. [onceKey] limits
+/// this to one run per database. Returns the number of marked rows.
+Future<int> markCoverlessLibraryRows(
+  Database libraryDatabase, {
+  String? onceKey,
+}) {
+  return sqlite.transactionWithBusyRetry(libraryDatabase, (txn) async {
+    if (onceKey != null) {
+      final marker = await txn.query(
+        'library_state',
+        columns: ['value'],
+        where: 'key = ?',
+        whereArgs: [onceKey],
+      );
+      if (marker.firstOrNull?['value'] == '1') return 0;
+    }
+    final marked = await txn.rawUpdate(
+      'UPDATE library SET audio_metadata_scan_version = ? '
+      'WHERE audio_metadata_scan_version > ? '
+      "AND (cover_path IS NULL OR cover_path = '') "
+      "AND file_path NOT LIKE 'network://%'",
+      [libraryLyricsMetadataScanVersion, libraryLyricsMetadataScanVersion],
+    );
+    if (onceKey != null) {
+      await txn.insert('library_state', {
+        'key': onceKey,
+        'value': '1',
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    return marked;
+  });
+}
+
+/// [markCoverlessLibraryRows] once, for the first scan with folder images.
+Future<int> markCoverlessLibraryRowsOnce(Database libraryDatabase) =>
+    markCoverlessLibraryRows(libraryDatabase, onceKey: _coverlessRereadKey);
+
 final _subsonicCover = RegExp(r'^subsonic_([0-9a-fA-F]{64})(?:_.*)?\.image$');
 
 /// A Subsonic cover (`subsonic_<hash>.image`, or `subsonic_<hash>_<id>.image`

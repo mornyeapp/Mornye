@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
+import 'package:mornye/providers/library_album_artwork_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/audio_analysis_cache.dart';
@@ -167,6 +169,13 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
       libraryCoverDir,
       await LibraryDatabase.instance.database,
     );
+    // Covers found online for albums come back from their saved addresses
+    // without a scan or a new search.
+    if (mounted) {
+      unawaited(
+        ref.read(libraryAlbumArtworkProvider.notifier).restoreMissing(),
+      );
+    }
   }
 
   Future<void> _clearAudioAnalysisCache() async {

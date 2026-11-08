@@ -232,6 +232,116 @@ void main() {
     },
   );
 
+  group('cover rereads', () {
+    late Directory root;
+    late Directory covers;
+    late SqliteProcessDatabase database;
+
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('reread-covers-');
+      covers = await Directory('${root.path}/library_covers').create();
+      database = await SqliteProcessDatabase.open(
+        path: '${root.path}/local_library.db',
+      );
+      await database.execute(
+        'CREATE TABLE library (id TEXT PRIMARY KEY, file_path TEXT, '
+        'cover_path TEXT, file_mod_time INTEGER, '
+        'audio_metadata_scan_version INTEGER)',
+      );
+      await database.execute(
+        'CREATE TABLE library_state (key TEXT PRIMARY KEY, value TEXT)',
+      );
+    });
+
+    tearDown(() async {
+      await database.close();
+      await root.delete(recursive: true);
+    });
+
+    Future<Map<String, int>> snapshot() async {
+      final rows = await database.rawQuery(
+        'SELECT id, file_mod_time, audio_metadata_scan_version FROM library',
+      );
+      return {
+        for (final row in rows)
+          row['id'] as String: libraryIncrementalSnapshotModTime(
+            storedModTime: row['file_mod_time'] as int,
+            storedScanVersion: row['audio_metadata_scan_version'] as int,
+          ),
+      };
+    }
+
+    test('rereads only the songs whose cover file is gone', () async {
+      await File('${covers.path}/kept.jpg').writeAsBytes([1]);
+      await Directory('${covers.path}/nested').create();
+      await File('${covers.path}/nested/kept.png').writeAsBytes([2]);
+      // The scan's spelling of the folder may differ from the app's.
+      const other = '/data/data/app/files/library_covers';
+      for (final (id, path, cover) in [
+        ('kept', '/music/a.flac', '${covers.path}/kept.jpg'),
+        ('alias', '/music/b.flac', '$other/kept.jpg'),
+        ('nested', '/music/c.flac', '${covers.path}/nested/kept.png'),
+        ('gone', '/music/d.flac', '${covers.path}/gone.jpg'),
+        ('gone too', '/music/e.flac', '${covers.path}/gone.jpg'),
+        ('windows', r'C:\Music\f.flac', r'C:\Data\library_covers\lost.jpg'),
+        ('network', 'network://nas/g.flac', '$other/lost.image'),
+        ('download', '/music/h.flac', '${root.path}/downloads/h.jpg'),
+        ('none', '/music/i.flac', null),
+      ]) {
+        await database.rawInsert(
+          'INSERT INTO library VALUES (?, ?, ?, 1000, 4)',
+          [id, path, cover],
+        );
+      }
+
+      expect(await markLibraryRowsWithMissingCovers(covers, database), 3);
+      expect(await snapshot(), {
+        'kept': 1000,
+        'alias': 1000,
+        'nested': 1000,
+        'gone': -1,
+        'gone too': -1,
+        'windows': -1,
+        'network': 1000,
+        'download': 1000,
+        'none': 1000,
+      });
+
+      await covers.delete(recursive: true);
+      expect(await markLibraryRowsWithMissingCovers(covers, database), 3);
+      expect(await snapshot(), containsPair('kept', -1));
+    });
+
+    test('rereads songs without a cover once', () async {
+      for (final (id, path, cover) in [
+        ('none', '/music/a.flac', null),
+        ('empty', 'content://tree/b.flac', ''),
+        ('covered', '/music/c.flac', '${covers.path}/c.jpg'),
+        ('network', 'network://nas/d.flac', null),
+      ]) {
+        await database.rawInsert(
+          'INSERT INTO library VALUES (?, ?, ?, 1000, 4)',
+          [id, path, cover],
+        );
+      }
+
+      expect(await markCoverlessLibraryRowsOnce(database), 2);
+      expect(await snapshot(), {
+        'none': -1,
+        'empty': -1,
+        'covered': 1000,
+        'network': 1000,
+      });
+
+      // The scan reads them again; a later run leaves them alone.
+      await database.rawUpdate(
+        'UPDATE library SET audio_metadata_scan_version = 4',
+      );
+      expect(await markCoverlessLibraryRowsOnce(database), 0);
+      expect(await markCoverlessLibraryRows(database), 2);
+    });
+  });
+
   test(
     'cover cleanup retains recent payloads awaiting a DB reference',
     () async {

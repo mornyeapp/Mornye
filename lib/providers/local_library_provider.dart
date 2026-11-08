@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/models/library_scan_failure.dart';
+import 'package:mornye/providers/library_album_artwork_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/library_cleanup.dart';
 import 'package:mornye/services/library_database.dart';

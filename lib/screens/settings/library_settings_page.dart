@@ -10,8 +10,10 @@ import 'package:mornye/controllers/library_re_enrich_all.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_scan_failure.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/download_history_provider.dart';
+import 'package:mornye/providers/library_album_artwork_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/link/link_source_names.dart';
@@ -292,6 +294,74 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
       await reEnrichWholeLibrary(context, ref, isActive: () => mounted);
     } finally {
       if (mounted) setState(() => _isLoadingReEnrich = false);
+    }
+  }
+
+  Future<void> _findArtwork() async {
+    if (ref.read(libraryAlbumArtworkProvider).running) return;
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    if (!ref.read(libraryAlbumArtworkProvider.notifier).canLookUp) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.libraryFindArtworkNoProvider)),
+      );
+      return;
+    }
+    var motion = false;
+    // Animated covers mean a lookup for every album, so they are a choice,
+    // offered only where the players and album pages show them.
+    if (context.isMornye && ref.read(settingsProvider).motionArtworkEnabled) {
+      final choice = await showAppBottomSheet<bool>(
+        context: context,
+        useRootNavigator: true,
+        title: l10n.libraryFindArtwork,
+        builder: (context) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppSheetOption(
+              leading: const AppIcon(Icons.image_outlined),
+              title: Text(context.l10n.libraryFindArtworkCovers),
+              subtitle: Text(context.l10n.libraryFindArtworkCoversSubtitle),
+              onTap: () => Navigator.pop(context, false),
+            ),
+            AppSheetOption(
+              leading: const AppIcon(Icons.motion_photos_on_outlined),
+              title: Text(context.l10n.libraryFindArtworkMotion),
+              subtitle: Text(context.l10n.libraryFindArtworkMotionSubtitle),
+              onTap: () => Navigator.pop(context, true),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      );
+      if (choice == null || !mounted) return;
+      motion = choice;
+    }
+    try {
+      final summary = await ref
+          .read(libraryAlbumArtworkProvider.notifier)
+          .findMissing(covers: true, motion: motion);
+      if (summary == null) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            summary.albums == 0
+                ? l10n.libraryFindArtworkNothing
+                : l10n.libraryFindArtworkResult(
+                    summary.covers,
+                    summary.motion,
+                    summary.failed,
+                  ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.snackbarError(context.friendlyError(error))),
+        ),
+      );
     }
   }
 
@@ -774,6 +844,9 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                   final canReEnrich =
                       !_isLoadingReEnrich &&
                       (libraryState.totalCount > 0 || hasDownloads);
+                  final artwork = ref.watch(libraryAlbumArtworkProvider);
+                  final canFindArtwork =
+                      !artwork.running && libraryState.totalCount > 0;
                   return SettingsGroup(
                     connected: true,
                     children: [
@@ -831,6 +904,31 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                             onTap: canReEnrich ? _reEnrichAll : null,
                           ),
                         ),
+                        if (artwork.running && artwork.albumKey == null)
+                          _ArtworkProgressTile(
+                            done: artwork.done,
+                            total: artwork.total,
+                            stopping: artwork.cancelling,
+                            onStop: ref
+                                .read(libraryAlbumArtworkProvider.notifier)
+                                .cancel,
+                          )
+                        else
+                          Opacity(
+                            opacity: canFindArtwork ? 1.0 : 0.5,
+                            child: SettingsItem(
+                              icon: Icons.image_search_outlined,
+                              title: context.l10n.libraryFindArtwork,
+                              subtitle: context.l10n.libraryFindArtworkSubtitle,
+                              trailing: artwork.running
+                                  ? const AppLoadingIndicator(
+                                      size: 20,
+                                      strokeWidth: 2,
+                                    )
+                                  : null,
+                              onTap: canFindArtwork ? _findArtwork : null,
+                            ),
+                          ),
                       ],
                       Opacity(
                         opacity: canFindMoved || _isFindingMovedDownloads

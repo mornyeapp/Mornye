@@ -347,6 +347,8 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
               '${state.scanErrorCount} errors',
         );
       } else {
+        await _markSongsForCoverReread();
+        if (!ref.mounted || _scanCancelRequested) return;
         final nativeIngestion = PlatformBridge.supportsCoreBackend;
         final existingFiles = nativeIngestion
             ? const <String, int>{}
@@ -624,6 +626,14 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
     } catch (e) {
       _log.w('Failed to save lastScannedAt: $e');
     }
+    // The scan cleared the covers of songs whose files have none, including
+    // covers found online for their albums.
+    try {
+      await ref.read(libraryAlbumArtworkStoreProvider).apply();
+    } catch (e) {
+      _log.w('Failed to apply found album covers: $e');
+    }
+    if (!ref.mounted) return;
 
     await _refreshSummaryFromStorage(
       lastScannedAt: now,
@@ -639,6 +649,8 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
       excludedDownloadedCount: skippedDownloads,
     );
     if (pruneCoverCache) await _pruneLibraryCoverCache();
+    if (!ref.mounted) return;
+    unawaited(ref.read(libraryAlbumArtworkProvider.notifier).restoreMissing());
 
     final message = summary();
     if (state.scanErrorCount > 0) {
@@ -918,6 +930,29 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
       return decoded.substring(cut + 1);
     }
     return decoded;
+  }
+
+  /// Lets an incremental scan read again the songs whose cover file is gone,
+  /// and once the songs without a cover, which may have a folder image, so
+  /// neither waits for a full scan.
+  Future<void> _markSongsForCoverReread() async {
+    try {
+      final appSupportDir = await getApplicationSupportDirectory();
+      final libraryDatabase = await _db.database;
+      final missing = await markLibraryRowsWithMissingCovers(
+        Directory('${appSupportDir.path}/library_covers'),
+        libraryDatabase,
+      );
+      final coverless = await markCoverlessLibraryRowsOnce(libraryDatabase);
+      if (missing > 0 || coverless > 0) {
+        _log.i(
+          'Rereading $missing songs whose cover file is gone and '
+          '$coverless songs without a cover',
+        );
+      }
+    } catch (e) {
+      _log.w('Could not check library covers: $e');
+    }
   }
 
   Future<void> _pruneLibraryCoverCache() async {

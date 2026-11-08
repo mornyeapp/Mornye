@@ -239,6 +239,18 @@ class SettingsSearchCatalog {
           ],
         ),
         SettingsSearchEntry(
+          icon: Icons.image_search_outlined,
+          title: l10n.libraryFindArtwork,
+          subtitle: l10n.libraryFindArtworkSubtitle,
+          keywords: const [
+            'album art',
+            'cover',
+            'artwork',
+            'animated cover',
+            'motion cover',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.cleaning_services_outlined,
           title: l10n.libraryCleanupMissingFiles,
           subtitle: l10n.libraryCleanupMissingFilesSubtitle,

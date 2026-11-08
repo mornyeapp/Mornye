@@ -58,11 +58,50 @@ class MotionArtworkStore {
         .toString();
   }
 
+  static final _storedKey = RegExp(r'^[0-9a-f]{64}$');
+
+  /// The key whose video [key] shows: its own, or the one its alias names.
+  Future<String> _resolve(Directory root, String key) async {
+    if (await File('${root.path}/$key.mp4').exists()) return key;
+    final alias = File('${root.path}/$key.alias');
+    if (!await alias.exists()) return key;
+    final target = (await alias.readAsString()).trim();
+    return _storedKey.hasMatch(target) ? target : key;
+  }
+
+  /// Lets [album] show the video saved for [target] without a second copy.
+  /// Players find a video by the album and the playing song's artist, so
+  /// each song artist of one album needs a name for the same video.
+  Future<void> alias(
+    MotionArtworkAlbum album,
+    MotionArtworkAlbum target,
+  ) async {
+    final key = _key(album);
+    final targetKey = _key(target);
+    if (_clearing || key == targetKey) return;
+    final root = await _directory();
+    await root.create(recursive: true);
+    await File('${root.path}/$key.alias').writeAsString(targetKey, flush: true);
+  }
+
+  /// Deletes the video saved for [album], or its alias.
+  Future<void> remove(MotionArtworkAlbum album) async {
+    if (_clearing) return;
+    final key = _key(album);
+    await _pending[key];
+    final root = await _directory();
+    for (final name in ['$key.mp4', '$key.json', '$key.alias']) {
+      await deleteFileQuietly(File('${root.path}/$name'));
+    }
+    _invalid.remove(key);
+    _legacyChecks.remove(key);
+  }
+
   Future<MotionArtwork?> find(MotionArtworkAlbum album) async {
     if (_clearing) return null;
     try {
       final root = await _directory();
-      final key = _key(album);
+      final key = await _resolve(root, _key(album));
       if (_invalid.contains(key)) return null;
       final file = File('${root.path}/$key.mp4');
       if (!await file.exists() || await file.length() == 0) return null;

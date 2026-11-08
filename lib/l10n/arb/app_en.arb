@@ -3449,6 +3449,89 @@
   "@libraryReEnrichAllBusy": {
     "description": "Snackbar when Re-enrich All is started during a Library scan"
   },
+  "libraryFindArtwork": "Find Missing Artwork",
+  "@libraryFindArtwork": {
+    "description": "Library settings action - look up covers online for albums without one, kept in the app"
+  },
+  "libraryFindArtworkSubtitle": "Look up covers for albums without one. Your music files stay unchanged.",
+  "@libraryFindArtworkSubtitle": {
+    "description": "Subtitle for the Find Missing Artwork action"
+  },
+  "libraryFindArtworkCovers": "Missing Covers",
+  "@libraryFindArtworkCovers": {
+    "description": "Find Missing Artwork option - only covers for albums that have none"
+  },
+  "libraryFindArtworkCoversSubtitle": "Albums whose songs have no cover",
+  "@libraryFindArtworkCoversSubtitle": {
+    "description": "Subtitle for the Missing Covers option"
+  },
+  "libraryFindArtworkMotion": "Missing Covers and Animated Covers",
+  "@libraryFindArtworkMotion": {
+    "description": "Find Missing Artwork option - covers for albums without one plus animated covers for every album"
+  },
+  "libraryFindArtworkMotionSubtitle": "Checks every album, so it takes longer",
+  "@libraryFindArtworkMotionSubtitle": {
+    "description": "Subtitle for the option that also looks up animated covers"
+  },
+  "libraryFindArtworkRunning": "Finding artwork...",
+  "@libraryFindArtworkRunning": {
+    "description": "Title of the progress row while artwork is looked up"
+  },
+  "libraryFindArtworkProgress": "{done} of {total} albums",
+  "@libraryFindArtworkProgress": {
+    "description": "Progress of the artwork lookup",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryFindArtworkStopping": "Stopping...",
+  "@libraryFindArtworkStopping": {
+    "description": "Progress row text after the artwork lookup was stopped, while the last albums finish"
+  },
+  "libraryFindArtworkNoProvider": "Enable a metadata extension to look up artwork.",
+  "@libraryFindArtworkNoProvider": {
+    "description": "Snackbar when no enabled extension can look up albums"
+  },
+  "libraryFindArtworkNothing": "Every album already has its artwork.",
+  "@libraryFindArtworkNothing": {
+    "description": "Snackbar when no album needs a cover or animated cover"
+  },
+  "libraryFindArtworkResult": "{covers, plural, =0{No new covers} =1{Found 1 cover} other{Found {covers} covers}}{motion, plural, =0{} =1{ · 1 animated cover} other{ · {motion} animated covers}}{failed, plural, =0{} =1{ · 1 album not checked} other{ · {failed} albums not checked}}",
+  "@libraryFindArtworkResult": {
+    "description": "Snackbar after Find Missing Artwork: covers found, animated covers found, then albums no extension could be asked about",
+    "placeholders": {
+      "covers": {
+        "type": "int"
+      },
+      "motion": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "albumFindArtwork": "Find Artwork",
+  "@albumFindArtwork": {
+    "description": "Local album menu action - look up this album's cover and animated cover online"
+  },
+  "albumFindArtworkNotFound": "No matching album found",
+  "@albumFindArtworkNotFound": {
+    "description": "Snackbar when Find Artwork finds no provider album that matches"
+  },
+  "albumRemoveFoundArtwork": "Remove Found Artwork",
+  "@albumRemoveFoundArtwork": {
+    "description": "Local album menu action - remove a cover and animated cover found online, for a wrong match"
+  },
+  "albumRemoveFoundArtworkDone": "Removed. Find Missing Artwork leaves this album alone now.",
+  "@albumRemoveFoundArtworkDone": {
+    "description": "Snackbar after removing found artwork from an album"
+  },
   "libraryFilterDownloaded": "Downloaded",
   "@libraryFilterDownloaded": {
     "description": "Filter chip - show only downloaded items"

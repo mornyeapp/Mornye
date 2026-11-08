@@ -697,3 +697,74 @@ class _ScanProgressTile extends StatelessWidget {
     );
   }
 }
+
+/// Find Missing Artwork while it runs, laid out like [_ScanProgressTile].
+class _ArtworkProgressTile extends StatelessWidget {
+  final int done;
+  final int total;
+  final bool stopping;
+  final VoidCallback onStop;
+
+  const _ArtworkProgressTile({
+    required this.done,
+    required this.total,
+    required this.stopping,
+    required this.onStop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppIcon(Icons.image_search_outlined, color: colorScheme.primary),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.libraryFindArtworkRunning,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (stopping || total > 0)
+                      Text(
+                        stopping
+                            ? context.l10n.libraryFindArtworkStopping
+                            : context.l10n.libraryFindArtworkProgress(
+                                done,
+                                total,
+                              ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              ExpressiveButton(
+                text: true,
+                onPressed: stopping ? null : onStop,
+                child: Text(context.l10n.actionStop),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          AppProgressIndicator.linear(
+            value: total > 0 ? done / total : null,
+            trackColor: colorScheme.surfaceContainerHighest,
+            color: colorScheme.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+      ),
+    );
+  }
+}

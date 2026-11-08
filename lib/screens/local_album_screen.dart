@@ -15,6 +15,7 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/audio_quality_badge_policy.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
+import 'package:mornye/services/library_album_artwork.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/batch_track_actions.dart';
 import 'package:mornye/models/album_track_order.dart';
@@ -22,6 +23,7 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/providers/deleted_library_files.dart';
+import 'package:mornye/providers/library_album_artwork_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -258,10 +260,13 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
             )
             .firstOrNull ??
         _sortedTracksCache.firstOrNull;
+    // Songs handed to the page keep the covers they had when it opened, so
+    // a cover found from here shows from its record.
+    final foundCover = _albumArtwork()?.record?.coverFile;
     return LocalLibraryArtworkBuilder(
       coverPath: albumCover?.isNotEmpty == true
           ? albumCover
-          : artworkTrack?.coverPath,
+          : artworkTrack?.coverPath ?? foundCover,
       filePath: artworkTrack?.filePath,
       builder: (context, coverPath) => context.isMornye
           ? MornyeArtistSurface(
@@ -508,13 +513,115 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
           );
         },
       ),
-      moreMenu: () => libraryTrackMenuGroups(
-        context,
-        ref,
-        items: _albumItems(),
-        onPlay: _playAll,
+      moreMenu: () => _withArtworkActions(
+        libraryTrackMenuGroups(
+          context,
+          ref,
+          items: _albumItems(),
+          onPlay: _playAll,
+        ),
+        hasCover: coverPath != null,
+        hasMotion:
+            motion != null ||
+            !context.isMornye ||
+            MediaQuery.disableAnimationsOf(context),
       ),
     );
+  }
+
+  /// The album's key and what Find Missing Artwork found for it. Null for
+  /// songs from a network connection, which keep their server's covers.
+  ({String albumKey, AlbumArtworkRecord? record})? _albumArtwork() {
+    final path = _sortedTracksCache.firstOrNull?.filePath;
+    if (path == null || path.startsWith('network://')) return null;
+    return ref.watch(libraryAlbumArtworkForSongProvider(path)).value;
+  }
+
+  /// [groups] with Find Artwork, while the album lacks a cover or an
+  /// animated cover it could show, and Remove Found Artwork, once something
+  /// was found. They go before a last group of destructive actions.
+  List<List<ContextMenuAction>> _withArtworkActions(
+    List<List<ContextMenuAction>> groups, {
+    required bool hasCover,
+    required bool hasMotion,
+  }) {
+    final artwork = _albumArtwork();
+    if (artwork == null) return groups;
+    final record = artwork.record;
+    final busy = ref.read(libraryAlbumArtworkProvider).running;
+    final wantsMotion =
+        !hasMotion && ref.read(settingsProvider).motionArtworkEnabled;
+    final actions = [
+      if (!hasCover || wantsMotion)
+        ContextMenuAction(
+          icon: Icons.image_search_outlined,
+          label: context.l10n.albumFindArtwork,
+          onSelected: busy
+              ? null
+              : () => _findArtwork(artwork.albumKey, motion: wantsMotion),
+        ),
+      if (record?.coverFile != null || record?.motionSaved == true)
+        ContextMenuAction(
+          icon: Icons.hide_image_outlined,
+          label: context.l10n.albumRemoveFoundArtwork,
+          onSelected: busy ? null : () => _removeFoundArtwork(artwork.albumKey),
+        ),
+    ];
+    if (actions.isEmpty) return groups;
+    final destructiveLast =
+        groups.isNotEmpty && groups.last.every((action) => action.destructive);
+    return [
+      ...destructiveLast ? groups.take(groups.length - 1) : groups,
+      actions,
+      if (destructiveLast) groups.last,
+    ];
+  }
+
+  Future<void> _findArtwork(String albumKey, {required bool motion}) async {
+    final artwork = ref.read(libraryAlbumArtworkProvider.notifier);
+    final l10n = context.l10n;
+    if (!artwork.canLookUp) {
+      showAppSnackBar(
+        context,
+        content: Text(l10n.libraryFindArtworkNoProvider),
+      );
+      return;
+    }
+    try {
+      final summary = await artwork.findForAlbum(albumKey, motion: motion);
+      if (summary == null || !mounted) return;
+      final found =
+          summary.covers > 0 || summary.motion > 0 || summary.failed > 0;
+      showAppSnackBar(
+        context,
+        content: Text(
+          found
+              ? l10n.libraryFindArtworkResult(
+                  summary.covers,
+                  summary.motion,
+                  summary.failed,
+                )
+              : l10n.albumFindArtworkNotFound,
+        ),
+      );
+      if (summary.songs > 0) _loadTracks();
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        content: Text(l10n.snackbarError(context.friendlyError(error))),
+      );
+    }
+  }
+
+  Future<void> _removeFoundArtwork(String albumKey) async {
+    final l10n = context.l10n;
+    await ref
+        .read(libraryAlbumArtworkProvider.notifier)
+        .removeForAlbum(albumKey);
+    if (!mounted) return;
+    showAppSnackBar(context, content: Text(l10n.albumRemoveFoundArtworkDone));
+    _loadTracks();
   }
 
   AlbumTrackSortKey get _sortKey =>
