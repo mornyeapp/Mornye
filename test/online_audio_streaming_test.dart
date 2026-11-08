@@ -127,11 +127,22 @@ void main() {
       // Resume starts playback of the progressive network stream
       await deck.resume();
       expect(deck.state, PlaybackDeckState.playing);
-      expect(engine.calls, contains(['play']));
+      expect(
+        engine.calls.any((call) => call.length == 1 && call[0] == 'play'),
+        isTrue,
+      );
 
       // Range seeking works directly on network stream
       await deck.seek(const Duration(seconds: 45));
-      expect(engine.calls, contains(['seek', '0:00:45.000000']));
+      expect(
+        engine.calls.any(
+          (call) =>
+              call.length == 2 &&
+              call[0] == 'seek' &&
+              call[1] == '0:00:45.000000',
+        ),
+        isTrue,
+      );
     });
 
     test(

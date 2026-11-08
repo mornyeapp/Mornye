@@ -100,9 +100,7 @@ class PlaybackController extends Notifier<PlaybackState> {
     Track track, {
     BuildContext? context,
   }) async {
-    _log.i(
-      'Resolving online stream for "${track.name}" by ${track.artistName}',
-    );
+    _log.i('Resolving stream for "${track.name}" by ${track.artistName}');
     try {
       final settings = ref.read(settingsProvider);
       final serviceName = track.source ?? '';
@@ -118,7 +116,7 @@ class PlaybackController extends Notifier<PlaybackState> {
         durationMs: track.duration > 0 ? track.duration * 1000 : 0,
         isrc: track.isrc ?? '',
         coverUrl: track.coverUrl ?? '',
-        quality: settings.preferredDownloadQuality,
+        quality: settings.audioQuality,
         outputDir: '',
         filenameFormat: '',
         useExtensions: true,
@@ -134,9 +132,13 @@ class PlaybackController extends Notifier<PlaybackState> {
       if (result['success'] == true && result['url'] is String) {
         final streamUrl = result['url'] as String;
         final rawHeaders = result['headers'];
-        final headers = rawHeaders is Map
-            ? rawHeaders.map((k, v) => MapEntry(k.toString(), v.toString()))
-            : null;
+        Map<String, String>? headers;
+        if (rawHeaders is Map) {
+          headers = {
+            for (final entry in rawHeaders.entries)
+              entry.key.toString(): entry.value.toString(),
+          };
+        }
         final durationMs = (result['duration_ms'] as num?)?.toInt();
         final bitrate = (result['bitrate'] as num?)?.toInt();
         final format = result['format']?.toString();
@@ -154,8 +156,8 @@ class PlaybackController extends Notifier<PlaybackState> {
         await ref.read(musicPlayerControllerProvider).playSingle(media);
         return true;
       } else {
-        final error =
-            result['error']?.toString() ?? 'Unable to resolve online stream';
+        final errorMessage = result['error']?.toString();
+        final error = errorMessage ?? 'Unable to resolve online stream';
         _log.w('Could not stream track online: $error');
         if (context != null && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
