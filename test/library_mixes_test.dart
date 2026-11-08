@@ -532,7 +532,7 @@ void main() {
         CREATE TABLE history_db.history (
           id TEXT PRIMARY KEY, file_path TEXT, track_name TEXT,
           artist_name TEXT, album_name TEXT, genre TEXT, duration INTEGER,
-          release_date TEXT, downloaded_at TEXT
+          release_date TEXT, downloaded_at TEXT, origin_file_path TEXT
         )
       ''');
       await db.execute('''

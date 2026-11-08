@@ -4,7 +4,6 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
-import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
@@ -162,18 +161,12 @@ class TrackListTile extends ConsumerWidget {
     if (playedLocal) {
       return;
     }
-    if (!context.mounted) return;
-
-    final playedOnline = await ref
-        .read(playbackProvider.notifier)
-        .playOnlineTrack(track, context: context);
-    if (playedOnline) return;
 
     onDownload();
   }
 
   /// What a tap on the row does, for the desktop song table: offers another
-  /// quality, plays the local copy, or plays online / downloads [track].
+  /// quality, plays the local copy, or downloads [track].
   static Future<void> activate(
     BuildContext context,
     WidgetRef ref,
@@ -200,12 +193,6 @@ class TrackListTile extends ConsumerWidget {
       return;
     }
     if (await playLocalIfAvailable(context, ref, track)) return;
-    if (!context.mounted) return;
-    if (await ref
-        .read(playbackProvider.notifier)
-        .playOnlineTrack(track, context: context)) {
-      return;
-    }
     onDownload();
   }
 }

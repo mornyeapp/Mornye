@@ -308,15 +308,8 @@ class PlaybackController extends Notifier<PlaybackState> {
       if (skippedCueVirtualTrack) {
         throw Exception(cueVirtualTrackRequiresSplitMessage);
       }
-      // If no local files were found for this list, attempt direct online
-      // playback for the selected start track.
-      final startTrack = tracks[safeStart];
-      final onlinePlayed = await playOnlineTrack(startTrack);
-      if (onlinePlayed) return;
-
       throw Exception(
-        'No local audio file is available to play and online stream '
-        'could not be resolved.',
+        'No local audio file is available to play. Download the track first.',
       );
     }
 

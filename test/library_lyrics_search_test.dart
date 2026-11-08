@@ -20,7 +20,8 @@ void main() {
         await createNativeLibraryFixture(db);
         await db.execute('''CREATE TABLE history_db.history (
           id TEXT PRIMARY KEY, file_path TEXT, track_name TEXT,
-          artist_name TEXT, cover_url TEXT, downloaded_at TEXT, has_lyrics INTEGER
+          artist_name TEXT, cover_url TEXT, downloaded_at TEXT,
+          has_lyrics INTEGER, origin_file_path TEXT
         )''');
         await db.insert('history_db.history', {
           'id': 'download',

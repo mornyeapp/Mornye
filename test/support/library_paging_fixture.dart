@@ -21,6 +21,9 @@ Future<LibraryQueueStore> createLibraryPagingFixture(
     FROM library WHERE 0
   ''');
   await db.execute(
+    'ALTER TABLE history_db.history ADD COLUMN origin_file_path TEXT',
+  );
+  await db.execute(
     'CREATE INDEX history_db.idx_history_album_key ON history(album_key)',
   );
   await db.execute('''
