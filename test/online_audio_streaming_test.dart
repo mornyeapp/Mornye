@@ -136,8 +136,7 @@ void main() {
       await deck.seek(const Duration(seconds: 45));
       expect(
         engine.calls.any(
-          (call) =>
-              call.length == 2 && call[0] == 'seek' && call[1] == '45000',
+          (call) => call.length == 2 && call[0] == 'seek' && call[1] == '45000',
         ),
         isTrue,
       );

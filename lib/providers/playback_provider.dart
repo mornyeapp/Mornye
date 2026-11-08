@@ -95,10 +95,7 @@ class PlaybackController extends Notifier<PlaybackState> {
 
   /// Resolves the remote streaming audio source for [track] and begins
   /// direct online playback in the internal player without downloading.
-  Future<bool> playOnlineTrack(
-    Track track, {
-    BuildContext? context,
-  }) async {
+  Future<bool> playOnlineTrack(Track track, {BuildContext? context}) async {
     _log.i('Resolving stream for "${track.name}" by ${track.artistName}');
     try {
       final settings = ref.read(settingsProvider);
@@ -168,9 +165,9 @@ class PlaybackController extends Notifier<PlaybackState> {
     } catch (e) {
       _log.e('Failed to play online track: $e');
       if (context != null && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to play online: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to play online: $e')));
       }
       return false;
     }
