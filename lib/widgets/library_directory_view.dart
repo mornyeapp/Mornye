@@ -46,6 +46,7 @@ import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 import 'package:mornye/widgets/track_card.dart';
@@ -877,6 +878,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
               : () => enterSelectionMode(item.id),
           onContextMenu: (position) =>
               showSelectionMenu(item.id, () => _showSongMenu(item, position)),
+          queueSwipe: libraryItemQueueSwipe(ref, item),
         );
       },
     );

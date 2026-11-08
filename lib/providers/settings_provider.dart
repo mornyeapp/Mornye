@@ -1007,6 +1007,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
     ),
   );
 
+  void setSwipeToQueue(bool enabled) =>
+      _commit(state.copyWith(swipeToQueue: enabled));
+
   void setHomeFeedProvider(String? provider) => _commit(
     provider == null || provider.isEmpty
         ? state.copyWith(clearHomeFeedProvider: true)

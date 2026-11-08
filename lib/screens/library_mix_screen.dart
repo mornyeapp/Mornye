@@ -33,6 +33,7 @@ import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 /// A mix's name: what it gathers, such as "Hip-Hop Mix".
@@ -396,6 +397,7 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
                 onLongPress: isSelectionMode
                     ? null
                     : () => enterSelectionMode(item.id),
+                queueSwipe: libraryItemQueueSwipe(ref, item),
               );
             },
           );

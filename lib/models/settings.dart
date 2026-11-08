@@ -213,6 +213,10 @@ class AppSettings {
   /// Library badge text: measured bitrate, file format, bit depth,
   /// bit depth/sample rate, or the combined bit depth/bitrate label.
   final String libraryQualityLabelMode;
+
+  /// Phones and tablets: a horizontal swipe on a song row plays it next or
+  /// adds it to the queue.
+  final bool swipeToQueue;
   final bool askQualityBeforeDownload;
   final bool enableLogging;
   final bool useExtensionProviders;
@@ -449,6 +453,7 @@ class AppSettings {
     this.libraryAlbumSortMode = 'a-z',
     this.defaultLibraryView = 'last',
     this.libraryQualityLabelMode = AppSettings.libraryQualityLabelBitDepthOnly,
+    this.swipeToQueue = true,
     this.askQualityBeforeDownload = true,
     this.enableLogging = false,
     this.useExtensionProviders = true,
@@ -627,6 +632,7 @@ class AppSettings {
     String? libraryAlbumSortMode,
     String? defaultLibraryView,
     String? libraryQualityLabelMode,
+    bool? swipeToQueue,
     bool? askQualityBeforeDownload,
     bool? enableLogging,
     bool? useExtensionProviders,
@@ -797,6 +803,7 @@ class AppSettings {
       defaultLibraryView: defaultLibraryView ?? this.defaultLibraryView,
       libraryQualityLabelMode:
           libraryQualityLabelMode ?? this.libraryQualityLabelMode,
+      swipeToQueue: swipeToQueue ?? this.swipeToQueue,
       askQualityBeforeDownload:
           askQualityBeforeDownload ?? this.askQualityBeforeDownload,
       enableLogging: enableLogging ?? this.enableLogging,

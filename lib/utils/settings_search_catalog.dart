@@ -187,6 +187,13 @@ class SettingsSearchCatalog {
             'kbps',
           ],
         ),
+        if (!isDesktopPlatform && !isAndroidTv)
+          SettingsSearchEntry(
+            icon: Icons.queue_music,
+            title: l10n.swipeToQueue,
+            subtitle: l10n.swipeToQueueSubtitle,
+            keywords: const ['gesture', 'play next', 'add to queue'],
+          ),
         SettingsSearchEntry(
           icon: Icons.library_music_outlined,
           title: l10n.libraryEnableLocalLibrary,

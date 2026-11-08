@@ -29,6 +29,7 @@ import 'package:mornye/widgets/desktop/hover_play_button.dart';
 import 'package:mornye/widgets/desktop/library_track_menu.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 import 'package:mornye/widgets/track_card.dart';
@@ -422,6 +423,9 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
     );
     final song = hit.kind == LibrarySearchKind.songs;
     final key = ValueKey('${hit.kind.name}:${hit.source}:${hit.id}');
+    final swipe = song
+        ? resolvedLibraryItemQueueSwipe(ref, () => _resolve(hit))
+        : null;
     Widget card({MediaPlaybackUi? playback}) => TrackCard(
       key: playback == null ? key : null,
       style: hit.kind == LibrarySearchKind.songs && !context.isMornye
@@ -472,6 +476,7 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
           : null,
       onLongPress: song ? () => _toggleSelection(hit) : null,
       onContextMenu: (position) => _showHitMenu(hit, position),
+      queueSwipe: swipe,
     );
     if (!song || context.isMornye) return card();
     // Material song rows follow the file they play, so a track change

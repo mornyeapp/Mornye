@@ -10,6 +10,7 @@ import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 /// How a [TrackCard] paints its container.
@@ -107,6 +108,7 @@ class TrackCard extends StatelessWidget {
     this.isCurrent = false,
     this.isPlaying = false,
     this.leadingArtwork = false,
+    this.queueSwipe,
   });
 
   /// Track number, cover art, or anything else that identifies the row.
@@ -159,6 +161,11 @@ class TrackCard extends StatelessWidget {
   /// [leading] is square artwork, which the Material style rounds toward a
   /// circle while the row is current.
   final bool leadingArtwork;
+
+  /// A sideways swipe that plays the song next or adds it to the queue
+  /// ([QueueSwipe]). Pass the same actions the row's menu offers, or null
+  /// where the menu has none. Selection mode turns it off.
+  final QueueSwipeActions? queueSwipe;
 
   @override
   Widget build(BuildContext context) {
@@ -306,6 +313,9 @@ class TrackCard extends StatelessWidget {
       child: Stack(
         children: [
           if (background != null) Positioned.fill(child: background!),
+          // Inside the card, so the swipe's actions join the row's node.
+          if (queueSwipe != null)
+            const Positioned.fill(child: QueueSwipeSemantics()),
           Padding(
             padding: contentPadding,
             child: Row(
@@ -374,33 +384,48 @@ class TrackCard extends StatelessWidget {
         ],
       ),
     );
+    // The swipe stays in the tree through selection mode, so the row keeps
+    // its state when selection starts or ends.
+    Widget swipe(Widget row) => queueSwipe == null
+        ? row
+        : QueueSwipe(
+            actions: queueSwipe,
+            enabled: !isSelectionMode,
+            margin: cardMargin,
+            borderRadius: borderRadius,
+            child: row,
+          );
     if (material) {
       // The card keeps its connected-group corners; a clip inside the
       // margin rounds the current row's ends into a pill, ripple included.
-      return DesktopContextMenuRegion(
-        onContextMenu: onContextMenu,
-        child: morph(
-          card,
-          from: RoundedRectangleBorder(borderRadius: borderRadius),
-          to: const StadiumBorder(),
-          inset: cardMargin.resolve(textDirection),
+      return swipe(
+        DesktopContextMenuRegion(
+          onContextMenu: onContextMenu,
+          child: morph(
+            card,
+            from: RoundedRectangleBorder(borderRadius: borderRadius),
+            to: const StadiumBorder(),
+            inset: cardMargin.resolve(textDirection),
+          ),
         ),
       );
     }
-    return DesktopContextMenuRegion(
-      onContextMenu: onContextMenu,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          card,
-          Padding(
-            padding: EdgeInsetsDirectional.only(
-              start: tokens.coverList + 40,
-              end: 20,
+    return swipe(
+      DesktopContextMenuRegion(
+        onContextMenu: onContextMenu,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            card,
+            Padding(
+              padding: EdgeInsetsDirectional.only(
+                start: tokens.coverList + 40,
+                end: 20,
+              ),
+              child: const Divider(),
             ),
-            child: const Divider(),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

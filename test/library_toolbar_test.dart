@@ -664,6 +664,42 @@ void main() {
     expect(container.read(settingsProvider).historyFilterMode, 'folders');
   });
 
+  testWidgets('the pager leaves sideways swipes to song rows while they '
+      'swipe to queue', (tester) async {
+    await pumpLibrary(tester);
+    final l10n = l10nOf(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(QueueTab)),
+    );
+    ScrollPhysics? pagerPhysics() => tester
+        .widget<PageView>(
+          find.descendant(
+            of: find.byType(QueueTab),
+            matching: find.byType(PageView),
+          ),
+        )
+        .physics;
+    expect(container.read(settingsProvider).swipeToQueue, isTrue);
+    expect(pagerPhysics(), isA<NeverScrollableScrollPhysics>());
+
+    // The tabs still change pages.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text(l10n.libraryFolders),
+      ),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.byType(LibraryDirectoryView), findsOneWidget);
+
+    // With the setting off the pager swipes as before.
+    container.read(settingsProvider.notifier).setSwipeToQueue(false);
+    await tester.pump();
+    expect(pagerPhysics(), isA<ClampingScrollPhysics>());
+  });
+
   testWidgets('Mornye keeps its filter button', (tester) async {
     await pumpLibrary(tester, mornye: true);
     final l10n = l10nOf(tester);
