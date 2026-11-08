@@ -40,6 +40,14 @@ void main() {
     expect(off.copyWith(locale: 'id').linkHideDisconnectedSongs, isFalse);
   });
 
+  test('Swipe to queue is on by default and remembers off', () {
+    expect(const AppSettings().swipeToQueue, isTrue);
+    expect(AppSettings.fromJson({}).swipeToQueue, isTrue);
+    final off = const AppSettings().copyWith(swipeToQueue: false);
+    expect(AppSettings.fromJson(off.toJson()).swipeToQueue, isFalse);
+    expect(off.copyWith(locale: 'id').swipeToQueue, isFalse);
+  });
+
   test('AI translation defaults to Fast and remembers either mode', () {
     expect(const AppSettings().lyricsAiWordSync, isFalse);
     expect(AppSettings.fromJson({}).lyricsAiWordSync, isFalse);

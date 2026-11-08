@@ -8166,6 +8166,14 @@
   "@trackAddToQueue": {
     "description": "Menu action to add a track to the playback queue"
   },
+  "swipeToQueue": "Swipe songs to queue",
+  "@swipeToQueue": {
+    "description": "Library setting: a horizontal swipe on a song row plays it next or adds it to the queue"
+  },
+  "swipeToQueueSubtitle": "Swipe a song one way to play it next and the other way to add it to the queue",
+  "@swipeToQueueSubtitle": {
+    "description": "Subtitle of the swipe songs to queue setting"
+  },
   "snackbarExtensionInstalledEnable": "{extensionName} installed. Enable it in Settings > Extensions",
   "@snackbarExtensionInstalledEnable": {
     "description": "Snackbar after installing an extension from the repo tab",

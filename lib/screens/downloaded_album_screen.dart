@@ -55,6 +55,7 @@ import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 
 class DownloadedAlbumScreen extends ConsumerStatefulWidget {
   final String albumName;
@@ -837,6 +838,10 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
         onPlay: playback.isCurrent
             ? toggle
             : () => _openFile(track, queueItems: navigationItems),
+        queueSwipe: libraryItemQueueSwipe(
+          ref,
+          UnifiedLibraryItem.fromDownloadHistory(track),
+        ),
       ),
     );
   }

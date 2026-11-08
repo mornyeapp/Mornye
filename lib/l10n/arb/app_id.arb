@@ -7210,6 +7210,14 @@
   "@trackAddToQueue": {
     "description": "Menu action to add a track to the playback queue"
   },
+  "swipeToQueue": "Geser lagu ke antrean",
+  "@swipeToQueue": {
+    "description": "Library setting: a horizontal swipe on a song row plays it next or adds it to the queue"
+  },
+  "swipeToQueueSubtitle": "Geser lagu ke satu arah untuk memutarnya selanjutnya dan ke arah lain untuk menambahkannya ke antrean",
+  "@swipeToQueueSubtitle": {
+    "description": "Subtitle of the swipe songs to queue setting"
+  },
   "snackbarExtensionInstalledEnable": "{extensionName} terinstal. Hidupkan di Setelan > Ekstensi",
   "@snackbarExtensionInstalledEnable": {
     "description": "Snackbar after installing an extension from the repo tab",

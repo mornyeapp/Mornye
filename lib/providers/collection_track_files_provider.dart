@@ -26,21 +26,27 @@ class CollectionTrackFilesRequest {
 }
 
 final collectionTrackFilesProvider = FutureProvider.autoDispose
-    .family<List<PlayableMedia>, CollectionTrackFilesRequest>((
-      ref,
-      request,
-    ) async {
-      final tracks = request.tracks;
-      final paths = await ref
-          .watch(playbackProvider.notifier)
-          .resolveTrackFilePaths(tracks);
-      return [
-        for (var index = 0; index < tracks.length; index++)
-          if (paths[index] case final path?)
-            if (path.isNotEmpty && !isCueVirtualPath(path))
-              playableFromTrack(tracks[index], path),
-      ];
-    });
+    .family<List<PlayableMedia>, CollectionTrackFilesRequest>(
+      (ref, request) => resolveCollectionTrackFiles(
+        ref.watch(playbackProvider.notifier),
+        request.tracks,
+      ),
+    );
+
+/// The playable files of [tracks] that have a download or a local copy, in
+/// order; tracks without one, and cue sheet entries, are left out.
+Future<List<PlayableMedia>> resolveCollectionTrackFiles(
+  PlaybackController playback,
+  List<Track> tracks,
+) async {
+  final paths = await playback.resolveTrackFilePaths(tracks);
+  return [
+    for (var index = 0; index < tracks.length; index++)
+      if (paths[index] case final path?)
+        if (path.isNotEmpty && !isCueVirtualPath(path))
+          playableFromTrack(tracks[index], path),
+  ];
+}
 
 /// Uses scanned metadata so FLAC files behind opaque SAF URIs stay excluded.
 final collectionTrackFlacCandidatesProvider = FutureProvider.autoDispose

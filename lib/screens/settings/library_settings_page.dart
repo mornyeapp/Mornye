@@ -29,6 +29,7 @@ import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/ios_library_folder_sheet.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 
 part 'library_settings_page_widgets.dart';
 
@@ -598,8 +599,19 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                     context,
                     settings.libraryQualityLabelMode,
                   ),
-                  showDivider: false,
+                  showDivider: !queueSwipeOffered,
                 ),
+                if (queueSwipeOffered)
+                  SettingsSwitchItem(
+                    icon: Icons.queue_music,
+                    title: context.l10n.swipeToQueue,
+                    subtitle: context.l10n.swipeToQueueSubtitle,
+                    value: settings.swipeToQueue,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setSwipeToQueue(value),
+                    showDivider: false,
+                  ),
               ],
             ),
           ),

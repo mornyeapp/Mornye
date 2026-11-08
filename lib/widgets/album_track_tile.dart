@@ -4,6 +4,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 /// Album-style track row: track number, title/subtitle, and a trailing play
@@ -25,6 +26,7 @@ class AlbumTrackTile extends StatelessWidget {
     required this.onPlay,
     this.isCurrent = false,
     this.isPlaying = false,
+    this.queueSwipe,
   });
 
   final int? trackNumber;
@@ -43,10 +45,14 @@ class AlbumTrackTile extends StatelessWidget {
   /// The current track is playing: the button offers pause.
   final bool isPlaying;
 
+  /// See [TrackCard.queueSwipe].
+  final QueueSwipeActions? queueSwipe;
+
   @override
   Widget build(BuildContext context) {
     return TrackCard(
       style: TrackCardStyle.flat,
+      queueSwipe: queueSwipe,
       isSelectionMode: isSelectionMode,
       isSelected: isSelected,
       isCurrent: isCurrent,

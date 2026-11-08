@@ -61,6 +61,7 @@ import 'package:mornye/widgets/disc_separator_chip.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 
 class LocalAlbumScreen extends ConsumerStatefulWidget {
   final String albumName;
@@ -890,6 +891,10 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
                     .read(musicPlayerControllerProvider)
                     .togglePlayPause(isPlaying)
               : () => _openFile(track),
+          queueSwipe: libraryItemQueueSwipe(
+            ref,
+            UnifiedLibraryItem.fromLocalLibrary(track),
+          ),
         );
       },
     );

@@ -1198,6 +1198,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
         );
       },
     );
+    final swipe = libraryItemQueueSwipe(ref, item);
     Widget card({bool current = false, bool playing = false}) => TrackCard(
       isSelectionMode: _isSelectionMode,
       isSelected: isSelected,
@@ -1225,6 +1226,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
       title: item.trackName,
       subtitle: subtitle,
       trailing: trailing,
+      queueSwipe: swipe,
     );
 
     return Semantics(

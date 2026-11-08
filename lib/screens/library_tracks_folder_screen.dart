@@ -15,6 +15,7 @@ import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/expressive_button_group.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/track_card.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
@@ -1355,9 +1356,20 @@ class _CollectionTrackTile extends ConsumerWidget {
         : ref.watch(catalogTrackPlaybackUiProvider(catalogTrackKey(track)));
     final isCurrent = playback?.isCurrent ?? false;
     final isPlaying = playback?.isPlaying ?? false;
+    // Songs with a file queue as the selection bar queues them.
+    final queueSwipe = isInHistory || isInLocalLibrary
+        ? mediaQueueSwipe(
+            ref,
+            () => resolveCollectionTrackFiles(
+              ref.read(playbackProvider.notifier),
+              [track],
+            ),
+          )
+        : null;
 
     return TrackCard(
       style: TrackCardStyle.flat,
+      queueSwipe: queueSwipe,
       isSelectionMode: isSelectionMode,
       isSelected: isSelected,
       isCurrent: isCurrent,

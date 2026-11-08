@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/exclusive_output_labels.dart';
 
@@ -186,6 +187,13 @@ class SettingsSearchCatalog {
             'kbps',
           ],
         ),
+        if (!isDesktopPlatform && !isAndroidTv)
+          SettingsSearchEntry(
+            icon: Icons.queue_music,
+            title: l10n.swipeToQueue,
+            subtitle: l10n.swipeToQueueSubtitle,
+            keywords: const ['gesture', 'play next', 'add to queue'],
+          ),
         SettingsSearchEntry(
           icon: Icons.library_music_outlined,
           title: l10n.libraryEnableLocalLibrary,
