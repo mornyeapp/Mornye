@@ -50,7 +50,11 @@ class AppDelegate: FlutterAppDelegate {
         Data(
           "Mornye is already running (pid \(running.processIdentifier)); quit it first.\n"
             .utf8))
-      running.activate()
+      if #available(macOS 14.0, *) {
+        running.activate()
+      } else {
+        running.activate(options: [.activateIgnoringOtherApps])
+      }
       exit(0)
     }
     super.applicationWillFinishLaunching(notification)
@@ -78,7 +82,7 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    return true
+    return false
   }
 
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
