@@ -47,7 +47,11 @@ class FakeListenBrainzServer {
   int submitStatus = 200;
   bool tokenValid = true;
   final submissions = <Map<String, dynamic>>[];
+
+  /// Every stored-listen request, accepted or not.
+  final requests = <Map<String, dynamic>>[];
   final urls = <Uri>[];
+  bool Function(Map<String, dynamic> listen)? refuses;
 
   List<Map<String, dynamic>> get listens => [
     for (final body in submissions)
@@ -74,6 +78,12 @@ class FakeListenBrainzServer {
       if (body['listen_type'] == 'playing_now') {
         submissions.add(body);
         return http.Response('{"status":"ok"}', 200);
+      }
+      requests.add(body);
+      // One malformed listen fails the whole request with HTTP 400.
+      final payload = (body['payload'] as List).cast<Map<String, dynamic>>();
+      if (refuses case final test? when payload.any(test)) {
+        return http.Response('{"code":400,"error":"Invalid listen"}', 400);
       }
       if (submitStatus == 200) submissions.add(body);
       return http.Response('{"status":"ok"}', submitStatus);

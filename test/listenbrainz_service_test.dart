@@ -153,6 +153,40 @@ void main() {
   );
 
   serviceTest(
+    'a refused import is resent one listen at a time, keeping the good ones',
+    (tester) async {
+      final server = FakeListenBrainzServer()
+        ..refuses = ((listen) =>
+            (listen['track_metadata'] as Map)['track_name'] == 'Bad');
+      final store = MemoryScrobbleStore(session: listenBrainzTestAccount)
+        ..queue = [
+          lastfmQueued(1),
+          lastfmQueued(2, title: 'Bad'),
+          lastfmQueued(3),
+        ];
+      final service = create(tester, server, store);
+      await service.initialize();
+      await service.flush();
+      expect(server.requests.map((body) => body['listen_type']), [
+        'import',
+        'single',
+        'single',
+        'single',
+      ]);
+      expect(
+        server.listens.map((listen) => listen['listened_at']),
+        [
+          lastfmQueued(1),
+          lastfmQueued(3),
+        ].map((entry) => entry.started.millisecondsSinceEpoch ~/ 1000),
+      );
+      expect(store.queue, isEmpty);
+      expect(service.problem, ScrobbleProblem.rejected);
+      expect(service.connected, isTrue);
+    },
+  );
+
+  serviceTest(
     'every enabled service gets the listen and one failing never blocks another',
     (tester) async {
       final start = tester.binding.clock.now();

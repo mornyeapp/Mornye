@@ -10,17 +10,20 @@ const lastfmTestSession = LastfmSession(
   key: 'session-key',
 );
 
-QueuedScrobble lastfmQueued(int id, {String username = 'listener'}) =>
-    QueuedScrobble(
-      id: '$id',
-      username: username,
-      track: const ScrobbleTrack(
-        title: 'Song',
-        artist: 'Artist',
-        duration: Duration(minutes: 4),
-      ),
-      started: DateTime.utc(2026, 11, 1, 12).add(Duration(minutes: id)),
-    );
+QueuedScrobble lastfmQueued(
+  int id, {
+  String username = 'listener',
+  String title = 'Song',
+}) => QueuedScrobble(
+  id: '$id',
+  username: username,
+  track: ScrobbleTrack(
+    title: title,
+    artist: 'Artist',
+    duration: const Duration(minutes: 4),
+  ),
+  started: DateTime.utc(2026, 11, 1, 12).add(Duration(minutes: id)),
+);
 
 class MemoryLastfmStore implements LastfmStore {
   LastfmSession? session = lastfmTestSession;
@@ -83,6 +86,8 @@ class FakeLastfmApi extends LastfmApi {
   final announcements = <Map<String, String>>[];
   final batches = <List<Map<String, String>>>[];
   final accounts = <String>[];
+  final accepted = <Map<String, String>>[];
+  bool Function(Map<String, String> track)? refuses;
   Object? announceError, batchError, sessionError;
   Completer<LastfmSession>? sessionResult;
   Completer<void>? batchGate;
@@ -120,5 +125,10 @@ class FakeLastfmApi extends LastfmApi {
     onBatch?.call();
     await batchGate?.future;
     if (batchError case final error?) throw error;
+    // Last.fm answers a malformed parameter in any listen for the request.
+    if (refuses case final test? when tracks.any(test)) {
+      throw const LastfmException(6);
+    }
+    accepted.addAll(tracks);
   }
 }

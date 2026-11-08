@@ -486,6 +486,60 @@ void main() {
   );
 
   serviceTest(
+    'a refused batch is resent one listen at a time and drops only the bad one',
+    (tester) async {
+      final store = MemoryLastfmStore()
+        ..queue = [
+          lastfmQueued(1),
+          lastfmQueued(2, title: 'Bad'),
+          lastfmQueued(3),
+        ];
+      final api = FakeLastfmApi()
+        ..refuses = ((track) => track['track'] == 'Bad');
+      final service = create(tester, api, store);
+      await service.initialize();
+      await service.flush();
+      expect(api.batches.map((batch) => batch.length), [3, 1, 1, 1]);
+      expect(api.accepted.map((track) => track['timestamp']), [
+        lastfmQueued(1).parameters['timestamp'],
+        lastfmQueued(3).parameters['timestamp'],
+      ]);
+      expect(store.queue, isEmpty);
+      expect(service.problem, ScrobbleProblem.rejected);
+    },
+  );
+
+  serviceTest(
+    'listens that keep failing are not looped on and wait for the timer',
+    (tester) async {
+      final store = MemoryLastfmStore()
+        ..queue = [lastfmQueued(1), lastfmQueued(2), lastfmQueued(3)];
+      final api = FakeLastfmApi()..refuses = ((_) => true);
+      // The first single listen hits an outage: the run stops there.
+      api.onBatch = () {
+        if (api.batches.length == 2) api.batchError = const LastfmException(16);
+      };
+      final service = create(tester, api, store);
+      await service.initialize();
+      await service.flush();
+      expect(api.batches.map((batch) => batch.length), [3, 1]);
+      expect(store.queue, hasLength(3));
+      expect(service.problem, ScrobbleProblem.connection);
+
+      api.batchError = null;
+      api.onBatch = null;
+      await tester.pump(const Duration(seconds: 29));
+      expect(api.batches, hasLength(2));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      // Each refused listen is tried once on its own, then dropped.
+      expect(api.batches.map((batch) => batch.length), [3, 1, 1, 1, 1]);
+      expect(store.queue, isEmpty);
+      expect(api.accepted, isEmpty);
+    },
+  );
+
+  serviceTest(
     'failed storage prevents submission and recovers without losing the queue',
     (tester) async {
       final store = MemoryLastfmStore()..failRead = true;
