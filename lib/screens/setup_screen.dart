@@ -780,13 +780,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
         : FloatingActionButton.extended(
             onPressed: _isLoading ? null : _completeSetup,
             label: _isLoading
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: colorScheme.onPrimary,
-                    ),
-                  )
+                ? AppLoadingIndicator(size: 20, color: colorScheme.onPrimary)
                 : Text(context.l10n.setupGetStarted),
             icon: const Icon(Icons.check),
             backgroundColor: colorScheme.primary,
