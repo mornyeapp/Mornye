@@ -1277,50 +1277,6 @@
   "@permissionNearbyDevices": {
     "description": "Nearby devices permission type label; use Android's name for this permission"
   },
-  "whatsNewLinkNearbyAllow": "Allow nearby devices",
-  "@whatsNewLinkNearbyAllow": {
-    "description": "Main button on the Nearby devices page of the What's New tour that asks for Android's Nearby devices permission"
-  },
-  "whatsNewLinkNearbyGranted": "Nearby devices allowed",
-  "@whatsNewLinkNearbyGranted": {
-    "description": "Shown on the Nearby devices page of the What's New tour after the Nearby devices permission is granted"
-  },
-  "whatsNewNearbyTitle": "Nearby devices",
-  "@whatsNewNearbyTitle": {
-    "description": "Title of the What's New page that asks for Android's Nearby devices permission; use Android's name for this permission"
-  },
-  "whatsNewNearbyDesc": "Android now asks before an app can reach other devices on your network. Mornye needs this for:",
-  "@whatsNewNearbyDesc": {
-    "description": "Description on the Nearby devices page of the What's New tour, followed by a list of uses"
-  },
-  "whatsNewNearbyLinkTitle": "Finding your computer",
-  "@whatsNewNearbyLinkTitle": {
-    "description": "Use of the Nearby devices permission: Mornye Link finds the computer"
-  },
-  "whatsNewNearbyLinkBody": "Mornye Link looks for your computer on the same Wi-Fi and stays connected to it.",
-  "@whatsNewNearbyLinkBody": {
-    "description": "Explains how Mornye Link uses the Nearby devices permission"
-  },
-  "whatsNewNearbyStorageTitle": "Network storage",
-  "@whatsNewNearbyStorageTitle": {
-    "description": "Use of the Nearby devices permission: SMB and WebDAV servers at home"
-  },
-  "whatsNewNearbyStorageBody": "Play music from a NAS or a server at home over SMB or WebDAV.",
-  "@whatsNewNearbyStorageBody": {
-    "description": "Explains how network storage uses the Nearby devices permission"
-  },
-  "whatsNewNearbyPrivateTitle": "Only your own devices",
-  "@whatsNewNearbyPrivateTitle": {
-    "description": "Reassurance on the Nearby devices page of the What's New tour"
-  },
-  "whatsNewNearbyPrivateBody": "Mornye uses it only to reach devices on your network, never to find where you are.",
-  "@whatsNewNearbyPrivateBody": {
-    "description": "Explains that the Nearby devices permission is not used for location"
-  },
-  "whatsNewNearbyRefused": "Not allowed. Mornye Link and network storage stay off until you allow Nearby devices for Mornye in Android settings.",
-  "@whatsNewNearbyRefused": {
-    "description": "Shown on the Nearby devices page of the What's New tour after the permission is refused"
-  },
   "setupNext": "Next",
   "@setupNext": {
     "description": "Next button text"
@@ -3892,73 +3848,6 @@
   "tutorialReadyMessage": "You're ready. Select your extensions, then search or paste a supported link.",
   "@tutorialReadyMessage": {
     "description": "Tutorial completion message"
-  },
-  "whatsNewIntroTitle": "Mornye {version} is here",
-  "@whatsNewIntroTitle": {
-    "description": "First page of the tour shown once after updating; version is like 5.3",
-    "placeholders": {
-      "version": {"type": "String"}
-    }
-  },
-  "whatsNewIntroDesc": "Our biggest update yet. Here's a quick look at what's new.",
-  "whatsNewLinkTitle": "Mornye Link",
-  "whatsNewLinkDesc": "Pair your phone and computer on the same network. Mornye Link is in beta.",
-  "whatsNewLinkPlayTitle": "Play across devices",
-  "whatsNewLinkPlayBody": "Browse your computer's library on your phone, control what it plays, and hand playback over without losing your place.",
-  "whatsNewLinkTransferTitle": "Move songs both ways",
-  "whatsNewLinkTransferBody": "Send songs to your computer or save them to your phone, right from the song menu.",
-  "whatsNewLinkSyncTitle": "Stay in sync",
-  "whatsNewLinkSyncBody": "Collections and listening history stay the same on paired devices.",
-  "whatsNewHomeTitle": "A Home that learns",
-  "whatsNewHomeDesc": "Mixes and autoplay now follow how you actually listen.",
-  "whatsNewHomeMixesTitle": "Mixes from your Library",
-  "whatsNewHomeMixesBody": "New mixes built from your own songs, including a mix for each genre.",
-  "whatsNewHomeAutoplayTitle": "Smarter autoplay",
-  "whatsNewHomeAutoplayBody": "Autoplay follows your listening session and learns from your favorites, playlists and replays.",
-  "whatsNewHomeAnalysisTitle": "Song analysis",
-  "whatsNewHomeAnalysisBody": "Mornye can analyze how your songs sound for closer picks. It stays off until you turn it on in Settings.",
-  "whatsNewPlayerTitle": "Player and lyrics",
-  "whatsNewPlayerDesc": "Smoother playback, and lyrics in any language.",
-  "whatsNewPlayerGaplessTitle": "Gapless playback",
-  "whatsNewPlayerGaplessBody": "Albums flow from one song into the next without a pause.",
-  "whatsNewPlayerTranslateTitle": "Translate lyrics",
-  "whatsNewPlayerTranslateBody": "Translate or romanize lyrics with an AI provider you set up.",
-  "whatsNewPlayerTimingTitle": "Lyrics timing",
-  "whatsNewPlayerTimingBody": "Move synced lyrics earlier or later when they drift from the song.",
-  "whatsNewPlayerAutoTitle": "Android Auto",
-  "whatsNewPlayerAutoBody": "Browse and play your Library from your car's screen.",
-  "whatsNewPlayerExclusiveTitle": "Exclusive output",
-  "whatsNewPlayerExclusiveBody": "Send audio straight to your output device without the system mixer.",
-  "whatsNewLibraryTitle": "Library and search",
-  "whatsNewLibraryDesc": "New ways to find and organize your music.",
-  "whatsNewLibraryFoldersTitle": "Browse by folder",
-  "whatsNewLibraryFoldersBody": "Explore your Library the way it's stored on disk.",
-  "whatsNewLibrarySuggestionsTitle": "Suggested songs",
-  "whatsNewLibrarySuggestionsBody": "Albums, singles and playlists now suggest songs that fit.",
-  "whatsNewLibraryRecognizeTitle": "Recognize music",
-  "whatsNewLibraryRecognizeBody": "Tap the microphone in Search to find out what's playing nearby.",
-  "whatsNewLibraryPlaylistsTitle": "Better playlists",
-  "whatsNewLibraryPlaylistsBody": "Reorder songs, create a playlist from a folder, or import playlist files.",
-  "whatsNewFasterTitle": "Faster everywhere",
-  "whatsNewFasterDesc": "Quicker and lighter, especially with large libraries.",
-  "whatsNewFasterLibraryTitle": "A quicker Library",
-  "whatsNewFasterLibraryBody": "Tabs and albums open faster, and scrolling stays smooth.",
-  "whatsNewFasterNetworkTitle": "Faster network music",
-  "whatsNewFasterNetworkBody": "Network shares scan many times faster, and Subsonic servers sync with far fewer requests.",
-  "whatsNewFasterQueueTitle": "Long queues that last",
-  "whatsNewFasterQueueBody": "Large queues save quickly and come back after a restart.",
-  "whatsNewFasterBackgroundTitle": "Lighter in the background",
-  "whatsNewFasterBackgroundBody": "The app starts faster and does less work while music plays.",
-  "whatsNewDone": "Start listening",
-  "@whatsNewDone": {
-    "description": "Button on the last page of the What's New tour"
-  },
-  "whatsNewAboutTitle": "What's new in {version}",
-  "@whatsNewAboutTitle": {
-    "description": "About page row that reopens the What's New tour; version is like 5.3",
-    "placeholders": {
-      "version": {"type": "String"}
-    }
   },
   "libraryForceFullScan": "Force Full Scan",
   "@libraryForceFullScan": {
