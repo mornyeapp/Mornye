@@ -1,10 +1,12 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
       - main
+      - feature/online-audio-streaming
 
 permissions:
   contents: read
@@ -138,7 +140,13 @@ jobs:
         run: flutter pub get
 
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed lib test integration_test scripts/prepare_flutter_sdk.dart
+        run: |
+          dart format --output=none --set-exit-if-changed lib test integration_test scripts/prepare_flutter_sdk.dart || {
+            echo "::error::dart format detected unformatted files. Showing diff:"
+            dart format lib test integration_test scripts/prepare_flutter_sdk.dart
+            git diff
+            exit 1
+          }
 
       - name: Analyze
         run: flutter analyze
@@ -228,7 +236,7 @@ jobs:
         run: dart scripts/prepare_flutter_sdk.dart
 
       - name: Prepare pinned Discord SDK
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: github.repository == 'mornyeapp/Mornye' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: ./.github/actions/discord-sdk
         with:
           passphrase: ${{ secrets.DISCORD_MOBILE_SDK_PASSPHRASE }}
@@ -308,7 +316,7 @@ jobs:
 
       # Fork PRs cannot access repository secrets and exercise the Lite build.
       - name: Prepare pinned Discord SDK
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: github.repository == 'mornyeapp/Mornye' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: ./.github/actions/discord-sdk
         with:
           passphrase: ${{ secrets.DISCORD_MOBILE_SDK_PASSPHRASE }}

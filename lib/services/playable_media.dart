@@ -28,6 +28,7 @@ class PlayableMedia {
   final String? genre;
   final bool autoplay;
   final Map<String, dynamic> displayMetadata;
+  final Map<String, String>? httpHeaders;
 
   const PlayableMedia({
     required this.id,
@@ -47,6 +48,7 @@ class PlayableMedia {
     this.genre,
     this.autoplay = false,
     this.displayMetadata = const {},
+    this.httpHeaders,
   });
 
   /// The `network://` cover the cover store keeps for this song:
@@ -79,6 +81,8 @@ class PlayableMedia {
     if (genre != null) 'genre': genre,
     if (autoplay) 'autoplay': true,
     if (displayMetadata.isNotEmpty) 'displayMetadata': displayMetadata,
+    if (httpHeaders != null && httpHeaders!.isNotEmpty)
+      'httpHeaders': httpHeaders,
   };
 
   static PlayableMedia? fromJson(
@@ -124,6 +128,9 @@ class PlayableMedia {
       genre: json['genre'] as String?,
       autoplay: json['autoplay'] == true,
       displayMetadata: playbackDisplayMetadata(json['displayMetadata']),
+      httpHeaders: (json['httpHeaders'] as Map?)?.map(
+        (k, v) => MapEntry(k.toString(), v.toString()),
+      ),
     );
   }
 
@@ -177,6 +184,8 @@ class PlayableMedia {
           'format': format!.trim(),
         if (explicit) 'explicit': true,
         if (autoplay) 'autoplay': true,
+        if (httpHeaders != null && httpHeaders!.isNotEmpty)
+          'httpHeaders': httpHeaders,
       },
     );
   }
@@ -213,6 +222,37 @@ PlayableMedia playableFromTrack(Track track, String path) {
         : null,
     duration: track.duration > 0 ? Duration(seconds: track.duration) : null,
     explicit: track.isExplicit,
+  );
+}
+
+/// An online stream source resolved directly from an online provider.
+PlayableMedia playableFromOnlineTrack({
+  required Track track,
+  required String streamUrl,
+  Map<String, String>? headers,
+  int? durationMs,
+  int? bitrate,
+  String? format,
+}) {
+  final cover = track.coverUrl ?? '';
+  final dur = (durationMs != null && durationMs > 0)
+      ? Duration(milliseconds: durationMs)
+      : (track.duration > 0 ? Duration(seconds: track.duration) : null);
+  final providerName = track.source?.trim().isNotEmpty == true
+      ? track.source!.trim()
+      : 'online';
+  return PlayableMedia(
+    id: 'stream://$providerName/${track.id}',
+    source: streamUrl,
+    title: track.name,
+    artist: track.artistName,
+    album: track.albumName,
+    artUri: !CoverStore.fetches(cover) ? normalizeArtUri(cover) : cover,
+    duration: dur,
+    bitrate: bitrate,
+    format: format,
+    explicit: track.isExplicit,
+    httpHeaders: headers,
   );
 }
 

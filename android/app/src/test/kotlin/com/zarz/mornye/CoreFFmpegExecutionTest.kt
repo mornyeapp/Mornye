@@ -84,6 +84,9 @@ private class FakeCoreExtensionExecution : CoreExtensionExecution {
 
     override fun download(requestJson: String): String = error("unused fake download")
 
+    override fun resolveStream(requestJson: String): String =
+        error("unused fake resolve-stream")
+
     override fun postProcess(inputJson: String, metadataJson: String): String =
         error("unused fake post-process")
 

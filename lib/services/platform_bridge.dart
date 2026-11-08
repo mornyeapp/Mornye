@@ -1014,6 +1014,29 @@ class PlatformBridge {
     return response;
   }
 
+  /// Resolves an online stream URL and optional request headers without downloading
+  /// the full track to disk.
+  static Future<Map<String, dynamic>> resolveStreamUrl({
+    required DownloadRequestPayload payload,
+    bool? useExtensions,
+    bool? useFallback,
+  }) async {
+    final routedPayload = payload.withStrategy(
+      useExtensions: useExtensions,
+      useFallback: useFallback,
+    );
+    final response = await _invokeDownloadMethod(
+      'resolveStreamUrl',
+      routedPayload,
+    );
+    if (response['success'] != true) {
+      final error = response['error'] ?? 'Unknown error';
+      final errorType = response['error_type'] ?? '';
+      _log.w('Stream resolution failed: $error (type: $errorType)');
+    }
+    return response;
+  }
+
   static Future<Map<String, dynamic>> getAllDownloadProgress() async =>
       _decodeProgressMapAsync(
         await _channel.invokeMethod('getAllDownloadProgress'),

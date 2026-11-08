@@ -159,6 +159,15 @@ impl ExtensionManager {
             .map_err(ExtensionManagerError::Operation)
     }
 
+    pub fn resolve_stream_url(
+        &self,
+        request_json: String,
+    ) -> Result<String, ExtensionManagerError> {
+        self.inner
+            .resolve_stream_source(&request_json, &|| Ok(()))
+            .map_err(ExtensionManagerError::Operation)
+    }
+
     pub fn check_extension_health_json(
         &self,
         extension_id: String,

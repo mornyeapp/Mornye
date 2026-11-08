@@ -73,7 +73,8 @@ void main() {
       await db.execute('''CREATE TABLE history_db.history (
         id TEXT PRIMARY KEY, track_name TEXT, artist_name TEXT,
         album_name TEXT, file_path TEXT, isrc TEXT, bit_depth INTEGER,
-        sample_rate INTEGER, bitrate INTEGER, format TEXT
+        sample_rate INTEGER, bitrate INTEGER, format TEXT,
+        origin_file_path TEXT
       )''');
       await db.execute('''CREATE TABLE history_db.history_path_keys (
         item_id TEXT NOT NULL, path_key TEXT NOT NULL,

@@ -291,6 +291,28 @@
         getRelatedTracks: value => array(value, track),
         checkAvailability: value => fields(value, [["available","b"],["reason","s"],["track_id","s","trackId"],
             ["skip_fallback","b","skipFallback"],["prepared_context","m","preparedContext"]], ["available"]),
+        getDownloadUrl: value => {
+            if (empty(value)) return null;
+            if (typeof value === "string") return { success: true, url: value };
+            return fields(value, [
+                ["success","b"],["url","s"],["audio_codec","s","audioCodec","codec"],
+                ["format","s"],["actual_extension","s","actualExtension"],
+                ["bitrate","i"],["duration_ms","i","durationMs"],
+                ["error_message","s","errorMessage","error"],["error_type","s","errorType"],
+                ["headers","M"],["decryption","m"]
+            ], ["url"]);
+        },
+        getStreamUrl: value => {
+            if (empty(value)) return null;
+            if (typeof value === "string") return { success: true, url: value };
+            return fields(value, [
+                ["success","b"],["url","s"],["audio_codec","s","audioCodec","codec"],
+                ["format","s"],["actual_extension","s","actualExtension"],
+                ["bitrate","i"],["duration_ms","i","durationMs"],
+                ["error_message","s","errorMessage","error"],["error_type","s","errorType"],
+                ["headers","M"],["decryption","m"]
+            ], ["url"]);
+        },
         download, fetchLyrics: lyrics,
         postProcessV2: value => fields(value, [["success","b"],["new_file_path","s","newFilePath"],
             ["new_file_uri","s","newFileUri"],["error","s"],["bit_depth","i","bitDepth"],["sample_rate","i","sampleRate"]], ["success"])

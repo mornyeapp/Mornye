@@ -206,11 +206,15 @@ class _MeasuredDeck implements PlaybackDeck {
   }
 
   @override
-  Future<void> setNetworkSource(String url, {bool arriving = false}) {
+  Future<void> setNetworkSource(
+    String url, {
+    bool arriving = false,
+    Map<String, String>? headers,
+  }) {
     source = url;
     return trace.call(
       'prepare',
-      () => inner.setNetworkSource(url, arriving: arriving),
+      () => inner.setNetworkSource(url, arriving: arriving, headers: headers),
     );
   }
 

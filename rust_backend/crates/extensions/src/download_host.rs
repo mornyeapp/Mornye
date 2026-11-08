@@ -32,6 +32,25 @@ pub(crate) fn register<'js>(
                     check()?;
                     let network = network.as_ref().ok_or("network access unavailable")?;
                     network.validate_url(&url)?;
+                    let item_id = control.item_id();
+                    if crate::stream_capture::is_capture_active(&item_id) {
+                        let headers_map: std::collections::BTreeMap<String, String> =
+                            serde_json::from_str(&headers).unwrap_or_default();
+                        crate::stream_capture::record_capture(
+                            &item_id,
+                            crate::stream_capture::CapturedStream {
+                                url: url.clone(),
+                                headers: headers_map,
+                                format: None,
+                            },
+                        );
+                        return Ok(serde_json::json!({
+                            "success": true,
+                            "file_path": path,
+                            "already_exists": true,
+                            "captured_stream": true,
+                        }));
+                    }
                     let path = files.resolve(&path)?;
                     let options = options.as_object();
                     let value = |key: &str| -> Result<Value<'js>, String> {
@@ -192,6 +211,39 @@ fn register_segments<'js>(
                     let path = files
                         .resolve(&path)
                         .map_err(|error| download::Failure::new("permission", error, 0))?;
+                    let item_id = control.item_id();
+                    let first_segment = if crate::stream_capture::is_capture_active(&item_id) {
+                        segments.first()
+                    } else {
+                        None
+                    };
+                    if let Some(first) = first_segment {
+                        let mut headers_map = std::collections::BTreeMap::new();
+                        let headers_obj = options
+                            .as_object()
+                            .and_then(|opts| opts.get::<_, rquickjs::Value>("headers").ok())
+                            .and_then(|val| val.into_object());
+                        if let Some(obj) = headers_obj {
+                            for k in obj.keys::<String>().flatten() {
+                                if let Ok(v) = obj.get::<_, String>(&k) {
+                                    headers_map.insert(k, v);
+                                }
+                            }
+                        }
+                        crate::stream_capture::record_capture(
+                            &item_id,
+                            crate::stream_capture::CapturedStream {
+                                url: first.url.clone(),
+                                headers: headers_map,
+                                format: None,
+                            },
+                        );
+                        return Ok(serde_json::json!({
+                            "success": true,
+                            "file_path": path.display().to_string(),
+                            "already_exists": true,
+                        }));
+                    }
                     let options = options.as_object();
                     let value = |key: &str| -> Result<Value<'js>, download::Failure> {
                         options.map_or_else(

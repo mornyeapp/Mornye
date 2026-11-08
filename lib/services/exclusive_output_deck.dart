@@ -237,10 +237,15 @@ class ExclusiveOutputDeck implements PlaybackDeck, QueuedPlaybackDeck {
   }
 
   @override
-  Future<void> setNetworkSource(String url, {bool arriving = false}) {
+  Future<void> setNetworkSource(
+    String url, {
+    bool arriving = false,
+    Map<String, String>? headers,
+  }) {
     _queueRevision++;
-    _source = (deck) => deck.setNetworkSource(url, arriving: arriving);
-    return _active.setNetworkSource(url, arriving: arriving);
+    _source = (deck) =>
+        deck.setNetworkSource(url, arriving: arriving, headers: headers);
+    return _active.setNetworkSource(url, arriving: arriving, headers: headers);
   }
 
   @override

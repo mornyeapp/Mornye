@@ -73,6 +73,7 @@ class MainActivity: FlutterFragmentActivity() {
         "ensureInstallMarker",
         "prepareRuntimeState",
         "downloadByStrategy",
+        "resolveStreamUrl",
         "runPostProcessingV2",
         "readAudioMetadata",
         "readFileMetadata",
@@ -519,6 +520,7 @@ class MainActivity: FlutterFragmentActivity() {
                         "prepareRuntimeState" -> handlePrepareRuntimeState(call, result, selectedBackend)
                         "exitApp" -> handleExitApp(call, result)
                         "downloadByStrategy" -> handleDownloadByStrategy(call, result)
+                        "resolveStreamUrl" -> handleResolveStreamUrl(call, result)
                         "getBackendImplementations" -> handleGetBackendImplementations(call, result)
                         "pickSafTree" -> {
                             launchSafTreePicker(call, result)

@@ -150,8 +150,11 @@ class _Deck implements PlaybackDeck {
   }
 
   @override
-  Future<void> setNetworkSource(String url, {bool arriving = false}) async =>
-      sources.add('${arriving ? 'arriving' : 'stream'} $url');
+  Future<void> setNetworkSource(
+    String url, {
+    bool arriving = false,
+    Map<String, String>? headers,
+  }) async => sources.add('${arriving ? 'arriving' : 'stream'} $url');
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

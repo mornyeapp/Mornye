@@ -163,8 +163,11 @@ class CastPlaybackDeck implements PlaybackDeck {
     bool dapExclusive = false,
   }) => _load(path);
   @override
-  Future<void> setNetworkSource(String url, {bool arriving = false}) =>
-      _load(url);
+  Future<void> setNetworkSource(
+    String url, {
+    bool arriving = false,
+    Map<String, String>? headers,
+  }) => _load(url);
   @override
   Future<void> configureOutput() async {}
   @override

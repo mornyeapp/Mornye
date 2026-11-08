@@ -7,6 +7,7 @@ import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/cover_cache_manager.dart';
@@ -176,6 +177,14 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
               notify(root.l10n.snackbarFileNotFound);
             }
           },
+        )
+      else
+        ContextMenuAction(
+          icon: Icons.play_arrow_rounded,
+          label: 'Play online',
+          onSelected: () => ref
+              .read(playbackProvider.notifier)
+              .playOnlineTrack(track, context: root),
         ),
       ContextMenuAction(
         icon: Icons.download_outlined,
@@ -493,7 +502,22 @@ class _TrackOptionsSheet extends ConsumerWidget {
                   title: context.l10n.trackMetadataPlay,
                   onTap: () => _playLocal(context, ref),
                 )
-              else if (qualityVariantAction ==
+              else
+                _OptionTile(
+                  icon: Icons.play_arrow_rounded,
+                  title: 'Play online',
+                  onTap: () {
+                    final rootContext = Navigator.of(
+                      context,
+                      rootNavigator: true,
+                    ).context;
+                    Navigator.pop(context);
+                    ref
+                        .read(playbackProvider.notifier)
+                        .playOnlineTrack(track, context: rootContext);
+                  },
+                ),
+              if (qualityVariantAction ==
                   QualityVariantMenuAction.downloadAnotherQuality)
                 _OptionTile(
                   icon: Icons.download_outlined,

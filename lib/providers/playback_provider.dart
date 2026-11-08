@@ -1,14 +1,18 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/download_request_payload.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/download_file_recovery.dart';
 import 'package:mornye/services/music_player_service.dart';
+import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/track_file_resolver.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
@@ -87,6 +91,86 @@ class PlaybackController extends Notifier<PlaybackState> {
           )
         : null;
     await openFile(recovered ?? path);
+  }
+
+  /// Resolves the remote streaming audio source for [track] and begins
+  /// direct online playback in the internal player without downloading.
+  Future<bool> playOnlineTrack(Track track, {BuildContext? context}) async {
+    _log.i('Resolving stream for "${track.name}" by ${track.artistName}');
+    try {
+      final settings = ref.read(settingsProvider);
+      final serviceName = track.source ?? '';
+      final payload = DownloadRequestPayload(
+        service: serviceName,
+        source: serviceName,
+        downloadProvider: serviceName,
+        providerTrackId: track.id,
+        spotifyId: track.id,
+        trackName: track.name,
+        artistName: track.artistName,
+        albumName: track.albumName,
+        durationMs: track.duration > 0 ? track.duration * 1000 : 0,
+        isrc: track.isrc ?? '',
+        coverUrl: track.coverUrl ?? '',
+        quality: settings.audioQuality,
+        outputDir: '',
+        filenameFormat: '',
+        useExtensions: true,
+        useFallback: true,
+      );
+
+      final result = await PlatformBridge.resolveStreamUrl(
+        payload: payload,
+        useExtensions: true,
+        useFallback: true,
+      );
+
+      if (result['success'] == true && result['url'] is String) {
+        final streamUrl = result['url'] as String;
+        final rawHeaders = result['headers'];
+        Map<String, String>? headers;
+        if (rawHeaders is Map) {
+          headers = {
+            for (final entry in rawHeaders.entries)
+              entry.key.toString(): entry.value.toString(),
+          };
+        }
+        final durationMs = (result['duration_ms'] as num?)?.toInt();
+        final bitrate = (result['bitrate'] as num?)?.toInt();
+        final format = result['format']?.toString();
+
+        final media = playableFromOnlineTrack(
+          track: track,
+          streamUrl: streamUrl,
+          headers: headers,
+          durationMs: durationMs,
+          bitrate: bitrate,
+          format: format,
+        );
+
+        _log.i('Starting direct online playback from $streamUrl');
+        await ref.read(musicPlayerControllerProvider).playSingle(media);
+        return true;
+      } else {
+        final errorMessage = result['error']?.toString();
+        final error = errorMessage ?? 'Unable to resolve online stream';
+        _log.w('Could not stream track online: $error');
+        if (context != null && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Online play unavailable: $error')),
+          );
+        }
+        return false;
+      }
+    } catch (e) {
+      _log.e('Failed to play online track: $e');
+      if (context != null && context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to play online: $e')));
+      }
+      return false;
+    }
   }
 
   /// Plays a local-library album/list starting at [startItem], queuing the rest

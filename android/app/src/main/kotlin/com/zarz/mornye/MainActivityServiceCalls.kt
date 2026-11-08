@@ -13,6 +13,14 @@ internal suspend fun MainActivity.handleDownloadByStrategy(call: MethodCall, res
     result.success(response)
 }
 
+internal suspend fun MainActivity.handleResolveStreamUrl(call: MethodCall, result: MethodChannel.Result) {
+    val requestJson = call.arguments as String
+    val response = withContext(Dispatchers.IO) {
+        coreBackend.resolveStreamUrl(requestJson)
+    }
+    result.success(response)
+}
+
 internal fun MainActivity.handleStartDownloadService(call: MethodCall, result: MethodChannel.Result) {
     val trackName = call.argument<String>("track_name") ?: ""
     val artistName = call.argument<String>("artist_name") ?: ""

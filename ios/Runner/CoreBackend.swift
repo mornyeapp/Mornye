@@ -160,6 +160,7 @@ protocol CoreBackend {
     func openDownloadProgress() throws -> CoreDownloadProgress
     func cancelActiveDownloads() throws -> String
     func downloadByStrategy(requestJson: String) throws -> String
+    func resolveStreamUrl(requestJson: String) throws -> String
     func runPostProcessing(inputJson: String, metadataJson: String) throws -> String
     func buildFilename(template: String, metadataJson: String) throws -> String
     func sanitizeFilename(filename: String) -> String
@@ -224,6 +225,11 @@ final class RustCoreBackend: CoreBackend {
     func downloadByStrategy(requestJson: String) throws -> String {
         let current = try owner()
         return try withFFmpegCommands(current) { try current.downloadByStrategy(requestJson: requestJson) }
+    }
+
+    func resolveStreamUrl(requestJson: String) throws -> String {
+        let current = try owner()
+        return try current.resolveStreamUrl(requestJson: requestJson)
     }
 
     func runPostProcessing(inputJson: String, metadataJson: String) throws -> String {
@@ -807,6 +813,11 @@ final class RustCoreBackend: CoreBackend {
             return try withFFmpegCommands(current) {
                 return try current.downloadByStrategy(requestJson: request)
             }
+        case "resolveStreamUrl":
+            guard let request = arguments as? String else {
+                throw NSError(domain: "CoreBackend", code: 1, userInfo: [NSLocalizedDescriptionKey: "Stream resolve request must be a JSON string"])
+            }
+            return try current.resolveStreamUrl(requestJson: request)
         case "getAllDownloadProgress": return try current.environment().downloadState().allProgress()
         case "cleanupConnections": try current.environment().cleanupConnections(); return nil
         case "clearItemProgress": try current.environment().downloadState().clearItemProgress(itemId: string("item_id")); return nil
