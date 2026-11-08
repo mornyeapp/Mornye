@@ -190,6 +190,9 @@ internal interface CoreBackend {
     fun readAudioMetadataObject(path: String, hint: String, cacheKey: String): JSONObject =
         JSONObject(readAudioMetadata(path, hint, cacheKey))
     fun setLibraryCoverCacheDirectory(path: String)
+    /** Stores the Library thumbnail of the folder image open at the
+     * `/proc/self/fd` [path]. Null without a Library cover directory. */
+    fun cacheLibraryFolderCover(path: String): String?
     fun scanLibraryFolderToNdjsonFile(folder: String, output: String): Long
     fun scanLibraryFolderIncremental(folder: String, existing: String): String
     fun getLibraryScanProgress(): String

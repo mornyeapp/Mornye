@@ -4,7 +4,9 @@ use image::{DynamicImage, ImageFormat, ImageReader};
 use std::borrow::Cow;
 use std::io::Cursor;
 
+mod folder;
 mod library;
+pub use folder::{folder_image, is_disc_folder, read_folder_image};
 pub use library::{
     LibraryThumbnail, library_content_stem, library_thumbnail, library_thumbnail_entry,
 };

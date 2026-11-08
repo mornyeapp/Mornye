@@ -16,6 +16,26 @@ use std::time::UNIX_EPOCH;
 mod scan;
 pub(super) use scan::ScanState;
 
+/// The folder image (cover.jpg and the like) a scan found beside songs, for
+/// those without embedded artwork.
+struct FolderImage {
+    path: String,
+    size: u64,
+    modified: i64,
+}
+
+impl FolderImage {
+    /// The thumbnail key for the song cached under `song`. Songs keep their
+    /// own thumbnail names, as with embedded artwork, and a replaced image
+    /// changes every key that uses it.
+    fn cache_key(&self, song: &str) -> String {
+        format!(
+            "{song}|folder|{}|{}|{}",
+            self.path, self.size, self.modified
+        )
+    }
+}
+
 impl Backend {
     pub fn set_library_cover_cache_directory(&self, directory: &str) -> Result<(), String> {
         let _operation = self.enter()?;
@@ -51,7 +71,17 @@ impl Backend {
         };
         check()?;
         let files = self.environment().native_files()?;
-        self.scan_audio_file(&files, path, hint, cache_key, &scan_time(), 0, None, &check)
+        self.scan_audio_file(
+            &files,
+            path,
+            hint,
+            cache_key,
+            &scan_time(),
+            0,
+            None,
+            None,
+            &check,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -64,6 +94,7 @@ impl Backend {
         scan_time: &str,
         mod_time: i64,
         covers: Option<&crate::files::SyncBatch>,
+        folder_image: Option<&FolderImage>,
         check: &dyn Fn() -> Result<(), String>,
     ) -> Result<Value, String> {
         check()?;
@@ -111,6 +142,24 @@ impl Backend {
                 check,
             )
             .ok()
+            .filter(|cover| !cover.is_empty())
+            .or_else(|| {
+                // Embedded artwork always wins over a folder image.
+                let image = folder_image?;
+                let song = if cache_key.is_empty() {
+                    path
+                } else {
+                    cache_key
+                };
+                self.save_folder_cover_to_cache_for_scan(
+                    &image.path,
+                    &directory,
+                    &image.cache_key(song),
+                    covers,
+                    check,
+                )
+                .ok()
+            })
         };
         check()?;
         let mut result = match metadata {
@@ -299,6 +348,7 @@ impl Backend {
             mod_time,
             cache_key,
             scan_time,
+            None,
             &check,
         )
     }
@@ -349,6 +399,7 @@ impl Backend {
         mod_time: i64,
         cache_key: &str,
         scan_time: &str,
+        folder_image: Option<&FolderImage>,
         check: &dyn Fn() -> Result<(), String>,
     ) -> Result<Value, String> {
         let files = self.environment().native_files()?;
@@ -385,6 +436,24 @@ impl Backend {
             String::new()
         } else {
             self.save_cover_to_cache_with_hint_and_key(audio, "", &directory, cache_key, check)
+                .ok()
+                .filter(|cover| !cover.is_empty())
+                .or_else(|| {
+                    let image = folder_image?;
+                    let song = if cache_key.is_empty() {
+                        audio
+                    } else {
+                        cache_key
+                    };
+                    self.save_folder_cover_to_cache_for_scan(
+                        &image.path,
+                        &directory,
+                        &image.cache_key(song),
+                        None,
+                        check,
+                    )
+                    .ok()
+                })
                 .unwrap_or_default()
         };
         check()?;

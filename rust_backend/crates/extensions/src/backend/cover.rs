@@ -327,6 +327,46 @@ impl Backend {
         )
     }
 
+    /// Caches the folder image at `image_path` (cover.jpg and the like) as
+    /// the Library thumbnail of a song without embedded artwork. `key` must
+    /// name this version of the image, so a replaced image gets a new
+    /// thumbnail.
+    pub(super) fn save_folder_cover_to_cache_for_scan(
+        &self,
+        image_path: &str,
+        cache_directory: &str,
+        key: &str,
+        batch: Option<&SyncBatch>,
+        check: &Check<'_>,
+    ) -> Result<String, String> {
+        self.cache_cover(
+            image_path,
+            "",
+            cache_directory,
+            key,
+            Some("image"),
+            |input, _, check| {
+                input.native_display()?;
+                let mut file = input
+                    .open(OpenOptions::new().read(true))
+                    .map_err(|error| error.to_string())?;
+                let data = mornye_core::cover::read_folder_image(&mut file, check)?;
+                let mime = if data.starts_with(b"\x89PNG") {
+                    "image/png"
+                } else {
+                    "image/jpeg"
+                };
+                Ok(CoverArt {
+                    data,
+                    mime: mime.into(),
+                })
+            },
+            batch,
+            cfg!(target_os = "android"),
+            check,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn cache_cover(
         &self,
@@ -398,7 +438,9 @@ impl Backend {
         if let Some(value) = format_override {
             format = value.into();
         }
+        // An override names a format its reader already handles.
         if cached.is_none()
+            && format_override.is_none()
             && !matches!(
                 format.as_str(),
                 "flac" | "m4a" | "mp3" | "ogg" | "opus" | "wav" | "aiff" | "aif" | "aifc"

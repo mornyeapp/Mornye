@@ -1,6 +1,6 @@
 //! One scan owner, bounded worker results and shared full/incremental traversal.
 
-use super::{Backend, library_extension, modified_time, scan_time};
+use super::{Backend, FolderImage, library_extension, modified_time, scan_time};
 use crate::files::SyncBatch;
 use cap_std::fs::OpenOptions;
 use serde::Serialize;
@@ -57,6 +57,8 @@ struct AudioFile {
     path: String,
     modified: i64,
     size: u64,
+    /// The folder image this file falls back to without embedded artwork.
+    folder_image: Option<Arc<FolderImage>>,
 }
 
 struct ScanSummary {
@@ -318,9 +320,12 @@ impl Backend {
         // validated. Children then need one lstat of their own name instead of
         // re-checking every ancestor plus two more stats per file; on FUSE SD
         // cards, USB drives and network mounts each of those is a round trip.
-        let mut pending = vec![(folder.to_owned(), false)];
+        // The last field carries a folder image: the one a file uses, or for
+        // a directory, the image of its parent.
+        let mut pending: Vec<(String, bool, Option<Arc<FolderImage>>)> =
+            vec![(folder.to_owned(), false, None)];
         let mut collected = Vec::new();
-        while let Some((path, parent_validated)) = pending.pop() {
+        while let Some((path, parent_validated, inherited)) = pending.pop() {
             check()?;
             let input = files.resolve_legacy(&path)?;
             let metadata = if parent_validated {
@@ -341,6 +346,16 @@ impl Backend {
                 let entries = input
                     .entries()
                     .map_err(|error| format!("walk library path {path}: {error}"))?;
+                // Folder images come from this listing, so songs never list
+                // their folder. A disc folder without one uses its parent's.
+                let own = folder_image(&files, &path, &entries);
+                let image = own.clone().or_else(|| {
+                    inherited.filter(|_| {
+                        Path::new(&path).file_name().is_some_and(|name| {
+                            mornye_core::cover::is_disc_folder(&name.to_string_lossy())
+                        })
+                    })
+                });
                 for (name, directory) in entries.into_iter().rev() {
                     if !directory && (!supported(&name) || staging(&name)) {
                         continue;
@@ -350,6 +365,11 @@ impl Backend {
                             .to_string_lossy()
                             .into_owned(),
                         true,
+                        if directory {
+                            own.clone()
+                        } else {
+                            image.clone()
+                        },
                     ));
                 }
             } else if supported(&path) && !staging(&path) {
@@ -357,6 +377,7 @@ impl Backend {
                     path,
                     modified: modified_time(&metadata),
                     size: metadata.len(),
+                    folder_image: inherited,
                 });
             }
         }
@@ -494,6 +515,7 @@ impl Backend {
                         file.modified,
                         "",
                         &time,
+                        file.folder_image.as_deref(),
                         &check,
                     ),
                     None => self.scan_cue_file_for_library(
@@ -563,6 +585,7 @@ impl Backend {
                                 time,
                                 file.modified,
                                 Some(covers),
+                                file.folder_image.as_deref(),
                                 check,
                             )
                         });
@@ -624,6 +647,35 @@ impl Backend {
             run,
         })
     }
+}
+
+/// The folder image among the `entries` of `directory`. A linked, special or
+/// unreadable image only costs the fallback, never the scan.
+fn folder_image(
+    files: &crate::files::ExtensionFiles,
+    directory: &str,
+    entries: &[(String, bool)],
+) -> Option<Arc<FolderImage>> {
+    let name = mornye_core::cover::folder_image(
+        entries
+            .iter()
+            .filter(|(_, directory)| !directory)
+            .map(|(name, _)| name.as_str()),
+    )?;
+    let path = crate::files::clean(&Path::new(directory).join(name))
+        .to_string_lossy()
+        .into_owned();
+    let metadata = files
+        .resolve_legacy(&path)
+        .ok()?
+        .native_child_metadata()
+        .ok()
+        .filter(|metadata| metadata.is_file())?;
+    Some(Arc::new(FolderImage {
+        path,
+        size: metadata.len(),
+        modified: modified_time(&metadata),
+    }))
 }
 
 fn cue_base(path: &str) -> Option<&str> {
@@ -987,6 +1039,207 @@ mod tests {
         } else {
             assert_eq!(files.len(), 6);
         }
+    }
+
+    /// A FLAC file with stream info and no picture block.
+    fn flac_without_picture() -> Vec<u8> {
+        let mut info = [0; 34];
+        let packed = (44_100_u64 << 44) | (1_u64 << 41) | (15_u64 << 36) | 44_100;
+        info[10..18].copy_from_slice(&packed.to_be_bytes());
+        let mut flac = b"fLaC\x80".to_vec();
+        flac.extend(&(info.len() as u32).to_be_bytes()[1..]);
+        flac.extend(info);
+        flac.extend([0xff, 0xf8]);
+        flac
+    }
+
+    /// Scans `library` in full and maps each song's path below it to the
+    /// bytes of its cover, if any.
+    fn scanned_covers(root: &Path, library: &Path) -> BTreeMap<String, Option<Vec<u8>>> {
+        let backend = backend(root, library);
+        let covers = root.join("data/library_covers");
+        backend
+            .set_library_cover_cache_directory(&covers.to_string_lossy())
+            .unwrap();
+        let result = backend
+            .scan_library_folder_incremental(&library.to_string_lossy(), "{}", &|| Ok(()))
+            .unwrap();
+        result["scanned"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                let path = row["filePath"].as_str().unwrap();
+                let song = path
+                    .strip_prefix(&*library.to_string_lossy())
+                    .unwrap()
+                    .trim_start_matches('/')
+                    .to_owned();
+                let cover = row["coverPath"].as_str().map(|cover| {
+                    assert_eq!(Path::new(cover).parent().unwrap(), covers);
+                    fs::read(cover).unwrap()
+                });
+                (song, cover)
+            })
+            .collect()
+    }
+
+    fn thumbnail(art: &[u8]) -> Vec<u8> {
+        mornye_core::cover::library_thumbnail(art, &|| Ok(()))
+            .unwrap()
+            .to_vec()
+    }
+
+    #[test]
+    fn songs_without_embedded_art_use_their_folder_image() {
+        let root = tempfile::tempdir().unwrap();
+        let library = fs::canonicalize(root.path()).unwrap().join("library");
+        let album = library.join("Album");
+        fs::create_dir_all(&album).unwrap();
+        let art = artwork(9_000, 1200);
+        fs::write(album.join("cover.jpg"), &art).unwrap();
+        for track in ["01.flac", "02.flac"] {
+            fs::write(album.join(track), flac_without_picture()).unwrap();
+        }
+        // CUE tracks share the same artwork path.
+        let cue = library.join("Cue");
+        fs::create_dir_all(&cue).unwrap();
+        let cue_art = artwork(9_001, 600);
+        fs::write(cue.join("folder.jpg"), &cue_art).unwrap();
+        fs::write(cue.join("album.flac"), flac_without_picture()).unwrap();
+        fs::write(
+            cue.join("album.cue"),
+            "FILE \"album.flac\" WAVE\nTRACK 01 AUDIO\nTITLE \"One\"\nINDEX 01 00:00:00\n",
+        )
+        .unwrap();
+        let none = library.join("None");
+        fs::create_dir_all(&none).unwrap();
+        fs::write(none.join("01.flac"), flac_without_picture()).unwrap();
+        fs::write(none.join("back.jpg"), &art).unwrap();
+
+        let covers = scanned_covers(root.path(), &library);
+
+        assert_eq!(covers.len(), 4);
+        assert_eq!(covers["Album/01.flac"], Some(thumbnail(&art)));
+        assert_eq!(covers["Album/02.flac"], Some(thumbnail(&art)));
+        assert_eq!(covers["Cue/album.cue#track01"], Some(thumbnail(&cue_art)));
+        assert_eq!(covers["None/01.flac"], None);
+    }
+
+    #[test]
+    fn embedded_art_wins_over_the_folder_image() {
+        let root = tempfile::tempdir().unwrap();
+        let library = fs::canonicalize(root.path()).unwrap().join("library");
+        let album = library.join("Album");
+        fs::create_dir_all(&album).unwrap();
+        let embedded = artwork(9_100, 1200);
+        fs::write(album.join("01.flac"), flac_with_picture(&embedded)).unwrap();
+        fs::write(album.join("02.flac"), flac_without_picture()).unwrap();
+        let folder = artwork(9_101, 1200);
+        fs::write(album.join("cover.jpg"), &folder).unwrap();
+
+        let covers = scanned_covers(root.path(), &library);
+
+        assert_eq!(covers["Album/01.flac"], Some(thumbnail(&embedded)));
+        assert_eq!(covers["Album/02.flac"], Some(thumbnail(&folder)));
+    }
+
+    #[test]
+    fn folder_images_follow_stem_priority_ignore_case_and_skip_apple_double() {
+        let root = tempfile::tempdir().unwrap();
+        let library = fs::canonicalize(root.path()).unwrap().join("library");
+        let arts: Vec<_> = (0..6).map(|seed| artwork(9_200 + seed, 400)).collect();
+        for (folder, images) in [
+            (
+                "Priority",
+                [("album.jpg", 0), ("front.png", 1), ("folder.jpeg", 2)],
+            ),
+            (
+                "Case",
+                [("Folder.JPG", 0), ("COVER.PNG", 3), ("AlbumArt.webp", 1)],
+            ),
+            (
+                "Double",
+                [("._cover.jpg", 0), ("._folder.jpg", 1), ("front.jpg", 4)],
+            ),
+            (
+                "Hidden",
+                [("._cover.jpg", 0), (".folder.jpg", 1), ("cover.gif", 5)],
+            ),
+        ] {
+            let folder = library.join(folder);
+            fs::create_dir_all(&folder).unwrap();
+            fs::write(folder.join("01.flac"), flac_without_picture()).unwrap();
+            for (name, art) in images {
+                fs::write(folder.join(name), &arts[art]).unwrap();
+            }
+        }
+
+        let covers = scanned_covers(root.path(), &library);
+
+        assert_eq!(covers["Priority/01.flac"], Some(thumbnail(&arts[2])));
+        assert_eq!(covers["Case/01.flac"], Some(thumbnail(&arts[3])));
+        assert_eq!(covers["Double/01.flac"], Some(thumbnail(&arts[4])));
+        assert_eq!(covers["Hidden/01.flac"], None);
+    }
+
+    #[test]
+    fn disc_folders_without_an_image_use_their_parents() {
+        let root = tempfile::tempdir().unwrap();
+        let library = fs::canonicalize(root.path()).unwrap().join("library");
+        let album = library.join("Album");
+        let parent = artwork(9_300, 800);
+        let own = artwork(9_301, 800);
+        for folder in ["CD1", "Disc 2 - Live", "Disk 03", "Extras"] {
+            fs::create_dir_all(album.join(folder)).unwrap();
+            fs::write(album.join(folder).join("01.flac"), flac_without_picture()).unwrap();
+        }
+        fs::write(album.join("cover.jpg"), &parent).unwrap();
+        fs::write(album.join("Disk 03/folder.jpg"), &own).unwrap();
+        // Only one level up: a disc folder's own subfolders do not inherit.
+        fs::create_dir_all(album.join("CD1/Scans")).unwrap();
+        fs::write(album.join("CD1/Scans/01.flac"), flac_without_picture()).unwrap();
+
+        let covers = scanned_covers(root.path(), &library);
+
+        assert_eq!(covers["Album/CD1/01.flac"], Some(thumbnail(&parent)));
+        assert_eq!(
+            covers["Album/Disc 2 - Live/01.flac"],
+            Some(thumbnail(&parent))
+        );
+        assert_eq!(covers["Album/Disk 03/01.flac"], Some(thumbnail(&own)));
+        assert_eq!(covers["Album/Extras/01.flac"], None);
+        assert_eq!(covers["Album/CD1/Scans/01.flac"], None);
+    }
+
+    #[test]
+    fn a_replaced_folder_image_gives_a_new_thumbnail() {
+        let root = tempfile::tempdir().unwrap();
+        let library = fs::canonicalize(root.path()).unwrap().join("library");
+        let album = library.join("Album");
+        fs::create_dir_all(&album).unwrap();
+        fs::write(album.join("01.flac"), flac_without_picture()).unwrap();
+        let image = album.join("cover.jpg");
+        let old = artwork(9_400, 900);
+        fs::write(&image, &old).unwrap();
+        let old_time = std::time::SystemTime::now() - Duration::from_secs(3600);
+        fs::File::options()
+            .write(true)
+            .open(&image)
+            .unwrap()
+            .set_modified(old_time)
+            .unwrap();
+        assert_eq!(
+            scanned_covers(root.path(), &library)["Album/01.flac"],
+            Some(thumbnail(&old))
+        );
+
+        let new = artwork(9_401, 900);
+        fs::write(&image, &new).unwrap();
+        assert_eq!(
+            scanned_covers(root.path(), &library)["Album/01.flac"],
+            Some(thumbnail(&new))
+        );
     }
 
     #[test]
