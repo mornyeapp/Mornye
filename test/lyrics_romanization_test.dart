@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/settings.dart';
@@ -151,7 +152,7 @@ void main() {
     test('Macedonian', () {
       expect(_romanize(['Ѓавол и ќерка', 'Џеб', 'Ѕвезда']), [
         'Gjavol i kjerka',
-        'Dzheb',
+        'Djeb',
         'Dzvezda',
       ]);
     });
@@ -384,6 +385,111 @@ void main() {
         ),
       ]);
       expect(lyricsWithRomanizedMainLines(lyrics), same(lyrics));
+    });
+  });
+
+  group('the reader language', () {
+    test('maps to the scripts it reads', () {
+      for (final code in ['ru', 'uk', 'be', 'bg', 'sr', 'mk', 'ky', 'kk']) {
+        expect(scriptsReadIn(code), {LyricsScript.cyrillic}, reason: code);
+      }
+      expect(scriptsReadIn('zh'), {LyricsScript.han});
+      expect(scriptsReadIn('ja'), {LyricsScript.kana, LyricsScript.han});
+      expect(scriptsReadIn('ko'), {LyricsScript.hangul});
+      expect(scriptsReadIn('hi'), {LyricsScript.devanagari});
+      expect(scriptsReadIn('pa'), {LyricsScript.gurmukhi});
+      expect(scriptsReadIn('sr', scriptCode: 'Latn'), isEmpty);
+      expect(scriptsReadIn('pa', scriptCode: 'Arab'), isEmpty);
+      expect(scriptsReadIn('en'), isEmpty);
+      expect(scriptsReadIn('id'), isEmpty);
+      for (final locale in const [
+        Locale('zh'),
+        Locale('zh', 'CN'),
+        Locale('zh', 'TW'),
+      ]) {
+        expect(lyricsReaderScripts(locale), {LyricsScript.han});
+      }
+    });
+
+    test('keeps its script as written and romanizes the others', () {
+      final lyrics = _lyrics([
+        _line(1, '사랑해'),
+        _line(2, 'Я тебя люблю'),
+        _line(3, '我爱你'),
+      ]);
+      final romanized = lyricsWithOfflineRomanization(
+        lyrics,
+        pinyin: _pinyin,
+        readerScripts: scriptsReadIn('ko'),
+      );
+      expect(romanized.lines.map((line) => line.romanization), [
+        null,
+        'Ya tebya lyublyu',
+        'wǒ ài nǐ',
+      ]);
+      expect(
+        lyricsNeedPinyin(lyrics, readerScripts: scriptsReadIn('zh')),
+        isFalse,
+      );
+    });
+
+    test('sends none of its lines to the AI', () {
+      final lyrics = _lyrics([
+        _line(1, 'きみのなまえ'),
+        _line(2, '君の名前'),
+        _line(3, 'สวัสดี'),
+        _line(4, '사랑해'),
+      ]);
+      final japanese = scriptsReadIn('ja');
+      expect(
+        linesNeedingAiRomanization(
+          lyrics,
+          readerScripts: japanese,
+        ).map((line) => line.text),
+        ['สวัสดี'],
+      );
+      expect(
+        lyricsWithOfflineRomanization(
+          lyrics,
+          readerScripts: japanese,
+        ).lines.map((line) => line.romanization),
+        [null, null, null, 'saranghae'],
+      );
+    });
+
+    test('drops what an AI translation romanized in its script', () {
+      final original = _lyrics([
+        _line(1, '君の名前'),
+        _line(2, 'สวัสดี'),
+        const LyricLine(
+          time: Duration(seconds: 3),
+          text: 'きみ',
+          romanization: 'kimi',
+        ),
+      ]);
+      final translated = _lyrics([
+        for (final (line, romanization) in [
+          (original.lines[0], 'kimi no namae'),
+          (original.lines[1], 'sawatdi'),
+          (original.lines[2], 'kimi'),
+        ])
+          line.withTranslation('x', romanization: romanization),
+      ]);
+      final shown = lyricsWithoutReaderRomanization(
+        original,
+        translated,
+        scriptsReadIn('ja'),
+      );
+      expect(shown.lines.map((line) => line.romanization), [
+        null,
+        'sawatdi',
+        'kimi',
+      ]);
+      expect(shown.lines.map((line) => line.translation), ['x', 'x', 'x']);
+      expect(
+        lyricsWithoutReaderRomanization(original, translated, const {}),
+        same(translated),
+      );
     });
   });
 

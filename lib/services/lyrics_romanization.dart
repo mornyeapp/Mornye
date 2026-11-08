@@ -9,7 +9,9 @@ library;
 
 import 'dart:async';
 import 'dart:isolate';
+import 'dart:ui' show Locale;
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/services.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/romanization/pinyin.dart';
@@ -54,43 +56,115 @@ class PinyinDataLoader {
 
 final _romanizers = Expando<(PinyinData?, TextRomanizer)>();
 
-TextRomanizer _romanizerFor(ParsedLyrics lyrics, PinyinData? pinyin) {
+TextRomanizer _romanizerFor(
+  ParsedLyrics lyrics,
+  PinyinData? pinyin,
+  Set<LyricsScript> readerScripts,
+) {
   final memo = _romanizers[lyrics];
-  if (memo != null && identical(memo.$1, pinyin)) return memo.$2;
+  if (memo != null &&
+      identical(memo.$1, pinyin) &&
+      setEquals(memo.$2.readerScripts, readerScripts)) {
+    return memo.$2;
+  }
   final romanizer = TextRomanizer.forTexts(
     lyricsWithPlainLines(lyrics).lines.map((line) => line.text),
     pinyin: pinyin,
+    readerScripts: readerScripts,
   );
   _romanizers[lyrics] = (pinyin, romanizer);
   return romanizer;
 }
 
+/// The scripts a user whose app reads in [locale] reads as they are written,
+/// so their lines are never romanized.
+Set<LyricsScript> lyricsReaderScripts(Locale locale) =>
+    scriptsReadIn(locale.languageCode, scriptCode: locale.scriptCode);
+
 /// Whether [lyrics] are Chinese, so romanizing them needs [PinyinData].
-bool lyricsNeedPinyin(ParsedLyrics lyrics) =>
-    _romanizerFor(lyrics, null).needsPinyin;
+bool lyricsNeedPinyin(
+  ParsedLyrics lyrics, {
+  Set<LyricsScript> readerScripts = const {},
+}) => _romanizerFor(lyrics, null, readerScripts).needsPinyin;
 
 /// The lines of [lyrics] written outside the Latin alphabet that have no
 /// romanization yet and that offline romanization cannot give one: the
-/// lines to ask the AI translation to romanize.
-Iterable<LyricLine> linesNeedingAiRomanization(ParsedLyrics lyrics) {
-  final romanizer = _romanizerFor(lyrics, null);
+/// lines to ask the AI translation to romanize. Lines in [readerScripts]
+/// are left out.
+Iterable<LyricLine> linesNeedingAiRomanization(
+  ParsedLyrics lyrics, {
+  Set<LyricsScript> readerScripts = const {},
+}) {
+  final romanizer = _romanizerFor(lyrics, null, readerScripts);
   return lyricsWithPlainLines(lyrics).lines.where((line) {
     if (line.romanization?.trim().isNotEmpty == true) return false;
     final text = translatableLyricText(line.text);
     return lyricNeedsRomanization(text) &&
+        !romanizer.readsAsWritten(text) &&
         !romanizer.canRomanize(text, assumePinyin: true);
   });
 }
 
+/// [shown], [original] as a translation shows it, without the
+/// romanization the translation gave lines in [readerScripts]: the AI
+/// romanizes every line it is sent. Romanization [original] has of its own
+/// stays.
+ParsedLyrics lyricsWithoutReaderRomanization(
+  ParsedLyrics original,
+  ParsedLyrics shown,
+  Set<LyricsScript> readerScripts,
+) {
+  if (readerScripts.isEmpty || identical(original, shown)) return shown;
+  final saved = lyricsWithPlainLines(original).lines;
+  if (saved.length != shown.lines.length) return shown;
+  var changed = false;
+  final lines = <LyricLine>[];
+  for (var i = 0; i < saved.length; i++) {
+    final line = shown.lines[i];
+    final own = saved[i];
+    if (line.romanization == own.romanization ||
+        !writtenIn(line.text, readerScripts)) {
+      lines.add(line);
+      continue;
+    }
+    changed = true;
+    lines.add(
+      LyricLine(
+        time: line.time,
+        end: line.end,
+        text: line.text,
+        words: line.words,
+        romanization: own.romanization,
+        romanizationWords: own.romanizationWords,
+        translation: line.translation,
+        translationWords: line.translationWords,
+        voice: line.voice,
+        isBackground: line.isBackground,
+        vocalGroup: line.vocalGroup,
+      ),
+    );
+  }
+  if (!changed) return shown;
+  return ParsedLyrics(
+    synced: shown.synced,
+    wordSynced: shown.wordSynced,
+    lines: lines,
+    plainText: shown.plainText,
+    writers: shown.writers,
+    provider: shown.provider,
+  );
+}
+
 /// [lyrics] with an offline romanization on each line written outside the
 /// Latin alphabet that has none, timed word by word on word-timed lines.
-/// Chinese lines wait for [pinyin].
+/// Chinese lines wait for [pinyin]; lines in [readerScripts] get none.
 ParsedLyrics lyricsWithOfflineRomanization(
   ParsedLyrics lyrics, {
   PinyinData? pinyin,
+  Set<LyricsScript> readerScripts = const {},
 }) {
   final base = lyricsWithPlainLines(lyrics);
-  final romanizer = _romanizerFor(lyrics, pinyin);
+  final romanizer = _romanizerFor(lyrics, pinyin, readerScripts);
   var changed = false;
   final lines = <LyricLine>[];
   for (final line in base.lines) {

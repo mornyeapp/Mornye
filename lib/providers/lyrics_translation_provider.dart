@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -15,6 +16,7 @@ import 'package:mornye/services/lyrics_translation_languages.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/services/lyrics_translation_song_languages.dart';
 import 'package:mornye/services/romanization/pinyin.dart';
+import 'package:mornye/services/romanization/text_romanizer.dart';
 import 'package:mornye/services/secure_storage_options.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
@@ -74,12 +76,23 @@ final pinyinDataLoaderProvider = Provider<PinyinDataLoader>(
   (ref) => PinyinDataLoader(),
 );
 
+/// The scripts of the app's language, or of the system's when the app
+/// follows it: the user reads them, so they are never romanized.
+Set<LyricsScript> lyricsReaderScriptsFor(AppSettings settings) =>
+    lyricsReaderScripts(
+      localeFromAppSetting(settings.locale) ??
+          PlatformDispatcher.instance.locale,
+    );
+
 /// Whether a translation of [lyrics] also asks for romanization: for the
 /// lines offline romanization cannot give, when the settings want both.
 bool lyricsAiRomanizes(AppSettings settings, ParsedLyrics lyrics) =>
     settings.lyricsRomanize &&
     settings.lyricsAiRomanize &&
-    linesNeedingAiRomanization(lyrics).isNotEmpty;
+    linesNeedingAiRomanization(
+      lyrics,
+      readerScripts: lyricsReaderScriptsFor(settings),
+    ).isNotEmpty;
 
 /// Creates the HTTP client of one job; tests substitute a mock.
 final lyricsAiHttpClientProvider = Provider<http.Client Function()>(
@@ -202,7 +215,8 @@ final lyricsTranslationProvider =
 class LyricsTranslationController extends Notifier<LyricsTranslationState> {
   final _lookedUp = <String>{};
   final _autoAttempted = <String>{};
-  final _merged = Expando<(LyricsTranslationResult, ParsedLyrics)>();
+  final _merged =
+      Expando<(LyricsTranslationResult, ParsedLyrics, Set<LyricsScript>)>();
   final _alreadyInTarget = <String, bool>{};
   LyricsTranslationCancelToken? _cancel;
   Object? _owner;
@@ -210,7 +224,8 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
   late LyricsTranslationSharing _sharing;
   late LyricsTranslationSongLanguages _songLanguages;
   late PinyinDataLoader _pinyin;
-  final _shown = Expando<(bool, bool, PinyinData?, ParsedLyrics)>();
+  final _shown =
+      Expando<(bool, bool, PinyinData?, Set<LyricsScript>, ParsedLyrics)>();
   bool _pinyinRequested = false;
 
   @override
@@ -381,20 +396,29 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     final mainLine = settings.lyricsRomanizedMainLine;
     if (!romanize && !mainLine) return translated;
     final pinyin = _pinyin.data;
+    final readers = lyricsReaderScriptsFor(settings);
     final memo = _shown[translated];
     if (memo != null &&
         memo.$1 == romanize &&
         memo.$2 == mainLine &&
-        identical(memo.$3, pinyin)) {
-      return memo.$4;
+        identical(memo.$3, pinyin) &&
+        setEquals(memo.$4, readers)) {
+      return memo.$5;
     }
     var result = translated;
     if (romanize) {
-      if (pinyin == null && lyricsNeedPinyin(translated)) _loadPinyin();
-      result = lyricsWithOfflineRomanization(result, pinyin: pinyin);
+      if (pinyin == null &&
+          lyricsNeedPinyin(translated, readerScripts: readers)) {
+        _loadPinyin();
+      }
+      result = lyricsWithOfflineRomanization(
+        result,
+        pinyin: pinyin,
+        readerScripts: readers,
+      );
     }
     if (mainLine) result = lyricsWithRomanizedMainLines(result);
-    _shown[translated] = (romanize, mainLine, pinyin, result);
+    _shown[translated] = (romanize, mainLine, pinyin, readers, result);
     return result;
   }
 
@@ -422,17 +446,26 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     LyricsTranslationSource source,
     LyricsTranslationResult result,
   ) {
+    final readers = lyricsReaderScriptsFor(ref.read(settingsProvider));
     final memo = _merged[lyrics];
-    if (memo != null && identical(memo.$1, result)) return memo.$2;
-    final merged = applyLyricsTranslation(
+    if (memo != null &&
+        identical(memo.$1, result) &&
+        setEquals(memo.$3, readers)) {
+      return memo.$2;
+    }
+    final merged = lyricsWithoutReaderRomanization(
       lyrics,
-      source,
-      result.translations,
-      romanizations: result.romanizations,
-      alignments: result.alignments,
-      romanizationAlignments: result.romanizationAlignments,
+      applyLyricsTranslation(
+        lyrics,
+        source,
+        result.translations,
+        romanizations: result.romanizations,
+        alignments: result.alignments,
+        romanizationAlignments: result.romanizationAlignments,
+      ),
+      readers,
     );
-    _merged[lyrics] = (result, merged);
+    _merged[lyrics] = (result, merged, readers);
     return merged;
   }
 
@@ -560,7 +593,10 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       final timedRomanize =
           wordSync &&
           romanize &&
-          linesNeedingAiRomanization(lyrics).any((line) => line.hasWordTiming);
+          linesNeedingAiRomanization(
+            lyrics,
+            readerScripts: lyricsReaderScriptsFor(settings),
+          ).any((line) => line.hasWordTiming);
       final reusable =
           cached != null &&
           (!romanize || cached.romanized) &&
