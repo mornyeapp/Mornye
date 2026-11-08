@@ -33,6 +33,7 @@ import 'package:mornye/services/network_playback_cache.dart';
 import 'package:mornye/services/network_storage_service.dart'
     show subsonicSongIdFromPath;
 import 'package:mornye/services/playback_deck.dart';
+import 'package:mornye/services/queue_dedup.dart';
 import 'package:mornye/services/switching_playback_deck.dart';
 import 'package:mornye/services/automix_analysis.dart';
 import 'package:mornye/services/automix_phase_lock.dart';
@@ -44,6 +45,7 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/automix_effect_renderer.dart';
 import 'package:mornye/services/automix_status.dart';
 import 'package:mornye/services/music_haptics.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/playback_artwork.dart';
@@ -184,6 +186,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   Timer? _sleepTimer;
   Timer? _listeningTimer;
   DateTime? _sleepTimerEndsAt;
+  bool _sleepAtEndOfSong = false;
 
   bool _shuffle = false;
   List<MediaItem>? _originalQueueOrder;
@@ -223,6 +226,9 @@ class MusicPlayerHandler extends BaseAudioHandler
   static const Duration _positionQueryAllowance = Duration(milliseconds: 50);
 
   DateTime? get sleepTimerEndsAt => _sleepTimerEndsAt;
+
+  /// Whether playback pauses when the current song ends.
+  bool get sleepAtEndOfSong => _sleepAtEndOfSong;
   bool get isDisposed => _disposed;
   int get playbackRequestGeneration => _playRequestGeneration;
 
@@ -263,6 +269,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         previous.pauseOnMute != settings.pauseOnMute ||
         previous.playOnHeadphonesConnected !=
             settings.playOnHeadphonesConnected ||
+        previous.resumeOnOutputReconnect != settings.resumeOnOutputReconnect ||
         previous.usbBitPerfect != settings.usbBitPerfect) {
       _refreshPlaybackAutomation();
     }
@@ -729,8 +736,13 @@ class MusicPlayerHandler extends BaseAudioHandler
         session.becomingNoisyEventStream.listen((_) {
           if (_cast.active) return;
           // Headphones unplugged / output route lost.
+          final wasPlaying =
+              _player.state == PlaybackDeckState.playing ||
+              playbackState.value.playing;
           _pausedByInterruption = false;
-          unawaited(_pauseForFocusLoss(reason: 'becoming noisy'));
+          unawaited(
+            _pauseForFocusLoss(reason: 'becoming noisy', noisy: wasPlaying),
+          );
         }),
       );
     } catch (e) {
@@ -753,10 +765,19 @@ class MusicPlayerHandler extends BaseAudioHandler
         !isDesktopPlatform &&
         _settings.playerMode == 'internal' &&
         _settings.playOnHeadphonesConnected;
+    // Phones and tablets only: a TV's outputs are not personal headphones.
+    final resumeAfterNoisyPause =
+        !_cast.active &&
+        !isDesktopPlatform &&
+        !isAndroidTv &&
+        _settings.playerMode == 'internal' &&
+        _settings.resumeOnOutputReconnect;
+    final watchDevices = playOnHeadphonesConnected || resumeAfterNoisyPause;
     unawaited(
       _playbackAutomation.configure(
         pauseOnMute: pauseOnMute,
         playOnHeadphonesConnected: playOnHeadphonesConnected,
+        resumeAfterNoisyPause: resumeAfterNoisyPause,
       ),
     );
     if (pauseOnMute && _automationVolumeSubscription == null) {
@@ -771,14 +792,12 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (subscription != null) unawaited(subscription.cancel());
     }
     final session = _audioSession;
-    if (playOnHeadphonesConnected &&
-        session != null &&
-        !_headphoneMonitoringRequested) {
+    if (watchDevices && session != null && !_headphoneMonitoringRequested) {
       _headphoneMonitoringRequested = true;
       unawaited(
         _startHeadphoneMonitoring(session, ++_headphoneMonitoringRevision),
       );
-    } else if (!playOnHeadphonesConnected) {
+    } else if (!watchDevices) {
       _headphoneMonitoringRequested = false;
       _headphoneMonitoringRevision++;
       final subscription = _automationDevicesSubscription;
@@ -816,9 +835,14 @@ class MusicPlayerHandler extends BaseAudioHandler
       _userPaused ||
       _playbackError != null;
 
-  Future<void> _pauseForFocusLoss({required String reason}) async {
+  Future<void> _pauseForFocusLoss({
+    required String reason,
+    bool noisy = false,
+  }) async {
     _log.i('Pausing internal player because of $reason');
     _playbackAutomation.cancelPendingActions();
+    // Only a route-loss pause of playing music may resume on reconnect.
+    if (noisy) _playbackAutomation.noisyPause();
     try {
       await _pausePlayback();
     } catch (e) {
@@ -830,6 +854,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   void setSleepTimer(Duration duration) {
     if (duration <= Duration.zero) return;
     _sleepTimer?.cancel();
+    _sleepAtEndOfSong = false;
     _sleepTimerEndsAt = DateTime.now().add(duration);
     _sleepTimer = Timer(duration, () {
       _sleepTimer = null;
@@ -840,10 +865,26 @@ class MusicPlayerHandler extends BaseAudioHandler
     });
   }
 
+  /// Pauses once the song playing ends, whichever song that is after skips.
+  /// The next song loads paused, so Play continues the queue. Gapless and
+  /// AutoMix stand down meanwhile, so no next song is ever audible: a mix
+  /// would start up to a minute before the end and cut the song short. A
+  /// crossfade already under way finishes, and the song it brought in is
+  /// the one that ends the session.
+  void setSleepTimerEndOfSong() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTimerEndsAt = null;
+    _sleepAtEndOfSong = true;
+    unawaited(_gapless.cancel());
+    if (!_autoMix.crossfading) unawaited(_autoMix.cancel());
+  }
+
   void cancelSleepTimer() {
     _sleepTimer?.cancel();
     _sleepTimer = null;
     _sleepTimerEndsAt = null;
+    _sleepAtEndOfSong = false;
   }
 
   Future<bool> _activateAudioSession(int generation) async {
@@ -1515,6 +1556,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       await setQueueAndPlay([item]);
       return;
     }
+    _withoutQueuedDuplicates([item]);
     final insertAt = playNext
         ? (_index + 1).clamp(0, _media.length)
         : _autoplay.manualInsertIndex;
@@ -1539,14 +1581,23 @@ class MusicPlayerHandler extends BaseAudioHandler
   }) async {
     if (items.isEmpty) return;
     if (_media.isEmpty || _index < 0) {
-      await setQueueAndPlay(items);
+      await setQueueAndPlay(
+        _settings.queueNoDuplicates
+            ? planQueueWithoutDuplicates(
+                queue: const [],
+                current: -1,
+                incoming: items,
+              ).insert
+            : items,
+      );
       return;
     }
+    final added = _withoutQueuedDuplicates(items);
     var at = playNext
         ? (_index + 1).clamp(0, _media.length)
         : _autoplay.manualInsertIndex;
     final queued = <MediaItem>[];
-    for (final item in items) {
+    for (final item in added) {
       _media.insert(at, item);
       final queueItem = _toMediaItem(item);
       _queueItems.insert(at, queueItem);
@@ -1600,7 +1651,18 @@ class MusicPlayerHandler extends BaseAudioHandler
     final at = _queueItems.indexWhere((entry) => identical(entry, item));
     if (_disposed || at < 0 || at == _index) return;
     _autoplay.dismiss(_media[at]);
-    _queueItems.removeAt(at);
+    _removeQueuedAt(at);
+    _markSessionQueueChanged();
+    unawaited(_cancelTransitions());
+    queue.add(List<MediaItem>.unmodifiable(_queueItems));
+    _broadcastState();
+    unawaited(_persistSession(position: playbackState.value.position));
+  }
+
+  /// Drops the entry at [at], never the current one, from the queue, its
+  /// shuffle order and the play history.
+  void _removeQueuedAt(int at) {
+    final item = _queueItems.removeAt(at);
     _media.removeAt(at);
     _originalQueueOrder?.removeWhere((entry) => identical(entry, item));
     if (at < _index) _index--;
@@ -1611,11 +1673,20 @@ class MusicPlayerHandler extends BaseAudioHandler
     _playHistory
       ..clear()
       ..addAll(history);
-    _markSessionQueueChanged();
-    unawaited(_cancelTransitions());
-    queue.add(List<MediaItem>.unmodifiable(_queueItems));
-    _broadcastState();
-    unawaited(_persistSession(position: playbackState.value.position));
+  }
+
+  /// With `queueNoDuplicates` on, [items] each once, with the upcoming
+  /// entries of the same songs removed so the insert moves them
+  /// ([planQueueWithoutDuplicates]). Unchanged otherwise.
+  List<PlayableMedia> _withoutQueuedDuplicates(List<PlayableMedia> items) {
+    if (!_settings.queueNoDuplicates) return items;
+    final plan = planQueueWithoutDuplicates(
+      queue: _media,
+      current: _index,
+      incoming: items,
+    );
+    plan.remove.forEach(_removeQueuedAt);
+    return plan.insert;
   }
 
   Future<void> _playIndex(
@@ -2124,10 +2195,16 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   Future<void> _onComplete() async {
+    // The end-of-song sleep timer: whatever plays next loads paused.
+    final sleep = _sleepAtEndOfSong;
+    if (sleep) {
+      _sleepAtEndOfSong = false;
+      _log.i('Song ended with the end-of-song sleep timer; pausing');
+    }
     if (_repeatMode == AudioServiceRepeatMode.one &&
         _index >= 0 &&
         _index < _media.length) {
-      await _playIndex(_index, recordHistory: false);
+      await _playIndex(_index, recordHistory: false, startPaused: sleep);
       return;
     }
     if (_index == _media.length - 1 &&
@@ -2141,9 +2218,12 @@ class MusicPlayerHandler extends BaseAudioHandler
       }
     }
     if (_index >= 0 && _index < _media.length - 1) {
-      await _playIndex(_index + 1);
+      await _playIndex(_index + 1, startPaused: sleep);
     } else if (_repeatMode == AudioServiceRepeatMode.all && _media.isNotEmpty) {
-      await _playIndex(_beginRepeatPass(_repeatPassStart()));
+      await _playIndex(
+        _beginRepeatPass(_repeatPassStart()),
+        startPaused: sleep,
+      );
     } else {
       _broadcastState(playerState: PlaybackDeckState.completed);
     }

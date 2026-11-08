@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/exclusive_output_labels.dart';
 
@@ -315,6 +316,18 @@ class SettingsSearchCatalog {
           keywords: const ['sound', 'tempo', 'bpm', 'key', 'recommendation'],
         ),
         SettingsSearchEntry(
+          icon: Icons.playlist_remove,
+          title: l10n.queueNoDuplicates,
+          subtitle: l10n.queueNoDuplicatesDescription,
+          keywords: const ['duplicate', 'queue', 'twice', 'play next', 'once'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.lock_outline,
+          title: l10n.queueLock,
+          subtitle: l10n.queueLockDescription,
+          keywords: const ['lock', 'queue', 'reorder', 'swipe', 'accidental'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.insights_outlined,
           title: l10n.listeningStats,
           subtitle: l10n.listeningStatsDescription,
@@ -400,6 +413,20 @@ class SettingsSearchCatalog {
           subtitle: l10n.playbackOnHeadphonesConnectedDescription,
           keywords: const ['earphone', 'headphone', 'bluetooth', 'connect'],
         ),
+        if (!isDesktopPlatform && !isAndroidTv)
+          SettingsSearchEntry(
+            icon: Icons.bluetooth_audio_outlined,
+            title: l10n.playbackResumeOnReconnect,
+            subtitle: l10n.playbackResumeOnReconnectDescription,
+            keywords: const [
+              'earphone',
+              'headphone',
+              'bluetooth',
+              'reconnect',
+              'resume',
+              'car',
+            ],
+          ),
         SettingsSearchEntry(
           icon: Icons.linear_scale,
           title: l10n.gaplessPlayback,
@@ -434,6 +461,13 @@ class SettingsSearchCatalog {
               'media player',
             ],
           ),
+          if (!isAndroidTv)
+            SettingsSearchEntry(
+              icon: Icons.fast_forward_outlined,
+              title: l10n.skipSilence,
+              subtitle: l10n.skipSilenceDescription,
+              keywords: const ['silence', 'quiet', 'gap', 'skip', 'hening'],
+            ),
           SettingsSearchEntry(
             icon: Icons.usb,
             title: l10n.usbBitPerfect,

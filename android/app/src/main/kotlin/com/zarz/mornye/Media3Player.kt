@@ -3,7 +3,9 @@
 package com.zarz.mornye
 
 import android.content.Context
+import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.MediaFormat
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -11,15 +13,20 @@ import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.RenderersFactory
+import androidx.media3.exoplayer.audio.AudioRendererEventListener
+import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
+import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.MediaSource
 import io.flutter.plugin.common.MethodCall
@@ -38,17 +45,73 @@ import io.flutter.plugin.common.MethodChannel
  * for every format instead, the same time-stretch MediaPlayer uses for
  * `setPlaybackParams(setSpeed)`. The `DynamicsProcessing` equalizer is an
  * effect on the session in the platform mixer and works with either PCM
- * format, since offload stays disabled.
+ * format, since offload stays disabled. Skip silence trades this for 16-bit
+ * decoding while it is on (see [Media3AudioRenderer]).
  *
  * Buffer size: see [MAX_BUFFERED_SPEED].
  */
-internal fun media3AudioRenderers(context: Context) = RenderersFactory { handler, _, audioListener, _, _ ->
-    val sink = DefaultAudioSink.Builder(context)
-        .setEnableFloatOutput(true)
-        .setEnableAudioOutputPlaybackParameters(true)
-        .setAudioTrackBufferSizeProvider(cappedSpeedBufferSize)
-        .build()
-    arrayOf(MediaCodecAudioRenderer(context, MediaCodecSelector.DEFAULT, handler, audioListener, sink))
+internal fun media3AudioRenderers(context: Context, decode16Bit: () -> Boolean) =
+    RenderersFactory { handler, _, audioListener, _, _ ->
+        val sink = DefaultAudioSink.Builder(context)
+            .setEnableFloatOutput(true)
+            .setEnableAudioOutputPlaybackParameters(true)
+            .setAudioTrackBufferSizeProvider(cappedSpeedBufferSize)
+            .build()
+        arrayOf(Media3AudioRenderer(context, handler, audioListener, sink, decode16Bit))
+    }
+
+/**
+ * Skip silence: `DefaultAudioSink` skips silence in its audio processor
+ * chain, which it bypasses for float PCM (see [media3AudioRenderers]), and
+ * media3 asks every decoder for float PCM once the sink takes float. So
+ * while [decode16Bit] holds, decoders are asked for 16-bit PCM instead,
+ * which the chain and its silence detection process. A decoder already
+ * running keeps its encoding; the mode applies from the next decoder start
+ * (the next source, or a queued item whose decoder cannot be reused).
+ */
+private class Media3AudioRenderer(
+    context: Context,
+    handler: Handler?,
+    listener: AudioRendererEventListener?,
+    sink: AudioSink,
+    private val decode16Bit: () -> Boolean,
+) : MediaCodecAudioRenderer(context, MediaCodecSelector.DEFAULT, handler, listener, sink) {
+    /** The mode the running decoder was configured with; playback thread only. */
+    private var decoding16Bit: Boolean? = null
+
+    override fun getMediaFormat(
+        format: Format,
+        codecMimeType: String,
+        codecMaxInputSize: Int,
+        codecOperatingRate: Float,
+    ): MediaFormat {
+        val mediaFormat = super.getMediaFormat(format, codecMimeType, codecMaxInputSize, codecOperatingRate)
+        val sixteen = decode16Bit()
+        if (sixteen && Build.VERSION.SDK_INT >= 24) {
+            mediaFormat.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
+        }
+        decoding16Bit = sixteen
+        return mediaFormat
+    }
+
+    override fun canReuseCodec(
+        codecInfo: MediaCodecInfo,
+        oldFormat: Format,
+        newFormat: Format,
+        isInitialization: Boolean,
+    ): DecoderReuseEvaluation {
+        val running = decoding16Bit
+        if (running != null && running != decode16Bit()) {
+            return DecoderReuseEvaluation(
+                codecInfo.name,
+                oldFormat,
+                newFormat,
+                DecoderReuseEvaluation.REUSE_RESULT_NO,
+                DecoderReuseEvaluation.DISCARD_REASON_APP_OVERRIDE,
+            )
+        }
+        return super.canReuseCodec(codecInfo, oldFormat, newFormat, isInitialization)
+    }
 }
 
 /**
@@ -105,8 +168,11 @@ internal class Media3Player(
     private var equalizer: PlaybackEqualizer? = null
     private var released = false
 
+    /** Read by the renderer on media3's playback thread. */
+    @Volatile private var skipSilence = false
+
     init {
-        exo = ExoPlayer.Builder(appContext, media3AudioRenderers(appContext))
+        exo = ExoPlayer.Builder(appContext, media3AudioRenderers(appContext) { skipSilence })
             .setLooper(looper)
             // The app owns focus (audio_session) and becoming-noisy handling.
             .setAudioAttributes(
@@ -117,6 +183,7 @@ internal class Media3Player(
                 false,
             )
             .setHandleAudioBecomingNoisy(false)
+            // Off until Dart sends `setSkipSilence`.
             .setSkipSilenceEnabled(false)
             .setWakeMode(C.WAKE_MODE_NONE)
             .build()
@@ -174,6 +241,15 @@ internal class Media3Player(
                 call.argument<Number>("volume")?.toDouble(),
             ))
             "clearNext" -> { clearNext(); result.success(null) }
+            "setSkipSilence" -> {
+                val enabled = call.argument<Boolean>("enabled")
+                    ?: return invalid(result, "enabled is required")
+                // Live where the running decoder already gives 16-bit PCM;
+                // otherwise from its next start (see Media3AudioRenderer).
+                skipSilence = enabled
+                exo.skipSilenceEnabled = enabled
+                result.success(null)
+            }
             "setEqualizer" -> {
                 val configuration = call.argument<Map<String, Any?>>("configuration")
                     ?: return invalid(result, "configuration is required")

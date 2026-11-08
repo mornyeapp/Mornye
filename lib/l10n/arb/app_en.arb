@@ -315,6 +315,37 @@
   "@newPlaybackEngineDescription": {
     "description": "Subtitle of the New playback engine switch. 'Crackle' means short clicks or static in the sound"
   },
+  "skipSilence": "Skip silence",
+  "@skipSilence": {
+    "description": "Android Playback setting that jumps over silent passages in songs"
+  },
+  "skipSilenceDescription": "Jumps over silent parts of songs. While on, songs are decoded at 16-bit.",
+  "skipSilenceNeedsEngine": "Turn on the new playback engine to use this.",
+  "@skipSilenceNeedsEngine": {
+    "description": "Added to the Skip silence subtitle while the New playback engine is off, which disables the switch"
+  },
+  "skipSilenceAutoMix": "Off while AutoMix is on.",
+  "@skipSilenceAutoMix": {
+    "description": "Added to the Skip silence subtitle while AutoMix is on, which suspends silence skipping"
+  },
+  "sectionPlaybackQueue": "Queue",
+  "@sectionPlaybackQueue": {
+    "description": "Playback settings section for how the play queue behaves"
+  },
+  "queueNoDuplicates": "No duplicates in queue",
+  "@queueNoDuplicates": {
+    "description": "Playback setting: adding a song already coming up in the queue moves it instead of adding a second copy"
+  },
+  "queueNoDuplicatesDescription": "Adding a song that is already coming up moves it instead of queueing it twice. The playing song and songs already played stay where they are.",
+  "queueLock": "Lock queue",
+  "@queueLock": {
+    "description": "Playback setting and queue header toggle tooltip that stops reordering and swiping songs out of the play queue"
+  },
+  "queueUnlock": "Unlock queue",
+  "@queueUnlock": {
+    "description": "Tooltip of the queue header toggle while the queue is locked"
+  },
+  "queueLockDescription": "Stops songs in the queue from being dragged or swiped away. Adding songs still works. The queue has the same switch.",
   "usbBitPerfect": "Hi-res and bit-perfect audio",
   "usbBitPerfectDescription": "Preserve source precision on compatible outputs. Choose direct USB or AAudio exclusive below; otherwise Android USB output requires Android 14 or later. Applies from the next track, without AutoMix or normalization. System volume may not control direct USB.",
   "usbHardwareVolume": "DAC hardware volume",
@@ -7231,6 +7262,18 @@
   "@nowPlayingSleepTimerCancelled": {
     "description": "Confirmation after cancelling the playback sleep timer"
   },
+  "nowPlayingSleepTimerEndOfSong": "End of song",
+  "@nowPlayingSleepTimerEndOfSong": {
+    "description": "Sleep timer choice that pauses playback when the current song ends"
+  },
+  "nowPlayingSleepTimerEndOfSongActive": "Ends after this song",
+  "@nowPlayingSleepTimerEndOfSongActive": {
+    "description": "Active end-of-song sleep timer shown in the player menu"
+  },
+  "nowPlayingSleepTimerEndOfSongSet": "Playback pauses when this song ends",
+  "@nowPlayingSleepTimerEndOfSongSet": {
+    "description": "Confirmation after choosing the end-of-song sleep timer"
+  },
   "nowPlayingOpenInExternalPlayer": "Open in external player",
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"
@@ -9052,6 +9095,15 @@
   "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
   "playbackOnHeadphonesConnected": "Play when headphones connect",
   "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
+  "playbackResumeOnReconnect": "Resume when headphones reconnect",
+  "@playbackResumeOnReconnect": {
+    "description": "Playback setting: resume only a recent pause caused by headphones or a Bluetooth output disconnecting"
+  },
+  "playbackResumeOnReconnectDescription": "If headphones or a Bluetooth device disconnect while music plays, playback resumes when one connects again within 30 minutes. Songs you paused stay paused. Built-in player only.",
+  "playbackResumeOnReconnectCovered": "Play when headphones connect is on and already resumes on every connection.",
+  "@playbackResumeOnReconnectCovered": {
+    "description": "Added to the Resume when headphones reconnect subtitle while the broader Play when headphones connect setting is on"
+  },
   "appearanceCustomFont": "Custom font",
   "appearanceCustomFontSubtitle": "Import a TTF or OTF file (up to 10 MB). Overrides the theme and system font.",
   "appearanceCustomFontInvalid": "Could not load this font. Choose a valid TTF or OTF file up to 10 MB.",

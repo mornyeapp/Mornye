@@ -18,6 +18,7 @@ import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/exclusive_output_labels.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
@@ -361,6 +362,30 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                 ),
             ],
           ),
+          ...settingsSectionSlivers(
+            title: context.l10n.sectionPlaybackQueue,
+            children: [
+              SettingsSwitchItem(
+                icon: Icons.playlist_remove,
+                title: context.l10n.queueNoDuplicates,
+                subtitle: context.l10n.queueNoDuplicatesDescription,
+                value: settings.queueNoDuplicates,
+                enabled: settings.playerMode == 'internal',
+                onChanged: (value) => ref
+                    .read(settingsProvider.notifier)
+                    .setQueueNoDuplicates(value),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.lock_outline,
+                title: context.l10n.queueLock,
+                subtitle: context.l10n.queueLockDescription,
+                value: settings.queueLocked,
+                onChanged: (value) =>
+                    ref.read(settingsProvider.notifier).setQueueLocked(value),
+                showDivider: false,
+              ),
+            ],
+          ),
           // Mute and headphone routes come from mobile system audio.
           if (!isDesktopPlatform)
             ...settingsSectionSlivers(
@@ -387,8 +412,27 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                   onChanged: (value) => ref
                       .read(settingsProvider.notifier)
                       .setPlayOnHeadphonesConnected(value),
-                  showDivider: false,
+                  showDivider: !isAndroidTv,
                 ),
+                // A TV's outputs are not headphones someone walks away with.
+                if (!isAndroidTv)
+                  SettingsSwitchItem(
+                    icon: Icons.bluetooth_audio_outlined,
+                    title: context.l10n.playbackResumeOnReconnect,
+                    subtitle: settings.playOnHeadphonesConnected
+                        ? '${context.l10n.playbackResumeOnReconnectDescription}'
+                              '\n\n'
+                              '${context.l10n.playbackResumeOnReconnectCovered}'
+                        : context.l10n.playbackResumeOnReconnectDescription,
+                    value: settings.resumeOnOutputReconnect,
+                    enabled:
+                        settings.playerMode == 'internal' &&
+                        !settings.playOnHeadphonesConnected,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setResumeOnOutputReconnect(value),
+                    showDivider: false,
+                  ),
               ],
             ),
           ...settingsSectionSlivers(
@@ -533,6 +577,24 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                       .read(settingsProvider.notifier)
                       .setMedia3Engine(value),
                 ),
+                // Phones and tablets only; media3 does the skipping.
+                if (!isAndroidTv)
+                  SettingsSwitchItem(
+                    icon: Icons.fast_forward_outlined,
+                    title: context.l10n.skipSilence,
+                    subtitle: [
+                      context.l10n.skipSilenceDescription,
+                      if (!settings.media3Engine)
+                        context.l10n.skipSilenceNeedsEngine
+                      else if (settings.autoMix)
+                        context.l10n.skipSilenceAutoMix,
+                    ].join('\n\n'),
+                    value: settings.skipSilence,
+                    enabled: settings.media3Engine,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setSkipSilence(value),
+                  ),
                 ValueListenableBuilder<UsbAudioStatus>(
                   valueListenable: usbAudioStatus,
                   builder: (context, status, _) => SettingsSwitchItem(

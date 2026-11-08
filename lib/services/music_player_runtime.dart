@@ -432,6 +432,13 @@ class MusicPlayerRuntime {
     // The decks read it as each song loads.
     playbackMedia3Engine.value =
         settings.media3Engine && dependencies.isAndroid;
+    // AutoMix times its fades and beat matching on the clock, which silence
+    // skipping would outrun.
+    playbackSkipSilence.value =
+        settings.skipSilence &&
+        settings.media3Engine &&
+        !settings.autoMix &&
+        dependencies.isAndroid;
     configureLockScreenLyrics(enabled: settings.lockScreenLyrics);
     _songAnalysis?.configure(settings);
     _handler?.applySettings(previous);

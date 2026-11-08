@@ -9,6 +9,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/settings/playback_settings_page.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/widgets/beta_badge.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -18,13 +19,14 @@ const _title = 'New playback engine';
 Future<ProviderContainer> _pumpPage(
   WidgetTester tester, {
   required bool mornye,
+  AppSettings settings = const AppSettings(),
 }) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(1200, 1600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final container = ProviderContainer(
-    overrides: [initialSettingsProvider.overrideWithValue(const AppSettings())],
+    overrides: [initialSettingsProvider.overrideWithValue(settings)],
   );
   addTearDown(container.dispose);
   await tester.pumpWidget(
@@ -116,5 +118,84 @@ void main() {
     ).playback.any((entry) => entry.title == l10n.newPlaybackEngine);
     expect(listed(androidAudio: true), isTrue);
     expect(listed(androidAudio: false), isFalse);
+    bool skipListed({required bool androidAudio}) => SettingsSearchCatalog(
+      l10n,
+      androidAudio: androidAudio,
+    ).playback.any((entry) => entry.title == l10n.skipSilence);
+    expect(skipListed(androidAudio: true), isTrue);
+    expect(skipListed(androidAudio: false), isFalse);
+  });
+
+  test('skip silence defaults to off and round-trips through JSON', () {
+    expect(const AppSettings().skipSilence, isFalse);
+    expect(AppSettings.fromJson(const {}).skipSilence, isFalse);
+    final on = const AppSettings().copyWith(skipSilence: true);
+    expect(on.toJson()['skipSilence'], isTrue);
+    expect(AppSettings.fromJson(on.toJson()).skipSilence, isTrue);
+  });
+
+  Finder skipSwitch() => find.byWidgetPredicate(
+    (widget) => widget is SettingsSwitchItem && widget.title == 'Skip silence',
+  );
+
+  for (final mornye in [false, true]) {
+    testWidgets('skip silence sits under the engine and needs it ($mornye)', (
+      tester,
+    ) async {
+      debugAndroidAudioSettingsOverride = true;
+      final container = await _pumpPage(tester, mornye: mornye);
+      await tester.scrollUntilVisible(
+        skipSwitch(),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      var item = tester.widget<SettingsSwitchItem>(skipSwitch());
+      expect(item.value, isFalse);
+      expect(item.enabled, isTrue);
+      expect(item.subtitle, startsWith('Jumps over silent parts of songs.'));
+
+      await tester.tap(find.text('Skip silence'));
+      await tester.pumpAndSettle();
+      expect(container.read(settingsProvider).skipSilence, isTrue);
+
+      await tester.tap(find.text(_title));
+      await tester.pumpAndSettle();
+      item = tester.widget<SettingsSwitchItem>(skipSwitch());
+      expect(item.enabled, isFalse);
+      expect(item.subtitle, contains('Turn on the new playback engine'));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('skip silence says AutoMix suspends it', (tester) async {
+    debugAndroidAudioSettingsOverride = true;
+    await _pumpPage(
+      tester,
+      mornye: false,
+      settings: const AppSettings(autoMix: true, skipSilence: true),
+    );
+    await tester.scrollUntilVisible(
+      skipSwitch(),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    final item = tester.widget<SettingsSwitchItem>(skipSwitch());
+    expect(item.subtitle, endsWith('Off while AutoMix is on.'));
+  });
+
+  testWidgets('Android TV does not show skip silence', (tester) async {
+    debugAndroidAudioSettingsOverride = true;
+    debugAndroidTvOverride = true;
+    addTearDown(() => debugAndroidTvOverride = null);
+    await _pumpPage(tester, mornye: false);
+    await tester.scrollUntilVisible(
+      _switchFinder,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(skipSwitch(), findsNothing);
   });
 }

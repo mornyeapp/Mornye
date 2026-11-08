@@ -64,6 +64,7 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   Media3PlaybackDeck({required this.playerId}) {
     playbackEqualizer.addListener(_equalizerChanged);
     playbackOutputVolume.addListener(_outputVolumeChanged);
+    playbackSkipSilence.addListener(_skipSilenceChanged);
   }
 
   static const _channel = MethodChannel('com.zarz.mornye/media3_player');
@@ -108,6 +109,10 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   bool _polling = false;
   bool _disposed = false;
   bool _equalizerSent = false;
+
+  /// The native player starts with silence skipping off; only a change from
+  /// that is sent.
+  bool _skipSilenceSent = false;
   Timer? _equalizerTimer;
   Future<void> _equalizerWrite = Future.value();
 
@@ -151,6 +156,37 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
         );
     if (playbackEqualizer.value.enabled) {
       _equalizerWrite = _equalizerWrite.then((_) => _syncEqualizer());
+    }
+    // Before the first source, so its decoder starts in the mode silence
+    // skipping needs.
+    if (playbackSkipSilence.value) await _sendSkipSilence();
+  }
+
+  void _skipSilenceChanged() {
+    final created = _created;
+    if (_disposed || created == null) return;
+    unawaited(
+      created.then((_) async {
+        if (_disposed || playbackSkipSilence.value == _skipSilenceSent) return;
+        await _sendSkipSilence();
+      }, onError: (Object _) {}),
+    );
+  }
+
+  /// Applies live. The native side decodes to 16-bit while it is on, which
+  /// a song already decoding to float adopts from its next decoder start.
+  Future<void> _sendSkipSilence() async {
+    final enabled = playbackSkipSilence.value;
+    _skipSilenceSent = enabled;
+    try {
+      await _channel.invokeMethod<void>('setSkipSilence', {
+        'playerId': playerId,
+        'enabled': enabled,
+      });
+    } on PlatformException catch (error) {
+      _log.w('Skip silence unavailable: ${error.code}');
+    } on MissingPluginException {
+      // An older native player: silence plays as before.
     }
   }
 
@@ -518,6 +554,7 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     if (_disposed) return;
     playbackEqualizer.removeListener(_equalizerChanged);
     playbackOutputVolume.removeListener(_outputVolumeChanged);
+    playbackSkipSilence.removeListener(_skipSilenceChanged);
     _equalizerTimer?.cancel();
     reportEqualizerError(playerId, null);
     _disposed = true;

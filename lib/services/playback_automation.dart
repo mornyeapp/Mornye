@@ -4,6 +4,23 @@
 
 import 'package:audio_session/audio_session.dart';
 
+/// How long a pause from a lost headphone or Bluetooth route stays resumable
+/// when an output connects again. Long enough for a car or a charging case,
+/// short enough that music does not start hours later.
+const noisyPauseResumeWindow = Duration(minutes: 30);
+
+/// Whether a connection at [now] resumes the route-loss pause made at
+/// [pausedAt]. A clock that went back counts as too old.
+bool resumesNoisyPause(
+  DateTime? pausedAt,
+  DateTime now, {
+  Duration window = noisyPauseResumeWindow,
+}) {
+  if (pausedAt == null) return false;
+  final elapsed = now.difference(pausedAt);
+  return !elapsed.isNegative && elapsed <= window;
+}
+
 /// Serializes automatic transport requests and remembers who paused playback.
 /// A volume change must never undo an explicit pause or a lost output route.
 class PlaybackAutomation {
@@ -14,12 +31,14 @@ class PlaybackAutomation {
     required Future<void> Function() play,
     required void Function(Object) onError,
     void Function()? onMutedPause,
+    DateTime Function()? now,
   }) : _isPlaying = isPlaying,
        _canResume = canResume,
        _pause = pause,
        _play = play,
        _onError = onError,
-       _onMutedPause = onMutedPause;
+       _onMutedPause = onMutedPause,
+       _now = now ?? DateTime.now;
 
   final bool Function() _isPlaying;
   final bool Function() _canResume;
@@ -27,44 +46,67 @@ class PlaybackAutomation {
   final Future<void> Function() _play;
   final void Function(Object) _onError;
   final void Function()? _onMutedPause;
+  final DateTime Function() _now;
   bool _pauseOnMute = false;
   bool _playOnHeadphonesConnected = false;
+  bool _resumeAfterNoisyPause = false;
   bool? _muted;
   bool _pausedByMute = false;
   bool _allowMutedPlayback = false;
   bool _disposed = false;
   int _intentRevision = 0;
   Set<String>? _headphones;
+
+  /// When playing music was paused because its output route went away.
+  /// Kept in memory only, so a pause from before the app was killed is
+  /// never resumed.
+  DateTime? _noisyPauseAt;
   Future<void> _tail = Future<void>.value();
 
   bool get blocksPlayback =>
       _pauseOnMute && _muted != false && !_allowMutedPlayback;
 
+  bool get _watchesDevices =>
+      _playOnHeadphonesConnected || _resumeAfterNoisyPause;
+
   Future<void> configure({
     required bool pauseOnMute,
     required bool playOnHeadphonesConnected,
+    bool resumeAfterNoisyPause = false,
   }) {
     if (_pauseOnMute == pauseOnMute &&
-        _playOnHeadphonesConnected == playOnHeadphonesConnected) {
+        _playOnHeadphonesConnected == playOnHeadphonesConnected &&
+        _resumeAfterNoisyPause == resumeAfterNoisyPause) {
       return _tail;
     }
+    final watchedDevices = _watchesDevices;
     cancelPendingActions();
     if (_pauseOnMute != pauseOnMute) {
       _muted = null;
       _allowMutedPlayback = false;
     }
-    if (_playOnHeadphonesConnected != playOnHeadphonesConnected) {
-      _headphones = null;
-    }
     _pauseOnMute = pauseOnMute;
     _playOnHeadphonesConnected = playOnHeadphonesConnected;
+    _resumeAfterNoisyPause = resumeAfterNoisyPause;
+    if (watchedDevices != _watchesDevices) _headphones = null;
     return _enqueue(_applyVolume);
   }
 
+  /// Any explicit transport change, track change or other pause supersedes
+  /// automatic work, including a resumable route-loss pause.
   void cancelPendingActions() {
+    _cancelQueued();
+    _noisyPauseAt = null;
+  }
+
+  void _cancelQueued() {
     _intentRevision++;
     _pausedByMute = false;
   }
+
+  /// Playing music was paused because headphones or a Bluetooth output went
+  /// away. Call after the pause request supersedes pending actions.
+  void noisyPause() => _noisyPauseAt = _now();
 
   /// A second, explicit Play accepts silent playback until volume is raised.
   /// Keep this choice across source reloads and duplicate zero-volume events.
@@ -106,16 +148,21 @@ class PlaybackAutomation {
     final previous = _headphones;
     _headphones = headphones;
     // The initial device inventory is not a connection gesture.
-    if (previous == null || !_playOnHeadphonesConnected) return _tail;
+    if (previous == null || !_watchesDevices) return _tail;
     if (previous.isNotEmpty && headphones.isEmpty) {
-      cancelPendingActions();
+      if (!_playOnHeadphonesConnected) return _tail;
+      // The route-loss pause stays resumable; this pause is the same one.
+      _cancelQueued();
       return _enqueue(() async {
         if (_isPlaying()) await _pause();
       });
     }
     if (headphones.difference(previous).isEmpty) return _tail;
     return _enqueue(() async {
-      if (_playOnHeadphonesConnected &&
+      final resumesNoisy =
+          _resumeAfterNoisyPause && resumesNoisyPause(_noisyPauseAt, _now());
+      _noisyPauseAt = null;
+      if ((_playOnHeadphonesConnected || resumesNoisy) &&
           !blocksPlayback &&
           !_isPlaying() &&
           _canResume()) {

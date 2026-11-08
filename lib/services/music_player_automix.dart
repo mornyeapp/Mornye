@@ -85,7 +85,12 @@ class _MusicAutoMix {
       !handler._interruptionActive &&
       handler._player.state == PlaybackDeckState.playing &&
       handler._repeatMode != AudioServiceRepeatMode.one &&
+      // The song plays to its end; a mix would cut it short.
+      !handler._sleepAtEndOfSong &&
       handler._media.length > 1;
+
+  /// A crossfade is audible: the incoming song already counts as current.
+  bool get crossfading => _fadeTimer != null;
 
   static bool _isUrl(String path) =>
       const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme);

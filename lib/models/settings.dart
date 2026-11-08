@@ -106,6 +106,8 @@ class AppSettings {
   final String playbackNormalizationMode; // 'track' or 'album'
   final bool pauseOnMute;
   final bool playOnHeadphonesConnected;
+  // Resume only a recent pause caused by headphones or Bluetooth going away.
+  final bool resumeOnOutputReconnect;
   // Start the next song the moment one ends; AutoMix replaces it while on.
   final bool gaplessPlayback;
   final bool autoMix;
@@ -140,6 +142,19 @@ class AppSettings {
   /// ([usbBitPerfect]) stay on the platform player. Applies from the next
   /// song.
   final bool media3Engine;
+
+  /// Android, through [media3Engine] only: jump over silent passages. Off
+  /// while AutoMix is on, whose fades follow the clock. While on, media3
+  /// decodes to 16-bit, which its silence detection needs.
+  final bool skipSilence;
+
+  /// Adding a song already coming up in the queue moves that entry instead
+  /// of queueing a second copy. The current and played entries stay.
+  final bool queueNoDuplicates;
+
+  /// The queue UIs stop reordering and swiping songs away; adding songs
+  /// from elsewhere still works. Toggled from the queue header too.
+  final bool queueLocked;
 
   /// Desktop: take the output device for the music player alone, bypassing
   /// the system mixer (WASAPI exclusive on Windows, hog mode on macOS, an
@@ -385,6 +400,7 @@ class AppSettings {
     this.playbackNormalizationMode = 'track',
     this.pauseOnMute = true,
     this.playOnHeadphonesConnected = false,
+    this.resumeOnOutputReconnect = false,
     this.gaplessPlayback = true,
     this.autoMix = false,
     this.autoMixDuration = 0,
@@ -400,6 +416,9 @@ class AppSettings {
     this.usbAllowFixedVolume = false,
     this.dapExclusive = false,
     this.media3Engine = true,
+    this.skipSilence = false,
+    this.queueNoDuplicates = false,
+    this.queueLocked = false,
     this.exclusiveOutput = false,
     this.exclusiveOutputDevice = '',
     this.autoplay = false,
@@ -559,6 +578,7 @@ class AppSettings {
     String? playbackNormalizationMode,
     bool? pauseOnMute,
     bool? playOnHeadphonesConnected,
+    bool? resumeOnOutputReconnect,
     bool? gaplessPlayback,
     bool? autoMix,
     int? autoMixDuration,
@@ -574,6 +594,9 @@ class AppSettings {
     bool? usbAllowFixedVolume,
     bool? dapExclusive,
     bool? media3Engine,
+    bool? skipSilence,
+    bool? queueNoDuplicates,
+    bool? queueLocked,
     bool? exclusiveOutput,
     String? exclusiveOutputDevice,
     bool? autoplay,
@@ -713,6 +736,8 @@ class AppSettings {
       pauseOnMute: pauseOnMute ?? this.pauseOnMute,
       playOnHeadphonesConnected:
           playOnHeadphonesConnected ?? this.playOnHeadphonesConnected,
+      resumeOnOutputReconnect:
+          resumeOnOutputReconnect ?? this.resumeOnOutputReconnect,
       gaplessPlayback: gaplessPlayback ?? this.gaplessPlayback,
       autoMix: autoMix ?? this.autoMix,
       autoMixDuration: autoMixDuration ?? this.autoMixDuration,
@@ -729,6 +754,9 @@ class AppSettings {
       usbAllowFixedVolume: usbAllowFixedVolume ?? this.usbAllowFixedVolume,
       dapExclusive: dapExclusive ?? this.dapExclusive,
       media3Engine: media3Engine ?? this.media3Engine,
+      skipSilence: skipSilence ?? this.skipSilence,
+      queueNoDuplicates: queueNoDuplicates ?? this.queueNoDuplicates,
+      queueLocked: queueLocked ?? this.queueLocked,
       exclusiveOutput: exclusiveOutput ?? this.exclusiveOutput,
       exclusiveOutputDevice:
           exclusiveOutputDevice ?? this.exclusiveOutputDevice,

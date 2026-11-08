@@ -25,6 +25,7 @@ class _Transport {
   int mutedWarnings = 0;
   Completer<void>? pauseGate;
   bool failPause = false;
+  DateTime now = DateTime(2026, 11, 8, 12);
   final List<Object> errors = [];
 
   late final PlaybackAutomation automation = PlaybackAutomation(
@@ -42,11 +43,29 @@ class _Transport {
     },
     onError: errors.add,
     onMutedPause: () => mutedWarnings++,
+    now: () => now,
   );
 
-  Future<void> enable({bool mute = true, bool headphones = false}) => automation
-      .configure(pauseOnMute: mute, playOnHeadphonesConnected: headphones);
+  Future<void> enable({
+    bool mute = true,
+    bool headphones = false,
+    bool reconnect = false,
+  }) => automation.configure(
+    pauseOnMute: mute,
+    playOnHeadphonesConnected: headphones,
+    resumeAfterNoisyPause: reconnect,
+  );
+
+  /// The handler's becoming-noisy path: supersede, mark, then pause.
+  Future<void> unplugWhilePlaying() async {
+    automation.cancelPendingActions();
+    automation.noisyPause();
+    playing = false;
+    await automation.devicesChanged({});
+  }
 }
+
+final _bluetooth = {device('car', AudioDeviceType.bluetoothA2dp)};
 
 void main() {
   test('mute automation defaults on and saved preferences survive restore', () {
@@ -328,6 +347,136 @@ void main() {
       await transport.automation.dispose();
     },
   );
+
+  group('resume when headphones reconnect', () {
+    test('the setting defaults to off and round-trips through JSON', () {
+      expect(const AppSettings().resumeOnOutputReconnect, isFalse);
+      expect(AppSettings.fromJson(const {}).resumeOnOutputReconnect, isFalse);
+      final on = const AppSettings().copyWith(resumeOnOutputReconnect: true);
+      expect(AppSettings.fromJson(on.toJson()).resumeOnOutputReconnect, true);
+    });
+
+    test('the window keeps recent pauses and drops old or future ones', () {
+      final at = DateTime(2026, 11, 8, 12);
+      expect(resumesNoisyPause(null, at), isFalse);
+      expect(resumesNoisyPause(at, at), isTrue);
+      expect(resumesNoisyPause(at, at.add(noisyPauseResumeWindow)), isTrue);
+      expect(
+        resumesNoisyPause(
+          at,
+          at.add(noisyPauseResumeWindow + const Duration(seconds: 1)),
+        ),
+        isFalse,
+      );
+      expect(
+        resumesNoisyPause(at, at.subtract(const Duration(minutes: 1))),
+        isFalse,
+      );
+    });
+
+    test('a route-loss pause resumes once on reconnect', () async {
+      final transport = _Transport();
+      await transport.enable(mute: false, reconnect: true);
+      await transport.automation.devicesChanged(_bluetooth);
+      await transport.unplugWhilePlaying();
+      // Disconnecting is not this setting's business: no extra pause.
+      expect(transport.pauses, 0);
+      transport.now = transport.now.add(const Duration(minutes: 29));
+      await transport.automation.devicesChanged(_bluetooth);
+      expect(transport.plays, 1);
+      expect(transport.playing, isTrue);
+
+      transport.playing = false;
+      await transport.automation.devicesChanged({});
+      await transport.automation.devicesChanged(_bluetooth);
+      expect(transport.plays, 1);
+      await transport.automation.dispose();
+    });
+
+    test('an old route-loss pause stays paused', () async {
+      final transport = _Transport();
+      await transport.enable(mute: false, reconnect: true);
+      await transport.automation.devicesChanged(_bluetooth);
+      await transport.unplugWhilePlaying();
+      transport.now = transport.now.add(const Duration(minutes: 31));
+      await transport.automation.devicesChanged(_bluetooth);
+      expect(transport.plays, 0);
+      await transport.automation.dispose();
+    });
+
+    test('a pause the user made never resumes', () async {
+      final transport = _Transport()..playing = false;
+      await transport.enable(mute: false, reconnect: true);
+      await transport.automation.devicesChanged(_bluetooth);
+      await transport.automation.devicesChanged({});
+      await transport.automation.devicesChanged(_bluetooth);
+      expect(transport.plays, 0);
+      await transport.automation.dispose();
+    });
+
+    test('pausing, playing or a new song after the unplug wins', () async {
+      final transport = _Transport();
+      await transport.enable(mute: false, reconnect: true);
+      await transport.automation.devicesChanged(_bluetooth);
+      await transport.unplugWhilePlaying();
+      // Pause, Play, a skip and Stop all supersede pending actions.
+      transport.automation.cancelPendingActions();
+      await transport.automation.devicesChanged(_bluetooth);
+      expect(transport.plays, 0);
+      await transport.automation.dispose();
+    });
+
+    test('a fresh automation (the app was killed) resumes nothing', () async {
+      final before = _Transport();
+      await before.enable(mute: false, reconnect: true);
+      await before.automation.devicesChanged(_bluetooth);
+      await before.unplugWhilePlaying();
+      await before.automation.dispose();
+
+      final after = _Transport()..playing = false;
+      await after.enable(mute: false, reconnect: true);
+      await after.automation.devicesChanged({});
+      await after.automation.devicesChanged(_bluetooth);
+      expect(after.plays, 0);
+      await after.automation.dispose();
+    });
+
+    test('an unavailable session still blocks the resume', () async {
+      final transport = _Transport();
+      await transport.enable(reconnect: true);
+      await transport.automation.volumeChanged(0.5);
+      await transport.automation.devicesChanged(_bluetooth);
+      await transport.unplugWhilePlaying();
+      transport.available = false;
+      await transport.automation.devicesChanged(_bluetooth);
+      expect(transport.plays, 0);
+      await transport.automation.dispose();
+    });
+
+    test('off: a route-loss pause stays paused', () async {
+      final transport = _Transport();
+      await transport.enable(mute: false);
+      await transport.automation.devicesChanged(_bluetooth);
+      await transport.unplugWhilePlaying();
+      await transport.automation.devicesChanged(_bluetooth);
+      expect(transport.plays, 0);
+      await transport.automation.dispose();
+    });
+
+    test('with Play when headphones connect, a disconnect keeps the '
+        'route-loss pause resumable', () async {
+      final transport = _Transport();
+      await transport.enable(mute: false, headphones: true, reconnect: true);
+      await transport.automation.devicesChanged(_bluetooth);
+      transport.automation.cancelPendingActions();
+      transport.automation.noisyPause();
+      await transport.automation.devicesChanged({});
+      expect(transport.pauses, 1);
+      await transport.automation.devicesChanged(_bluetooth);
+      expect(transport.plays, 1);
+      await transport.automation.dispose();
+    });
+  });
 
   test('disposal cancels queued work and stale notifications', () async {
     final transport = _Transport();

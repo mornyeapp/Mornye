@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/expressive_button.dart';
+import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_queue_artwork.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
@@ -56,6 +58,8 @@ class PlayerQueueSheet extends ConsumerWidget {
     final queue = ref.watch(playQueueProvider).value ?? const [];
     final current = ref.watch(currentMediaItemProvider).value;
     final controller = ref.read(musicPlayerControllerProvider);
+    // Locked: no reordering or swiping songs away here; adding still works.
+    final locked = ref.watch(settingsProvider.select((s) => s.queueLocked));
     final textTheme = Theme.of(context).textTheme;
     final expressive = materialExpressiveEnabled(context);
     final artworkMotion = AppMotion.spatial(
@@ -79,6 +83,20 @@ class PlayerQueueSheet extends ConsumerWidget {
                         ),
                       ),
               ),
+              ExpressiveIconButton(
+                selected: locked,
+                tooltip: locked
+                    ? context.l10n.queueUnlock
+                    : context.l10n.queueLock,
+                icon: Icon(locked ? Icons.lock : Icons.lock_open),
+                foregroundColor: locked
+                    ? colorScheme.onSecondaryContainer
+                    : colorScheme.onSurfaceVariant,
+                backgroundColor: locked ? colorScheme.secondaryContainer : null,
+                onPressed: () =>
+                    ref.read(settingsProvider.notifier).setQueueLocked(!locked),
+              ),
+              const SizedBox(width: 4),
               PlayerPlaybackModeButton(
                 mode: PlayerPlaybackMode.autoplay,
                 colorScheme: colorScheme,
@@ -128,8 +146,9 @@ class PlayerQueueSheet extends ConsumerWidget {
               scrollController: scrollController,
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
               itemCount: queue.length,
+              buildDefaultDragHandles: !locked,
               onReorderItem: (oldIndex, newIndex) {
-                controller.moveQueueItem(oldIndex, newIndex);
+                if (!locked) controller.moveQueueItem(oldIndex, newIndex);
               },
               proxyDecorator: (child, index, animation) {
                 if (!expressive) {
@@ -163,7 +182,7 @@ class PlayerQueueSheet extends ConsumerWidget {
                 final isCurrent = current?.id == item.id;
                 return PlayerQueueDismissible(
                   key: ObjectKey(item),
-                  enabled: !isCurrent,
+                  enabled: !isCurrent && !locked,
                   onRemove: () => controller.removeQueuedItem(item),
                   child: ListTile(
                     selected: isCurrent,
@@ -219,17 +238,19 @@ class PlayerQueueSheet extends ConsumerWidget {
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    trailing: ReorderableDragStartListener(
-                      index: i,
-                      // 24dp glyph plus padding gives a 48dp drag target.
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: AppIcon(
-                          Icons.drag_handle,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
+                    trailing: locked
+                        ? null
+                        : ReorderableDragStartListener(
+                            index: i,
+                            // 24dp glyph plus padding gives a 48dp drag target.
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: AppIcon(
+                                Icons.drag_handle,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
                     onTap: () => controller.jumpTo(i),
                   ),
                 );

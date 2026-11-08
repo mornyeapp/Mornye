@@ -43,6 +43,7 @@ import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/source_metadata_events.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:path/path.dart' as p;
@@ -304,8 +305,31 @@ class _Session implements AudioSession {
   Object? activationError;
   Completer<void>? configureBarrier;
   final interruptions = StreamController<AudioInterruptionEvent>.broadcast();
+  final noisy = StreamController<void>.broadcast();
+  final devicesChanged = StreamController<AudioDevicesChangedEvent>.broadcast();
+  Set<AudioDevice> devices = {};
 
-  Future<void> dispose() => interruptions.close();
+  Future<void> dispose() async {
+    await interruptions.close();
+    await noisy.close();
+    await devicesChanged.close();
+  }
+
+  /// Changes the outputs and notifies, as a plug or a Bluetooth link does.
+  void route(Set<AudioDevice> next) {
+    devices = next;
+    devicesChanged.add(AudioDevicesChangedEvent());
+  }
+
+  @override
+  Future<Set<AudioDevice>> getDevices({
+    bool includeInputs = true,
+    bool includeOutputs = true,
+  }) async => devices;
+
+  @override
+  Stream<AudioDevicesChangedEvent> get devicesChangedEventStream =>
+      devicesChanged.stream;
 
   @override
   Future<void> configure(AudioSessionConfiguration configuration) async {
@@ -332,7 +356,7 @@ class _Session implements AudioSession {
   Stream<AudioInterruptionEvent> get interruptionEventStream =>
       interruptions.stream;
   @override
-  Stream<void> get becomingNoisyEventStream => const Stream.empty();
+  Stream<void> get becomingNoisyEventStream => noisy.stream;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -841,6 +865,31 @@ void main() {
     expect(playbackMedia3Engine.value, isFalse);
   });
 
+  test('skip silence needs Android, the media3 engine and no AutoMix', () {
+    addTearDown(() {
+      playbackMedia3Engine.value = false;
+      playbackSkipSilence.value = false;
+    });
+    final android = _runtime(isAndroid: true);
+    final on = android.settings.copyWith(
+      media3Engine: true,
+      skipSilence: true,
+      autoMix: false,
+    );
+    android.configure(on);
+    expect(playbackSkipSilence.value, isTrue);
+    android.configure(on.copyWith(autoMix: true));
+    expect(playbackSkipSilence.value, isFalse);
+    android.configure(on.copyWith(media3Engine: false));
+    expect(playbackSkipSilence.value, isFalse);
+    android.configure(on.copyWith(skipSilence: false));
+    expect(playbackSkipSilence.value, isFalse);
+
+    final other = _runtime();
+    other.configure(on);
+    expect(playbackSkipSilence.value, isFalse);
+  });
+
   test('changing the engine drops a song queued on the old one', () async {
     final deck = _QueuedDeck();
     final runtime = _runtime(
@@ -878,6 +927,116 @@ void main() {
     }
     expect(deck.nextSource, '/two.flac');
     expect(deck.queued, 2);
+  });
+
+  group('end-of-song sleep timer', () {
+    const two = PlayableMedia(
+      id: 'two',
+      source: '/two.flac',
+      title: 'Two',
+      artist: 'Artist',
+      duration: Duration(seconds: 60),
+    );
+    const three = PlayableMedia(
+      id: 'three',
+      source: '/three.flac',
+      title: 'Three',
+      artist: 'Artist',
+      duration: Duration(seconds: 60),
+    );
+
+    Future<(MusicPlayerHandler, _QueuedDeck)> start() async {
+      final deck = _QueuedDeck();
+      final runtime = _runtime(
+        settings: const AppSettings(
+          pauseOnMute: false,
+          gaplessPlayback: true,
+          autoMix: false,
+        ),
+        createDeck: (_) => deck,
+      );
+      final player = await runtime.initialize();
+      await player.setQueueAndPlay([_track, two, three]);
+      return (player, deck);
+    }
+
+    Future<void> finish(MusicPlayerHandler player, _QueuedDeck deck) async {
+      final index = player.playbackState.value.queueIndex;
+      deck.state = PlaybackDeckState.completed;
+      deck.completions.add(null);
+      for (
+        var i = 0;
+        i < 30 && player.playbackState.value.queueIndex == index;
+        i++
+      ) {
+        await _settle();
+      }
+      await _settle();
+    }
+
+    test('drops a queued next song and loads the next one paused', () async {
+      final (player, deck) = await start();
+      deck.positionEvents.add(const Duration(seconds: 45));
+      for (var i = 0; i < 30 && deck.nextSource == null; i++) {
+        await _settle();
+      }
+      expect(deck.nextSource, '/two.flac');
+
+      player.setSleepTimerEndOfSong();
+      await _settle();
+      expect(player.sleepAtEndOfSong, isTrue);
+      expect(player.sleepTimerEndsAt, isNull);
+      expect(deck.nextSource, isNull);
+      // Gapless stays off for the rest of the song.
+      deck.positionEvents.add(const Duration(seconds: 50));
+      for (var i = 0; i < 5; i++) {
+        await _settle();
+      }
+      expect(deck.nextSource, isNull);
+
+      await finish(player, deck);
+      expect(player.playbackState.value.queueIndex, 1);
+      expect(player.mediaItem.value!.id, 'two');
+      expect(player.playbackState.value.playing, isFalse);
+      expect(deck.state, isNot(PlaybackDeckState.playing));
+      expect(deck.sources.last, '/two.flac');
+      expect(player.sleepAtEndOfSong, isFalse);
+    });
+
+    test('a skip moves the stop to the end of the new song', () async {
+      final (player, deck) = await start();
+      player.setSleepTimerEndOfSong();
+      await player.skipToNext();
+      await _settle();
+      expect(player.mediaItem.value!.id, 'two');
+      expect(player.playbackState.value.playing, isTrue);
+      expect(player.sleepAtEndOfSong, isTrue);
+
+      await finish(player, deck);
+      expect(player.mediaItem.value!.id, 'three');
+      expect(player.playbackState.value.playing, isFalse);
+      expect(player.sleepAtEndOfSong, isFalse);
+    });
+
+    test('replaces the minute timer and is cancelled like it', () async {
+      final (player, deck) = await start();
+      player.setSleepTimer(const Duration(minutes: 15));
+      player.setSleepTimerEndOfSong();
+      expect(player.sleepTimerEndsAt, isNull);
+      expect(player.sleepAtEndOfSong, isTrue);
+      player.setSleepTimer(const Duration(minutes: 15));
+      expect(player.sleepAtEndOfSong, isFalse);
+      expect(player.sleepTimerEndsAt, isNotNull);
+
+      player.setSleepTimerEndOfSong();
+      player.cancelSleepTimer();
+      expect(player.sleepAtEndOfSong, isFalse);
+      expect(player.sleepTimerEndsAt, isNull);
+      // Cancelled: the queue plays on.
+      await finish(player, deck);
+      expect(player.mediaItem.value!.id, 'two');
+      expect(player.playbackState.value.playing, isTrue);
+    });
   });
 
   for (final failure in [false, true]) {
@@ -2309,6 +2468,94 @@ void main() {
       handler.playbackState.value.errorMessage,
       contains('Audio file is unavailable'),
     );
+  });
+
+  group('resume when headphones reconnect', () {
+    // ignore: experimental_member_use
+    final car = AudioDevice(
+      id: 'car',
+      name: 'Car',
+      isInput: false,
+      isOutput: true,
+      // ignore: experimental_member_use
+      type: AudioDeviceType.bluetoothA2dp,
+    );
+
+    Future<(MusicPlayerHandler, _Session, List<_Deck>)> start({
+      bool enabled = true,
+    }) async {
+      final session = _Session()..devices = {car};
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        settings: AppSettings(
+          pauseOnMute: false,
+          resumeOnOutputReconnect: enabled,
+        ),
+        session: session,
+        decks: decks,
+      ).initialize();
+      await handler.setQueueAndPlay([_track]);
+      await _settle();
+      return (handler, session, decks);
+    }
+
+    Future<void> unplug(_Session session) async {
+      session.noisy.add(null);
+      session.route({});
+      await _settle();
+      await _settle();
+    }
+
+    test('a route-loss pause resumes when the output returns', () async {
+      final (handler, session, decks) = await start();
+      await unplug(session);
+      expect(decks.single.state, PlaybackDeckState.paused);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.playing);
+      expect(handler.playbackState.value.playing, isTrue);
+    });
+
+    test('a pause after the unplug keeps it paused', () async {
+      final (handler, session, decks) = await start();
+      await unplug(session);
+      await handler.pause();
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+    });
+
+    test('a song paused before the unplug stays paused', () async {
+      final (handler, session, decks) = await start();
+      await handler.pause();
+      await unplug(session);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+    });
+
+    test('off: the output returning leaves it paused', () async {
+      final (_, session, decks) = await start(enabled: false);
+      await unplug(session);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+    });
+
+    test('hidden from Android TV: nothing resumes there', () async {
+      debugAndroidTvOverride = true;
+      addTearDown(() => debugAndroidTvOverride = null);
+      final (_, session, decks) = await start();
+      await unplug(session);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+    });
   });
 
   test('denied or failed audio focus cannot resume a paused source', () async {

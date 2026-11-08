@@ -650,6 +650,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setPlayOnHeadphonesConnected(bool enabled) =>
       _commit(state.copyWith(playOnHeadphonesConnected: enabled));
 
+  void setResumeOnOutputReconnect(bool enabled) =>
+      _commit(state.copyWith(resumeOnOutputReconnect: enabled));
+
   void setGaplessPlayback(bool enabled) =>
       _commit(state.copyWith(gaplessPlayback: enabled));
 
@@ -741,6 +744,15 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setMedia3Engine(bool enabled) =>
       _commit(state.copyWith(media3Engine: enabled));
+
+  void setSkipSilence(bool enabled) =>
+      _commit(state.copyWith(skipSilence: enabled));
+
+  void setQueueNoDuplicates(bool enabled) =>
+      _commit(state.copyWith(queueNoDuplicates: enabled));
+
+  void setQueueLocked(bool locked) =>
+      _commit(state.copyWith(queueLocked: locked));
 
   void setExclusiveOutput(bool enabled) =>
       _commit(state.copyWith(exclusiveOutput: enabled));
