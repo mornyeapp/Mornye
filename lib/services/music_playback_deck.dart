@@ -366,7 +366,11 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   }
 
   @override
-  Future<void> setNetworkSource(String url, {bool arriving = false}) async {
+  Future<void> setNetworkSource(
+    String url, {
+    bool arriving = false,
+    Map<String, String>? headers,
+  }) async {
     await stop();
     _source = null;
     _routeLost = false;

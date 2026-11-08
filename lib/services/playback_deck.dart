@@ -125,7 +125,12 @@ abstract interface class PlaybackDeck {
 
   /// Loads [url]. [arriving] marks a file still being written behind it (a
   /// song a paired phone is sending), which must start before it is whole.
-  Future<void> setNetworkSource(String url, {bool arriving = false});
+  /// [headers] are optional HTTP request headers for authenticated streams.
+  Future<void> setNetworkSource(
+    String url, {
+    bool arriving = false,
+    Map<String, String>? headers,
+  });
 
   /// Loads a local file. The output flags request Android's native USB and
   /// exclusive paths; other decks ignore them, except that [requiresDsd]

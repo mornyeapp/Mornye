@@ -311,6 +311,7 @@ fn method_table_covers_the_host_contract() {
         "editFileMetadata",
         "readAudioMetadata",
         "downloadByStrategy",
+        "resolveStreamUrl",
         "runPostProcessingV2",
     ] {
         assert!(unique.contains(&method), "missing {method}");

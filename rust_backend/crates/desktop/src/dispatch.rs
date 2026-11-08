@@ -425,6 +425,7 @@ pub(crate) static METHODS: &[Entry] = &[
         )
     }),
     pool("downloadByStrategy", download_by_strategy),
+    pool("resolveStreamUrl", resolve_stream_url),
     pool("getAllDownloadProgress", |c, _| {
         text(c.owner()?.environment().download_state().all_progress())
     }),
@@ -874,6 +875,29 @@ fn download_by_strategy(c: &Ctx<'_>, a: &Args) -> CallResult {
     text(with_ffmpeg_commands(&manager, ffmpeg, || {
         manager.download_by_strategy(request)
     }))
+}
+
+fn resolve_stream_url(c: &Ctx<'_>, a: &Args) -> CallResult {
+    let request = a
+        .as_string()
+        .ok_or_else(|| CallError::failure("Stream resolve request must be a JSON string"))?
+        .to_owned();
+    let manager = c.owner()?;
+    let item_id = serde_json::from_str::<Value>(&request)
+        .ok()
+        .and_then(|value| value["item_id"].as_str().map(str::to_owned))
+        .filter(|id| !id.is_empty());
+    if let Some(item_id) = item_id {
+        c.on_cancel(move |rt| {
+            if let Ok(manager) = rt.backend.owner() {
+                let _ = manager
+                    .environment()
+                    .download_state()
+                    .cancel_download(item_id);
+            }
+        });
+    }
+    text(manager.resolve_stream_url(request))
 }
 
 /// `getLyricsLRC`, `getLyricsLRCWithSource` and `fetchAndSaveLyrics`.

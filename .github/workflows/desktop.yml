@@ -9,6 +9,7 @@ on:
       - "windows/**"
       - "lib/widgets/duplicate_review_sheet.dart"
       - "test/duplicate_review_sheet_test.dart"
+      - "test/online_audio_streaming_test.dart"
       - "test/settings_bottom_inset_test.dart"
       - "lib/services/lastfm/**"
       - "lib/widgets/lastfm_settings.dart"
@@ -250,7 +251,7 @@ jobs:
       # linux/CMakeLists.txt installs the library and the FFmpeg tools staged
       # above into lib/ and lib/ffmpeg/.
       - name: Test desktop duplicate review and updater
-        run: flutter test --reporter expanded test/duplicate_review_sheet_test.dart test/desktop_updater_test.dart test/settings_bottom_inset_test.dart test/semantics_geometry_regression_test.dart
+        run: flutter test --reporter expanded test/duplicate_review_sheet_test.dart test/desktop_updater_test.dart test/settings_bottom_inset_test.dart test/semantics_geometry_regression_test.dart test/online_audio_streaming_test.dart
 
       - name: Build Linux bundle
         env:
@@ -372,7 +373,7 @@ jobs:
       # windows/CMakeLists.txt installs the library built above next to
       # mornye.exe and the FFmpeg tools staged above into ffmpeg\.
       - name: Test desktop duplicate review and updater
-        run: flutter test --reporter expanded test/duplicate_review_sheet_test.dart test/desktop_updater_test.dart test/settings_bottom_inset_test.dart test/semantics_geometry_regression_test.dart
+        run: flutter test --reporter expanded test/duplicate_review_sheet_test.dart test/desktop_updater_test.dart test/settings_bottom_inset_test.dart test/semantics_geometry_regression_test.dart test/online_audio_streaming_test.dart
 
       - name: Build Windows app
         env:

@@ -22,6 +22,7 @@ internal data class CoreFFmpegCommand(
 
 internal interface CoreExtensionExecution : AutoCloseable {
     fun download(requestJson: String): String
+    fun resolveStream(requestJson: String): String
     fun postProcess(inputJson: String, metadataJson: String): String
     fun waitPending(timeoutMs: Long): List<CoreFFmpegCommand>
     fun commandIsActive(commandId: String): Boolean
@@ -173,6 +174,8 @@ internal interface CoreBackend {
     fun completeAuthCallback(state: String, code: String, sessionGrant: Boolean, onResolved: (String) -> Unit)
     fun downloadByStrategy(requestJson: String): String =
         withCoreFFmpegExecution(openExtensionExecution()) { it.download(requestJson) }
+    fun resolveStreamUrl(requestJson: String): String =
+        openExtensionExecution().use { it.resolveStream(requestJson) }
     fun openDownloadProgress(): CoreDownloadProgress
     fun initItemProgress(itemId: String)
     fun clearItemProgress(itemId: String)

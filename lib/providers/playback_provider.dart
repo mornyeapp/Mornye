@@ -1,14 +1,18 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/download_request_payload.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/download_file_recovery.dart';
 import 'package:mornye/services/music_player_service.dart';
+import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/track_file_resolver.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
@@ -87,6 +91,71 @@ class PlaybackController extends Notifier<PlaybackState> {
           )
         : null;
     await openFile(recovered ?? path);
+  }
+
+  /// Resolves the remote streaming audio source for [track] and begins
+  /// direct online playback in the internal player without downloading.
+  Future<bool> playOnlineTrack(
+    Track track, {
+    BuildContext? context,
+  }) async {
+    _log.i('Resolving online stream for "${track.name}" by ${track.artistName}');
+    try {
+      final settings = ref.read(settingsProvider);
+      final payload = DownloadRequestPayload.fromTrack(
+        track,
+        service: track.provider ?? '',
+        source: track.source ?? '',
+        quality: settings.preferredDownloadQuality,
+      );
+
+      final result = await PlatformBridge.resolveStreamUrl(
+        payload: payload,
+        useExtensions: true,
+        useFallback: true,
+      );
+
+      if (result['success'] == true && result['url'] is String) {
+        final streamUrl = result['url'] as String;
+        final rawHeaders = result['headers'];
+        final headers = rawHeaders is Map
+            ? rawHeaders.map((k, v) => MapEntry(k.toString(), v.toString()))
+            : null;
+        final durationMs = (result['duration_ms'] as num?)?.toInt();
+        final bitrate = (result['bitrate'] as num?)?.toInt();
+        final format = result['format']?.toString();
+
+        final media = playableFromOnlineTrack(
+          track: track,
+          streamUrl: streamUrl,
+          headers: headers,
+          durationMs: durationMs,
+          bitrate: bitrate,
+          format: format,
+        );
+
+        _log.i('Starting direct online playback from $streamUrl');
+        await ref.read(musicPlayerControllerProvider).playSingle(media);
+        return true;
+      } else {
+        final error = result['error']?.toString() ?? 'Unable to resolve online stream';
+        _log.w('Could not stream track online: $error');
+        if (context != null && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Online play unavailable: $error')),
+          );
+        }
+        return false;
+      }
+    } catch (e) {
+      _log.e('Failed to play online track: $e');
+      if (context != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to play online: $e')),
+        );
+      }
+      return false;
+    }
   }
 
   /// Plays a local-library album/list starting at [startItem], queuing the rest
@@ -224,8 +293,14 @@ class PlaybackController extends Notifier<PlaybackState> {
       if (skippedCueVirtualTrack) {
         throw Exception(cueVirtualTrackRequiresSplitMessage);
       }
+      // If no local files were found for this list, attempt direct online playback
+      // for the selected start track.
+      final startTrack = tracks[safeStart];
+      final onlinePlayed = await playOnlineTrack(startTrack);
+      if (onlinePlayed) return;
+
       throw Exception(
-        'No local audio file is available to play. Download the track first.',
+        'No local audio file is available to play and online stream could not be resolved.',
       );
     }
 

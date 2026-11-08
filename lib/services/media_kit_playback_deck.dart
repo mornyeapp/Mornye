@@ -27,7 +27,7 @@ abstract interface class MpvEngine {
   Duration get position;
 
   /// Loads [source] paused.
-  Future<void> open(String source);
+  Future<void> open(String source, {Map<String, String>? httpHeaders});
   Future<void> play();
   Future<void> pause();
   Future<void> seek(Duration position);
@@ -157,9 +157,9 @@ class MediaKitEngine implements MpvEngine, MpvPlaylistEngine {
   Duration get position => _player.state.position;
 
   @override
-  Future<void> open(String source) async {
+  Future<void> open(String source, {Map<String, String>? httpHeaders}) async {
     await _configured;
-    await _player.open(Media(source), play: false);
+    await _player.open(Media(source, httpHeaders: httpHeaders), play: false);
   }
 
   @override
@@ -623,8 +623,11 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   Future<void> setPlaybackRate(double rate) => _engine.setSpeed(rate);
 
   @override
-  Future<void> setNetworkSource(String url, {bool arriving = false}) =>
-      _load(url);
+  Future<void> setNetworkSource(
+    String url, {
+    bool arriving = false,
+    Map<String, String>? headers,
+  }) => _load(url, headers: headers);
 
   @override
   Future<void> setFileSource(
@@ -637,7 +640,11 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     bool dapExclusive = false,
   }) => _load(path, requiresDsd: requiresDsd);
 
-  Future<void> _load(String source, {bool requiresDsd = false}) async {
+  Future<void> _load(
+    String source, {
+    bool requiresDsd = false,
+    Map<String, String>? headers,
+  }) async {
     await stop();
     final token = ++_token;
     final loaded = Completer<String?>();
@@ -647,7 +654,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     _source = source;
     String? error;
     try {
-      await _engine.open(source);
+      await _engine.open(source, httpHeaders: headers);
       error = await loaded.future.timeout(
         _loadTimeout,
         onTimeout: () => 'Timed out opening the source',

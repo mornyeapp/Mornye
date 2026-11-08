@@ -504,6 +504,7 @@ internal object RustCoreBackend : CoreBackend {
         val commands = current.environment().use { it.ffmpegCommands() }
         return object : CoreExtensionExecution {
             override fun download(requestJson: String): String = current.downloadByStrategy(requestJson)
+            override fun resolveStream(requestJson: String): String = current.resolveStreamUrl(requestJson)
             override fun postProcess(inputJson: String, metadataJson: String): String =
                 current.runPostProcessing(inputJson, metadataJson, 120_000uL)
             override fun waitPending(timeoutMs: Long): List<CoreFFmpegCommand> =

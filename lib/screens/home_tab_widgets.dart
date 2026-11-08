@@ -408,6 +408,13 @@ class _TrackItemWithStatus extends ConsumerWidget {
       }
     }
 
+    if (await playLocalIfAvailable(context, ref, track)) return;
+    if (await ref
+        .read(playbackProvider.notifier)
+        .playOnlineTrack(track, context: context)) {
+      return;
+    }
+
     onDownload(
       forceQualityPicker:
           settings.allowQualityVariants && (isInHistory || isInLocalLibrary),

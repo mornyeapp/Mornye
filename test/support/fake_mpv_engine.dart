@@ -65,8 +65,12 @@ class FakeMpvEngine implements MpvEngine, MpvPlaylistEngine {
   Stream<MpvLogError> get errors => errorEvents.stream;
 
   @override
-  Future<void> open(String source) async {
-    calls.add(['open', source]);
+  Future<void> open(String source, {Map<String, String>? httpHeaders}) async {
+    if (httpHeaders != null) {
+      calls.add(['open', source, httpHeaders.toString()]);
+    } else {
+      calls.add(['open', source]);
+    }
     if (openBarrier case final barrier?) await barrier.future;
     scheduleMicrotask(() {
       if (openError case final error?) {

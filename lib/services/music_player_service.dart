@@ -1696,6 +1696,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         await _player.setNetworkSource(
           path,
           arriving: _runtime.streamsArrivingFile(path),
+          headers: media.httpHeaders,
         );
       } else {
         await _player.setFileSource(

@@ -65,8 +65,11 @@ class _Deck implements PlaybackDeck, QueuedPlaybackDeck {
   @override
   Future<void> setPlaybackRate(double rate) async => calls.add('rate $rate');
   @override
-  Future<void> setNetworkSource(String url, {bool arriving = false}) async =>
-      calls.add('url $url');
+  Future<void> setNetworkSource(
+    String url, {
+    bool arriving = false,
+    Map<String, String>? headers,
+  }) async => calls.add('url $url');
   @override
   Future<void> setFileSource(
     String path, {

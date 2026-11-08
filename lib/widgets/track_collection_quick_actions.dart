@@ -176,6 +176,14 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
               notify(root.l10n.snackbarFileNotFound);
             }
           },
+        )
+      else
+        ContextMenuAction(
+          icon: Icons.play_arrow_rounded,
+          label: 'Play online',
+          onSelected: () => ref
+              .read(playbackProvider.notifier)
+              .playOnlineTrack(track, context: root),
         ),
       ContextMenuAction(
         icon: Icons.download_outlined,
@@ -493,7 +501,22 @@ class _TrackOptionsSheet extends ConsumerWidget {
                   title: context.l10n.trackMetadataPlay,
                   onTap: () => _playLocal(context, ref),
                 )
-              else if (qualityVariantAction ==
+              else
+                _OptionTile(
+                  icon: Icons.play_arrow_rounded,
+                  title: 'Play online',
+                  onTap: () {
+                    final rootContext = Navigator.of(
+                      context,
+                      rootNavigator: true,
+                    ).context;
+                    Navigator.pop(context);
+                    ref
+                        .read(playbackProvider.notifier)
+                        .playOnlineTrack(track, context: rootContext);
+                  },
+                ),
+              if (qualityVariantAction ==
                   QualityVariantMenuAction.downloadAnotherQuality)
                 _OptionTile(
                   icon: Icons.download_outlined,

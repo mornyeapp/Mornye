@@ -77,6 +77,336 @@ impl Backend {
             .unwrap_or_else(|error| native_error_response(&error).to_string()))
     }
 
+    /// Resolves an online playable audio stream for a track without downloading
+    /// the full audio file to disk.
+    pub fn resolve_stream_source(&self, raw: &str, check: &Check<'_>) -> Result<String, String> {
+        let _operation = self.enter()?;
+        let request = match DownloadRequest::parse(raw) {
+            Ok(request) => request,
+            Err(error) => {
+                return Ok(native_error_response(&format!("Invalid request: {error}")).to_string());
+            }
+        };
+        if !request.use_extensions {
+            return Ok(native_error_response(
+                "Extension providers are disabled; cannot resolve online audio source",
+            )
+            .to_string());
+        }
+        Ok(self
+            .resolve_stream_request(request, check)
+            .unwrap_or_else(|error| native_error_response(&error).to_string()))
+    }
+
+    fn resolve_stream_request(
+        &self,
+        mut request: DownloadRequest,
+        check: &Check<'_>,
+    ) -> Result<String, String> {
+        request.normalize();
+        self.check()?;
+        check()?;
+        self.set_song_link_region(&request.songlink_region)?;
+        let state = self.environment().download_state();
+        let lease = Arc::new(
+            state
+                .acquire(&request.item_id)
+                .map_err(|error| error.to_string())?,
+        );
+        lease.check_active().map_err(|error| error.to_string())?;
+
+        let result = std::thread::scope(|scope| {
+            let (finished, completion) = mpsc::sync_channel(1);
+            let request_lease = lease.clone();
+            let worker = std::thread::Builder::new()
+                .name("stream-resolver".into())
+                .spawn_scoped(scope, move || {
+                    let result = self.plan_stream_source(request, request_lease);
+                    let _ = finished.send(());
+                    result
+                })
+                .map_err(|error| error.to_string())?;
+            let mut cancelled = None;
+            while !worker.is_finished() {
+                if let Err(error) = self.check().and_then(|()| check()) {
+                    cancelled = Some(error);
+                    lease.release();
+                    break;
+                }
+                if !matches!(
+                    completion.recv_timeout(Duration::from_millis(5)),
+                    Err(mpsc::RecvTimeoutError::Timeout)
+                ) {
+                    break;
+                }
+            }
+            let result = worker
+                .join()
+                .map_err(|_| "stream resolver panicked".to_owned())?;
+            if let Some(error) = cancelled {
+                return Err(error);
+            }
+            self.check()?;
+            check()?;
+            lease.check_active().map_err(|error| error.to_string())?;
+            result
+        });
+
+        result.map(|value| compact(value).to_string())
+    }
+
+    fn plan_stream_source(
+        &self,
+        mut request: DownloadRequest,
+        lease: Arc<RequestLease>,
+    ) -> Result<Value, String> {
+        let check = || {
+            self.check()
+                .and_then(|()| lease.check_active().map_err(|error| error.to_string()))
+        };
+        let mut selected = request.service.trim().to_owned();
+        let priorities: Value = serde_json::from_str(
+            &self
+                .provider_priorities()
+                .map_err(|error| error.to_string())?,
+        )
+        .map_err(|error| error.to_string())?;
+        let mut priority: Vec<String> = serde_json::from_value(priorities["download"].clone())
+            .map_err(|error| error.to_string())?;
+        if !request.use_fallback {
+            if selected.is_empty() {
+                selected = request.source.trim().to_owned();
+            }
+            if !selected.is_empty() {
+                priority = vec![selected.clone()];
+            }
+        } else if !request.service.is_empty() {
+            priority.retain(|id| !id.eq_ignore_ascii_case(&request.service));
+            priority.insert(0, request.service.clone());
+        }
+
+        self.enrich_download_source(&mut request, lease.clone())?;
+
+        let mut last = None;
+        let mut attempts = VecDeque::new();
+        if !request.source.is_empty() && selected == request.source {
+            attempts.push_back((request.source.clone(), true));
+        }
+        let mut fallback = Some(priority);
+        loop {
+            if attempts.is_empty() {
+                let Some(priority) = fallback.take() else {
+                    break;
+                };
+                let protected = if selected.is_empty() {
+                    &request.source
+                } else {
+                    &selected
+                };
+                let priority = self.prioritize_healthy_downloads(priority, protected, &selected)?;
+                attempts.extend(priority.into_iter().map(|id| (id, false)));
+            }
+            let Some((id, direct)) = attempts.pop_front() else {
+                break;
+            };
+            check()?;
+            if id.is_empty()
+                || (!direct && id == request.source && request.source != selected)
+                || (!direct
+                    && id != selected
+                    && !self
+                        .fallback_allowed(&id)
+                        .map_err(|error| error.to_string())?)
+            {
+                continue;
+            }
+            let Ok(manifest) = self.download_manifest(&id) else {
+                continue;
+            };
+            if !manifest.has_type("download_provider") {
+                continue;
+            }
+
+            let source = [&request.service, &request.source]
+                .into_iter()
+                .filter_map(|p| self.download_manifest(p.trim()).ok())
+                .find(|m| m.find_quality(request.quality.trim()).is_some());
+            let quality = manifest
+                .resolve_download_quality(&request.quality, source.as_ref())
+                .unwrap_or_else(|_| request.quality.clone());
+            let mut attempt = request.clone();
+            attempt.quality = quality;
+
+            let availability = if direct {
+                json!({"available": true})
+            } else {
+                match self.download_availability(&id, &attempt, lease.clone()) {
+                    Ok(v) => v,
+                    Err(err) => {
+                        last = Some(failure(&id, &err, "", 0));
+                        continue;
+                    }
+                }
+            };
+            if availability["available"] != true {
+                let reason = text(&availability, "reason").trim();
+                last = Some(failure(
+                    &id,
+                    if reason.is_empty() { "Not available from this provider" } else { reason },
+                    "",
+                    0,
+                ));
+                continue;
+            }
+
+            let track_id = if direct {
+                preferred_track_id(&attempt, &manifest, text(&availability, "track_id"))
+            } else {
+                text(&availability, "track_id").to_owned()
+            };
+
+            let mut prepared = availability["prepared_context"]
+                .as_object()
+                .cloned()
+                .unwrap_or_default();
+            prepared.insert("host_track".into(), host_track(&attempt));
+
+            // 1. Direct getDownloadUrl / getStreamUrl
+            match self.try_resolve_direct_url(&id, &track_id, &attempt.quality, &prepared, lease.clone()) {
+                Ok(Some(stream_info)) => return Ok(stream_info),
+                Ok(None) => {},
+                Err(err) => {
+                    self.log_provider_failure(&id, "direct stream resolve", &err);
+                }
+            }
+
+            // 2. Stream capture via download()
+            match self.try_resolve_via_stream_capture(&id, &track_id, &attempt, &manifest, prepared, lease.clone()) {
+                Ok(Some(stream_info)) => return Ok(stream_info),
+                Ok(None) => {},
+                Err(err) => {
+                    self.log_provider_failure(&id, "captured stream resolve", &err);
+                    last = Some(failure(&id, &err, "", 0));
+                    continue;
+                }
+            }
+        }
+
+        Ok(match last {
+            Some(last) => failure(
+                text(&last, "service"),
+                &format!("All online streaming providers failed. Last error: {}", text(&last, "error")),
+                text(&last, "error_type"),
+                0,
+            ),
+            None => failure(
+                "",
+                "No streamable online providers available for this track",
+                "not_found",
+                0,
+            ),
+        })
+    }
+
+    fn try_resolve_direct_url(
+        &self,
+        id: &str,
+        track_id: &str,
+        quality: &str,
+        prepared: &serde_json::Map<String, Value>,
+        lease: Arc<RequestLease>,
+    ) -> Result<Option<Value>, String> {
+        let args = json!([
+            track_id,
+            quality,
+            { "preparedContext": prepared }
+        ]).to_string();
+        for method in ["getDownloadUrl", "getStreamUrl"] {
+            if let Ok(val) = self.provider_call_value(id, method, &args, Some(lease.clone()), 20_000) {
+                if val.get("decryption").is_some_and(|d| !d.is_null()) {
+                    return Ok(None);
+                }
+                let url = val.get("url").and_then(|u| u.as_str()).unwrap_or("");
+                if url.starts_with("http://") || url.starts_with("https://") {
+                    let mut headers = val.get("headers").cloned().unwrap_or(json!({}));
+                    if !headers.is_object() {
+                        headers = json!({});
+                    }
+                    return Ok(Some(json!({
+                        "success": true,
+                        "url": url,
+                        "headers": headers,
+                        "format": val.get("format").or_else(|| val.get("actual_extension")),
+                        "audio_codec": val.get("audio_codec"),
+                        "bitrate": val.get("bitrate"),
+                        "duration_ms": val.get("duration_ms"),
+                        "provider": id,
+                    })));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    fn try_resolve_via_stream_capture(
+        &self,
+        id: &str,
+        track_id: &str,
+        request: &DownloadRequest,
+        manifest: &ExtensionManifest,
+        prepared: serde_json::Map<String, Value>,
+        lease: Arc<RequestLease>,
+    ) -> Result<Option<Value>, String> {
+        static CAPTURE_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let capture_seq = CAPTURE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let token = format!("stream-capture-{}-{capture_seq}", std::process::id());
+        let guard = crate::stream_capture::StreamCaptureGuard::new(token.clone());
+
+        let environment = self.environment();
+        let staging_path = environment
+            .data_directory()
+            .join(&manifest.name)
+            .join("downloads")
+            .join(format!(".stream_{token}.tmp"))
+            .to_string_lossy()
+            .into_owned();
+
+        let response = self.download_with_lease(
+            &manifest.name,
+            ProviderDownloadRequest {
+                track_id: track_id.to_owned(),
+                quality: request.quality.clone(),
+                output_path: staging_path,
+                item_id: token.clone(),
+                prepared_context: Some(prepared),
+            },
+            45_000,
+            Some(lease.clone()),
+        );
+
+        let parsed: Option<Value> = response.ok().and_then(|raw| serde_json::from_str(&raw).ok());
+        if let Some(res) = &parsed {
+            if res.get("decryption").is_some_and(|d| !d.is_null()) {
+                return Ok(None);
+            }
+        }
+
+        if let Some(captured) = guard.take() {
+            if captured.url.starts_with("http://") || captured.url.starts_with("https://") {
+                let format = captured.format
+                    .or_else(|| parsed.as_ref().and_then(|p| p.get("actual_extension").and_then(|e| e.as_str().map(String::from))));
+                return Ok(Some(json!({
+                    "success": true,
+                    "url": captured.url,
+                    "headers": captured.headers,
+                    "format": format,
+                    "provider": id,
+                })));
+            }
+        }
+        Ok(None)
+    }
+
     fn download_request(
         &self,
         mut request: DownloadRequest,

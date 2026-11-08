@@ -219,8 +219,9 @@ impl ExtensionManager {
                 "getTrack" | "getAlbum" | "getPlaylist" | "getArtist" | "getConcert"
                 | "searchTracks" | "enrichTrack" => (!manifest.has_type("metadata_provider"))
                     .then_some("is not a metadata provider"),
-                "checkAvailability" => (!manifest.has_type("download_provider"))
-                    .then_some("is not a download provider"),
+                "checkAvailability" | "getDownloadUrl" | "getStreamUrl" => (!manifest
+                    .has_type("download_provider"))
+                .then_some("is not a download provider"),
                 "fetchLyrics" => {
                     (!manifest.has_type("lyrics_provider")).then_some("is not a lyrics provider")
                 }
