@@ -604,6 +604,26 @@ class SettingsSearchCatalog {
           ],
         ),
         SettingsSearchEntry(
+          icon: Icons.record_voice_over_outlined,
+          title: l10n.lyricsRomanize,
+          subtitle: l10n.lyricsRomanizeSubtitle,
+          keywords: const [
+            'romanization',
+            'pronunciation',
+            'romaji',
+            'pinyin',
+            'transliteration',
+            'latin',
+            'offline',
+          ],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.swap_vert_rounded,
+          title: l10n.lyricsRomanizedMainLine,
+          subtitle: l10n.lyricsRomanizedMainLineSubtitle,
+          keywords: const ['romanization', 'romaji', 'pinyin', 'main line'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.auto_awesome_outlined,
           title: l10n.lyricsAiTranslation,
           keywords: const [

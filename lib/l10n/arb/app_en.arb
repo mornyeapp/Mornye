@@ -2120,6 +2120,22 @@
   "@lyricsPlayerPreviewSubtitle": {
     "description": "Subtitle of the Lyric line in player switch"
   },
+  "lyricsRomanize": "Romanize lyrics",
+  "@lyricsRomanize": {
+    "description": "Lyrics setting that shows lyrics written in other alphabets in Latin letters, worked out offline on the device"
+  },
+  "lyricsRomanizeSubtitle": "Show how Korean, Cyrillic, Hindi, Punjabi, Chinese and Japanese kana lyrics are sung, worked out on this device. AI translation can romanize the rest.",
+  "@lyricsRomanizeSubtitle": {
+    "description": "Subtitle of the Romanize lyrics switch. Japanese kanji are not covered offline, hence 'kana'"
+  },
+  "lyricsRomanizedMainLine": "Romanization as main line",
+  "@lyricsRomanizedMainLine": {
+    "description": "Lyrics setting that shows the romanized text as the lyric line itself"
+  },
+  "lyricsRomanizedMainLineSubtitle": "Show the romanized text in place of each line, with the original under it.",
+  "@lyricsRomanizedMainLineSubtitle": {
+    "description": "Subtitle of the Romanization as main line switch"
+  },
   "lyricsMode": "Lyrics Mode",
   "@lyricsMode": {
     "description": "Setting - how to save lyrics"
@@ -7632,7 +7648,7 @@
   "@lyricsAiRomanize": {
     "description": "AI translation switch that also asks for romanized lyrics"
   },
-  "lyricsAiRomanizeSubtitle": "Shows how lyrics in other alphabets are sung, such as romaji for Japanese or pinyin for Chinese",
+  "lyricsAiRomanizeSubtitle": "Also romanizes the lines this device can't, such as Japanese kanji, Thai or Arabic",
   "@lyricsAiRomanizeSubtitle": {
     "description": "Subtitle of the AI romanization switch"
   },

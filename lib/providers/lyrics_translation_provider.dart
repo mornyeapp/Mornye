@@ -9,10 +9,12 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_language_guess.dart';
+import 'package:mornye/services/lyrics_romanization.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_languages.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/services/lyrics_translation_song_languages.dart';
+import 'package:mornye/services/romanization/pinyin.dart';
 import 'package:mornye/services/secure_storage_options.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
@@ -66,6 +68,18 @@ final lyricsTranslationSongLanguagesProvider =
     Provider<LyricsTranslationSongLanguages>(
       (ref) => LyricsTranslationSongLanguages(),
     );
+
+/// The Chinese reading data of offline romanization.
+final pinyinDataLoaderProvider = Provider<PinyinDataLoader>(
+  (ref) => PinyinDataLoader(),
+);
+
+/// Whether a translation of [lyrics] also asks for romanization: for the
+/// lines offline romanization cannot give, when the settings want both.
+bool lyricsAiRomanizes(AppSettings settings, ParsedLyrics lyrics) =>
+    settings.lyricsRomanize &&
+    settings.lyricsAiRomanize &&
+    linesNeedingAiRomanization(lyrics).isNotEmpty;
 
 /// Creates the HTTP client of one job; tests substitute a mock.
 final lyricsAiHttpClientProvider = Provider<http.Client Function()>(
@@ -195,9 +209,13 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
   int _jobIds = 0;
   late LyricsTranslationSharing _sharing;
   late LyricsTranslationSongLanguages _songLanguages;
+  late PinyinDataLoader _pinyin;
+  final _shown = Expando<(bool, bool, PinyinData?, ParsedLyrics)>();
+  bool _pinyinRequested = false;
 
   @override
   LyricsTranslationState build() {
+    _pinyin = ref.watch(pinyinDataLoaderProvider);
     _sharing = ref.watch(lyricsTranslationSharingProvider);
     _songLanguages = ref.watch(lyricsTranslationSongLanguagesProvider);
     unawaited(
@@ -353,6 +371,48 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     return _apply(lyrics, source, result);
   }
 
+  /// [lyrics] as the player shows them: [display], with the offline
+  /// romanization and the main line the settings choose. Saving uses
+  /// [display]: offline romanization is worked out again, never saved.
+  ParsedLyrics shown(ParsedLyrics lyrics) {
+    final translated = display(lyrics);
+    final settings = ref.read(settingsProvider);
+    final romanize = settings.lyricsRomanize;
+    final mainLine = settings.lyricsRomanizedMainLine;
+    if (!romanize && !mainLine) return translated;
+    final pinyin = _pinyin.data;
+    final memo = _shown[translated];
+    if (memo != null &&
+        memo.$1 == romanize &&
+        memo.$2 == mainLine &&
+        identical(memo.$3, pinyin)) {
+      return memo.$4;
+    }
+    var result = translated;
+    if (romanize) {
+      if (pinyin == null && lyricsNeedPinyin(translated)) _loadPinyin();
+      result = lyricsWithOfflineRomanization(result, pinyin: pinyin);
+    }
+    if (mainLine) result = lyricsWithRomanizedMainLines(result);
+    _shown[translated] = (romanize, mainLine, pinyin, result);
+    return result;
+  }
+
+  /// Loads the Chinese readings, then has the views show them.
+  void _loadPinyin() {
+    if (_pinyinRequested) return;
+    _pinyinRequested = true;
+    unawaited(
+      _pinyin.load().then((data) {
+        if (data == null || !ref.mounted) return;
+        state = LyricsTranslationState(
+          results: {...state.results},
+          job: state.job,
+        );
+      }),
+    );
+  }
+
   /// [lyrics] with [result], timed word by word wherever [result] has the
   /// timing, whatever the mode: the mode only decides whether a new
   /// translation asks for it. A translation from a linked device, or one
@@ -495,18 +555,12 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       final cached = await cache.read(key);
       cancel.throwIfCancelled();
       // An explicit translation can upgrade older line-only cache entries.
-      final romanize =
-          settings.lyricsAiRomanize && lyricsNeedRomanization(lyrics);
+      final romanize = lyricsAiRomanizes(settings, lyrics);
       final wordSync = settings.lyricsAiWordSync && source.wordSynced;
       final timedRomanize =
           wordSync &&
           romanize &&
-          lyrics.lines.any(
-            (line) =>
-                line.hasWordTiming &&
-                line.romanization?.trim().isNotEmpty != true &&
-                lyricNeedsRomanization(line.text),
-          );
+          linesNeedingAiRomanization(lyrics).any((line) => line.hasWordTiming);
       final reusable =
           cached != null &&
           (!romanize || cached.romanized) &&

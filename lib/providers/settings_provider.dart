@@ -875,6 +875,12 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLyricsAiRomanize(bool enabled) =>
       _commit(state.copyWith(lyricsAiRomanize: enabled));
 
+  void setLyricsRomanize(bool enabled) =>
+      _commit(state.copyWith(lyricsRomanize: enabled));
+
+  void setLyricsRomanizedMainLine(bool enabled) =>
+      _commit(state.copyWith(lyricsRomanizedMainLine: enabled));
+
   void setLyricsAiWordSync(bool enabled) =>
       _commit(state.copyWith(lyricsAiWordSync: enabled));
 

@@ -154,8 +154,7 @@ class DownloadLyricsTranslator {
     final target = _targetOf(source, settings);
     if (target == null) return null;
 
-    final romanize =
-        settings.lyricsAiRomanize && lyricsNeedRomanization(lyrics);
+    final romanize = lyricsAiRomanizes(settings, lyrics);
     final wordSync = settings.lyricsAiWordSync && source.wordSynced;
     final cache = _ref.read(lyricsTranslationCacheProvider);
     final key = lyricsTranslationCacheKey(

@@ -12,6 +12,7 @@ import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
+import 'package:mornye/services/lyrics_romanization.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_alignment.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
@@ -167,10 +168,12 @@ void main() {
     AppSettings settings = _settings,
     Map<String, String>? keys,
     LyricsTranslationCache? cache,
+    PinyinDataLoader? pinyin,
   }) async {
     final container = ProviderContainer(
       overrides: [
         initialSettingsProvider.overrideWithValue(settings),
+        if (pinyin != null) pinyinDataLoaderProvider.overrideWithValue(pinyin),
         lyricsAiKeyStoreProvider.overrideWithValue(
           MemoryLyricsAiKeyStore(keys ?? {'openai': 'sk-test'}),
         ),
@@ -961,5 +964,80 @@ void main() {
       ),
       isTrue,
     );
+  });
+
+  group('offline romanization', () {
+    ParsedLyrics song(List<String> texts) => ParsedLyrics(
+      synced: true,
+      wordSynced: false,
+      lines: [
+        for (var i = 0; i < texts.length; i++)
+          LyricLine(
+            time: Duration(seconds: i),
+            text: texts[i],
+          ),
+      ],
+      plainText: texts.join('\n'),
+    );
+
+    bool asksRomanization() {
+      final body = jsonDecode(requests.single.body) as Map<String, dynamic>;
+      final system = (body['messages'] as List).first as Map;
+      return (system['content'] as String).contains('"romanization"');
+    }
+
+    test('asks the AI only for what the device cannot romanize', () async {
+      final container = await containerFor();
+      final controller = container.read(lyricsTranslationProvider.notifier);
+      await controller.translate(song(['사랑해', '좋아']));
+      expect(asksRomanization(), isFalse);
+      requests.clear();
+      await controller.translate(song(['きみの', '君の名前']));
+      expect(asksRomanization(), isTrue);
+    });
+
+    test('romanization off asks the AI for none', () async {
+      final container = await containerFor(
+        settings: _settings.copyWith(lyricsRomanize: false),
+      );
+      final controller = container.read(lyricsTranslationProvider.notifier);
+      await controller.translate(song(['きみの', '君の名前']));
+      expect(asksRomanization(), isFalse);
+      expect(controller.shown(song(['사랑해'])).lines.single.romanization, isNull);
+    });
+
+    test('shows Chinese once its data loads, and never saves it', () async {
+      final loader = PinyinDataLoader(
+        read: () async => File(pinyinDataAsset).readAsBytes(),
+      );
+      final container = await containerFor(pinyin: loader);
+      final controller = container.read(lyricsTranslationProvider.notifier);
+      final lyrics = song(['我爱你', '사랑해']);
+      expect(controller.shown(lyrics).lines.map((line) => line.romanization), [
+        null,
+        'saranghae',
+      ]);
+      await loader.load();
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.shown(lyrics).lines.first.romanization, 'wǒ ài nǐ');
+      expect(controller.display(lyrics), same(lyrics));
+      expect(
+        lyricsTranslationUnsaved(lyrics, controller.display(lyrics)),
+        isFalse,
+      );
+    });
+
+    test('puts the romanization in the main line when asked', () async {
+      final container = await containerFor(
+        settings: _settings.copyWith(lyricsRomanizedMainLine: true),
+      );
+      final line = container
+          .read(lyricsTranslationProvider.notifier)
+          .shown(song(['사랑해']))
+          .lines
+          .single;
+      expect(line.text, 'saranghae');
+      expect(line.romanization, '사랑해');
+    });
   });
 }
