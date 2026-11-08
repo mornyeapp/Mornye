@@ -41,17 +41,27 @@ const _item = MediaItem(
   extras: {'source': _source},
 );
 
+const _otherItem = MediaItem(
+  id: '/music/Album/other.flac',
+  title: 'Other',
+  artist: 'Artist',
+  duration: Duration(minutes: 2),
+  extras: {'source': '/music/Album/other.flac'},
+);
+
 void main() {
   late StreamController<PlaybackState> playback;
   late _Player player;
   late _Events events;
   late List<String> saved;
+  late List<String> savedSources;
 
   setUp(() {
     playback = StreamController<PlaybackState>.broadcast();
     player = _Player();
     events = _Events();
     saved = [];
+    savedSources = [];
   });
   tearDown(() => playback.close());
 
@@ -70,7 +80,10 @@ void main() {
     final metadata = PlayerMetadataController(
       readMetadata: (_) async => {'lyrics': lyrics},
       parseLyrics: (raw) async => LyricsParser.parse(raw),
-      saveOnlineLyrics: (_, raw) async => saved.add(raw),
+      saveOnlineLyrics: (source, raw) async {
+        savedSources.add(source);
+        saved.add(raw);
+      },
       metadataEvents: events,
     );
     addTearDown(metadata.dispose);
@@ -140,6 +153,34 @@ void main() {
     expect(find.text('Lyrics saved'), findsOneWidget);
     expect(metadata.lyrics.synced, isTrue);
     expect(metadata.rawLyrics, saved.single);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('saving after the track changed still writes the opened song', (
+    tester,
+  ) async {
+    final metadata = await open(tester, 'First line\nSecond line');
+    playback.add(
+      PlaybackState(updatePosition: const Duration(milliseconds: 12345)),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('lyrics-editor-set-time')));
+    await tester.pump();
+    expect(find.text('00:12.35'), findsOneWidget);
+
+    // The song ends (or is skipped) while the editor is still open.
+    await metadata.load(_otherItem);
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('lyrics-editor-save')));
+    await tester.pumpAndSettle();
+    expect(savedSources, [_source]);
+    expect(saved, ['[00:12.35]First line\nSecond line']);
+    expect(events.published, [_source]);
+    // The player now shows the other track; the saved lyrics stay with
+    // the song they were written for.
+    expect(metadata.item?.id, _otherItem.id);
+    expect(metadata.lyrics.synced, isFalse);
     expect(tester.takeException(), isNull);
   });
 

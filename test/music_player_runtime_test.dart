@@ -3049,6 +3049,61 @@ void main() {
     },
   );
 
+  test(
+    'a tag edit retires the SAF playback copy and its resolved path',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('saf-edit-');
+      addTearDown(() => directory.delete(recursive: true));
+      final copies = [
+        for (var i = 1; i <= 2; i++)
+          await File('${directory.path}/copy$i.flac').writeAsString('audio'),
+      ];
+      var copyCalls = 0;
+      const channel = MethodChannel('com.zarz.mornye/backend');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
+        channel,
+        (call) async => switch (call.method) {
+          'safCopyToTemp' => copies[copyCalls++].path,
+          _ => null,
+        },
+      );
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      final events = SourceMetadataEvents();
+      final handler = await _runtime(
+        sourceMetadataEvents: events,
+        readMetadata: (_, {displayName}) async => {'title': 'Edited'},
+      ).initialize();
+      const source = 'content://test.provider/document/song.flac';
+      const song = PlayableMedia(
+        id: 'edited',
+        source: source,
+        title: 'Song',
+        artist: 'Artist',
+      );
+      await handler.setQueueAndPlay([song, _track]);
+      expect(copyCalls, 1);
+      expect(
+        handler.mediaItem.value?.extras?['resolvedSource'],
+        copies[0].path,
+      );
+      await events.publish(source);
+      // The published item no longer points at the pre-edit copy, so a
+      // metadata probe reads the edited document itself.
+      expect(handler.mediaItem.value?.extras?['resolvedSource'], isNull);
+      await handler.skipToNext();
+      await handler.skipToPrevious();
+      // Coming back copies the document again instead of replaying, and
+      // re-reading, the copy made before the edit.
+      expect(copyCalls, 2);
+      expect(
+        handler.mediaItem.value?.extras?['resolvedSource'],
+        copies[1].path,
+      );
+    },
+  );
+
   test('failed player stop cannot undo a confirmed storage deletion', () async {
     final directory = await Directory.systemTemp.createTemp('failed-reaction-');
     addTearDown(() => directory.delete(recursive: true));

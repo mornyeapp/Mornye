@@ -265,7 +265,7 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
     if (_saving || !_dirty) return;
     setState(() => _saving = true);
     try {
-      await widget.metadata.saveEditedLyrics(_draft.toLrc());
+      await widget.metadata.saveEditedLyrics(_draft.toLrc(), item: widget.item);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {

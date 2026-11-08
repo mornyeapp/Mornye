@@ -2555,6 +2555,11 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> onSourceMetadataChanged(String source) async {
     // An edited network file must not play from its copy before the edit.
     await _prefetch.invalidate(source);
+    // A document plays from a copy that carries the tags it was made with.
+    // Retire that copy so the next play, and the next metadata probe, read
+    // the edited file instead of resurrecting the old tags (lyrics too).
+    await _sourceCache.invalidate(source);
+    await _formats.invalidate(source);
     if (_disposed || !_media.any((item) => item.source == source)) return;
     final token = Object();
     _metadataChanges[source] = token;
@@ -2610,6 +2615,10 @@ class MusicPlayerHandler extends BaseAudioHandler
             ...?item.extras,
             ...?facts.extras,
             'explicit': updated.explicit,
+            // The resolved path names a playback copy made before this
+            // edit. Drop it so metadata probes read the document itself
+            // until playback resolves a fresh copy.
+            if (previous.isContentUri) 'resolvedSource': null,
           },
         );
         final old = _queueItems[i];
