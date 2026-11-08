@@ -1183,7 +1183,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   }) async {
     final controller = ref.read(musicPlayerControllerProvider);
     final sleepTimerEndsAt = controller.sleepTimerEndsAt;
-    final sleepTimerSubtitle = sleepTimerEndsAt == null
+    final sleepTimerSubtitle = controller.sleepAtEndOfSong
+        ? context.l10n.nowPlayingSleepTimerEndOfSongActive
+        : sleepTimerEndsAt == null
         ? null
         : context.l10n.nowPlayingSleepTimerActive(
             MaterialLocalizations.of(
@@ -1369,7 +1371,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     ColorScheme colorScheme,
   ) async {
     const durations = [15, 30, 45, 60];
-    final isActive = controller.sleepTimerEndsAt != null;
+    final endOfSong = controller.sleepAtEndOfSong;
+    final isActive = controller.sleepTimerEndsAt != null || endOfSong;
     final selection = await showAppBottomSheet<String>(
       context: context,
       useRootNavigator: true,
@@ -1383,9 +1386,18 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               SettingsItem(
                 icon: Icons.timer_outlined,
                 title: sheetContext.l10n.nowPlayingSleepTimerMinutes(minutes),
-                showDivider: isActive || minutes != durations.last,
                 onTap: () => Navigator.of(sheetContext).pop('$minutes'),
               ),
+            SettingsItem(
+              icon: Icons.music_note_outlined,
+              title: sheetContext.l10n.nowPlayingSleepTimerEndOfSong,
+              selected: endOfSong,
+              trailing: endOfSong
+                  ? AppIcon(Icons.check, color: colorScheme.primary)
+                  : null,
+              showDivider: isActive,
+              onTap: () => Navigator.of(sheetContext).pop('endOfSong'),
+            ),
             if (isActive)
               SettingsItem(
                 icon: Icons.timer_off_outlined,
@@ -1403,6 +1415,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       controller.cancelSleepTimer();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.nowPlayingSleepTimerCancelled)),
+      );
+      return;
+    }
+
+    if (selection == 'endOfSong') {
+      controller.setSleepTimerEndOfSong();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.nowPlayingSleepTimerEndOfSongSet)),
       );
       return;
     }

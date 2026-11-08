@@ -905,6 +905,116 @@ void main() {
     expect(deck.queued, 2);
   });
 
+  group('end-of-song sleep timer', () {
+    const two = PlayableMedia(
+      id: 'two',
+      source: '/two.flac',
+      title: 'Two',
+      artist: 'Artist',
+      duration: Duration(seconds: 60),
+    );
+    const three = PlayableMedia(
+      id: 'three',
+      source: '/three.flac',
+      title: 'Three',
+      artist: 'Artist',
+      duration: Duration(seconds: 60),
+    );
+
+    Future<(MusicPlayerHandler, _QueuedDeck)> start() async {
+      final deck = _QueuedDeck();
+      final runtime = _runtime(
+        settings: const AppSettings(
+          pauseOnMute: false,
+          gaplessPlayback: true,
+          autoMix: false,
+        ),
+        createDeck: (_) => deck,
+      );
+      final player = await runtime.initialize();
+      await player.setQueueAndPlay([_track, two, three]);
+      return (player, deck);
+    }
+
+    Future<void> finish(MusicPlayerHandler player, _QueuedDeck deck) async {
+      final index = player.playbackState.value.queueIndex;
+      deck.state = PlaybackDeckState.completed;
+      deck.completions.add(null);
+      for (
+        var i = 0;
+        i < 30 && player.playbackState.value.queueIndex == index;
+        i++
+      ) {
+        await _settle();
+      }
+      await _settle();
+    }
+
+    test('drops a queued next song and loads the next one paused', () async {
+      final (player, deck) = await start();
+      deck.positionEvents.add(const Duration(seconds: 45));
+      for (var i = 0; i < 30 && deck.nextSource == null; i++) {
+        await _settle();
+      }
+      expect(deck.nextSource, '/two.flac');
+
+      player.setSleepTimerEndOfSong();
+      await _settle();
+      expect(player.sleepAtEndOfSong, isTrue);
+      expect(player.sleepTimerEndsAt, isNull);
+      expect(deck.nextSource, isNull);
+      // Gapless stays off for the rest of the song.
+      deck.positionEvents.add(const Duration(seconds: 50));
+      for (var i = 0; i < 5; i++) {
+        await _settle();
+      }
+      expect(deck.nextSource, isNull);
+
+      await finish(player, deck);
+      expect(player.playbackState.value.queueIndex, 1);
+      expect(player.mediaItem.value!.id, 'two');
+      expect(player.playbackState.value.playing, isFalse);
+      expect(deck.state, isNot(PlaybackDeckState.playing));
+      expect(deck.sources.last, '/two.flac');
+      expect(player.sleepAtEndOfSong, isFalse);
+    });
+
+    test('a skip moves the stop to the end of the new song', () async {
+      final (player, deck) = await start();
+      player.setSleepTimerEndOfSong();
+      await player.skipToNext();
+      await _settle();
+      expect(player.mediaItem.value!.id, 'two');
+      expect(player.playbackState.value.playing, isTrue);
+      expect(player.sleepAtEndOfSong, isTrue);
+
+      await finish(player, deck);
+      expect(player.mediaItem.value!.id, 'three');
+      expect(player.playbackState.value.playing, isFalse);
+      expect(player.sleepAtEndOfSong, isFalse);
+    });
+
+    test('replaces the minute timer and is cancelled like it', () async {
+      final (player, deck) = await start();
+      player.setSleepTimer(const Duration(minutes: 15));
+      player.setSleepTimerEndOfSong();
+      expect(player.sleepTimerEndsAt, isNull);
+      expect(player.sleepAtEndOfSong, isTrue);
+      player.setSleepTimer(const Duration(minutes: 15));
+      expect(player.sleepAtEndOfSong, isFalse);
+      expect(player.sleepTimerEndsAt, isNotNull);
+
+      player.setSleepTimerEndOfSong();
+      player.cancelSleepTimer();
+      expect(player.sleepAtEndOfSong, isFalse);
+      expect(player.sleepTimerEndsAt, isNull);
+      // Cancelled: the queue plays on.
+      await finish(player, deck);
+      expect(player.mediaItem.value!.id, 'two');
+      expect(player.playbackState.value.playing, isTrue);
+    });
+  });
+
   for (final failure in [false, true]) {
     test(
       'exclusive gapless handles cancellation and queue failure ($failure)',

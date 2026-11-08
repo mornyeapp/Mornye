@@ -7244,6 +7244,18 @@
   "@nowPlayingSleepTimerCancelled": {
     "description": "Confirmation after cancelling the playback sleep timer"
   },
+  "nowPlayingSleepTimerEndOfSong": "End of song",
+  "@nowPlayingSleepTimerEndOfSong": {
+    "description": "Sleep timer choice that pauses playback when the current song ends"
+  },
+  "nowPlayingSleepTimerEndOfSongActive": "Ends after this song",
+  "@nowPlayingSleepTimerEndOfSongActive": {
+    "description": "Active end-of-song sleep timer shown in the player menu"
+  },
+  "nowPlayingSleepTimerEndOfSongSet": "Playback pauses when this song ends",
+  "@nowPlayingSleepTimerEndOfSongSet": {
+    "description": "Confirmation after choosing the end-of-song sleep timer"
+  },
   "nowPlayingOpenInExternalPlayer": "Open in external player",
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"

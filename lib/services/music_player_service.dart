@@ -184,6 +184,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   Timer? _sleepTimer;
   Timer? _listeningTimer;
   DateTime? _sleepTimerEndsAt;
+  bool _sleepAtEndOfSong = false;
 
   bool _shuffle = false;
   List<MediaItem>? _originalQueueOrder;
@@ -223,6 +224,9 @@ class MusicPlayerHandler extends BaseAudioHandler
   static const Duration _positionQueryAllowance = Duration(milliseconds: 50);
 
   DateTime? get sleepTimerEndsAt => _sleepTimerEndsAt;
+
+  /// Whether playback pauses when the current song ends.
+  bool get sleepAtEndOfSong => _sleepAtEndOfSong;
   bool get isDisposed => _disposed;
   int get playbackRequestGeneration => _playRequestGeneration;
 
@@ -830,6 +834,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   void setSleepTimer(Duration duration) {
     if (duration <= Duration.zero) return;
     _sleepTimer?.cancel();
+    _sleepAtEndOfSong = false;
     _sleepTimerEndsAt = DateTime.now().add(duration);
     _sleepTimer = Timer(duration, () {
       _sleepTimer = null;
@@ -840,10 +845,26 @@ class MusicPlayerHandler extends BaseAudioHandler
     });
   }
 
+  /// Pauses once the song playing ends, whichever song that is after skips.
+  /// The next song loads paused, so Play continues the queue. Gapless and
+  /// AutoMix stand down meanwhile, so no next song is ever audible: a mix
+  /// would start up to a minute before the end and cut the song short. A
+  /// crossfade already under way finishes, and the song it brought in is
+  /// the one that ends the session.
+  void setSleepTimerEndOfSong() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTimerEndsAt = null;
+    _sleepAtEndOfSong = true;
+    unawaited(_gapless.cancel());
+    if (!_autoMix.crossfading) unawaited(_autoMix.cancel());
+  }
+
   void cancelSleepTimer() {
     _sleepTimer?.cancel();
     _sleepTimer = null;
     _sleepTimerEndsAt = null;
+    _sleepAtEndOfSong = false;
   }
 
   Future<bool> _activateAudioSession(int generation) async {
@@ -2124,10 +2145,16 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   Future<void> _onComplete() async {
+    // The end-of-song sleep timer: whatever plays next loads paused.
+    final sleep = _sleepAtEndOfSong;
+    if (sleep) {
+      _sleepAtEndOfSong = false;
+      _log.i('Song ended with the end-of-song sleep timer; pausing');
+    }
     if (_repeatMode == AudioServiceRepeatMode.one &&
         _index >= 0 &&
         _index < _media.length) {
-      await _playIndex(_index, recordHistory: false);
+      await _playIndex(_index, recordHistory: false, startPaused: sleep);
       return;
     }
     if (_index == _media.length - 1 &&
@@ -2141,9 +2168,12 @@ class MusicPlayerHandler extends BaseAudioHandler
       }
     }
     if (_index >= 0 && _index < _media.length - 1) {
-      await _playIndex(_index + 1);
+      await _playIndex(_index + 1, startPaused: sleep);
     } else if (_repeatMode == AudioServiceRepeatMode.all && _media.isNotEmpty) {
-      await _playIndex(_beginRepeatPass(_repeatPassStart()));
+      await _playIndex(
+        _beginRepeatPass(_repeatPassStart()),
+        startPaused: sleep,
+      );
     } else {
       _broadcastState(playerState: PlaybackDeckState.completed);
     }

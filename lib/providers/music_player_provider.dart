@@ -395,6 +395,8 @@ class MusicPlayerController {
 
   DateTime? get sleepTimerEndsAt => _handler?.sleepTimerEndsAt;
 
+  bool get sleepAtEndOfSong => _handler?.sleepAtEndOfSong ?? false;
+
   Future<MusicPlayerHandler?> ensureInitialized() async {
     try {
       return await _runtime.initialize();
@@ -513,6 +515,8 @@ class MusicPlayerController {
   }
 
   void setSleepTimer(Duration duration) => _handler?.setSleepTimer(duration);
+
+  void setSleepTimerEndOfSong() => _handler?.setSleepTimerEndOfSong();
 
   void cancelSleepTimer() => _handler?.cancelSleepTimer();
 

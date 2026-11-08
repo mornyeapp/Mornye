@@ -6917,6 +6917,9 @@
   "@nowPlayingSleepTimerCancelled": {
     "description": "Confirmation after cancelling the playback sleep timer"
   },
+  "nowPlayingSleepTimerEndOfSong": "Akhir lagu",
+  "nowPlayingSleepTimerEndOfSongActive": "Berhenti setelah lagu ini",
+  "nowPlayingSleepTimerEndOfSongSet": "Pemutaran dijeda saat lagu ini selesai",
   "nowPlayingOpenInExternalPlayer": "Buka di pemutar eksternal",
   "nowPlayingHideVolume": "Sembunyikan volume",
   "nowPlayingShowVolume": "Tampilkan volume",

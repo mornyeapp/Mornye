@@ -910,6 +910,40 @@ void main() {
     return incoming;
   }
 
+  test('the end-of-song sleep timer drops a prepared mix', () async {
+    await prepare();
+    expect(native.live, hasLength(2));
+    handler.setSleepTimerEndOfSong();
+    await _until(() => native.live.length == 1);
+    // The planned start passes without a mix.
+    native.positions['music-player'] = 55000;
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(handler.mediaItem.value?.id, 'one');
+    expect(native.live, {'music-player'});
+
+    await native.event('music-player', 'audio.onComplete');
+    await _until(() => handler.mediaItem.value?.id == 'two');
+    expect(handler.playbackState.value.playing, isFalse);
+    expect(native.playing, isEmpty);
+    expect(handler.sleepAtEndOfSong, isFalse);
+  });
+
+  test(
+    'a crossfade under way finishes; the song it brought in ends the session',
+    () async {
+      final incoming = await startMix();
+      handler.setSleepTimerEndOfSong();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(native.playing, contains(incoming));
+      expect(handler.mediaItem.value?.id, 'two');
+
+      await native.event(incoming, 'audio.onComplete');
+      await _until(() => handler.mediaItem.value?.id == 'three');
+      expect(handler.playbackState.value.playing, isFalse);
+      expect(handler.sleepAtEndOfSong, isFalse);
+    },
+  );
+
   test(
     'haptics survives an AutoMix handoff followed by a manual skip',
     () async {

@@ -41,6 +41,8 @@ class _MusicGapless {
         !handler._player.isDirect &&
         !handler._disposed &&
         handler._sourceReady &&
+        // The next song must stay silent until Play.
+        !handler._sleepAtEndOfSong &&
         handler._repeatMode != AudioServiceRepeatMode.one;
   }
 
