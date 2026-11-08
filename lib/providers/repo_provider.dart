@@ -190,6 +190,41 @@ class RepoSource {
   bool get hasError => error.isNotEmpty;
 }
 
+/// Repositories with the same name (two registry files of one GitHub
+/// repository) get their file name added, or else their URL, so rows,
+/// sheets and messages can tell them apart.
+List<RepoSource> distinctRepoSourceNames(List<RepoSource> sources) {
+  bool shared(List<RepoSource> list, String name) =>
+      list.where((s) => s.name == name).length > 1;
+  RepoSource renamed(RepoSource source, String name) => RepoSource(
+    registryUrl: source.registryUrl,
+    name: name,
+    extensionCount: source.extensionCount,
+    error: source.error,
+  );
+
+  final withFile = [
+    for (final source in sources)
+      if (shared(sources, source.name))
+        renamed(source, '${source.name} (${_registryFileName(source)})')
+      else
+        source,
+  ];
+  return [
+    for (final source in withFile)
+      if (shared(withFile, source.name))
+        renamed(source, source.registryUrl)
+      else
+        source,
+  ];
+}
+
+String _registryFileName(RepoSource source) {
+  final segments = Uri.tryParse(source.registryUrl)?.pathSegments ?? const [];
+  final file = segments.lastWhere((s) => s.isNotEmpty, orElse: () => '');
+  return file.isEmpty ? source.registryUrl : file;
+}
+
 /// The store list from every repository's entries: one entry per id.
 class RepoCatalogMerge {
   final List<RepoExtension> extensions;
@@ -743,16 +778,24 @@ class RepoNotifier extends Notifier<RepoState> {
     }
   }
 
-  static List<RepoSource> _parseSources(Map<String, dynamic> catalog) => [
-    for (final raw in (catalog['sources'] as List<dynamic>? ?? const []))
-      if (raw is Map) RepoSource.fromJson(raw.cast<String, dynamic>()),
-  ];
+  static List<RepoSource> _parseSources(Map<String, dynamic> catalog) =>
+      distinctRepoSourceNames([
+        for (final raw in (catalog['sources'] as List<dynamic>? ?? const []))
+          if (raw is Map) RepoSource.fromJson(raw.cast<String, dynamic>()),
+      ]);
 
   Future<void> _applyCatalog(Map<String, dynamic> catalog) async {
     final sources = _parseSources(catalog);
+    final names = {
+      for (final source in sources) source.registryUrl: source.name,
+    };
     _entries = [
       for (final raw in (catalog['extensions'] as List<dynamic>? ?? const []))
-        if (raw is Map) RepoExtension.fromJson(raw.cast<String, dynamic>()),
+        if (raw is Map)
+          _withSourceName(
+            RepoExtension.fromJson(raw.cast<String, dynamic>()),
+            names,
+          ),
     ];
     final merge = mergeRepoCatalog(
       entries: _entries,
@@ -771,6 +814,16 @@ class RepoNotifier extends Notifier<RepoState> {
       error: failed ? _combinedError(sources) : null,
       clearError: !failed,
     );
+  }
+
+  static RepoExtension _withSourceName(
+    RepoExtension entry,
+    Map<String, String> names,
+  ) {
+    final name = names[entry.registryUrl];
+    return name == null || name == entry.registryName
+        ? entry
+        : entry.copyWith(registryName: name);
   }
 
   static String _combinedError(List<RepoSource> sources) => sources.length == 1

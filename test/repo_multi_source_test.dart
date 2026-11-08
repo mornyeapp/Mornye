@@ -367,4 +367,22 @@ void main() {
     expect(state().error, contains('Registry of $_second failed'));
     expect(state().extensions, isEmpty);
   });
+
+  test('repositories with the same name are told apart', () {
+    const same = 'https://raw.githubusercontent.com/example/repo/main/';
+    final names = distinctRepoSourceNames(const [
+      RepoSource(registryUrl: '${same}registry.json', name: 'example/repo'),
+      RepoSource(registryUrl: '${same}other.json', name: 'example/repo'),
+      RepoSource(registryUrl: 'https://a.example/x/r.json', name: 'Store'),
+      RepoSource(registryUrl: 'https://b.example/y/r.json', name: 'Store'),
+      RepoSource(registryUrl: _first, name: 'example.com'),
+    ]).map((s) => s.name);
+    expect(names, [
+      'example/repo (registry.json)',
+      'example/repo (other.json)',
+      'https://a.example/x/r.json',
+      'https://b.example/y/r.json',
+      'example.com',
+    ]);
+  });
 }
