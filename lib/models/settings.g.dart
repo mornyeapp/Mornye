@@ -203,6 +203,8 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   lyricsAiInstruction: json['lyricsAiInstruction'] as String? ?? '',
   lyricsAutoTranslate: json['lyricsAutoTranslate'] as bool? ?? false,
   lyricsAiRomanize: json['lyricsAiRomanize'] as bool? ?? true,
+  lyricsRomanize: readLyricsRomanize(json, 'lyricsRomanize') as bool? ?? true,
+  lyricsRomanizedMainLine: json['lyricsRomanizedMainLine'] as bool? ?? false,
   lyricsAiWordSync: json['lyricsAiWordSync'] as bool? ?? false,
   lyricsTranslationSaveTo: json['lyricsTranslationSaveTo'] == null
       ? lyricsTranslationSaveToSongFile
@@ -354,6 +356,8 @@ Map<String, dynamic> _$AppSettingsToJson(
   'lyricsAiInstruction': instance.lyricsAiInstruction,
   'lyricsAutoTranslate': instance.lyricsAutoTranslate,
   'lyricsAiRomanize': instance.lyricsAiRomanize,
+  'lyricsRomanize': instance.lyricsRomanize,
+  'lyricsRomanizedMainLine': instance.lyricsRomanizedMainLine,
   'lyricsAiWordSync': instance.lyricsAiWordSync,
   'lyricsTranslationSaveTo': instance.lyricsTranslationSaveTo,
   'lyricsTranslationAutoSave': instance.lyricsTranslationAutoSave,

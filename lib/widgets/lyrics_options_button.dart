@@ -221,9 +221,12 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
         .read(lyricsTranslationProvider.notifier)
         .display(original);
     final source = LyricsTranslationSource.cached(original);
-    final pronunciation = lyrics.lines.any(
-      (line) => line.romanization?.trim().isNotEmpty == true,
-    );
+    // The offline romanization can be hidden too, though it is never saved.
+    final pronunciation = ref
+        .read(lyricsTranslationProvider.notifier)
+        .shown(original)
+        .lines
+        .any((line) => line.romanization?.trim().isNotEmpty == true);
     final translation = lyricsHaveTranslation(lyrics);
     final translating = job != null && job.sourceHash == source.hash;
     final canTranslate = ready && !source.isEmpty && job == null;

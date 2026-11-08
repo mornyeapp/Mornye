@@ -173,6 +173,12 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
       themeProvider.select((theme) => theme.lyricsOffsetMs),
     );
     ref.watch(lyricsTranslationProvider.select((state) => state.results));
+    ref.watch(
+      settingsProvider.select(
+        (settings) =>
+            (settings.lyricsRomanize, settings.lyricsRomanizedMainLine),
+      ),
+    );
     final state = ref.watch(playbackStateProvider).value;
     final translation = ref.read(lyricsTranslationProvider.notifier);
     // An offstage or covered player keeps no line timer running.
@@ -186,7 +192,7 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
           return const SizedBox.shrink();
         }
         final lines = _timelineFor(
-          translation.display(metadata.lyrics),
+          translation.shown(metadata.lyrics),
           offsetMs,
         );
         if (lines.isEmpty) {

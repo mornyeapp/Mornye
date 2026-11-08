@@ -211,6 +211,8 @@ flutter:
     - assets/licenses/libsmb2.txt
     - assets/licenses/native_palette.txt
     - assets/licenses/native_data_jobs.txt
+    - assets/licenses/romanization.txt
+    - assets/romanization/pinyin.txt.gz
 
   fonts:
     - family: Inter

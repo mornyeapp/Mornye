@@ -69,6 +69,11 @@ String lyricsTranslationSaveToFromJson(Object? value) =>
     ? lyricsTranslationSaveToMlrc
     : lyricsTranslationSaveToSongFile;
 
+/// Offline romanization starts as the AI romanization switch was, so a
+/// user who turned that off is not shown romanization they did not want.
+Object? readLyricsRomanize(Map<dynamic, dynamic> json, String key) =>
+    json[key] ?? json['lyricsAiRomanize'];
+
 @JsonSerializable(explicitToJson: true)
 class AppSettings {
   static const String homeFeedProviderOff = '__off__';
@@ -324,9 +329,18 @@ class AppSettings {
   /// Translate lyrics without a translation as they open.
   final bool lyricsAutoTranslate;
 
-  /// Ask the translation for a romanization of lines written outside the
-  /// Latin alphabet.
+  /// Ask the translation for a romanization of the lines written outside
+  /// the Latin alphabet that offline romanization cannot give, while
+  /// [lyricsRomanize] is on.
   final bool lyricsAiRomanize;
+
+  /// Romanize lyrics written outside the Latin alphabet on the device,
+  /// where their script allows it.
+  @JsonKey(readValue: readLyricsRomanize)
+  final bool lyricsRomanize;
+
+  /// Show a line's romanization as the line, with the original under it.
+  final bool lyricsRomanizedMainLine;
 
   /// Align AI translations and readings to sung words instead of whole lines.
   final bool lyricsAiWordSync;
@@ -504,6 +518,8 @@ class AppSettings {
     this.lyricsAiInstruction = '',
     this.lyricsAutoTranslate = false,
     this.lyricsAiRomanize = true,
+    this.lyricsRomanize = true,
+    this.lyricsRomanizedMainLine = false,
     this.lyricsAiWordSync = false,
     this.lyricsTranslationSaveTo = lyricsTranslationSaveToSongFile,
     this.lyricsTranslationAutoSave = false,
@@ -670,6 +686,8 @@ class AppSettings {
     String? lyricsAiInstruction,
     bool? lyricsAutoTranslate,
     bool? lyricsAiRomanize,
+    bool? lyricsRomanize,
+    bool? lyricsRomanizedMainLine,
     bool? lyricsAiWordSync,
     String? lyricsTranslationSaveTo,
     bool? lyricsTranslationAutoSave,
@@ -863,6 +881,9 @@ class AppSettings {
       lyricsAiInstruction: lyricsAiInstruction ?? this.lyricsAiInstruction,
       lyricsAutoTranslate: lyricsAutoTranslate ?? this.lyricsAutoTranslate,
       lyricsAiRomanize: lyricsAiRomanize ?? this.lyricsAiRomanize,
+      lyricsRomanize: lyricsRomanize ?? this.lyricsRomanize,
+      lyricsRomanizedMainLine:
+          lyricsRomanizedMainLine ?? this.lyricsRomanizedMainLine,
       lyricsAiWordSync: lyricsAiWordSync ?? this.lyricsAiWordSync,
       lyricsTranslationSaveTo:
           lyricsTranslationSaveTo ?? this.lyricsTranslationSaveTo,

@@ -204,7 +204,9 @@ class _LyricsAiTranslationPageState
                 icon: Icons.record_voice_over_outlined,
                 title: l10n.lyricsAiRomanize,
                 subtitle: l10n.lyricsAiRomanizeSubtitle,
-                value: settings.lyricsAiRomanize,
+                // Romanization off in Lyrics settings turns it off here too.
+                value: settings.lyricsRomanize && settings.lyricsAiRomanize,
+                enabled: settings.lyricsRomanize,
                 onChanged: notifier.setLyricsAiRomanize,
               ),
               SettingsItem(

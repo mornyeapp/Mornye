@@ -149,6 +149,10 @@ void main() {
           'roxmltree',
         ], await rootBundle.loadString('assets/licenses/native_data_jobs.txt'));
         yield LicenseEntryWithLineBreaks(const [
+          'Unihan (Unicode Han Database)',
+          'phrase-pinyin-data',
+        ], await rootBundle.loadString('assets/licenses/romanization.txt'));
+        yield LicenseEntryWithLineBreaks(const [
           'FFmpeg',
         ], await rootBundle.loadString('assets/licenses/ffmpeg.txt'));
         // FFmpegKit (mobile) and the Linux and Windows FFmpeg builds.

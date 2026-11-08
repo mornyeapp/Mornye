@@ -58,6 +58,8 @@ class PlayerLyricsSection extends ConsumerWidget {
           settings.locale,
           settings.lyricsAutoTranslate,
           settings.lyricsAiWordSync,
+          settings.lyricsRomanize,
+          settings.lyricsRomanizedMainLine,
         ),
       ),
     );
@@ -69,7 +71,7 @@ class PlayerLyricsSection extends ConsumerWidget {
         child: _buildLyricsSection(
           context,
           visibility,
-          translation.display(metadata.lyrics),
+          translation.shown(metadata.lyrics),
         ),
       ),
     );
@@ -250,11 +252,7 @@ class PlayerLyricsSection extends ConsumerWidget {
           shown(line.translation, visibility.$2) != null,
     );
     if (!hasSupplements) {
-      return Text(
-        metadata.lyrics.plainText,
-        style: style,
-        textAlign: TextAlign.center,
-      );
+      return Text(lyrics.plainText, style: style, textAlign: TextAlign.center);
     }
     final supplementStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(
       height: 1.4,
