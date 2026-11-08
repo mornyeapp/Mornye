@@ -35,6 +35,38 @@ pub fn registry_location(input: &str) -> Result<RegistryLocation, RepositoryErro
     })
 }
 
+/// The label a configured source shows: the registry's own `name` when it
+/// has one, else `<owner>/<repo>` for GitHub, else host plus path without a
+/// trailing `/registry.json`.
+pub fn source_name(registry_url: &str, registry_name: &str) -> String {
+    let name = registry_name.trim();
+    if !name.is_empty() {
+        return name.into();
+    }
+    let url = registry_url.trim();
+    for prefix in ["https://raw.githubusercontent.com/", "https://github.com/"] {
+        let Some(path) = url.strip_prefix(prefix) else {
+            continue;
+        };
+        let mut parts = path.split(['/', '?', '#']);
+        let owner = parts.next().unwrap_or("");
+        let repository = parts.next().unwrap_or("");
+        let repository = repository.strip_suffix(".git").unwrap_or(repository);
+        if !owner.is_empty() && !repository.is_empty() {
+            return format!("{owner}/{repository}");
+        }
+    }
+    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
+    let rest = rest.split(['?', '#']).next().unwrap_or("");
+    let (authority, path) = rest.split_once('/').unwrap_or((rest, ""));
+    let host = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    let path = format!("/{path}");
+    let path = path.strip_suffix("/registry.json").unwrap_or(&path);
+    format!("{host}{}", path.trim_end_matches('/'))
+}
+
 pub fn require_https(input: &str, context: &str) -> Result<(), RepositoryError> {
     if input.is_empty() {
         return Err(error(format!("{context} URL is empty")));
