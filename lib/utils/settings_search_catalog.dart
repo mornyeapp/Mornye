@@ -413,6 +413,20 @@ class SettingsSearchCatalog {
           subtitle: l10n.playbackOnHeadphonesConnectedDescription,
           keywords: const ['earphone', 'headphone', 'bluetooth', 'connect'],
         ),
+        if (!isDesktopPlatform && !isAndroidTv)
+          SettingsSearchEntry(
+            icon: Icons.bluetooth_audio_outlined,
+            title: l10n.playbackResumeOnReconnect,
+            subtitle: l10n.playbackResumeOnReconnectDescription,
+            keywords: const [
+              'earphone',
+              'headphone',
+              'bluetooth',
+              'reconnect',
+              'resume',
+              'car',
+            ],
+          ),
         SettingsSearchEntry(
           icon: Icons.linear_scale,
           title: l10n.gaplessPlayback,

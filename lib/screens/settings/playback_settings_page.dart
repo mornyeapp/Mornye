@@ -412,8 +412,27 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                   onChanged: (value) => ref
                       .read(settingsProvider.notifier)
                       .setPlayOnHeadphonesConnected(value),
-                  showDivider: false,
+                  showDivider: !isAndroidTv,
                 ),
+                // A TV's outputs are not headphones someone walks away with.
+                if (!isAndroidTv)
+                  SettingsSwitchItem(
+                    icon: Icons.bluetooth_audio_outlined,
+                    title: context.l10n.playbackResumeOnReconnect,
+                    subtitle: settings.playOnHeadphonesConnected
+                        ? '${context.l10n.playbackResumeOnReconnectDescription}'
+                              '\n\n'
+                              '${context.l10n.playbackResumeOnReconnectCovered}'
+                        : context.l10n.playbackResumeOnReconnectDescription,
+                    value: settings.resumeOnOutputReconnect,
+                    enabled:
+                        settings.playerMode == 'internal' &&
+                        !settings.playOnHeadphonesConnected,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setResumeOnOutputReconnect(value),
+                    showDivider: false,
+                  ),
               ],
             ),
           ...settingsSectionSlivers(

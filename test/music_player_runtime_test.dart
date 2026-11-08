@@ -43,6 +43,7 @@ import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/source_metadata_events.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:path/path.dart' as p;
@@ -304,8 +305,31 @@ class _Session implements AudioSession {
   Object? activationError;
   Completer<void>? configureBarrier;
   final interruptions = StreamController<AudioInterruptionEvent>.broadcast();
+  final noisy = StreamController<void>.broadcast();
+  final devicesChanged = StreamController<AudioDevicesChangedEvent>.broadcast();
+  Set<AudioDevice> devices = {};
 
-  Future<void> dispose() => interruptions.close();
+  Future<void> dispose() async {
+    await interruptions.close();
+    await noisy.close();
+    await devicesChanged.close();
+  }
+
+  /// Changes the outputs and notifies, as a plug or a Bluetooth link does.
+  void route(Set<AudioDevice> next) {
+    devices = next;
+    devicesChanged.add(AudioDevicesChangedEvent());
+  }
+
+  @override
+  Future<Set<AudioDevice>> getDevices({
+    bool includeInputs = true,
+    bool includeOutputs = true,
+  }) async => devices;
+
+  @override
+  Stream<AudioDevicesChangedEvent> get devicesChangedEventStream =>
+      devicesChanged.stream;
 
   @override
   Future<void> configure(AudioSessionConfiguration configuration) async {
@@ -332,7 +356,7 @@ class _Session implements AudioSession {
   Stream<AudioInterruptionEvent> get interruptionEventStream =>
       interruptions.stream;
   @override
-  Stream<void> get becomingNoisyEventStream => const Stream.empty();
+  Stream<void> get becomingNoisyEventStream => noisy.stream;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -2444,6 +2468,94 @@ void main() {
       handler.playbackState.value.errorMessage,
       contains('Audio file is unavailable'),
     );
+  });
+
+  group('resume when headphones reconnect', () {
+    // ignore: experimental_member_use
+    final car = AudioDevice(
+      id: 'car',
+      name: 'Car',
+      isInput: false,
+      isOutput: true,
+      // ignore: experimental_member_use
+      type: AudioDeviceType.bluetoothA2dp,
+    );
+
+    Future<(MusicPlayerHandler, _Session, List<_Deck>)> start({
+      bool enabled = true,
+    }) async {
+      final session = _Session()..devices = {car};
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        settings: AppSettings(
+          pauseOnMute: false,
+          resumeOnOutputReconnect: enabled,
+        ),
+        session: session,
+        decks: decks,
+      ).initialize();
+      await handler.setQueueAndPlay([_track]);
+      await _settle();
+      return (handler, session, decks);
+    }
+
+    Future<void> unplug(_Session session) async {
+      session.noisy.add(null);
+      session.route({});
+      await _settle();
+      await _settle();
+    }
+
+    test('a route-loss pause resumes when the output returns', () async {
+      final (handler, session, decks) = await start();
+      await unplug(session);
+      expect(decks.single.state, PlaybackDeckState.paused);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.playing);
+      expect(handler.playbackState.value.playing, isTrue);
+    });
+
+    test('a pause after the unplug keeps it paused', () async {
+      final (handler, session, decks) = await start();
+      await unplug(session);
+      await handler.pause();
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+    });
+
+    test('a song paused before the unplug stays paused', () async {
+      final (handler, session, decks) = await start();
+      await handler.pause();
+      await unplug(session);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+    });
+
+    test('off: the output returning leaves it paused', () async {
+      final (_, session, decks) = await start(enabled: false);
+      await unplug(session);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+    });
+
+    test('hidden from Android TV: nothing resumes there', () async {
+      debugAndroidTvOverride = true;
+      addTearDown(() => debugAndroidTvOverride = null);
+      final (_, session, decks) = await start();
+      await unplug(session);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+    });
   });
 
   test('denied or failed audio focus cannot resume a paused source', () async {

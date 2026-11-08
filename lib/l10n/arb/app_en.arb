@@ -9095,6 +9095,15 @@
   "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
   "playbackOnHeadphonesConnected": "Play when headphones connect",
   "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
+  "playbackResumeOnReconnect": "Resume when headphones reconnect",
+  "@playbackResumeOnReconnect": {
+    "description": "Playback setting: resume only a recent pause caused by headphones or a Bluetooth output disconnecting"
+  },
+  "playbackResumeOnReconnectDescription": "If headphones or a Bluetooth device disconnect while music plays, playback resumes when one connects again within 30 minutes. Songs you paused stay paused. Built-in player only.",
+  "playbackResumeOnReconnectCovered": "Play when headphones connect is on and already resumes on every connection.",
+  "@playbackResumeOnReconnectCovered": {
+    "description": "Added to the Resume when headphones reconnect subtitle while the broader Play when headphones connect setting is on"
+  },
   "appearanceCustomFont": "Custom font",
   "appearanceCustomFontSubtitle": "Import a TTF or OTF file (up to 10 MB). Overrides the theme and system font.",
   "appearanceCustomFontInvalid": "Could not load this font. Choose a valid TTF or OTF file up to 10 MB.",

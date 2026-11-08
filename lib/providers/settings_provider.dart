@@ -650,6 +650,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setPlayOnHeadphonesConnected(bool enabled) =>
       _commit(state.copyWith(playOnHeadphonesConnected: enabled));
 
+  void setResumeOnOutputReconnect(bool enabled) =>
+      _commit(state.copyWith(resumeOnOutputReconnect: enabled));
+
   void setGaplessPlayback(bool enabled) =>
       _commit(state.copyWith(gaplessPlayback: enabled));
 

@@ -45,6 +45,7 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/automix_effect_renderer.dart';
 import 'package:mornye/services/automix_status.dart';
 import 'package:mornye/services/music_haptics.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/playback_artwork.dart';
@@ -268,6 +269,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         previous.pauseOnMute != settings.pauseOnMute ||
         previous.playOnHeadphonesConnected !=
             settings.playOnHeadphonesConnected ||
+        previous.resumeOnOutputReconnect != settings.resumeOnOutputReconnect ||
         previous.usbBitPerfect != settings.usbBitPerfect) {
       _refreshPlaybackAutomation();
     }
@@ -734,8 +736,13 @@ class MusicPlayerHandler extends BaseAudioHandler
         session.becomingNoisyEventStream.listen((_) {
           if (_cast.active) return;
           // Headphones unplugged / output route lost.
+          final wasPlaying =
+              _player.state == PlaybackDeckState.playing ||
+              playbackState.value.playing;
           _pausedByInterruption = false;
-          unawaited(_pauseForFocusLoss(reason: 'becoming noisy'));
+          unawaited(
+            _pauseForFocusLoss(reason: 'becoming noisy', noisy: wasPlaying),
+          );
         }),
       );
     } catch (e) {
@@ -758,10 +765,19 @@ class MusicPlayerHandler extends BaseAudioHandler
         !isDesktopPlatform &&
         _settings.playerMode == 'internal' &&
         _settings.playOnHeadphonesConnected;
+    // Phones and tablets only: a TV's outputs are not personal headphones.
+    final resumeAfterNoisyPause =
+        !_cast.active &&
+        !isDesktopPlatform &&
+        !isAndroidTv &&
+        _settings.playerMode == 'internal' &&
+        _settings.resumeOnOutputReconnect;
+    final watchDevices = playOnHeadphonesConnected || resumeAfterNoisyPause;
     unawaited(
       _playbackAutomation.configure(
         pauseOnMute: pauseOnMute,
         playOnHeadphonesConnected: playOnHeadphonesConnected,
+        resumeAfterNoisyPause: resumeAfterNoisyPause,
       ),
     );
     if (pauseOnMute && _automationVolumeSubscription == null) {
@@ -776,14 +792,12 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (subscription != null) unawaited(subscription.cancel());
     }
     final session = _audioSession;
-    if (playOnHeadphonesConnected &&
-        session != null &&
-        !_headphoneMonitoringRequested) {
+    if (watchDevices && session != null && !_headphoneMonitoringRequested) {
       _headphoneMonitoringRequested = true;
       unawaited(
         _startHeadphoneMonitoring(session, ++_headphoneMonitoringRevision),
       );
-    } else if (!playOnHeadphonesConnected) {
+    } else if (!watchDevices) {
       _headphoneMonitoringRequested = false;
       _headphoneMonitoringRevision++;
       final subscription = _automationDevicesSubscription;
@@ -821,9 +835,14 @@ class MusicPlayerHandler extends BaseAudioHandler
       _userPaused ||
       _playbackError != null;
 
-  Future<void> _pauseForFocusLoss({required String reason}) async {
+  Future<void> _pauseForFocusLoss({
+    required String reason,
+    bool noisy = false,
+  }) async {
     _log.i('Pausing internal player because of $reason');
     _playbackAutomation.cancelPendingActions();
+    // Only a route-loss pause of playing music may resume on reconnect.
+    if (noisy) _playbackAutomation.noisyPause();
     try {
       await _pausePlayback();
     } catch (e) {

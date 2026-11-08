@@ -106,6 +106,8 @@ class AppSettings {
   final String playbackNormalizationMode; // 'track' or 'album'
   final bool pauseOnMute;
   final bool playOnHeadphonesConnected;
+  // Resume only a recent pause caused by headphones or Bluetooth going away.
+  final bool resumeOnOutputReconnect;
   // Start the next song the moment one ends; AutoMix replaces it while on.
   final bool gaplessPlayback;
   final bool autoMix;
@@ -398,6 +400,7 @@ class AppSettings {
     this.playbackNormalizationMode = 'track',
     this.pauseOnMute = true,
     this.playOnHeadphonesConnected = false,
+    this.resumeOnOutputReconnect = false,
     this.gaplessPlayback = true,
     this.autoMix = false,
     this.autoMixDuration = 0,
@@ -575,6 +578,7 @@ class AppSettings {
     String? playbackNormalizationMode,
     bool? pauseOnMute,
     bool? playOnHeadphonesConnected,
+    bool? resumeOnOutputReconnect,
     bool? gaplessPlayback,
     bool? autoMix,
     int? autoMixDuration,
@@ -732,6 +736,8 @@ class AppSettings {
       pauseOnMute: pauseOnMute ?? this.pauseOnMute,
       playOnHeadphonesConnected:
           playOnHeadphonesConnected ?? this.playOnHeadphonesConnected,
+      resumeOnOutputReconnect:
+          resumeOnOutputReconnect ?? this.resumeOnOutputReconnect,
       gaplessPlayback: gaplessPlayback ?? this.gaplessPlayback,
       autoMix: autoMix ?? this.autoMix,
       autoMixDuration: autoMixDuration ?? this.autoMixDuration,
