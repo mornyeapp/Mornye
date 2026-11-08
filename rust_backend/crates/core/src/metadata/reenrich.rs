@@ -82,6 +82,9 @@ pub struct Request {
     pub preview_only: bool,
     pub replace_release_metadata: bool,
     pub include_candidates: bool,
+    /// Lists candidates without giving up the automatic early stop, for a
+    /// batch whose songs are mostly matched without a pick.
+    pub quick_candidates: bool,
     pub selected_candidate: Option<Value>,
     pub provider_ids: Option<Vec<Option<String>>>,
 }
@@ -98,7 +101,7 @@ lenient_deserialize!(Request {
     "duration_ms" => duration_ms, "search_online" => search_online,
     "update_fields" => update_fields, "preview_only" => preview_only,
     "replace_release_metadata" => replace_release_metadata,
-    "include_candidates" => include_candidates,
+    "include_candidates" => include_candidates, "quick_candidates" => quick_candidates,
     "selected_candidate" => selected_candidate, "provider_ids" => provider_ids,
 });
 
@@ -226,6 +229,14 @@ impl Request {
     /// Candidates are only listed for a preview, which is what a picker shows.
     pub fn wants_candidates(&self) -> bool {
         self.include_candidates && self.preview_only
+    }
+
+    /// Whether the search may stop at the first provider with a confident
+    /// match. A picker for one song asks every provider instead; a batch
+    /// keeps the stop, since asking every provider for every song of a large
+    /// library multiplies its searches.
+    pub fn stops_when_confident(&self) -> bool {
+        !self.wants_candidates() || self.quick_candidates
     }
 
     /// The whole artist string or the album finds songs from other releases,

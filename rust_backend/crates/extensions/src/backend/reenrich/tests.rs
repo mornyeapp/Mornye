@@ -386,6 +386,23 @@ fn an_automatic_run_stops_at_the_first_confident_provider() {
 }
 
 #[test]
+fn a_batch_lists_candidates_but_keeps_the_early_stop() {
+    let reissue = r#"() => [{id: "reissue", name: "Signal", artists: "Lead Artist",
+        album_name: "Album", duration_ms: 201000}]"#;
+    let fixture = providers(&[("provider-a", RIGHT_SONG), ("provider-b", reissue)]);
+    let response = fixture
+        .reenrich(song(
+            json!({"include_candidates":true,"quick_candidates":true}),
+        ))
+        .unwrap();
+    assert_eq!(response["auto_match"], "strong");
+    assert_eq!(fixture.queries("provider-b"), "");
+    let candidates = response["candidates"].as_array().unwrap();
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(candidates[0]["provider_id"], "provider-a");
+}
+
+#[test]
 fn candidates_are_ranked_unique_and_capped_and_weak_matches_wait_for_a_choice() {
     let compilation = r#"() => [{id: "compilation", name: "Signal", artists: "Lead Artist",
         album_name: "Different Record", duration_ms: 202000}]"#;

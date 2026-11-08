@@ -297,6 +297,7 @@ impl Backend {
     ) -> Result<(Vec<Value>, Option<TrackMetadata>), String> {
         let only = request.provider_ids();
         let wants = request.wants_candidates();
+        let stops = request.stops_when_confident();
         let mut found = Vec::new();
         // A provider restriction asks for those providers' results only.
         let catalog = if only.is_empty() {
@@ -332,9 +333,10 @@ impl Backend {
                     "",
                     30_000,
                     Some(lease),
-                    // A picker lists every provider; an automatic run stops at
-                    // the first confident one, in the user's priority order.
-                    |tracks| !wants && tracks.iter().any(|track| request.confident(track)),
+                    // A picker lists every provider; an automatic run or a
+                    // batch stops at the first confident one, in the user's
+                    // priority order.
+                    |tracks| stops && tracks.iter().any(|track| request.confident(track)),
                 )
             });
             check()?;
