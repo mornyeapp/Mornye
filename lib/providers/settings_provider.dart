@@ -742,6 +742,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setMedia3Engine(bool enabled) =>
       _commit(state.copyWith(media3Engine: enabled));
 
+  void setSkipSilence(bool enabled) =>
+      _commit(state.copyWith(skipSilence: enabled));
+
   void setExclusiveOutput(bool enabled) =>
       _commit(state.copyWith(exclusiveOutput: enabled));
 

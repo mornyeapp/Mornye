@@ -395,6 +395,47 @@ void main() {
     expect(playbackEqualizerError.value, isNull);
   });
 
+  test('skip silence reaches the player before its first source', () async {
+    addTearDown(() => playbackSkipSilence.value = false);
+    playbackSkipSilence.value = true;
+    await deck.setFileSource('/song.flac');
+    final methods = native.methods;
+    expect(
+      methods.indexOf('setSkipSilence'),
+      lessThan(methods.indexOf('setSource')),
+    );
+    expect(native.last('setSkipSilence'), {'playerId': 'one', 'enabled': true});
+
+    playbackSkipSilence.value = false;
+    await _settle();
+    expect(native.last('setSkipSilence')['enabled'], isFalse);
+    expect(native.count('setSkipSilence'), 2);
+  });
+
+  test('skip silence is sent only when it differs from off', () async {
+    addTearDown(() => playbackSkipSilence.value = false);
+    await deck.setFileSource('/song.flac');
+    expect(native.methods, isNot(contains('setSkipSilence')));
+
+    playbackSkipSilence.value = true;
+    await _settle();
+    expect(native.last('setSkipSilence')['enabled'], isTrue);
+
+    native.replies['setSkipSilence'] = (_) async =>
+        throw MissingPluginException();
+    playbackSkipSilence.value = false;
+    await _settle();
+    await deck.resume();
+    expect(native.count('play'), 1);
+  });
+
+  test('a deck never created sends nothing for skip silence', () async {
+    addTearDown(() => playbackSkipSilence.value = false);
+    playbackSkipSilence.value = true;
+    await _settle();
+    expect(native.calls, isEmpty);
+  });
+
   test('a disabled equalizer is never sent', () async {
     await deck.setFileSource('/song.flac');
     playbackEqualizer.value = const EqualizerSettings(preamp: 2);

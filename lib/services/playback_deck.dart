@@ -58,6 +58,11 @@ final playbackExclusiveOutput = ValueNotifier<bool>(false);
 /// outputs, which stay on audioplayers. A change applies from the next song.
 final playbackMedia3Engine = ValueNotifier<bool>(false);
 
+/// Android: the `skipSilence` setting while [playbackMedia3Engine] is on and
+/// AutoMix is off. media3 decks jump over silent passages while it is true;
+/// audioplayers decks ignore it.
+final playbackSkipSilence = ValueNotifier<bool>(false);
+
 /// Linux: the ALSA device [playbackExclusiveOutput] opens, as an mpv device
 /// name. Empty until one is known; the output stays shared meanwhile.
 final playbackExclusiveDevice = ValueNotifier<String>('');

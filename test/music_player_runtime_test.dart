@@ -841,6 +841,31 @@ void main() {
     expect(playbackMedia3Engine.value, isFalse);
   });
 
+  test('skip silence needs Android, the media3 engine and no AutoMix', () {
+    addTearDown(() {
+      playbackMedia3Engine.value = false;
+      playbackSkipSilence.value = false;
+    });
+    final android = _runtime(isAndroid: true);
+    final on = android.settings.copyWith(
+      media3Engine: true,
+      skipSilence: true,
+      autoMix: false,
+    );
+    android.configure(on);
+    expect(playbackSkipSilence.value, isTrue);
+    android.configure(on.copyWith(autoMix: true));
+    expect(playbackSkipSilence.value, isFalse);
+    android.configure(on.copyWith(media3Engine: false));
+    expect(playbackSkipSilence.value, isFalse);
+    android.configure(on.copyWith(skipSilence: false));
+    expect(playbackSkipSilence.value, isFalse);
+
+    final other = _runtime();
+    other.configure(on);
+    expect(playbackSkipSilence.value, isFalse);
+  });
+
   test('changing the engine drops a song queued on the old one', () async {
     final deck = _QueuedDeck();
     final runtime = _runtime(

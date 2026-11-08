@@ -18,6 +18,7 @@ import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/exclusive_output_labels.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
@@ -533,6 +534,24 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                       .read(settingsProvider.notifier)
                       .setMedia3Engine(value),
                 ),
+                // Phones and tablets only; media3 does the skipping.
+                if (!isAndroidTv)
+                  SettingsSwitchItem(
+                    icon: Icons.fast_forward_outlined,
+                    title: context.l10n.skipSilence,
+                    subtitle: [
+                      context.l10n.skipSilenceDescription,
+                      if (!settings.media3Engine)
+                        context.l10n.skipSilenceNeedsEngine
+                      else if (settings.autoMix)
+                        context.l10n.skipSilenceAutoMix,
+                    ].join('\n\n'),
+                    value: settings.skipSilence,
+                    enabled: settings.media3Engine,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setSkipSilence(value),
+                  ),
                 ValueListenableBuilder<UsbAudioStatus>(
                   valueListenable: usbAudioStatus,
                   builder: (context, status, _) => SettingsSwitchItem(

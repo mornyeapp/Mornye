@@ -315,6 +315,19 @@
   "@newPlaybackEngineDescription": {
     "description": "Subtitle of the New playback engine switch. 'Crackle' means short clicks or static in the sound"
   },
+  "skipSilence": "Skip silence",
+  "@skipSilence": {
+    "description": "Android Playback setting that jumps over silent passages in songs"
+  },
+  "skipSilenceDescription": "Jumps over silent parts of songs. While on, songs are decoded at 16-bit.",
+  "skipSilenceNeedsEngine": "Turn on the new playback engine to use this.",
+  "@skipSilenceNeedsEngine": {
+    "description": "Added to the Skip silence subtitle while the New playback engine is off, which disables the switch"
+  },
+  "skipSilenceAutoMix": "Off while AutoMix is on.",
+  "@skipSilenceAutoMix": {
+    "description": "Added to the Skip silence subtitle while AutoMix is on, which suspends silence skipping"
+  },
   "usbBitPerfect": "Hi-res and bit-perfect audio",
   "usbBitPerfectDescription": "Preserve source precision on compatible outputs. Choose direct USB or AAudio exclusive below; otherwise Android USB output requires Android 14 or later. Applies from the next track, without AutoMix or normalization. System volume may not control direct USB.",
   "usbHardwareVolume": "DAC hardware volume",

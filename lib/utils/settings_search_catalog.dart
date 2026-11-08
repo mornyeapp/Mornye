@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/exclusive_output_labels.dart';
 
@@ -434,6 +435,13 @@ class SettingsSearchCatalog {
               'media player',
             ],
           ),
+          if (!isAndroidTv)
+            SettingsSearchEntry(
+              icon: Icons.fast_forward_outlined,
+              title: l10n.skipSilence,
+              subtitle: l10n.skipSilenceDescription,
+              keywords: const ['silence', 'quiet', 'gap', 'skip', 'hening'],
+            ),
           SettingsSearchEntry(
             icon: Icons.usb,
             title: l10n.usbBitPerfect,
