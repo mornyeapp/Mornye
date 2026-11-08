@@ -408,7 +408,9 @@ class _TrackItemWithStatus extends ConsumerWidget {
       }
     }
 
+    if (!context.mounted) return;
     if (await playLocalIfAvailable(context, ref, track)) return;
+    if (!context.mounted) return;
     if (await ref
         .read(playbackProvider.notifier)
         .playOnlineTrack(track, context: context)) {

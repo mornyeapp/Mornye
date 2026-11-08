@@ -162,6 +162,7 @@ class TrackListTile extends ConsumerWidget {
     if (playedLocal) {
       return;
     }
+    if (!context.mounted) return;
 
     final playedOnline = await ref
         .read(playbackProvider.notifier)
@@ -199,6 +200,7 @@ class TrackListTile extends ConsumerWidget {
       return;
     }
     if (await playLocalIfAvailable(context, ref, track)) return;
+    if (!context.mounted) return;
     if (await ref
         .read(playbackProvider.notifier)
         .playOnlineTrack(track, context: context)) {
