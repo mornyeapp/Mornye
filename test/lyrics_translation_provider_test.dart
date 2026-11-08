@@ -996,6 +996,25 @@ void main() {
       expect(asksRomanization(), isTrue);
     });
 
+    test('the app language keeps its script unromanized', () async {
+      final container = await containerFor(
+        settings: _settings.copyWith(locale: 'ja'),
+      );
+      final controller = container.read(lyricsTranslationProvider.notifier);
+      await controller.translate(song(['きみの', '君の名前']));
+      expect(asksRomanization(), isFalse);
+      final lyrics = song(['사랑해', 'きみの']);
+      expect(controller.shown(lyrics).lines.map((line) => line.romanization), [
+        'saranghae',
+        null,
+      ]);
+      container.read(settingsProvider.notifier).setLocale('ko');
+      expect(controller.shown(lyrics).lines.map((line) => line.romanization), [
+        null,
+        'kimino',
+      ]);
+    });
+
     test('romanization off asks the AI for none', () async {
       final container = await containerFor(
         settings: _settings.copyWith(lyricsRomanize: false),

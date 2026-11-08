@@ -5,8 +5,7 @@
 /// - Belarusian: BGN/PCGN, without the soft sign mark;
 /// - Bulgarian: the Streamlined System of 2009;
 /// - Serbian: the Serbian Latin alphabet;
-/// - Macedonian: the digraph system of official documents since 2008,
-///   with `dzh` for џ;
+/// - Macedonian: the digraph system of official documents since 2008;
 /// - Kyrgyz: BGN/PCGN.
 ///
 /// Letters a language does not use take the Russian value, or a common
@@ -84,7 +83,7 @@ const _serbian = {
   'џ': 'dž', 'ј': 'j', 'љ': 'lj', 'њ': 'nj',
 };
 
-const _macedonian = {'х': 'h', 'ц': 'c', 'џ': 'dzh', 'ѓ': 'gj', 'ќ': 'kj'};
+const _macedonian = {'х': 'h', 'ц': 'c', 'џ': 'dj', 'ѓ': 'gj', 'ќ': 'kj'};
 
 const _kyrgyz = {'ж': 'j'};
 

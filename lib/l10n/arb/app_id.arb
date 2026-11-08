@@ -1887,6 +1887,7 @@
   "lyricsRomanizeSubtitle": "Tampilkan cara lirik bahasa Korea, Sirilik, Hindi, Punjabi, Mandarin, dan kana Jepang dinyanyikan, diolah di perangkat ini. Terjemahan AI dapat meromanisasi sisanya.",
   "lyricsRomanizedMainLine": "Romanisasi sebagai baris utama",
   "lyricsRomanizedMainLineSubtitle": "Tampilkan teks romanisasi menggantikan tiap baris, dengan teks aslinya di bawahnya.",
+  "lyricsAiRomanizeSubtitle": "Juga meromanisasi baris yang tidak bisa diolah perangkat ini, seperti kanji Jepang, Thai, atau Arab",
   "lyricsMode": "Mode Lirik",
   "@lyricsMode": {
     "description": "Setting - how to save lyrics"

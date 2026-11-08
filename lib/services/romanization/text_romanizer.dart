@@ -4,7 +4,43 @@ import 'package:mornye/services/romanization/kana.dart';
 import 'package:mornye/services/romanization/korean.dart';
 import 'package:mornye/services/romanization/pinyin.dart';
 
-enum _Script { hangul, cyrillic, devanagari, gurmukhi, kana, han }
+/// The scripts offline romanization reads.
+enum LyricsScript { hangul, cyrillic, devanagari, gurmukhi, kana, han }
+
+/// Languages written in Cyrillic, among those an app or system language
+/// can be.
+const _cyrillicLanguages = {
+  // Slavic languages.
+  'ru', 'uk', 'be', 'bg', 'sr', 'mk',
+  // Turkic, Iranian, Mongolic, Caucasian and Uralic ones.
+  'ky', 'kk', 'tg', 'mn', 'tt', 'ba', 'cv', 'sah', 'os', 'ce', 'ab', 'av',
+  'kv', 'udm',
+};
+
+const _devanagariLanguages = {'hi', 'mr', 'ne', 'sa', 'kok', 'mai', 'bho'};
+
+/// The scripts a reader of the language of [languageCode] (in
+/// [scriptCode], when the locale names one) reads without romanization.
+Set<LyricsScript> scriptsReadIn(String languageCode, {String? scriptCode}) {
+  final language = languageCode.toLowerCase();
+  final script = scriptCode?.toLowerCase();
+  // A language can be written in another script than its usual one, as
+  // Serbian in Latin or Punjabi in Arabic.
+  bool writes(String usual) => script == null || script == usual;
+  if (_cyrillicLanguages.contains(language) && writes('cyrl')) {
+    return const {LyricsScript.cyrillic};
+  }
+  return switch (language) {
+    'zh' => const {LyricsScript.han},
+    'ja' => const {LyricsScript.kana, LyricsScript.han},
+    'ko' => const {LyricsScript.hangul},
+    'pa' when writes('guru') => const {LyricsScript.gurmukhi},
+    _ when _devanagariLanguages.contains(language) && writes('deva') => const {
+      LyricsScript.devanagari,
+    },
+    _ => const {},
+  };
+}
 
 bool _isHangul(int unit) =>
     (unit >= 0xAC00 && unit <= 0xD7A3) ||
@@ -30,14 +66,14 @@ int _runeAt(String text, int index) {
   return unit;
 }
 
-_Script? _scriptOf(int rune) {
+LyricsScript? _scriptOf(int rune) {
   if (rune < 0x400) return null;
-  if (isCyrillic(rune)) return _Script.cyrillic;
-  if (isDevanagari(rune)) return _Script.devanagari;
-  if (isGurmukhi(rune)) return _Script.gurmukhi;
-  if (_isHangul(rune)) return _Script.hangul;
-  if (isKana(rune)) return _Script.kana;
-  if (_isHan(rune)) return _Script.han;
+  if (isCyrillic(rune)) return LyricsScript.cyrillic;
+  if (isDevanagari(rune)) return LyricsScript.devanagari;
+  if (isGurmukhi(rune)) return LyricsScript.gurmukhi;
+  if (_isHangul(rune)) return LyricsScript.hangul;
+  if (isKana(rune)) return LyricsScript.kana;
+  if (_isHan(rune)) return LyricsScript.han;
   return null;
 }
 
@@ -66,14 +102,34 @@ const _cjkPunctuation = {
   '・': ' ',
 };
 
+/// Whether [text] has a letter of one of [scripts].
+bool writtenIn(String text, Set<LyricsScript> scripts) {
+  if (scripts.isEmpty) return false;
+  for (final rune in text.runes) {
+    if (scripts.contains(_scriptOf(rune))) return true;
+  }
+  return false;
+}
+
 /// Romanizes the lines of one song offline, with what the whole song
 /// tells about them: the language of its Cyrillic, and whether its Han
 /// characters are Chinese (Japanese kanji and Korean hanja are not
-/// romanized).
+/// romanized). Lines in a script of [readerScripts], which the user reads
+/// as they are, stay unromanized.
 class TextRomanizer {
-  TextRomanizer._(this.cyrillic, this._hanIsChinese, this._hasHan, this.pinyin);
+  TextRomanizer._(
+    this.cyrillic,
+    this._hanIsChinese,
+    this._hasHan,
+    this.pinyin,
+    this.readerScripts,
+  );
 
-  factory TextRomanizer.forTexts(Iterable<String> texts, {PinyinData? pinyin}) {
+  factory TextRomanizer.forTexts(
+    Iterable<String> texts, {
+    PinyinData? pinyin,
+    Set<LyricsScript> readerScripts = const {},
+  }) {
     var kana = 0;
     var han = 0;
     var hangul = 0;
@@ -81,13 +137,13 @@ class TextRomanizer {
     for (final text in texts) {
       for (final rune in text.runes) {
         switch (_scriptOf(rune)) {
-          case _Script.kana:
+          case LyricsScript.kana:
             kana++;
-          case _Script.han:
+          case LyricsScript.han:
             han++;
-          case _Script.hangul:
+          case LyricsScript.hangul:
             hangul++;
-          case _Script.cyrillic:
+          case LyricsScript.cyrillic:
             cyrillic.writeCharCode(rune);
           default:
             break;
@@ -101,6 +157,7 @@ class TextRomanizer {
       !japanese && hangul <= han,
       han > 0,
       pinyin,
+      readerScripts,
     );
   }
 
@@ -108,9 +165,15 @@ class TextRomanizer {
   final bool _hanIsChinese;
   final bool _hasHan;
   final PinyinData? pinyin;
+  final Set<LyricsScript> readerScripts;
 
   /// Whether the song is Chinese, so its romanization needs [pinyin].
-  bool get needsPinyin => _hanIsChinese && _hasHan;
+  bool get needsPinyin =>
+      _hanIsChinese && _hasHan && !readerScripts.contains(LyricsScript.han);
+
+  /// Whether [text] is written in a script of [readerScripts], so it reads
+  /// as it is.
+  bool readsAsWritten(String text) => writtenIn(text, readerScripts);
 
   /// Whether every letter of [text] outside the Latin alphabet romanizes
   /// here. With [assumePinyin], Chinese counts before [pinyin] is loaded.
@@ -120,7 +183,7 @@ class TextRomanizer {
       if (rune > 0xFFFF) i++;
       if (rune < 0x80) continue;
       final script = _scriptOf(rune);
-      if (script == _Script.han) {
+      if (script == LyricsScript.han) {
         if (!_hanIsChinese) return false;
         final data = pinyin;
         if (data == null ? !assumePinyin : data.reading(rune) == null) {
@@ -138,9 +201,10 @@ class TextRomanizer {
 
   /// [text] romanized, as one part per UTF-16 code unit of [text], so any
   /// slice of [text] (a word timed on its own) maps to its slice of the
-  /// result. Null when a letter of [text] does not romanize here.
+  /// result. Null when a letter of [text] does not romanize here, or when
+  /// [text] [readsAsWritten].
   List<String>? romanize(String text) {
-    if (!canRomanize(text)) return null;
+    if (readsAsWritten(text) || !canRomanize(text)) return null;
     final out = [for (var i = 0; i < text.length; i++) text[i]];
     final cjk = List.filled(text.length, false);
     var i = 0;
@@ -155,7 +219,7 @@ class TextRomanizer {
         final rune = _runeAt(text, end);
         if (_scriptOf(rune) == script) {
           end += rune > 0xFFFF ? 2 : 1;
-        } else if (script == _Script.cyrillic &&
+        } else if (script == LyricsScript.cyrillic &&
             isCyrillicApostrophe(text, end)) {
           end++;
         } else {
@@ -163,18 +227,18 @@ class TextRomanizer {
         }
       }
       switch (script) {
-        case _Script.hangul:
+        case LyricsScript.hangul:
           romanizeHangul(text, i, end, out);
-        case _Script.cyrillic:
+        case LyricsScript.cyrillic:
           romanizeCyrillic(text, i, end, out, cyrillic);
-        case _Script.devanagari:
+        case LyricsScript.devanagari:
           romanizeDevanagari(text, i, end, out);
-        case _Script.gurmukhi:
+        case LyricsScript.gurmukhi:
           romanizeGurmukhi(text, i, end, out);
-        case _Script.kana:
+        case LyricsScript.kana:
           romanizeKana(text, i, end, out);
           cjk.fillRange(i, end, true);
-        case _Script.han:
+        case LyricsScript.han:
           _romanizeHan(text, i, end, out);
           cjk.fillRange(i, end, true);
       }

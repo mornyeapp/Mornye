@@ -175,8 +175,12 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
     ref.watch(lyricsTranslationProvider.select((state) => state.results));
     ref.watch(
       settingsProvider.select(
-        (settings) =>
-            (settings.lyricsRomanize, settings.lyricsRomanizedMainLine),
+        (settings) => (
+          settings.lyricsRomanize,
+          settings.lyricsRomanizedMainLine,
+          // The app language decides which scripts stay unromanized.
+          settings.locale,
+        ),
       ),
     );
     final state = ref.watch(playbackStateProvider).value;
