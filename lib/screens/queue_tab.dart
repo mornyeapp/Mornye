@@ -1003,7 +1003,12 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                     )
                   : PageView.builder(
                       controller: _filterPageController!,
-                      physics: const ClampingScrollPhysics(),
+                      // While song rows swipe to queue, the tabs alone
+                      // change pages, so the two sideways swipes never
+                      // compete.
+                      physics: queueSwipeEnabled(ref)
+                          ? const NeverScrollableScrollPhysics()
+                          : const ClampingScrollPhysics(),
                       onPageChanged: _onFilterPageChanged,
                       itemCount: _filterModes.length,
                       itemBuilder: (context, index) {
