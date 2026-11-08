@@ -100,7 +100,9 @@ class PlaybackController extends Notifier<PlaybackState> {
     Track track, {
     BuildContext? context,
   }) async {
-    _log.i('Resolving online stream for "${track.name}" by ${track.artistName}');
+    _log.i(
+      'Resolving online stream for "${track.name}" by ${track.artistName}',
+    );
     try {
       final settings = ref.read(settingsProvider);
       final serviceName = track.source ?? '';

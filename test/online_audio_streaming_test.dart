@@ -15,52 +15,53 @@ void main() {
     test(
       'playableFromOnlineTrack constructs valid online media with headers',
       () {
-      final track = Track(
-        id: 'track-123',
-        name: 'Online Song',
-        artistName: 'Online Artist',
-        albumName: 'Online Album',
-        duration: 210,
-        source: 'jiosaavn',
-        coverUrl: 'https://example.com/cover.jpg',
-      );
+        final track = Track(
+          id: 'track-123',
+          name: 'Online Song',
+          artistName: 'Online Artist',
+          albumName: 'Online Album',
+          duration: 210,
+          source: 'jiosaavn',
+          coverUrl: 'https://example.com/cover.jpg',
+        );
 
-      final headers = {
-        'User-Agent': 'Mornye-Audio/1.0',
-        'Authorization': 'Bearer test-token',
-      };
+        final headers = {
+          'User-Agent': 'Mornye-Audio/1.0',
+          'Authorization': 'Bearer test-token',
+        };
 
-      final media = playableFromOnlineTrack(
-        track: track,
-        streamUrl: 'https://audio.example.com/stream.mp4',
-        headers: headers,
-        durationMs: 210000,
-        bitrate: 320000,
-        format: 'm4a',
-      );
+        final media = playableFromOnlineTrack(
+          track: track,
+          streamUrl: 'https://audio.example.com/stream.mp4',
+          headers: headers,
+          durationMs: 210000,
+          bitrate: 320000,
+          format: 'm4a',
+        );
 
-      expect(media.id, 'stream://jiosaavn/track-123');
-      expect(media.source, 'https://audio.example.com/stream.mp4');
-      expect(media.isNetwork, isTrue);
-      expect(media.title, 'Online Song');
-      expect(media.artist, 'Online Artist');
-      expect(media.album, 'Online Album');
-      expect(media.duration, const Duration(milliseconds: 210000));
-      expect(media.bitrate, 320000);
-      expect(media.format, 'm4a');
-      expect(media.httpHeaders, headers);
+        expect(media.id, 'stream://jiosaavn/track-123');
+        expect(media.source, 'https://audio.example.com/stream.mp4');
+        expect(media.isNetwork, isTrue);
+        expect(media.title, 'Online Song');
+        expect(media.artist, 'Online Artist');
+        expect(media.album, 'Online Album');
+        expect(media.duration, const Duration(milliseconds: 210000));
+        expect(media.bitrate, 320000);
+        expect(media.format, 'm4a');
+        expect(media.httpHeaders, headers);
 
-      // JSON serialization round-trip preserves headers
-      final json = media.toJson();
-      expect(json['httpHeaders'], headers);
+        // JSON serialization round-trip preserves headers
+        final json = media.toJson();
+        expect(json['httpHeaders'], headers);
 
-      final restored = PlayableMedia.fromJson(json);
-      expect(restored, isNotNull);
-      expect(restored!.id, media.id);
-      expect(restored.source, media.source);
-      expect(restored.isNetwork, isTrue);
-      expect(restored.httpHeaders, headers);
-    });
+        final restored = PlayableMedia.fromJson(json);
+        expect(restored, isNotNull);
+        expect(restored!.id, media.id);
+        expect(restored.source, media.source);
+        expect(restored.isNetwork, isTrue);
+        expect(restored.httpHeaders, headers);
+      },
+    );
 
     test('toMediaItem preserves stream metadata and headers', () {
       final track = Track(
@@ -136,19 +137,20 @@ void main() {
     test(
       'loads remote HTTP stream without headers when not required',
       () async {
-      await deck.setNetworkSource('https://stream.example.com/direct.mp3');
+        await deck.setNetworkSource('https://stream.example.com/direct.mp3');
 
-      expect(
-        engine.calls,
-        containsAllInOrder([
-          ['stop'],
-          ['open', 'https://stream.example.com/direct.mp3'],
-        ]),
-      );
+        expect(
+          engine.calls,
+          containsAllInOrder([
+            ['stop'],
+            ['open', 'https://stream.example.com/direct.mp3'],
+          ]),
+        );
 
-      await deck.resume();
-      expect(deck.state, PlaybackDeckState.playing);
-    });
+        await deck.resume();
+        expect(deck.state, PlaybackDeckState.playing);
+      },
+    );
 
     test('local file playback remains functional and unmodified', () async {
       await deck.setFileSource('/path/to/local/downloaded_song.flac');

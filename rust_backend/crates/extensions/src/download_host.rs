@@ -212,36 +212,37 @@ fn register_segments<'js>(
                         .resolve(&path)
                         .map_err(|error| download::Failure::new("permission", error, 0))?;
                     let item_id = control.item_id();
-                    if crate::stream_capture::is_capture_active(&item_id) {
-                        if let Some(first) = segments.first() {
-                            let mut headers_map = std::collections::BTreeMap::new();
-                            if let Some(opts) = options.as_object() {
-                                if let Ok(val) = opts.get::<_, rquickjs::Value>("headers") {
-                                    if let Some(obj) = val.as_object() {
-                                        for key in obj.keys::<String>() {
-                                            if let Ok(k) = key {
-                                                if let Ok(v) = obj.get::<_, String>(&k) {
-                                                    headers_map.insert(k, v);
-                                                }
-                                            }
-                                        }
-                                    }
+                    let first_segment = if crate::stream_capture::is_capture_active(&item_id) {
+                        segments.first()
+                    } else {
+                        None
+                    };
+                    if let Some(first) = first_segment {
+                        let mut headers_map = std::collections::BTreeMap::new();
+                        let headers_obj = options
+                            .as_object()
+                            .and_then(|opts| opts.get::<_, rquickjs::Value>("headers").ok())
+                            .and_then(|val| val.into_object());
+                        if let Some(obj) = headers_obj {
+                            for k in obj.keys::<String>().flatten() {
+                                if let Ok(v) = obj.get::<_, String>(&k) {
+                                    headers_map.insert(k, v);
                                 }
                             }
-                            crate::stream_capture::record_capture(
-                                &item_id,
-                                crate::stream_capture::CapturedStream {
-                                    url: first.url.clone(),
-                                    headers: headers_map,
-                                    format: None,
-                                },
-                            );
-                            return Ok(serde_json::json!({
-                                "success": true,
-                                "file_path": path.display().to_string(),
-                                "already_exists": true,
-                            }));
                         }
+                        crate::stream_capture::record_capture(
+                            &item_id,
+                            crate::stream_capture::CapturedStream {
+                                url: first.url.clone(),
+                                headers: headers_map,
+                                format: None,
+                            },
+                        );
+                        return Ok(serde_json::json!({
+                            "success": true,
+                            "file_path": path.display().to_string(),
+                            "already_exists": true,
+                        }));
                     }
                     let options = options.as_object();
                     let value = |key: &str| -> Result<Value<'js>, download::Failure> {

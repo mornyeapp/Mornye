@@ -410,28 +410,30 @@ impl Backend {
         let parsed: Option<Value> = response
             .ok()
             .and_then(|raw| serde_json::from_str(&raw).ok());
-        if let Some(res) = &parsed {
-            if res.get("decryption").is_some_and(|d| !d.is_null()) {
-                return Ok(None);
-            }
+        if parsed
+            .as_ref()
+            .is_some_and(|res| res.get("decryption").is_some_and(|d| !d.is_null()))
+        {
+            return Ok(None);
         }
 
-        if let Some(captured) = guard.take() {
-            if captured.url.starts_with("http://") || captured.url.starts_with("https://") {
-                let format = captured.format.or_else(|| {
-                    parsed.as_ref().and_then(|p| {
-                        p.get("actual_extension")
-                            .and_then(|e| e.as_str().map(String::from))
-                    })
-                });
-                return Ok(Some(json!({
-                    "success": true,
-                    "url": captured.url,
-                    "headers": captured.headers,
-                    "format": format,
-                    "provider": id,
-                })));
-            }
+        if let Some(captured) = guard
+            .take()
+            .filter(|c| c.url.starts_with("http://") || c.url.starts_with("https://"))
+        {
+            let format = captured.format.or_else(|| {
+                parsed.as_ref().and_then(|p| {
+                    p.get("actual_extension")
+                        .and_then(|e| e.as_str().map(String::from))
+                })
+            });
+            return Ok(Some(json!({
+                "success": true,
+                "url": captured.url,
+                "headers": captured.headers,
+                "format": format,
+                "provider": id,
+            })));
         }
         Ok(None)
     }
