@@ -473,7 +473,7 @@ class _LibraryTracksFolderScreenState
         context,
         colorScheme,
         title,
-        effectiveEntries,
+        displayedEntries,
         playlist,
         rawEntries: rawEntries,
       ),

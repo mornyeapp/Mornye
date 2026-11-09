@@ -418,7 +418,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       meta: HeaderMetaRow(
         items: [
           HeaderMetaItem(
-            context.l10n.tracksCount(_sortedTracks.length),
+            context.l10n.tracksCount(_displayedTracks.length),
             icon: Icons.playlist_play,
           ),
         ],
@@ -464,20 +464,20 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
           ),
       ],
       actions: CollectionHeaderActions(
-        tracks: _sortedTracks,
-        onLoveAll: () => loveAllTracks(this.context, ref, _sortedTracks),
+        tracks: _displayedTracks,
+        onLoveAll: () => loveAllTracks(this.context, ref, _displayedTracks),
         downloadIcon: Icons.download_rounded,
         tonalDownload: true,
         onDownloadAll: () => confirmDownloadAllDialog(
           context,
-          _sortedTracks.length,
+          _displayedTracks.length,
           () => _downloadAll(context),
         ),
         addToPlaylistIcon: Icons.playlist_add,
         onAddToPlaylist: () => showAddTracksToPlaylistSheet(
           context,
           ref,
-          _sortedTracks,
+          _displayedTracks,
           playlistNamePrefill: widget.playlistName,
           preserveOccurrences: true,
         ),
