@@ -996,10 +996,13 @@ class _LibraryTracksFolderScreenState
                   focusNode: _searchFocusNode,
                   style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
                   decoration: InputDecoration(
-                    hintText:
-                        MaterialLocalizations.of(context).searchFieldLabel,
+                    hintText: MaterialLocalizations.of(
+                      context,
+                    ).searchFieldLabel,
                     hintStyle: TextStyle(
-                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.7,
+                      ),
                       fontSize: 14,
                     ),
                     border: InputBorder.none,
@@ -1017,7 +1020,10 @@ class _LibraryTracksFolderScreenState
                 IconButton(
                   icon: const Icon(Icons.clear, size: 18),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                   onPressed: () {
                     setState(() {
                       _searchQuery = '';

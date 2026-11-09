@@ -31,11 +31,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
-              body: Center(
-                child: TrackCollectionQuickActions(
-                  track: track,
-                ),
-              ),
+              body: Center(child: TrackCollectionQuickActions(track: track)),
             ),
           ),
         ),
@@ -66,11 +62,7 @@ void main() {
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: Scaffold(
-                body: Center(
-                  child: TrackCollectionQuickActions(
-                    track: track,
-                  ),
-                ),
+                body: Center(child: TrackCollectionQuickActions(track: track)),
               ),
             ),
           ),
