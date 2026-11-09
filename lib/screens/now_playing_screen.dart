@@ -1236,6 +1236,26 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     onTap: () => Navigator.of(sheetContext).pop('sleepTimer'),
                   ),
                   SettingsItem(
+                    icon: Icons.compare_arrows,
+                    title:
+                        Localizations.localeOf(sheetContext).languageCode ==
+                            'it'
+                        ? 'Modalità DJ (Smart Crossfade)'
+                        : 'DJ Mode (AutoMix)',
+                    subtitle: ref.watch(
+                          settingsProvider.select((s) => s.autoMix),
+                        )
+                        ? (Localizations.localeOf(sheetContext).languageCode ==
+                                'it'
+                            ? 'Attiva'
+                            : 'On')
+                        : (Localizations.localeOf(sheetContext).languageCode ==
+                                'it'
+                            ? 'Disattivata'
+                            : 'Off'),
+                    onTap: () => Navigator.of(sheetContext).pop('djMode'),
+                  ),
+                  SettingsItem(
                     icon: Icons.equalizer,
                     title: sheetContext.l10n.equalizerTitle,
                     onTap: () => Navigator.of(sheetContext).pop('equalizer'),
@@ -1318,6 +1338,28 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         break;
       case 'sleepTimer':
         await _showSleepTimerSheet(context, controller, colorScheme);
+        break;
+      case 'djMode':
+        final current = ref.read(settingsProvider).autoMix;
+        await ref.read(settingsProvider.notifier).setAutoMix(!current);
+        if (mounted) {
+          final isIt =
+              Localizations.localeOf(context).languageCode == 'it';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                !current
+                    ? (isIt
+                        ? 'Modalità DJ (Smart Crossfade) attivata'
+                        : 'DJ Mode activated')
+                    : (isIt
+                        ? 'Modalità DJ (Smart Crossfade) disattivata'
+                        : 'DJ Mode deactivated'),
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
         break;
       case 'equalizer':
         await pushPage<void>(context, (_) => const EqualizerScreen());

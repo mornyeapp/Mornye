@@ -8108,7 +8108,7 @@
   "@mornyeFavorited": {
     "description": "Selected state of the compact favorite action"
   },
-  "autoMixDescription": "Blend songs with beat matching and pitch-preserving tempo adjustment. Uses crossfade when beats cannot be matched.",
+  "autoMixDescription": "Sfuma e mixa le canzoni in modo continuo senza pause stile DJ con dissolvenza incrociata.",
   "gaplessPlayback": "Gapless playback",
   "@gaplessPlayback": {
     "description": "Playback settings switch that starts the next song the moment one ends"

@@ -253,7 +253,9 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
               ),
               SettingsSwitchItem(
                 icon: Icons.compare_arrows,
-                title: 'AutoMix',
+                title: Localizations.localeOf(context).languageCode == 'it'
+                    ? 'Modalità DJ (Smart Crossfade)'
+                    : 'DJ Mode (AutoMix)',
                 subtitle: context.l10n.autoMixDescription,
                 value: autoMixActive,
                 enabled:
