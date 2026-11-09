@@ -198,6 +198,22 @@ class AutoEqDatabase {
       preamp: -4.2,
       gains: [3.8, 2.5, 0.5, -0.5, 0.2, 1.0, 2.2, -1.5, -0.8, 2.0],
     ),
+    const AutoEqProfile(
+      id: 'sennheiser_hd800s',
+      brand: 'Sennheiser',
+      model: 'HD 800 S',
+      type: 'Over-Ear',
+      preamp: -6.5,
+      gains: [6.8, 4.2, 1.0, -0.4, 0.0, 0.2, 1.0, -3.5, -2.8, 2.5],
+    ),
+    const AutoEqProfile(
+      id: 'sennheiser_hd490_pro',
+      brand: 'Sennheiser',
+      model: 'HD 490 Pro',
+      type: 'Over-Ear',
+      preamp: -4.5,
+      gains: [4.2, 2.5, 0.5, -0.4, 0.0, 0.4, 1.2, -1.8, -0.5, 1.8],
+    ),
 
     // ----------------- SAMSUNG / AKG -----------------
     const AutoEqProfile(
@@ -416,6 +432,22 @@ class AutoEqDatabase {
       preamp: -2.5,
       gains: [1.5, 0.8, 0.0, -0.2, 0.0, 0.5, 1.2, -0.5, 0.5, 1.5],
     ),
+    const AutoEqProfile(
+      id: 'moondrop_space_travel',
+      brand: 'Moondrop',
+      model: 'Space Travel',
+      type: 'In-Ear',
+      preamp: -3.2,
+      gains: [1.8, 1.0, 0.2, -0.4, 0.2, 0.5, 1.8, -1.0, 0.2, 1.5],
+    ),
+    const AutoEqProfile(
+      id: 'moondrop_aria_2',
+      brand: 'Moondrop',
+      model: 'Aria 2',
+      type: 'In-Ear',
+      preamp: -3.0,
+      gains: [2.0, 1.2, 0.2, -0.4, 0.2, 0.6, 2.0, -1.2, 0.4, 1.6],
+    ),
 
     // ----------------- ANKER SOUNDCORE -----------------
     const AutoEqProfile(
@@ -577,6 +609,282 @@ class AutoEqDatabase {
       type: 'In-Ear',
       preamp: -5.5,
       gains: [1.0, -2.2, -4.5, -2.5, 0.8, 2.2, 4.2, 3.8, 0.8, 2.5],
+    ),
+
+    // ----------------- KIWI EARS -----------------
+    const AutoEqProfile(
+      id: 'kiwi_ears_belle',
+      brand: 'Kiwi Ears',
+      model: 'Belle',
+      type: 'In-Ear',
+      preamp: -4.2,
+      gains: [1.8, 1.2, 0.5, -0.2, 0.4, 0.8, 2.8, -1.5, -0.6, 1.2],
+    ),
+    const AutoEqProfile(
+      id: 'kiwi_ears_cadenza',
+      brand: 'Kiwi Ears',
+      model: 'Cadenza',
+      type: 'In-Ear',
+      preamp: -3.8,
+      gains: [1.5, 0.8, 0.2, -0.4, 0.2, 0.6, 2.4, -1.8, 0.4, 1.8],
+    ),
+    const AutoEqProfile(
+      id: 'kiwi_ears_quintet',
+      brand: 'Kiwi Ears',
+      model: 'Quintet',
+      type: 'In-Ear',
+      preamp: -4.0,
+      gains: [2.0, 1.0, 0.0, -0.6, 0.2, 0.5, 2.2, -2.2, -1.0, 2.0],
+    ),
+    const AutoEqProfile(
+      id: 'kiwi_ears_orchestra_lite',
+      brand: 'Kiwi Ears',
+      model: 'Orchestra Lite',
+      type: 'In-Ear',
+      preamp: -3.5,
+      gains: [2.8, 1.8, 0.6, -0.2, 0.0, 0.4, 1.5, -1.0, 0.2, 1.5],
+    ),
+    const AutoEqProfile(
+      id: 'kiwi_ears_melody',
+      brand: 'Kiwi Ears',
+      model: 'Melody',
+      type: 'In-Ear',
+      preamp: -4.5,
+      gains: [1.2, 0.4, -0.8, -1.2, 0.4, 1.0, 2.8, -2.0, -1.5, 1.4],
+    ),
+
+    // ----------------- CMF BY NOTHING -----------------
+    const AutoEqProfile(
+      id: 'cmf_buds_pro_2',
+      brand: 'CMF',
+      model: 'Buds Pro 2',
+      type: 'In-Ear',
+      preamp: -5.0,
+      gains: [-1.5, -3.2, -2.0, 0.2, 0.8, 1.5, 3.2, 1.2, -0.5, 2.2],
+    ),
+    const AutoEqProfile(
+      id: 'cmf_buds_pro',
+      brand: 'CMF',
+      model: 'Buds Pro',
+      type: 'In-Ear',
+      preamp: -4.8,
+      gains: [-1.2, -2.8, -1.8, 0.0, 0.6, 1.2, 3.0, 0.8, -0.8, 1.8],
+    ),
+    const AutoEqProfile(
+      id: 'cmf_buds',
+      brand: 'CMF',
+      model: 'Buds',
+      type: 'In-Ear',
+      preamp: -4.5,
+      gains: [-0.8, -2.2, -1.5, 0.2, 0.5, 1.0, 2.8, 1.0, -0.4, 1.5],
+    ),
+
+    // ----------------- 7HZ -----------------
+    const AutoEqProfile(
+      id: '7hz_zero_2',
+      brand: '7Hz',
+      model: 'Zero 2',
+      type: 'In-Ear',
+      preamp: -3.6,
+      gains: [1.2, 0.6, 0.0, -0.4, 0.2, 0.5, 2.0, -1.4, 0.2, 1.6],
+    ),
+    const AutoEqProfile(
+      id: '7hz_zero',
+      brand: '7Hz',
+      model: 'Salnotes Zero',
+      type: 'In-Ear',
+      preamp: -4.2,
+      gains: [2.5, 1.5, 0.4, -0.2, 0.0, 0.4, 1.8, -1.6, 0.5, 1.8],
+    ),
+    const AutoEqProfile(
+      id: '7hz_timeless',
+      brand: '7Hz',
+      model: 'Timeless',
+      type: 'In-Ear',
+      preamp: -4.0,
+      gains: [1.0, 0.2, -0.6, -0.8, 0.2, 0.8, 2.2, -2.5, -1.2, 2.2],
+    ),
+    const AutoEqProfile(
+      id: '7hz_sonus',
+      brand: '7Hz',
+      model: 'Sonus',
+      type: 'In-Ear',
+      preamp: -3.8,
+      gains: [1.6, 0.8, 0.2, -0.5, 0.0, 0.6, 2.5, -1.8, -0.2, 1.5],
+    ),
+
+    // ----------------- TRUTHEAR -----------------
+    const AutoEqProfile(
+      id: 'truthear_hexa',
+      brand: 'Truthear',
+      model: 'Hexa',
+      type: 'In-Ear',
+      preamp: -3.4,
+      gains: [1.8, 1.0, 0.2, -0.2, 0.0, 0.4, 1.5, -1.0, 0.6, 1.4],
+    ),
+    const AutoEqProfile(
+      id: 'truthear_zero_red',
+      brand: 'Truthear',
+      model: 'Zero:RED',
+      type: 'In-Ear',
+      preamp: -3.5,
+      gains: [1.5, 0.8, 0.0, -0.4, 0.2, 0.6, 2.0, -1.2, 0.4, 1.6],
+    ),
+    const AutoEqProfile(
+      id: 'truthear_zero',
+      brand: 'Truthear',
+      model: 'Zero (Blue)',
+      type: 'In-Ear',
+      preamp: -4.0,
+      gains: [0.8, 0.0, -0.8, -0.6, 0.2, 0.8, 2.4, -1.8, 0.2, 1.8],
+    ),
+    const AutoEqProfile(
+      id: 'truthear_nova',
+      brand: 'Truthear',
+      model: 'Nova',
+      type: 'In-Ear',
+      preamp: -3.6,
+      gains: [1.0, 0.4, -0.2, -0.5, 0.2, 0.5, 1.8, -1.5, 0.2, 1.5],
+    ),
+    const AutoEqProfile(
+      id: 'truthear_gate',
+      brand: 'Truthear',
+      model: 'Gate',
+      type: 'In-Ear',
+      preamp: -3.8,
+      gains: [1.6, 0.9, 0.2, -0.3, 0.1, 0.5, 2.2, -1.6, 0.4, 1.4],
+    ),
+
+    // ----------------- TANGZU -----------------
+    const AutoEqProfile(
+      id: 'tangzu_waner',
+      brand: 'Tangzu',
+      model: "Wan'er S.G",
+      type: 'In-Ear',
+      preamp: -3.8,
+      gains: [1.4, 0.8, 0.2, -0.4, 0.2, 0.6, 2.2, -1.6, 0.2, 1.5],
+    ),
+    const AutoEqProfile(
+      id: 'tangzu_fudu',
+      brand: 'Tangzu',
+      model: 'Fudu Verse 1',
+      type: 'In-Ear',
+      preamp: -4.0,
+      gains: [1.0, 0.2, -0.4, -0.6, 0.2, 0.8, 2.5, -1.8, 0.0, 1.8],
+    ),
+
+    // ----------------- NOTHING -----------------
+    const AutoEqProfile(
+      id: 'nothing_ear_2024',
+      brand: 'Nothing',
+      model: 'Ear (2024)',
+      type: 'In-Ear',
+      preamp: -4.2,
+      gains: [1.2, 0.4, -0.5, -0.8, 0.2, 0.8, 2.6, -1.4, -0.5, 1.8],
+    ),
+    const AutoEqProfile(
+      id: 'nothing_ear_a',
+      brand: 'Nothing',
+      model: 'Ear (a)',
+      type: 'In-Ear',
+      preamp: -4.5,
+      gains: [0.5, -0.6, -1.2, -0.8, 0.4, 1.0, 2.8, -1.2, -0.8, 1.6],
+    ),
+    const AutoEqProfile(
+      id: 'nothing_ear_2',
+      brand: 'Nothing',
+      model: 'Ear (2)',
+      type: 'In-Ear',
+      preamp: -4.6,
+      gains: [1.0, 0.2, -0.8, -1.0, 0.2, 1.0, 3.0, -1.8, -1.0, 2.0],
+    ),
+
+    // ----------------- FIIO / JADEAUDIO -----------------
+    const AutoEqProfile(
+      id: 'fiio_fh3',
+      brand: 'Fiio',
+      model: 'FH3',
+      type: 'In-Ear',
+      preamp: -4.2,
+      gains: [0.8, -0.2, -1.2, -0.8, 0.4, 1.0, 2.6, -1.8, -0.6, 1.8],
+    ),
+    const AutoEqProfile(
+      id: 'fiio_fd3',
+      brand: 'Fiio',
+      model: 'FD3',
+      type: 'In-Ear',
+      preamp: -4.0,
+      gains: [1.2, 0.4, -0.6, -0.6, 0.2, 0.8, 2.4, -2.0, -0.8, 2.0],
+    ),
+    const AutoEqProfile(
+      id: 'fiio_jh5',
+      brand: 'Fiio',
+      model: 'JH5',
+      type: 'In-Ear',
+      preamp: -3.8,
+      gains: [1.5, 0.6, 0.0, -0.4, 0.2, 0.6, 2.2, -1.6, 0.0, 1.6],
+    ),
+    const AutoEqProfile(
+      id: 'fiio_jt1',
+      brand: 'Fiio',
+      model: 'JT1',
+      type: 'Over-Ear',
+      preamp: -4.5,
+      gains: [0.5, -0.8, -2.0, -1.2, 0.4, 1.2, 2.8, 0.8, -1.2, 1.5],
+    ),
+
+    // ----------------- FOCAL -----------------
+    const AutoEqProfile(
+      id: 'focal_bathys',
+      brand: 'Focal',
+      model: 'Bathys',
+      type: 'Over-Ear',
+      preamp: -4.0,
+      gains: [1.8, 0.8, -0.4, -0.8, 0.0, 0.5, 1.8, -1.0, 0.2, 1.6],
+    ),
+    const AutoEqProfile(
+      id: 'focal_clear',
+      brand: 'Focal',
+      model: 'Clear',
+      type: 'Over-Ear',
+      preamp: -4.8,
+      gains: [4.8, 2.8, 0.5, -0.5, 0.0, 0.2, 1.2, -1.5, 0.5, 2.2],
+    ),
+
+    // ----------------- MEZE -----------------
+    const AutoEqProfile(
+      id: 'meze_109_pro',
+      brand: 'Meze',
+      model: '109 Pro',
+      type: 'Over-Ear',
+      preamp: -4.2,
+      gains: [3.8, 2.0, 0.2, -0.5, 0.0, 0.4, 1.6, -2.2, -1.2, 1.8],
+    ),
+    const AutoEqProfile(
+      id: 'meze_99_classics',
+      brand: 'Meze',
+      model: '99 Classics',
+      type: 'Over-Ear',
+      preamp: -6.0,
+      gains: [-1.2, -4.0, -5.5, -3.2, 0.8, 2.0, 3.8, 2.4, 0.5, 2.0],
+    ),
+
+    // ----------------- AUDEZE -----------------
+    const AutoEqProfile(
+      id: 'audeze_lcd_x',
+      brand: 'Audeze',
+      model: 'LCD-X',
+      type: 'Over-Ear',
+      preamp: -5.2,
+      gains: [2.5, 1.2, 0.2, 0.0, 0.4, 1.0, 3.5, 2.2, -0.8, 1.5],
+    ),
+    const AutoEqProfile(
+      id: 'audeze_maxwell',
+      brand: 'Audeze',
+      model: 'Maxwell',
+      type: 'Over-Ear',
+      preamp: -3.5,
+      gains: [1.8, 0.8, 0.0, -0.2, 0.0, 0.2, 1.2, -0.8, 0.4, 1.4],
     ),
   ];
 

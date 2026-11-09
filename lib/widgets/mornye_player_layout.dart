@@ -22,6 +22,7 @@ import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/playback_source_label.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
+import 'package:mornye/widgets/realtime_audio_visualizer.dart';
 import 'package:mornye/widgets/player_track_swipe.dart';
 
 const _mornyeContentInset = mornyeLyricsContentInset;
@@ -455,6 +456,15 @@ class MornyePlayerLayout extends ConsumerWidget {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (ref.watch(settingsProvider.select((s) => s.realtimeVisualizer)) && page == 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                    child: RealtimeAudioVisualizer(
+                      isPlaying: ref.watch(playbackPlayingProvider),
+                      accentColor: colorScheme.primary,
+                      height: 24,
+                    ),
+                  ),
                 controls(),
                 if (showVolume) ...[
                   SizedBox(height: volumeGap - transportShift + headroom),

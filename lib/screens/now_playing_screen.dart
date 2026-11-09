@@ -42,6 +42,7 @@ import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_queue_sheet.dart';
 import 'package:mornye/widgets/player_details_sheet.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
+import 'package:mornye/widgets/pitch_tempo_control_sheet.dart';
 import 'package:mornye/widgets/material_player_layout.dart';
 import 'package:mornye/widgets/mornye_player_layout.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
@@ -709,6 +710,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               // Devices entry only takes a slot when paired.
                               if (ref.watch(linkPhoneClientProvider) != null)
                                 const LinkDevicesButton(color: Colors.white),
+                              if (ref.watch(settingsProvider.select((s) => s.pitchTempoControls)))
+                                IconButton(
+                                  tooltip: 'Pitch & Tempo',
+                                  color: Colors.white,
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: (ref.watch(settingsProvider.select((s) => s.playbackPitch)) != 0 ||
+                                            ref.watch(settingsProvider.select((s) => s.playbackSpeed)) != 1.0)
+                                        ? Colors.white.withValues(alpha: 0.22)
+                                        : Colors.transparent,
+                                  ),
+                                  icon: const AppIcon(Icons.speed_rounded),
+                                  onPressed: () => PitchTempoControlSheet.show(context),
+                                ),
                               IconButton(
                                 tooltip: context.l10n.nowPlayingUpNext,
                                 color: Colors.white,
@@ -834,7 +848,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 artUri: mediaItem.artUri,
                 squareArtwork: squareArtwork,
                 artworkAspectRatio: artworkRatio,
-                fadeStart: stillFullBleed ? 0.72 : 0.58,
+                fadeStart: stillFullBleed ? 0.38 : 0.42,
                 ambientGlow: true,
                 artwork: fullBleed && !_landscape && _currentPage == 0
                     ? PlayerTransitionArtwork(

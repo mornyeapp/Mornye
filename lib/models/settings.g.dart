@@ -41,6 +41,11 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   playOnHeadphonesConnected:
       json['playOnHeadphonesConnected'] as bool? ?? false,
   gaplessPlayback: json['gaplessPlayback'] as bool? ?? true,
+  spatialAudio: json['spatialAudio'] as bool? ?? false,
+  realtimeVisualizer: json['realtimeVisualizer'] as bool? ?? true,
+  pitchTempoControls: json['pitchTempoControls'] as bool? ?? false,
+  playbackPitch: (json['playbackPitch'] as num?)?.toDouble() ?? 0.0,
+  playbackSpeed: (json['playbackSpeed'] as num?)?.toDouble() ?? 1.0,
   autoMix: json['autoMix'] as bool? ?? false,
   autoMixDuration: json['autoMixDuration'] == null
       ? 0
@@ -217,6 +222,11 @@ Map<String, dynamic> _$AppSettingsToJson(
   'pauseOnMute': instance.pauseOnMute,
   'playOnHeadphonesConnected': instance.playOnHeadphonesConnected,
   'gaplessPlayback': instance.gaplessPlayback,
+  'spatialAudio': instance.spatialAudio,
+  'realtimeVisualizer': instance.realtimeVisualizer,
+  'pitchTempoControls': instance.pitchTempoControls,
+  'playbackPitch': instance.playbackPitch,
+  'playbackSpeed': instance.playbackSpeed,
   'autoMix': instance.autoMix,
   'autoMixDuration': instance.autoMixDuration,
   'autoMixEffect': _$AutoMixEffectEnumMap[instance.autoMixEffect]!,

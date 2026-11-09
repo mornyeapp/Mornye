@@ -56,6 +56,7 @@ class MpvAudioFilterChain {
     'stereotools',
     'acompressor',
     'alimiter',
+    'bs2b',
   };
 
   /// Sample rate assumed before the decoder reports one. Bands above 45% of
@@ -71,23 +72,26 @@ class MpvAudioFilterChain {
     EqualizerSettings settings, {
     int? sampleRate,
     Set<String> unavailable = const {},
+    bool spatialAudio = false,
   }) {
-    if (!settings.enabled) return empty;
+    if (!settings.enabled && !spatialAudio) return empty;
     bool has(String name) => !unavailable.contains(name);
     final rate = (sampleRate == null || sampleRate <= 0)
         ? defaultSampleRate
         : sampleRate;
     final frequencies = settings.frequencies;
     final gains = settings.effectiveGains;
-    final step = math.pow(
-      frequencies.last / frequencies.first,
-      1 / (frequencies.length - 1),
-    );
+    final step = frequencies.length > 1
+        ? math.pow(
+            frequencies.last / frequencies.first,
+            1 / (frequencies.length - 1),
+          )
+        : 2.0;
     final q = math.sqrt(step) / (step - 1);
     return MpvAudioFilterChain(
       volumeGainDb: has('volume') ? 0 : settings.inputGain,
       [
-        if (has('volume'))
+        if (has('volume') && settings.inputGain != 0)
           MpvAudioFilter(
             'pre',
             'volume',
@@ -96,16 +100,29 @@ class MpvAudioFilterChain {
               'volume': '${_number(settings.inputGain)}dB',
             },
           ),
-        for (var i = 0; i < gains.length; i++)
-          MpvAudioFilter(
-            'band$i',
-            'equalizer',
-            options: {
-              'f': _number(math.min(frequencies[i], rate * 0.45)),
-              't': 'q',
-              'w': _number(q),
-              'g': _number(gains[i]),
-            },
+        if (settings.enabled)
+          for (var i = 0; i < gains.length; i++)
+            MpvAudioFilter(
+              'band$i',
+              'equalizer',
+              options: {
+                'f': _number(math.min(frequencies[i], rate * 0.45)),
+                't': 'q',
+                'w': _number(q),
+                'g': _number(gains[i]),
+              },
+            ),
+        if (spatialAudio && has('bs2b'))
+          const MpvAudioFilter(
+            'spatial_crossfeed',
+            'bs2b',
+            options: {'profile': 'default'},
+          )
+        else if (spatialAudio && has('stereotools'))
+          const MpvAudioFilter(
+            'spatial_crossfeed',
+            'stereotools',
+            options: {'crosslevel': '0.35'},
           ),
         // Applied only when set: the filter converts its input to stereo.
         if (settings.balance != 0 && has('stereotools'))

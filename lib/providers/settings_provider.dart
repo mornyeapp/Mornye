@@ -13,6 +13,7 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/folder_path_template.dart';
 import 'package:mornye/services/download_file_recovery.dart';
 import 'package:mornye/services/secure_storage_options.dart';
+import 'package:mornye/services/playback_equalizer.dart';
 import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/utils/audio_conversion_utils.dart';
@@ -242,6 +243,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
     await _cleanupRetiredSpotifySettings();
 
     LogBuffer.loggingEnabled = state.enableLogging;
+    playbackSpatialAudio.value = state.spatialAudio;
 
     await syncLyricsSettingsToBackend();
     await _syncNetworkCompatibilitySettingsToBackend();
@@ -451,6 +453,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
     await _saveSettings();
 
     LogBuffer.loggingEnabled = state.enableLogging;
+    playbackSpatialAudio.value = state.spatialAudio;
     _syncLyricsSettingsToBackend();
     await _syncNetworkCompatibilitySettingsToBackend();
     await _syncExtensionFallbackSettingsToBackend();
@@ -651,6 +654,23 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setGaplessPlayback(bool enabled) =>
       _commit(state.copyWith(gaplessPlayback: enabled));
+
+  void setSpatialAudio(bool enabled) {
+    playbackSpatialAudio.value = enabled;
+    _commit(state.copyWith(spatialAudio: enabled));
+  }
+
+  void setRealtimeVisualizer(bool enabled) =>
+      _commit(state.copyWith(realtimeVisualizer: enabled));
+
+  void setPitchTempoControls(bool enabled) =>
+      _commit(state.copyWith(pitchTempoControls: enabled));
+
+  void setPlaybackPitch(double semitones) =>
+      _commit(state.copyWith(playbackPitch: semitones));
+
+  void setPlaybackSpeed(double speed) =>
+      _commit(state.copyWith(playbackSpeed: speed));
 
   void setAutoMix(bool enabled) => _commit(state.copyWith(autoMix: enabled));
 

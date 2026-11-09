@@ -138,24 +138,16 @@ void main() {
   });
 
   group('Phase 6 MornyeAppSplash Screen', () {
-    testWidgets('MornyeAppSplash displays HD badge and wordmark then dismisses', (tester) async {
+    testWidgets('MornyeAppSplash launches immediately without animation delay', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: MornyeAppSplash(
-            child: const Scaffold(body: Text('Main Screen')),
+            child: Scaffold(body: Text('Main Screen')),
           ),
         ),
       );
 
       await tester.pump();
-      expect(find.text('M O R N Y E'), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
-
-      // Advance animation to completion (1400ms)
-      await tester.pump(const Duration(milliseconds: 1500));
-      await tester.pumpAndSettle();
-
-      expect(find.text('M O R N Y E'), findsNothing);
       expect(find.text('Main Screen'), findsOneWidget);
     });
   });

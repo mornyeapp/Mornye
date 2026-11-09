@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -12,7 +13,7 @@ class MornyePlayerBackground extends StatelessWidget {
     this.artwork,
     this.squareArtwork = true,
     this.artworkAspectRatio,
-    this.fadeStart = 0.58,
+    this.fadeStart = 0.42,
     this.ambientGlow = false,
   });
 
@@ -201,18 +202,19 @@ class _ArtworkFade extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (bottom <= top) return;
-    final rect = Rect.fromLTRB(0, top, size.width, bottom);
+    // Extend slightly past the artwork bottom to ensure the edge is 100% buried
+    final bleedBottom = math.max(bottom + 12.0, size.height);
+    final rect = Rect.fromLTRB(0, top, size.width, bleedBottom);
     final paint = Paint()..isAntiAlias = false;
     if (background.begin == Alignment.topCenter &&
         background.end == Alignment.bottomCenter) {
-      // Stops where either the colour or the alpha changes slope keep both
-      // linear between them.
+      // Non-linear stops that reach full opacity before the bottom edge
+      final baseStops = const [0.0, 0.25, 0.50, 0.70, 0.85, 0.92, 1.0];
       final stops = {
-        0.0,
-        1.0,
+        ...baseStops,
         for (final stop in background.stops ?? const <double>[])
           if (stop * size.height > top && stop * size.height < bottom)
-            (stop * size.height - top) / (bottom - top),
+            ((stop * size.height - top) / (bottom - top)).clamp(0.0, 1.0),
       }.toList()..sort();
       canvas.drawRect(
         rect,
@@ -221,7 +223,10 @@ class _ArtworkFade extends CustomPainter {
             for (final stop in stops)
               _backgroundAt(
                 (top + stop * (bottom - top)) / size.height,
-              ).withValues(alpha: stop),
+              ).withValues(
+                // Reaches full opacity before stop = 0.92, hiding the bottom edge
+                alpha: Curves.easeInQuad.transform((stop / 0.92).clamp(0.0, 1.0)),
+              ),
           ], stops),
       );
       return;
@@ -237,10 +242,18 @@ class _ArtworkFade extends CustomPainter {
       rect,
       paint
         ..blendMode = BlendMode.dstIn
-        ..shader = ui.Gradient.linear(rect.topCenter, rect.bottomCenter, const [
-          Colors.transparent,
-          Colors.white,
-        ]),
+        ..shader = ui.Gradient.linear(
+          rect.topCenter,
+          Offset(rect.topCenter.dx, bottom),
+          const [
+            Colors.transparent,
+            Color(0x33ffffff),
+            Color(0xaaffffff),
+            Colors.white,
+            Colors.white,
+          ],
+          const [0.0, 0.35, 0.65, 0.90, 1.0],
+        ),
     );
     canvas.restore();
   }

@@ -261,6 +261,37 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                     !(isDesktopPlatform && settings.exclusiveOutput),
                 onChanged: (value) =>
                     ref.read(settingsProvider.notifier).setAutoMix(value),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.surround_sound,
+                title: 'Audio Spaziale & Crossfeed (Bauer)',
+                subtitle:
+                    "Riduce l'affaticamento acustico in cuffia simulando la risposta di monitor da studio",
+                value: settings.spatialAudio,
+                enabled: !settings.usbBitPerfect,
+                onChanged: (value) => ref
+                    .read(settingsProvider.notifier)
+                    .setSpatialAudio(value),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.graphic_eq_rounded,
+                title: 'Visualizzatore di Spettro nel Player',
+                subtitle:
+                    'Mostra onde di frequenza audio fluide in tempo reale nella schermata di riproduzione',
+                value: settings.realtimeVisualizer,
+                onChanged: (value) => ref
+                    .read(settingsProvider.notifier)
+                    .setRealtimeVisualizer(value),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.speed_rounded,
+                title: 'Controlli Pitch & Velocità',
+                subtitle:
+                    'Abilita controlli rapidi nel player per regolare tonalità (semitoni) e BPM indipendentemente',
+                value: settings.pitchTempoControls,
+                onChanged: (value) => ref
+                    .read(settingsProvider.notifier)
+                    .setPitchTempoControls(value),
                 showDivider: false,
               ),
             ],

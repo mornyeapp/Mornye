@@ -237,6 +237,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
        _arrivingLoadTimeout = arrivingLoadTimeout,
        _engine = engine ?? debugEngineFactory?.call() ?? MediaKitEngine() {
     playbackEqualizer.addListener(_equalizerChanged);
+    playbackSpatialAudio.addListener(_equalizerChanged);
     playbackOutputVolume.addListener(_outputVolumeChanged);
     playbackExclusiveOutput.addListener(_exclusiveChanged);
     playbackExclusiveDevice.addListener(_exclusiveChanged);
@@ -744,6 +745,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
         settings,
         sampleRate: _sampleRate,
         unavailable: _missingFilters,
+        spatialAudio: playbackSpatialAudio.value,
       );
 
   /// Learns which optional filters libmpv lacks. mpv checks `lavfi-NAME`
@@ -821,6 +823,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   Future<void> dispose() async {
     if (_disposed) return;
     playbackEqualizer.removeListener(_equalizerChanged);
+    playbackSpatialAudio.removeListener(_equalizerChanged);
     playbackOutputVolume.removeListener(_outputVolumeChanged);
     playbackExclusiveOutput.removeListener(_exclusiveChanged);
     playbackExclusiveDevice.removeListener(_exclusiveChanged);

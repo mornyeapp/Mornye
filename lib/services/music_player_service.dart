@@ -2358,6 +2358,12 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   @override
+  Future<void> setSpeed(double speed) async {
+    await _player.setPlaybackRate(speed);
+    playbackState.add(playbackState.value.copyWith(speed: speed));
+  }
+
+  @override
   Future<void> pause() async {
     _playbackAutomation.cancelPendingActions();
     _pausedByInterruption = false;
