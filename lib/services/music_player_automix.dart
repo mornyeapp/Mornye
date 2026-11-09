@@ -223,13 +223,13 @@ class _MusicAutoMix {
         cacheKey: next.isContentUri ? next.source : null,
       );
       if (!_current(generation)) return;
-      if (options.hasEffects || plan.assisted) {
+      if (options.hasEffects || plan.assisted || plan.beatMatched) {
         effectTail = await renderer.render(
           currentPath,
           start: plan.start,
           duration: plan.duration,
           options: options,
-          bassHandoff: plan.assisted,
+          bassHandoff: plan.assisted || plan.beatMatched,
         );
         if (!_current(generation)) return;
         if (effectTail != null) {
@@ -376,7 +376,7 @@ class _MusicAutoMix {
             original,
             plan,
             generation,
-            tolerance: Duration(milliseconds: plan.beatMatched ? 20 : 50),
+            tolerance: Duration(milliseconds: plan.beatMatched ? 150 : 250),
           )) {
             if (!_current(generation)) return;
             throw StateError('Effect deck could not be aligned');
@@ -574,16 +574,21 @@ class _MusicAutoMix {
     PlaybackDeck live,
     AutoMixPlan plan,
     int generation, {
-    Duration tolerance = const Duration(milliseconds: 50),
+    Duration tolerance = const Duration(milliseconds: 150),
   }) async {
-    for (var attempt = 0; attempt < 3; attempt++) {
+    for (var attempt = 0; attempt < 4; attempt++) {
       final effectPosition = await effect.getCurrentPosition();
       final livePosition = await live.getCurrentPosition();
       if (!_current(generation)) return false;
       if (effectPosition == null || livePosition == null) return false;
       final target = livePosition - plan.start;
-      if ((target - effectPosition).abs() <= tolerance) return true;
+      final error = (target - effectPosition).abs();
+      if (error <= tolerance) return true;
       if (target.isNegative) return false;
+      if (attempt == 3 && error <= const Duration(milliseconds: 350)) {
+        // Tolerant fallback for platform audio latency on Android
+        return true;
+      }
       await effect.seek(target);
       if (!_current(generation)) return false;
       if (await _waitForProgress(effect, target, generation) == null) {

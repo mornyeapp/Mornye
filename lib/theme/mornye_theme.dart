@@ -249,7 +249,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     final accent = accentColor(selectedAccent, brightness);
     final foreground = dark ? Colors.white : Colors.black;
     final surface = dark ? Colors.black : Colors.white;
-    final grouped = dark ? const Color(0xff1c1c1e) : const Color(0xfff2f2f7);
+    final grouped = dark ? const Color(0xff121214) : const Color(0xfff2f2f7);
     final secondary = dark ? const Color(0xff98989f) : const Color(0xff6c6c70);
     final scheme =
         ColorScheme.fromSeed(
@@ -271,14 +271,14 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
           surfaceContainerLowest: surface,
           surfaceContainerLow: grouped,
           surfaceContainer: grouped,
-          surfaceContainerHigh: dark ? const Color(0xff2c2c2e) : grouped,
+          surfaceContainerHigh: dark ? const Color(0xff1c1c20) : grouped,
           surfaceContainerHighest: dark
-              ? const Color(0xff3a3a3c)
+              ? const Color(0xff27272e)
               : const Color(0xffe5e5ea),
           onSurfaceVariant: secondary,
           outline: secondary,
           outlineVariant: dark
-              ? const Color(0xff38383a)
+              ? const Color(0xff2c2c34)
               : const Color(0xffc6c6c8),
           surfaceTint: Colors.transparent,
         );

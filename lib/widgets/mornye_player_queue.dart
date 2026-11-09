@@ -129,9 +129,18 @@ class MornyePlayerQueue extends ConsumerWidget {
                             ? context.l10n.autoMixOn
                             : context.l10n.autoMixOff,
                         selected: autoMix,
-                        onPressed: () => ref
-                            .read(settingsProvider.notifier)
-                            .setAutoMix(!autoMix),
+                        onPressed: () async {
+                          final next = !autoMix;
+                          ref.read(settingsProvider.notifier).setAutoMix(next);
+                          if (next) {
+                            final reordered = await controller.orderUpcomingQueueByBpm();
+                            if (context.mounted && reordered) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(context.l10n.djQueueBpmMatched)),
+                              );
+                            }
+                          }
+                        },
                       ),
                     ],
                   )
@@ -144,9 +153,18 @@ class MornyePlayerQueue extends ConsumerWidget {
                             ? context.l10n.autoMixOn
                             : context.l10n.autoMixOff,
                         selected: autoMix,
-                        onPressed: () => ref
-                            .read(settingsProvider.notifier)
-                            .setAutoMix(!autoMix),
+                        onPressed: () async {
+                          final next = !autoMix;
+                          ref.read(settingsProvider.notifier).setAutoMix(next);
+                          if (next) {
+                            final reordered = await controller.orderUpcomingQueueByBpm();
+                            if (context.mounted && reordered) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(context.l10n.djQueueBpmMatched)),
+                              );
+                            }
+                          }
+                        },
                       ),
                       const SizedBox(width: 12),
                       modeButton(
@@ -188,6 +206,48 @@ class MornyePlayerQueue extends ConsumerWidget {
                       ),
                     ],
                   ),
+                if (autoMix && count > 1) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('dj-match-bpm-button'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: Icon(
+                        CupertinoIcons.waveform_path_badge_plus,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      label: Text(
+                        context.l10n.djOrderQueueByBpm,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      onPressed: () async {
+                        final reordered =
+                            await controller.orderUpcomingQueueByBpm();
+                        if (context.mounted && reordered) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(context.l10n.djQueueBpmMatched),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Column(

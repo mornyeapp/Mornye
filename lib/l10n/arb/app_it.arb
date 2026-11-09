@@ -10460,5 +10460,7 @@
   "syncLyricsSummary": "{successful} testi salvati nella memoria, {failed} non trovati.",
   "syncLyricsCheckedCount": "{current} di {total} brani verificati",
   "editPlaylistAction": "Modifica playlist",
-  "listeningStatsToday": "Oggi"
+  "listeningStatsToday": "Oggi",
+  "djOrderQueueByBpm": "Ordina coda per Beat Matching (DJ)",
+  "djQueueBpmMatched": "Coda riordinata per Beat Matching DJ"
 }

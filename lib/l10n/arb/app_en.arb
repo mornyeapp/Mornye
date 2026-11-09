@@ -10587,5 +10587,13 @@
   "listeningStatsToday": "Today",
   "@listeningStatsToday": {
     "description": "Choice chip label for today listening statistics"
+  },
+  "djOrderQueueByBpm": "Match BPM queue",
+  "@djOrderQueueByBpm": {
+    "description": "Button to reorder upcoming queue by BPM compatibility for DJ mode"
+  },
+  "djQueueBpmMatched": "Queue ordered by DJ beat matching",
+  "@djQueueBpmMatched": {
+    "description": "Snackbar shown after reordering upcoming queue by BPM"
   }
 }

@@ -250,7 +250,7 @@ class AutoMixPlan {
     if (end < 20 || nextLength < 20) return null;
     final manualDuration = options.safeDurationSeconds;
     final maximum = math.min(60.0, math.min(end / 2, nextLength / 2));
-    var fade = (manualDuration == 0 ? 5.0 : manualDuration.toDouble()).clamp(
+    var fade = (manualDuration == 0 ? 8.0 : manualDuration.toDouble()).clamp(
       3.0,
       maximum,
     );
@@ -289,7 +289,8 @@ class AutoMixPlan {
       } else {
         rate = candidate;
         if (manualDuration == 0) {
-          fade = (8 * outgoing.period).clamp(3.0, math.min(8.0, maximum));
+          // 16 beats = 4 full bars in 4/4 time: standard Apple Music DJ phrase transition.
+          fade = (16 * outgoing.period).clamp(5.0, math.min(12.0, maximum));
         }
         final phase = outroOffset + outgoing.phase;
         start =

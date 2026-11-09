@@ -78,6 +78,7 @@ class _CountUp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reduced = MediaQuery.disableAnimationsOf(context);
+    final primary = Theme.of(context).colorScheme.primary;
     return TweenAnimationBuilder<double>(
       tween: Tween(
         begin: reduced ? value.toDouble() : 0,
@@ -92,8 +93,15 @@ class _CountUp extends StatelessWidget {
           style: Theme.of(context).textTheme.displayLarge?.copyWith(
             fontSize: fontSize ?? 96,
             height: 1,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -2,
             color: DefaultTextStyle.of(context).style.color,
+            shadows: [
+              Shadow(
+                color: primary.withValues(alpha: 0.35),
+                blurRadius: 28,
+              ),
+            ],
           ),
         ),
       ),
@@ -241,24 +249,58 @@ class _RankedRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final color = DefaultTextStyle.of(context).style.color;
-    return Row(
+    final isTop3 = rank != null && rank! <= 3;
+    final podiumBadge = switch (rank) {
+      1 => const Color(0xffffd700), // Gold
+      2 => const Color(0xffdcdcdc), // Silver
+      3 => const Color(0xffcd7f32), // Bronze
+      _ => null,
+    };
+
+    final rowContent = Row(
       children: [
-        if (rank case final rank?)
-          SizedBox(
-            width: 40,
+        if (rank case final rank?) ...[
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: podiumBadge != null
+                  ? podiumBadge.withValues(alpha: 0.22)
+                  : Colors.white.withValues(alpha: 0.08),
+              border: Border.all(
+                color: podiumBadge != null
+                    ? podiumBadge.withValues(alpha: 0.85)
+                    : Colors.white.withValues(alpha: 0.18),
+                width: podiumBadge != null ? 1.5 : 1.0,
+              ),
+              boxShadow: podiumBadge != null
+                  ? [
+                      BoxShadow(
+                        color: podiumBadge.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+            alignment: Alignment.center,
             child: Text(
               '$rank',
-              style: textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: color?.withValues(alpha: 0.55),
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: podiumBadge ?? color?.withValues(alpha: 0.7),
               ),
             ),
           ),
+          const SizedBox(width: 12),
+        ],
         artwork,
-        const SizedBox(width: 16),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 title,
@@ -269,6 +311,7 @@ class _RankedRow extends StatelessWidget {
                   color: color,
                 ),
               ),
+              const SizedBox(height: 2),
               Text(
                 subtitle,
                 maxLines: 1,
@@ -281,6 +324,24 @@ class _RankedRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isTop3
+            ? (podiumBadge?.withValues(alpha: 0.08) ?? Colors.white.withValues(alpha: 0.06))
+            : Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isTop3
+              ? (podiumBadge?.withValues(alpha: 0.28) ?? Colors.white.withValues(alpha: 0.12))
+              : Colors.white.withValues(alpha: 0.08),
+          width: isTop3 ? 1.2 : 0.8,
+        ),
+      ),
+      child: rowContent,
     );
   }
 }

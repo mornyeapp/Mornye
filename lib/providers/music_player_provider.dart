@@ -433,6 +433,11 @@ class MusicPlayerController {
     handler?.updateQueuePreservingCurrent(items, currentIndex);
   }
 
+  Future<bool> orderUpcomingQueueByBpm() async {
+    final handler = await ensureInitialized();
+    return await handler?.orderUpcomingQueueByBpm() ?? false;
+  }
+
   Future<({LocalLibraryItem item, List<LocalLibraryItem> tracks})?>
   localAlbumFor(String mediaId) async {
     final database = _runtime.dependencies.libraryDatabase;

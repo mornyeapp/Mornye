@@ -1634,6 +1634,71 @@ class MusicPlayerHandler extends BaseAudioHandler
     unawaited(_persistSession(position: playbackState.value.position));
   }
 
+  Future<bool> orderUpcomingQueueByBpm() async {
+    if (_disposed || _index < 0 || _index >= _media.length - 2) return false;
+    final current = _media[_index];
+    double targetBpm = 120.0;
+    try {
+      final currentPath = await _formats.resolve(current);
+      if (currentPath != null && !_MusicAutoMix._isUrl(currentPath)) {
+        final grid = await _autoMix.analyzer.analyze(currentPath);
+        if (grid != null && grid.bpm >= 60 && grid.bpm <= 180) {
+          targetBpm = grid.bpm;
+        }
+      }
+    } catch (_) {}
+
+    final upcoming = _media.sublist(_index + 1);
+    final scored = <({PlayableMedia media, double bpm})>[];
+    for (final media in upcoming) {
+      double bpm = 120.0;
+      try {
+        final path = await _formats.resolve(media);
+        if (path != null && !_MusicAutoMix._isUrl(path)) {
+          final grid = await _autoMix.analyzer.analyze(path);
+          if (grid != null && grid.bpm >= 60 && grid.bpm <= 180) {
+            bpm = grid.bpm;
+          } else {
+            final hash = media.title.hashCode.abs() % 40;
+            bpm = (targetBpm - 20 + hash).clamp(70.0, 160.0);
+          }
+        } else {
+          final hash = media.title.hashCode.abs() % 40;
+          bpm = (targetBpm - 20 + hash).clamp(70.0, 160.0);
+        }
+      } catch (_) {
+        final hash = media.title.hashCode.abs() % 40;
+        bpm = (targetBpm - 20 + hash).clamp(70.0, 160.0);
+      }
+      scored.add((media: media, bpm: bpm));
+    }
+
+    final sorted = <PlayableMedia>[];
+    var currentBpm = targetBpm;
+    final remaining = List.of(scored);
+    while (remaining.isNotEmpty) {
+      remaining.sort((a, b) {
+        double dist(double bpm) {
+          final diff = (bpm - currentBpm).abs();
+          final diffHalf = (bpm * 2 - currentBpm).abs();
+          final diffDouble = (bpm * 0.5 - currentBpm).abs();
+          return min(diff, min(diffHalf, diffDouble));
+        }
+        return dist(a.bpm).compareTo(dist(b.bpm));
+      });
+      final best = remaining.removeAt(0);
+      sorted.add(best.media);
+      currentBpm = best.bpm;
+    }
+
+    final newQueue = [
+      ..._media.sublist(0, _index + 1),
+      ...sorted,
+    ];
+    updateQueuePreservingCurrent(newQueue, _index);
+    return true;
+  }
+
   Future<void> _playIndex(
     int index, {
     bool recordHistory = true,

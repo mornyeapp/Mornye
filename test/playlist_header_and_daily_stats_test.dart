@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/screens/library_tracks_folder_screen.dart';
-import 'package:mornye/controllers/library_tracks_folder_data.dart';
 
 void main() {
   test('Localization contains today and playlist edit strings in Italian and English', () async {
@@ -13,12 +12,16 @@ void main() {
     expect(it.editPlaylistAction, 'Modifica playlist');
     expect(it.autoMixMixing, 'DJ Mix');
     expect(it.autoMixCrossfading, 'Transizione DJ');
+    expect(it.djOrderQueueByBpm, 'Ordina coda per Beat Matching (DJ)');
+    expect(it.djQueueBpmMatched, 'Coda riordinata per Beat Matching DJ');
 
     final en = await AppLocalizations.delegate.load(const Locale('en'));
     expect(en.listeningStatsToday, 'Today');
     expect(en.editPlaylistAction, 'Edit playlist');
     expect(en.autoMixMixing, 'DJ Mix');
     expect(en.autoMixCrossfading, 'DJ Transition');
+    expect(en.djOrderQueueByBpm, 'Match BPM queue');
+    expect(en.djQueueBpmMatched, 'Queue ordered by DJ beat matching');
   });
 
   testWidgets('ListeningStatisticsScreen renders today choice chip', (tester) async {
