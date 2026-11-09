@@ -95,6 +95,10 @@ class _LibraryTracksFolderScreenState
   UserPlaylistCollection? playlist;
   final _folderData = LibraryTracksFolderData();
   PlaylistSortMode _sortMode = PlaylistSortMode.custom;
+  bool _isSearchActive = false;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
   List<CollectionTrackEntry>? _orderDraft;
   List<String> _orderBefore = const [];
   bool _savingOrder = false;
@@ -183,6 +187,13 @@ class _LibraryTracksFolderScreenState
             .ensurePlaylistLoaded(playlistId),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPersistedSortMode() async {
@@ -396,7 +407,16 @@ class _LibraryTracksFolderScreenState
     final effectiveEntries = _editingOrder
         ? entries
         : sortCollectionTrackEntries(entries, _sortMode);
-    _folderData.update(effectiveEntries);
+    final displayedEntries =
+        (!_isSearchActive || _searchQuery.trim().isEmpty || _editingOrder)
+        ? effectiveEntries
+        : effectiveEntries.where((entry) {
+            final q = _searchQuery.trim().toLowerCase();
+            return entry.track.name.toLowerCase().contains(q) ||
+                entry.track.artistName.toLowerCase().contains(q) ||
+                (entry.track.albumName?.toLowerCase().contains(q) ?? false);
+          }).toList();
+    _folderData.update(displayedEntries);
     pruneSelection(_folderData.keys);
 
     final title = switch (widget.mode) {
@@ -436,8 +456,8 @@ class _LibraryTracksFolderScreenState
         : 0.0;
 
     final inHistory = _folderData.inHistory(existingHistoryKeys);
-    final ids = [for (final entry in effectiveEntries) entry.key];
-    final datesAdded = [for (final entry in effectiveEntries) entry.addedAt];
+    final ids = [for (final entry in displayedEntries) entry.key];
+    final datesAdded = [for (final entry in displayedEntries) entry.addedAt];
     final scaffold = CollectionScaffold(
       scrollController: scrollController,
       isSelectionMode: showsSelectionBar,
@@ -458,6 +478,8 @@ class _LibraryTracksFolderScreenState
         rawEntries: rawEntries,
       ),
       slivers: [
+        if (_isSearchActive && !_editingOrder)
+          _buildSearchBarSliver(context, colorScheme),
         if (_editingOrder)
           SliverToBoxAdapter(
             child: Padding(
@@ -470,7 +492,7 @@ class _LibraryTracksFolderScreenState
               child: Text(context.l10n.playlistEditOrderDescription),
             ),
           ),
-        if (entries.isEmpty)
+        if (entries.isEmpty || (displayedEntries.isEmpty && !_editingOrder))
           SliverFillRemaining(
             hasScrollBody: false,
             child: _EmptyFolderState(
@@ -509,16 +531,16 @@ class _LibraryTracksFolderScreenState
             },
             onSelect: applyDesktopClick,
             onActivate: (index) => _activateEntry(
-              effectiveEntries,
+              displayedEntries,
               folderTracks,
               inHistory,
               index,
             ),
             onContextMenu: (index, position) => showSelectionMenu(
-              effectiveEntries[index].key,
+              displayedEntries[index].key,
               () => _showEntryMenu(
                 context,
-                effectiveEntries,
+                displayedEntries,
                 folderTracks,
                 inHistory,
                 index,
@@ -533,7 +555,7 @@ class _LibraryTracksFolderScreenState
             padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((context, index) {
-                final entry = effectiveEntries[index];
+                final entry = displayedEntries[index];
                 final isSelected = selectedIds.contains(entry.key);
                 final isInHistory = inHistory[index];
                 return KeyedSubtree(
@@ -557,7 +579,7 @@ class _LibraryTracksFolderScreenState
                     ),
                   ),
                 );
-              }, childCount: effectiveEntries.length),
+              }, childCount: displayedEntries.length),
             ),
           ),
         if (playlist case final playlist?
@@ -947,6 +969,69 @@ class _LibraryTracksFolderScreenState
         .removePlaylistCover(playlistId);
   }
 
+  Widget _buildSearchBarSliver(BuildContext context, ColorScheme colorScheme) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: wideListInset(context) + 16,
+          vertical: 8,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Icon(Icons.search, size: 20, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('library-search-input'),
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText:
+                        MaterialLocalizations.of(context).searchFieldLabel,
+                    hintStyle: TextStyle(
+                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      fontSize: 14,
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val;
+                    });
+                  },
+                ),
+              ),
+              if (_searchQuery.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAppBar(
     BuildContext context,
     ColorScheme colorScheme,
@@ -1110,7 +1195,26 @@ class _LibraryTracksFolderScreenState
             LinkTrackTransferButton(
               tracks: entries.map((e) => e.track).toList(growable: false),
             ),
-          if (!isSelectionMode && entries.length > 1 && !_editingOrder)
+          if (!isSelectionMode && entries.length > 1 && !_editingOrder) ...[
+            HeaderCircleButton(
+              key: const ValueKey('library-search-button'),
+              icon: _isSearchActive ? Icons.search_off : Icons.search,
+              iconSize: 20,
+              tooltip: _isSearchActive
+                  ? MaterialLocalizations.of(context).closeButtonTooltip
+                  : MaterialLocalizations.of(context).searchFieldLabel,
+              onPressed: () {
+                setState(() {
+                  _isSearchActive = !_isSearchActive;
+                  if (!_isSearchActive) {
+                    _searchQuery = '';
+                    _searchController.clear();
+                  } else {
+                    _searchFocusNode.requestFocus();
+                  }
+                });
+              },
+            ),
             buildPlaylistSortButton(
               context: context,
               currentSort: _sortMode,
@@ -1120,6 +1224,7 @@ class _LibraryTracksFolderScreenState
                 PlaylistSortStorage.setSortMode(_playlistKey, newSort);
               },
             ),
+          ],
           if (!isSelectionMode && entries.length > 1)
             HeaderCircleButton(
               key: const ValueKey('collection-edit-order'),
