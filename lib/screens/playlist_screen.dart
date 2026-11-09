@@ -74,6 +74,10 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   String? _resolvedHeaderVideoUrl;
   PlaylistSortMode _sortMode = PlaylistSortMode.custom;
   List<Track> _sortedTracks = const [];
+  bool _isSearchActive = false;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
 
   List<Track> get _tracks => _fetchedTracks ?? widget.tracks;
   String get _playlistName => _resolvedPlaylistName ?? widget.playlistName;
@@ -81,6 +85,18 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   String? get _headerVideoUrl =>
       _resolvedHeaderVideoUrl ?? widget.headerVideoUrl;
   String get _playlistKey => widget.playlistId ?? widget.playlistName;
+
+  List<Track> get _displayedTracks {
+    if (!_isSearchActive || _searchQuery.trim().isEmpty) {
+      return _sortedTracks;
+    }
+    final q = _searchQuery.trim().toLowerCase();
+    return _sortedTracks.where((track) {
+      return track.name.toLowerCase().contains(q) ||
+          track.artistName.toLowerCase().contains(q) ||
+          (track.albumName?.toLowerCase().contains(q) ?? false);
+    }).toList();
+  }
 
   void _updateSortedTracks() {
     _sortedTracks = sortTracksByMode(_tracks, _sortMode);
@@ -190,6 +206,13 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
     _loadPersistedSortMode();
     _updateSortedTracks();
     _fetchTracksIfNeeded();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPersistedSortMode() async {
@@ -321,6 +344,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ),
         appBar: _buildAppBar(context, colorScheme),
         slivers: [
+          if (_isSearchActive) _buildSearchBarSliver(context, colorScheme),
           _buildTrackList(context, colorScheme),
           _buildPlaylistFooter(context, colorScheme),
           if (!_isLoading && tracks.isNotEmpty && !isSelectionMode)
@@ -400,7 +424,25 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ],
       ),
       appBarActions: [
-        if (!isSelectionMode && _sortedTracks.length > 1)
+        if (!isSelectionMode && _sortedTracks.length > 1) ...[
+          HeaderCircleButton(
+            key: const ValueKey('playlist-search-button'),
+            icon: _isSearchActive ? Icons.search_off : Icons.search,
+            tooltip: _isSearchActive
+                ? MaterialLocalizations.of(context).closeButtonTooltip
+                : MaterialLocalizations.of(context).searchFieldLabel,
+            onPressed: () {
+              setState(() {
+                _isSearchActive = !_isSearchActive;
+                if (!_isSearchActive) {
+                  _searchQuery = '';
+                  _searchController.clear();
+                } else {
+                  _searchFocusNode.requestFocus();
+                }
+              });
+            },
+          ),
           buildPlaylistSortButton(
             context: context,
             currentSort: _sortMode,
@@ -413,6 +455,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
               PlaylistSortStorage.setSortMode(_playlistKey, newSort);
             },
           ),
+        ],
         if (ref.watch(linkPhoneClientProvider) != null)
           LinkDownloadOnDesktopButton(
             tracks: _sortedTracks,
@@ -442,11 +485,74 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
     );
   }
 
+  Widget _buildSearchBarSliver(BuildContext context, ColorScheme colorScheme) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: wideListInset(context) + 16,
+          vertical: 8,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Icon(Icons.search, size: 20, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('playlist-search-input'),
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText:
+                        MaterialLocalizations.of(context).searchFieldLabel,
+                    hintStyle: TextStyle(
+                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      fontSize: 14,
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val;
+                    });
+                  },
+                ),
+              ),
+              if (_searchQuery.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPlaylistFooter(BuildContext context, ColorScheme colorScheme) =>
       buildTrackListFooter(
         context,
         colorScheme,
-        _sortedTracks,
+        _displayedTracks,
         excludeEpochReleaseDate: true,
       );
 
@@ -483,7 +589,20 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       );
     }
 
-    final tracks = _sortedTracks;
+    final tracks = _displayedTracks;
+    if (tracks.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Center(
+            child: Text(
+              context.l10n.errorNoTracksFound,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ),
+      );
+    }
     _historySnapshot.update(tracks);
     final historyKeys = _historySnapshot.lookupKeys;
     final existingHistoryKeys = ref.watch(
