@@ -10,7 +10,7 @@ import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/widgets/track_list_tile.dart';
 
 class _FakeMusicPlayerController extends MusicPlayerController {
-  _FakeMusicPlayerController() : super(runtime: null as dynamic);
+  _FakeMusicPlayerController() : super();
 
   PlayableMedia? lastPlayNextItem;
 

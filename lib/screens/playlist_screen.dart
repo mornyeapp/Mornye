@@ -100,7 +100,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
     return _sortedTracks.where((track) {
       return track.name.toLowerCase().contains(q) ||
           track.artistName.toLowerCase().contains(q) ||
-          (track.albumName?.toLowerCase().contains(q) ?? false);
+          track.albumName.toLowerCase().contains(q);
     }).toList();
   }
 

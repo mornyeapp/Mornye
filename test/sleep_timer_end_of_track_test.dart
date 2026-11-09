@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/playback_deck.dart';
-import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/music_player_service.dart';
 
 class _CompletingMockDeck implements PlaybackDeck {

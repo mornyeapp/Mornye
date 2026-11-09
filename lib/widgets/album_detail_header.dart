@@ -256,9 +256,44 @@ class AlbumDetailHeader extends StatelessWidget {
         ),
       ];
     }
+    final Widget detailsSliver;
+    if (!immersive && paletteSource != null && paletteSource!.isNotEmpty) {
+      detailsSliver = SliverToBoxAdapter(
+        child: CoverPaletteBuilder(
+          imageSource: paletteSource,
+          builder: (context, headerScheme) => Stack(
+            alignment: Alignment.topCenter,
+            children: [
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.0, 0.40, 0.85, 1.0],
+                        colors: [
+                          headerScheme.primary.withValues(alpha: 0.38),
+                          headerScheme.secondary.withValues(alpha: 0.20),
+                          headerScheme.surface.withValues(alpha: 0.05),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              details,
+            ],
+          ),
+        ),
+      );
+    } else {
+      detailsSliver = SliverToBoxAdapter(child: details);
+    }
     return [
       Builder(builder: (_) => toolbar()),
-      SliverToBoxAdapter(child: details),
+      detailsSliver,
     ];
   }
 

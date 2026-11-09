@@ -10595,5 +10595,21 @@
   "djQueueBpmMatched": "Queue ordered by DJ beat matching",
   "@djQueueBpmMatched": {
     "description": "Snackbar shown after reordering upcoming queue by BPM"
+  },
+  "playerQueueTabQueue": "Queue",
+  "@playerQueueTabQueue": {
+    "description": "Segmented tab label for player queue"
+  },
+  "playerQueueTabHistory": "History",
+  "@playerQueueTabHistory": {
+    "description": "Segmented tab label for playback history in player"
+  },
+  "playerQueueHistoryEmpty": "No recently played tracks",
+  "@playerQueueHistoryEmpty": {
+    "description": "Empty state message for playback history in queue sheet"
+  },
+  "playerQueuePlayedEarlier": "Played earlier",
+  "@playerQueuePlayedEarlier": {
+    "description": "Header for previously played songs in current session"
   }
 }

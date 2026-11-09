@@ -319,10 +319,14 @@ class MornyeGlass extends ConsumerWidget {
     final shadows = firstInGroup && lastInGroup
         ? [
             BoxShadow(
-              color: Colors.black.withValues(alpha: dark ? 0.14 : 0.08),
-              blurRadius: 8,
-              blurStyle: BlurStyle.outer,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: dark ? 0.20 : 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: dark ? 0.12 : 0.04),
+              blurRadius: 22,
+              offset: const Offset(0, 7),
             ),
           ]
         : null;
@@ -449,21 +453,21 @@ class _MornyeGlassRim extends CustomPainter {
         0.8,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = emphasized ? 1 : 0.6
+          ..strokeWidth = emphasized ? 1.1 : 0.75
           ..shader = LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            stops: const [0, 0.14, 0.5, 0.86, 1],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: const [0, 0.18, 0.52, 0.85, 1],
             colors:
                 [
                       firstInGroup
-                          ? Color(emphasized ? 0x88ffffff : 0x40ffffff)
+                          ? Color(emphasized ? 0xb0ffffff : 0x5affffff)
                           : Colors.transparent,
-                      Color(emphasized ? 0x26ffffff : 0x0dffffff),
-                      const Color(0x0a000000),
-                      Color(emphasized ? 0x20ffffff : 0x0dffffff),
+                      Color(emphasized ? 0x36ffffff : 0x16ffffff),
+                      const Color(0x06000000),
+                      Color(emphasized ? 0x24ffffff : 0x10ffffff),
                       lastInGroup
-                          ? Color(emphasized ? 0x55ffffff : 0x26ffffff)
+                          ? Color(emphasized ? 0x66ffffff : 0x30ffffff)
                           : Colors.transparent,
                     ]
                     .map(

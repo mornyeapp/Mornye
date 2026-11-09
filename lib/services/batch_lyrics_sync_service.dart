@@ -102,13 +102,37 @@ Future<bool> _defaultCheckHasLyrics(BatchLyricsItem item) async {
 }
 
 Future<String> _defaultFetchLyrics(Track track) async {
-  final result = await PlatformBridge.getLyricsLRCWithSource(
-    track.id,
-    track.name,
-    track.artistName,
-    durationMs: track.duration * 1000,
-  ).timeout(const Duration(seconds: 25));
-  return result['lyrics']?.toString() ?? '';
+  try {
+    var result = await PlatformBridge.getLyricsLRCWithSource(
+      track.id,
+      track.name,
+      track.artistName,
+      durationMs: track.duration * 1000,
+    ).timeout(const Duration(seconds: 15));
+    var lyrics = result['lyrics']?.toString() ?? '';
+    if (lyrics.isEmpty && track.id.isNotEmpty) {
+      result = await PlatformBridge.getLyricsLRCWithSource(
+        '',
+        track.name,
+        track.artistName,
+        durationMs: track.duration * 1000,
+      ).timeout(const Duration(seconds: 15));
+      lyrics = result['lyrics']?.toString() ?? '';
+    }
+    return lyrics;
+  } catch (_) {
+    try {
+      final result = await PlatformBridge.getLyricsLRCWithSource(
+        '',
+        track.name,
+        track.artistName,
+        durationMs: track.duration * 1000,
+      ).timeout(const Duration(seconds: 15));
+      return result['lyrics']?.toString() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
 }
 
 Future<void> _defaultSaveTags(String filePath, String lyrics) async {

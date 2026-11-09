@@ -9,17 +9,21 @@ class AutoMixBeatGrid {
     required this.phase,
     required this.confidence,
     required this.firstSound,
+    this.lastSound = 0,
   });
 
   final double bpm;
   final double phase;
   final double confidence;
   final double firstSound;
+  final double lastSound;
 
   bool get reliable => confidence >= 0.55 && bpm >= 60 && bpm <= 180;
   double get period => 60 / bpm;
   double beatAtOrAfter(double seconds) =>
       phase + ((seconds - phase) / period).ceil() * period;
+  double beatAtOrBefore(double seconds) =>
+      phase + ((seconds - phase) / period).floor() * period;
 }
 
 /// Bounded, original onset/autocorrelation detector. Runs in an isolate on
@@ -78,6 +82,10 @@ AutoMixBeatGrid analyzeAutoMixPcm(Uint8List pcm) {
     (e) => e > math.max(0.00001, peakEnergy * 0.0001),
   );
   final firstSound = math.max(0, firstAudible) / framesPerSecond;
+  final lastAudible = energy.lastIndexWhere(
+    (e) => e > math.max(0.00001, peakEnergy * 0.002),
+  );
+  final lastSound = lastAudible >= 0 ? lastAudible / framesPerSecond : frames / framesPerSecond;
   // Suppress slow volume changes and constant noise before finding the pulse.
   final prefix = Float64List(frames + 1);
   for (var i = 0; i < frames; i++) {
@@ -99,6 +107,7 @@ AutoMixBeatGrid analyzeAutoMixPcm(Uint8List pcm) {
       phase: 0,
       confidence: 0,
       firstSound: firstSound,
+      lastSound: lastSound,
     );
   }
 
@@ -194,6 +203,7 @@ AutoMixBeatGrid analyzeAutoMixPcm(Uint8List pcm) {
     phase: bestPhase / framesPerSecond,
     confidence: math.min(bestScore, coverage),
     firstSound: firstSound,
+    lastSound: lastSound,
   );
 }
 
@@ -254,7 +264,10 @@ class AutoMixPlan {
       3.0,
       maximum,
     );
-    var start = end - fade;
+    final audibleEnd = outro != null && outro.lastSound > 0
+        ? (outroOffset + outro.lastSound).clamp(end - 15.0, end)
+        : end;
+    var start = audibleEnd - fade;
     var incomingStart = 0.0;
     var rate = 1.0;
     var matched = false;
@@ -295,7 +308,7 @@ class AutoMixPlan {
         final phase = outroOffset + outgoing.phase;
         start =
             phase +
-            ((end - fade - phase) / outgoing.period).floor() * outgoing.period;
+            ((audibleEnd - fade - phase) / outgoing.period).floor() * outgoing.period;
         incomingStart = firstBeat;
         matched = true;
       }

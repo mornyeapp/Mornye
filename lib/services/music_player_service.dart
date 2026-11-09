@@ -2506,6 +2506,8 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
     if (_index < _media.length - 1) {
       if (_settings.autoMix && _player.state == PlaybackDeckState.playing) {
+        final transitioned = await _autoMix.triggerImmediateTransition();
+        if (transitioned) return;
         try {
           await _player.setVolume(0.4);
           await Future<void>.delayed(const Duration(milliseconds: 60));

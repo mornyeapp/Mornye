@@ -421,7 +421,7 @@ class _LibraryTracksFolderScreenState
             final q = _searchQuery.trim().toLowerCase();
             return entry.track.name.toLowerCase().contains(q) ||
                 entry.track.artistName.toLowerCase().contains(q) ||
-                (entry.track.albumName?.toLowerCase().contains(q) ?? false);
+                entry.track.albumName.toLowerCase().contains(q);
           }).toList();
     _folderData.update(displayedEntries);
     pruneSelection(_folderData.keys);
@@ -1269,6 +1269,7 @@ class _LibraryTracksFolderScreenState
                     playlistId: id,
                     playlistName: playlist?.name ?? title,
                     hasCustomCover: hasCustomCover,
+                    entries: rawEntries,
                   );
                 },
               ),
@@ -1387,9 +1388,27 @@ class _LibraryTracksFolderScreenState
       history: HistoryDatabase.instance,
       includeLocal: ref.read(settingsProvider).localLibraryEnabled,
     );
+    final historyItems = ref.read(downloadHistoryProvider).items;
     final items = <BatchLyricsItem>[];
     for (var i = 0; i < tracks.length; i++) {
-      final path = resolved.paths[i];
+      var path = resolved.paths[i];
+      if (path == null || path.isEmpty) {
+        final match = historyItems.cast<DownloadHistoryItem?>().firstWhere(
+          (h) =>
+              (h != null &&
+                  h.spotifyId != null &&
+                  h.spotifyId!.isNotEmpty &&
+                  h.spotifyId == tracks[i].id) ||
+              (h != null &&
+                  h.trackName.toLowerCase() == tracks[i].name.toLowerCase() &&
+                  h.artistName.toLowerCase() ==
+                      tracks[i].artistName.toLowerCase()),
+          orElse: () => null,
+        );
+        if (match != null && match.filePath.isNotEmpty) {
+          path = match.filePath;
+        }
+      }
       if (path != null && path.isNotEmpty) {
         items.add(BatchLyricsItem(track: tracks[i], filePath: path));
       }
@@ -1409,6 +1428,7 @@ class _LibraryTracksFolderScreenState
     required String playlistId,
     required String playlistName,
     required bool hasCustomCover,
+    List<CollectionTrackEntry> entries = const [],
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final menuPosition = isDesktopPlatform
@@ -1431,6 +1451,12 @@ class _LibraryTracksFolderScreenState
               label: context.l10n.collectionPlaylistChangeCover,
               onSelected: _pickCoverImage,
             ),
+            if (entries.isNotEmpty)
+              ContextMenuAction(
+                icon: Icons.lyrics_outlined,
+                label: context.l10n.syncLyricsAction,
+                onSelected: () => _syncPlaylistLyrics(entries),
+              ),
           ],
           if (hasCustomCover)
             [
@@ -1511,6 +1537,35 @@ class _LibraryTracksFolderScreenState
                 _pickCoverImage();
               },
             ),
+            if (entries.isNotEmpty)
+              AppSheetOption(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 4,
+                ),
+                leading: context.isMornye
+                    ? Icon(
+                        mornyeIconFor(Icons.lyrics_outlined),
+                        color: colorScheme.primary,
+                      )
+                    : Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.lyrics_outlined,
+                          color: colorScheme.onSecondaryContainer,
+                        ),
+                      ),
+                title: Text(context.l10n.syncLyricsAction),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _syncPlaylistLyrics(entries);
+                },
+              ),
             if (hasCustomCover)
               AppSheetOption(
                 contentPadding: const EdgeInsets.symmetric(

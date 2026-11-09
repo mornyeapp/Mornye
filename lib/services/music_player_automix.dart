@@ -285,7 +285,32 @@ class _MusicAutoMix {
     }
   }
 
-  Future<void> _start(int generation) async {
+  Future<bool> triggerImmediateTransition() async {
+    if (!_canMix || _starting || _fadeTimer != null) return false;
+    final incoming = _prepared;
+    final next = _next;
+    final plan = _plan;
+    if (incoming == null || next == null || plan == null) return false;
+    final position = await handler._player.getCurrentPosition();
+    if (position == null) return false;
+
+    final immediatePlan = AutoMixPlan(
+      start: position,
+      incomingStart: plan.incomingStart,
+      duration: const Duration(milliseconds: 2500),
+      rate: plan.rate,
+      beatMatched: plan.beatMatched,
+      assisted: plan.assisted,
+      beatPeriod: plan.beatPeriod,
+    );
+    _plan = immediatePlan;
+    _startTimer?.cancel();
+    _startTimer = null;
+    await _start(_generation, forceStart: true);
+    return true;
+  }
+
+  Future<void> _start(int generation, {bool forceStart = false}) async {
     final incoming = _prepared;
     final next = _next;
     var plan = _plan;
@@ -303,11 +328,13 @@ class _MusicAutoMix {
     try {
       final position = await handler._player.getCurrentPosition();
       if (!_current(generation) || position == null) return;
-      final delta = position - plan.start;
-      if (delta < const Duration(milliseconds: -40)) {
-        _starting = false;
-        onPosition(position);
-        return;
+      if (!forceStart) {
+        final delta = position - plan.start;
+        if (delta < const Duration(milliseconds: -40)) {
+          _starting = false;
+          onPosition(position);
+          return;
+        }
       }
       final outgoingEnd =
           handler.mediaItem.value?.duration ?? plan.start + plan.duration;

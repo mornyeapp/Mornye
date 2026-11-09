@@ -10462,5 +10462,9 @@
   "editPlaylistAction": "Modifica playlist",
   "listeningStatsToday": "Oggi",
   "djOrderQueueByBpm": "Ordina coda per Beat Matching (DJ)",
-  "djQueueBpmMatched": "Coda riordinata per Beat Matching DJ"
+  "djQueueBpmMatched": "Coda riordinata per Beat Matching DJ",
+  "playerQueueTabQueue": "In coda",
+  "playerQueueTabHistory": "Cronologia",
+  "playerQueueHistoryEmpty": "Nessun brano riprodotto di recente",
+  "playerQueuePlayedEarlier": "Brani precedenti"
 }

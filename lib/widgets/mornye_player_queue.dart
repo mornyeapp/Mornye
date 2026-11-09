@@ -3,20 +3,30 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/player_queue_artwork.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
 
 /// Upcoming tracks share the player's artwork backdrop and transport controls.
-class MornyePlayerQueue extends ConsumerWidget {
+class MornyePlayerQueue extends ConsumerStatefulWidget {
   const MornyePlayerQueue({super.key, required this.colorScheme});
 
   final ColorScheme colorScheme;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MornyePlayerQueue> createState() => _MornyePlayerQueueState();
+}
+
+class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
+  int _selectedTab = 0; // 0: In coda, 1: Cronologia
+
+  @override
+  Widget build(BuildContext context) {
     final queue = ref.watch(playQueueProvider).value ?? const <MediaItem>[];
     final playback = ref.watch(
       playbackStateProvider.select(
@@ -26,7 +36,8 @@ class MornyePlayerQueue extends ConsumerWidget {
         ),
       ),
     );
-    final start = ref.watch(currentQueueIndexProvider) + 1;
+    final currentIndex = ref.watch(currentQueueIndexProvider);
+    final start = currentIndex + 1;
     final count = queue.length - start;
     final controller = ref.read(musicPlayerControllerProvider);
     final autoMix = ref.watch(settingsProvider.select((s) => s.autoMix));
@@ -96,6 +107,12 @@ class MornyePlayerQueue extends ConsumerWidget {
       ),
     );
 
+    final historyState = ref.watch(downloadHistoryProvider);
+    final historyItems = historyState.items;
+    final playedEarlier = currentIndex > 0
+        ? queue.sublist(0, currentIndex).reversed.toList()
+        : const <MediaItem>[];
+
     return CustomScrollView(
       key: const PageStorageKey('mornye-player-queue'),
       slivers: [
@@ -107,244 +124,488 @@ class MornyePlayerQueue extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (isDesktopPlatform)
-                  Row(
-                    children: [
-                      desktopModeButton(
-                        icon: CupertinoIcons.infinite,
-                        label: context.l10n.queueAutoplay,
-                        stateLabel: autoplay
-                            ? context.l10n.autoplayOn
-                            : context.l10n.autoplayOff,
-                        selected: autoplay,
-                        onPressed: () => ref
-                            .read(settingsProvider.notifier)
-                            .setAutoplay(!autoplay),
-                      ),
-                      const SizedBox(width: 12),
-                      desktopModeButton(
-                        icon: CupertinoIcons.arrow_merge,
-                        label: context.l10n.queueAutoMix,
-                        stateLabel: autoMix
-                            ? context.l10n.autoMixOn
-                            : context.l10n.autoMixOff,
-                        selected: autoMix,
-                        onPressed: () async {
-                          final next = !autoMix;
-                          ref.read(settingsProvider.notifier).setAutoMix(next);
-                          if (next) {
-                            final reordered = await controller.orderUpcomingQueueByBpm();
-                            if (context.mounted && reordered) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(context.l10n.djQueueBpmMatched)),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                    ],
-                  )
-                else
-                  Row(
-                    children: [
-                      modeButton(
-                        icon: CupertinoIcons.arrow_merge,
-                        label: autoMix
-                            ? context.l10n.autoMixOn
-                            : context.l10n.autoMixOff,
-                        selected: autoMix,
-                        onPressed: () async {
-                          final next = !autoMix;
-                          ref.read(settingsProvider.notifier).setAutoMix(next);
-                          if (next) {
-                            final reordered = await controller.orderUpcomingQueueByBpm();
-                            if (context.mounted && reordered) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(context.l10n.djQueueBpmMatched)),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      modeButton(
-                        icon: CupertinoIcons.shuffle,
-                        label: playback.shuffle
-                            ? context.l10n.nowPlayingShuffleOn
-                            : context.l10n.nowPlayingPlayInOrder,
-                        selected: playback.shuffle,
-                        onPressed: () =>
-                            controller.setShuffle(!playback.shuffle),
-                      ),
-                      const SizedBox(width: 12),
-                      modeButton(
-                        icon: playback.repeat == AudioServiceRepeatMode.one
-                            ? CupertinoIcons.repeat_1
-                            : CupertinoIcons.repeat,
-                        label: repeatLabel,
-                        selected:
-                            playback.repeat != AudioServiceRepeatMode.none,
-                        onPressed: () =>
-                            controller.setRepeatMode(switch (playback.repeat) {
-                              AudioServiceRepeatMode.none =>
-                                AudioServiceRepeatMode.all,
-                              AudioServiceRepeatMode.all =>
-                                AudioServiceRepeatMode.one,
-                              _ => AudioServiceRepeatMode.none,
-                            }),
-                      ),
-                      const SizedBox(width: 12),
-                      modeButton(
-                        icon: CupertinoIcons.infinite,
-                        label: autoplay
-                            ? context.l10n.autoplayOn
-                            : context.l10n.autoplayOff,
-                        selected: autoplay,
-                        onPressed: () => ref
-                            .read(settingsProvider.notifier)
-                            .setAutoplay(!autoplay),
-                      ),
-                    ],
-                  ),
-                if (autoMix && count > 1) ...[
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      key: const ValueKey('dj-match-bpm-button'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: BorderSide(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                // Segmented tab selector: [ In coda ] / [ Cronologia ]
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Center(
+                    child: Container(
+                      height: 36,
+                      constraints: const BoxConstraints(maxWidth: 320),
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          width: 0.8,
                         ),
                       ),
-                      icon: Icon(
-                        CupertinoIcons.waveform_path_badge_plus,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      label: Text(
-                        context.l10n.djOrderQueueByBpm,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      onPressed: () async {
-                        final reordered =
-                            await controller.orderUpcomingQueueByBpm();
-                        if (context.mounted && reordered) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(context.l10n.djQueueBpmMatched),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Semantics(
+                              button: true,
+                              selected: _selectedTab == 0,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => setState(() => _selectedTab = 0),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  curve: Curves.easeOutCubic,
+                                  decoration: BoxDecoration(
+                                    color: _selectedTab == 0
+                                        ? Colors.white.withValues(alpha: 0.25)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    context.l10n.playerQueueTabQueue,
+                                    style: type.bodyMedium?.copyWith(
+                                      color: _selectedTab == 0
+                                          ? Colors.white
+                                          : Colors.white60,
+                                      fontWeight: _selectedTab == 0
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                          );
-                        }
-                      },
+                          ),
+                          Expanded(
+                            child: Semantics(
+                              button: true,
+                              selected: _selectedTab == 1,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => setState(() => _selectedTab = 1),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  curve: Curves.easeOutCubic,
+                                  decoration: BoxDecoration(
+                                    color: _selectedTab == 1
+                                        ? Colors.white.withValues(alpha: 0.25)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    context.l10n.playerQueueTabHistory,
+                                    style: type.bodyMedium?.copyWith(
+                                      color: _selectedTab == 1
+                                          ? Colors.white
+                                          : Colors.white60,
+                                      fontWeight: _selectedTab == 1
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (_selectedTab == 0) ...[
+                  if (isDesktopPlatform)
+                    Row(
+                      children: [
+                        desktopModeButton(
+                          icon: CupertinoIcons.infinite,
+                          label: context.l10n.queueAutoplay,
+                          stateLabel: autoplay
+                              ? context.l10n.autoplayOn
+                              : context.l10n.autoplayOff,
+                          selected: autoplay,
+                          onPressed: () => ref
+                              .read(settingsProvider.notifier)
+                              .setAutoplay(!autoplay),
+                        ),
+                        const SizedBox(width: 12),
+                        desktopModeButton(
+                          icon: CupertinoIcons.arrow_merge,
+                          label: context.l10n.queueAutoMix,
+                          stateLabel: autoMix
+                              ? context.l10n.autoMixOn
+                              : context.l10n.autoMixOff,
+                          selected: autoMix,
+                          onPressed: () async {
+                            final next = !autoMix;
+                            ref.read(settingsProvider.notifier).setAutoMix(next);
+                            if (next) {
+                              final reordered =
+                                  await controller.orderUpcomingQueueByBpm();
+                              if (context.mounted && reordered) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(context.l10n.djQueueBpmMatched),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      ],
+                    )
+                  else
+                    Row(
+                      children: [
+                        modeButton(
+                          icon: CupertinoIcons.arrow_merge,
+                          label: autoMix
+                              ? context.l10n.autoMixOn
+                              : context.l10n.autoMixOff,
+                          selected: autoMix,
+                          onPressed: () async {
+                            final next = !autoMix;
+                            ref.read(settingsProvider.notifier).setAutoMix(next);
+                            if (next) {
+                              final reordered =
+                                  await controller.orderUpcomingQueueByBpm();
+                              if (context.mounted && reordered) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(context.l10n.djQueueBpmMatched),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        modeButton(
+                          icon: CupertinoIcons.shuffle,
+                          label: playback.shuffle
+                              ? context.l10n.nowPlayingShuffleOn
+                              : context.l10n.nowPlayingPlayInOrder,
+                          selected: playback.shuffle,
+                          onPressed: () =>
+                              controller.setShuffle(!playback.shuffle),
+                        ),
+                        const SizedBox(width: 12),
+                        modeButton(
+                          icon: playback.repeat == AudioServiceRepeatMode.one
+                              ? CupertinoIcons.repeat_1
+                              : CupertinoIcons.repeat,
+                          label: repeatLabel,
+                          selected:
+                              playback.repeat != AudioServiceRepeatMode.none,
+                          onPressed: () =>
+                              controller.setRepeatMode(switch (playback.repeat) {
+                                AudioServiceRepeatMode.none =>
+                                  AudioServiceRepeatMode.all,
+                                AudioServiceRepeatMode.all =>
+                                  AudioServiceRepeatMode.one,
+                                _ => AudioServiceRepeatMode.none,
+                              }),
+                        ),
+                        const SizedBox(width: 12),
+                        modeButton(
+                          icon: CupertinoIcons.infinite,
+                          label: autoplay
+                              ? context.l10n.autoplayOn
+                              : context.l10n.autoplayOff,
+                          selected: autoplay,
+                          onPressed: () => ref
+                              .read(settingsProvider.notifier)
+                              .setAutoplay(!autoplay),
+                        ),
+                      ],
+                    ),
+                  if (autoMix && count > 1) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('dj-match-bpm-button'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.5),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: Icon(
+                          CupertinoIcons.waveform_path_badge_plus,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        label: Text(
+                          context.l10n.djOrderQueueByBpm,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        onPressed: () async {
+                          final reordered =
+                              await controller.orderUpcomingQueueByBpm();
+                          if (context.mounted && reordered) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(context.l10n.djQueueBpmMatched),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.l10n.mornyeContinuePlaying,
+                          style: type.titleLarge?.copyWith(color: Colors.white),
+                        ),
+                        if (autoplay &&
+                            playback.repeat == AudioServiceRepeatMode.none)
+                          Text(
+                            context.l10n.autoplayFromLibrary,
+                            style: type.bodySmall?.copyWith(
+                              color: Colors.white70,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ],
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        context.l10n.mornyeContinuePlaying,
-                        style: type.titleLarge?.copyWith(color: Colors.white),
-                      ),
-                      if (autoplay &&
-                          playback.repeat == AudioServiceRepeatMode.none)
-                        Text(
-                          context.l10n.autoplayFromLibrary,
-                          style: type.bodySmall?.copyWith(
-                            color: Colors.white70,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
         ),
-        if (count == 0)
-          SliverPadding(
-            padding: const EdgeInsets.all(28),
-            sliver: SliverToBoxAdapter(
-              child: Text(
-                context.l10n.nowPlayingQueueEmpty,
-                style: type.bodyMedium?.copyWith(color: Colors.white70),
+        if (_selectedTab == 0) ...[
+          if (count == 0)
+            SliverPadding(
+              padding: const EdgeInsets.all(28),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  context.l10n.nowPlayingQueueEmpty,
+                  style: type.bodyMedium?.copyWith(color: Colors.white70),
+                ),
               ),
-            ),
-          )
-        else
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            sliver: SliverReorderableList(
-              itemCount: count,
-              onReorderItem: (oldIndex, newIndex) =>
-                  controller.moveQueueItem(start + oldIndex, start + newIndex),
-              proxyDecorator: (child, index, animation) => Material(
-                color: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(12),
-                child: child,
-              ),
-              itemBuilder: (context, index) {
-                final item = queue[start + index];
-                return PlayerQueueDismissible(
-                  key: ObjectKey(item),
-                  onRemove: () => controller.removeQueuedItem(item),
-                  child: ListTile(
-                    contentPadding: const EdgeInsetsDirectional.only(start: 12),
-                    minVerticalPadding: 6,
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(5),
-                      child: SizedBox.square(
-                        dimension: 40,
-                        child: PlayerQueueArtwork(
-                          item: item,
-                          colorScheme: colorScheme,
-                          cacheWidth: 120,
-                          iconSize: 22,
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: type.bodyLarge?.copyWith(color: Colors.white),
-                    ),
-                    subtitle: Text(
-                      item.artist ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: type.bodySmall?.copyWith(color: Colors.white70),
-                    ),
-                    trailing: ReorderableDragStartListener(
-                      index: index,
-                      child: const ColoredBox(
-                        color: Colors.transparent,
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              sliver: SliverReorderableList(
+                itemCount: count,
+                onReorderItem: (oldIndex, newIndex) =>
+                    controller.moveQueueItem(start + oldIndex, start + newIndex),
+                proxyDecorator: (child, index, animation) => Material(
+                  color: widget.colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(12),
+                  child: child,
+                ),
+                itemBuilder: (context, index) {
+                  final item = queue[start + index];
+                  return PlayerQueueDismissible(
+                    key: ObjectKey(item),
+                    onRemove: () => controller.removeQueuedItem(item),
+                    child: ListTile(
+                      contentPadding:
+                          const EdgeInsetsDirectional.only(start: 12),
+                      minVerticalPadding: 6,
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(5),
                         child: SizedBox.square(
-                          dimension: 44,
-                          child: Icon(
-                            CupertinoIcons.line_horizontal_3,
-                            color: Colors.white38,
+                          dimension: 40,
+                          child: PlayerQueueArtwork(
+                            item: item,
+                            colorScheme: widget.colorScheme,
+                            cacheWidth: 120,
+                            iconSize: 22,
                           ),
                         ),
                       ),
+                      title: Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: type.bodyLarge?.copyWith(color: Colors.white),
+                      ),
+                      subtitle: Text(
+                        item.artist ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: type.bodySmall?.copyWith(color: Colors.white70),
+                      ),
+                      trailing: ReorderableDragStartListener(
+                        index: index,
+                        child: const ColoredBox(
+                          color: Colors.transparent,
+                          child: SizedBox.square(
+                            dimension: 44,
+                            child: Icon(
+                              CupertinoIcons.line_horizontal_3,
+                              color: Colors.white38,
+                            ),
+                          ),
+                        ),
+                      ),
+                      onTap: () => controller.jumpTo(start + index),
                     ),
-                    onTap: () => controller.jumpTo(start + index),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
+        ] else ...[
+          // History tab
+          if (playedEarlier.isEmpty && historyItems.isEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.all(28),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  context.l10n.playerQueueHistoryEmpty,
+                  style: type.bodyMedium?.copyWith(color: Colors.white70),
+                ),
+              ),
+            )
+          else ...[
+            if (playedEarlier.isNotEmpty) ...[
+              SliverPadding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktopPlatform ? 16 : 28,
+                  vertical: 8,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: Text(
+                    context.l10n.playerQueuePlayedEarlier,
+                    style: type.titleMedium?.copyWith(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final item = playedEarlier[index];
+                      final origIndex = currentIndex - 1 - index;
+                      return ListTile(
+                        contentPadding:
+                            const EdgeInsetsDirectional.only(start: 12),
+                        minVerticalPadding: 6,
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(5),
+                          child: SizedBox.square(
+                            dimension: 40,
+                            child: PlayerQueueArtwork(
+                              item: item,
+                              colorScheme: widget.colorScheme,
+                              cacheWidth: 120,
+                              iconSize: 22,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: type.bodyLarge?.copyWith(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          item.artist ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: type.bodySmall?.copyWith(color: Colors.white70),
+                        ),
+                        onTap: () => controller.jumpTo(origIndex),
+                      );
+                    },
+                    childCount: playedEarlier.length,
+                  ),
+                ),
+              ),
+            ],
+            if (historyItems.isNotEmpty) ...[
+              SliverPadding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktopPlatform ? 16 : 28,
+                  vertical: 8,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: Text(
+                    context.l10n.playerQueueTabHistory,
+                    style: type.titleMedium?.copyWith(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final item = historyItems[index];
+                      return ListTile(
+                        contentPadding:
+                            const EdgeInsetsDirectional.only(start: 12),
+                        minVerticalPadding: 6,
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(5),
+                          child: SizedBox.square(
+                            dimension: 40,
+                            child: item.coverUrl != null &&
+                                    item.coverUrl!.isNotEmpty
+                                ? CachedCoverImage(
+                                    imageUrl: item.coverUrl!,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Container(
+                                    color: widget.colorScheme.surfaceContainerHigh,
+                                    child: const Icon(
+                                      CupertinoIcons.music_note,
+                                      color: Colors.white54,
+                                      size: 20,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        title: Text(
+                          item.trackName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: type.bodyLarge?.copyWith(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          item.artistName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: type.bodySmall?.copyWith(color: Colors.white70),
+                        ),
+                        onTap: () {
+                          ref
+                              .read(playbackProvider.notifier)
+                              .playHistoryQueue(historyItems, startItem: item);
+                        },
+                      );
+                    },
+                    childCount: historyItems.length,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ],
       ],
     );
   }

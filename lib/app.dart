@@ -27,6 +27,7 @@ import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_shortcuts.dart';
 import 'package:mornye/widgets/desktop/library_drop_target.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
+import 'package:mornye/widgets/mornye_app_splash.dart';
 import 'package:mornye/widgets/mornye_glass_preparation.dart';
 import 'package:mornye/widgets/playback_feedback.dart';
 import 'package:mornye/widgets/tv_navigation.dart';
@@ -222,7 +223,9 @@ Widget buildAppContent(
       ),
     );
   }
-  return AndroidKeyboardLifecycle(child: _AppMediaQuery(child: appContent));
+  return MornyeAppSplash(
+    child: AndroidKeyboardLifecycle(child: _AppMediaQuery(child: appContent)),
+  );
 }
 
 /// Treats the display as one continuous surface so bottom sheets and dialogs
