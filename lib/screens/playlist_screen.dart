@@ -33,6 +33,7 @@ import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/widgets/downloadable_cover.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
+import 'package:mornye/widgets/batch_lyrics_sync_dialog.dart';
 
 class PlaylistScreen extends ConsumerStatefulWidget {
   final String playlistName;
@@ -453,6 +454,19 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
                 _updateSortedTracks();
               });
               PlaylistSortStorage.setSortMode(_playlistKey, newSort);
+            },
+          ),
+          HeaderCircleButton(
+            key: const ValueKey('playlist-sync-lyrics-button'),
+            icon: Icons.lyrics_outlined,
+            tooltip: 'Scarica testi mancanti',
+            onPressed: () {
+              showDialog<void>(
+                context: context,
+                builder: (_) => BatchLyricsSyncDialog(
+                  tracks: _sortedTracks,
+                ),
+              );
             },
           ),
         ],
