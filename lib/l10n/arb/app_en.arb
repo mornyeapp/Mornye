@@ -10503,5 +10503,77 @@
   "lyricsEditLineActions": "Line actions",
   "lyricsEditSaved": "Lyrics saved",
   "lyricsEditSaveFailed": "Couldn't save the lyrics to this file",
-  "lyricsEditReadOnly": "Lyrics can't be saved to this song's file"
+  "lyricsEditReadOnly": "Lyrics can't be saved to this song's file",
+  "djModeTitle": "DJ Mode (Smart Crossfade)",
+  "@djModeTitle": {
+    "description": "Title of the smart crossfade DJ playback mode"
+  },
+  "djModeOn": "On",
+  "@djModeOn": {
+    "description": "DJ Mode enabled state"
+  },
+  "djModeOff": "Off",
+  "@djModeOff": {
+    "description": "DJ Mode disabled state"
+  },
+  "djModeActivated": "DJ Mode (Smart Crossfade) activated",
+  "@djModeActivated": {
+    "description": "Snackbar shown when DJ Mode is toggled on"
+  },
+  "djModeDeactivated": "DJ Mode (Smart Crossfade) deactivated",
+  "@djModeDeactivated": {
+    "description": "Snackbar shown when DJ Mode is toggled off"
+  },
+  "syncLyricsAction": "Download missing lyrics",
+  "@syncLyricsAction": {
+    "description": "Button to download missing lyrics for playlist or selection"
+  },
+  "syncLyricsAllAction": "Download all missing lyrics",
+  "@syncLyricsAllAction": {
+    "description": "Button to download missing lyrics for the entire library"
+  },
+  "syncLyricsChecking": "Checking tracks without lyrics...",
+  "@syncLyricsChecking": {
+    "description": "Progress state while scanning for missing lyrics"
+  },
+  "syncLyricsCompleted": "Sync completed",
+  "@syncLyricsCompleted": {
+    "description": "Title when lyrics sync completes"
+  },
+  "syncLyricsCancelled": "Sync cancelled",
+  "@syncLyricsCancelled": {
+    "description": "Title when lyrics sync is cancelled"
+  },
+  "syncLyricsNoTracks": "No local or downloaded tracks found to sync.",
+  "@syncLyricsNoTracks": {
+    "description": "Message when no matching local tracks are found to sync"
+  },
+  "syncLyricsAllHaveLyrics": "All tracks already have lyrics.",
+  "@syncLyricsAllHaveLyrics": {
+    "description": "Message when all tracks already have lyrics"
+  },
+  "syncLyricsSummary": "{successful} lyrics saved to storage, {failed} not found.",
+  "@syncLyricsSummary": {
+    "description": "Summary of batch lyrics sync result",
+    "placeholders": {
+      "successful": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "syncLyricsCheckedCount": "{current} of {total} tracks checked",
+  "@syncLyricsCheckedCount": {
+    "description": "Progress of lyrics check phase",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  }
 }

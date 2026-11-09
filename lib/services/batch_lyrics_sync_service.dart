@@ -8,8 +8,16 @@ import 'package:mornye/services/player_lyrics_persistence.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_metadata_helper.dart';
+import 'package:path/path.dart' as p;
 
 final _log = AppLogger('BatchLyricsSync');
+
+class BatchLyricsItem {
+  final Track track;
+  final String filePath;
+
+  const BatchLyricsItem({required this.track, required this.filePath});
+}
 
 class BatchLyricsProgress {
   final int completed;
@@ -18,6 +26,9 @@ class BatchLyricsProgress {
   final int failed;
   final bool isCancelled;
   final String? currentTrackName;
+  final bool isChecking;
+  final int checkingCurrent;
+  final int checkingTotal;
 
   const BatchLyricsProgress({
     required this.completed,
@@ -26,6 +37,9 @@ class BatchLyricsProgress {
     required this.failed,
     this.isCancelled = false,
     this.currentTrackName,
+    this.isChecking = false,
+    this.checkingCurrent = 0,
+    this.checkingTotal = 0,
   });
 
   BatchLyricsProgress copyWith({
@@ -35,6 +49,9 @@ class BatchLyricsProgress {
     int? failed,
     bool? isCancelled,
     String? currentTrackName,
+    bool? isChecking,
+    int? checkingCurrent,
+    int? checkingTotal,
   }) {
     return BatchLyricsProgress(
       completed: completed ?? this.completed,
@@ -43,29 +60,28 @@ class BatchLyricsProgress {
       failed: failed ?? this.failed,
       isCancelled: isCancelled ?? this.isCancelled,
       currentTrackName: currentTrackName ?? this.currentTrackName,
+      isChecking: isChecking ?? this.isChecking,
+      checkingCurrent: checkingCurrent ?? this.checkingCurrent,
+      checkingTotal: checkingTotal ?? this.checkingTotal,
     );
   }
 }
 
-typedef LyricsChecker = Future<bool> Function(Track track);
+typedef LyricsChecker = Future<bool> Function(BatchLyricsItem item);
 typedef LyricsFetcher = Future<String> Function(Track track);
-typedef LyricsTagSaver = Future<void> Function(String source, String lyrics);
+typedef LyricsTagSaver = Future<void> Function(String filePath, String lyrics);
 typedef LyricsSidecarSaver =
-    Future<void> Function(String source, String lyrics);
+    Future<bool> Function(String filePath, String lyrics);
 
-Future<bool> _defaultCheckHasLyrics(Track track) async {
-  final source = track.source;
-  if (source == null || source.isEmpty) return false;
+Future<bool> _defaultCheckHasLyrics(BatchLyricsItem item) async {
+  final filePath = item.filePath;
+  if (filePath.isEmpty) return false;
 
   // 1. Check sidecar .lrc file if on filesystem
-  if (!isContentUri(source)) {
-    final uri = Uri.tryParse(source);
-    final localPath = uri?.scheme == 'file' ? uri!.toFilePath() : source;
-    final slash = localPath.lastIndexOf(Platform.pathSeparator);
-    final dot = localPath.lastIndexOf('.');
-    final lrcPath = (dot > slash)
-        ? '${localPath.substring(0, dot)}.lrc'
-        : '$localPath.lrc';
+  if (!isContentUri(filePath)) {
+    final uri = Uri.tryParse(filePath);
+    final localPath = uri?.scheme == 'file' ? uri!.toFilePath() : filePath;
+    final lrcPath = p.setExtension(localPath, '.lrc');
     try {
       final file = File(lrcPath);
       if (await file.exists()) {
@@ -77,7 +93,7 @@ Future<bool> _defaultCheckHasLyrics(Track track) async {
 
   // 2. Check embedded tags
   try {
-    final meta = await readPlaybackFileMetadataWithRetry(source);
+    final meta = await readPlaybackFileMetadataWithRetry(filePath);
     final lyrics = meta['lyrics']?.toString() ?? '';
     if (hasUsableLyricsContent(lyrics)) return true;
   } catch (_) {}
@@ -95,22 +111,19 @@ Future<String> _defaultFetchLyrics(Track track) async {
   return result['lyrics']?.toString() ?? '';
 }
 
-Future<void> _defaultSaveTags(String source, String lyrics) async {
-  await persistPlayerLyrics(source, lyrics);
+Future<void> _defaultSaveTags(String filePath, String lyrics) async {
+  await persistPlayerLyrics(filePath, lyrics);
 }
 
-Future<void> _defaultSaveSidecar(String source, String lyrics) async {
-  if (isContentUri(source)) {
-    await PlatformBridge.writeSafSidecarLrc(source, lyrics);
+Future<bool> _defaultSaveSidecar(String filePath, String lyrics) async {
+  if (isContentUri(filePath)) {
+    return await PlatformBridge.writeSafSidecarLrc(filePath, lyrics);
   } else {
-    final uri = Uri.tryParse(source);
-    final localPath = uri?.scheme == 'file' ? uri!.toFilePath() : source;
-    final slash = localPath.lastIndexOf(Platform.pathSeparator);
-    final dot = localPath.lastIndexOf('.');
-    final lrcPath = (dot > slash)
-        ? '${localPath.substring(0, dot)}.lrc'
-        : '$localPath.lrc';
+    final uri = Uri.tryParse(filePath);
+    final localPath = uri?.scheme == 'file' ? uri!.toFilePath() : filePath;
+    final lrcPath = p.setExtension(localPath, '.lrc');
     await File(lrcPath).writeAsString(lyrics);
+    return true;
   }
 }
 
@@ -130,29 +143,47 @@ class BatchLyricsSyncService {
        _saveTags = saveTags ?? _defaultSaveTags,
        _saveSidecar = saveSidecar ?? _defaultSaveSidecar;
 
-  Future<BatchLyricsProgress> syncTracks(
-    List<Track> tracks, {
+  Future<BatchLyricsProgress> syncItems(
+    List<BatchLyricsItem> items, {
     required void Function(BatchLyricsProgress) onProgress,
     bool Function()? isCancelled,
     bool skipExisting = true,
   }) async {
-    final toProcess = <Track>[];
+    final toProcess = <BatchLyricsItem>[];
 
-    // Filter tracks
-    for (final track in tracks) {
+    // Filter tracks with checking progress
+    for (var i = 0; i < items.length; i++) {
       if (isCancelled?.call() == true) {
-        final cancelledProgress = BatchLyricsProgress(
+        final cancelledProgress = const BatchLyricsProgress(
           completed: 0,
           total: 0,
           successful: 0,
           failed: 0,
           isCancelled: true,
+          isChecking: false,
         );
         onProgress(cancelledProgress);
         return cancelledProgress;
       }
-      if (!skipExisting || !await _checkHasLyrics(track)) {
-        toProcess.add(track);
+
+      final item = items[i];
+      if (i % 5 == 0 || i == items.length - 1) {
+        onProgress(
+          BatchLyricsProgress(
+            completed: 0,
+            total: 0,
+            successful: 0,
+            failed: 0,
+            isChecking: true,
+            checkingCurrent: i + 1,
+            checkingTotal: items.length,
+            currentTrackName: item.track.name,
+          ),
+        );
+      }
+
+      if (!skipExisting || !await _checkHasLyrics(item)) {
+        toProcess.add(item);
       }
     }
 
@@ -171,7 +202,7 @@ class BatchLyricsSyncService {
     var successful = 0;
     var failed = 0;
 
-    for (final track in toProcess) {
+    for (final item in toProcess) {
       if (isCancelled?.call() == true) {
         final progress = BatchLyricsProgress(
           completed: completed,
@@ -179,7 +210,7 @@ class BatchLyricsSyncService {
           successful: successful,
           failed: failed,
           isCancelled: true,
-          currentTrackName: track.name,
+          currentTrackName: item.track.name,
         );
         onProgress(progress);
         return progress;
@@ -191,35 +222,42 @@ class BatchLyricsSyncService {
           total: toProcess.length,
           successful: successful,
           failed: failed,
-          currentTrackName: track.name,
+          currentTrackName: item.track.name,
         ),
       );
 
       var trackSuccess = false;
       try {
-        final rawLyrics = await _fetchLyrics(track);
+        final rawLyrics = await _fetchLyrics(item.track);
         if (hasUsableLyricsContent(rawLyrics)) {
-          final source = track.source;
-          if (source != null && source.isNotEmpty) {
+          final filePath = item.filePath;
+          if (filePath.isNotEmpty) {
+            var tagSaved = false;
+            var sidecarSaved = false;
+
             // 1. Save in tags
             try {
-              await _saveTags(source, rawLyrics);
+              await _saveTags(filePath, rawLyrics);
+              tagSaved = true;
             } catch (e) {
-              _log.w('Could not embed tags for ${track.name}: $e');
+              _log.w('Could not embed tags for ${item.track.name}: $e');
             }
 
             // 2. Save sidecar .lrc file
             try {
-              await _saveSidecar(source, rawLyrics);
+              final ok = await _saveSidecar(filePath, rawLyrics);
+              if (ok) sidecarSaved = true;
             } catch (e) {
-              _log.w('Could not write sidecar .lrc for ${track.name}: $e');
+              _log.w('Could not write sidecar .lrc for ${item.track.name}: $e');
             }
 
-            trackSuccess = true;
+            if (tagSaved || sidecarSaved) {
+              trackSuccess = true;
+            }
           }
         }
       } catch (e) {
-        _log.w('Failed to sync lyrics for ${track.name}: $e');
+        _log.w('Failed to sync lyrics for ${item.track.name}: $e');
       }
 
       completed++;
@@ -235,7 +273,7 @@ class BatchLyricsSyncService {
           total: toProcess.length,
           successful: successful,
           failed: failed,
-          currentTrackName: track.name,
+          currentTrackName: item.track.name,
         ),
       );
     }

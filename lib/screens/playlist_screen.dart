@@ -33,6 +33,11 @@ import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/widgets/downloadable_cover.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
+import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/batch_lyrics_sync_service.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/track_file_resolver.dart';
 import 'package:mornye/widgets/batch_lyrics_sync_dialog.dart';
 
 class PlaylistScreen extends ConsumerStatefulWidget {
@@ -236,6 +241,32 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
     if (!identical(widget.tracks, oldWidget.tracks)) {
       _updateSortedTracks();
     }
+  }
+
+  Future<void> _syncPlaylistLyrics() async {
+    final tracks = _sortedTracks;
+    if (tracks.isEmpty) return;
+    final resolved = await resolveTrackFiles(
+      tracks,
+      library: LibraryDatabase.instance,
+      history: HistoryDatabase.instance,
+      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+    );
+    final items = <BatchLyricsItem>[];
+    for (var i = 0; i < tracks.length; i++) {
+      final path = resolved.paths[i];
+      if (path != null && path.isNotEmpty) {
+        items.add(BatchLyricsItem(track: tracks[i], filePath: path));
+      }
+    }
+    if (!mounted) return;
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.syncLyricsNoTracks)));
+      return;
+    }
+    await BatchLyricsSyncDialog.show(context, items: items);
   }
 
   Future<void> _fetchTracksIfNeeded() async {
@@ -459,13 +490,8 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
           HeaderCircleButton(
             key: const ValueKey('playlist-sync-lyrics-button'),
             icon: Icons.lyrics_outlined,
-            tooltip: 'Scarica testi mancanti',
-            onPressed: () {
-              showDialog<void>(
-                context: context,
-                builder: (_) => BatchLyricsSyncDialog(tracks: _sortedTracks),
-              );
-            },
+            tooltip: context.l10n.syncLyricsAction,
+            onPressed: _syncPlaylistLyrics,
           ),
         ],
         if (ref.watch(linkPhoneClientProvider) != null)

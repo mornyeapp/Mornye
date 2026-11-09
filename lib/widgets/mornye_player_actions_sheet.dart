@@ -166,17 +166,11 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
             _action(
               context,
               'djMode',
-              Localizations.localeOf(context).languageCode == 'it'
-                  ? 'Modalità DJ (Smart Crossfade)'
-                  : 'DJ Mode (AutoMix)',
+              context.l10n.djModeTitle,
               CupertinoIcons.arrow_right_arrow_left,
               subtitle: autoMixActive
-                  ? (Localizations.localeOf(context).languageCode == 'it'
-                        ? 'Attiva'
-                        : 'On')
-                  : (Localizations.localeOf(context).languageCode == 'it'
-                        ? 'Disattivata'
-                        : 'Off'),
+                  ? context.l10n.djModeOn
+                  : context.l10n.djModeOff,
             ),
             _action(
               context,

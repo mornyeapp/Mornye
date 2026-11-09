@@ -10443,5 +10443,19 @@
         "type": "String"
       }
     }
-  }
+  },
+  "djModeTitle": "Modalità DJ (Smart Crossfade)",
+  "djModeOn": "Attiva",
+  "djModeOff": "Disattivata",
+  "djModeActivated": "Modalità DJ (Smart Crossfade) attivata",
+  "djModeDeactivated": "Modalità DJ (Smart Crossfade) disattivata",
+  "syncLyricsAction": "Scarica testi mancanti",
+  "syncLyricsAllAction": "Scarica tutti i testi mancanti",
+  "syncLyricsChecking": "Controllo dei brani privi di testo...",
+  "syncLyricsCompleted": "Sincronizzazione completata",
+  "syncLyricsCancelled": "Sincronizzazione annullata",
+  "syncLyricsNoTracks": "Nessun brano locale o scaricato trovato da sincronizzare.",
+  "syncLyricsAllHaveLyrics": "Tutti i brani hanno già i testi sincronizzati.",
+  "syncLyricsSummary": "{successful} testi salvati nella memoria, {failed} non trovati.",
+  "syncLyricsCheckedCount": "{current} di {total} brani verificati"
 }

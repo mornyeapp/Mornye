@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mornye/controllers/library_re_enrich_all.dart';
+import 'package:mornye/services/batch_lyrics_sync_service.dart';
 import 'package:mornye/widgets/batch_lyrics_sync_dialog.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_scan_failure.dart';
@@ -302,17 +303,17 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
     );
     if (!mounted) return;
     if (items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nessun brano trovato nella libreria.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.syncLyricsNoTracks)));
       return;
     }
-    final tracks = items.map((i) => i.toTrack()).toList();
+    final targets = items
+        .where((i) => i.filePath.isNotEmpty)
+        .map((i) => BatchLyricsItem(track: i.toTrack(), filePath: i.filePath))
+        .toList();
     if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (_) => BatchLyricsSyncDialog(tracks: tracks),
-    );
+    await BatchLyricsSyncDialog.show(context, items: targets);
   }
 
   Future<void> _findMovedDownloads() async {
@@ -853,9 +854,9 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                         ),
                         SettingsItem(
                           icon: Icons.lyrics_outlined,
-                          title: 'Scarica tutti i testi mancanti',
+                          title: context.l10n.syncLyricsAllAction,
                           subtitle:
-                              'Cerca e salva permanentemente i testi nei file e come .lrc',
+                              'Salva permanentemente i testi nei file e come .lrc',
                           onTap: _syncAllLibraryLyrics,
                         ),
                       ],
