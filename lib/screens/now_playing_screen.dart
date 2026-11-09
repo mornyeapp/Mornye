@@ -835,6 +835,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 squareArtwork: squareArtwork,
                 artworkAspectRatio: artworkRatio,
                 fadeStart: stillFullBleed ? 0.72 : 0.58,
+                ambientGlow: true,
                 artwork: fullBleed && !_landscape && _currentPage == 0
                     ? PlayerTransitionArtwork(
                         artworkKey: _motionArtworkKey,

@@ -13,6 +13,7 @@ class MornyePlayerBackground extends StatelessWidget {
     this.squareArtwork = true,
     this.artworkAspectRatio,
     this.fadeStart = 0.58,
+    this.ambientGlow = false,
   });
 
   final Uri? artUri;
@@ -22,6 +23,9 @@ class MornyePlayerBackground extends StatelessWidget {
 
   /// Fraction of the artwork's height that stays sharp before fading out.
   final double fadeStart;
+
+  /// Whether to render an ambient radial glow derived from cover palette.
+  final bool ambientGlow;
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +96,40 @@ class MornyePlayerBackground extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
+                  if (ambientGlow)
+                    Positioned.fill(
+                      child: KeyedSubtree(
+                        key: const ValueKey('mornye-ambient-glow'),
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: RadialGradient(
+                                center: const Alignment(0.0, -0.28),
+                                radius: 0.95,
+                                colors: [
+                                  dominant
+                                      .withSaturation(
+                                        (dominant.saturation * 1.3).clamp(
+                                          0.2,
+                                          0.75,
+                                        ),
+                                      )
+                                      .withLightness(0.42)
+                                      .toColor()
+                                      .withValues(alpha: 0.38),
+                                  muted
+                                      .withLightness(0.32)
+                                      .toColor()
+                                      .withValues(alpha: 0.16),
+                                  Colors.transparent,
+                                ],
+                                stops: const [0.0, 0.55, 1.0],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   artworkLayer!,
                   // An outgoing cover fades out while the gradient leaves
                   // the full-bleed layout.
