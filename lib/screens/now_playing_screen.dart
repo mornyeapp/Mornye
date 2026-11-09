@@ -131,6 +131,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   late int _currentPage = widget.initialPage;
   bool _landscape = false;
   bool _queueSheetShowing = false;
+  double _horizontalDragDelta = 0;
+  double _verticalDragDelta = 0;
   String? _measuredMotionSource;
   double? _motionAspectRatio;
   String? _failedMotionSource;
@@ -390,26 +392,56 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     if (!fullBleed && _artworkForeground.value.isNotEmpty) {
       _artworkForeground.value = {};
     }
-    Widget artwork() => MornyePlayerArtwork(
-      mediaItem: mediaItem,
-      videoUrl: motionArtwork?.source,
-      resolvingVideo: motionState?.isLoading == true,
-      onAspectRatioChanged: (ratio) {
-        if (!mounted ||
-            (_measuredMotionSource == motionArtwork?.source &&
-                _motionAspectRatio == ratio)) {
-          return;
-        }
-        setState(() {
-          _measuredMotionSource = motionArtwork?.source;
-          _motionAspectRatio = ratio;
-        });
+    Widget artwork() => GestureDetector(
+      key: const ValueKey('now-playing-artwork-gesture'),
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragStart: (_) {
+        _horizontalDragDelta = 0;
       },
-      onError: () {
-        if (mounted) {
-          setState(() => _failedMotionSource = motionArtwork?.source);
+      onHorizontalDragUpdate: (details) {
+        _horizontalDragDelta += details.primaryDelta ?? 0;
+      },
+      onHorizontalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity < -150 || _horizontalDragDelta < -60) {
+          ref.read(musicPlayerControllerProvider).next();
+        } else if (velocity > 150 || _horizontalDragDelta > 60) {
+          ref.read(musicPlayerControllerProvider).previous();
         }
       },
+      onVerticalDragStart: (_) {
+        _verticalDragDelta = 0;
+      },
+      onVerticalDragUpdate: (details) {
+        _verticalDragDelta += details.primaryDelta ?? 0;
+      },
+      onVerticalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity > 250 || _verticalDragDelta > 80) {
+          Navigator.of(context).maybePop();
+        }
+      },
+      child: MornyePlayerArtwork(
+        mediaItem: mediaItem,
+        videoUrl: motionArtwork?.source,
+        resolvingVideo: motionState?.isLoading == true,
+        onAspectRatioChanged: (ratio) {
+          if (!mounted ||
+              (_measuredMotionSource == motionArtwork?.source &&
+                  _motionAspectRatio == ratio)) {
+            return;
+          }
+          setState(() {
+            _measuredMotionSource = motionArtwork?.source;
+            _motionAspectRatio = ratio;
+          });
+        },
+        onError: () {
+          if (mounted) {
+            setState(() => _failedMotionSource = motionArtwork?.source);
+          }
+        },
+      ),
     );
 
     // The Mornye route moves the entire player together. A second,
