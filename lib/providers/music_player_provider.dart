@@ -424,6 +424,14 @@ class MusicPlayerController {
 
   Future<void> playSingle(PlayableMedia item) => playAll([item]);
 
+  Future<void> updateQueuePreservingCurrent(
+    List<PlayableMedia> items,
+    int currentIndex,
+  ) async {
+    final handler = await ensureInitialized();
+    handler?.updateQueuePreservingCurrent(items, currentIndex);
+  }
+
   Future<({LocalLibraryItem item, List<LocalLibraryItem> tracks})?>
   localAlbumFor(String mediaId) async {
     final database = _runtime.dependencies.libraryDatabase;

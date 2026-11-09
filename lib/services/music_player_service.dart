@@ -1550,6 +1550,24 @@ class MusicPlayerHandler extends BaseAudioHandler
     unawaited(_persistSession(position: playbackState.value.position));
   }
 
+  void updateQueuePreservingCurrent(
+    List<PlayableMedia> items,
+    int currentIndex,
+  ) {
+    if (items.isEmpty || _disposed) return;
+    _media
+      ..clear()
+      ..addAll(items);
+    _queueItems
+      ..clear()
+      ..addAll(items.map(_toMediaItem));
+    _originalQueueOrder = null;
+    _index = currentIndex.clamp(0, items.length - 1);
+    _markSessionQueueChanged();
+    queue.add(List<MediaItem>.unmodifiable(_queueItems));
+    _broadcastState();
+  }
+
   void moveQueueItem(int oldIndex, int newIndex) {
     if (oldIndex < 0 ||
         oldIndex >= _media.length ||

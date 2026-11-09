@@ -163,6 +163,44 @@ class PlaybackController extends Notifier<PlaybackState> {
     final safeStart = startIndex.clamp(0, tracks.length - 1);
     List<String?>? resolvedPaths;
     String? networkSource;
+
+    // Fast path: resolve only the starting track first so audio starts immediately
+    if (ref.read(settingsProvider).playerMode == 'internal' && tracks.length > 1) {
+      try {
+        final initialPaths = await resolveTrackFilePaths([tracks[safeStart]]);
+        final initialPath = initialPaths.isNotEmpty ? initialPaths.single : null;
+        if (initialPath != null &&
+            !isCueVirtualPath(initialPath) &&
+            await _useInternalPlayer(source: initialPath)) {
+          final initialPlayable = playableFromTrack(tracks[safeStart], initialPath);
+          final controller = ref.read(musicPlayerControllerProvider);
+          await controller.playSingle(initialPlayable);
+
+          unawaited(() async {
+            try {
+              final allPaths = await resolveTrackFilePaths(tracks);
+              final fullQueue = <PlayableMedia>[];
+              int? activeIdx;
+              for (var i = 0; i < tracks.length; i++) {
+                final p = allPaths[i];
+                if (p == null || isCueVirtualPath(p)) continue;
+                if (i == safeStart) activeIdx = fullQueue.length;
+                fullQueue.add(playableFromTrack(tracks[i], p));
+              }
+              if (fullQueue.length > 1 && activeIdx != null) {
+                await controller.updateQueuePreservingCurrent(fullQueue, activeIdx);
+              }
+            } catch (e) {
+              _log.w('Background queue resolution failed: $e');
+            }
+          }());
+          return;
+        }
+      } catch (e) {
+        _log.d('Fast-start initial track resolution skipped, falling back: $e');
+      }
+    }
+
     if (ref.read(settingsProvider).playerMode != 'internal') {
       var skippedCueVirtualTrack = false;
       // External playback opens one file. Resolve only candidates actually
