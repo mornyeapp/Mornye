@@ -24,6 +24,7 @@ const List<Locale> filteredSupportedLocales = <Locale>[
   Locale('ja'),
   Locale('vi'),
   Locale('zh', 'CN'),
+  Locale('th'),
 ];
 
 /// Set of locale codes for quick lookup.
@@ -41,6 +42,7 @@ const Set<String> filteredLocaleCodes = <String>{
   'ja',
   'vi',
   'zh_CN',
+  'th',
 };
 
 /// The locale the language setting names, or null to follow the device.

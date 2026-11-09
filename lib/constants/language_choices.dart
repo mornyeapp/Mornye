@@ -24,6 +24,7 @@ const appLanguageChoices = [
   ('vi', 'Tiếng Việt', Icons.language),
   ('zh_CN', '简体中文', Icons.language),
   ('zh_TW', '繁體中文', Icons.language),
+  ('th', 'ภาษาไทย', Icons.language),
 ];
 
 final supportedLanguageChoices = List<(String, String, IconData)>.unmodifiable(
