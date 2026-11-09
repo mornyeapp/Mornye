@@ -10532,6 +10532,10 @@
   "@syncLyricsAllAction": {
     "description": "Button to download missing lyrics for the entire library"
   },
+  "syncLyricsAllSubtitle": "Save lyrics permanently into files and as .lrc files",
+  "@syncLyricsAllSubtitle": {
+    "description": "Subtitle describing permanent lyrics persistence"
+  },
   "syncLyricsChecking": "Checking tracks without lyrics...",
   "@syncLyricsChecking": {
     "description": "Progress state while scanning for missing lyrics"

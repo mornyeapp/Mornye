@@ -855,8 +855,7 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                         SettingsItem(
                           icon: Icons.lyrics_outlined,
                           title: context.l10n.syncLyricsAllAction,
-                          subtitle:
-                              'Salva permanentemente i testi nei file e come .lrc',
+                          subtitle: context.l10n.syncLyricsAllSubtitle,
                           onTap: _syncAllLibraryLyrics,
                         ),
                       ],

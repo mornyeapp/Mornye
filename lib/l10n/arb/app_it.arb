@@ -10451,6 +10451,7 @@
   "djModeDeactivated": "Modalità DJ (Smart Crossfade) disattivata",
   "syncLyricsAction": "Scarica testi mancanti",
   "syncLyricsAllAction": "Scarica tutti i testi mancanti",
+  "syncLyricsAllSubtitle": "Salva permanentemente i testi nei file e come .lrc",
   "syncLyricsChecking": "Controllo dei brani privi di testo...",
   "syncLyricsCompleted": "Sincronizzazione completata",
   "syncLyricsCancelled": "Sincronizzazione annullata",
