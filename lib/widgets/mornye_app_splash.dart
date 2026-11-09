@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:mornye/theme/app_theme.dart';
 
-/// Modern fluid splash animation with the high-definition Mornye badge and neon glow.
+/// Modern fluid splash animation with sonic ripple waves, high-definition
+/// Mornye liquid badge, and modern geometric studio typography.
 class MornyeAppSplash extends StatefulWidget {
   final Widget child;
 
@@ -14,7 +16,7 @@ class _MornyeAppSplashState extends State<MornyeAppSplash>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scaleAnimation;
-  late final Animation<double> _glowAnimation;
+  late final Animation<double> _rippleAnimation;
   late final Animation<double> _fadeAnimation;
   bool _dismissed = false;
 
@@ -23,36 +25,36 @@ class _MornyeAppSplashState extends State<MornyeAppSplash>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1500),
     );
 
     _scaleAnimation = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.82, end: 1.04)
+        tween: Tween<double>(begin: 0.84, end: 1.05)
             .chain(CurveTween(curve: Curves.easeOutCubic)),
-        weight: 65,
+        weight: 60,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.04, end: 1.0)
+        tween: Tween<double>(begin: 1.05, end: 1.0)
             .chain(CurveTween(curve: Curves.easeInOutCubic)),
-        weight: 35,
+        weight: 40,
       ),
     ]).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 0.65),
+        curve: const Interval(0.0, 0.70),
       ),
     );
 
-    _glowAnimation = CurvedAnimation(
+    _rippleAnimation = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.15, 0.75, curve: Curves.easeInOut),
+      curve: const Interval(0.10, 0.85, curve: Curves.easeOutQuad),
     );
 
     _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.72, 1.0, curve: Curves.easeOutCubic),
+        curve: const Interval(0.75, 1.0, curve: Curves.easeOutCubic),
       ),
     );
 
@@ -84,6 +86,9 @@ class _MornyeAppSplashState extends State<MornyeAppSplash>
   Widget build(BuildContext context) {
     if (_dismissed) return widget.child;
 
+    final primary = Theme.of(context).colorScheme.primary;
+    final secondary = Theme.of(context).colorScheme.secondary;
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -93,6 +98,8 @@ class _MornyeAppSplashState extends State<MornyeAppSplash>
           builder: (context, _) {
             final opacity = _fadeAnimation.value;
             if (opacity <= 0.0) return const SizedBox.shrink();
+
+            final rippleVal = _rippleAnimation.value;
 
             return IgnorePointer(
               ignoring: opacity < 0.2,
@@ -109,54 +116,96 @@ class _MornyeAppSplashState extends State<MornyeAppSplash>
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              Container(
-                                width: 150,
-                                height: 150,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: RadialGradient(
-                                    colors: [
-                                      Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withValues(
-                                            alpha: 0.55 * _glowAnimation.value,
-                                          ),
-                                      Theme.of(context)
-                                          .colorScheme
-                                          .secondary
-                                          .withValues(
-                                            alpha: 0.25 * _glowAnimation.value,
-                                          ),
-                                      Colors.transparent,
-                                    ],
-                                    stops: const [0.0, 0.5, 1.0],
-                                  ),
+                              // Sonic wave ripple rings
+                              CustomPaint(
+                                size: const Size(260, 260),
+                                painter: _SonicRipplePainter(
+                                  progress: rippleVal,
+                                  primaryColor: primary,
+                                  secondaryColor: secondary,
                                 ),
                               ),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(24),
-                                child: Image.asset(
-                                  'assets/brand/logo/png/mornye-badge@4x.png',
-                                  width: 96,
-                                  height: 96,
-                                  filterQuality: FilterQuality.high,
+                              // Frosted liquid glass container for badge
+                              Container(
+                                width: 104,
+                                height: 104,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(26),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Colors.white.withValues(alpha: 0.16),
+                                      Colors.white.withValues(alpha: 0.04),
+                                    ],
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.25),
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: primary.withValues(
+                                        alpha: 0.35 * (1.0 - rippleVal * 0.4),
+                                      ),
+                                      blurRadius: 36,
+                                      spreadRadius: 4,
+                                    ),
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.5),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: Image.asset(
+                                    'assets/brand/logo/png/mornye-badge@4x.png',
+                                    width: 96,
+                                    height: 96,
+                                    filterQuality: FilterQuality.high,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 32),
+                        // Modern Studio Typography
                         Opacity(
-                          opacity: _glowAnimation.value.clamp(0.0, 1.0),
-                          child: const Text(
-                            'M O R N Y E',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 6.0,
-                            ),
+                          opacity: rippleVal.clamp(0.0, 1.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'M O R N Y E',
+                                style: TextStyle(
+                                  fontFamily: AppTheme.bundledFontFamily,
+                                  color: Colors.white,
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 9.0,
+                                  shadows: [
+                                    Shadow(
+                                      color: primary.withValues(alpha: 0.6),
+                                      blurRadius: 20,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'S T U D I O   S O U N D',
+                                style: TextStyle(
+                                  fontFamily: AppTheme.bundledFontFamily,
+                                  color: primary.withValues(alpha: 0.85),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 4.5,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -170,4 +219,47 @@ class _MornyeAppSplashState extends State<MornyeAppSplash>
       ],
     );
   }
+}
+
+class _SonicRipplePainter extends CustomPainter {
+  final double progress;
+  final Color primaryColor;
+  final Color secondaryColor;
+
+  const _SonicRipplePainter({
+    required this.progress,
+    required this.primaryColor,
+    required this.secondaryColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0.0) return;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxRadius = size.width / 2;
+
+    // Draw 3 expanding concentric harmonic wave rings
+    for (var i = 0; i < 3; i++) {
+      final ringProgress = (progress - (i * 0.18)).clamp(0.0, 1.0);
+      if (ringProgress <= 0.0 || ringProgress >= 1.0) continue;
+
+      final radius = 55.0 + (maxRadius - 55.0) * ringProgress;
+      final opacity = (1.0 - ringProgress) * (0.45 - (i * 0.10));
+
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (2.4 - (ringProgress * 1.4)).clamp(0.8, 2.4)
+        ..color = Color.lerp(primaryColor, secondaryColor, ringProgress)!
+            .withValues(alpha: opacity.clamp(0.0, 1.0));
+
+      canvas.drawCircle(center, radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SonicRipplePainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.primaryColor != primaryColor ||
+      oldDelegate.secondaryColor != secondaryColor;
 }

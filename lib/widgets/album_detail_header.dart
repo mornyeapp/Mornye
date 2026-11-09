@@ -168,14 +168,19 @@ class AlbumDetailHeader extends StatelessWidget {
     );
     Widget toolbar({bool collapsed = true}) => SliverAppBar(
       pinned: true,
-      backgroundColor: collapsed ? scheme.surface : Colors.transparent,
+      backgroundColor: context.isMornye
+          ? Colors.transparent
+          : (collapsed ? scheme.surface : Colors.transparent),
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 0,
       title: headerToolbarTitle(
         showTitleListenable,
         showTitleInAppBar,
         (showTitle) => AnimatedOpacity(
-          opacity: showTitle || appBarTitle != null || (immersive && collapsed)
+          opacity: showTitle ||
+                  appBarTitle != null ||
+                  (immersive && collapsed) ||
+                  (!immersive && collapsed)
               ? 1
               : 0,
           duration: const Duration(milliseconds: 180),
@@ -291,8 +296,17 @@ class AlbumDetailHeader extends StatelessWidget {
     } else {
       detailsSliver = SliverToBoxAdapter(child: details);
     }
+    final collapseOffset =
+        (artworkSize + 20 - (kToolbarHeight + MediaQuery.paddingOf(context).top))
+            .clamp(0.0, double.infinity);
     return [
-      Builder(builder: (_) => toolbar()),
+      Builder(
+        builder: (context) => SliverLayoutInfoBuilder(
+          select: (constraints) => constraints.scrollOffset >= collapseOffset,
+          builder: (context, collapsed) =>
+              _AlbumOverlayToolbar(child: toolbar(collapsed: collapsed)),
+        ),
+      ),
       detailsSliver,
     ];
   }
@@ -314,9 +328,13 @@ class AlbumDetailHeader extends StatelessWidget {
         backgroundColor: backgroundColor,
       );
 
-  Widget _buildMornyeDetails(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(20, immersive ? 0 : 20, 20, 28),
-    child: Column(
+  Widget _buildMornyeDetails(BuildContext context) {
+    final topPadding = immersive
+        ? 0.0
+        : (kToolbarHeight + MediaQuery.paddingOf(context).top + 16.0);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, topPadding, 20, 28),
+      child: Column(
       children: [
         if (!immersive)
           ConstrainedBox(
@@ -365,6 +383,7 @@ class AlbumDetailHeader extends StatelessWidget {
       ],
     ),
   );
+}
 
   Widget _buildAppBar(BuildContext context, ColorScheme headerScheme) {
     final tokens = context.tokens;

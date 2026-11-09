@@ -8,6 +8,7 @@ import 'package:mornye/services/player_lyrics_persistence.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/lyrics_metadata_helper.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 
 final _log = AppLogger('PlayerMetadata');
@@ -279,20 +280,79 @@ class PlayerMetadataController extends ChangeNotifier {
     }
   }
 
+  String _extractLyricsCandidate(
+    Map<String, dynamic> value,
+    MediaItem? item,
+  ) {
+    for (final key in const [
+      'lyrics',
+      'LYRICS',
+      'unsyncedlyrics',
+      'UNSYNCEDLYRICS',
+    ]) {
+      final text = value[key]?.toString().trim() ?? '';
+      if (text.isNotEmpty && hasUsableLyricsContent(text)) return text;
+    }
+
+    for (final key in const [
+      'description',
+      'DESCRIPTION',
+      'comment',
+      'COMMENT',
+      'synopsis',
+      'desc',
+    ]) {
+      final text = value[key]?.toString().trim() ?? '';
+      if (text.isNotEmpty) {
+        final extracted = extractLyricsFromDescription(text);
+        if (extracted.isNotEmpty) return extracted;
+      }
+    }
+
+    final extras = item?.extras;
+    if (extras != null) {
+      for (final key in const ['lyrics', 'description', 'comment']) {
+        final text = extras[key]?.toString().trim() ?? '';
+        if (text.isNotEmpty) {
+          final extracted = extractLyricsFromDescription(text);
+          if (extracted.isNotEmpty) return extracted;
+        }
+      }
+      final displayMeta = extras['displayMetadata'];
+      if (displayMeta is Map) {
+        for (final key in const ['lyrics', 'description', 'comment']) {
+          final text = displayMeta[key]?.toString().trim() ?? '';
+          if (text.isNotEmpty) {
+            final extracted = extractLyricsFromDescription(text);
+            if (extracted.isNotEmpty) return extracted;
+          }
+        }
+      }
+    }
+
+    return '';
+  }
+
   Future<void>? _replaceMetadata(Map<String, dynamic> value) {
     final revision = ++_metadataRevision;
-    final raw = (value['lyrics'] ?? '').toString();
+    var raw = (value['lyrics'] ?? '').toString();
+    if (raw.trim().isEmpty) {
+      raw = _extractLyricsCandidate(value, _item);
+    }
     // Empty fallback metadata stays synchronous, so file probes start at the
     // same point and changing tracks clears the previous lyrics immediately.
     if (raw.isEmpty) {
       _publishMetadata(value, ParsedLyrics.empty);
       return null;
     }
-    _metadata = value.isEmpty ? null : Map.unmodifiable(value);
+    final enrichedValue = raw != (value['lyrics'] ?? '').toString()
+        ? <String, dynamic>{...value, 'lyrics': raw}
+        : value;
+    _metadata = enrichedValue.isEmpty ? null : Map.unmodifiable(enrichedValue);
     if (raw != _lyricsRaw) _lyrics = ParsedLyrics.empty;
     _loading = true;
     notifyListeners();
-    return _parseAndReplaceMetadata(value, raw, _generation, revision);
+    return _parseAndReplaceMetadata(enrichedValue, raw, _generation, revision);
   }
 
   Future<void> _parseAndReplaceMetadata(

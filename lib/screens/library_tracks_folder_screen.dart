@@ -1057,12 +1057,15 @@ class _LibraryTracksFolderScreenState
     final customCoverPath = playlist?.coverImagePath;
     final isLovedMode = widget.mode == LibraryTracksFolderMode.loved;
     final isPlaylistMode = widget.mode == LibraryTracksFolderMode.playlist;
-    final rawCoverUrl = isLovedMode ? null : _firstRawCoverUrl(entries);
+    final entriesForCover = rawEntries.isNotEmpty ? rawEntries : entries;
+    final rawCoverUrl = isLovedMode ? null : _firstRawCoverUrl(entriesForCover);
     final localCoverUrl =
-        rawCoverUrl == null && !isLovedMode && entries.isNotEmpty
+        rawCoverUrl == null && !isLovedMode && entriesForCover.isNotEmpty
         ? ref
               .watch(
-                localLibraryFirstCoverProvider(_coverBatchRequest(entries)),
+                localLibraryFirstCoverProvider(
+                  _coverBatchRequest(entriesForCover),
+                ),
               )
               .maybeWhen(data: (cover) => cover, orElse: () => null)
         : null;

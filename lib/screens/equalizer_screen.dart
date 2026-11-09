@@ -20,6 +20,7 @@ import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_menu_button.dart';
+import 'package:mornye/widgets/autoeq_selector_sheet.dart';
 import 'package:mornye/widgets/app_slider.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/app_switch.dart';
@@ -272,6 +273,14 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
               SettingsGroup(
                 children: [
                   SettingsItem(
+                    title: 'AutoEq (Wavelet)',
+                    subtitle: 'Profili di compensazione Harman per cuffie',
+                    icon: Icons.headphones_outlined,
+                    showIconInMornye: true,
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => showAutoEqSelectorSheet(context),
+                  ),
+                  SettingsItem(
                     title: l10n.equalizerPresets,
                     trailing: Consumer(
                       builder: (context, ref, _) => _DetailValue(
@@ -308,6 +317,20 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
               SettingsInfoCard(
                 message: l10n.equalizerBypass,
                 icon: Icons.info_outline,
+              ),
+            ),
+            section(
+              SettingsGroup(
+                children: [
+                  SettingsItem(
+                    title: 'AutoEq (Wavelet)',
+                    subtitle: 'Profili di compensazione Harman per cuffie',
+                    icon: Icons.headphones_outlined,
+                    showIconInMornye: true,
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => showAutoEqSelectorSheet(context),
+                  ),
+                ],
               ),
             ),
             section(SettingsSectionHeader(title: l10n.equalizerPresets)),

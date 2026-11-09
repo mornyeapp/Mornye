@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mornye/models/theme_settings.dart';
+import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/app_tokens.dart';
 
 /// Flutter counterpart of Mornye's iPhone visual system. Reference values come
@@ -293,7 +294,9 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
       color: foreground,
       fontFamily:
           fontFamily ??
-          (apple || useSystemFont ? type.textStyle.fontFamily : 'Inter'),
+          (apple || useSystemFont
+              ? type.textStyle.fontFamily
+              : AppTheme.bundledFontFamily),
     );
     final display = type.navLargeTitleTextStyle.copyWith(
       inherit: true,
@@ -302,7 +305,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
           fontFamily ??
           (apple || useSystemFont
               ? type.navLargeTitleTextStyle.fontFamily
-              : 'Inter'),
+              : AppTheme.bundledFontFamily),
     );
     // Supply complete styles: replacing a Material role with a bare TextStyle
     // loses its system family and retains Material tracking in other roles.
