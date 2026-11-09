@@ -8498,7 +8498,7 @@
   "listeningStatsRecord": "Record listening",
   "listeningStatsDescription": "Stored only on this device, starting now. Records the built-in player only; pauses, buffering and seeking add no listening time. A play counts after 30 seconds.",
   "listeningStatsEmpty": "Play music with the built-in player to start your listening recap. Earlier listening cannot be recovered.",
-  "listeningStatsDays": "{days} days",
+  "listeningStatsDays": "{days} giorni",
   "@listeningStatsDays": {
     "placeholders": {
       "days": {
@@ -8782,8 +8782,8 @@
   "autoMixPitch": "Pitch (semitones)",
   "autoMixEcho": "Echo",
   "autoMixLowPass": "Muffled filter",
-  "autoMixMixing": "Mixing",
-  "autoMixCrossfading": "Crossfade",
+  "autoMixMixing": "DJ Mix",
+  "autoMixCrossfading": "Transizione DJ",
   "playbackAutomation": "Automatic playback",
   "playbackPauseOnMute": "Pause when muted",
   "snackbarPlaybackMuted": "Media volume is zero. Playback paused. Press play again to continue.",
@@ -10458,5 +10458,7 @@
   "syncLyricsNoTracks": "Nessun brano locale o scaricato trovato da sincronizzare.",
   "syncLyricsAllHaveLyrics": "Tutti i brani hanno già i testi sincronizzati.",
   "syncLyricsSummary": "{successful} testi salvati nella memoria, {failed} non trovati.",
-  "syncLyricsCheckedCount": "{current} di {total} brani verificati"
+  "syncLyricsCheckedCount": "{current} di {total} brani verificati",
+  "editPlaylistAction": "Modifica playlist",
+  "listeningStatsToday": "Oggi"
 }

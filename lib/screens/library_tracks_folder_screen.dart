@@ -30,6 +30,11 @@ import 'package:mornye/models/playlist_sort.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/m3u_playlist_service.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
+import 'package:mornye/services/batch_lyrics_sync_service.dart';
+import 'package:mornye/services/track_file_resolver.dart';
+import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/widgets/batch_lyrics_sync_dialog.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/collection_track_files_provider.dart';
@@ -1241,27 +1246,33 @@ class _LibraryTracksFolderScreenState
               tooltip: context.l10n.playlistEditOrder,
               onPressed: () => _editOrder(rawEntries),
             ),
-          if (isPlaylistMode && !isSelectionMode) ...[
+          if (entries.isNotEmpty && !isSelectionMode)
             HeaderCircleButton(
-              icon: Icons.edit_outlined,
+              key: const ValueKey('library-sync-lyrics-button'),
+              icon: Icons.lyrics_outlined,
               iconSize: 20,
-              tooltip: context.l10n.collectionRenamePlaylist,
-              onPressed: () {
-                final id = widget.playlistId ?? playlist?.id;
-                if (id == null || id.isEmpty) return;
-                _showRenamePlaylistDialog(context, id, playlist?.name ?? title);
-              },
+              tooltip: context.l10n.syncLyricsAction,
+              onPressed: () => _syncPlaylistLyrics(entries),
             ),
+          if (isPlaylistMode && !isSelectionMode)
             Builder(
               builder: (buttonContext) => HeaderCircleButton(
-                icon: Icons.camera_alt_outlined,
+                key: const ValueKey('collection-edit-playlist'),
+                icon: Icons.edit_outlined,
                 iconSize: 20,
-                tooltip: context.l10n.collectionPlaylistChangeCover,
-                onPressed: () =>
-                    _showCoverOptionsSheet(buttonContext, hasCustomCover),
+                tooltip: context.l10n.editPlaylistAction,
+                onPressed: () {
+                  final id = widget.playlistId ?? playlist?.id;
+                  if (id == null || id.isEmpty) return;
+                  _showEditPlaylistSheet(
+                    buttonContext,
+                    playlistId: id,
+                    playlistName: playlist?.name ?? title,
+                    hasCustomCover: hasCustomCover,
+                  );
+                },
               ),
             ),
-          ],
         ],
       ],
       moreMenu: linkTransfers && !isSelectionMode && !_editingOrder
@@ -1367,10 +1378,41 @@ class _LibraryTracksFolderScreenState
     );
   }
 
-  void _showCoverOptionsSheet(BuildContext context, bool hasCustomCover) {
+  Future<void> _syncPlaylistLyrics(List<CollectionTrackEntry> entries) async {
+    final tracks = [for (final entry in entries) entry.track];
+    if (tracks.isEmpty) return;
+    final resolved = await resolveTrackFiles(
+      tracks,
+      library: LibraryDatabase.instance,
+      history: HistoryDatabase.instance,
+      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+    );
+    final items = <BatchLyricsItem>[];
+    for (var i = 0; i < tracks.length; i++) {
+      final path = resolved.paths[i];
+      if (path != null && path.isNotEmpty) {
+        items.add(BatchLyricsItem(track: tracks[i], filePath: path));
+      }
+    }
+    if (!mounted) return;
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.syncLyricsNoTracks)));
+      return;
+    }
+    await BatchLyricsSyncDialog.show(context, items: items);
+  }
+
+  void _showEditPlaylistSheet(
+    BuildContext buttonContext, {
+    required String playlistId,
+    required String playlistName,
+    required bool hasCustomCover,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     final menuPosition = isDesktopPlatform
-        ? contextMenuPositionBelow(context)
+        ? contextMenuPositionBelow(buttonContext)
         : null;
     if (menuPosition != null) {
       showContextMenu(
@@ -1378,6 +1420,12 @@ class _LibraryTracksFolderScreenState
         position: menuPosition,
         groups: [
           [
+            ContextMenuAction(
+              icon: Icons.drive_file_rename_outline,
+              label: context.l10n.collectionRenamePlaylist,
+              onSelected: () =>
+                  _showRenamePlaylistDialog(context, playlistId, playlistName),
+            ),
             ContextMenuAction(
               icon: Icons.image_outlined,
               label: context.l10n.collectionPlaylistChangeCover,
@@ -1407,6 +1455,34 @@ class _LibraryTracksFolderScreenState
           children: [
             const AppSheetHandle(),
             const SizedBox(height: 16),
+            AppSheetOption(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 4,
+              ),
+              leading: context.isMornye
+                  ? Icon(
+                      mornyeIconFor(Icons.drive_file_rename_outline),
+                      color: colorScheme.primary,
+                    )
+                  : Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.drive_file_rename_outline,
+                        color: colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+              title: Text(context.l10n.collectionRenamePlaylist),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showRenamePlaylistDialog(context, playlistId, playlistName);
+              },
+            ),
             AppSheetOption(
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 24,

@@ -8725,8 +8725,8 @@
   "autoMixPitch": "Pitch (semitones)",
   "autoMixEcho": "Echo",
   "autoMixLowPass": "Muffled filter",
-  "autoMixMixing": "Mixing",
-  "autoMixCrossfading": "Crossfade",
+  "autoMixMixing": "DJ Mix",
+  "autoMixCrossfading": "DJ Transition",
   "playbackAutomation": "Automatic playback",
   "playbackPauseOnMute": "Pause when muted",
   "snackbarPlaybackMuted": "Media volume is zero. Playback paused. Press play again to continue.",
@@ -10579,5 +10579,13 @@
         "type": "int"
       }
     }
+  },
+  "editPlaylistAction": "Edit playlist",
+  "@editPlaylistAction": {
+    "description": "Action to edit playlist details including name and cover"
+  },
+  "listeningStatsToday": "Today",
+  "@listeningStatsToday": {
+    "description": "Choice chip label for today listening statistics"
   }
 }

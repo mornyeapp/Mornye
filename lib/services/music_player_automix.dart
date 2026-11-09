@@ -408,7 +408,9 @@ class _MusicAutoMix {
       _plan = null;
       handler._player = incoming;
       _setStatus(
-        plan.beatMatched ? AutoMixStatus.mixing : AutoMixStatus.crossfading,
+        (plan.beatMatched || plan.assisted)
+            ? AutoMixStatus.mixing
+            : AutoMixStatus.crossfading,
       );
       // An index at or before the current one wraps to a new repeat-all pass.
       final nextIndex = _nextIndex > handler._index

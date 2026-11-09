@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/widgets/open_audio_button.dart';
 import 'package:flutter/foundation.dart'
     show ValueListenable, listEquals, setEquals;
@@ -889,7 +890,17 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                   AppSliverHeader.tabRoot(
                     title: context.l10n.navLibrary,
                     alignToContent: true,
-                    actions: const [OpenAudioButton()],
+                    actions: [
+                      AppIconButton(
+                        icon: const Icon(Icons.insights_outlined),
+                        tooltip: context.l10n.listeningStats,
+                        onPressed: () => pushPage<void>(
+                          context,
+                          (_) => const ListeningStatisticsScreen(),
+                        ),
+                      ),
+                      const OpenAudioButton(),
+                    ],
                   )
                 else
                   AppSliverHeader.page(

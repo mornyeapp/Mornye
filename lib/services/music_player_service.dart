@@ -2440,6 +2440,14 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (_disposed || generation != _playRequestGeneration) return;
     }
     if (_index < _media.length - 1) {
+      if (_settings.autoMix && _player.state == PlaybackDeckState.playing) {
+        try {
+          await _player.setVolume(0.4);
+          await Future<void>.delayed(const Duration(milliseconds: 60));
+          await _player.setVolume(0.1);
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        } catch (_) {}
+      }
       await _playIndex(_index + 1, userSkip: true);
     }
   }
