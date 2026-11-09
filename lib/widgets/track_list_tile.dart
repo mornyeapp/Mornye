@@ -1,10 +1,15 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/local_playback.dart';
@@ -81,7 +86,7 @@ class TrackListTile extends ConsumerWidget {
           )
         : false;
 
-    return TrackCard(
+    final card = TrackCard(
       style: TrackCardStyle.flat,
       isSelectionMode: isSelectionMode,
       isSelected: isSelected,
@@ -140,6 +145,75 @@ class TrackListTile extends ConsumerWidget {
                   track,
                   hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
                 ),
+    );
+
+    if (isSelectionMode) return card;
+
+    return Dismissible(
+      key: ValueKey('track-swipe-queue-${track.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        await _enqueuePlayNext(context, ref);
+        return false;
+      },
+      background: _buildSwipeBackground(context),
+      child: card,
+    );
+  }
+
+  Future<void> _enqueuePlayNext(BuildContext context, WidgetRef ref) async {
+    try {
+      HapticFeedback.mediumImpact();
+      final paths = await ref
+          .read(playbackProvider.notifier)
+          .resolveTrackFilePaths([track]);
+      final path = paths.isNotEmpty ? paths.single : null;
+      if (path != null) {
+        final playable = playableFromTrack(track, path);
+        await ref.read(musicPlayerControllerProvider).playNext(playable);
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.snackbarAddedToQueue(track.name)),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
+  Widget _buildSwipeBackground(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      alignment: AlignmentDirectional.centerEnd,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            context.isMornye
+                ? CupertinoIcons.text_badge_plus
+                : Icons.queue_music,
+            color: colorScheme.onPrimaryContainer,
+            size: 24,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            context.l10n.trackAddToQueue,
+            style: TextStyle(
+              color: colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -2,7 +2,9 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
@@ -1581,7 +1583,7 @@ class _CollectionTrackTile extends ConsumerWidget {
     final isCurrent = playback?.isCurrent ?? false;
     final isPlaying = playback?.isPlaying ?? false;
 
-    return TrackCard(
+    final card = TrackCard(
       style: TrackCardStyle.flat,
       isSelectionMode: isSelectionMode,
       isSelected: isSelected,
@@ -1659,6 +1661,75 @@ class _CollectionTrackTile extends ConsumerWidget {
               _navigateToMetadata(context, ref);
             },
       onLongPress: isSelectionMode ? onTap : onLongPress,
+    );
+
+    if (isSelectionMode) return card;
+
+    return Dismissible(
+      key: ValueKey('library-swipe-queue-${entry.key}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        await _enqueuePlayNext(context, ref);
+        return false;
+      },
+      background: _buildSwipeBackground(context),
+      child: card,
+    );
+  }
+
+  Future<void> _enqueuePlayNext(BuildContext context, WidgetRef ref) async {
+    try {
+      HapticFeedback.mediumImpact();
+      final paths = await ref
+          .read(playbackProvider.notifier)
+          .resolveTrackFilePaths([entry.track]);
+      final path = paths.isNotEmpty ? paths.single : null;
+      if (path != null) {
+        final playable = playableFromTrack(entry.track, path);
+        await ref.read(musicPlayerControllerProvider).playNext(playable);
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.snackbarAddedToQueue(entry.track.name)),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
+  Widget _buildSwipeBackground(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      alignment: AlignmentDirectional.centerEnd,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            context.isMornye
+                ? CupertinoIcons.text_badge_plus
+                : Icons.queue_music,
+            color: colorScheme.onPrimaryContainer,
+            size: 24,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            context.l10n.trackAddToQueue,
+            style: TextStyle(
+              color: colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
