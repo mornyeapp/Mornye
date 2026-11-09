@@ -9,6 +9,9 @@ import 'package:mornye/services/csv_import_service.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/m3u_playlist_service.dart';
 import 'package:mornye/utils/file_access.dart';
+import 'package:mornye/utils/logger.dart';
+
+final _log = AppLogger('PlaylistImport');
 
 /// One Library folder offered as a playlist source.
 class LibraryFolder {
@@ -194,6 +197,26 @@ List<String> _pathSegments(String raw) {
       .toList(growable: false);
 }
 
+final _percentEscape = RegExp('%[0-9A-Fa-f]{2}');
+
+/// [_pathSegments] of a plain path line written percent-encoded, as some
+/// players do ("My%20Song.flac"); empty for any other line.
+List<String> _decodedPathSegments(String raw) {
+  final path = raw.trim();
+  if (!_percentEscape.hasMatch(path) ||
+      isContentUri(path) ||
+      path.toLowerCase().startsWith('file:')) {
+    return const [];
+  }
+  try {
+    return _pathSegments(Uri.decodeComponent(path));
+  } on ArgumentError {
+    return const [];
+  } on FormatException {
+    return const [];
+  }
+}
+
 /// Matches playlist paths to Library files by their last one to three
 /// segments, so an export from another device or player still resolves.
 class PlaylistPathIndex {
@@ -217,8 +240,12 @@ class PlaylistPathIndex {
 
   /// The Library id at [path], or null when no single file matches. The
   /// longest tail present decides; a shared one is not narrowed further.
-  String? match(String path) {
-    final segments = _pathSegments(path);
+  /// A percent-encoded line is tried again decoded.
+  String? match(String path) =>
+      _matchSegments(_pathSegments(path)) ??
+      _matchSegments(_decodedPathSegments(path));
+
+  String? _matchSegments(List<String> segments) {
     for (var count = math.min(_depth, segments.length); count > 0; count--) {
       final id = _ids[segments.sublist(segments.length - count).join('/')];
       if (id != null) return id.isEmpty ? null : id;
@@ -258,6 +285,7 @@ Future<({List<Track> tracks, int matched})> matchPlaylistImport(
     for (var i = 0; i < entries.length; i++)
       if (rows[i] == null) i,
   ];
+  final byPath = entries.length - pending.length;
   final found = await library.findExistingBatch([
     for (final i in pending)
       LocalLibraryBatchLookupRequest(
@@ -268,6 +296,26 @@ Future<({List<Track> tracks, int matched})> matchPlaylistImport(
   ]);
   for (var j = 0; j < pending.length; j++) {
     rows[pending[j]] = found[j];
+  }
+  // A title numbered to keep the playlist's order ("001 - Song") is looked
+  // up again without its number.
+  final numbered = [
+    for (final i in pending)
+      if (rows[i] == null &&
+          _withoutPosition(entries[i].track.name) != entries[i].track.name)
+        i,
+  ];
+  if (numbered.isNotEmpty) {
+    final retried = await library.findExistingBatch([
+      for (final i in numbered)
+        LocalLibraryBatchLookupRequest(
+          trackName: _withoutPosition(entries[i].track.name),
+          artistName: entries[i].track.artistName,
+        ),
+    ]);
+    for (var j = 0; j < numbered.length; j++) {
+      rows[numbered[j]] = retried[j];
+    }
   }
   var matched = 0;
   final tracks = <Track>[];
@@ -280,5 +328,29 @@ Future<({List<Track> tracks, int matched})> matchPlaylistImport(
       tracks.add(_localTrack(LocalLibraryItem.fromJson(row)));
     }
   }
+  _log.i(
+    'Matched $matched of ${entries.length} playlist entries '
+    '($byPath by path, ${matched - byPath} by title and artist)',
+  );
+  final unmatchedPaths = [
+    for (var i = 0; i < entries.length; i++)
+      if (rows[i] == null && entries[i].path != null) entries[i].path!,
+  ];
+  if (unmatchedPaths.isNotEmpty) {
+    _log.i(
+      'Unmatched path lines, first: ${unmatchedPaths.take(3).join(' | ')}',
+    );
+  }
   return (tracks: tracks, matched: matched);
+}
+
+final _positionPrefix = RegExp(r'^\d{1,4}\s*[-.)]\s+');
+
+/// [title] without a leading playlist position such as "001 - " or "01. ",
+/// which some exports write into the display text to keep their order.
+String _withoutPosition(String title) {
+  final match = _positionPrefix.firstMatch(title);
+  return match == null || match.end >= title.length
+      ? title
+      : title.substring(match.end);
 }

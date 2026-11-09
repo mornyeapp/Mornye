@@ -175,6 +175,20 @@ void main() {
     expect(index.match('Live/disc.flac'), isNull);
   });
 
+  test('percent-encoded playlist paths match after decoding', () {
+    final index = PlaylistPathIndex([
+      (id: 'spaced', sourceId: 's', filePath: '/m/My Album/01 My Song.flac'),
+      (id: 'percent', sourceId: 's', filePath: '/m/Hits/100% Pure.flac'),
+      (id: 'accent', sourceId: 's', filePath: _document('Café/Été.flac')),
+    ]);
+
+    expect(index.match('Music/My%20Album/01%20My%20Song.flac'), 'spaced');
+    expect(index.match('../Caf%C3%A9/%C3%89t%C3%A9.flac'), 'accent');
+    expect(index.match('/sdcard/Hits/100% Pure.flac'), 'percent');
+    expect(index.match('/sdcard/Hits/100%zz%20.flac'), isNull);
+    expect(index.match('/sdcard/Hits/Bad%C3.flac'), isNull);
+  });
+
   test(
     'M3U imports keep their path lines and skip a byte order mark',
     () async {
@@ -231,6 +245,48 @@ void main() {
       expect(
         [for (final lookup in library.lookups) lookup.trackName],
         ['Second', 'Missing'],
+      );
+    },
+  );
+
+  test(
+    'a title numbered for the playlist order is matched without its number',
+    () async {
+      final library = _Library([
+        _row('song', '/music/Album/Song.flac', title: 'Song'),
+        _row('year', '/music/Album/1979.flac', title: '1979'),
+      ]);
+      Track track(String name) => Track(
+        id: 'm3u_$name',
+        name: name,
+        artistName: 'Artist',
+        albumName: 'Unknown Album',
+        duration: 0,
+      );
+
+      final result = await matchPlaylistImport([
+        PlaylistImportEntry(track('001 - Song'), 'elsewhere/001 - Song.mp3'),
+        PlaylistImportEntry(track('02. Song')),
+        PlaylistImportEntry(track('1979')),
+        PlaylistImportEntry(track('003 - Missing')),
+      ], library);
+
+      expect(result.matched, 3);
+      expect(
+        [for (final track in result.tracks) track.id],
+        ['song', 'song', 'year', 'm3u_003 - Missing'],
+      );
+      expect(
+        [for (final lookup in library.lookups) lookup.trackName],
+        [
+          '001 - Song',
+          '02. Song',
+          '1979',
+          '003 - Missing',
+          'Song',
+          'Song',
+          'Missing',
+        ],
       );
     },
   );

@@ -154,6 +154,10 @@ Future<void> _importFile(BuildContext context, WidgetRef ref) async {
     match.tracks,
     preserveOccurrences: true,
   );
+  _log.i(
+    'Imported ${result.addedCount} of ${match.tracks.length} playlist '
+    'entries, ${result.alreadyInPlaylistCount} skipped as already present',
+  );
   if (!context.mounted) return;
   showAppSnackBar(
     context,
