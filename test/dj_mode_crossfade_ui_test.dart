@@ -22,7 +22,9 @@ class _TestCollections extends LibraryCollectionsNotifier {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('PlaybackSettingsPage displays DJ Mode (Smart Crossfade)', (tester) async {
+  testWidgets('PlaybackSettingsPage displays DJ Mode (Smart Crossfade)', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize = const Size(1200, 3000);
     tester.view.devicePixelRatio = 1;
@@ -32,18 +34,14 @@ void main() {
       ProviderScope(
         overrides: [
           settingsProvider.overrideWith(
-            () => FixedSettingsNotifier(
-              const AppSettings(autoMix: true),
-            ),
+            () => FixedSettingsNotifier(const AppSettings(autoMix: true)),
           ),
         ],
         child: const MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           locale: Locale('it'),
-          home: Scaffold(
-            body: PlaybackSettingsPage(),
-          ),
+          home: Scaffold(body: PlaybackSettingsPage()),
         ),
       ),
     );
@@ -53,54 +51,53 @@ void main() {
     expect(find.text('Modalità DJ (Smart Crossfade)'), findsOneWidget);
   });
 
-  testWidgets('MornyePlayerActionsSheet displays DJ Mode quick toggle with status', (tester) async {
-    SharedPreferences.setMockInitialValues({});
-    tester.view.physicalSize = const Size(1200, 3000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(() => tester.view.resetPhysicalSize());
+  testWidgets(
+    'MornyePlayerActionsSheet displays DJ Mode quick toggle with status',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(1200, 3000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() => tester.view.resetPhysicalSize());
 
-    final mediaItem = MediaItem(
-      id: 'track-1',
-      title: 'Track Title',
-      artist: 'Artist Name',
-    );
+      final mediaItem = MediaItem(
+        id: 'track-1',
+        title: 'Track Title',
+        artist: 'Artist Name',
+      );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          settingsProvider.overrideWith(
-            () => FixedSettingsNotifier(
-              const AppSettings(autoMix: true),
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsProvider.overrideWith(
+              () => FixedSettingsNotifier(const AppSettings(autoMix: true)),
             ),
-          ),
-          playerCollectionTrackProvider.overrideWith(
-            (ref, item) async => Track(
-              id: item.id,
-              name: item.title,
-              artistName: item.artist ?? '',
-              albumName: item.album ?? '',
-              duration: 180,
-              source: 'local',
+            playerCollectionTrackProvider.overrideWith(
+              (ref, item) async => Track(
+                id: item.id,
+                name: item.title,
+                artistName: item.artist ?? '',
+                albumName: item.album ?? '',
+                duration: 180,
+                source: 'local',
+              ),
             ),
-          ),
-          libraryCollectionsProvider.overrideWith(_TestCollections.new),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          locale: const Locale('it'),
-          home: Scaffold(
-            body: MornyePlayerActionsSheet(
-              mediaItem: mediaItem,
+            libraryCollectionsProvider.overrideWith(_TestCollections.new),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('it'),
+            home: Scaffold(
+              body: MornyePlayerActionsSheet(mediaItem: mediaItem),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text('Modalità DJ (Smart Crossfade)'), findsOneWidget);
-    expect(find.text('Attiva'), findsOneWidget);
-  });
+      expect(find.text('Modalità DJ (Smart Crossfade)'), findsOneWidget);
+      expect(find.text('Attiva'), findsOneWidget);
+    },
+  );
 }

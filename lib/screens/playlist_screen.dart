@@ -463,9 +463,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
             onPressed: () {
               showDialog<void>(
                 context: context,
-                builder: (_) => BatchLyricsSyncDialog(
-                  tracks: _sortedTracks,
-                ),
+                builder: (_) => BatchLyricsSyncDialog(tracks: _sortedTracks),
               );
             },
           ),

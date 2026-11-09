@@ -12,7 +12,9 @@ import 'support/fixed_settings.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('LibrarySettingsPage contains batch lyrics sync tile', (tester) async {
+  testWidgets('LibrarySettingsPage contains batch lyrics sync tile', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1;
@@ -31,9 +33,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           locale: Locale('it'),
-          home: Scaffold(
-            body: LibrarySettingsPage(),
-          ),
+          home: Scaffold(body: LibrarySettingsPage()),
         ),
       ),
     );

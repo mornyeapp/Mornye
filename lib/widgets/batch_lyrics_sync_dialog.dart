@@ -6,11 +6,7 @@ class BatchLyricsSyncDialog extends StatefulWidget {
   final List<Track> tracks;
   final BatchLyricsSyncService? service;
 
-  const BatchLyricsSyncDialog({
-    super.key,
-    required this.tracks,
-    this.service,
-  });
+  const BatchLyricsSyncDialog({super.key, required this.tracks, this.service});
 
   @override
   State<BatchLyricsSyncDialog> createState() => _BatchLyricsSyncDialogState();

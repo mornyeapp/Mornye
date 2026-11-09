@@ -172,11 +172,11 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
               CupertinoIcons.arrow_right_arrow_left,
               subtitle: autoMixActive
                   ? (Localizations.localeOf(context).languageCode == 'it'
-                      ? 'Attiva'
-                      : 'On')
+                        ? 'Attiva'
+                        : 'On')
                   : (Localizations.localeOf(context).languageCode == 'it'
-                      ? 'Disattivata'
-                      : 'Off'),
+                        ? 'Disattivata'
+                        : 'Off'),
             ),
             _action(
               context,

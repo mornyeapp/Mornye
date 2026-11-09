@@ -50,7 +50,8 @@ class BatchLyricsProgress {
 typedef LyricsChecker = Future<bool> Function(Track track);
 typedef LyricsFetcher = Future<String> Function(Track track);
 typedef LyricsTagSaver = Future<void> Function(String source, String lyrics);
-typedef LyricsSidecarSaver = Future<void> Function(String source, String lyrics);
+typedef LyricsSidecarSaver =
+    Future<void> Function(String source, String lyrics);
 
 Future<bool> _defaultCheckHasLyrics(Track track) async {
   final source = track.source;
@@ -62,8 +63,9 @@ Future<bool> _defaultCheckHasLyrics(Track track) async {
     final localPath = uri?.scheme == 'file' ? uri!.toFilePath() : source;
     final slash = localPath.lastIndexOf(Platform.pathSeparator);
     final dot = localPath.lastIndexOf('.');
-    final lrcPath =
-        (dot > slash) ? '${localPath.substring(0, dot)}.lrc' : '$localPath.lrc';
+    final lrcPath = (dot > slash)
+        ? '${localPath.substring(0, dot)}.lrc'
+        : '$localPath.lrc';
     try {
       final file = File(lrcPath);
       if (await file.exists()) {
@@ -105,8 +107,9 @@ Future<void> _defaultSaveSidecar(String source, String lyrics) async {
     final localPath = uri?.scheme == 'file' ? uri!.toFilePath() : source;
     final slash = localPath.lastIndexOf(Platform.pathSeparator);
     final dot = localPath.lastIndexOf('.');
-    final lrcPath =
-        (dot > slash) ? '${localPath.substring(0, dot)}.lrc' : '$localPath.lrc';
+    final lrcPath = (dot > slash)
+        ? '${localPath.substring(0, dot)}.lrc'
+        : '$localPath.lrc';
     await File(lrcPath).writeAsString(lyrics);
   }
 }
