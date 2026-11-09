@@ -182,6 +182,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   Timer? _sleepTimer;
   Timer? _listeningTimer;
   DateTime? _sleepTimerEndsAt;
+  bool _sleepTimerEndOfTrack = false;
 
   bool _shuffle = false;
   List<MediaItem>? _originalQueueOrder;
@@ -221,6 +222,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   static const Duration _positionQueryAllowance = Duration(milliseconds: 50);
 
   DateTime? get sleepTimerEndsAt => _sleepTimerEndsAt;
+  bool get isSleepTimerEndOfTrack => _sleepTimerEndOfTrack;
   bool get isDisposed => _disposed;
   int get playbackRequestGeneration => _playRequestGeneration;
 
@@ -820,6 +822,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   void setSleepTimer(Duration duration) {
     if (duration <= Duration.zero) return;
     _sleepTimer?.cancel();
+    _sleepTimerEndOfTrack = false;
     _sleepTimerEndsAt = DateTime.now().add(duration);
     _sleepTimer = Timer(duration, () {
       _sleepTimer = null;
@@ -830,10 +833,18 @@ class MusicPlayerHandler extends BaseAudioHandler
     });
   }
 
+  void setSleepTimerEndOfTrack() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTimerEndsAt = null;
+    _sleepTimerEndOfTrack = true;
+  }
+
   void cancelSleepTimer() {
     _sleepTimer?.cancel();
     _sleepTimer = null;
     _sleepTimerEndsAt = null;
+    _sleepTimerEndOfTrack = false;
   }
 
   Future<bool> _activateAudioSession(int generation) async {
@@ -2167,6 +2178,13 @@ class MusicPlayerHandler extends BaseAudioHandler
     _completing = true;
     try {
       _runtime.personalization.finish();
+      if (_sleepTimerEndOfTrack) {
+        _sleepTimerEndOfTrack = false;
+        unawaited(_gapless.cancel());
+        _log.i('Sleep timer end of track reached; pausing playback');
+        await pause();
+        return;
+      }
       if (await _gapless.handoff()) return;
       await _onComplete();
     } finally {
