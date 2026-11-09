@@ -60,26 +60,29 @@ class _PlayerQueueDismissibleState extends State<PlayerQueueDismissible> {
     child: widget.child,
   );
 
-  Widget _buildMaterialBackground(BuildContext context, {required bool isStart}) =>
-      Container(
-        alignment: isStart
-            ? AlignmentDirectional.centerStart
-            : AlignmentDirectional.centerEnd,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.error,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: AppIcon(
-          Icons.delete_outline,
-          color: Theme.of(context).colorScheme.onError,
-          semanticLabel: MaterialLocalizations.of(
-            context,
-          ).deleteButtonTooltip,
-        ),
-      );
+  Widget _buildMaterialBackground(
+    BuildContext context, {
+    required bool isStart,
+  }) => Container(
+    alignment: isStart
+        ? AlignmentDirectional.centerStart
+        : AlignmentDirectional.centerEnd,
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.error,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: AppIcon(
+      Icons.delete_outline,
+      color: Theme.of(context).colorScheme.onError,
+      semanticLabel: MaterialLocalizations.of(context).deleteButtonTooltip,
+    ),
+  );
 
-  Widget _buildMornyeBackground(BuildContext context, {required bool isStart}) => DecoratedBox(
+  Widget _buildMornyeBackground(
+    BuildContext context, {
+    required bool isStart,
+  }) => DecoratedBox(
     decoration: BoxDecoration(
       color: CupertinoColors.systemRed.resolveFrom(context),
       borderRadius: BorderRadius.circular(12),

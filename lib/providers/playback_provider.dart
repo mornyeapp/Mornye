@@ -166,14 +166,20 @@ class PlaybackController extends Notifier<PlaybackState> {
     String? networkSource;
 
     // Fast path: resolve only the starting track first so audio starts immediately
-    if (ref.read(settingsProvider).playerMode == 'internal' && tracks.length > 1) {
+    if (ref.read(settingsProvider).playerMode == 'internal' &&
+        tracks.length > 1) {
       try {
         final initialPaths = await resolveTrackFilePaths([tracks[safeStart]]);
-        final initialPath = initialPaths.isNotEmpty ? initialPaths.single : null;
+        final initialPath = initialPaths.isNotEmpty
+            ? initialPaths.single
+            : null;
         if (initialPath != null &&
             !isCueVirtualPath(initialPath) &&
             await _useInternalPlayer(source: initialPath)) {
-          final initialPlayable = playableFromTrack(tracks[safeStart], initialPath);
+          final initialPlayable = playableFromTrack(
+            tracks[safeStart],
+            initialPath,
+          );
           final controller = ref.read(musicPlayerControllerProvider);
           await controller.playSingle(initialPlayable);
 
@@ -189,7 +195,10 @@ class PlaybackController extends Notifier<PlaybackState> {
                 fullQueue.add(playableFromTrack(tracks[i], p));
               }
               if (fullQueue.length > 1 && activeIdx != null) {
-                await controller.updateQueuePreservingCurrent(fullQueue, activeIdx);
+                await controller.updateQueuePreservingCurrent(
+                  fullQueue,
+                  activeIdx,
+                );
               }
             } catch (e) {
               _log.w('Background queue resolution failed: $e');

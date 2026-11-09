@@ -148,9 +148,7 @@ void main() {
       expect(fakePlayback.lastPlayedTracks, isNotNull);
       expect(fakePlayback.lastPlayedTracks!.length, equals(2));
       expect(
-        fakePlayback.lastPlayedTracks!.every(
-          (t) => t.artistName == 'Coldplay',
-        ),
+        fakePlayback.lastPlayedTracks!.every((t) => t.artistName == 'Coldplay'),
         isTrue,
       );
     },

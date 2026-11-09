@@ -44,6 +44,7 @@ class _CompletingMockDeck implements PlaybackDeck {
     paused = true;
     state = PlaybackDeckState.paused;
   }
+
   @override
   Future<void> resume() async => state = PlaybackDeckState.playing;
   @override
@@ -56,6 +57,7 @@ class _CompletingMockDeck implements PlaybackDeck {
   Future<void> dispose() async {
     await _completeController.close();
   }
+
   @override
   Future<void> setFileSource(
     String path, {
@@ -70,6 +72,7 @@ class _CompletingMockDeck implements PlaybackDeck {
   }) async {
     state = PlaybackDeckState.playing;
   }
+
   @override
   Future<void> setPlaybackRate(double rate) async {}
   @override

@@ -71,43 +71,44 @@ class _MockDeck implements PlaybackDeck {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('updateQueuePreservingCurrent updates queue without stopping current playback', () async {
-    final runtime = MusicPlayerRuntime(
-      dependencies: PlaybackDependencies(
-        createDeck: (_) => _MockDeck(),
-      ),
-    );
-    final handler = MusicPlayerHandler(runtime: runtime);
-    final item1 = const PlayableMedia(
-      id: '1',
-      source: 'local://1',
-      title: 'Song 1',
-      artist: 'Artist 1',
-    );
-    final item2 = const PlayableMedia(
-      id: '2',
-      source: 'local://2',
-      title: 'Song 2',
-      artist: 'Artist 2',
-    );
-    final item3 = const PlayableMedia(
-      id: '3',
-      source: 'local://3',
-      title: 'Song 3',
-      artist: 'Artist 3',
-    );
+  test(
+    'updateQueuePreservingCurrent updates queue without stopping current playback',
+    () async {
+      final runtime = MusicPlayerRuntime(
+        dependencies: PlaybackDependencies(createDeck: (_) => _MockDeck()),
+      );
+      final handler = MusicPlayerHandler(runtime: runtime);
+      final item1 = const PlayableMedia(
+        id: '1',
+        source: 'local://1',
+        title: 'Song 1',
+        artist: 'Artist 1',
+      );
+      final item2 = const PlayableMedia(
+        id: '2',
+        source: 'local://2',
+        title: 'Song 2',
+        artist: 'Artist 2',
+      );
+      final item3 = const PlayableMedia(
+        id: '3',
+        source: 'local://3',
+        title: 'Song 3',
+        artist: 'Artist 3',
+      );
 
-    // Initial play with only item2
-    await handler.setQueueAndPlay([item2], initialIndex: 0);
-    expect(handler.queue.value.length, equals(1));
-    expect(handler.queue.value.first.title, equals('Song 2'));
+      // Initial play with only item2
+      await handler.setQueueAndPlay([item2], initialIndex: 0);
+      expect(handler.queue.value.length, equals(1));
+      expect(handler.queue.value.first.title, equals('Song 2'));
 
-    // Now update queue preserving current item2 at index 1
-    handler.updateQueuePreservingCurrent([item1, item2, item3], 1);
+      // Now update queue preserving current item2 at index 1
+      handler.updateQueuePreservingCurrent([item1, item2, item3], 1);
 
-    expect(handler.queue.value.length, equals(3));
-    expect(handler.queue.value[0].title, equals('Song 1'));
-    expect(handler.queue.value[1].title, equals('Song 2'));
-    expect(handler.queue.value[2].title, equals('Song 3'));
-  });
+      expect(handler.queue.value.length, equals(3));
+      expect(handler.queue.value[0].title, equals('Song 1'));
+      expect(handler.queue.value[1].title, equals('Song 2'));
+      expect(handler.queue.value[2].title, equals('Song 3'));
+    },
+  );
 }
