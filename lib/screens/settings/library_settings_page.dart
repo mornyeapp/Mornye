@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mornye/controllers/library_re_enrich_all.dart';
+import 'package:mornye/widgets/batch_lyrics_sync_dialog.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_scan_failure.dart';
 import 'package:mornye/models/settings.dart';
@@ -293,6 +294,25 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
     } finally {
       if (mounted) setState(() => _isLoadingReEnrich = false);
     }
+  }
+
+  Future<void> _syncAllLibraryLyrics() async {
+    final items = await loadReEnrichableLibraryItems(
+      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+    );
+    if (!mounted) return;
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nessun brano trovato nella libreria.')),
+      );
+      return;
+    }
+    final tracks = items.map((i) => i.toTrack()).toList();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => BatchLyricsSyncDialog(tracks: tracks),
+    );
   }
 
   Future<void> _findMovedDownloads() async {
@@ -830,6 +850,13 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                                 : null,
                             onTap: canReEnrich ? _reEnrichAll : null,
                           ),
+                        ),
+                        SettingsItem(
+                          icon: Icons.lyrics_outlined,
+                          title: 'Scarica tutti i testi mancanti',
+                          subtitle:
+                              'Cerca e salva permanentemente i testi nei file e come .lrc',
+                          onTap: _syncAllLibraryLyrics,
                         ),
                       ],
                       Opacity(
