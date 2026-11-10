@@ -140,6 +140,9 @@ pub(super) fn parse_lrc(
     // so a negative offset cannot turn them into apparently useful timing.
     let synced = has_usable_timing(&parsed);
     parsed.sort_by_key(|line| line.time_ms);
+    if synced {
+        pair_translations(&mut parsed);
+    }
     let romaji = align(&parsed, romaji);
     let romaji_words = align(&parsed, romaji_words);
     let translation = align(&parsed, translation);
@@ -166,7 +169,10 @@ pub(super) fn parse_lrc(
             check()?;
             line.romanization = romaji.get(&line.time_ms).cloned();
             line.romanization_words = spelled(&line.romanization, romaji_words.get(&line.time_ms));
-            line.translation = translation.get(&line.time_ms).cloned();
+            line.translation = translation
+                .get(&line.time_ms)
+                .cloned()
+                .or_else(|| line.translation.take());
             line.translation_words =
                 spelled(&line.translation, translation_words.get(&line.time_ms));
             line.time_ms = shift(line.time_ms, offset);
@@ -183,4 +189,52 @@ pub(super) fn parse_lrc(
         plain_text,
         ..Parsed::default()
     })
+}
+
+/// Bilingual LRC files time each translation like the line it translates:
+/// the original, then its translation, under one timestamp. Lines are read
+/// so only when most moments of the song are such a pair, so occasional
+/// simultaneous singers stay separate lines. Mirrors the Dart parser.
+fn pair_translations(lines: &mut Vec<Line>) {
+    let sung = |line: &Line| !line.is_background && !line.text.is_empty();
+    // Each run of lines sharing a timestamp, as its length and whether it is
+    // an original followed by its translation.
+    let mut runs = Vec::new();
+    let (mut moments, mut pairs) = (0, 0);
+    let mut start = 0;
+    while start < lines.len() {
+        let rest = &lines[start..];
+        let len = rest
+            .iter()
+            .take_while(|line| line.time_ms == rest[0].time_ms)
+            .count();
+        let run = &rest[..len];
+        let pair = len == 2
+            && sung(&run[0])
+            && sung(&run[1])
+            && run[1]
+                .voice
+                .as_ref()
+                .is_none_or(|voice| run[0].voice.as_ref() == Some(voice));
+        moments += usize::from(run.iter().any(sung));
+        pairs += usize::from(pair);
+        runs.push((len, pair));
+        start += len;
+    }
+    if pairs < 2 || pairs * 2 <= moments {
+        return;
+    }
+    let mut source = std::mem::take(lines).into_iter();
+    for (len, pair) in runs {
+        if !pair {
+            lines.extend(source.by_ref().take(len));
+            continue;
+        }
+        let (mut line, translation) = (source.next().unwrap(), source.next().unwrap());
+        // A repeated line is the same words twice, not a translation.
+        if translation.text != line.text {
+            line.translation = Some(translation.text);
+        }
+        lines.push(line);
+    }
 }

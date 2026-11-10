@@ -25,6 +25,7 @@ import 'package:mornye/services/network_library_scanner.dart';
 import 'package:mornye/services/metadata_cover_resources.dart';
 import 'package:mornye/services/metadata_persistence_service.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/lyrics_sidecar.dart';
 import 'package:mornye/services/cue_split_library_service.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/widgets/network_offline_actions.dart';

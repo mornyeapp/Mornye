@@ -265,6 +265,21 @@ void main() {
       ]);
     });
 
+    test('reads the .lrc file next to a local song', () async {
+      final dir = await Directory.systemTemp.createTemp('lrc_store_');
+      addTearDown(() => dir.delete(recursive: true));
+      final song = p.join(dir.path, 'Song.wav');
+      const store = LyricsSidecarStore(extension: lrcExtension);
+      expect(await store.read(song), isNull);
+      await File(p.join(dir.path, 'Song.lrc')).writeAsString('[00:01.00]Hola');
+      expect(await store.read(song), '[00:01.00]Hola');
+      await store.write(song, '[00:01.00]Adios');
+      expect(
+        await File(p.join(dir.path, 'Song.lrc')).readAsString(),
+        '[00:01.00]Adios',
+      );
+    });
+
     test('has none for network songs, CUE tracks and streams', () {
       const store = LyricsSidecarStore();
       expect(store.canWrite('network://share/Song.flac'), isFalse);
@@ -283,13 +298,85 @@ void main() {
       required _MemorySidecar sidecar,
       required List<String> saved,
       required _Events events,
+      _MemorySidecar? lrcFile,
     }) => PlayerMetadataController(
       readMetadata: (path) async => {if (lyrics.isNotEmpty) 'lyrics': lyrics},
       parseLyrics: _parse,
       saveOnlineLyrics: (source, raw) async => saved.add(raw),
       metadataEvents: events,
       sidecar: sidecar,
+      lrcFile: lrcFile ?? _MemorySidecar(),
     );
+
+    test('shows the .lrc file of a song without lyrics of its own', () async {
+      final lrcFile = _MemorySidecar()
+        ..files[_source] =
+            '[00:01.00]Hola\n[00:01.00]Hello\n'
+            '[00:02.00]Mundo\n[00:02.00]World';
+      final metadata = controller(
+        lyrics: '',
+        sidecar: _MemorySidecar(),
+        saved: [],
+        events: _Events(),
+        lrcFile: lrcFile,
+      );
+      addTearDown(metadata.dispose);
+      await metadata.load(_item);
+      await pumpEventQueue();
+      expect(metadata.rawLyrics, lrcFile.files[_source]);
+      // A bilingual file shows each second line as the translation.
+      expect(
+        metadata.lyrics.lines.map((line) => (line.text, line.translation)),
+        [('Hola', 'Hello'), ('Mundo', 'World')],
+      );
+    });
+
+    test('the song\'s own lyrics win over its .lrc file', () async {
+      final lrcFile = _MemorySidecar()..files[_source] = '[00:01.00]Other';
+      final metadata = controller(
+        lyrics: '[00:01.00]Own',
+        sidecar: _MemorySidecar(),
+        saved: [],
+        events: _Events(),
+        lrcFile: lrcFile,
+      );
+      addTearDown(metadata.dispose);
+      await metadata.load(_item);
+      await pumpEventQueue();
+      expect(metadata.rawLyrics, '[00:01.00]Own');
+    });
+
+    test('translations and edits of .lrc lyrics go back to the .lrc '
+        'file', () async {
+      final lrcFile = _MemorySidecar()..files[_source] = '[00:01.00]Hola';
+      final saved = <String>[];
+      final metadata = controller(
+        lyrics: '',
+        sidecar: _MemorySidecar(),
+        saved: saved,
+        events: _Events(),
+        lrcFile: lrcFile,
+      );
+      addTearDown(metadata.dispose);
+      await metadata.load(_item);
+      await pumpEventQueue();
+      final target = await metadata.saveShownLyrics(
+        _translated(metadata.lyrics, ['Hello']),
+        preferSidecar: false,
+      );
+      final tagged =
+          '[00:01.00]Hola\n[x-translation:1000:${_encoded('Hello')}]';
+      expect(target, LyricsSaveTarget.songFile);
+      expect(lrcFile.files[_source], tagged);
+      expect(metadata.rawLyrics, tagged);
+
+      final edit = metadata.beginLyricsEdit()!;
+      expect(edit.inLrcFile, isTrue);
+      await metadata.saveEditedLyrics('[00:01.00]Adios', edit: edit);
+      expect(lrcFile.files[_source], '[00:01.00]Adios');
+      expect(metadata.lyrics.lines.single.text, 'Adios');
+      expect(saved, isEmpty);
+    });
 
     test('shows what the .mlrc file saved over the song', () async {
       final sidecar = _MemorySidecar()

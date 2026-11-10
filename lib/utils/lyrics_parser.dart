@@ -483,13 +483,14 @@ class LyricsParser {
     // before applying offsets, which must not manufacture usable timing.
     final synced = _hasUsableTiming(parsed);
     _sortLines(parsed);
-    final alignedRomanization = _alignSupplements(parsed, romanization);
+    final timed = synced ? _pairTranslations(parsed) : parsed;
+    final alignedRomanization = _alignSupplements(timed, romanization);
     final alignedRomanizationWords = _alignSupplements(
-      parsed,
+      timed,
       romanizationWords,
     );
-    final alignedTranslation = _alignSupplements(parsed, translation);
-    final alignedTranslationWords = _alignSupplements(parsed, translationWords);
+    final alignedTranslation = _alignSupplements(timed, translation);
+    final alignedTranslationWords = _alignSupplements(timed, translationWords);
     // Keep readable text when optional timings are incomplete or belong to a
     // different revision of the text they time.
     List<LyricWord> spelled(String? text, List<LyricWord>? words) =>
@@ -501,11 +502,11 @@ class LyricsParser {
         offsetMs == 0 &&
             alignedRomanization.isEmpty &&
             alignedTranslation.isEmpty
-        ? parsed
-        : parsed.map((l) {
+        ? timed
+        : timed.map((l) {
             final time = l.time.inMilliseconds;
             final romanization = alignedRomanization[time];
-            final translation = alignedTranslation[time];
+            final translation = alignedTranslation[time] ?? l.translation;
             return LyricLine(
               time: _shift(l.time, offsetMs),
               end: l.end == null ? null : _shift(l.end!, offsetMs),
@@ -861,6 +862,58 @@ class LyricsParser {
       }
     }
     return result;
+  }
+
+  /// Bilingual LRC files time each translation like the line it translates:
+  /// the original, then its translation, under one timestamp. Lines are read
+  /// so only when most moments of the song are such a pair, so occasional
+  /// simultaneous singers stay separate lines. Mirrors the native parser.
+  static List<LyricLine> _pairTranslations(List<LyricLine> lines) {
+    bool sung(LyricLine line) => !line.isBackground && line.text.isNotEmpty;
+    bool sameVoice(LyricVoice? a, LyricVoice? b) =>
+        b == null ||
+        (a != null &&
+            a.id == b.id &&
+            a.index == b.index &&
+            a.isGroup == b.isGroup);
+    // Each run of lines sharing a timestamp, as its length and whether it is
+    // an original followed by its translation.
+    final runs = <(int, bool)>[];
+    var moments = 0;
+    var pairs = 0;
+    for (var start = 0; start < lines.length;) {
+      var end = start + 1;
+      while (end < lines.length && lines[end].time == lines[start].time) {
+        end++;
+      }
+      final run = lines.sublist(start, end);
+      final pair =
+          run.length == 2 &&
+          sung(run[0]) &&
+          sung(run[1]) &&
+          sameVoice(run[0].voice, run[1].voice);
+      if (run.any(sung)) moments++;
+      if (pair) pairs++;
+      runs.add((run.length, pair));
+      start = end;
+    }
+    if (pairs < 2 || pairs * 2 <= moments) return lines;
+    final paired = <LyricLine>[];
+    var index = 0;
+    for (final (length, pair) in runs) {
+      if (!pair) {
+        paired.addAll(lines.getRange(index, index + length));
+      } else {
+        final line = lines[index];
+        final translation = lines[index + 1].text;
+        // A repeated line is the same words twice, not a translation.
+        paired.add(
+          translation == line.text ? line : line.withTranslation(translation),
+        );
+      }
+      index += length;
+    }
+    return paired;
   }
 
   static void _sortLines(List<LyricLine> lines) {

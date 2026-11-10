@@ -27,8 +27,11 @@ import 'package:mornye/utils/lyrics_parser.dart';
 /// - Word timing JSON is `[{"text", "startTimeMs", "endTimeMs"}]` in absolute
 ///   milliseconds; the texts spell the line's pronunciation or translation.
 const mlrcExtension = 'mlrc';
+
+/// `.lrc`, the plain lyrics file other players also read next to a song.
+const lrcExtension = 'lrc';
 const _mlrcHeader = '[x-mlrc:1]';
-const _maxMlrcBytes = 8 * 1024 * 1024;
+const _maxSidecarBytes = 8 * 1024 * 1024;
 
 final _supplementRow = RegExp(
   r'^\[x-(romaji-words|romaji|translation-words|translation):(\d+):([^\]]*)\]$',
@@ -41,12 +44,16 @@ final _tagRow = RegExp(
 );
 
 /// The `.mlrc` path next to the audio file at [path].
-String mlrcPathFor(String path) {
-  final extension = p.extension(path);
-  final base = extension.isEmpty
+String mlrcPathFor(String path) => sidecarPathFor(path, mlrcExtension);
+
+/// The path of the sidecar with [extension] next to the audio file at
+/// [path].
+String sidecarPathFor(String path, String extension) {
+  final audioExtension = p.extension(path);
+  final base = audioExtension.isEmpty
       ? path
-      : path.substring(0, path.length - extension.length);
-  return '$base.$mlrcExtension';
+      : path.substring(0, path.length - audioExtension.length);
+  return '$base.$extension';
 }
 
 /// The `.mlrc` text for [shown], the song's lyrics as the player displays
@@ -231,11 +238,15 @@ ParsedLyrics mergeSavedLyrics(ParsedLyrics lyrics, ParsedLyrics? saved) {
   );
 }
 
-/// Reads and writes a song's `.mlrc` file: next to a local file, or in the
-/// folder of an Android document. Network songs and CUE tracks, which share
-/// one audio file, have none.
+/// Reads and writes a song's `.mlrc` file, or its sidecar with another
+/// [extension] such as `.lrc`: next to a local file, or in the folder of an
+/// Android document. Network songs and CUE tracks, which share one audio
+/// file, have none.
 class LyricsSidecarStore {
-  const LyricsSidecarStore();
+  const LyricsSidecarStore({this.extension = mlrcExtension});
+
+  /// The sidecar's file extension, without the dot.
+  final String extension;
 
   String? _localPath(String source) {
     if (source.isEmpty ||
@@ -252,31 +263,33 @@ class LyricsSidecarStore {
   bool _isDocument(String source) =>
       isContentUri(source) && !isCueVirtualPath(source) && !isDesktopPlatform;
 
-  /// Whether [source] can have a `.mlrc` file.
+  /// Whether [source] can have this sidecar.
   bool canWrite(String source) =>
       _localPath(source) != null || _isDocument(source);
 
-  /// The `.mlrc` text next to [source], or null when it has none.
+  /// The sidecar text next to [source], or null when it has none.
   Future<String?> read(String source) async {
     final path = _localPath(source);
     if (path != null) {
-      final file = File(mlrcPathFor(path));
-      if (!await file.exists() || await file.length() > _maxMlrcBytes) {
+      final file = File(sidecarPathFor(path, extension));
+      // Most songs have no sidecar. A synchronous check answers that at
+      // once, so the player's lyrics never wait on file I/O for a miss.
+      if (!file.existsSync() || await file.length() > _maxSidecarBytes) {
         return null;
       }
       return utf8.decode(await file.readAsBytes(), allowMalformed: true);
     }
     if (_isDocument(source)) {
-      return PlatformBridge.readSafSidecar(source, mlrcExtension);
+      return PlatformBridge.readSafSidecar(source, extension);
     }
     return null;
   }
 
-  /// Saves [content] as the `.mlrc` file next to [source].
+  /// Saves [content] as the sidecar next to [source].
   Future<void> write(String source, String content) async {
     final path = _localPath(source);
     if (path != null) {
-      final target = File(mlrcPathFor(path));
+      final target = File(sidecarPathFor(path, extension));
       final staged = File('${target.path}.partial');
       await staged.writeAsString(content, flush: true);
       try {
@@ -288,15 +301,11 @@ class LyricsSidecarStore {
       return;
     }
     if (_isDocument(source)) {
-      if (!await PlatformBridge.writeSafSidecar(
-        source,
-        content,
-        mlrcExtension,
-      )) {
-        throw StateError('The .mlrc file could not be written');
+      if (!await PlatformBridge.writeSafSidecar(source, content, extension)) {
+        throw StateError('The .$extension file could not be written');
       }
       return;
     }
-    throw UnsupportedError('This song cannot have a .mlrc file');
+    throw UnsupportedError('This song cannot have a .$extension file');
   }
 }

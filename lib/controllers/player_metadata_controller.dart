@@ -11,6 +11,7 @@ import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_draft.dart';
+import 'package:mornye/utils/lyrics_metadata_helper.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 
 final _log = AppLogger('PlayerMetadata');
@@ -21,7 +22,8 @@ typedef OnlineLyricsSaver = Future<void> Function(String source, String lyrics);
 
 /// Where [PlayerMetadataController.saveShownLyrics] wrote.
 enum LyricsSaveTarget {
-  /// Tags in the song's own LRC lyrics.
+  /// Tags in the song's own LRC lyrics, or in its `.lrc` file when those are
+  /// the lyrics shown.
   songFile,
 
   /// The `.mlrc` file next to the song.
@@ -41,11 +43,20 @@ class LyricsSaveUnsupported implements Exception {
 /// controller may advance while a permission check or the editor is open.
 @immutable
 class PlayerLyricsEdit {
-  const PlayerLyricsEdit._(this.item, this.source, this.rawLyrics);
+  const PlayerLyricsEdit._(
+    this.item,
+    this.source,
+    this.rawLyrics, {
+    required this.inLrcFile,
+  });
 
   final MediaItem item;
   final String source;
   final String rawLyrics;
+
+  /// The lyrics come from the `.lrc` file next to the song, which saving
+  /// rewrites instead of the song's own file.
+  final bool inLrcFile;
 }
 
 Future<String> _fetchOnlineLyrics(MediaItem item) async {
@@ -68,12 +79,14 @@ class PlayerMetadataController extends ChangeNotifier {
     OnlineLyricsSaver? saveOnlineLyrics,
     SourceMetadataEvents? metadataEvents,
     LyricsSidecarStore? sidecar,
+    LyricsSidecarStore? lrcFile,
   }) : _readMetadata = readMetadata ?? readPlaybackFileMetadataWithRetry,
        _parseLyrics = parseLyrics ?? LyricsParser.parseAsyncNative,
        _fetchOnline = fetchOnlineLyrics ?? _fetchOnlineLyrics,
        _saveOnline = saveOnlineLyrics ?? persistPlayerLyrics,
        _metadataEvents = metadataEvents ?? SourceMetadataEvents.instance,
-       _sidecar = sidecar ?? const LyricsSidecarStore() {
+       _sidecar = sidecar ?? const LyricsSidecarStore(),
+       _lrcFile = lrcFile ?? const LyricsSidecarStore(extension: lrcExtension) {
     _unsubscribeMetadata = _metadataEvents.subscribe((changed) async {
       if (_disposed ||
           changed != source ||
@@ -93,12 +106,19 @@ class PlayerMetadataController extends ChangeNotifier {
   final OnlineLyricsSaver _saveOnline;
   final SourceMetadataEvents _metadataEvents;
   final LyricsSidecarStore _sidecar;
+
+  /// The `.lrc` file next to the song, read when its own file has no lyrics.
+  final LyricsSidecarStore _lrcFile;
   final _savingLyricsSources = <String>{};
 
   /// The song's `.mlrc` lyrics, laid over [_fileLyrics] for [lyrics].
   ParsedLyrics? _saved;
 
-  /// The lyrics the song's own file holds, as parsed from [_lyricsRaw].
+  /// The song's `.lrc` lyrics, read because its own file has none.
+  String? _lrcFileLyrics;
+
+  /// The lyrics the song's own file holds, or else its `.lrc` file, as parsed
+  /// from [_lyricsRaw].
   ParsedLyrics _fileLyrics = ParsedLyrics.empty;
   MediaItem? _item;
   bool _searchingOnline = false;
@@ -197,8 +217,25 @@ class PlayerMetadataController extends ChangeNotifier {
     final item = _item;
     final source = this.source;
     if (_disposed || _loading || item == null || source == null) return null;
-    return PlayerLyricsEdit._(item, source, _lyricsRaw);
+    return PlayerLyricsEdit._(
+      item,
+      source,
+      _lyricsRaw,
+      inLrcFile: _lyricsInLrcFile,
+    );
   }
+
+  /// The shown lyrics are the `.lrc` file's, not the song's own.
+  bool get _lyricsInLrcFile =>
+      _lrcFileLyrics != null && _lyricsRaw == _lrcFileLyrics;
+
+  /// Writes [raw] where the shown lyrics came from: the `.lrc` file next to
+  /// the song, or the song's own file.
+  Future<void> _saveSongLyrics(
+    String source,
+    String raw, {
+    required bool inLrcFile,
+  }) => inLrcFile ? _lrcFile.write(source, raw) : _saveOnline(source, raw);
 
   bool isCurrentLyricsEdit(PlayerLyricsEdit edit) =>
       !_disposed && _item?.id == edit.item.id && source == edit.source;
@@ -220,7 +257,7 @@ class PlayerMetadataController extends ChangeNotifier {
     // the old lyrics back; show what was written instead.
     _savingLyricsSources.add(source);
     try {
-      await _saveOnline(source, raw);
+      await _saveSongLyrics(source, raw, inLrcFile: edit.inLrcFile);
       await _metadataEvents.publish(source);
     } finally {
       _savingLyricsSources.remove(source);
@@ -232,6 +269,7 @@ class PlayerMetadataController extends ChangeNotifier {
       return;
     }
     _metadata = Map.unmodifiable({...?_metadata, 'lyrics': raw});
+    if (edit.inLrcFile) _lrcFileLyrics = raw;
     _setFileLyrics(parsed, raw);
     _onlineSearchMissed = false;
     _onlineLyricsSaveFailed = false;
@@ -262,10 +300,11 @@ class PlayerMetadataController extends ChangeNotifier {
       LyricsDraft.canEdit(_lyricsRaw);
 
   /// Saves the translations and pronunciations [shown], these lyrics as the
-  /// player displays them, adds. They go into the song's own LRC lyrics
-  /// unless [preferSidecar] is set or those cannot carry them (TTML, lyrics
-  /// without timing, none at all); then into a `.mlrc` file next to the
-  /// song. An existing `.mlrc` file is kept in step with the song's file.
+  /// player displays them, adds. They go into the song's own LRC lyrics, or
+  /// the `.lrc` file the shown lyrics come from, unless [preferSidecar] is
+  /// set or those cannot carry them (TTML, lyrics without timing, none at
+  /// all); then into a `.mlrc` file next to the song. An existing `.mlrc`
+  /// file is kept in step with the song's file.
   /// Throws [LyricsSaveUnsupported] when neither can be written.
   Future<LyricsSaveTarget> saveShownLyrics(
     ParsedLyrics shown, {
@@ -277,6 +316,7 @@ class PlayerMetadataController extends ChangeNotifier {
     }
     final generation = _generation;
     final raw = _lyricsRaw;
+    final inLrcFile = _lyricsInLrcFile;
     final embedded = _songFileTakesTranslations
         ? lyricsWithTranslations(raw, shown)
         : null;
@@ -293,7 +333,7 @@ class PlayerMetadataController extends ChangeNotifier {
     try {
       String? mlrc;
       if (target == LyricsSaveTarget.songFile) {
-        await _saveOnline(source, embedded!);
+        await _saveSongLyrics(source, embedded!, inLrcFile: inLrcFile);
         // An older .mlrc file would bring back what the song now replaces.
         if (_saved != null && sidecarWritable) {
           mlrc = buildMlrc(raw: embedded, shown: shown);
@@ -317,6 +357,7 @@ class PlayerMetadataController extends ChangeNotifier {
       _saved = saved;
       if (target == LyricsSaveTarget.songFile) {
         _metadata = Map.unmodifiable({...?_metadata, 'lyrics': embedded});
+        if (inLrcFile) _lrcFileLyrics = embedded;
         _setFileLyrics(file, embedded!);
       } else {
         _lyrics = mergeSavedLyrics(_fileLyrics, saved);
@@ -393,6 +434,7 @@ class PlayerMetadataController extends ChangeNotifier {
       _requestKey = key;
       _loadedPath = null;
       _saved = null;
+      _lrcFileLyrics = null;
     }
     if (const {'http', 'https'}.contains(Uri.tryParse(source)?.scheme)) {
       _loadedPath = source;
@@ -424,21 +466,43 @@ class PlayerMetadataController extends ChangeNotifier {
     // The .mlrc file sits next to the song itself, not a resolved copy. It
     // never holds up the song's own lyrics.
     unawaited(_loadSaved(source, generation));
+    var probed = false;
+    Map<String, dynamic> fileMetadata;
     try {
-      final probed = await _readMetadata(path);
+      final read = await _readMetadata(path);
       if (_disposed || generation != _generation) return;
-      _probePending = false;
-      _loadedPath = path;
-      final pending = _replaceMetadata(
-        mergePlaybackFileMetadata(_fallback, probed),
-      );
-      if (pending != null) await pending;
+      fileMetadata = mergePlaybackFileMetadata(_fallback, read);
+      probed = true;
     } catch (error) {
       if (_disposed || generation != _generation) return;
-      _probePending = false;
       _log.w('Failed to read metadata: $error');
-      final pending = _replaceMetadata(_fallback);
-      if (pending != null) await pending;
+      fileMetadata = _fallback;
+    }
+    // A song without lyrics of its own shows the .lrc file next to it, read
+    // beside the song itself rather than a resolved copy.
+    final ownLyrics = fileMetadata['lyrics']?.toString() ?? '';
+    final lrc = hasUsableLyricsContent(ownLyrics)
+        ? null
+        : await _readLrcFile(source);
+    if (_disposed || generation != _generation) return;
+    _probePending = false;
+    if (probed) _loadedPath = path;
+    _lrcFileLyrics = lrc;
+    final pending = _replaceMetadata(
+      lrc == null ? fileMetadata : {...fileMetadata, 'lyrics': lrc},
+    );
+    if (pending != null) await pending;
+  }
+
+  /// The `.lrc` file's lyrics, or null when the song has no such file, it
+  /// holds no lyrics, or it cannot be read.
+  Future<String?> _readLrcFile(String source) async {
+    try {
+      final raw = await _lrcFile.read(source);
+      return raw != null && hasUsableLyricsContent(raw) ? raw : null;
+    } catch (error) {
+      _log.w('Could not read the .lrc lyrics: $error');
+      return null;
     }
   }
 

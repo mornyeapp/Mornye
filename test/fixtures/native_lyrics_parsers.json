@@ -1499,5 +1499,133 @@
         }
       ]
     }
+  },
+  {
+    "name": "bilingual LRC reads the line sharing a timestamp as its translation",
+    "request": {
+      "operation": "parse_lyrics",
+      "raw": "[offset:100]\n[x-translation:3000:U2Vjb25kIHRyYW5zbGF0aW9u]\n[00:01.00]First line\n[00:01.00]Primera línea\n[00:03.00]Second line\n[00:03.00]Segunda línea\n[00:05.00]Third line\n[00:07.00]Same line\n[00:07.00]Same line"
+    },
+    "expected": {
+      "synced": true,
+      "wordSynced": false,
+      "plainText": "First line\nPrimera línea\nSecond line\nSegunda línea\nThird line\nSame line\nSame line",
+      "writers": null,
+      "provider": null,
+      "lines": [
+        {
+          "timeMs": 900,
+          "endMs": null,
+          "text": "First line",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": "Primera línea",
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 0
+        },
+        {
+          "timeMs": 2900,
+          "endMs": null,
+          "text": "Second line",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": "Second translation",
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 2
+        },
+        {
+          "timeMs": 4900,
+          "endMs": null,
+          "text": "Third line",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": null,
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 4
+        },
+        {
+          "timeMs": 6900,
+          "endMs": null,
+          "text": "Same line",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": null,
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 5
+        }
+      ]
+    }
+  },
+  {
+    "name": "an occasional shared timestamp keeps both lines",
+    "request": {
+      "operation": "parse_lyrics",
+      "raw": "[00:01.00]Lead\n[00:01.00]Harmony\n[00:03.00]Next\n[00:05.00]Last"
+    },
+    "expected": {
+      "synced": true,
+      "wordSynced": false,
+      "plainText": "Lead\nHarmony\nNext\nLast",
+      "writers": null,
+      "provider": null,
+      "lines": [
+        {
+          "timeMs": 1000,
+          "endMs": null,
+          "text": "Lead",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": null,
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 0
+        },
+        {
+          "timeMs": 1000,
+          "endMs": null,
+          "text": "Harmony",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": null,
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 1
+        },
+        {
+          "timeMs": 3000,
+          "endMs": null,
+          "text": "Next",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": null,
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 2
+        },
+        {
+          "timeMs": 5000,
+          "endMs": null,
+          "text": "Last",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": null,
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 3
+        }
+      ]
+    }
   }
 ]

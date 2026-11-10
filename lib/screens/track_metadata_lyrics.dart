@@ -226,7 +226,21 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
     final metadata = await readPlaybackFileMetadataWithRetry(
       sourcePath,
     ).timeout(const Duration(seconds: 5));
-    return {'lyrics': metadata['lyrics']?.toString() ?? '', 'source': ''};
+    final lyrics = metadata['lyrics']?.toString() ?? '';
+    if (hasUsableLyricsContent(lyrics)) return {'lyrics': lyrics, 'source': ''};
+    // An Android document's .lrc file is out of the lyrics reader's reach.
+    String? lrc;
+    try {
+      lrc = await const LyricsSidecarStore(
+        extension: lrcExtension,
+      ).read(sourcePath).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      _log.d('Could not read the .lrc lyrics: $e');
+    }
+    return {
+      'lyrics': lrc != null && hasUsableLyricsContent(lrc) ? lrc : lyrics,
+      'source': '',
+    };
   }
 
   /// Check for lyrics embedded in the audio file only (no network requests).
