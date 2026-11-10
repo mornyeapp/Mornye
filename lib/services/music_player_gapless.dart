@@ -9,7 +9,8 @@ part of 'music_player_service.dart';
 class _MusicGapless {
   _MusicGapless(this.handler);
 
-  /// How long before the end the next song loads.
+  /// How long before the end the next song loads, in song time at normal
+  /// speed; it grows with a faster speed (`_songLead`).
   static const lead = Duration(seconds: 30);
 
   final MusicPlayerHandler handler;
@@ -67,7 +68,8 @@ class _MusicGapless {
     final duration = handler.mediaItem.value?.duration;
     return duration != null &&
         duration > Duration.zero &&
-        duration - estimate <= lead + const Duration(seconds: 1) &&
+        duration - estimate <=
+            _songLead(lead) + _songTime(const Duration(seconds: 1)) &&
         _attempt !=
             '${handler._playRequestGeneration}:${handler._sessionQueueRevision}';
   }
@@ -82,7 +84,7 @@ class _MusicGapless {
     final duration = handler.mediaItem.value?.duration;
     if (duration == null ||
         duration <= Duration.zero ||
-        duration - position > lead) {
+        duration - position > _songLead(lead)) {
       return;
     }
     final key =
@@ -92,8 +94,8 @@ class _MusicGapless {
     unawaited(_prepare(duration - position));
   }
 
-  /// How long before the end a network song stops waiting for its local
-  /// copy and loads from the server instead.
+  /// How long before the end, in clock time, a network song stops waiting
+  /// for its local copy and loads from the server instead.
   static const _serverLead = Duration(seconds: 10);
 
   /// Prepares the next song while [remaining] of the current one plays.
@@ -118,7 +120,10 @@ class _MusicGapless {
       // A network song still downloading may finish in time to open from
       // disk, which a native queue needs to start it without a gap.
       if (next.source.startsWith('network://')) {
-        await handler._prefetch.ready(next, remaining - _serverLead);
+        await handler._prefetch.ready(
+          next,
+          _clockTime(remaining) - _serverLead,
+        );
         if (!_current(generation)) return;
       }
       if (handler._dependencies.isAndroid && next.isContentUri) {

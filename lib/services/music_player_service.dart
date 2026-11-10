@@ -439,6 +439,8 @@ class MusicPlayerHandler extends BaseAudioHandler
     unawaited(_player.configureOutput());
     unawaited(_configureAudioSession());
     _refreshPlaybackAutomation();
+    playbackSpeed.addListener(_tempoChanged);
+    playbackTempoSupportRevision.addListener(_tempoChanged);
 
     _listenToPlayer(_player);
     _cast.initialize();
@@ -934,10 +936,42 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
   }
 
+  /// The rate the media session reports, so the lock screen, the system
+  /// progress and every position extrapolated from the state move at the
+  /// real rate: AutoMix's relative rate times [playbackSpeed], where the
+  /// output applies it.
+  double get _sessionSpeed =>
+      _autoMix.rate *
+      (_player.tempoSupport == PlaybackTempoSupport.none
+          ? 1
+          : playbackSpeed.value);
+
+  /// Publishes [playbackTempoSupport] for the deck playing now.
+  void _publishTempoSupport() {
+    if (_disposed) return;
+    final current = musicPlayerRuntime.handler;
+    if (current != null && !identical(current, this)) return;
+    playbackTempoSupport.value = _player.tempoSupport;
+  }
+
+  /// A new speed, or a deck that now applies it differently: the session
+  /// reports the new rate from the position reached at the old one.
+  void _tempoChanged() {
+    if (_disposed) return;
+    _publishTempoSupport();
+    final state = playbackState.value;
+    final speed = _sessionSpeed;
+    if (state.speed == speed) return;
+    playbackState.add(
+      state.copyWith(updatePosition: state.position, speed: speed),
+    );
+  }
+
   void _broadcastState({PlaybackDeckState? playerState, bool? loading}) {
     final state = playerState ?? _player.state;
     final failed = _playbackError != null;
     final playing = !failed && state == PlaybackDeckState.playing;
+    _publishTempoSupport();
 
     playbackState.add(
       playbackState.value.copyWith(
@@ -963,7 +997,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         errorMessage: _playbackError?.toString(),
         playing: playing,
         queueIndex: _index >= 0 ? _index : null,
-        speed: _autoMix.rate,
+        speed: _sessionSpeed,
         shuffleMode: _shuffle
             ? AudioServiceShuffleMode.all
             : AudioServiceShuffleMode.none,
@@ -1057,7 +1091,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     playbackState.add(
       playbackState.value.copyWith(
         updatePosition: position,
-        speed: _autoMix.rate,
+        speed: _sessionSpeed,
       ),
     );
   }
@@ -1084,7 +1118,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         persistedAt != null &&
         DateTime.now().difference(persistedAt) <
             _positionPersistInterval - _positionQueryAllowance) {
-      final estimate = _lastBroadcastPosition + (now - readAt) * _autoMix.rate;
+      final estimate = _lastBroadcastPosition + (now - readAt) * _sessionSpeed;
       if (!_autoMix.wantsPosition(estimate) &&
           !_gapless.wantsPosition(estimate) &&
           !_autoplay.wouldFill) {
@@ -2866,6 +2900,8 @@ class MusicPlayerHandler extends BaseAudioHandler
     _autoplay.reset();
     _prefetch.stop();
     _disposed = true;
+    playbackSpeed.removeListener(_tempoChanged);
+    playbackTempoSupportRevision.removeListener(_tempoChanged);
     await _autoplay.history.flush();
     await _cast.dispose();
     _runtime.personalization.finish();

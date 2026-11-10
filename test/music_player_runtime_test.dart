@@ -92,6 +92,8 @@ class _Deck implements PlaybackDeck {
   @override
   bool get isDirect => false;
   @override
+  PlaybackTempoSupport get tempoSupport => PlaybackTempoSupport.full;
+  @override
   bool get needsSourceReload => false;
   @override
   Stream<PlaybackDeckState> get onPlayerStateChanged => const Stream.empty();
@@ -160,6 +162,9 @@ class _Deck implements PlaybackDeck {
 }
 
 class _CastDeck extends _Deck {
+  @override
+  PlaybackTempoSupport get tempoSupport => PlaybackTempoSupport.none;
+
   final states = StreamController<PlaybackDeckState>.broadcast(sync: true);
   final completions = StreamController<void>.broadcast(sync: true);
 
@@ -1135,6 +1140,12 @@ void main() {
         ),
       ]);
       await handler.seek(const Duration(seconds: 12));
+      addTearDown(() {
+        playbackSpeed.value = 1;
+        playbackTempoSupport.value = PlaybackTempoSupport.full;
+      });
+      playbackSpeed.value = 1.5;
+      expect(handler.playbackState.value.speed, 1.5);
       events.add({
         'connected': true,
         'deviceId': 'tv',
@@ -1142,6 +1153,9 @@ void main() {
         'volume': 0.4,
       });
       await handler.play();
+      // The receiver plays at normal speed, whatever the setting.
+      expect(handler.playbackState.value.speed, 1);
+      expect(playbackTempoSupport.value, PlaybackTempoSupport.none);
       expect(local.single.disposals, 1);
       expect(tv.single.sources, [_track.source]);
       expect(tv.single.position.inSeconds, 12);
@@ -1164,6 +1178,8 @@ void main() {
       expect(local.last.sources.last, '/two.flac');
       expect(local.last.state, isNot(PlaybackDeckState.playing));
       expect(handler.playbackState.value.playing, isFalse);
+      expect(handler.playbackState.value.speed, 1.5);
+      expect(playbackTempoSupport.value, PlaybackTempoSupport.full);
       await runtime.dispose();
       output.dispose();
       await events.close();

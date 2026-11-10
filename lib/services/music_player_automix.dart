@@ -5,6 +5,35 @@ part of 'music_player_service.dart';
 /// run transitions on a fake clock.
 Stopwatch Function() autoMixStopwatch = Stopwatch.new;
 
+// Plans, positions and leads are song time, which passes [playbackSpeed]
+// times faster than the clock that times fades and waits. AutoMix and
+// gapless playback run only on decks that apply the speed.
+
+/// Song time that passes in [clock].
+Duration _songTime(Duration clock) => clock * playbackSpeed.value;
+
+/// Clock time [song] takes to play.
+Duration _clockTime(Duration song) => song * (1 / playbackSpeed.value);
+
+/// A lead before a song's end, in song time, that still leaves at least
+/// [lead] of clock time to prepare above normal speed.
+Duration _songLead(Duration lead) => lead * max(1.0, playbackSpeed.value);
+
+/// A stopwatch in song time. It adds up each interval at the speed of the
+/// moment, so a speed change during a fade carries on from where it was.
+class _SongClock {
+  final Stopwatch _clock = autoMixStopwatch()..start();
+  Duration _read = Duration.zero;
+  Duration _song = Duration.zero;
+
+  Duration get elapsed {
+    final now = _clock.elapsed;
+    _song += _songTime(now - _read);
+    _read = now;
+    return _song;
+  }
+}
+
 /// Owns only the extra deck and transition work. The ordinary player remains
 /// the sole transport when AutoMix is disabled or a transition cannot be made.
 class _MusicAutoMix {
@@ -12,7 +41,8 @@ class _MusicAutoMix {
 
   /// How long before the end of a song its mix is prepared. A plan starts
   /// within the last minute (the longest fade), which leaves preparation
-  /// at least 90 s, and a song skipped earlier prepares nothing.
+  /// at least 90 s, and a song skipped earlier prepares nothing. Song time
+  /// at normal speed; it grows with a faster speed ([_songLead]).
   static const lead = Duration(seconds: 150);
 
   /// How far a start computed from a new position may move before the
@@ -42,6 +72,9 @@ class _MusicAutoMix {
   bool _preparing = false;
   bool _starting = false;
   double _incomingVolume = 1;
+
+  /// The incoming deck's rate, relative to [playbackSpeed]: 1 plays at the
+  /// listener's speed (every deck multiplies its rate by it).
   double rate = 1;
   final Stopwatch _clock = autoMixStopwatch()..start();
   Timer? _startTimer;
@@ -115,7 +148,8 @@ class _MusicAutoMix {
     final duration = handler.mediaItem.value?.duration;
     return duration != null &&
         duration >= const Duration(seconds: 20) &&
-        duration - estimate <= lead + const Duration(seconds: 1) &&
+        duration - estimate <=
+            _songLead(lead) + _songTime(const Duration(seconds: 1)) &&
         _attempt !=
             '${handler._playRequestGeneration}:${handler._sessionQueueRevision}';
   }
@@ -128,7 +162,7 @@ class _MusicAutoMix {
         unawaited(cancel());
         return;
       }
-      final delay = plan.start - position;
+      final delay = _clockTime(plan.start - position);
       final wait = delay.isNegative ? Duration.zero : delay;
       final due = _clock.elapsed + wait;
       // Positions follow the clock, so most ticks confirm the timer set.
@@ -148,7 +182,7 @@ class _MusicAutoMix {
     final duration = handler.mediaItem.value?.duration;
     if (duration == null ||
         duration < const Duration(seconds: 20) ||
-        duration - position > lead) {
+        duration - position > _songLead(lead)) {
       return;
     }
     final key =
@@ -316,7 +350,9 @@ class _MusicAutoMix {
       }
       final outgoingEnd =
           handler.mediaItem.value?.duration ?? plan.start + plan.duration;
-      if (outgoingEnd - position <= const Duration(milliseconds: 500)) {
+      // Too late to start once the song ends within half a second.
+      if (outgoingEnd - position <=
+          _songTime(const Duration(milliseconds: 500))) {
         await _abandonStart(generation);
         return;
       }
@@ -451,7 +487,11 @@ class _MusicAutoMix {
       handler._broadcastPosition(audiblePosition, force: true);
       handler._broadcastState(playerState: PlaybackDeckState.playing);
       unawaited(handler._persistSession(position: audiblePosition));
+      // The plan, fadeDuration and the phase lock's beat are song time; the
+      // effect handover below is a short clock-time crossfade between two
+      // aligned decks.
       final clock = autoMixStopwatch()..start();
+      final songClock = _SongClock();
       final transition = plan;
       final phaseLock = plan.beatMatched
           ? AutoMixPhaseLock(
@@ -470,8 +510,9 @@ class _MusicAutoMix {
         _writing = true;
         _fadeWrite = () async {
           try {
+            final elapsed = songClock.elapsed;
             final levels = autoMixEnvelope(
-              clock.elapsed,
+              elapsed,
               transition,
               fadeDuration: fadeDuration,
             );
@@ -497,10 +538,10 @@ class _MusicAutoMix {
             if (generation != _generation) return;
             var targetRate = levels.rate;
             if (phaseLock != null &&
-                clock.elapsed < fadeDuration &&
+                elapsed < fadeDuration &&
                 _outgoing != null) {
-              targetRate = phaseLock.rateAt(clock.elapsed);
-              if (phaseLock.shouldMeasure(clock.elapsed)) {
+              targetRate = phaseLock.rateAt(elapsed);
+              if (phaseLock.shouldMeasure(elapsed)) {
                 final error = await _phaseError(
                   incoming,
                   outgoing,
@@ -510,8 +551,8 @@ class _MusicAutoMix {
                       : transition.start,
                 );
                 if (generation != _generation) return;
-                phaseLock.observe(clock.elapsed, error);
-                targetRate = phaseLock.rateAt(clock.elapsed);
+                phaseLock.observe(elapsed, error);
+                targetRate = phaseLock.rateAt(elapsed);
                 if (!phaseLock.trusted) {
                   _setStatus(AutoMixStatus.crossfading);
                   _log.w(
@@ -530,7 +571,7 @@ class _MusicAutoMix {
               await handler._disposeDeck(dry);
               if (generation != _generation) return;
             }
-            if (clock.elapsed >= fadeDuration && _outgoing != null) {
+            if (elapsed >= fadeDuration && _outgoing != null) {
               _outgoing = null;
               await handler._disposeDeck(outgoing);
               final tail = _effectTail;
@@ -620,7 +661,8 @@ class _MusicAutoMix {
       if (before == null || incomingPosition == null || after == null) {
         return (position: current, aligned: false);
       }
-      if (after < before || after - before > const Duration(milliseconds: 80)) {
+      if (after < before ||
+          after - before > _songTime(const Duration(milliseconds: 80))) {
         return (position: incomingPosition, aligned: false);
       }
       // The incoming reading falls between the two outgoing readings.
@@ -668,7 +710,7 @@ class _MusicAutoMix {
           next == null ||
           after == null ||
           after < before ||
-          after - before > const Duration(milliseconds: 80)) {
+          after - before > _songTime(const Duration(milliseconds: 80))) {
         return null;
       }
       final expected =

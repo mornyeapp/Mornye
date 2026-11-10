@@ -1805,6 +1805,83 @@ void main() {
     expect(start.rate, 1);
   });
 
+  group('at double speed', () {
+    setUp(
+      () => musicPlayerRuntime.configure(
+        musicPlayerRuntime.settings.copyWith(playbackSpeed: 2),
+      ),
+    );
+    tearDown(
+      () => musicPlayerRuntime.configure(
+        musicPlayerRuntime.settings.copyWith(playbackSpeed: 1),
+      ),
+    );
+
+    fakeTimeTest('a song mixes at its planned moment in song time', () async {
+      setLengths(const Duration(seconds: 200));
+      setAutoMixEnabled(true);
+      await handler.setQueueAndPlay(_tracks);
+      expect(native.rates['music-player'], 2);
+      expect(handler.playbackState.value.speed, 2);
+      playFrom(0);
+      final clock = time.stopwatch()..start();
+      await playUntil(
+        () => handler.mediaItem.value?.id == 'two',
+        const Duration(seconds: 100),
+      );
+      // 195 s of song in under 100 s.
+      expect(clock.elapsed, lessThan(const Duration(seconds: 99)));
+      final incoming = mixDecks().single;
+      final start = mixStart(incoming);
+      expect(start.at, inInclusiveRange(195000, 195200));
+      expect(start.cue, 0);
+      // The incoming deck plays at the listener's speed as well.
+      expect(start.rate, 2);
+      expect(handler.playbackState.value.speed, 2);
+
+      // The 5 s fade covers the same 5 s of song, which take 2.5 s.
+      final fade = time.stopwatch()..start();
+      await playUntil(
+        () => !native.live.contains('music-player'),
+        const Duration(seconds: 5),
+      );
+      expect(fade.elapsed.inMilliseconds, inInclusiveRange(2200, 2900));
+      expect(native.lastVolume(incoming), closeTo(1, 0.0001));
+    });
+
+    fakeTimeTest(
+      'the session reports each new speed from where it was',
+      () async {
+        await handler.setQueueAndPlay(_tracks);
+        playFrom(10000);
+        await Future<void>.delayed(const Duration(seconds: 1));
+        final before = handler.playbackState.value.position;
+        musicPlayerRuntime.configure(
+          musicPlayerRuntime.settings.copyWith(playbackSpeed: 0.5),
+        );
+        final state = handler.playbackState.value;
+        expect(state.speed, 0.5);
+        expect(state.updatePosition, greaterThanOrEqualTo(before));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(native.rates['music-player'], 0.5);
+        expect(playbackTempoSupport.value, isNot(PlaybackTempoSupport.none));
+      },
+    );
+
+    fakeTimeTest('the preparation lead grows with the speed', () async {
+      setLengths(const Duration(minutes: 6));
+      setAutoMixEnabled(true);
+      await handler.setQueueAndPlay(_tracks);
+      // 300 s of song before the end still leave 150 s to prepare.
+      native.positions['music-player'] = 59000;
+      await Future<void>.delayed(const Duration(seconds: 1));
+      expect(analyzer.calls, isEmpty);
+      native.positions['music-player'] = 61000;
+      await _until(() => analyzer.calls.isNotEmpty);
+      expect(analyzer.calls, ['/one.flac', '/two.flac']);
+    });
+  });
+
   fakeTimeTest('a long beat-matched song mixes on its planned beat', () async {
     analyzer.matchBeats = true;
     setLengths(const Duration(seconds: 200));

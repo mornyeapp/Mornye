@@ -89,6 +89,8 @@ class _MusicCast {
         : handler._dependencies.createDeck('music-player');
     _appliedDevice = device;
     handler._listenToPlayer(handler._player);
+    // A receiver plays at normal speed and pitch.
+    handler._tempoChanged();
     await handler._disposeDeck(previous);
     handler._refreshPlaybackAutomation();
     if (device != null) {
