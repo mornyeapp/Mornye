@@ -84,9 +84,22 @@ class MediaPlayerWrapper(
         }
     }
 
+    override fun setPitch(pitch: Float) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (pitch == 1.0f && !playbackParamsApplied) return
+            mediaPlayer.playbackParams = mediaPlayer.playbackParams.setPitch(pitch)
+            playbackParamsApplied = true
+        }
+    }
+
     override fun setSource(source: Source) {
         reset()
         source.setForMediaPlayer(mediaPlayer)
+        val vol = wrappedPlayer.volume
+        val bal = wrappedPlayer.balance
+        val left = Math.min(1f, 1f - bal) * vol
+        val right = Math.min(1f, 1f + bal) * vol
+        mediaPlayer.setVolume(left, right)
     }
 
     override fun setLooping(looping: Boolean) {
@@ -95,7 +108,13 @@ class MediaPlayerWrapper(
 
     override fun start() {
         mixedOutput.hold(true)
+        val vol = wrappedPlayer.volume
+        val bal = wrappedPlayer.balance
+        val left = Math.min(1f, 1f - bal) * vol
+        val right = Math.min(1f, 1f + bal) * vol
+        mediaPlayer.setVolume(left, right)
         setRate(wrappedPlayer.rate)
+        setPitch(wrappedPlayer.pitch)
         // Do not depend on setPlaybackParams implicitly starting the output.
         mediaPlayer.start()
     }

@@ -324,7 +324,17 @@ internal fun Context.readCompleteMetadataFromUri(
     uri: Uri,
     displayNameHint: String? = null,
 ): JSONObject? = readMetadataFromUri(coreBackend, uri, displayNameHint) { path, name ->
-    JSONObject(coreBackend.readFileMetadata(path, name)).takeUnless { it.has("error") }
+    val obj = JSONObject(coreBackend.readFileMetadata(path, name)).takeUnless { it.has("error") }
+    if (obj != null) {
+        val lyrics = obj.optString("lyrics", "").trim()
+        if (lyrics.isEmpty()) {
+            val sidecar = readSafSidecarLrc(uri)
+            if (!sidecar.isNullOrBlank()) {
+                obj.put("lyrics", sidecar)
+            }
+        }
+    }
+    obj
 }
 
 /** Keep the resolved audio descriptor alive for quality and artwork reads.
@@ -494,6 +504,25 @@ internal fun Context.writeSafSidecarLrc(audioUri: Uri, lrcContent: String): Bool
             return false
         }
     }
+
+internal fun Context.readSafSidecarLrc(audioUri: Uri): String? {
+    try {
+        val parent = safParentDir(audioUri) ?: return null
+        val audioName = try {
+            DocumentFile.fromSingleUri(this, audioUri)?.name
+        } catch (_: Exception) {
+            null
+        } ?: return null
+        val baseName = audioName.substringBeforeLast('.', audioName)
+        val lrcName = "$baseName.lrc"
+        val lrcDoc = findSafChild(this, parent, lrcName) ?: return null
+        return contentResolver.openInputStream(lrcDoc.uri)?.use { stream ->
+            stream.bufferedReader(Charsets.UTF_8).readText()
+        }
+    } catch (_: Exception) {
+        return null
+    }
+}
 
 internal fun Context.runPostProcessingSafV2(
     coreBackend: CoreBackend,

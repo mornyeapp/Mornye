@@ -41,6 +41,7 @@ class _MusicGapless {
         !handler._player.isDirect &&
         !handler._disposed &&
         handler._sourceReady &&
+        !handler.isSleepTimerEndOfTrack &&
         handler._repeatMode != AudioServiceRepeatMode.one;
   }
 
@@ -195,6 +196,7 @@ class _MusicGapless {
         await deck.setFileSource(path);
       }
       if (!_current(generation)) return;
+      await deck.setVolume(volume);
       final duration = await deck.getDuration();
       if (!_current(generation)) return;
       final chained = await handler._player.setNextDeck(deck);
@@ -277,6 +279,7 @@ class _MusicGapless {
     handler._playbackAutomation.cancelPendingActions();
     handler._recordPlayHistory(index);
     handler._normalizationVolume = _nextVolume;
+    unawaited(incoming.setVolume(_nextVolume));
     handler._activeResolvedPath = _nextIsCopy ? path : null;
     handler._failures.started(next, path);
     handler._pendingRestorePosition = null;

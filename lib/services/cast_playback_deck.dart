@@ -172,6 +172,8 @@ class CastPlaybackDeck implements PlaybackDeck {
   @override
   Future<void> setPlaybackRate(double rate) async {}
   @override
+  Future<void> setPitch(double pitch) async {}
+  @override
   void startPositionUpdates(Duration interval, {bool Function()? wanted}) {}
   @override
   Future<void> cancelPreparation() async {

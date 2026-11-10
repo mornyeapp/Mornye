@@ -312,6 +312,7 @@ class LinkPhoneFileRequests {
 
   /// The names waiting or uploading.
   final _requested = <String>{};
+  final _activeStarts = <String, LinkUploadStart>{};
   int _uploading = 0;
   bool _disposed = false;
 
@@ -329,6 +330,7 @@ class LinkPhoneFileRequests {
   void dispose() {
     _disposed = true;
     _dropWaiting();
+    _activeStarts.clear();
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }
@@ -338,6 +340,7 @@ class LinkPhoneFileRequests {
   void _dropWaiting() {
     _requested.removeAll(_waiting);
     _waiting.clear();
+    _activeStarts.clear();
   }
 
   void _onMessage(Map<String, dynamic> message) {
@@ -447,7 +450,23 @@ class LinkPhoneFileRequests {
 
   /// Sends the song the desktop knows as [name] (`<fileId>.<suffix>`).
   void request(String name) {
-    if (_disposed || !_requested.add(name)) return;
+    if (_disposed) return;
+    if (_activeStarts[name] case final start?) {
+      _say({
+        'type': LinkMessageTypes.filesSending,
+        'name': name,
+        'file': start.name,
+        'size': start.size,
+        'streamable': start.streamable,
+      });
+      return;
+    }
+    if (!_requested.add(name)) {
+      if (_waiting.remove(name)) {
+        _waiting.addFirst(name);
+      }
+      return;
+    }
     _waiting.add(name);
     _next();
   }
@@ -475,13 +494,16 @@ class LinkPhoneFileRequests {
       await files.upload(
         client,
         file,
-        onStart: (start) => _say({
-          'type': LinkMessageTypes.filesSending,
-          'name': name,
-          'file': start.name,
-          'size': start.size,
-          'streamable': start.streamable,
-        }),
+        onStart: (start) {
+          _activeStarts[name] = start;
+          _say({
+            'type': LinkMessageTypes.filesSending,
+            'name': name,
+            'file': start.name,
+            'size': start.size,
+            'streamable': start.streamable,
+          });
+        },
       );
     } on Object catch (error) {
       _log.w('Could not send a song file to the desktop: $error');
@@ -490,6 +512,8 @@ class LinkPhoneFileRequests {
         'name': name,
         'reason': error is LinkException ? error.code : 'unavailable',
       });
+    } finally {
+      _activeStarts.remove(name);
     }
   }
 

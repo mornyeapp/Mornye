@@ -110,6 +110,26 @@ void main() {
       ).nowPlayingShuffleLibrary;
       expect(find.text(shuffleLibrary), findsNothing);
       expect(find.text('Next'), findsOneWidget);
+
+      // Switch to History tab
+      final historyTab = AppLocalizations.of(
+        tester.element(find.byType(MornyePlayerQueue)),
+      ).playerQueueTabHistory;
+      await tester.tap(find.text(historyTab));
+      await tester.pumpAndSettle();
+      expect(find.text('Previous'), findsOneWidget);
+      await tester.tap(find.text('Previous'));
+      expect(player.jumpedTo, 0);
+
+      // Switch back to Queue tab
+      final queueTab = AppLocalizations.of(
+        tester.element(find.byType(MornyePlayerQueue)),
+      ).playerQueueTabQueue;
+      await tester.tap(find.text(queueTab));
+      await tester.pumpAndSettle();
+      expect(find.text('Previous'), findsNothing);
+      expect(find.text('Next'), findsOneWidget);
+
       expect(tester.takeException(), isNull);
     },
   );

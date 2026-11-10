@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
+import 'package:mornye/controllers/library_re_enrich_all.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/library_browse_provider.dart';
@@ -325,6 +326,13 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
             : context.l10n.searchAlbums);
     final actions = <Widget>[
       if (_overview) const OpenAudioButton(),
+      if (_overview)
+        IconButton(
+          tooltip: context.l10n.libraryReEnrichAll,
+          icon: const Icon(Icons.auto_fix_high),
+          onPressed: () =>
+              reEnrichWholeLibrary(context, ref, isActive: () => mounted),
+        ),
       IconButton(
         tooltip: context.l10n.librarySearchHint,
         icon: const Icon(Icons.search),

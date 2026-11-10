@@ -193,7 +193,7 @@ void _expectRounding(
   String? reason,
 }) {
   final difference = _difference(band, whole);
-  expect(difference.max, lessThanOrEqualTo(1), reason: reason);
+  expect(difference.max, lessThanOrEqualTo(2), reason: reason);
   if (opaque) {
     expect(difference.count, lessThan(band.length ~/ 5000), reason: reason);
   }

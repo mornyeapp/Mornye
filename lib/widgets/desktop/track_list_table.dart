@@ -35,6 +35,10 @@ class TrackListTable extends ConsumerStatefulWidget {
     this.showPreview = false,
     this.onSaveCover,
     this.rowAction,
+    this.datesAdded,
+    this.sort,
+    this.onSort,
+    this.sortableColumns,
   });
 
   /// See [SliverTrackTable.albumLayout] and [SliverTrackTable.albumArtist].
@@ -42,6 +46,14 @@ class TrackListTable extends ConsumerStatefulWidget {
   final String? albumArtist;
 
   final List<Track> tracks;
+
+  /// Optional date added for each track by index (e.g. for playlists).
+  final List<DateTime>? datesAdded;
+
+  /// External sort configuration, if controlled by caller.
+  final TrackTableSort? sort;
+  final ValueChanged<TrackTableSort?>? onSort;
+  final Set<TrackTableColumn>? sortableColumns;
 
   /// Selection id of each track, by index.
   final List<String> ids;
@@ -93,7 +105,8 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
         (widget.rowAction == null) != (oldWidget.rowAction == null) ||
         !listEquals(widget.tracks, oldWidget.tracks) ||
         !listEquals(widget.ids, oldWidget.ids) ||
-        !listEquals(widget.isInHistory, oldWidget.isInHistory)) {
+        !listEquals(widget.isInHistory, oldWidget.isInHistory) ||
+        !listEquals(widget.datesAdded, oldWidget.datesAdded)) {
       _rows = _buildRows();
     }
   }
@@ -117,6 +130,9 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
           title: tracks[i].name,
           artist: tracks[i].artistName,
           album: tracks[i].albumName,
+          dateAdded: widget.datesAdded != null && i < widget.datesAdded!.length
+              ? widget.datesAdded![i]
+              : null,
           quality: tracks[i].audioQuality,
           duration: tracks[i].duration > 0
               ? Duration(seconds: tracks[i].duration)
@@ -172,12 +188,16 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
           TrackTableColumn.title,
           TrackTableColumn.artist,
           if (widget.showAlbum) TrackTableColumn.album,
+          if (widget.datesAdded != null) TrackTableColumn.dateAdded,
           // Catalog pages often list no quality before a download.
           if (rows.any((row) => row.quality?.isNotEmpty ?? false))
             TrackTableColumn.quality,
           TrackTableColumn.duration,
         ],
         selectedIds: widget.selectedIds,
+        sort: widget.sort,
+        onSort: widget.onSort,
+        sortableColumns: widget.sortableColumns,
         albumLayout: widget.albumLayout,
         albumArtist: widget.albumArtist,
         onSelect: widget.onSelect,

@@ -612,16 +612,88 @@ class _RewindBackdropState extends State<_RewindBackdrop> {
           );
     final current = widget.artworks[from];
     final next = widget.artworks[to];
+    final primary = Theme.of(context).colorScheme.primary;
+
+    // Fluid liquid aurora orbs drifting smoothly (Apple Music Replay style)
+    Widget auroraOrb({
+      required Alignment alignment,
+      required double size,
+      required Color color,
+      required Offset orbit,
+      required double speed,
+    }) => Align(
+      alignment: alignment,
+      child: Transform.translate(
+        offset: Offset(
+          math.sin(t * speed) * orbit.dx,
+          math.cos(t * speed) * orbit.dy,
+        ),
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [
+                color.withValues(alpha: 0.42),
+                color.withValues(alpha: 0.18),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.52, 1.0],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final aura1 = Color.lerp(
+      const Color(0xff7928ca), // Electric Violet
+      const Color(0xffff0080), // Neon Magenta
+      (math.sin(t * 0.35 + from) * 0.5 + 0.5),
+    )!;
+    final aura2 = Color.lerp(
+      primary,
+      const Color(0xff00d2ff), // Neon Cyan
+      (math.cos(t * 0.45 + to) * 0.5 + 0.5),
+    )!;
+    final aura3 = Color.lerp(
+      const Color(0xffff6b00), // Sunset Amber
+      const Color(0xffff0055), // Hot Rose
+      (math.sin(t * 0.5) * 0.5 + 0.5),
+    )!;
+
     return ColoredBox(
       color: Colors.black,
       child: Stack(
         fit: StackFit.expand,
         children: [
+          // Dynamic ambient fluid aurora mesh
+          auroraOrb(
+            alignment: const Alignment(0.85, -0.75),
+            size: 340,
+            color: aura1,
+            orbit: const Offset(35, 25),
+            speed: 0.7,
+          ),
+          auroraOrb(
+            alignment: const Alignment(-0.85, 0.65),
+            size: 380,
+            color: aura2,
+            orbit: const Offset(30, 40),
+            speed: 0.85,
+          ),
+          auroraOrb(
+            alignment: const Alignment(0.65, 0.8),
+            size: 300,
+            color: aura3,
+            orbit: const Offset(25, 30),
+            speed: 0.6,
+          ),
           if (current == next)
-            artwork(current, 1)
+            artwork(current, 0.75)
           else ...[
-            artwork(current, 1 - blend),
-            artwork(next, blend),
+            artwork(current, 0.75 * (1 - blend)),
+            artwork(next, 0.75 * blend),
           ],
           DecoratedBox(
             decoration: BoxDecoration(
@@ -629,8 +701,8 @@ class _RewindBackdropState extends State<_RewindBackdrop> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withValues(alpha: 0.45),
-                  Colors.black.withValues(alpha: 0.8),
+                  Colors.black.withValues(alpha: 0.30),
+                  Colors.black.withValues(alpha: 0.68),
                 ],
               ),
             ),

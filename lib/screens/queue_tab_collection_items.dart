@@ -596,7 +596,7 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
               ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
             ),
             Text(
-              context.l10n.itemCount(count),
+              count > 0 ? context.l10n.itemCount(count) : 'Smart Playlist',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -613,6 +613,9 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     LibraryCollectionsState collectionState,
   ) {
     final entries = <_CollectionEntry>[];
+    entries.add(_CollectionEntry.recentlyAdded);
+    entries.add(_CollectionEntry.mostPlayed);
+    entries.add(_CollectionEntry.bpmMix);
     if (collectionState.wishlistCount > 0) {
       entries.add(_CollectionEntry.wishlist);
     }
@@ -634,6 +637,27 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     _CollectionEntryType type,
     LibraryCollectionsState collectionState,
   ) => switch (type) {
+    _CollectionEntryType.recentlyAdded => (
+      Icons.schedule_rounded,
+      const Color(0xFF2196F3),
+      'Aggiunti di recente',
+      0,
+      () => _openSmartPlaylist(SmartPlaylistType.recentlyAdded),
+    ),
+    _CollectionEntryType.mostPlayed => (
+      Icons.local_fire_department_rounded,
+      const Color(0xFFFF5722),
+      'I più ascoltati',
+      0,
+      () => _openSmartPlaylist(SmartPlaylistType.mostPlayed),
+    ),
+    _CollectionEntryType.bpmMix => (
+      Icons.speed_rounded,
+      const Color(0xFF00BFA5),
+      'BPM Mix',
+      0,
+      () => _openSmartPlaylist(SmartPlaylistType.bpmMix),
+    ),
     _CollectionEntryType.wishlist => (
       Icons.add_circle_outline,
       const Color(0xFF1DB954),
@@ -800,8 +824,14 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
         entry.type,
         collectionState,
       );
+      final isSmart =
+          entry.type == _CollectionEntryType.recentlyAdded ||
+          entry.type == _CollectionEntryType.mostPlayed ||
+          entry.type == _CollectionEntryType.bpmMix;
       final countText = entry.type == _CollectionEntryType.favoriteArtists
           ? context.l10n.collectionArtistCount(count)
+          : isSmart
+          ? 'Smart Playlist'
           : '$count ${count == 1 ? 'track' : 'tracks'}';
       return _buildCollectionListItem(
         context: context,

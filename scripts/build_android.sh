@@ -105,6 +105,28 @@ BUILD_GIT_COMMIT="$(git rev-parse --short=8 HEAD)"
   --dart-define="GIT_COMMIT=$BUILD_GIT_COMMIT" \
   ${FLUTTER_ARGS[@]+"${FLUTTER_ARGS[@]}"}
 
+APKSIGNER="$(find "${ANDROID_HOME:-$HOME/Android/Sdk}/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -n 1 || command -v apksigner || true)"
+DEBUG_KEYSTORE="$HOME/.android/debug.keystore"
+if [[ ! -f "$PROJECT_DIR/android/key.properties" && -n "$APKSIGNER" && -x "$APKSIGNER" && -f "$DEBUG_KEYSTORE" ]]; then
+  for target in "${ANDROID_ABIS[@]}" universal; do
+    apk="app-$target-release.apk"
+    if [[ "$target" == "universal" ]]; then
+      apk=app-release.apk
+    fi
+    if [[ -f "$OUTPUT_DIR/$apk" ]]; then
+      "$APKSIGNER" sign \
+        --ks "$DEBUG_KEYSTORE" \
+        --ks-pass pass:android \
+        --key-pass pass:android \
+        --ks-key-alias androiddebugkey \
+        --v1-signing-enabled true \
+        --v2-signing-enabled true \
+        --v3-signing-enabled true \
+        "$OUTPUT_DIR/$apk"
+    fi
+  done
+fi
+
 for target in "${ANDROID_ABIS[@]}" universal; do
   apk="app-$target-release.apk"
   abis="$target"

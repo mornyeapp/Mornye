@@ -6,6 +6,9 @@ final playbackEqualizer = ValueNotifier<EqualizerSettings>(
   const EqualizerSettings(),
 );
 
+/// Whether Bauer spatial audio crossfeed is active.
+final playbackSpatialAudio = ValueNotifier<bool>(false);
+
 /// A native error is surfaced in the editor rather than claiming EQ is active.
 final playbackEqualizerError = ValueNotifier<String?>(null);
 

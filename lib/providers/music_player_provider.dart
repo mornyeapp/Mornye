@@ -402,6 +402,7 @@ class MusicPlayerController {
   MusicPlayerHandler? get _handler => _runtime.handler;
 
   DateTime? get sleepTimerEndsAt => _handler?.sleepTimerEndsAt;
+  bool get isSleepTimerEndOfTrack => _handler?.isSleepTimerEndOfTrack ?? false;
 
   Future<MusicPlayerHandler?> ensureInitialized() async {
     try {
@@ -423,6 +424,19 @@ class MusicPlayerController {
   }
 
   Future<void> playSingle(PlayableMedia item) => playAll([item]);
+
+  Future<void> updateQueuePreservingCurrent(
+    List<PlayableMedia> items,
+    int currentIndex,
+  ) async {
+    final handler = await ensureInitialized();
+    handler?.updateQueuePreservingCurrent(items, currentIndex);
+  }
+
+  Future<bool> orderUpcomingQueueByBpm() async {
+    final handler = await ensureInitialized();
+    return await handler?.orderUpcomingQueueByBpm() ?? false;
+  }
 
   Future<({LocalLibraryItem item, List<LocalLibraryItem> tracks})?>
   localAlbumFor(String mediaId) async {
@@ -522,6 +536,8 @@ class MusicPlayerController {
 
   void setSleepTimer(Duration duration) => _handler?.setSleepTimer(duration);
 
+  void setSleepTimerEndOfTrack() => _handler?.setSleepTimerEndOfTrack();
+
   void cancelSleepTimer() => _handler?.cancelSleepTimer();
 
   Future<void> togglePlayPause(bool isPlaying) async {
@@ -551,6 +567,11 @@ class MusicPlayerController {
 
   Future<void> setRepeatMode(AudioServiceRepeatMode mode) async =>
       remote?.setRepeatMode(mode) ?? _handler?.setRepeatMode(mode);
+
+  Future<void> setSpeed(double speed) async => _handler?.setSpeed(speed);
+
+  Future<void> setPitch(double semitones) async =>
+      _handler?.setPitch(semitones);
 
   Future<void> playNext(PlayableMedia item) async {
     if (remote case final remote?) {

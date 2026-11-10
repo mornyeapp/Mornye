@@ -112,6 +112,7 @@ class ExclusiveOutputDeck implements PlaybackDeck, QueuedPlaybackDeck {
     _active = target;
     await target.setVolume(_volume);
     await target.setPlaybackRate(_rate);
+    await target.setPitch(_pitch);
     if (_positionInterval case final interval?) {
       target.startPositionUpdates(interval, wanted: _positionWanted);
     }
@@ -234,6 +235,14 @@ class ExclusiveOutputDeck implements PlaybackDeck, QueuedPlaybackDeck {
   Future<void> setPlaybackRate(double rate) {
     _rate = rate;
     return _active.setPlaybackRate(rate);
+  }
+
+  double _pitch = 1.0;
+
+  @override
+  Future<void> setPitch(double pitch) {
+    _pitch = pitch;
+    return _active.setPitch(pitch);
   }
 
   @override

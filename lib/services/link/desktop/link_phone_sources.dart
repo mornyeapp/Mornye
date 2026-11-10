@@ -95,7 +95,7 @@ class LinkPhoneSources
     required LinkArrivingFiles? Function() arriving,
     List<String> Function()? connectedDevices,
     Future<Map<String, dynamic>> Function(String path)? readTags,
-    this.answerTimeout = const Duration(seconds: 15),
+    this.answerTimeout = const Duration(seconds: 30),
     this.lyricsTimeout = const Duration(seconds: 5),
     this.deleteTimeout = const Duration(seconds: 20),
     this.progressInterval = const Duration(milliseconds: 250),
@@ -270,6 +270,10 @@ class LinkPhoneSources
     if (received != null) return received;
     final sending = _sending[name];
     if (sending != null) {
+      if (!sending.streamable) {
+        await sending.arrival.done;
+        return sending.arrival.path;
+      }
       final arrival = await _arriving()?.expect(
         _receivedDir(),
         sending.file,
@@ -461,6 +465,12 @@ class LinkPhoneSources
         pending.deviceId == deviceId &&
         !pending.answer.isCompleted) {
       pending.answer.complete(message);
+    } else if (pending == null &&
+        type == LinkMessageTypes.filesSending &&
+        name is String &&
+        _songName(name) != null &&
+        !_sending.containsKey(name)) {
+      _arrive(name, message).ignore();
     }
     return true;
   }

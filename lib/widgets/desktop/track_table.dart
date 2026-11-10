@@ -12,7 +12,15 @@ import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
 
 /// A column of a [SliverTrackTable], in display order.
-enum TrackTableColumn { number, title, artist, album, quality, duration }
+enum TrackTableColumn {
+  number,
+  title,
+  artist,
+  album,
+  dateAdded,
+  quality,
+  duration,
+}
 
 /// The column a [SliverTrackTable] is sorted by, and its direction.
 typedef TrackTableSort = ({TrackTableColumn column, bool ascending});
@@ -26,6 +34,7 @@ class TrackTableRow {
     this.number,
     this.artist,
     this.album,
+    this.dateAdded,
     this.quality,
     this.duration,
     this.leading,
@@ -40,6 +49,7 @@ class TrackTableRow {
   final int? number;
   final String? artist;
   final String? album;
+  final DateTime? dateAdded;
 
   /// Format or quality label, such as "FLAC 24-bit/96kHz".
   final String? quality;
@@ -337,6 +347,7 @@ Comparable<Object?>? _sortKey(TrackTableRow row, TrackTableColumn column) {
     TrackTableColumn.title => text(row.title),
     TrackTableColumn.artist => text(row.artist),
     TrackTableColumn.album => text(row.album),
+    TrackTableColumn.dateAdded => row.dateAdded?.millisecondsSinceEpoch,
     TrackTableColumn.duration => row.duration?.inMilliseconds,
     TrackTableColumn.quality => switch (row.quality) {
       null || '' => null,
@@ -394,6 +405,7 @@ class TrackTableLayout {
   const TrackTableLayout._();
 
   static const double number = 44;
+  static const double dateAdded = 110;
   static const double quality = 132;
   static const double duration = 64;
   static const double trailing = 52;
@@ -418,6 +430,7 @@ class TrackTableLayout {
 
   static double? width(TrackTableColumn column) => switch (column) {
     TrackTableColumn.number => number,
+    TrackTableColumn.dateAdded => dateAdded,
     TrackTableColumn.quality => quality,
     TrackTableColumn.duration => duration,
     _ => null,
@@ -494,6 +507,7 @@ class _TrackTableHeader extends StatelessWidget {
       TrackTableColumn.title => l10n.editMetadataFieldTitle,
       TrackTableColumn.artist => l10n.trackArtist,
       TrackTableColumn.album => l10n.trackAlbum,
+      TrackTableColumn.dateAdded => 'Date added',
       TrackTableColumn.quality => l10n.audioInfoQuality,
       TrackTableColumn.duration => l10n.trackDuration,
     };
@@ -739,6 +753,11 @@ class _TrackTableRowViewState extends State<_TrackTableRowView> {
       ),
       TrackTableColumn.artist => plain(row.artist),
       TrackTableColumn.album => plain(row.album),
+      TrackTableColumn.dateAdded => plain(
+        row.dateAdded == null
+            ? null
+            : '${row.dateAdded!.toLocal().year}-${row.dateAdded!.toLocal().month.toString().padLeft(2, '0')}-${row.dateAdded!.toLocal().day.toString().padLeft(2, '0')}',
+      ),
       TrackTableColumn.quality => plain(row.quality),
       TrackTableColumn.duration => plain(
         row.duration == null ? null : _formatDuration(row.duration!),

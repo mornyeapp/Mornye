@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
@@ -228,7 +229,7 @@ jobs:
         run: dart scripts/prepare_flutter_sdk.dart
 
       - name: Prepare pinned Discord SDK
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: github.repository == 'mornyeapp/Mornye'
         uses: ./.github/actions/discord-sdk
         with:
           passphrase: ${{ secrets.DISCORD_MOBILE_SDK_PASSPHRASE }}
@@ -308,7 +309,7 @@ jobs:
 
       # Fork PRs cannot access repository secrets and exercise the Lite build.
       - name: Prepare pinned Discord SDK
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: github.repository == 'mornyeapp/Mornye'
         uses: ./.github/actions/discord-sdk
         with:
           passphrase: ${{ secrets.DISCORD_MOBILE_SDK_PASSPHRASE }}
@@ -385,3 +386,11 @@ jobs:
           path: |
             build/symbols/android/
             build/app/outputs/mapping/release/mapping.txt
+
+      - name: Retain Android APKs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mornye-apks
+          if-no-files-found: error
+          retention-days: 14
+          path: build/app/outputs/flutter-apk/*.apk

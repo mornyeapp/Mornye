@@ -35,12 +35,19 @@ Map<String, dynamic> playbackDisplayMetadata(Object? value) {
     'replaygain_album_gain',
     'replaygain_album_peak',
     'lyrics',
+    'description',
+    'comment',
   };
   return {
     for (final key in keys)
       if (value[key] case final Object field
           when (field is String &&
-                  field.length <= (key == 'lyrics' ? 256 * 1024 : 4096)) ||
+                  field.length <=
+                      (key == 'lyrics' ||
+                              key == 'description' ||
+                              key == 'comment'
+                          ? 256 * 1024
+                          : 4096)) ||
               (field is num && field.isFinite) ||
               field is bool)
         key: field,

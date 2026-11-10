@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/widgets/open_audio_button.dart';
 import 'package:flutter/foundation.dart'
     show ValueListenable, listEquals, setEquals;
@@ -76,6 +77,8 @@ import 'package:mornye/services/album_completeness.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/services/batch_track_actions.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
+import 'package:mornye/screens/smart_playlist_screen.dart';
+import 'package:mornye/services/smart_playlists_service.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/screens/listening_rewind_screen.dart';
 import 'package:mornye/screens/favorite_artists_screen.dart';
@@ -889,7 +892,17 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                   AppSliverHeader.tabRoot(
                     title: context.l10n.navLibrary,
                     alignToContent: true,
-                    actions: const [OpenAudioButton()],
+                    actions: [
+                      AppIconButton(
+                        icon: const Icon(Icons.insights_outlined),
+                        tooltip: context.l10n.listeningStats,
+                        onPressed: () => pushPage<void>(
+                          context,
+                          (_) => const ListeningStatisticsScreen(),
+                        ),
+                      ),
+                      const OpenAudioButton(),
+                    ],
                   )
                 else
                   AppSliverHeader.page(

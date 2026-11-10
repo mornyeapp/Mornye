@@ -286,6 +286,9 @@ class _MemoryStore implements SongAnalysisStore {
   final rows = <String, SongAnalysisRecord>{};
 
   @override
+  Future<Database> get database => throw UnimplementedError();
+
+  @override
   int get version => SongFeatures.version;
 
   @override

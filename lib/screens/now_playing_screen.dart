@@ -17,6 +17,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/screens/lyrics_share_screen.dart';
+import 'package:mornye/services/queue_lyrics_prefetcher.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -42,6 +43,8 @@ import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_queue_sheet.dart';
 import 'package:mornye/widgets/player_details_sheet.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
+import 'package:mornye/widgets/fluid_mesh_glow.dart';
+import 'package:mornye/widgets/pitch_tempo_control_sheet.dart';
 import 'package:mornye/widgets/material_player_layout.dart';
 import 'package:mornye/widgets/mornye_player_layout.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
@@ -131,6 +134,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   late int _currentPage = widget.initialPage;
   bool _landscape = false;
   bool _queueSheetShowing = false;
+  double _horizontalDragDelta = 0;
+  double _verticalDragDelta = 0;
   String? _measuredMotionSource;
   double? _motionAspectRatio;
   String? _failedMotionSource;
@@ -153,6 +158,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   final _motionArtworkKey = GlobalKey();
   final _artworkForeground = ValueNotifier<Map<String, Color>>({});
   final _seekPreview = PlaybackSeekPreview();
+  late final QueueLyricsPrefetcher _lyricsPrefetcher = QueueLyricsPrefetcher(
+    onPrefetch: (item) => _trackMetadata.prefetch(item),
+  );
+  ProviderSubscription<AsyncValue<List<MediaItem>>>? _queueSub;
   NowPlayingRoute? _artworkRoute;
 
   @override
@@ -170,6 +179,17 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             inspectUnresolvedContentUri: _currentPage == 1,
           ),
         );
+        final queue = ref.read(playQueueProvider).value ?? const [];
+        final currentIndex = ref.read(currentQueueIndexProvider);
+        _lyricsPrefetcher.updateQueue(queue: queue, currentIndex: currentIndex);
+      },
+    );
+    _queueSub = ref.listenManual<AsyncValue<List<MediaItem>>>(
+      playQueueProvider,
+      (previous, next) {
+        final queue = next.value ?? const [];
+        final currentIndex = ref.read(currentQueueIndexProvider);
+        _lyricsPrefetcher.updateQueue(queue: queue, currentIndex: currentIndex);
       },
     );
     _lyricsPlayingSub = ref.listenManual<bool>(playbackPlayingProvider, (
@@ -263,6 +283,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _artworkRoute?.readArtwork = null;
     _lyricsIdleTimer?.cancel();
     _mediaItemSub?.close();
+    _queueSub?.close();
     _lyricsPlayingSub?.close();
     _lyricsAutoHideSub?.close();
     _lyricsTranslation.cancel(owner: this);
@@ -340,9 +361,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) &&
             !MediaQuery.disableAnimationsOf(context)
         ? ref.watch(
-            playerMotionArtworkProvider((
-              album: mediaItem.album ?? '',
+            trackCanvasProvider((
+              id: mediaItem.id,
+              title: mediaItem.title,
               artist: mediaItem.artist ?? '',
+              album: mediaItem.album ?? '',
+              source: source,
+              spotifyId:
+                  mediaItem.extras?['spotify_id']?.toString() ??
+                  mediaItem.extras?['spotifyId']?.toString(),
+              canvasUrl:
+                  mediaItem.extras?['canvas_url']?.toString() ??
+                  mediaItem.extras?['canvas']?.toString() ??
+                  mediaItem.extras?['header_video']?.toString(),
             )),
           )
         : null;
@@ -390,26 +421,56 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     if (!fullBleed && _artworkForeground.value.isNotEmpty) {
       _artworkForeground.value = {};
     }
-    Widget artwork() => MornyePlayerArtwork(
-      mediaItem: mediaItem,
-      videoUrl: motionArtwork?.source,
-      resolvingVideo: motionState?.isLoading == true,
-      onAspectRatioChanged: (ratio) {
-        if (!mounted ||
-            (_measuredMotionSource == motionArtwork?.source &&
-                _motionAspectRatio == ratio)) {
-          return;
-        }
-        setState(() {
-          _measuredMotionSource = motionArtwork?.source;
-          _motionAspectRatio = ratio;
-        });
+    Widget artwork() => GestureDetector(
+      key: const ValueKey('now-playing-artwork-gesture'),
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragStart: (_) {
+        _horizontalDragDelta = 0;
       },
-      onError: () {
-        if (mounted) {
-          setState(() => _failedMotionSource = motionArtwork?.source);
+      onHorizontalDragUpdate: (details) {
+        _horizontalDragDelta += details.primaryDelta ?? 0;
+      },
+      onHorizontalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity < -150 || _horizontalDragDelta < -60) {
+          ref.read(musicPlayerControllerProvider).next();
+        } else if (velocity > 150 || _horizontalDragDelta > 60) {
+          ref.read(musicPlayerControllerProvider).previous();
         }
       },
+      onVerticalDragStart: (_) {
+        _verticalDragDelta = 0;
+      },
+      onVerticalDragUpdate: (details) {
+        _verticalDragDelta += details.primaryDelta ?? 0;
+      },
+      onVerticalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity > 250 || _verticalDragDelta > 80) {
+          Navigator.of(context).maybePop();
+        }
+      },
+      child: MornyePlayerArtwork(
+        mediaItem: mediaItem,
+        videoUrl: motionArtwork?.source,
+        resolvingVideo: motionState?.isLoading == true,
+        onAspectRatioChanged: (ratio) {
+          if (!mounted ||
+              (_measuredMotionSource == motionArtwork?.source &&
+                  _motionAspectRatio == ratio)) {
+            return;
+          }
+          setState(() {
+            _measuredMotionSource = motionArtwork?.source;
+            _motionAspectRatio = ratio;
+          });
+        },
+        onError: () {
+          if (mounted) {
+            setState(() => _failedMotionSource = motionArtwork?.source);
+          }
+        },
+      ),
     );
 
     // The Mornye route moves the entire player together. A second,
@@ -677,6 +738,35 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               // Devices entry only takes a slot when paired.
                               if (ref.watch(linkPhoneClientProvider) != null)
                                 const LinkDevicesButton(color: Colors.white),
+                              if (ref.watch(
+                                settingsProvider.select(
+                                  (s) => s.pitchTempoControls,
+                                ),
+                              ))
+                                IconButton(
+                                  tooltip: 'Pitch & Tempo',
+                                  color: Colors.white,
+                                  style: IconButton.styleFrom(
+                                    backgroundColor:
+                                        (ref.watch(
+                                                  settingsProvider.select(
+                                                    (s) => s.playbackPitch,
+                                                  ),
+                                                ) !=
+                                                0 ||
+                                            ref.watch(
+                                                  settingsProvider.select(
+                                                    (s) => s.playbackSpeed,
+                                                  ),
+                                                ) !=
+                                                1.0)
+                                        ? Colors.white.withValues(alpha: 0.22)
+                                        : Colors.transparent,
+                                  ),
+                                  icon: const AppIcon(Icons.speed_rounded),
+                                  onPressed: () =>
+                                      PitchTempoControlSheet.show(context),
+                                ),
                               IconButton(
                                 tooltip: context.l10n.nowPlayingUpNext,
                                 color: Colors.white,
@@ -764,7 +854,29 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       ),
     );
     if (!mornye) {
-      if (!materialBackdrop) return _lyricsPointerListener(player);
+      final isAmoled =
+          Theme.of(context).scaffoldBackgroundColor == Colors.black;
+      if (!materialBackdrop) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: KeyedSubtree(
+                key: const ValueKey('now-playing-fluid-mesh'),
+                child: IgnorePointer(
+                  child: FluidMeshGlow(
+                    artUri: mediaItem.artUri,
+                    colorScheme: colorScheme,
+                    opacity: _currentPage == 1 ? 0.38 : 0.28,
+                    isAmoled: isAmoled,
+                  ),
+                ),
+              ),
+            ),
+            _lyricsPointerListener(player),
+          ],
+        );
+      }
       return Stack(
         fit: StackFit.expand,
         children: [
@@ -772,6 +884,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             mediaItem: mediaItem,
             colorScheme: colorScheme,
             showArtwork: materialFullScreen && _currentPage != 1,
+          ),
+          Positioned.fill(
+            child: KeyedSubtree(
+              key: const ValueKey('now-playing-fluid-mesh'),
+              child: IgnorePointer(
+                child: FluidMeshGlow(
+                  artUri: mediaItem.artUri,
+                  colorScheme: colorScheme,
+                  opacity: _currentPage == 1 ? 0.38 : 0.28,
+                  isAmoled: isAmoled,
+                ),
+              ),
+            ),
           ),
           _lyricsPointerListener(player),
         ],
@@ -802,7 +927,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 artUri: mediaItem.artUri,
                 squareArtwork: squareArtwork,
                 artworkAspectRatio: artworkRatio,
-                fadeStart: stillFullBleed ? 0.72 : 0.58,
+                fadeStart: stillFullBleed ? 0.38 : 0.42,
+                ambientGlow: true,
                 artwork: fullBleed && !_landscape && _currentPage == 0
                     ? PlayerTransitionArtwork(
                         artworkKey: _motionArtworkKey,
@@ -1115,7 +1241,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   }) async {
     final controller = ref.read(musicPlayerControllerProvider);
     final sleepTimerEndsAt = controller.sleepTimerEndsAt;
-    final sleepTimerSubtitle = sleepTimerEndsAt == null
+    final isEndOfTrack = controller.isSleepTimerEndOfTrack;
+    final sleepTimerSubtitle = isEndOfTrack
+        ? 'Al termine del brano'
+        : sleepTimerEndsAt == null
         ? null
         : context.l10n.nowPlayingSleepTimerActive(
             MaterialLocalizations.of(
@@ -1198,6 +1327,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     title: sheetContext.l10n.nowPlayingSleepTimer,
                     subtitle: sleepTimerSubtitle,
                     onTap: () => Navigator.of(sheetContext).pop('sleepTimer'),
+                  ),
+                  SettingsItem(
+                    icon: Icons.compare_arrows,
+                    title: sheetContext.l10n.djModeTitle,
+                    subtitle:
+                        ref.watch(settingsProvider.select((s) => s.autoMix))
+                        ? sheetContext.l10n.djModeOn
+                        : sheetContext.l10n.djModeOff,
+                    onTap: () => Navigator.of(sheetContext).pop('djMode'),
                   ),
                   SettingsItem(
                     icon: Icons.equalizer,
@@ -1283,6 +1421,22 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       case 'sleepTimer':
         await _showSleepTimerSheet(context, controller, colorScheme);
         break;
+      case 'djMode':
+        final current = ref.read(settingsProvider).autoMix;
+        ref.read(settingsProvider.notifier).setAutoMix(!current);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                !current
+                    ? context.l10n.djModeActivated
+                    : context.l10n.djModeDeactivated,
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        break;
       case 'equalizer':
         await pushPage<void>(context, (_) => const EqualizerScreen());
         break;
@@ -1301,7 +1455,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     ColorScheme colorScheme,
   ) async {
     const durations = [15, 30, 45, 60];
-    final isActive = controller.sleepTimerEndsAt != null;
+    final isActive =
+        controller.sleepTimerEndsAt != null ||
+        controller.isSleepTimerEndOfTrack;
     final selection = await showAppBottomSheet<String>(
       context: context,
       useRootNavigator: true,
@@ -1315,9 +1471,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               SettingsItem(
                 icon: Icons.timer_outlined,
                 title: sheetContext.l10n.nowPlayingSleepTimerMinutes(minutes),
-                showDivider: isActive || minutes != durations.last,
+                showDivider: true,
                 onTap: () => Navigator.of(sheetContext).pop('$minutes'),
               ),
+            SettingsItem(
+              icon: Icons.music_note_outlined,
+              title: 'Al termine del brano attuale',
+              showDivider: isActive,
+              onTap: () => Navigator.of(sheetContext).pop('endOfTrack'),
+            ),
             if (isActive)
               SettingsItem(
                 icon: Icons.timer_off_outlined,
@@ -1333,8 +1495,18 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
     if (selection == 'off') {
       controller.cancelSleepTimer();
+      if (mounted) setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.nowPlayingSleepTimerCancelled)),
+      );
+      return;
+    }
+
+    if (selection == 'endOfTrack') {
+      controller.setSleepTimerEndOfTrack();
+      if (mounted) setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Timer impostato al termine del brano')),
       );
       return;
     }
@@ -1342,6 +1514,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final minutes = int.tryParse(selection);
     if (minutes == null) return;
     controller.setSleepTimer(Duration(minutes: minutes));
+    if (mounted) setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(

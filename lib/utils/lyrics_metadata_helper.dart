@@ -80,6 +80,80 @@ bool hasUsableLyricsContent(String lyrics) {
   return false;
 }
 
+/// Extracts lyrics from a description, comment, or unstructured metadata text.
+String extractLyricsFromDescription(String text) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return '';
+
+  // 1. If it contains LRC timestamps, extract timestamped lines
+  final timestampMatches = RegExp(
+    r'\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\].+',
+  ).allMatches(trimmed);
+  if (timestampMatches.length >= 2) {
+    return timestampMatches.map((m) => m.group(0)!).join('\n');
+  }
+
+  // 2. Look for explicit lyrics header: Lyrics:, Testo:, Letra:, Paroles:
+  final headerMatch = RegExp(
+    r'(?:^|\n)\s*(?:[-=*#~\[\(]*\s*)?(?:lyrics|testo|letra|paroles|song\s*lyrics|testo\s*della\s*canzone)\s*(?:[-=*#~\]\)]*)\s*:\s*\n?',
+    caseSensitive: false,
+  ).firstMatch(trimmed);
+
+  if (headerMatch != null) {
+    final afterHeader = trimmed.substring(headerMatch.end).trim();
+    if (afterHeader.isNotEmpty) {
+      // Cut off any trailing promotional sections if present
+      final promoCutoff = RegExp(
+        r'\n\s*(?:[-=*#~]*\s*)?(?:follow|links?|subscribe|connect|copyright|socials?|merch|stream|listen|credits?)\b[^\n]*[:\n]',
+        caseSensitive: false,
+      ).firstMatch(afterHeader);
+      final candidate =
+          (promoCutoff != null
+                  ? afterHeader.substring(0, promoCutoff.start)
+                  : afterHeader)
+              .trim();
+      if (hasUsableLyricsContent(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  // 3. If multiple lines exist and at least 3 lines look like lyrics (not URLs or promo headers)
+  final lines = trimmed.split('\n');
+  final lyricLines = <String>[];
+  var inLyrics = false;
+  for (final rawLine in lines) {
+    final line = rawLine.trim();
+    if (line.isEmpty) {
+      if (inLyrics) lyricLines.add('');
+      continue;
+    }
+    // Skip common URL or promo lines
+    if (line.startsWith('http://') ||
+        line.startsWith('https://') ||
+        line.startsWith('www.')) {
+      continue;
+    }
+    if (RegExp(
+      r'^(?:follow|subscribe|connect|stream|buy|prod\.|produced by|mixed by|mastered by|directed by)\b',
+      caseSensitive: false,
+    ).hasMatch(line)) {
+      continue;
+    }
+
+    lyricLines.add(line);
+    inLyrics = true;
+  }
+
+  final cleaned = lyricLines.join('\n').trim();
+  if (lyricLines.where((l) => l.trim().isNotEmpty).length >= 3 &&
+      hasUsableLyricsContent(cleaned)) {
+    return cleaned;
+  }
+
+  return '';
+}
+
 bool hasEmbeddedLyricsMetadata(Map<String, String> metadata) {
   final lyrics = (metadata['LYRICS'] ?? '').trim();
   if (hasUsableLyricsContent(lyrics)) return true;

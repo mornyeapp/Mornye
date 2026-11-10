@@ -59,6 +59,7 @@ class DynamicColorWrapper extends ConsumerWidget {
               fontFamily: fontFamily,
               glassClarity: themeSettings.mornyeGlassClarity,
               glassOutlines: themeSettings.mornyeGlassOutlines,
+              isAmoled: themeSettings.useAmoled,
             ),
             themeSettings.themeMode,
           );
@@ -155,10 +156,10 @@ class DynamicColorWrapper extends ConsumerWidget {
       surface: Colors.black,
       onSurface: Colors.white,
       surfaceContainerLowest: Colors.black,
-      surfaceContainerLow: const Color(0xFF111111),
-      surfaceContainer: const Color(0xFF161616),
-      surfaceContainerHigh: const Color(0xFF1F1F1F),
-      surfaceContainerHighest: const Color(0xFF2A2A2A),
+      surfaceContainerLow: Colors.black,
+      surfaceContainer: const Color(0xFF080808),
+      surfaceContainerHigh: const Color(0xFF141414),
+      surfaceContainerHighest: const Color(0xFF202020),
       inverseSurface: Colors.white,
       onInverseSurface: Colors.black,
     );

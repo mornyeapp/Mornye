@@ -326,6 +326,12 @@ extension _QueueTabNavigation on _QueueTabState {
     );
   }
 
+  void _openSmartPlaylist(SmartPlaylistType type) {
+    _navigateWithUnfocus(
+      MaterialPageRoute(builder: (_) => SmartPlaylistScreen(type: type)),
+    );
+  }
+
   void _openPlaylistById(String playlistId) {
     _navigateWithUnfocus(
       MaterialPageRoute(

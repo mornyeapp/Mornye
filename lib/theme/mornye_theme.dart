@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mornye/models/theme_settings.dart';
+import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/app_tokens.dart';
 
 /// Flutter counterpart of Mornye's iPhone visual system. Reference values come
@@ -16,6 +17,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     this.fontFamily,
     this.glassClarity = kDefaultMornyeGlassClarity,
     this.glassOutlines = true,
+    this.isAmoled = false,
   });
 
   final Color? chromeSurface;
@@ -24,6 +26,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
   final String? fontFamily;
   final double glassClarity;
   final bool glassOutlines;
+  final bool isAmoled;
 
   static double glassClarityOf(BuildContext context) =>
       Theme.of(context).extension<MornyeTheme>()?.glassClarity ??
@@ -124,7 +127,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
   // key because it controls fonts and route transitions.
   static final _themeCache =
       <
-        (TargetPlatform, Brightness, Color?, MornyeAccent, bool, String?),
+        (TargetPlatform, Brightness, Color?, MornyeAccent, bool, String?, bool),
         ThemeData
       >{};
   static final _glassVariants = Expando<ThemeData>();
@@ -137,6 +140,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     String? fontFamily,
     double glassClarity = kDefaultMornyeGlassClarity,
     bool glassOutlines = true,
+    bool isAmoled = false,
   }) {
     final key = (
       defaultTargetPlatform,
@@ -145,6 +149,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
       accent,
       useSystemFont,
       fontFamily,
+      isAmoled,
     );
     var theme = _themeCache.remove(key);
     // Artwork chrome only tints a few roles, so derive it from the base theme.
@@ -154,6 +159,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
             selectedAccent: accent,
             useSystemFont: useSystemFont,
             fontFamily: fontFamily,
+            isAmoled: isAmoled,
           )
         : _withChromeSurface(
             build(
@@ -161,6 +167,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
               accent: accent,
               useSystemFont: useSystemFont,
               fontFamily: fontFamily,
+              isAmoled: isAmoled,
             ),
             chromeSurface,
           );
@@ -236,6 +243,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
       fontFamily: preferences?.fontFamily,
       glassClarity: preferences?.glassClarity ?? kDefaultMornyeGlassClarity,
       glassOutlines: preferences?.glassOutlines ?? true,
+      isAmoled: preferences?.isAmoled ?? false,
     );
   }
 
@@ -244,12 +252,15 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     required MornyeAccent selectedAccent,
     required bool useSystemFont,
     String? fontFamily,
+    bool isAmoled = false,
   }) {
     final dark = brightness == Brightness.dark;
     final accent = accentColor(selectedAccent, brightness);
     final foreground = dark ? Colors.white : Colors.black;
     final surface = dark ? Colors.black : Colors.white;
-    final grouped = dark ? const Color(0xff1c1c1e) : const Color(0xfff2f2f7);
+    final grouped = dark
+        ? (isAmoled ? Colors.black : const Color(0xff121214))
+        : const Color(0xfff2f2f7);
     final secondary = dark ? const Color(0xff98989f) : const Color(0xff6c6c70);
     final scheme =
         ColorScheme.fromSeed(
@@ -269,16 +280,20 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
           surface: surface,
           onSurface: foreground,
           surfaceContainerLowest: surface,
-          surfaceContainerLow: grouped,
-          surfaceContainer: grouped,
-          surfaceContainerHigh: dark ? const Color(0xff2c2c2e) : grouped,
+          surfaceContainerLow: isAmoled && dark ? Colors.black : grouped,
+          surfaceContainer: isAmoled && dark
+              ? const Color(0xff080808)
+              : grouped,
+          surfaceContainerHigh: dark
+              ? (isAmoled ? const Color(0xff121214) : const Color(0xff1c1c20))
+              : grouped,
           surfaceContainerHighest: dark
-              ? const Color(0xff3a3a3c)
+              ? (isAmoled ? const Color(0xff1c1c20) : const Color(0xff27272e))
               : const Color(0xffe5e5ea),
           onSurfaceVariant: secondary,
           outline: secondary,
           outlineVariant: dark
-              ? const Color(0xff38383a)
+              ? const Color(0xff2c2c34)
               : const Color(0xffc6c6c8),
           surfaceTint: Colors.transparent,
         );
@@ -293,7 +308,9 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
       color: foreground,
       fontFamily:
           fontFamily ??
-          (apple || useSystemFont ? type.textStyle.fontFamily : 'Inter'),
+          (apple || useSystemFont
+              ? type.textStyle.fontFamily
+              : AppTheme.bundledFontFamily),
     );
     final display = type.navLargeTitleTextStyle.copyWith(
       inherit: true,
@@ -302,7 +319,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
           fontFamily ??
           (apple || useSystemFont
               ? type.navLargeTitleTextStyle.fontFamily
-              : 'Inter'),
+              : AppTheme.bundledFontFamily),
     );
     // Supply complete styles: replacing a Material role with a bare TextStyle
     // loses its system family and retains Material tracking in other roles.
@@ -356,6 +373,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
           accent: selectedAccent,
           useSystemFont: useSystemFont,
           fontFamily: fontFamily,
+          isAmoled: isAmoled,
         ),
         tokens,
       ],
@@ -455,6 +473,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     String? fontFamily,
     double? glassClarity,
     bool? glassOutlines,
+    bool? isAmoled,
   }) => MornyeTheme(
     chromeSurface: chromeSurface ?? this.chromeSurface,
     accent: accent ?? this.accent,
@@ -462,6 +481,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     fontFamily: fontFamily ?? this.fontFamily,
     glassClarity: glassClarity ?? this.glassClarity,
     glassOutlines: glassOutlines ?? this.glassOutlines,
+    isAmoled: isAmoled ?? this.isAmoled,
   );
 
   @override
@@ -478,6 +498,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     glassOutlines: t < 0.5
         ? glassOutlines
         : other?.glassOutlines ?? glassOutlines,
+    isAmoled: t < 0.5 ? isAmoled : other?.isAmoled ?? isAmoled,
   );
 
   @override
@@ -488,7 +509,8 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
       other.useSystemFont == useSystemFont &&
       other.fontFamily == fontFamily &&
       other.glassClarity == glassClarity &&
-      other.glassOutlines == glassOutlines;
+      other.glassOutlines == glassOutlines &&
+      other.isAmoled == isAmoled;
 
   @override
   int get hashCode => Object.hash(
@@ -498,6 +520,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     fontFamily,
     glassClarity,
     glassOutlines,
+    isAmoled,
   );
 }
 
@@ -520,8 +543,11 @@ class MornyeSettingsTheme extends StatelessWidget {
     if (!context.isMornye) return child;
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
+    final isAmoled = theme.extension<MornyeTheme>()?.isAmoled == true;
     final background = dark ? Colors.black : const Color(0xfff2f2f7);
-    final group = dark ? const Color(0xff1c1c1e) : Colors.white;
+    final group = dark
+        ? (isAmoled ? const Color(0xff0d0d0f) : const Color(0xff1c1c1e))
+        : Colors.white;
     return Theme(
       data: _themes[theme] ??= theme.copyWith(
         scaffoldBackgroundColor: background,

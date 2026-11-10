@@ -146,6 +146,8 @@ class SoundPoolPlayer(
         streamId?.let { soundPool.setRate(it, rate) }
     }
 
+    override fun setPitch(pitch: Float) {}
+
     override fun setLooping(looping: Boolean) {
         streamId?.let { soundPool.setLoop(it, looping.loopModeInteger()) }
     }

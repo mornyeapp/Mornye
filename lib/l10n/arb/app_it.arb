@@ -8108,7 +8108,7 @@
   "@mornyeFavorited": {
     "description": "Selected state of the compact favorite action"
   },
-  "autoMixDescription": "Blend songs with beat matching and pitch-preserving tempo adjustment. Uses crossfade when beats cannot be matched.",
+  "autoMixDescription": "Sfuma e mixa le canzoni in modo continuo senza pause stile DJ con dissolvenza incrociata.",
   "gaplessPlayback": "Gapless playback",
   "@gaplessPlayback": {
     "description": "Playback settings switch that starts the next song the moment one ends"
@@ -8498,7 +8498,7 @@
   "listeningStatsRecord": "Record listening",
   "listeningStatsDescription": "Stored only on this device, starting now. Records the built-in player only; pauses, buffering and seeking add no listening time. A play counts after 30 seconds.",
   "listeningStatsEmpty": "Play music with the built-in player to start your listening recap. Earlier listening cannot be recovered.",
-  "listeningStatsDays": "{days} days",
+  "listeningStatsDays": "{days} giorni",
   "@listeningStatsDays": {
     "placeholders": {
       "days": {
@@ -8782,8 +8782,8 @@
   "autoMixPitch": "Pitch (semitones)",
   "autoMixEcho": "Echo",
   "autoMixLowPass": "Muffled filter",
-  "autoMixMixing": "Mixing",
-  "autoMixCrossfading": "Crossfade",
+  "autoMixMixing": "DJ Mix",
+  "autoMixCrossfading": "Transizione DJ",
   "playbackAutomation": "Automatic playback",
   "playbackPauseOnMute": "Pause when muted",
   "snackbarPlaybackMuted": "Media volume is zero. Playback paused. Press play again to continue.",
@@ -10443,5 +10443,28 @@
         "type": "String"
       }
     }
-  }
+  },
+  "djModeTitle": "Modalità DJ (Smart Crossfade)",
+  "djModeOn": "Attiva",
+  "djModeOff": "Disattivata",
+  "djModeActivated": "Modalità DJ (Smart Crossfade) attivata",
+  "djModeDeactivated": "Modalità DJ (Smart Crossfade) disattivata",
+  "syncLyricsAction": "Scarica testi mancanti",
+  "syncLyricsAllAction": "Scarica tutti i testi mancanti",
+  "syncLyricsAllSubtitle": "Salva permanentemente i testi nei file e come .lrc",
+  "syncLyricsChecking": "Controllo dei brani privi di testo...",
+  "syncLyricsCompleted": "Sincronizzazione completata",
+  "syncLyricsCancelled": "Sincronizzazione annullata",
+  "syncLyricsNoTracks": "Nessun brano locale o scaricato trovato da sincronizzare.",
+  "syncLyricsAllHaveLyrics": "Tutti i brani hanno già i testi sincronizzati.",
+  "syncLyricsSummary": "{successful} testi salvati nella memoria, {failed} non trovati.",
+  "syncLyricsCheckedCount": "{current} di {total} brani verificati",
+  "editPlaylistAction": "Modifica playlist",
+  "listeningStatsToday": "Oggi",
+  "djOrderQueueByBpm": "Ordina coda per Beat Matching (DJ)",
+  "djQueueBpmMatched": "Coda riordinata per Beat Matching DJ",
+  "playerQueueTabQueue": "In coda",
+  "playerQueueTabHistory": "Cronologia",
+  "playerQueueHistoryEmpty": "Nessun brano riprodotto di recente",
+  "playerQueuePlayedEarlier": "Brani precedenti"
 }

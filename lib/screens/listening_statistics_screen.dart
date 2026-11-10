@@ -34,7 +34,7 @@ class ListeningStatisticsScreen extends ConsumerStatefulWidget {
 
 class _ListeningStatisticsScreenState
     extends ConsumerState<ListeningStatisticsScreen> {
-  int _days = 7;
+  int _days = 1;
   int _year = DateTime.now().year;
   bool _clearing = false;
 
@@ -108,10 +108,12 @@ class _ListeningStatisticsScreenState
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          for (final days in [7, 30, 0])
+                          for (final days in [1, 7, 30, 0])
                             AppChoiceChip(
                               label: Text(
-                                days == 0
+                                days == 1
+                                    ? context.l10n.listeningStatsToday
+                                    : days == 0
                                     ? '$_year'
                                     : context.l10n.listeningStatsDays(days),
                               ),

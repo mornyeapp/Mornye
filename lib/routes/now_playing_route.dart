@@ -97,7 +97,7 @@ class NowPlayingRoute extends PageRoute<void> {
   void endDrag(DragEndDetails details, double pageHeight) {
     final velocity = (details.primaryVelocity ?? 0) / pageHeight;
     final value = controller?.value ?? 1.0;
-    if (velocity > 1.0 || (velocity >= 0 && value < 0.7)) {
+    if (velocity > 0.45 || (velocity >= 0 && value < 0.82)) {
       navigator?.pop();
     } else {
       _settleOpen();
@@ -247,6 +247,27 @@ class NowPlayingRoute extends PageRoute<void> {
         ? const AlwaysStoppedAnimation(Offset.zero)
         : slide.drive(Tween(begin: const Offset(0, 1), end: Offset.zero));
     final opacity = inPlacePop ? animation : kAlwaysCompleteAnimation;
+
+    if (context.isMornye && !inPlacePop) {
+      final progress = (1.0 - animation.value).clamp(0.0, 1.0);
+      final radius = 38.0 * progress;
+      final scale = 1.0 - (0.08 * progress);
+      return SlideTransition(
+        position: position,
+        child: FadeTransition(
+          opacity: opacity,
+          child: Transform.scale(
+            scale: scale,
+            alignment: Alignment.topCenter,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(radius),
+              child: child,
+            ),
+          ),
+        ),
+      );
+    }
+
     return SlideTransition(
       position: position,
       child: FadeTransition(opacity: opacity, child: child),

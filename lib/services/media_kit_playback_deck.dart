@@ -36,6 +36,7 @@ abstract interface class MpvEngine {
   /// mpv's `volume` property, 0 to 100 on a cubic curve.
   Future<void> setVolume(double volume);
   Future<void> setSpeed(double speed);
+  Future<void> setPitch(double pitch);
 
   /// Returns the mpv error code: negative on failure.
   Future<int> setProperty(String name, String value);
@@ -174,6 +175,9 @@ class MediaKitEngine implements MpvEngine, MpvPlaylistEngine {
   Future<void> setVolume(double volume) => _player.setVolume(volume);
   @override
   Future<void> setSpeed(double speed) => _player.setRate(speed);
+  @override
+  Future<void> setPitch(double pitch) =>
+      setProperty('pitch', pitch.toStringAsFixed(4));
 
   @override
   Future<int> setProperty(String name, String value) async {
@@ -228,9 +232,16 @@ class MediaKitSourceException implements Exception {
 /// Gapless uses the native playlist on this same output, including exclusive
 /// mode. AutoMix still owns separate decks while it is enabled.
 class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
-  MediaKitPlaybackDeck({required this.playerId, MpvEngine? engine})
-    : _engine = engine ?? debugEngineFactory?.call() ?? MediaKitEngine() {
+  MediaKitPlaybackDeck({
+    required this.playerId,
+    MpvEngine? engine,
+    Duration loadTimeout = const Duration(seconds: 20),
+    Duration arrivingLoadTimeout = const Duration(seconds: 45),
+  }) : _loadTimeout = loadTimeout,
+       _arrivingLoadTimeout = arrivingLoadTimeout,
+       _engine = engine ?? debugEngineFactory?.call() ?? MediaKitEngine() {
     playbackEqualizer.addListener(_equalizerChanged);
+    playbackSpatialAudio.addListener(_equalizerChanged);
     playbackOutputVolume.addListener(_outputVolumeChanged);
     playbackExclusiveOutput.addListener(_exclusiveChanged);
     playbackExclusiveDevice.addListener(_exclusiveChanged);
@@ -291,7 +302,8 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     }();
   }
 
-  static const _loadTimeout = Duration(seconds: 20);
+  final Duration _loadTimeout;
+  final Duration _arrivingLoadTimeout;
 
   final _states = StreamController<PlaybackDeckState>.broadcast();
   final _durations = StreamController<Duration>.broadcast();
@@ -623,8 +635,16 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   Future<void> setPlaybackRate(double rate) => _engine.setSpeed(rate);
 
   @override
+  Future<void> setPitch(double pitch) {
+    _pitch = pitch;
+    return _engine.setPitch(pitch);
+  }
+
+  double _pitch = 1.0;
+
+  @override
   Future<void> setNetworkSource(String url, {bool arriving = false}) =>
-      _load(url);
+      _load(url, arriving: arriving);
 
   @override
   Future<void> setFileSource(
@@ -637,7 +657,11 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     bool dapExclusive = false,
   }) => _load(path, requiresDsd: requiresDsd);
 
-  Future<void> _load(String source, {bool requiresDsd = false}) async {
+  Future<void> _load(
+    String source, {
+    bool requiresDsd = false,
+    bool arriving = false,
+  }) async {
     await stop();
     final token = ++_token;
     final loaded = Completer<String?>();
@@ -649,7 +673,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     try {
       await _engine.open(source);
       error = await loaded.future.timeout(
-        _loadTimeout,
+        arriving ? _arrivingLoadTimeout : _loadTimeout,
         onTimeout: () => 'Timed out opening the source',
       );
     } finally {
@@ -664,6 +688,9 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     }
     if (_exclusive) {
       playbackExclusiveStatus.value = ExclusiveOutputStatus.active;
+    }
+    if (_pitch != 1.0) {
+      await _engine.setPitch(_pitch);
     }
   }
 
@@ -733,6 +760,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
         settings,
         sampleRate: _sampleRate,
         unavailable: _missingFilters,
+        spatialAudio: playbackSpatialAudio.value,
       );
 
   /// Learns which optional filters libmpv lacks. mpv checks `lavfi-NAME`
@@ -810,6 +838,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   Future<void> dispose() async {
     if (_disposed) return;
     playbackEqualizer.removeListener(_equalizerChanged);
+    playbackSpatialAudio.removeListener(_equalizerChanged);
     playbackOutputVolume.removeListener(_outputVolumeChanged);
     playbackExclusiveOutput.removeListener(_exclusiveChanged);
     playbackExclusiveDevice.removeListener(_exclusiveChanged);

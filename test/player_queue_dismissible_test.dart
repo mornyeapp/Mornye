@@ -84,6 +84,15 @@ void main() {
           // If the queue update is deferred/rejected, the row remains usable.
           expect(tester.getRect(song), original);
           expect(tester.takeException(), isNull);
+
+          // Test swipe in the opposite direction (bidirectional dismissal)
+          final oppositeSwipe = await tester.startGesture(original.center);
+          await oppositeSwipe.moveBy(Offset(-sign * 20, 0));
+          await oppositeSwipe.moveBy(Offset(-sign * 256, 0));
+          await tester.pump();
+          await oppositeSwipe.up();
+          await tester.pumpAndSettle();
+          expect(removals, 2);
         },
       );
     }

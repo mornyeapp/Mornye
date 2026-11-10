@@ -88,6 +88,13 @@ class PlayerLyricsSection extends ConsumerWidget {
       );
     }
     if (metadata.lyrics.isEmpty) {
+      if (isActive && metadata.filePath == null && !metadata.loading) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (isActive && metadata.filePath == null && !metadata.loading) {
+            metadata.ensureFileMetadata();
+          }
+        });
+      }
       // Scrolls when a short screen leaves too little room above the
       // controls, so the search button stays reachable.
       return LayoutBuilder(

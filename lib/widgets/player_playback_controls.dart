@@ -624,7 +624,20 @@ class _QualityBadge extends StatelessWidget {
         vertical: mornye ? 2 : 5,
       ),
       decoration: mornye
-          ? null
+          ? BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: radius,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.24),
+                width: 0.9,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 8,
+                ),
+              ],
+            )
           : BoxDecoration(
               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: radius,
@@ -635,7 +648,7 @@ class _QualityBadge extends StatelessWidget {
           AppIcon(
             Icons.graphic_eq,
             size: mornye ? 11 : 14,
-            color: colorScheme.onSurfaceVariant,
+            color: mornye ? Colors.white : colorScheme.onSurfaceVariant,
           ),
           SizedBox(width: mornye ? 5 : 6),
           Flexible(
@@ -645,7 +658,8 @@ class _QualityBadge extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 fontSize: mornye ? 10.5 : 12,
-                color: colorScheme.onSurfaceVariant,
+                fontWeight: mornye ? FontWeight.w600 : null,
+                color: mornye ? Colors.white : colorScheme.onSurfaceVariant,
                 letterSpacing: 0.2,
               ),
             ),

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
@@ -77,6 +78,7 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
         (state) => track != null && state.isLoved(track),
       ),
     );
+    final autoMixActive = ref.watch(settingsProvider.select((s) => s.autoMix));
     return _MornyePlayerMenuSurface(
       mediaItem: mediaItem,
       child: MornyeContextMenu(
@@ -161,6 +163,15 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
               ),
           ],
           [
+            _action(
+              context,
+              'djMode',
+              context.l10n.djModeTitle,
+              CupertinoIcons.arrow_right_arrow_left,
+              subtitle: autoMixActive
+                  ? context.l10n.djModeOn
+                  : context.l10n.djModeOff,
+            ),
             _action(
               context,
               'equalizer',

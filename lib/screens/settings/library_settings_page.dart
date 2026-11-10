@@ -7,6 +7,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mornye/controllers/library_re_enrich_all.dart';
+import 'package:mornye/services/batch_lyrics_sync_service.dart';
+import 'package:mornye/widgets/batch_lyrics_sync_dialog.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_scan_failure.dart';
 import 'package:mornye/models/settings.dart';
@@ -293,6 +295,25 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
     } finally {
       if (mounted) setState(() => _isLoadingReEnrich = false);
     }
+  }
+
+  Future<void> _syncAllLibraryLyrics() async {
+    final items = await loadReEnrichableLibraryItems(
+      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+    );
+    if (!mounted) return;
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.syncLyricsNoTracks)));
+      return;
+    }
+    final targets = items
+        .where((i) => i.filePath.isNotEmpty)
+        .map((i) => BatchLyricsItem(track: i.toTrack(), filePath: i.filePath))
+        .toList();
+    if (!mounted) return;
+    await BatchLyricsSyncDialog.show(context, items: targets);
   }
 
   Future<void> _findMovedDownloads() async {
@@ -830,6 +851,12 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                                 : null,
                             onTap: canReEnrich ? _reEnrichAll : null,
                           ),
+                        ),
+                        SettingsItem(
+                          icon: Icons.lyrics_outlined,
+                          title: context.l10n.syncLyricsAllAction,
+                          subtitle: context.l10n.syncLyricsAllSubtitle,
+                          onTap: _syncAllLibraryLyrics,
                         ),
                       ],
                       Opacity(

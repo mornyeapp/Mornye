@@ -83,6 +83,11 @@ class AppSettings {
   final bool playOnHeadphonesConnected;
   // Start the next song the moment one ends; AutoMix replaces it while on.
   final bool gaplessPlayback;
+  final bool spatialAudio;
+  final bool realtimeVisualizer;
+  final bool pitchTempoControls;
+  final double playbackPitch;
+  final double playbackSpeed;
   final bool autoMix;
   @JsonKey(fromJson: autoMixDurationFromJson)
   final int autoMixDuration;
@@ -303,6 +308,11 @@ class AppSettings {
     this.pauseOnMute = true,
     this.playOnHeadphonesConnected = false,
     this.gaplessPlayback = true,
+    this.spatialAudio = false,
+    this.realtimeVisualizer = true,
+    this.pitchTempoControls = false,
+    this.playbackPitch = 0.0,
+    this.playbackSpeed = 1.0,
     this.autoMix = false,
     this.autoMixDuration = 0,
     this.autoMixEffect = AutoMixEffect.auto,
@@ -456,6 +466,11 @@ class AppSettings {
     bool? pauseOnMute,
     bool? playOnHeadphonesConnected,
     bool? gaplessPlayback,
+    bool? spatialAudio,
+    bool? realtimeVisualizer,
+    bool? pitchTempoControls,
+    double? playbackPitch,
+    double? playbackSpeed,
     bool? autoMix,
     int? autoMixDuration,
     AutoMixEffect? autoMixEffect,
@@ -594,6 +609,11 @@ class AppSettings {
       playOnHeadphonesConnected:
           playOnHeadphonesConnected ?? this.playOnHeadphonesConnected,
       gaplessPlayback: gaplessPlayback ?? this.gaplessPlayback,
+      spatialAudio: spatialAudio ?? this.spatialAudio,
+      realtimeVisualizer: realtimeVisualizer ?? this.realtimeVisualizer,
+      pitchTempoControls: pitchTempoControls ?? this.pitchTempoControls,
+      playbackPitch: playbackPitch ?? this.playbackPitch,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       autoMix: autoMix ?? this.autoMix,
       autoMixDuration: autoMixDuration ?? this.autoMixDuration,
       autoMixEffect: autoMixEffect ?? this.autoMixEffect,

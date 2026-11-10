@@ -168,14 +168,20 @@ class AlbumDetailHeader extends StatelessWidget {
     );
     Widget toolbar({bool collapsed = true}) => SliverAppBar(
       pinned: true,
-      backgroundColor: collapsed ? scheme.surface : Colors.transparent,
+      backgroundColor: context.isMornye
+          ? Colors.transparent
+          : (collapsed ? scheme.surface : Colors.transparent),
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 0,
       title: headerToolbarTitle(
         showTitleListenable,
         showTitleInAppBar,
         (showTitle) => AnimatedOpacity(
-          opacity: showTitle || appBarTitle != null || (immersive && collapsed)
+          opacity:
+              showTitle ||
+                  appBarTitle != null ||
+                  (immersive && collapsed) ||
+                  (!immersive && collapsed)
               ? 1
               : 0,
           duration: const Duration(milliseconds: 180),
@@ -190,7 +196,7 @@ class AlbumDetailHeader extends StatelessWidget {
       leadingWidth: kToolbarHeight + edgeInset,
       leading: back,
       actionsPadding: EdgeInsetsDirectional.only(end: edgeInset),
-      actions: appBarActions,
+      actions: _buildToolbarActions(context),
     );
     if (immersive) {
       final detailsTop = (artworkSize - 20).clamp(0.0, double.infinity);
@@ -256,9 +262,55 @@ class AlbumDetailHeader extends StatelessWidget {
         ),
       ];
     }
+    final Widget detailsSliver;
+    if (!immersive && paletteSource != null && paletteSource!.isNotEmpty) {
+      detailsSliver = SliverToBoxAdapter(
+        child: CoverPaletteBuilder(
+          imageSource: paletteSource,
+          builder: (context, headerScheme) => Stack(
+            alignment: Alignment.topCenter,
+            children: [
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.0, 0.40, 0.85, 1.0],
+                        colors: [
+                          headerScheme.primary.withValues(alpha: 0.38),
+                          headerScheme.secondary.withValues(alpha: 0.20),
+                          headerScheme.surface.withValues(alpha: 0.05),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              details,
+            ],
+          ),
+        ),
+      );
+    } else {
+      detailsSliver = SliverToBoxAdapter(child: details);
+    }
+    final collapseOffset =
+        (artworkSize +
+                20 -
+                (kToolbarHeight + MediaQuery.paddingOf(context).top))
+            .clamp(0.0, double.infinity);
     return [
-      Builder(builder: (_) => toolbar()),
-      SliverToBoxAdapter(child: details),
+      Builder(
+        builder: (context) => SliverLayoutInfoBuilder(
+          select: (constraints) => constraints.scrollOffset >= collapseOffset,
+          builder: (context, collapsed) =>
+              _AlbumOverlayToolbar(child: toolbar(collapsed: collapsed)),
+        ),
+      ),
+      detailsSliver,
     ];
   }
 
@@ -279,57 +331,62 @@ class AlbumDetailHeader extends StatelessWidget {
         backgroundColor: backgroundColor,
       );
 
-  Widget _buildMornyeDetails(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(20, immersive ? 0 : 20, 20, 28),
-    child: Column(
-      children: [
-        if (!immersive)
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 280),
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.16),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
+  Widget _buildMornyeDetails(BuildContext context) {
+    final topPadding = immersive
+        ? 0.0
+        : (kToolbarHeight + MediaQuery.paddingOf(context).top + 16.0);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, topPadding, 20, 28),
+      child: Column(
+        children: [
+          if (!immersive)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 280),
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.16),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) =>
+                          coverBuilder!(context, constraints.maxWidth),
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) =>
-                        coverBuilder!(context, constraints.maxWidth),
                   ),
                 ),
               ),
             ),
+          if (!immersive) const SizedBox(height: 22),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        if (!immersive) const SizedBox(height: 22),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        if (subtitle != null) ...[const SizedBox(height: 5), subtitle!],
-        if (meta != null) ...[const SizedBox(height: 5), meta!],
-        if (actions != null) ...[
-          SizedBox(height: immersive ? 16 : 24),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: actions!,
-          ),
+          if (subtitle != null) ...[const SizedBox(height: 5), subtitle!],
+          if (meta != null) ...[const SizedBox(height: 5), meta!],
+          if (actions != null) ...[
+            SizedBox(height: immersive ? 16 : 24),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: actions!,
+            ),
+          ],
         ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
 
   Widget _buildAppBar(BuildContext context, ColorScheme headerScheme) {
     final tokens = context.tokens;
@@ -552,8 +609,24 @@ class AlbumDetailHeader extends StatelessWidget {
             ),
       ),
       actionsPadding: EdgeInsetsDirectional.only(end: iosEdgeInset),
-      actions: appBarActions,
+      actions: _buildToolbarActions(context),
     );
+  }
+
+  List<Widget>? _buildToolbarActions(BuildContext context) {
+    final actions = appBarActions;
+    if (actions == null || actions.isEmpty) return null;
+    final filtered = actions.where((w) => w is! SizedBox).toList();
+    if (filtered.isEmpty) return null;
+    if (context.isMornye) {
+      return [MornyeActionCapsule(children: filtered)];
+    }
+    return [
+      for (var i = 0; i < filtered.length; i++) ...[
+        if (i > 0) const SizedBox(width: 8),
+        filtered[i],
+      ],
+    ];
   }
 }
 

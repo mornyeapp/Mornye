@@ -2,7 +2,9 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
@@ -24,9 +26,15 @@ import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/playlist_sort.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/m3u_playlist_service.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
+import 'package:mornye/services/batch_lyrics_sync_service.dart';
+import 'package:mornye/services/track_file_resolver.dart';
+import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/widgets/batch_lyrics_sync_dialog.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/collection_track_files_provider.dart';
@@ -43,6 +51,7 @@ import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/confirm_and_delete_tracks.dart';
 import 'package:mornye/controllers/library_tracks_folder_data.dart';
 import 'package:mornye/controllers/selection_mode_mixin.dart';
+import 'package:mornye/widgets/playlist_sort_sheet.dart';
 import 'package:mornye/widgets/collection_reorder_sliver.dart';
 import 'package:mornye/widgets/discard_changes_dialog.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
@@ -92,12 +101,19 @@ class _LibraryTracksFolderScreenState
         CollapsingHeaderScrollMixin<LibraryTracksFolderScreen> {
   UserPlaylistCollection? playlist;
   final _folderData = LibraryTracksFolderData();
+  PlaylistSortMode _sortMode = PlaylistSortMode.custom;
+  bool _isSearchActive = false;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
   List<CollectionTrackEntry>? _orderDraft;
   List<String> _orderBefore = const [];
   bool _savingOrder = false;
   bool _draggingOrder = false;
   bool _confirmingDiscard = false;
   bool _trackActionInProgress = false;
+
+  String get _playlistKey => widget.playlistId ?? widget.mode.name;
 
   bool get _editingOrder => _orderDraft != null;
   bool get _orderChanged =>
@@ -109,6 +125,7 @@ class _LibraryTracksFolderScreenState
   void _editOrder(List<CollectionTrackEntry> entries) {
     exitSelectionMode();
     setState(() {
+      _sortMode = PlaylistSortMode.custom;
       _orderDraft = [...entries];
       _orderBefore = [for (final entry in entries) entry.key];
       _draggingOrder = false;
@@ -125,6 +142,7 @@ class _LibraryTracksFolderScreenState
           _orderDraft = null;
           _draggingOrder = false;
         });
+        _loadPersistedSortMode();
       }
     } finally {
       _confirmingDiscard = false;
@@ -143,6 +161,7 @@ class _LibraryTracksFolderScreenState
           : await notifier.reorderSavedTracks(widget.mode, keys);
       if (!mounted) return;
       setState(() => _orderDraft = null);
+      PlaylistSortStorage.setSortMode(_playlistKey, PlaylistSortMode.custom);
       showAppSnackBar(
         context,
         content: Text(
@@ -166,6 +185,7 @@ class _LibraryTracksFolderScreenState
   @override
   void initState() {
     super.initState();
+    _loadPersistedSortMode();
     final playlistId = widget.playlistId;
     if (widget.mode == LibraryTracksFolderMode.playlist && playlistId != null) {
       Future.microtask(
@@ -173,6 +193,29 @@ class _LibraryTracksFolderScreenState
             .read(libraryCollectionsProvider.notifier)
             .ensurePlaylistLoaded(playlistId),
       );
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPersistedSortMode() async {
+    final key = _playlistKey;
+    final mode = await PlaylistSortStorage.getSortMode(key);
+    if (!mounted || key != _playlistKey || mode == _sortMode) return;
+    setState(() => _sortMode = mode);
+  }
+
+  @override
+  void didUpdateWidget(LibraryTracksFolderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.playlistId != oldWidget.playlistId ||
+        widget.mode != oldWidget.mode) {
+      _loadPersistedSortMode();
     }
   }
 
@@ -366,8 +409,21 @@ class _LibraryTracksFolderScreenState
         break;
     }
 
+    final rawEntries = entries;
     entries = _orderDraft ?? entries;
-    _folderData.update(entries);
+    final effectiveEntries = _editingOrder
+        ? entries
+        : sortCollectionTrackEntries(entries, _sortMode);
+    final displayedEntries =
+        (!_isSearchActive || _searchQuery.trim().isEmpty || _editingOrder)
+        ? effectiveEntries
+        : effectiveEntries.where((entry) {
+            final q = _searchQuery.trim().toLowerCase();
+            return entry.track.name.toLowerCase().contains(q) ||
+                entry.track.artistName.toLowerCase().contains(q) ||
+                entry.track.albumName.toLowerCase().contains(q);
+          }).toList();
+    _folderData.update(displayedEntries);
     pruneSelection(_folderData.keys);
 
     final title = switch (widget.mode) {
@@ -407,7 +463,8 @@ class _LibraryTracksFolderScreenState
         : 0.0;
 
     final inHistory = _folderData.inHistory(existingHistoryKeys);
-    final ids = [for (final entry in entries) entry.key];
+    final ids = [for (final entry in displayedEntries) entry.key];
+    final datesAdded = [for (final entry in displayedEntries) entry.addedAt];
     final scaffold = CollectionScaffold(
       scrollController: scrollController,
       isSelectionMode: showsSelectionBar,
@@ -415,12 +472,21 @@ class _LibraryTracksFolderScreenState
       selectionBar: _buildSelectionBottomBar(
         context,
         colorScheme,
-        entries,
+        effectiveEntries,
         ids,
         bottomPadding,
       ),
-      appBar: _buildAppBar(context, colorScheme, title, entries, playlist),
+      appBar: _buildAppBar(
+        context,
+        colorScheme,
+        title,
+        displayedEntries,
+        playlist,
+        rawEntries: rawEntries,
+      ),
       slivers: [
+        if (_isSearchActive && !_editingOrder)
+          _buildSearchBarSliver(context, colorScheme),
         if (_editingOrder)
           SliverToBoxAdapter(
             child: Padding(
@@ -433,7 +499,7 @@ class _LibraryTracksFolderScreenState
               child: Text(context.l10n.playlistEditOrderDescription),
             ),
           ),
-        if (entries.isEmpty)
+        if (entries.isEmpty || (displayedEntries.isEmpty && !_editingOrder))
           SliverFillRemaining(
             hasScrollBody: false,
             child: _EmptyFolderState(
@@ -462,15 +528,26 @@ class _LibraryTracksFolderScreenState
             tracks: folderTracks,
             ids: ids,
             isInHistory: inHistory,
+            datesAdded: datesAdded,
             selectedIds: selectedIds,
+            sort: tableSortFromPlaylistSort(_sortMode),
+            onSort: (nextSort) {
+              setState(() {
+                _sortMode = playlistSortFromTableSort(nextSort);
+              });
+            },
             onSelect: applyDesktopClick,
-            onActivate: (index) =>
-                _activateEntry(entries, folderTracks, inHistory, index),
+            onActivate: (index) => _activateEntry(
+              displayedEntries,
+              folderTracks,
+              inHistory,
+              index,
+            ),
             onContextMenu: (index, position) => showSelectionMenu(
-              entries[index].key,
+              displayedEntries[index].key,
               () => _showEntryMenu(
                 context,
-                entries,
+                displayedEntries,
                 folderTracks,
                 inHistory,
                 index,
@@ -485,7 +562,7 @@ class _LibraryTracksFolderScreenState
             padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((context, index) {
-                final entry = entries[index];
+                final entry = displayedEntries[index];
                 final isSelected = selectedIds.contains(entry.key);
                 final isInHistory = inHistory[index];
                 return KeyedSubtree(
@@ -509,7 +586,7 @@ class _LibraryTracksFolderScreenState
                     ),
                   ),
                 );
-              }, childCount: entries.length),
+              }, childCount: displayedEntries.length),
             ),
           ),
         if (playlist case final playlist?
@@ -541,11 +618,11 @@ class _LibraryTracksFolderScreenState
         onDelete: isSelectionMode ? () => _removeSelected(entries) : null,
         onActivate: () {
           if (_editingOrder) return;
-          final index = entries.indexWhere(
+          final index = effectiveEntries.indexWhere(
             (entry) => entry.key == selectionAnchorId,
           );
           if (index >= 0) {
-            _activateEntry(entries, folderTracks, inHistory, index);
+            _activateEntry(effectiveEntries, folderTracks, inHistory, index);
           }
         },
         child: scaffold,
@@ -899,23 +976,96 @@ class _LibraryTracksFolderScreenState
         .removePlaylistCover(playlistId);
   }
 
+  Widget _buildSearchBarSliver(BuildContext context, ColorScheme colorScheme) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: wideListInset(context) + 16,
+          vertical: 8,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Icon(Icons.search, size: 20, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('library-search-input'),
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: MaterialLocalizations.of(
+                      context,
+                    ).searchFieldLabel,
+                    hintStyle: TextStyle(
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.7,
+                      ),
+                      fontSize: 14,
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val;
+                    });
+                  },
+                ),
+              ),
+              if (_searchQuery.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAppBar(
     BuildContext context,
     ColorScheme colorScheme,
     String title,
     List<CollectionTrackEntry> entries,
-    UserPlaylistCollection? playlist,
-  ) {
+    UserPlaylistCollection? playlist, {
+    required List<CollectionTrackEntry> rawEntries,
+  }) {
     final expandedHeight = calculateExpandedHeight(context);
     final customCoverPath = playlist?.coverImagePath;
     final isLovedMode = widget.mode == LibraryTracksFolderMode.loved;
     final isPlaylistMode = widget.mode == LibraryTracksFolderMode.playlist;
-    final rawCoverUrl = isLovedMode ? null : _firstRawCoverUrl(entries);
+    final entriesForCover = rawEntries.isNotEmpty ? rawEntries : entries;
+    final rawCoverUrl = isLovedMode ? null : _firstRawCoverUrl(entriesForCover);
     final localCoverUrl =
-        rawCoverUrl == null && !isLovedMode && entries.isNotEmpty
+        rawCoverUrl == null && !isLovedMode && entriesForCover.isNotEmpty
         ? ref
               .watch(
-                localLibraryFirstCoverProvider(_coverBatchRequest(entries)),
+                localLibraryFirstCoverProvider(
+                  _coverBatchRequest(entriesForCover),
+                ),
               )
               .maybeWhen(data: (cover) => cover, orElse: () => null)
         : null;
@@ -1057,45 +1207,76 @@ class _LibraryTracksFolderScreenState
           if (isPlaylistMode &&
               !isSelectionMode &&
               entries.isNotEmpty &&
-              ref.watch(linkPhoneClientProvider) != null) ...[
-            const SizedBox(width: 8),
+              ref.watch(linkPhoneClientProvider) != null)
             LinkTrackTransferButton(
               tracks: entries.map((e) => e.track).toList(growable: false),
             ),
+          if (!isSelectionMode && entries.length > 1 && !_editingOrder) ...[
+            HeaderCircleButton(
+              key: const ValueKey('library-search-button'),
+              icon: _isSearchActive ? Icons.search_off : Icons.search,
+              iconSize: 20,
+              tooltip: _isSearchActive
+                  ? MaterialLocalizations.of(context).closeButtonTooltip
+                  : MaterialLocalizations.of(context).searchFieldLabel,
+              onPressed: () {
+                setState(() {
+                  _isSearchActive = !_isSearchActive;
+                  if (!_isSearchActive) {
+                    _searchQuery = '';
+                    _searchController.clear();
+                  } else {
+                    _searchFocusNode.requestFocus();
+                  }
+                });
+              },
+            ),
+            buildPlaylistSortButton(
+              context: context,
+              currentSort: _sortMode,
+              hasDateAdded: true,
+              onSortChanged: (newSort) {
+                setState(() => _sortMode = newSort);
+                PlaylistSortStorage.setSortMode(_playlistKey, newSort);
+              },
+            ),
           ],
-          if (!isSelectionMode && entries.length > 1) ...[
-            const SizedBox(width: 8),
+          if (!isSelectionMode && entries.length > 1)
             HeaderCircleButton(
               key: const ValueKey('collection-edit-order'),
               icon: Icons.swap_vert,
               iconSize: 20,
               tooltip: context.l10n.playlistEditOrder,
-              onPressed: () => _editOrder(entries),
+              onPressed: () => _editOrder(rawEntries),
             ),
-          ],
-          if (isPlaylistMode && !isSelectionMode) ...[
-            const SizedBox(width: 8),
+          if (entries.isNotEmpty && !isSelectionMode)
             HeaderCircleButton(
-              icon: Icons.edit_outlined,
+              key: const ValueKey('library-sync-lyrics-button'),
+              icon: Icons.lyrics_outlined,
               iconSize: 20,
-              tooltip: context.l10n.collectionRenamePlaylist,
-              onPressed: () {
-                final id = widget.playlistId ?? playlist?.id;
-                if (id == null || id.isEmpty) return;
-                _showRenamePlaylistDialog(context, id, playlist?.name ?? title);
-              },
+              tooltip: context.l10n.syncLyricsAction,
+              onPressed: () => _syncPlaylistLyrics(entries),
             ),
-            const SizedBox(width: 8),
+          if (isPlaylistMode && !isSelectionMode)
             Builder(
               builder: (buttonContext) => HeaderCircleButton(
-                icon: Icons.camera_alt_outlined,
+                key: const ValueKey('collection-edit-playlist'),
+                icon: Icons.edit_outlined,
                 iconSize: 20,
-                tooltip: context.l10n.collectionPlaylistChangeCover,
-                onPressed: () =>
-                    _showCoverOptionsSheet(buttonContext, hasCustomCover),
+                tooltip: context.l10n.editPlaylistAction,
+                onPressed: () {
+                  final id = widget.playlistId ?? playlist?.id;
+                  if (id == null || id.isEmpty) return;
+                  _showEditPlaylistSheet(
+                    buttonContext,
+                    playlistId: id,
+                    playlistName: playlist?.name ?? title,
+                    hasCustomCover: hasCustomCover,
+                    entries: rawEntries,
+                  );
+                },
               ),
             ),
-          ],
         ],
       ],
       moreMenu: linkTransfers && !isSelectionMode && !_editingOrder
@@ -1201,10 +1382,60 @@ class _LibraryTracksFolderScreenState
     );
   }
 
-  void _showCoverOptionsSheet(BuildContext context, bool hasCustomCover) {
+  Future<void> _syncPlaylistLyrics(List<CollectionTrackEntry> entries) async {
+    final tracks = [for (final entry in entries) entry.track];
+    if (tracks.isEmpty) return;
+    final resolved = await resolveTrackFiles(
+      tracks,
+      library: LibraryDatabase.instance,
+      history: HistoryDatabase.instance,
+      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+    );
+    final historyItems = ref.read(downloadHistoryProvider).items;
+    final items = <BatchLyricsItem>[];
+    for (var i = 0; i < tracks.length; i++) {
+      var path = resolved.paths[i];
+      if (path == null || path.isEmpty) {
+        final match = historyItems.cast<DownloadHistoryItem?>().firstWhere(
+          (h) =>
+              (h != null &&
+                  h.spotifyId != null &&
+                  h.spotifyId!.isNotEmpty &&
+                  h.spotifyId == tracks[i].id) ||
+              (h != null &&
+                  h.trackName.toLowerCase() == tracks[i].name.toLowerCase() &&
+                  h.artistName.toLowerCase() ==
+                      tracks[i].artistName.toLowerCase()),
+          orElse: () => null,
+        );
+        if (match != null && match.filePath.isNotEmpty) {
+          path = match.filePath;
+        }
+      }
+      if (path != null && path.isNotEmpty) {
+        items.add(BatchLyricsItem(track: tracks[i], filePath: path));
+      }
+    }
+    if (!mounted) return;
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.syncLyricsNoTracks)));
+      return;
+    }
+    await BatchLyricsSyncDialog.show(context, items: items);
+  }
+
+  void _showEditPlaylistSheet(
+    BuildContext buttonContext, {
+    required String playlistId,
+    required String playlistName,
+    required bool hasCustomCover,
+    List<CollectionTrackEntry> entries = const [],
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     final menuPosition = isDesktopPlatform
-        ? contextMenuPositionBelow(context)
+        ? contextMenuPositionBelow(buttonContext)
         : null;
     if (menuPosition != null) {
       showContextMenu(
@@ -1213,10 +1444,22 @@ class _LibraryTracksFolderScreenState
         groups: [
           [
             ContextMenuAction(
+              icon: Icons.drive_file_rename_outline,
+              label: context.l10n.collectionRenamePlaylist,
+              onSelected: () =>
+                  _showRenamePlaylistDialog(context, playlistId, playlistName),
+            ),
+            ContextMenuAction(
               icon: Icons.image_outlined,
               label: context.l10n.collectionPlaylistChangeCover,
               onSelected: _pickCoverImage,
             ),
+            if (entries.isNotEmpty)
+              ContextMenuAction(
+                icon: Icons.lyrics_outlined,
+                label: context.l10n.syncLyricsAction,
+                onSelected: () => _syncPlaylistLyrics(entries),
+              ),
           ],
           if (hasCustomCover)
             [
@@ -1248,6 +1491,34 @@ class _LibraryTracksFolderScreenState
               ),
               leading: context.isMornye
                   ? Icon(
+                      mornyeIconFor(Icons.drive_file_rename_outline),
+                      color: colorScheme.primary,
+                    )
+                  : Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.drive_file_rename_outline,
+                        color: colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+              title: Text(context.l10n.collectionRenamePlaylist),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showRenamePlaylistDialog(context, playlistId, playlistName);
+              },
+            ),
+            AppSheetOption(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 4,
+              ),
+              leading: context.isMornye
+                  ? Icon(
                       mornyeIconFor(Icons.image_outlined),
                       color: colorScheme.primary,
                     )
@@ -1269,6 +1540,35 @@ class _LibraryTracksFolderScreenState
                 _pickCoverImage();
               },
             ),
+            if (entries.isNotEmpty)
+              AppSheetOption(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 4,
+                ),
+                leading: context.isMornye
+                    ? Icon(
+                        mornyeIconFor(Icons.lyrics_outlined),
+                        color: colorScheme.primary,
+                      )
+                    : Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.lyrics_outlined,
+                          color: colorScheme.onSecondaryContainer,
+                        ),
+                      ),
+                title: Text(context.l10n.syncLyricsAction),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _syncPlaylistLyrics(entries);
+                },
+              ),
             if (hasCustomCover)
               AppSheetOption(
                 contentPadding: const EdgeInsets.symmetric(
@@ -1417,7 +1717,7 @@ class _CollectionTrackTile extends ConsumerWidget {
     final isCurrent = playback?.isCurrent ?? false;
     final isPlaying = playback?.isPlaying ?? false;
 
-    return TrackCard(
+    final card = TrackCard(
       style: TrackCardStyle.flat,
       isSelectionMode: isSelectionMode,
       isSelected: isSelected,
@@ -1495,6 +1795,75 @@ class _CollectionTrackTile extends ConsumerWidget {
               _navigateToMetadata(context, ref);
             },
       onLongPress: isSelectionMode ? onTap : onLongPress,
+    );
+
+    if (isSelectionMode) return card;
+
+    return Dismissible(
+      key: ValueKey('library-swipe-queue-${entry.key}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        await _enqueuePlayNext(context, ref);
+        return false;
+      },
+      background: _buildSwipeBackground(context),
+      child: card,
+    );
+  }
+
+  Future<void> _enqueuePlayNext(BuildContext context, WidgetRef ref) async {
+    try {
+      HapticFeedback.mediumImpact();
+      final paths = await ref
+          .read(playbackProvider.notifier)
+          .resolveTrackFilePaths([entry.track]);
+      final path = paths.isNotEmpty ? paths.single : null;
+      if (path != null) {
+        final playable = playableFromTrack(entry.track, path);
+        await ref.read(musicPlayerControllerProvider).playNext(playable);
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.snackbarAddedToQueue(entry.track.name)),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
+  Widget _buildSwipeBackground(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      alignment: AlignmentDirectional.centerEnd,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            context.isMornye
+                ? CupertinoIcons.text_badge_plus
+                : Icons.queue_music,
+            color: colorScheme.onPrimaryContainer,
+            size: 24,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            context.l10n.trackAddToQueue,
+            style: TextStyle(
+              color: colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

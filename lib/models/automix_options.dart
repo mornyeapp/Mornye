@@ -1,4 +1,4 @@
-enum AutoMixEffect { auto, crossfade, muffled, echo, pitch, custom }
+enum AutoMixEffect { auto, crossfade, muffled, echo, pitch, vinylBrake, custom }
 
 int autoMixDurationFromJson(Object? value) =>
     value is num && value.isFinite && value > 0
@@ -65,7 +65,11 @@ class AutoMixOptions {
       effect == AutoMixEffect.muffled ||
       effect == AutoMixEffect.custom && lowPass;
   bool get hasEffects =>
-      effectiveSpeed != 1 || effectivePitch != 0 || useEcho || useLowPass;
+      effectiveSpeed != 1 ||
+      effectivePitch != 0 ||
+      useEcho ||
+      useLowPass ||
+      effect == AutoMixEffect.vinylBrake;
 
   double outroWindowOffset(Duration duration, double windowSeconds) {
     final seconds = duration.inMicroseconds / 1e6;

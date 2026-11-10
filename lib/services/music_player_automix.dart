@@ -84,6 +84,7 @@ class _MusicAutoMix {
       !handler._userPaused &&
       !handler._interruptionActive &&
       handler._player.state == PlaybackDeckState.playing &&
+      !handler.isSleepTimerEndOfTrack &&
       handler._repeatMode != AudioServiceRepeatMode.one &&
       handler._media.length > 1;
 
@@ -207,6 +208,22 @@ class _MusicAutoMix {
       if (!_current(generation)) return;
       final intro = await analyzer.analyzeTransition(nextPath);
       if (!_current(generation)) return;
+      int? outgoingKey;
+      int? incomingKey;
+      try {
+        final featMap = await SongAnalysisStore().features([
+          currentPath,
+          nextPath,
+        ]);
+        final outFeat = featMap[currentPath];
+        final inFeat = featMap[nextPath];
+        if (outFeat != null && outFeat[SongFeatures.keyStrength] >= 0.3) {
+          outgoingKey = outFeat[SongFeatures.key].round();
+        }
+        if (inFeat != null && inFeat[SongFeatures.keyStrength] >= 0.3) {
+          incomingKey = inFeat[SongFeatures.key].round();
+        }
+      } catch (_) {}
       final plan = AutoMixPlan.create(
         outgoingDuration: duration,
         incomingDuration: nextDuration,
@@ -214,22 +231,28 @@ class _MusicAutoMix {
         intro: intro,
         outroOffset: offset,
         options: options,
+        outgoingKey: outgoingKey,
+        incomingKey: incomingKey,
       );
       if (plan == null) return;
       await deck.seek(plan.incomingStart);
       await deck.setPlaybackRate(plan.rate);
+      if (plan.harmonicPitchShift != 0) {
+        final pitchRatio = pow(2, plan.harmonicPitchShift / 12).toDouble();
+        await deck.setPitch(pitchRatio);
+      }
       final volume = await handler._normalizationVolumeFor(
         nextPath,
         cacheKey: next.isContentUri ? next.source : null,
       );
       if (!_current(generation)) return;
-      if (options.hasEffects || plan.assisted) {
+      if (options.hasEffects || plan.assisted || plan.beatMatched) {
         effectTail = await renderer.render(
           currentPath,
           start: plan.start,
           duration: plan.duration,
           options: options,
-          bassHandoff: plan.assisted,
+          bassHandoff: plan.assisted || plan.beatMatched,
         );
         if (!_current(generation)) return;
         if (effectTail != null) {
@@ -285,7 +308,32 @@ class _MusicAutoMix {
     }
   }
 
-  Future<void> _start(int generation) async {
+  Future<bool> triggerImmediateTransition() async {
+    if (!_canMix || _starting || _fadeTimer != null) return false;
+    final incoming = _prepared;
+    final next = _next;
+    final plan = _plan;
+    if (incoming == null || next == null || plan == null) return false;
+    final position = await handler._player.getCurrentPosition();
+    if (position == null) return false;
+
+    final immediatePlan = AutoMixPlan(
+      start: position,
+      incomingStart: plan.incomingStart,
+      duration: const Duration(milliseconds: 2500),
+      rate: plan.rate,
+      beatMatched: plan.beatMatched,
+      assisted: plan.assisted,
+      beatPeriod: plan.beatPeriod,
+    );
+    _plan = immediatePlan;
+    _startTimer?.cancel();
+    _startTimer = null;
+    await _start(_generation, forceStart: true);
+    return true;
+  }
+
+  Future<void> _start(int generation, {bool forceStart = false}) async {
     final incoming = _prepared;
     final next = _next;
     var plan = _plan;
@@ -303,11 +351,13 @@ class _MusicAutoMix {
     try {
       final position = await handler._player.getCurrentPosition();
       if (!_current(generation) || position == null) return;
-      final delta = position - plan.start;
-      if (delta < const Duration(milliseconds: -40)) {
-        _starting = false;
-        onPosition(position);
-        return;
+      if (!forceStart) {
+        final delta = position - plan.start;
+        if (delta < const Duration(milliseconds: -40)) {
+          _starting = false;
+          onPosition(position);
+          return;
+        }
       }
       final outgoingEnd =
           handler.mediaItem.value?.duration ?? plan.start + plan.duration;
@@ -376,7 +426,7 @@ class _MusicAutoMix {
             original,
             plan,
             generation,
-            tolerance: Duration(milliseconds: plan.beatMatched ? 20 : 50),
+            tolerance: Duration(milliseconds: plan.beatMatched ? 150 : 250),
           )) {
             if (!_current(generation)) return;
             throw StateError('Effect deck could not be aligned');
@@ -408,7 +458,9 @@ class _MusicAutoMix {
       _plan = null;
       handler._player = incoming;
       _setStatus(
-        plan.beatMatched ? AutoMixStatus.mixing : AutoMixStatus.crossfading,
+        (plan.beatMatched || plan.assisted)
+            ? AutoMixStatus.mixing
+            : AutoMixStatus.crossfading,
       );
       // An index at or before the current one wraps to a new repeat-all pass.
       final nextIndex = _nextIndex > handler._index
@@ -519,6 +571,9 @@ class _MusicAutoMix {
               await incoming.setPlaybackRate(targetRate);
               rate = targetRate;
             }
+            if (transition.harmonicPitchShift != 0) {
+              await incoming.setPitch(levels.pitch);
+            }
             if (generation != _generation) return;
             if (dry != null && progress >= 1) {
               _effectDry = null;
@@ -537,6 +592,10 @@ class _MusicAutoMix {
               _fadeTimer?.cancel();
               _fadeTimer = null;
               rate = 1;
+              if (transition.harmonicPitchShift != 0) {
+                await incoming.setPitch(1.0);
+              }
+              await incoming.setVolume(_incomingVolume);
               _mixPins.clear();
               await handler._cleanupPendingResolvedPaths();
               handler._broadcastState();
@@ -572,16 +631,21 @@ class _MusicAutoMix {
     PlaybackDeck live,
     AutoMixPlan plan,
     int generation, {
-    Duration tolerance = const Duration(milliseconds: 50),
+    Duration tolerance = const Duration(milliseconds: 150),
   }) async {
-    for (var attempt = 0; attempt < 3; attempt++) {
+    for (var attempt = 0; attempt < 4; attempt++) {
       final effectPosition = await effect.getCurrentPosition();
       final livePosition = await live.getCurrentPosition();
       if (!_current(generation)) return false;
       if (effectPosition == null || livePosition == null) return false;
       final target = livePosition - plan.start;
-      if ((target - effectPosition).abs() <= tolerance) return true;
+      final error = (target - effectPosition).abs();
+      if (error <= tolerance) return true;
       if (target.isNegative) return false;
+      if (attempt == 3 && error <= const Duration(milliseconds: 350)) {
+        // Tolerant fallback for platform audio latency on Android
+        return true;
+      }
       await effect.seek(target);
       if (!_current(generation)) return false;
       if (await _waitForProgress(effect, target, generation) == null) {

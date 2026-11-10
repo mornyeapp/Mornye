@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:mornye/theme/cover_palette.dart';
+import 'package:mornye/widgets/fluid_mesh_glow.dart';
 
 /// Opaque cover-derived surface, with full-bleed artwork on the player page
 /// and a muted two-tone gradient behind lyrics and the queue.
@@ -12,7 +13,8 @@ class MornyePlayerBackground extends StatelessWidget {
     this.artwork,
     this.squareArtwork = true,
     this.artworkAspectRatio,
-    this.fadeStart = 0.58,
+    this.fadeStart = 0.42,
+    this.ambientGlow = false,
   });
 
   final Uri? artUri;
@@ -22,6 +24,9 @@ class MornyePlayerBackground extends StatelessWidget {
 
   /// Fraction of the artwork's height that stays sharp before fading out.
   final double fadeStart;
+
+  /// Whether to render an ambient radial glow derived from cover palette.
+  final bool ambientGlow;
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +97,22 @@ class MornyePlayerBackground extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
+                  if (ambientGlow)
+                    Positioned.fill(
+                      child: KeyedSubtree(
+                        key: const ValueKey('mornye-ambient-glow'),
+                        child: IgnorePointer(
+                          child: FluidMeshGlow(
+                            artUri: artUri,
+                            sourceColor: sourceColor,
+                            dominantColor: dominant.toColor(),
+                            opacity: 0.40,
+                            isAmoled:
+                                theme.scaffoldBackgroundColor == Colors.black,
+                          ),
+                        ),
+                      ),
+                    ),
                   artworkLayer!,
                   // An outgoing cover fades out while the gradient leaves
                   // the full-bleed layout.
@@ -131,7 +152,36 @@ class MornyePlayerBackground extends StatelessWidget {
                       ? null
                       : KeyedSubtree(
                           key: const ValueKey('full-player-artwork'),
-                          child: artwork!,
+                          child: ShaderMask(
+                            blendMode: BlendMode.dstIn,
+                            shaderCallback: (bounds) => LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: [
+                                0.0,
+                                (fadeStart * 0.75).clamp(0.0, 1.0),
+                                fadeStart.clamp(0.0, 1.0),
+                                (fadeStart + (1.0 - fadeStart) * 0.50).clamp(
+                                  0.0,
+                                  1.0,
+                                ),
+                                (fadeStart + (1.0 - fadeStart) * 0.80).clamp(
+                                  0.0,
+                                  1.0,
+                                ),
+                                1.0,
+                              ],
+                              colors: const [
+                                Colors.white,
+                                Colors.white,
+                                Color(0xe6ffffff),
+                                Color(0x80ffffff),
+                                Color(0x22ffffff),
+                                Colors.transparent,
+                              ],
+                            ).createShader(bounds),
+                            child: artwork!,
+                          ),
                         ),
                 ),
               ),
@@ -163,18 +213,19 @@ class _ArtworkFade extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (bottom <= top) return;
-    final rect = Rect.fromLTRB(0, top, size.width, bottom);
+    // Fades smoothly into the background right at the artwork's bottom edge
+    final bleedBottom = bottom + 1.0;
+    final rect = Rect.fromLTRB(0, top, size.width, bleedBottom);
     final paint = Paint()..isAntiAlias = false;
     if (background.begin == Alignment.topCenter &&
         background.end == Alignment.bottomCenter) {
-      // Stops where either the colour or the alpha changes slope keep both
-      // linear between them.
+      // Non-linear stops that reach full opacity at the bottom edge
+      final baseStops = const [0.0, 0.25, 0.50, 0.70, 0.85, 0.95, 1.0];
       final stops = {
-        0.0,
-        1.0,
+        ...baseStops,
         for (final stop in background.stops ?? const <double>[])
           if (stop * size.height > top && stop * size.height < bottom)
-            (stop * size.height - top) / (bottom - top),
+            ((stop * size.height - top) / (bottom - top)).clamp(0.0, 1.0),
       }.toList()..sort();
       canvas.drawRect(
         rect,
@@ -183,7 +234,10 @@ class _ArtworkFade extends CustomPainter {
             for (final stop in stops)
               _backgroundAt(
                 (top + stop * (bottom - top)) / size.height,
-              ).withValues(alpha: stop),
+              ).withValues(
+                // Reaches full opacity at stop = 1.0, seamlessly burying the bottom edge
+                alpha: Curves.easeInQuad.transform(stop.clamp(0.0, 1.0)),
+              ),
           ], stops),
       );
       return;
@@ -199,10 +253,18 @@ class _ArtworkFade extends CustomPainter {
       rect,
       paint
         ..blendMode = BlendMode.dstIn
-        ..shader = ui.Gradient.linear(rect.topCenter, rect.bottomCenter, const [
-          Colors.transparent,
-          Colors.white,
-        ]),
+        ..shader = ui.Gradient.linear(
+          rect.topCenter,
+          Offset(rect.topCenter.dx, bottom),
+          const [
+            Colors.transparent,
+            Color(0x33ffffff),
+            Color(0xaaffffff),
+            Colors.white,
+            Colors.white,
+          ],
+          const [0.0, 0.35, 0.65, 0.90, 1.0],
+        ),
     );
     canvas.restore();
   }

@@ -8725,8 +8725,8 @@
   "autoMixPitch": "Pitch (semitones)",
   "autoMixEcho": "Echo",
   "autoMixLowPass": "Muffled filter",
-  "autoMixMixing": "Mixing",
-  "autoMixCrossfading": "Crossfade",
+  "autoMixMixing": "DJ Mix",
+  "autoMixCrossfading": "DJ Transition",
   "playbackAutomation": "Automatic playback",
   "playbackPauseOnMute": "Pause when muted",
   "snackbarPlaybackMuted": "Media volume is zero. Playback paused. Press play again to continue.",
@@ -10503,5 +10503,113 @@
   "lyricsEditLineActions": "Line actions",
   "lyricsEditSaved": "Lyrics saved",
   "lyricsEditSaveFailed": "Couldn't save the lyrics to this file",
-  "lyricsEditReadOnly": "Lyrics can't be saved to this song's file"
+  "lyricsEditReadOnly": "Lyrics can't be saved to this song's file",
+  "djModeTitle": "DJ Mode (Smart Crossfade)",
+  "@djModeTitle": {
+    "description": "Title of the smart crossfade DJ playback mode"
+  },
+  "djModeOn": "On",
+  "@djModeOn": {
+    "description": "DJ Mode enabled state"
+  },
+  "djModeOff": "Off",
+  "@djModeOff": {
+    "description": "DJ Mode disabled state"
+  },
+  "djModeActivated": "DJ Mode (Smart Crossfade) activated",
+  "@djModeActivated": {
+    "description": "Snackbar shown when DJ Mode is toggled on"
+  },
+  "djModeDeactivated": "DJ Mode (Smart Crossfade) deactivated",
+  "@djModeDeactivated": {
+    "description": "Snackbar shown when DJ Mode is toggled off"
+  },
+  "syncLyricsAction": "Download missing lyrics",
+  "@syncLyricsAction": {
+    "description": "Button to download missing lyrics for playlist or selection"
+  },
+  "syncLyricsAllAction": "Download all missing lyrics",
+  "@syncLyricsAllAction": {
+    "description": "Button to download missing lyrics for the entire library"
+  },
+  "syncLyricsAllSubtitle": "Save lyrics permanently into files and as .lrc files",
+  "@syncLyricsAllSubtitle": {
+    "description": "Subtitle describing permanent lyrics persistence"
+  },
+  "syncLyricsChecking": "Checking tracks without lyrics...",
+  "@syncLyricsChecking": {
+    "description": "Progress state while scanning for missing lyrics"
+  },
+  "syncLyricsCompleted": "Sync completed",
+  "@syncLyricsCompleted": {
+    "description": "Title when lyrics sync completes"
+  },
+  "syncLyricsCancelled": "Sync cancelled",
+  "@syncLyricsCancelled": {
+    "description": "Title when lyrics sync is cancelled"
+  },
+  "syncLyricsNoTracks": "No local or downloaded tracks found to sync.",
+  "@syncLyricsNoTracks": {
+    "description": "Message when no matching local tracks are found to sync"
+  },
+  "syncLyricsAllHaveLyrics": "All tracks already have lyrics.",
+  "@syncLyricsAllHaveLyrics": {
+    "description": "Message when all tracks already have lyrics"
+  },
+  "syncLyricsSummary": "{successful} lyrics saved to storage, {failed} not found.",
+  "@syncLyricsSummary": {
+    "description": "Summary of batch lyrics sync result",
+    "placeholders": {
+      "successful": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "syncLyricsCheckedCount": "{current} of {total} tracks checked",
+  "@syncLyricsCheckedCount": {
+    "description": "Progress of lyrics check phase",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "editPlaylistAction": "Edit playlist",
+  "@editPlaylistAction": {
+    "description": "Action to edit playlist details including name and cover"
+  },
+  "listeningStatsToday": "Today",
+  "@listeningStatsToday": {
+    "description": "Choice chip label for today listening statistics"
+  },
+  "djOrderQueueByBpm": "Match BPM queue",
+  "@djOrderQueueByBpm": {
+    "description": "Button to reorder upcoming queue by BPM compatibility for DJ mode"
+  },
+  "djQueueBpmMatched": "Queue ordered by DJ beat matching",
+  "@djQueueBpmMatched": {
+    "description": "Snackbar shown after reordering upcoming queue by BPM"
+  },
+  "playerQueueTabQueue": "Queue",
+  "@playerQueueTabQueue": {
+    "description": "Segmented tab label for player queue"
+  },
+  "playerQueueTabHistory": "History",
+  "@playerQueueTabHistory": {
+    "description": "Segmented tab label for playback history in player"
+  },
+  "playerQueueHistoryEmpty": "No recently played tracks",
+  "@playerQueueHistoryEmpty": {
+    "description": "Empty state message for playback history in queue sheet"
+  },
+  "playerQueuePlayedEarlier": "Played earlier",
+  "@playerQueuePlayedEarlier": {
+    "description": "Header for previously played songs in current session"
+  }
 }

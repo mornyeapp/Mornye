@@ -122,6 +122,7 @@ abstract interface class PlaybackDeck {
   /// Linear gain from 0 to 1, before [playbackOutputVolume].
   Future<void> setVolume(double volume);
   Future<void> setPlaybackRate(double rate);
+  Future<void> setPitch(double pitch);
 
   /// Loads [url]. [arriving] marks a file still being written behind it (a
   /// song a paired phone is sending), which must start before it is whole.

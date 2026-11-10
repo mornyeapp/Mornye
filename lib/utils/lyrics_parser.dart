@@ -155,6 +155,7 @@ class ParsedLyrics {
   });
 
   bool get isEmpty => lines.isEmpty && plainText.trim().isEmpty;
+  bool get isNotEmpty => !isEmpty;
 
   static const ParsedLyrics empty = ParsedLyrics(
     synced: false,

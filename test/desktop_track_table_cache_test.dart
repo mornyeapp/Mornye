@@ -66,6 +66,10 @@ int _legacyCompare(TrackTableRow a, TrackTableRow b, TrackTableColumn column) {
     TrackTableColumn.title => text(a.title, b.title),
     TrackTableColumn.artist => text(a.artist, b.artist),
     TrackTableColumn.album => text(a.album, b.album),
+    TrackTableColumn.dateAdded => number(
+      a.dateAdded?.millisecondsSinceEpoch,
+      b.dateAdded?.millisecondsSinceEpoch,
+    ),
     TrackTableColumn.duration => number(
       a.duration?.inMilliseconds,
       b.duration?.inMilliseconds,
@@ -122,6 +126,12 @@ List<TrackTableRow> _syntheticRows(int count) {
           const Duration(minutes: 3),
           const Duration(milliseconds: 179999),
         ]),
+        dateAdded: pick([
+          null,
+          DateTime.utc(2025, 1, 1),
+          DateTime.utc(2026, 3, 15),
+          DateTime.utc(2024, 12, 31),
+        ]),
       ),
   ];
 }
@@ -131,6 +141,7 @@ const _labels = {
   TrackTableColumn.title: 'Title',
   TrackTableColumn.artist: 'Artist',
   TrackTableColumn.album: 'Album',
+  TrackTableColumn.dateAdded: 'Date added',
   TrackTableColumn.quality: 'Quality',
   TrackTableColumn.duration: 'Duration',
 };

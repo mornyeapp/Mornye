@@ -179,6 +179,8 @@ class _MeasuredDeck implements PlaybackDeck {
   Future<void> setVolume(double volume) => inner.setVolume(volume);
   @override
   Future<void> setPlaybackRate(double rate) => inner.setPlaybackRate(rate);
+  @override
+  Future<void> setPitch(double pitch) => inner.setPitch(pitch);
 
   @override
   Future<void> setFileSource(

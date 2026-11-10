@@ -6,7 +6,9 @@ import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/models/playlist_sort.dart';
 import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/widgets/playlist_sort_sheet.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
@@ -31,6 +33,14 @@ import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/widgets/downloadable_cover.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
+import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/batch_lyrics_sync_service.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/m3u_playlist_service.dart';
+import 'package:mornye/services/track_file_resolver.dart';
+import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
+import 'package:mornye/widgets/batch_lyrics_sync_dialog.dart';
 
 class PlaylistScreen extends ConsumerStatefulWidget {
   final String playlistName;
@@ -70,21 +80,44 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   String? _resolvedPlaylistName;
   String? _resolvedCoverUrl;
   String? _resolvedHeaderVideoUrl;
+  PlaylistSortMode _sortMode = PlaylistSortMode.custom;
+  List<Track> _sortedTracks = const [];
+  bool _isSearchActive = false;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
 
   List<Track> get _tracks => _fetchedTracks ?? widget.tracks;
   String get _playlistName => _resolvedPlaylistName ?? widget.playlistName;
   String? get _coverUrl => _resolvedCoverUrl ?? widget.coverUrl;
   String? get _headerVideoUrl =>
       _resolvedHeaderVideoUrl ?? widget.headerVideoUrl;
+  String get _playlistKey => widget.playlistId ?? widget.playlistName;
+
+  List<Track> get _displayedTracks {
+    if (!_isSearchActive || _searchQuery.trim().isEmpty) {
+      return _sortedTracks;
+    }
+    final q = _searchQuery.trim().toLowerCase();
+    return _sortedTracks.where((track) {
+      return track.name.toLowerCase().contains(q) ||
+          track.artistName.toLowerCase().contains(q) ||
+          track.albumName.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  void _updateSortedTracks() {
+    _sortedTracks = sortTracksByMode(_tracks, _sortMode);
+  }
 
   /// Playlists can legitimately contain the same track twice, so selection is
   /// keyed by position as well as id (matching the album screen).
   String _trackSelectionId(Track track, int index) => '${track.id}#$index';
 
   List<Track> get _selectedTracks => [
-    for (var index = 0; index < _tracks.length; index++)
-      if (selectedIds.contains(_trackSelectionId(_tracks[index], index)))
-        _tracks[index],
+    for (var index = 0; index < _sortedTracks.length; index++)
+      if (selectedIds.contains(_trackSelectionId(_sortedTracks[index], index)))
+        _sortedTracks[index],
   ];
 
   Widget _buildSelectionBottomBar(
@@ -178,7 +211,111 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   @override
   void initState() {
     super.initState();
+    _loadPersistedSortMode();
+    _updateSortedTracks();
     _fetchTracksIfNeeded();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPersistedSortMode() async {
+    final key = _playlistKey;
+    final mode = await PlaylistSortStorage.getSortMode(key);
+    if (!mounted || key != _playlistKey || mode == _sortMode) return;
+    setState(() {
+      _sortMode = mode;
+      _updateSortedTracks();
+    });
+  }
+
+  @override
+  void didUpdateWidget(PlaylistScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.playlistId != oldWidget.playlistId ||
+        widget.playlistName != oldWidget.playlistName) {
+      _loadPersistedSortMode();
+    }
+    if (!identical(widget.tracks, oldWidget.tracks)) {
+      _updateSortedTracks();
+    }
+  }
+
+  Future<void> _syncPlaylistLyrics() async {
+    final tracks = _sortedTracks;
+    if (tracks.isEmpty) return;
+    final resolved = await resolveTrackFiles(
+      tracks,
+      library: LibraryDatabase.instance,
+      history: HistoryDatabase.instance,
+      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+    );
+    final items = <BatchLyricsItem>[];
+    for (var i = 0; i < tracks.length; i++) {
+      final path = resolved.paths[i];
+      if (path != null && path.isNotEmpty) {
+        items.add(BatchLyricsItem(track: tracks[i], filePath: path));
+      }
+    }
+    if (!mounted) return;
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.syncLyricsNoTracks)));
+      return;
+    }
+    await BatchLyricsSyncDialog.show(context, items: items);
+  }
+
+  Future<void> _exportM3u() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
+    try {
+      final tracks = _displayedTracks;
+      if (tracks.isEmpty) return;
+      final resolved = await resolveTrackFiles(
+        tracks,
+        library: LibraryDatabase.instance,
+        history: HistoryDatabase.instance,
+        includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+      );
+      final exportEntries = <M3uExportEntry>[];
+      for (var i = 0; i < tracks.length; i++) {
+        final path = resolved.paths[i] ?? '';
+        final entryPath = M3uPlaylistService.exportPathFor(path);
+        if (entryPath != null) {
+          exportEntries.add(M3uExportEntry(track: tracks[i], path: entryPath));
+        }
+      }
+      if (exportEntries.isEmpty) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.collectionExportM3uNone)),
+        );
+        return;
+      }
+      final file = await M3uPlaylistService.writeExportEntries(
+        _playlistName,
+        exportEntries,
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.collectionExportM3uDone(exportEntries.length, tracks.length),
+          ),
+        ),
+      );
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.path)], text: _playlistName),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.collectionExportM3uFailed)),
+      );
+    }
   }
 
   Future<void> _fetchTracksIfNeeded() async {
@@ -236,6 +373,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
             ? headerVideo
             : _resolvedHeaderVideoUrl;
         _isLoading = false;
+        _updateSortedTracks();
       });
     } catch (e) {
       if (!mounted) return;
@@ -264,9 +402,10 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ? MediaQuery.paddingOf(context).bottom
         : 0.0;
 
+    final tracks = _sortedTracks;
     final ids = [
-      for (var index = 0; index < _tracks.length; index++)
-        _trackSelectionId(_tracks[index], index),
+      for (var index = 0; index < tracks.length; index++)
+        _trackSelectionId(tracks[index], index),
     ];
     pruneSelection(ids.toSet());
 
@@ -286,14 +425,15 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ),
         appBar: _buildAppBar(context, colorScheme),
         slivers: [
+          if (_isSearchActive) _buildSearchBarSliver(context, colorScheme),
           _buildTrackList(context, colorScheme),
           _buildPlaylistFooter(context, colorScheme),
-          if (!_isLoading && _tracks.isNotEmpty && !isSelectionMode)
+          if (!_isLoading && tracks.isNotEmpty && !isSelectionMode)
             CollectionSuggestionsSliver(
               collectionKey:
                   'playlist:${widget.metadataProviderId}:'
                   '${widget.playlistId ?? widget.playlistName}',
-              tracks: _tracks,
+              tracks: tracks,
             ),
         ],
       ),
@@ -359,37 +499,149 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       meta: HeaderMetaRow(
         items: [
           HeaderMetaItem(
-            context.l10n.tracksCount(_tracks.length),
+            context.l10n.tracksCount(_displayedTracks.length),
             icon: Icons.playlist_play,
           ),
         ],
       ),
-      appBarActions: ref.watch(linkPhoneClientProvider) == null
-          ? null
-          : [
-              LinkDownloadOnDesktopButton(
-                tracks: _tracks,
-                service: _recommendedDownloadService(),
-                playlistName: _playlistName,
-              ),
-            ],
+      appBarActions: [
+        if (!isSelectionMode && _sortedTracks.length > 1) ...[
+          HeaderCircleButton(
+            key: const ValueKey('playlist-search-button'),
+            icon: _isSearchActive ? Icons.search_off : Icons.search,
+            tooltip: _isSearchActive
+                ? MaterialLocalizations.of(context).closeButtonTooltip
+                : MaterialLocalizations.of(context).searchFieldLabel,
+            onPressed: () {
+              setState(() {
+                _isSearchActive = !_isSearchActive;
+                if (!_isSearchActive) {
+                  _searchQuery = '';
+                  _searchController.clear();
+                } else {
+                  _searchFocusNode.requestFocus();
+                }
+              });
+            },
+          ),
+          buildPlaylistSortButton(
+            context: context,
+            currentSort: _sortMode,
+            hasDateAdded: false,
+            onSortChanged: (newSort) {
+              setState(() {
+                _sortMode = newSort;
+                _updateSortedTracks();
+              });
+              PlaylistSortStorage.setSortMode(_playlistKey, newSort);
+            },
+          ),
+          HeaderCircleButton(
+            key: const ValueKey('playlist-sync-lyrics-button'),
+            icon: Icons.lyrics_outlined,
+            tooltip: context.l10n.syncLyricsAction,
+            onPressed: _syncPlaylistLyrics,
+          ),
+          HeaderCircleButton(
+            key: const ValueKey('playlist-export-m3u-button'),
+            icon: Icons.ios_share,
+            tooltip: context.l10n.collectionExportM3u,
+            onPressed: _exportM3u,
+          ),
+        ],
+        if (ref.watch(linkPhoneClientProvider) != null)
+          LinkDownloadOnDesktopButton(
+            tracks: _sortedTracks,
+            service: _recommendedDownloadService(),
+            playlistName: _playlistName,
+          ),
+      ],
       actions: CollectionHeaderActions(
-        tracks: _tracks,
-        onLoveAll: () => loveAllTracks(this.context, ref, _tracks),
+        tracks: _displayedTracks,
+        onLoveAll: () => loveAllTracks(this.context, ref, _displayedTracks),
         downloadIcon: Icons.download_rounded,
         tonalDownload: true,
         onDownloadAll: () => confirmDownloadAllDialog(
           context,
-          _tracks.length,
+          _displayedTracks.length,
           () => _downloadAll(context),
         ),
         addToPlaylistIcon: Icons.playlist_add,
         onAddToPlaylist: () => showAddTracksToPlaylistSheet(
           context,
           ref,
-          _tracks,
+          _displayedTracks,
           playlistNamePrefill: widget.playlistName,
           preserveOccurrences: true,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBarSliver(BuildContext context, ColorScheme colorScheme) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: wideListInset(context) + 16,
+          vertical: 8,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Icon(Icons.search, size: 20, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('playlist-search-input'),
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: MaterialLocalizations.of(
+                      context,
+                    ).searchFieldLabel,
+                    hintStyle: TextStyle(
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.7,
+                      ),
+                      fontSize: 14,
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val;
+                    });
+                  },
+                ),
+              ),
+              if (_searchQuery.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -399,7 +651,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       buildTrackListFooter(
         context,
         colorScheme,
-        _tracks,
+        _displayedTracks,
         excludeEpochReleaseDate: true,
       );
 
@@ -436,20 +688,32 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       );
     }
 
-    _historySnapshot.update(_tracks);
+    final tracks = _displayedTracks;
+    if (tracks.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Center(
+            child: Text(
+              context.l10n.errorNoTracksFound,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ),
+      );
+    }
+    _historySnapshot.update(tracks);
     final historyKeys = _historySnapshot.lookupKeys;
     final existingHistoryKeys = ref.watch(
       downloadHistoryVisibleBatchExistsProvider(_historySnapshot.request),
     );
     if (isDesktopPlatform) {
       final ids = [
-        for (var i = 0; i < _tracks.length; i++)
-          _trackSelectionId(_tracks[i], i),
+        for (var i = 0; i < tracks.length; i++) _trackSelectionId(tracks[i], i),
       ];
       final inHistory = [
         for (final key in historyKeys) existingHistoryKeys.contains(key),
       ];
-      final tracks = _tracks;
       void activate(int index) => TrackListTile.activate(
         context,
         ref,
@@ -472,6 +736,11 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ids: ids,
         isInHistory: inHistory,
         selectedIds: selectedIds,
+        sort: tableSortFromPlaylistSort(_sortMode),
+        onSort: (nextSort) => setState(() {
+          _sortMode = playlistSortFromTableSort(nextSort);
+          _updateSortedTracks();
+        }),
         onSelect: applyDesktopClick,
         onActivate: activate,
         showArtwork: true,
@@ -482,7 +751,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate((context, index) {
-          final track = _tracks[index];
+          final track = tracks[index];
           final selectionId = _trackSelectionId(track, index);
           final isInHistory = existingHistoryKeys.contains(historyKeys[index]);
           return KeyedSubtree(
@@ -533,7 +802,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
               ),
             ),
           );
-        }, childCount: _tracks.length),
+        }, childCount: tracks.length),
       ),
     );
   }
@@ -559,7 +828,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
     await queueTracksSkippingDownloaded(
       context,
       ref,
-      _tracks,
+      _sortedTracks,
       artistNameForPicker: _playlistName,
       recommendedService: _recommendedDownloadService(),
       playlistName: _playlistName,

@@ -6,6 +6,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/playlist_sources.dart';
+import 'package:mornye/services/smart_playlists_service.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -16,7 +17,7 @@ import 'package:mornye/widgets/playlist_picker_sheet.dart';
 
 final _log = AppLogger('CreatePlaylist');
 
-enum _PlaylistSource { empty, folder, file }
+enum _PlaylistSource { empty, folder, file, smart }
 
 /// Creates a playlist that starts empty, holds one Library folder, or
 /// imports an M3U or CSV file matched to local files.
@@ -52,6 +53,12 @@ Future<void> showCreatePlaylistSheet(
               l10n.playlistImportFile,
               l10n.playlistImportFileSubtitle,
             ),
+            (
+              _PlaylistSource.smart,
+              Icons.auto_awesome_rounded,
+              'Playlist intelligente',
+              'Genera dai più ascoltati, aggiunti di recente o per BPM',
+            ),
           ])
             AppSheetOption(
               leading: AppIcon(icon),
@@ -72,6 +79,8 @@ Future<void> showCreatePlaylistSheet(
       await _createFromFolder(context, ref);
     case _PlaylistSource.file:
       await _importFile(context, ref);
+    case _PlaylistSource.smart:
+      await _createSmart(context, ref);
   }
 }
 
@@ -87,6 +96,80 @@ Future<void> _createEmpty(BuildContext context, WidgetRef ref) async {
   final name = await _promptName(context);
   if (name == null || name.isEmpty) return;
   await ref.read(libraryCollectionsProvider.notifier).createPlaylist(name);
+}
+
+Future<void> _createSmart(BuildContext context, WidgetRef ref) async {
+  final chosenType = await showAppScrollableBottomSheet<SmartPlaylistType>(
+    context: context,
+    title: 'Scegli tipo di playlist intelligente',
+    builder: (sheetContext, controller) => SingleChildScrollView(
+      controller: controller,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (type, icon, title, subtitle) in [
+            (
+              SmartPlaylistType.recentlyAdded,
+              Icons.schedule_rounded,
+              'Aggiunti di recente',
+              'Gli ultimi brani inseriti nella libreria',
+            ),
+            (
+              SmartPlaylistType.mostPlayed,
+              Icons.local_fire_department_rounded,
+              'I più ascoltati',
+              'I tuoi brani con più riproduzioni',
+            ),
+            (
+              SmartPlaylistType.bpmMix,
+              Icons.speed_rounded,
+              'BPM Mix Energetico',
+              'Brani con ritmo ideale (120 - 135 BPM)',
+            ),
+          ])
+            AppSheetOption(
+              leading: AppIcon(icon),
+              title: Text(title),
+              subtitle: Text(subtitle),
+              onTap: () => Navigator.pop(sheetContext, type),
+            ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    ),
+  );
+
+  if (chosenType == null || !context.mounted) return;
+
+  final name = await _promptName(context, chosenType.title);
+  if (name == null || name.isEmpty || !context.mounted) return;
+
+  final tracks = await SmartPlaylistsService.instance.getPlaylistTracks(
+    chosenType,
+  );
+  if (!context.mounted) return;
+
+  if (tracks.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Nessun brano trovato per questa regola.')),
+    );
+    return;
+  }
+
+  final notifier = ref.read(libraryCollectionsProvider.notifier);
+  final playlistId = await notifier.createPlaylist(name);
+
+  final result = await notifier.addTracksToPlaylist(
+    playlistId,
+    tracks,
+    preserveOccurrences: true,
+  );
+
+  if (!context.mounted) return;
+  showAppSnackBar(
+    context,
+    content: Text('Playlist "$name" creata con ${result.addedCount} brani'),
+  );
 }
 
 Future<void> _createFromFolder(BuildContext context, WidgetRef ref) async {
