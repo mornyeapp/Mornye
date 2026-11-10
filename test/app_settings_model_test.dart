@@ -51,6 +51,43 @@ void main() {
     expect(AppSettings.fromJson({'interfaceScale': 3}).interfaceScale, 1.3);
   });
 
+  test('Playback speed and pitch default to normal and restore in range', () {
+    const defaults = AppSettings();
+    expect(defaults.playbackSpeed, 1);
+    expect(defaults.playbackKeepPitch, isTrue);
+    expect(defaults.playbackPitch, 0);
+    final empty = AppSettings.fromJson({});
+    expect(empty.playbackSpeed, 1);
+    expect(empty.playbackKeepPitch, isTrue);
+    expect(empty.playbackPitch, 0);
+
+    final changed = defaults.copyWith(
+      playbackSpeed: 1.25,
+      playbackKeepPitch: false,
+      playbackPitch: -3.5,
+    );
+    final restored = AppSettings.fromJson(changed.toJson());
+    expect(restored.playbackSpeed, 1.25);
+    expect(restored.playbackKeepPitch, isFalse);
+    expect(restored.playbackPitch, -3.5);
+    expect(restored.copyWith(locale: 'id').playbackSpeed, 1.25);
+
+    for (final invalid in ['', double.nan, double.infinity]) {
+      final settings = AppSettings.fromJson({
+        'playbackSpeed': invalid,
+        'playbackPitch': invalid,
+      });
+      expect(settings.playbackSpeed, 1);
+      expect(settings.playbackPitch, 0);
+    }
+    final clamped = AppSettings.fromJson({
+      'playbackSpeed': 9,
+      'playbackPitch': -40,
+    });
+    expect(clamped.playbackSpeed, maxPlaybackSpeed);
+    expect(clamped.playbackPitch, -maxPlaybackPitch);
+  });
+
   test('Link hides disconnected devices by default and remembers off', () {
     expect(const AppSettings().linkHideDisconnectedSongs, isTrue);
     expect(AppSettings.fromJson({}).linkHideDisconnectedSongs, isTrue);

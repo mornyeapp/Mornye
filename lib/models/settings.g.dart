@@ -61,6 +61,13 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       : autoMixPitchFromJson(json['autoMixPitch']),
   autoMixEcho: json['autoMixEcho'] as bool? ?? false,
   autoMixLowPass: json['autoMixLowPass'] as bool? ?? false,
+  playbackSpeed: json['playbackSpeed'] == null
+      ? 1
+      : playbackSpeedFromJson(json['playbackSpeed']),
+  playbackKeepPitch: json['playbackKeepPitch'] as bool? ?? true,
+  playbackPitch: json['playbackPitch'] == null
+      ? 0
+      : playbackPitchFromJson(json['playbackPitch']),
   discordRichPresenceEnabled:
       json['discordRichPresenceEnabled'] as bool? ?? false,
   usbBitPerfect: json['usbBitPerfect'] as bool? ?? false,
@@ -263,6 +270,9 @@ Map<String, dynamic> _$AppSettingsToJson(
   'autoMixPitch': instance.autoMixPitch,
   'autoMixEcho': instance.autoMixEcho,
   'autoMixLowPass': instance.autoMixLowPass,
+  'playbackSpeed': instance.playbackSpeed,
+  'playbackKeepPitch': instance.playbackKeepPitch,
+  'playbackPitch': instance.playbackPitch,
   'discordRichPresenceEnabled': instance.discordRichPresenceEnabled,
   'usbBitPerfect': instance.usbBitPerfect,
   'usbDirect': instance.usbDirect,

@@ -44,6 +44,21 @@ double musicHapticsLevelFromJson(Object? value) =>
 double autoplayRandomnessFromJson(Object? value) =>
     value is num && value.isFinite ? value.toDouble().clamp(0, 1) : 0;
 
+/// Slowest and fastest playback speed, as a factor of the normal speed.
+const double minPlaybackSpeed = 0.5;
+const double maxPlaybackSpeed = 2;
+
+double playbackSpeedFromJson(Object? value) => value is num && value.isFinite
+    ? value.toDouble().clamp(minPlaybackSpeed, maxPlaybackSpeed)
+    : 1;
+
+/// Largest pitch shift either way, in semitones.
+const double maxPlaybackPitch = 12;
+
+double playbackPitchFromJson(Object? value) => value is num && value.isFinite
+    ? value.toDouble().clamp(-maxPlaybackPitch, maxPlaybackPitch)
+    : 0;
+
 /// Smallest and largest Interface size, as a factor of the normal size.
 const double minInterfaceScale = 0.8;
 const double maxInterfaceScale = 1.3;
@@ -152,6 +167,20 @@ class AppSettings {
   final double autoMixPitch;
   final bool autoMixEcho;
   final bool autoMixLowPass;
+
+  /// Playback speed for every song, from [minPlaybackSpeed] to
+  /// [maxPlaybackSpeed]; 1 is normal.
+  @JsonKey(fromJson: playbackSpeedFromJson)
+  final double playbackSpeed;
+
+  /// True keeps the pitch while the speed changes; false lets the pitch
+  /// follow the speed, as a record played faster or slower.
+  final bool playbackKeepPitch;
+
+  /// Pitch shift in semitones on top of [playbackKeepPitch], from
+  /// -[maxPlaybackPitch] to [maxPlaybackPitch]; 0 is the original key.
+  @JsonKey(fromJson: playbackPitchFromJson)
+  final double playbackPitch;
   AutoMixOptions get autoMixOptions => AutoMixOptions(
     durationSeconds: autoMixDuration,
     effect: autoMixEffect,
@@ -458,6 +487,9 @@ class AppSettings {
     this.autoMixPitch = 0,
     this.autoMixEcho = false,
     this.autoMixLowPass = false,
+    this.playbackSpeed = 1,
+    this.playbackKeepPitch = true,
+    this.playbackPitch = 0,
     this.discordRichPresenceEnabled = false,
     this.usbBitPerfect = false,
     this.usbDirect = false,
@@ -639,6 +671,9 @@ class AppSettings {
     double? autoMixPitch,
     bool? autoMixEcho,
     bool? autoMixLowPass,
+    double? playbackSpeed,
+    bool? playbackKeepPitch,
+    double? playbackPitch,
     bool? discordRichPresenceEnabled,
     bool? usbBitPerfect,
     bool? usbDirect,
@@ -799,6 +834,9 @@ class AppSettings {
       autoMixPitch: autoMixPitch ?? this.autoMixPitch,
       autoMixEcho: autoMixEcho ?? this.autoMixEcho,
       autoMixLowPass: autoMixLowPass ?? this.autoMixLowPass,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+      playbackKeepPitch: playbackKeepPitch ?? this.playbackKeepPitch,
+      playbackPitch: playbackPitch ?? this.playbackPitch,
       discordRichPresenceEnabled:
           discordRichPresenceEnabled ?? this.discordRichPresenceEnabled,
       usbBitPerfect: usbBitPerfect ?? this.usbBitPerfect,

@@ -682,6 +682,20 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setAutoMixLowPass(bool enabled) =>
       _commit(state.copyWith(autoMixLowPass: enabled));
 
+  void setPlaybackSpeed(double speed) =>
+      _commit(state.copyWith(playbackSpeed: playbackSpeedFromJson(speed)));
+
+  void setPlaybackKeepPitch(bool keep) =>
+      _commit(state.copyWith(playbackKeepPitch: keep));
+
+  void setPlaybackPitch(double semitones) =>
+      _commit(state.copyWith(playbackPitch: playbackPitchFromJson(semitones)));
+
+  /// Normal speed, the pitch kept and the original key.
+  void resetPlaybackTempo() => _commit(
+    state.copyWith(playbackSpeed: 1, playbackKeepPitch: true, playbackPitch: 0),
+  );
+
   void setDiscordRichPresenceEnabled(bool enabled) =>
       _commit(state.copyWith(discordRichPresenceEnabled: enabled));
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -62,6 +63,64 @@ final playbackMedia3Engine = ValueNotifier<bool>(false);
 /// AutoMix is off. media3 decks jump over silent passages while it is true;
 /// audioplayers decks ignore it.
 final playbackSkipSilence = ValueNotifier<bool>(false);
+
+/// The `playbackSpeed` setting. Every deck multiplies the rate it is given
+/// ([PlaybackDeck.setPlaybackRate], 1 unless AutoMix is beat matching) by
+/// this value, and applies a change at once, also mid-song.
+final playbackSpeed = ValueNotifier<double>(1);
+
+/// Pitch for every song, from the `playbackKeepPitch` and `playbackPitch`
+/// settings.
+@immutable
+class PlaybackPitch {
+  const PlaybackPitch({this.semitones = 0, this.followsRate = false});
+
+  /// No shift; the pitch stays put while the speed changes.
+  static const none = PlaybackPitch();
+
+  /// Shift on top of [followsRate], from -12 to 12.
+  final double semitones;
+
+  /// True lets the pitch follow the deck's effective rate (a record played
+  /// faster or slower); false keeps it while the speed changes.
+  final bool followsRate;
+
+  /// Frequency factor for a deck playing at [rate] (its effective rate,
+  /// [playbackSpeed] included).
+  double factorAt(double rate) =>
+      math.pow(2, semitones / 12).toDouble() * (followsRate ? rate : 1);
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlaybackPitch &&
+      other.semitones == semitones &&
+      other.followsRate == followsRate;
+
+  @override
+  int get hashCode => Object.hash(semitones, followsRate);
+}
+
+/// Applied by every deck that can change pitch, at once, also mid-song.
+final playbackPitch = ValueNotifier<PlaybackPitch>(PlaybackPitch.none);
+
+/// What the output playing now can do with [playbackSpeed] and
+/// [playbackPitch]. The music player keeps it current for the deck that
+/// plays; the speed and pitch controls read it.
+enum PlaybackTempoSupport {
+  /// Speed, keeping or following pitch, and the pitch shift.
+  full,
+
+  /// Speed only (pitch kept); the pitch controls do nothing on this output.
+  speedOnly,
+
+  /// Neither: the audio does not pass through the app (Cast, Android USB
+  /// bit-perfect or direct output).
+  none,
+}
+
+final playbackTempoSupport = ValueNotifier<PlaybackTempoSupport>(
+  PlaybackTempoSupport.full,
+);
 
 /// The `spatialAudio` setting. True lets the platform spatialize songs (its
 /// default on Android); false asks it never to. media3 decks and the

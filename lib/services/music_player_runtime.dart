@@ -447,6 +447,11 @@ class MusicPlayerRuntime {
         !settings.autoMix &&
         dependencies.isAndroid;
     playbackSpatialAudio.value = settings.spatialAudio;
+    playbackSpeed.value = settings.playbackSpeed;
+    playbackPitch.value = PlaybackPitch(
+      semitones: settings.playbackPitch,
+      followsRate: !settings.playbackKeepPitch,
+    );
     configureLockScreenLyrics(enabled: settings.lockScreenLyrics);
     _songAnalysis?.configure(settings);
     _handler?.applySettings(previous);
