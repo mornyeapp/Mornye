@@ -365,6 +365,67 @@
   "@spatialAudioOutputOff": {
     "description": "Spatial audio status on iOS: the current output has no spatial audio, or the user turned it off in Control Center"
   },
+  "playbackTempoTitle": "Speed and pitch",
+  "@playbackTempoTitle": {
+    "description": "Now Playing menu item, Playback settings row and sheet title for the playback speed and pitch controls"
+  },
+  "playbackTempoDescription": "Play songs faster or slower, or in another key",
+  "@playbackTempoDescription": {
+    "description": "Subtitle of the Speed and pitch row in Playback settings"
+  },
+  "playbackTempoSpeed": "Speed",
+  "@playbackTempoSpeed": {
+    "description": "Title of the playback speed slider in the Speed and pitch sheet"
+  },
+  "playbackTempoSpeedValue": "{speed}x",
+  "@playbackTempoSpeedValue": {
+    "description": "Playback speed with its unit, such as 1.25x; speed is a number already formatted for the language",
+    "placeholders": {
+      "speed": {
+        "type": "String"
+      }
+    }
+  },
+  "playbackTempoKeepPitch": "Keep pitch",
+  "@playbackTempoKeepPitch": {
+    "description": "Switch in the Speed and pitch sheet: on keeps the key while the speed changes"
+  },
+  "playbackTempoKeepPitchDescription": "Off lets the pitch follow the speed, like a record played faster or slower",
+  "@playbackTempoKeepPitchDescription": {
+    "description": "Subtitle of the Keep pitch switch"
+  },
+  "playbackTempoPitch": "Pitch",
+  "@playbackTempoPitch": {
+    "description": "Title of the pitch shift slider in the Speed and pitch sheet, in semitones"
+  },
+  "playbackTempoSemitones": "{count, plural, =1{{value} semitone} other{{value} semitones}}",
+  "@playbackTempoSemitones": {
+    "description": "Pitch shift shown under the Speed and pitch menu item, such as '+2 semitones'; value is the signed, formatted number and count its size",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "playbackTempoPitchFollows": "Pitch follows speed",
+  "@playbackTempoPitchFollows": {
+    "description": "Shown under the Speed and pitch menu item while Keep pitch is off"
+  },
+  "playbackTempoReset": "Reset",
+  "@playbackTempoReset": {
+    "description": "Button in the Speed and pitch sheet that returns to normal speed, the pitch kept and the original key"
+  },
+  "playbackTempoUnavailable": "The audio doesn't pass through the app on this output, for example while casting or with direct USB output, so speed and pitch can't change.",
+  "@playbackTempoUnavailable": {
+    "description": "Note in the Speed and pitch sheet while every control is disabled because the current output plays the audio outside the app"
+  },
+  "playbackTempoSpeedOnly": "Only the speed can change on this output; the pitch stays as recorded.",
+  "@playbackTempoSpeedOnly": {
+    "description": "Note in the Speed and pitch sheet while Keep pitch and the pitch slider are disabled because the current output cannot shift pitch"
+  },
   "sectionPlaybackQueue": "Queue",
   "@sectionPlaybackQueue": {
     "description": "Playback settings section for how the play queue behaves"
