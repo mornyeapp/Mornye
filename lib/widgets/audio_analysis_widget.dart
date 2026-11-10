@@ -1,31 +1,47 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
+import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/services/audio_analysis_jobs.dart';
 import 'package:mornye/services/audio_analysis_cache.dart';
 import 'package:mornye/services/audio_analysis_ffmpeg.dart';
 import 'package:mornye/services/audio_analysis_models.dart';
 import 'package:mornye/services/audio_analysis_runner.dart';
+import 'package:mornye/services/audio_compare_dsp.dart';
+import 'package:mornye/services/audio_compare_engine.dart';
+import 'package:mornye/services/audio_file_open_service.dart'
+    show openAudioExtensions;
 import 'package:mornye/services/network_audio_analysis_input.dart';
 import 'package:mornye/widgets/settings_group.dart';
+import 'package:mornye/widgets/app_action_button.dart';
+import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
+import 'package:mornye/widgets/expressive_button.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/string_utils.dart';
 
 export 'package:mornye/services/audio_analysis_ffmpeg.dart';
 export 'package:mornye/services/audio_analysis_models.dart';
 
 part 'audio_analysis_info_card.dart';
+part 'audio_compare_view.dart';
 part 'audio_analysis_spectrogram.dart';
 
 class AudioAnalysisCard extends StatefulWidget {
@@ -627,6 +643,13 @@ class _AudioAnalysisCardState extends State<AudioAnalysisCard> {
         _AudioInfoCard(
           data: data,
           onRescan: () => _analyze(forceRefresh: true),
+          onCompare: audioCompareAvailable
+              ? () => pickAndShowAudioCompare(
+                  context,
+                  referencePath: widget.filePath,
+                  referenceSize: data.fileSize,
+                )
+              : null,
         ),
         if (_spectrogramImage != null) ...[
           const SizedBox(height: 12),

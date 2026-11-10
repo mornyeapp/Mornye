@@ -9426,6 +9426,135 @@
   "audioInfoBluetoothUnavailableHint": "Android may show the active codec in Bluetooth settings without making it available to Mornye. This is separate from the song's file format.",
   "audioAnalysisFileBitrate": "Average file bitrate",
   "audioAnalysisFileBitrateHint": "Includes tags and container overhead. It can differ from the audio stream bitrate and is not the Bluetooth bitrate.",
+  "audioCompareAction": "Compare with another file",
+  "audioCompareActionHint": "Null test: lines up another version of this song and shows what differs.",
+  "audioCompareUnavailable": "Comparing with another file needs a file picker, which this device does not have.",
+  "audioComparePickTitle": "Choose the file to compare",
+  "audioCompareSameFile": "That is the same file. Choose another version of the song.",
+  "audioCompareTitle": "Compare files",
+  "audioCompareStagePreparing": "Reading both files",
+  "audioCompareStageAligning": "Lining up the files",
+  "audioCompareStageMeasuring": "Measuring the difference",
+  "audioCompareStageSpectrogram": "Drawing the difference",
+  "audioCompareStepLabel": "Step {step} of {total}",
+  "@audioCompareStepLabel": {
+    "description": "Progress of the null test",
+    "placeholders": {
+      "step": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareErrorUnreadable": "{file} could not be read as audio.",
+  "@audioCompareErrorUnreadable": {
+    "description": "Null test error when a file has no audio stream",
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareErrorTooShort": "Both files need at least two seconds of audio.",
+  "audioCompareErrorDecode": "One of the files could not be decoded.",
+  "audioCompareErrorGeneric": "The comparison failed: {error}",
+  "@audioCompareErrorGeneric": {
+    "description": "Null test error with a reason",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareLevelIdentical": "The files are identical: the audio cancels completely.",
+  "audioCompareLevelNearlyIdentical": "The files are the same audio, apart from differences far below hearing.",
+  "audioCompareLevelMostlyIdentical": "The files are the same audio with small differences, such as resampling or dither.",
+  "audioCompareLevelModerate": "The files share a source but differ clearly, as lossy encoding or a filter does.",
+  "audioCompareLevelLarge": "The files differ a lot, as a remaster or a different mix does.",
+  "audioCompareBandHigh": "Most of the difference is in the high frequencies.",
+  "audioCompareBandLow": "Most of the difference is below 8 kHz.",
+  "audioCompareBandBroadband": "The difference is spread across the whole range.",
+  "audioComparePeak": "Largest difference at {time}: {level}",
+  "@audioComparePeak": {
+    "description": "Time and level of the loudest residual window",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareNoticeTitle": "This comparison may not mean much",
+  "audioCompareNoticeWeakAlignment": "The files could not be lined up with confidence, so they may not be the same recording.",
+  "audioCompareNoticeResidualHigh": "The difference stays as loud as the music for the whole song, so these are probably different recordings or mixes.",
+  "audioCompareNoticeDrift": "The timing drifts by {ms} ms between the start and later in the song, so one file plays at a slightly different speed.",
+  "@audioCompareNoticeDrift": {
+    "description": "Null test notice when the alignment changes over the song",
+    "placeholders": {
+      "ms": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareNoticeDuration": "The lengths differ by {seconds} s, so one file has extra or missing audio.",
+  "@audioCompareNoticeDuration": {
+    "description": "Null test notice when the aligned durations differ",
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareNoticeFooter": "The figures below are shown as measured.",
+  "audioCompareTimelineTitle": "Difference over time",
+  "audioCompareTimelineHint": "Tap or drag on the graph to read a moment.",
+  "audioCompareTimelineCaption": "Level of the difference relative to the music, in dB. Lower is closer; -120 dB means the files cancel.",
+  "audioComparePlayFromHere": "Play from here",
+  "audioCompareChannelBoth": "Both",
+  "audioCompareChannelLeft": "Left",
+  "audioCompareChannelRight": "Right",
+  "audioCompareSummaryTitle": "Summary",
+  "audioCompareReference": "This song",
+  "audioCompareOther": "Compared file",
+  "audioCompareOffset": "Offset",
+  "audioCompareOffsetValue": "{samples} samples ({ms} ms)",
+  "@audioCompareOffsetValue": {
+    "description": "Alignment offset in samples and milliseconds",
+    "placeholders": {
+      "samples": {
+        "type": "String"
+      },
+      "ms": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareOffsetLater": "The audio starts this much later in the compared file.",
+  "audioCompareOffsetEarlier": "The audio starts this much earlier in the compared file.",
+  "audioCompareGain": "Level match",
+  "audioCompareGainDetail": "Applied to the compared file before subtracting.",
+  "audioCompareGainInverted": "Applied to the compared file before subtracting. Its polarity is inverted.",
+  "audioCompareOverall": "Overall difference",
+  "audioCompareOverallDetail": "Energy of the difference relative to the music over the whole song.",
+  "audioCompareMatch": "Alignment match",
+  "audioCompareNoteResampled": "The files were compared at {rate}; one was resampled, which adds a small difference of its own.",
+  "@audioCompareNoteResampled": {
+    "description": "Null test note when a file was resampled",
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareNoteChannels": "The files have different channel layouts and were mixed to the same one.",
+  "audioCompareSpectrogramTitle": "Spectrogram of the difference",
+  "audioCompareSpectrogramCaption": "What is left after subtracting the files. Dark means they cancel.",
+  "audioCompareExplainTitle": "What is a null test?",
+  "audioCompareExplainBody": "A null test lines up two versions of a song, matches their level, then subtracts one from the other. Whatever is left is the difference between them. Identical audio cancels to silence. Lossy encoding leaves a quiet residue, mostly in the highs. A different master or mix leaves almost the music itself. A small residue does not mean you can hear it, and a file can sound the same while measuring differently.",
   "audioInfoSystemDefaultRate": "System default sample rate",
   "audioInfoAndroidPcmRates": "Android PCM sample rates",
   "audioInfoAndroidPcmFormats": "Android PCM formats",
