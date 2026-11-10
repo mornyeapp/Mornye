@@ -36,6 +36,7 @@ import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/playback_source_label.dart';
+import 'package:mornye/widgets/playback_tempo_sheet.dart';
 import 'package:mornye/widgets/lyrics_options_button.dart';
 import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/lyrics_screen_awake.dart';
@@ -1225,7 +1226,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               context,
             ).formatTimeOfDay(TimeOfDay.fromDateTime(sleepTimerEndsAt)),
           );
-    final volumeShown = ref.read(settingsProvider).playerShowVolume;
+    final settings = ref.read(settingsProvider);
+    final volumeShown = settings.playerShowVolume;
+    final tempoSubtitle = playbackTempoSettingsSummary(context.l10n, settings);
     final linkClient = ref.read(linkPhoneClientProvider);
     final transfer = await linkTransferSongsOfPlaying(
       ref,
@@ -1246,6 +1249,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             builder: (_) => MornyePlayerActionsSheet(
               mediaItem: mediaItem,
               sleepTimerSubtitle: sleepTimerSubtitle,
+              tempoSubtitle: tempoSubtitle,
               volumeShown: volumeShown,
               sendToDesktop: sendToDesktop,
               saveToPhone: saveToPhone,
@@ -1308,6 +1312,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     icon: Icons.equalizer,
                     title: sheetContext.l10n.equalizerTitle,
                     onTap: () => Navigator.of(sheetContext).pop('equalizer'),
+                  ),
+                  SettingsItem(
+                    icon: Icons.speed,
+                    title: sheetContext.l10n.playbackTempoTitle,
+                    subtitle: tempoSubtitle,
+                    onTap: () => Navigator.of(sheetContext).pop('tempo'),
                   ),
                   SettingsItem(
                     icon: volumeShown
@@ -1390,6 +1400,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         break;
       case 'equalizer':
         await pushPage<void>(context, (_) => const EqualizerScreen());
+        break;
+      case 'tempo':
+        await showPlaybackTempoSheet(context);
         break;
       case 'volume':
         ref.read(settingsProvider.notifier).setPlayerShowVolume(!volumeShown);

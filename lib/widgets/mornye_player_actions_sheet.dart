@@ -52,6 +52,7 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
     super.key,
     required this.mediaItem,
     this.sleepTimerSubtitle,
+    this.tempoSubtitle,
     this.volumeShown = true,
     this.sendToDesktop,
     this.saveToPhone = false,
@@ -59,6 +60,9 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
 
   final MediaItem mediaItem;
   final String? sleepTimerSubtitle;
+
+  /// The speed and pitch while either differs from normal.
+  final String? tempoSubtitle;
 
   /// Whether the player shows its volume slider, which the menu toggles.
   final bool volumeShown;
@@ -166,6 +170,13 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
               'equalizer',
               context.l10n.equalizerTitle,
               CupertinoIcons.slider_horizontal_3,
+            ),
+            _action(
+              context,
+              'tempo',
+              context.l10n.playbackTempoTitle,
+              CupertinoIcons.gauge,
+              subtitle: tempoSubtitle,
             ),
             _action(
               context,
