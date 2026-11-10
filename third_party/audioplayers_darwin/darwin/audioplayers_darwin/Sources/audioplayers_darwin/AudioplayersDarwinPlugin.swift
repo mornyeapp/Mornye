@@ -228,6 +228,20 @@ public class AudioplayersDarwinPlugin: NSObject, FlutterPlugin {
         return
       }
       player.setSpatialAudio(enabled)
+    } else if method == "setPitch" {
+      guard let semitones = (args["semitones"] as? NSNumber)?.doubleValue, semitones.isFinite,
+        let followsRate = args["followsRate"] as? Bool
+      else {
+        result(FlutterError(code: "DarwinAudioError", message: "Missing pitch values", details: nil))
+        return
+      }
+      do { try await player.setPitch(semitones: semitones, followsRate: followsRate) }
+      catch {
+        let detail: String
+        if case AudioPlayerError.error(let message) = error { detail = message } else { detail = "\(error)" }
+        result(FlutterError(code: "DarwinAudioError", message: "Pitch shift is unavailable for this source", details: detail))
+        return
+      }
     } else if method == "setNextPlayer" {
       let nextId = args["nextPlayerId"] as? String
       player.next = nextId.flatMap { self.getPlayer(playerId: $0) }
