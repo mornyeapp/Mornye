@@ -1056,6 +1056,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setForceBackdropBlur(bool enabled) =>
       _commit(state.copyWith(forceBackdropBlur: enabled));
 
+  void setInterfaceScale(double scale) =>
+      _commit(state.copyWith(interfaceScale: interfaceScaleFromJson(scale)));
+
   void setExtensionVerificationBrowserMode(String mode) => _commit(
     state.copyWith(
       extensionVerificationBrowserMode:

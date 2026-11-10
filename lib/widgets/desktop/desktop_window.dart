@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
 /// Overrides [desktopTitleBarInContent] in tests.
@@ -37,6 +38,15 @@ const double desktopTitleBarHeight = 52;
 
 /// Width the traffic lights take at the leading edge of the title bar row.
 const double desktopWindowControlsWidth = 78;
+
+/// [desktopTitleBarHeight] in the app's logical pixels. The traffic lights
+/// keep their native size at every Interface size, so the row does too.
+double desktopTitleBarHeightFor(BuildContext context) =>
+    desktopTitleBarHeight / AdaptiveUiScale.of(context);
+
+/// [desktopWindowControlsWidth] in the app's logical pixels.
+double desktopWindowControlsWidthFor(BuildContext context) =>
+    desktopWindowControlsWidth / AdaptiveUiScale.of(context);
 
 const _windowChannel = MethodChannel('com.zarz.mornye/window');
 

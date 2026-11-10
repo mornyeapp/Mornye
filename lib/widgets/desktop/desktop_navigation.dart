@@ -298,10 +298,12 @@ class DesktopShellLayout extends ConsumerWidget {
                   children: [
                     // The traffic lights sit above the rail.
                     if (desktopTitleBarInContentFor(context))
-                      const SizedBox(
-                        height: desktopTitleBarHeight,
-                        width: desktopWindowControlsWidth,
-                        child: DesktopWindowDragArea(zoomOnDoubleClick: true),
+                      SizedBox(
+                        height: desktopTitleBarHeightFor(context),
+                        width: desktopWindowControlsWidthFor(context),
+                        child: const DesktopWindowDragArea(
+                          zoomOnDoubleClick: true,
+                        ),
                       ),
                     // Expanded by default and always collapsed below
                     // [desktopExpandedRailBreakpoint]; the rail's menu
@@ -650,12 +652,12 @@ class _DesktopContentArea extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             pane,
-            const Positioned(
+            Positioned(
               top: 0,
               left: 0,
               right: 0,
-              height: desktopTitleBarHeight,
-              child: DesktopWindowDragArea(),
+              height: desktopTitleBarHeightFor(context),
+              child: const DesktopWindowDragArea(),
             ),
           ],
         );
@@ -1724,7 +1726,7 @@ class _SidebarHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
     height: desktopTitleBarInContentFor(context)
-        ? desktopTitleBarHeight
+        ? desktopTitleBarHeightFor(context)
         : height,
     child: const DesktopWindowDragArea(
       zoomOnDoubleClick: true,

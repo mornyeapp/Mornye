@@ -218,15 +218,19 @@ Widget buildAppContent(
 /// Treats the display as one continuous surface so bottom sheets and dialogs
 /// stay centered on large/foldable devices. The window metrics are read here
 /// rather than in [buildAppContent], so a resize rebuilds only these layers
-/// and passes the app content through unchanged.
-class _AppMediaQuery extends StatelessWidget {
+/// and passes the app content through unchanged. The Interface size setting
+/// scales everything below it.
+class _AppMediaQuery extends ConsumerWidget {
   final Widget child;
 
   const _AppMediaQuery({required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final mediaQuery = MediaQuery.of(context);
+    final interfaceScale = ref.watch(
+      settingsProvider.select((settings) => settings.interfaceScale),
+    );
     return MediaQuery(
       data: mediaQuery.copyWith(
         displayFeatures: const [],
@@ -234,7 +238,9 @@ class _AppMediaQuery extends StatelessWidget {
             ? NavigationMode.directional
             : mediaQuery.navigationMode,
       ),
-      child: MornyeGlassPreparation(child: AdaptiveUiScaler(child: child)),
+      child: MornyeGlassPreparation(
+        child: AdaptiveUiScaler(userScale: interfaceScale, child: child),
+      ),
     );
   }
 }

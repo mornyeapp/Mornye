@@ -585,6 +585,89 @@ class _ThemeModeSelector extends StatelessWidget {
   }
 }
 
+/// Scales the whole app. The size applies when the slider is released, so
+/// the slider does not move under the pointer while it is dragged.
+class _InterfaceSizeSlider extends ConsumerStatefulWidget {
+  const _InterfaceSizeSlider();
+
+  @override
+  ConsumerState<_InterfaceSizeSlider> createState() =>
+      _InterfaceSizeSliderState();
+}
+
+class _InterfaceSizeSliderState extends ConsumerState<_InterfaceSizeSlider> {
+  double? _draft;
+
+  @override
+  Widget build(BuildContext context) {
+    final saved = ref.watch(
+      settingsProvider.select((settings) => settings.interfaceScale),
+    );
+    final value = interfaceScaleFromJson(_draft ?? saved);
+    final l10n = context.l10n;
+    final tokens = context.tokens;
+    final theme = Theme.of(context);
+    final format = NumberFormat.percentPattern(l10n.localeName);
+    final label = format.format(value);
+    final content = Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: tokens.rowPaddingH,
+        vertical: tokens.rowPaddingV,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SliderValueHeader(title: l10n.appearanceInterfaceSize, value: label),
+          AppSlider(
+            key: const ValueKey('interface-size-slider'),
+            value: value,
+            min: minInterfaceScale,
+            max: maxInterfaceScale,
+            divisions: 10,
+            label: label,
+            semanticLabel: l10n.appearanceInterfaceSize,
+            semanticFormatterCallback: format.format,
+            onChanged: (value) => setState(() => _draft = value),
+            onChangeEnd: (value) {
+              ref.read(settingsProvider.notifier).setInterfaceScale(value);
+              setState(() => _draft = null);
+            },
+          ),
+          DefaultTextStyle(
+            style: theme.textTheme.bodySmall!.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: Text(l10n.appearanceInterfaceSizeSmaller)),
+                SizedBox(width: tokens.gapMd),
+                Expanded(
+                  child: Text(
+                    l10n.appearanceInterfaceSizeLarger,
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: tokens.gapSm),
+          Text(
+            l10n.appearanceInterfaceSizeDescription,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+    return SettingsSearchTarget(
+      label: l10n.appearanceInterfaceSize,
+      child: content,
+    );
+  }
+}
+
 class _HistoryViewSelector extends StatelessWidget {
   final String currentMode;
   final ValueChanged<String> onChanged;

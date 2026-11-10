@@ -92,7 +92,8 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
   }
 
   /// Centers the top buttons on the traffic lights' row.
-  static const double _controlsTop = (desktopTitleBarHeight - 36) / 2;
+  static double _controlsTop(BuildContext context) =>
+      (desktopTitleBarHeightFor(context) - 36) / 2;
 
   @override
   Widget build(BuildContext context) {
@@ -143,21 +144,21 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
                   : _layout(context, mediaItem, colorScheme, panel),
             ),
             // The player covers the title bar row, so it drags the window.
-            const Positioned(
+            Positioned(
               top: 0,
               left: 0,
               right: 0,
-              height: desktopTitleBarHeight,
-              child: DesktopWindowDragArea(zoomOnDoubleClick: true),
+              height: desktopTitleBarHeightFor(context),
+              child: const DesktopWindowDragArea(zoomOnDoubleClick: true),
             ),
             // The close button follows the traffic lights, which hide in
             // full screen.
             ValueListenableBuilder<bool>(
               valueListenable: desktopWindowFullScreen,
               builder: (context, fullScreen, button) => PositionedDirectional(
-                top: _controlsTop,
+                top: _controlsTop(context),
                 start: desktopTitleBarInContentFor(context) && !fullScreen
-                    ? desktopWindowControlsWidth + 12
+                    ? desktopWindowControlsWidthFor(context) + 12
                     : 20,
                 child: button!,
               ),
@@ -169,7 +170,7 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
               ),
             ),
             PositionedDirectional(
-              top: _controlsTop,
+              top: _controlsTop(context),
               end: 20,
               width: 260,
               child: _Capsule(

@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/constants/language_choices.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/models/theme_settings.dart';
+import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/app_slider.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/slider_value_header.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
@@ -237,6 +242,7 @@ class AppearanceSettingsPage extends ConsumerWidget {
               title: context.l10n.sectionLayout,
               connected: true,
               children: [
+                const _InterfaceSizeSlider(),
                 _HistoryViewSelector(
                   currentMode: settings.historyViewMode,
                   onChanged: (mode) => ref

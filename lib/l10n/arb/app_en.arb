@@ -2888,6 +2888,22 @@
   "@appearanceForceBlurSubtitle": {
     "description": "Subtitle for the force-blur toggle"
   },
+  "appearanceInterfaceSize": "Interface size",
+  "@appearanceInterfaceSize": {
+    "description": "Title of the slider that scales the whole app"
+  },
+  "appearanceInterfaceSizeDescription": "Makes everything in the app smaller or larger. Smaller sizes also make buttons smaller to tap.",
+  "@appearanceInterfaceSizeDescription": {
+    "description": "Explanation under the Interface size slider"
+  },
+  "appearanceInterfaceSizeSmaller": "Smaller",
+  "@appearanceInterfaceSizeSmaller": {
+    "description": "Label at the small end of the Interface size slider"
+  },
+  "appearanceInterfaceSizeLarger": "Larger",
+  "@appearanceInterfaceSizeLarger": {
+    "description": "Label at the large end of the Interface size slider"
+  },
   "queueClearAll": "Clear All",
   "@queueClearAll": {
     "description": "Button - clear all queue items"

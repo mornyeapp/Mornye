@@ -155,6 +155,12 @@ class SettingsSearchCatalog {
           keywords: const ['backdrop blur', 'performance'],
         ),
         SettingsSearchEntry(
+          icon: Icons.format_size,
+          title: l10n.appearanceInterfaceSize,
+          subtitle: l10n.appearanceInterfaceSizeDescription,
+          keywords: const ['scale', 'zoom', 'ui size', 'density', 'skala'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.language,
           title: l10n.appearanceLanguage,
           keywords: const ['locale', 'translation'],

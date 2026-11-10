@@ -52,20 +52,55 @@ EdgeInsets _scaledInsets(EdgeInsets value, double divisor) => EdgeInsets.only(
   bottom: value.bottom / divisor,
 );
 
-/// Scales the complete app surface on tablets, including controls, dialogs,
-/// navigation, spacing and hit targets. The child receives the correspondingly
-/// smaller logical viewport so responsive layouts still reflow instead of
-/// being cropped, while [FittedBox] maps that viewport back to the full screen.
-class AdaptiveUiScaler extends StatelessWidget {
-  const AdaptiveUiScaler({super.key, required this.child});
+/// The scale [AdaptiveUiScaler] applies below it: one logical pixel there
+/// covers [scale] logical pixels of the window.
+class AdaptiveUiScale extends InheritedWidget {
+  const AdaptiveUiScale({super.key, required this.scale, required super.child});
 
+  final double scale;
+
+  /// 1 outside an [AdaptiveUiScaler].
+  static double of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AdaptiveUiScale>()?.scale ?? 1;
+
+  @override
+  bool updateShouldNotify(AdaptiveUiScale oldWidget) =>
+      scale != oldWidget.scale;
+}
+
+/// Scales the complete app surface on tablets and TVs, and by the Interface
+/// size setting everywhere, including controls, dialogs, navigation, spacing
+/// and hit targets. The child receives the correspondingly smaller or larger
+/// logical viewport so responsive layouts still reflow instead of being
+/// cropped, while [FittedBox] maps that viewport back to the full screen.
+class AdaptiveUiScaler extends StatefulWidget {
+  const AdaptiveUiScaler({super.key, this.userScale = 1, required this.child});
+
+  /// The Interface size setting, applied on top of the automatic scale.
+  final double userScale;
   final Widget child;
+
+  @override
+  State<AdaptiveUiScaler> createState() => _AdaptiveUiScalerState();
+}
+
+class _AdaptiveUiScalerState extends State<AdaptiveUiScaler> {
+  // Keeps the app's state (open pages, scroll positions) when the scale
+  // starts or stops being 1, which adds or removes the layers around it.
+  final _contentKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final scale = isAndroidTv ? 1.15 : adaptiveUiScaleForSize(mediaQuery.size);
-    if (scale == 1) return child;
+    final scale =
+        (isAndroidTv ? 1.15 : adaptiveUiScaleForSize(mediaQuery.size)) *
+        widget.userScale;
+    final content = AdaptiveUiScale(
+      key: _contentKey,
+      scale: scale,
+      child: widget.child,
+    );
+    if (scale == 1) return content;
 
     final scaledSize = Size(
       mediaQuery.size.width / scale,
@@ -88,7 +123,7 @@ class AdaptiveUiScaler extends StatelessWidget {
         alignment: Alignment.topLeft,
         child: SizedBox.fromSize(
           size: scaledSize,
-          child: MediaQuery(data: scaledMediaQuery, child: child),
+          child: MediaQuery(data: scaledMediaQuery, child: content),
         ),
       ),
     );

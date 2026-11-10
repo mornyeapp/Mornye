@@ -44,6 +44,14 @@ double musicHapticsLevelFromJson(Object? value) =>
 double autoplayRandomnessFromJson(Object? value) =>
     value is num && value.isFinite ? value.toDouble().clamp(0, 1) : 0;
 
+/// Smallest and largest Interface size, as a factor of the normal size.
+const double minInterfaceScale = 0.8;
+const double maxInterfaceScale = 1.3;
+
+double interfaceScaleFromJson(Object? value) => value is num && value.isFinite
+    ? value.toDouble().clamp(minInterfaceScale, maxInterfaceScale)
+    : 1;
+
 /// Sort choices offered by the Library, in display order.
 const librarySortModes = [
   'latest',
@@ -277,6 +285,11 @@ class AppSettings {
   /// profile disabled it for this device tier. Off means "follow the
   /// device default".
   final bool forceBackdropBlur;
+
+  /// Interface size: scales the whole app, on top of the automatic tablet
+  /// and TV scale. 1 is the normal size.
+  @JsonKey(fromJson: interfaceScaleFromJson)
+  final double interfaceScale;
   final String
   extensionVerificationBrowserMode; // 'external_first' or 'in_app_first'
   final String locale;
@@ -508,6 +521,7 @@ class AppSettings {
     this.autoUpdateExtensions = true,
     this.heroAnimationsEnabled = true,
     this.forceBackdropBlur = false,
+    this.interfaceScale = 1,
     this.extensionVerificationBrowserMode = 'in_app_first',
     this.locale = 'system',
     this.lyricsMode = 'embed',
@@ -686,6 +700,7 @@ class AppSettings {
     bool? autoUpdateExtensions,
     bool? heroAnimationsEnabled,
     bool? forceBackdropBlur,
+    double? interfaceScale,
     String? extensionVerificationBrowserMode,
     String? locale,
     String? lyricsMode,
@@ -862,6 +877,7 @@ class AppSettings {
       heroAnimationsEnabled:
           heroAnimationsEnabled ?? this.heroAnimationsEnabled,
       forceBackdropBlur: forceBackdropBlur ?? this.forceBackdropBlur,
+      interfaceScale: interfaceScale ?? this.interfaceScale,
       extensionVerificationBrowserMode:
           extensionVerificationBrowserMode ??
           this.extensionVerificationBrowserMode,

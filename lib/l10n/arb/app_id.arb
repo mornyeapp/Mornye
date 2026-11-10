@@ -2617,6 +2617,22 @@
   "@appearanceForceBlurSubtitle": {
     "description": "Subtitle for the force-blur toggle"
   },
+  "appearanceInterfaceSize": "Ukuran antarmuka",
+  "@appearanceInterfaceSize": {
+    "description": "Title of the slider that scales the whole app"
+  },
+  "appearanceInterfaceSizeDescription": "Memperkecil atau memperbesar semua yang ada di aplikasi. Ukuran lebih kecil juga membuat tombol lebih kecil untuk diketuk.",
+  "@appearanceInterfaceSizeDescription": {
+    "description": "Explanation under the Interface size slider"
+  },
+  "appearanceInterfaceSizeSmaller": "Lebih kecil",
+  "@appearanceInterfaceSizeSmaller": {
+    "description": "Label at the small end of the Interface size slider"
+  },
+  "appearanceInterfaceSizeLarger": "Lebih besar",
+  "@appearanceInterfaceSizeLarger": {
+    "description": "Label at the large end of the Interface size slider"
+  },
   "queueClearAll": "Hapus Semua",
   "@queueClearAll": {
     "description": "Button - clear all queue items"

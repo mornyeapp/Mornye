@@ -32,6 +32,25 @@ void main() {
     );
   });
 
+  test('Interface size defaults to normal and restores within range', () {
+    expect(const AppSettings().interfaceScale, 1);
+    expect(AppSettings.fromJson({}).interfaceScale, 1);
+    for (final value in [0.8, 0.9, 1.25, 1.3]) {
+      final settings = const AppSettings().copyWith(interfaceScale: value);
+      final restored = AppSettings.fromJson(settings.toJson());
+      expect(restored.interfaceScale, value);
+      expect(restored.copyWith(locale: 'id').interfaceScale, value);
+    }
+    for (final invalid in ['', double.nan, double.infinity]) {
+      expect(
+        AppSettings.fromJson({'interfaceScale': invalid}).interfaceScale,
+        1,
+      );
+    }
+    expect(AppSettings.fromJson({'interfaceScale': 0.2}).interfaceScale, 0.8);
+    expect(AppSettings.fromJson({'interfaceScale': 3}).interfaceScale, 1.3);
+  });
+
   test('Link hides disconnected devices by default and remembers off', () {
     expect(const AppSettings().linkHideDisconnectedSongs, isTrue);
     expect(AppSettings.fromJson({}).linkHideDisconnectedSongs, isTrue);
