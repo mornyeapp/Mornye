@@ -59,12 +59,15 @@ String _buildShowspectrumOptions({required int width, required String color}) {
       'limit=0';
 }
 
+/// [inputLabel] names the audio to draw; another graph that ends in that
+/// label (such as a null test residual) can precede this filter.
 String buildAudioSpectrogramFilter({
   int channel = -1,
   bool includeCutoffPlane = false,
   double? durationSeconds,
   int? sampleRate,
   int? channels,
+  String inputLabel = '[0:a:0]',
 }) {
   final channelFilter = channel >= 0 ? 'pan=mono|c0=c$channel,' : '';
   final samplingFilter = _buildAudioSpectrogramSamplingFilter(
@@ -74,7 +77,7 @@ String buildAudioSpectrogramFilter({
     channels: channels,
   );
   final input =
-      '[0:a:0]$channelFilter${samplingFilter}aformat=sample_fmts=fltp';
+      '$inputLabel$channelFilter${samplingFilter}aformat=sample_fmts=fltp';
   final display = _buildShowspectrumOptions(
     width: audioSpectrogramWidth,
     color: 'intensity',
@@ -261,15 +264,17 @@ int? _parseLastAstatsInt(String text, String label) {
   return value;
 }
 
+/// Escapes a file path for a quoted filter option such as
+/// `ametadata=print:file='...'`.
+String escapeFFmpegFilterPath(String path) =>
+    path.replaceAll(r'\', r'\\').replaceAll(':', r'\:').replaceAll("'", r"\'");
+
 String buildAudioMetricsFilter({
   required double durationSeconds,
   required String metadataPath,
 }) {
   final metadataStart = math.max(0.0, durationSeconds - 2.0);
-  final escapedPath = metadataPath
-      .replaceAll(r'\', r'\\')
-      .replaceAll(':', r'\:')
-      .replaceAll("'", r"\'");
+  final escapedPath = escapeFFmpegFilterPath(metadataPath);
   return 'astats=metadata=1:reset=0:'
       'measure_perchannel=Peak_level+RMS_level+Peak_count:'
       'measure_overall=Peak_level+RMS_level,'
