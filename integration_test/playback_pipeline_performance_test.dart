@@ -158,6 +158,8 @@ class _MeasuredDeck implements PlaybackDeck {
   @override
   bool get isDirect => inner.isDirect;
   @override
+  PlaybackTempoSupport get tempoSupport => inner.tempoSupport;
+  @override
   bool get needsSourceReload => inner.needsSourceReload;
   @override
   Stream<PlaybackDeckState> get onPlayerStateChanged =>

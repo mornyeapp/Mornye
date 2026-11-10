@@ -340,7 +340,7 @@ class Media3PlayerPluginTest {
         assertEquals("equalizer", call("setEqualizer", mapOf("configuration" to
             equalizer + ("gains" to listOf(0.0)))).failure().first)
         assertNull(call("setEqualizer", mapOf("configuration" to equalizer)).success())
-        call("setRate", mapOf("rate" to 2.0)).success()
+        call("setPlaybackParameters", mapOf("speed" to 2.0, "pitch" to 1.0)).success()
         call("play").success()
         awaitState("playing")
         Thread.sleep(300)
@@ -357,13 +357,13 @@ class Media3PlayerPluginTest {
                 line.contains("PCM_FLOAT") || line.contains("Format")
         }
         Log.i(TAG, "session $session audio_flinger:\n" + lines.joinToString("\n"))
-        call("setRate", mapOf("rate" to 1.0)).success()
+        call("setPlaybackParameters", mapOf("speed" to 1.0, "pitch" to 1.0)).success()
         Thread.sleep(300)
         val again = position()
         Thread.sleep(1000)
         assertEquals(1000.0, (position() - again).toDouble(), 200.0)
         assertNull(call("setEqualizer", mapOf("configuration" to mapOf("enabled" to false))).success())
-        assertEquals("invalid_argument", call("setRate", mapOf("rate" to 0.0)).failure().first)
+        assertEquals("invalid_argument", call("setPlaybackParameters", mapOf("speed" to 0.0)).failure().first)
     }
 
     @Test fun twentyFourBitFlacDecodes() {

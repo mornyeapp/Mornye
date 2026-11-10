@@ -178,6 +178,8 @@ class _PreviewDeck implements PlaybackDeck {
   @override
   bool get isDirect => false;
   @override
+  PlaybackTempoSupport get tempoSupport => PlaybackTempoSupport.full;
+  @override
   bool get needsSourceReload => false;
   @override
   Stream<PlaybackDeckState> get onPlayerStateChanged => states.stream;

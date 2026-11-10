@@ -3,6 +3,7 @@ package xyz.luan.audioplayers.player
 import android.content.Context
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.os.Build
 import xyz.luan.audioplayers.AudioContextAndroid
 import xyz.luan.audioplayers.AudioplayersPlugin
 import xyz.luan.audioplayers.EventHandler
@@ -12,6 +13,7 @@ import xyz.luan.audioplayers.PlayerMode.MEDIA_PLAYER
 import xyz.luan.audioplayers.ReleaseMode
 import xyz.luan.audioplayers.source.Source
 import kotlin.math.min
+import kotlin.math.pow
 
 // For some reason this cannot be accessed from MediaPlayer.MEDIA_ERROR_SYSTEM
 private const val MEDIA_ERROR_SYSTEM = -2147483648
@@ -36,6 +38,38 @@ class WrappedPlayer internal constructor(
      * so a change applies from the next source.
      */
     var spatialAudio = true
+
+    /** Pitch shift in semitones, kept for every source of this player. */
+    var pitchSemitones = 0.0
+        private set
+
+    /** Whether the pitch follows [rate] instead of staying put. */
+    var pitchFollowsRate = false
+        private set
+
+    /**
+     * Applies at once while playing, otherwise from the next start, like
+     * [rate]: setting playback parameters starts a paused MediaPlayer.
+     */
+    fun setPitch(semitones: Double, followsRate: Boolean) {
+        check(semitones.isFinite()) { "semitones must be finite" }
+        check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M || (semitones == 0.0 && !followsRate)) {
+            "Changing the pitch is only available for Android M/23+"
+        }
+        if (pitchSemitones == semitones && pitchFollowsRate == followsRate) return
+        pitchSemitones = semitones
+        pitchFollowsRate = followsRate
+        if (playing && prepared && !released) player?.setRate(rate)
+    }
+
+    /**
+     * The MediaPlayer pitch at [rate]: 2^(semitones/12), times [rate] when
+     * the pitch follows it, within the platform's 0.25 to 4.
+     */
+    fun pitchAt(rate: Float): Float {
+        val shift = 2.0.pow(pitchSemitones / 12) * if (pitchFollowsRate) rate else 1f
+        return shift.toFloat().coerceIn(0.25f, 4f)
+    }
 
     fun setEqualizer(configuration: Map<String, Any?>) {
         val output = player as? MediaPlayerWrapper

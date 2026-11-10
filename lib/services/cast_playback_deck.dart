@@ -33,6 +33,10 @@ class CastPlaybackDeck implements PlaybackDeck {
   PlaybackDeckState get state => _state;
   @override
   bool get isDirect => false;
+
+  /// The receiver plays the file itself, at normal speed and pitch.
+  @override
+  PlaybackTempoSupport get tempoSupport => PlaybackTempoSupport.none;
   @override
   bool get needsSourceReload => !output.connected;
   @override

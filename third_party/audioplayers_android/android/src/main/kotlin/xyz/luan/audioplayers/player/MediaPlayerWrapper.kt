@@ -72,12 +72,14 @@ class MediaPlayerWrapper(
         mediaPlayer.setVolume(leftVolume, rightVolume)
     }
 
+    /** Applies [rate] with the player's pitch (see [WrappedPlayer.pitchAt]). */
     override fun setRate(rate: Float) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pitch = wrappedPlayer.pitchAt(rate)
             // Normal playback does not need the platform's time-stretch path.
             // Once changed, still apply 1.0 to restore the original speed.
-            if (rate == 1.0f && !playbackParamsApplied) return
-            mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(rate)
+            if (rate == 1.0f && pitch == 1.0f && !playbackParamsApplied) return
+            mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(rate).setPitch(pitch)
             playbackParamsApplied = true
         } else if (rate != 1.0f) {
             error("Changing the playback rate is only available for Android M/23+ or using LOW_LATENCY mode.")

@@ -42,6 +42,8 @@ class _Deck implements PlaybackDeck, QueuedPlaybackDeck {
   @override
   bool get isDirect => false;
   @override
+  PlaybackTempoSupport tempoSupport = PlaybackTempoSupport.full;
+  @override
   bool get needsSourceReload => false;
   @override
   Stream<PlaybackDeckState> get onPlayerStateChanged => states.stream;

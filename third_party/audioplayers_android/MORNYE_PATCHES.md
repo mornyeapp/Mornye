@@ -98,6 +98,21 @@ them again after its reset and a change applies from the next source. The
 pub-hosted platform interface is unchanged; the app calls the method on the
 channel directly, like `setEqualizer`.
 
+### Pitch
+
+A `setPitch` method (arguments `semitones` and `followsRate`) on the
+per-player method channel stores the values on `WrappedPlayer` (0 and false
+by default), so they apply to the current source and every later one.
+`MediaPlayerWrapper.setRate` sets the playback parameters' pitch with the
+speed: `2^(semitones/12)`, times the rate when `followsRate` is true, within
+the platform's 0.25 to 4. Like the rate, a change applies at once only while
+playing, since setting playback parameters starts a paused MediaPlayer;
+`start()` applies it otherwise. The 1.0 shortcut under "Rate and start"
+skips `setPlaybackParams` only while the pitch is 1.0 as well. Below Android
+6 (API 23), any shift or following pitch fails. The Dart caller is
+`lib/services/music_playback_deck.dart` in the app, which sends only changes
+from the defaults, like `setSpatialAudio`.
+
 ### Error state
 
 `WrappedPlayer.onError` now marks the player as not prepared and not playing,
@@ -145,5 +160,6 @@ Compared against the pub.dev 5.3.0 package in the local pub cache:
    return value, or starting after `setPlaybackParams`.
 4. Keep the Gradle values in step with the app's `android/app/build.gradle.kts`.
 5. Test playback from a remote SAF provider, the equalizer, a playback error
-   in the middle of a queue, and rate changes back to 1.0.
+   in the middle of a queue, rate changes back to 1.0, and a pitch shift
+   applied while paused and while playing.
 6. Run `flutter pub get` and update this file.

@@ -122,6 +122,15 @@ final playbackTempoSupport = ValueNotifier<PlaybackTempoSupport>(
   PlaybackTempoSupport.full,
 );
 
+/// Counts changes of a deck's [PlaybackDeck.tempoSupport] that no call to
+/// the deck caused (an engine refusing a pitch shift for its source), so
+/// the music player publishes [playbackTempoSupport] again.
+final playbackTempoSupportRevision = ValueNotifier<int>(0);
+
+/// Called by a deck whose [PlaybackDeck.tempoSupport] changed by itself.
+void notifyPlaybackTempoSupportChanged() =>
+    playbackTempoSupportRevision.value++;
+
 /// The `spatialAudio` setting. True lets the platform spatialize songs (its
 /// default on Android); false asks it never to. media3 decks and the
 /// audioplayers forks apply it; libmpv decks ignore it.
@@ -168,6 +177,10 @@ abstract interface class QueuedPlaybackDeck implements PlaybackDeck {
 /// - applies `playbackEqualizer` (`playback_equalizer.dart`) to its own output
 ///   and reports failures with `reportEqualizerError`, keyed by player id;
 /// - multiplies [setVolume] by [playbackOutputVolume];
+/// - multiplies [setPlaybackRate] by [playbackSpeed] and applies
+///   [playbackPitch] at that effective rate, as far as [tempoSupport] says,
+///   at once on every change, also mid-song and while paused (without
+///   starting playback), and to every later source;
 /// - delivers runtime failures as errors on [onPlayerStateChanged], and makes
 ///   [resume] throw when the current source failed to load.
 abstract interface class PlaybackDeck {
@@ -176,6 +189,11 @@ abstract interface class PlaybackDeck {
   /// True while a native output bypasses the mixer (Android USB bit-perfect).
   /// Volume, rate and the equalizer have no effect in that mode.
   bool get isDirect;
+
+  /// What this deck does with [playbackSpeed] and [playbackPitch] for the
+  /// source it holds now. A change the deck notices by itself also calls
+  /// [notifyPlaybackTempoSupportChanged].
+  PlaybackTempoSupport get tempoSupport;
 
   /// True when a direct output lost its route and the source must be loaded
   /// again before playback can continue.

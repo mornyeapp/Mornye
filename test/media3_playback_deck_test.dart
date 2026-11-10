@@ -176,7 +176,8 @@ void main() {
     deck.onPositionChanged.listen(positions.add);
     await deck.setFileSource('/song.flac');
     await deck.setPlaybackRate(1.25);
-    expect(native.last('setRate')['rate'], 1.25);
+    expect(native.last('setPlaybackParameters')['speed'], 1.25);
+    expect(native.last('setPlaybackParameters')['pitch'], 1);
 
     await deck.resume();
     expect(native.methods.last, 'play');
@@ -483,6 +484,56 @@ void main() {
   test('a deck never created sends nothing for spatial audio', () async {
     addTearDown(() => playbackSpatialAudio.value = true);
     playbackSpatialAudio.value = false;
+    await _settle();
+    expect(native.calls, isEmpty);
+  });
+
+  test('speed and pitch reach the player before its first source', () async {
+    addTearDown(() {
+      playbackSpeed.value = 1;
+      playbackPitch.value = PlaybackPitch.none;
+    });
+    playbackSpeed.value = 1.5;
+    playbackPitch.value = const PlaybackPitch(semitones: 12);
+    await deck.setFileSource('/song.flac');
+    final methods = native.methods;
+    expect(
+      methods.indexOf('setPlaybackParameters'),
+      lessThan(methods.indexOf('setSource')),
+    );
+    expect(native.last('setPlaybackParameters'), {
+      'playerId': 'one',
+      'speed': 1.5,
+      'pitch': 2.0,
+    });
+
+    // AutoMix's rate is relative to the speed; a following pitch takes the
+    // effective rate.
+    playbackPitch.value = const PlaybackPitch(followsRate: true);
+    await deck.setPlaybackRate(1.1);
+    expect(native.last('setPlaybackParameters')['speed'], closeTo(1.65, 1e-9));
+    expect(native.last('setPlaybackParameters')['pitch'], closeTo(1.65, 1e-9));
+
+    // Live while paused, without starting playback.
+    playbackSpeed.value = 0.75;
+    await _settle();
+    expect(native.last('setPlaybackParameters')['speed'], closeTo(0.825, 1e-9));
+    expect(native.methods, isNot(contains('play')));
+    expect(deck.tempoSupport, PlaybackTempoSupport.full);
+  });
+
+  test('normal speed and pitch are never sent', () async {
+    await deck.setFileSource('/song.flac');
+    await deck.setPlaybackRate(1);
+    playbackPitch.value = const PlaybackPitch(followsRate: true);
+    addTearDown(() => playbackPitch.value = PlaybackPitch.none);
+    await _settle();
+    expect(native.methods, isNot(contains('setPlaybackParameters')));
+  });
+
+  test('a deck never created sends nothing for speed', () async {
+    addTearDown(() => playbackSpeed.value = 1);
+    playbackSpeed.value = 2;
     await _settle();
     expect(native.calls, isEmpty);
   });

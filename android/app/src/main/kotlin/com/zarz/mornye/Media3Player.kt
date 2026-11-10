@@ -16,6 +16,7 @@ import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.common.util.UnstableApi
@@ -42,8 +43,8 @@ import io.flutter.plugin.common.MethodChannel
  * for 16-bit PCM and the low bits are lost. With float output its audio
  * processor chain (Sonic) is skipped for that PCM, so Sonic speed changes
  * would silently not apply; the platform playback parameters change speed
- * for every format instead, the same time-stretch MediaPlayer uses for
- * `setPlaybackParams(setSpeed)`. The `DynamicsProcessing` equalizer is an
+ * and pitch for every format instead, the same time-stretch MediaPlayer
+ * uses for `setPlaybackParams`. The `DynamicsProcessing` equalizer is an
  * effect on the session in the platform mixer and works with either PCM
  * format, since offload stays disabled. Skip silence trades this for 16-bit
  * decoding while it is on (see [Media3AudioRenderer]).
@@ -121,13 +122,19 @@ private class Media3AudioRenderer(
  * time at 8x. That makes 4 s at 1x. Once a song's end is in the buffer the
  * track is told to play out, so a song queued later than that opens a new
  * track at the handoff, and a short song before a queued one waits on the
- * buffer. The app changes speed by at most 1.2x (AutoMix), so sizing for 2x
- * keeps at least the 1x buffer's time up to 2x at a quarter of the size: 1 s
- * at 1x. Volume
- * (`AudioTrack.setVolume`), speed and the session equalizer act after this
- * buffer, so its size does not delay them.
+ * buffer. The app plays at most 2x (the speed setting) times 1.2 (AutoMix),
+ * so sizing for 2.5x keeps at least the 1x buffer's time up to 2.5x at
+ * under a third of the size: 1.25 s at 1x. Volume
+ * (`AudioTrack.setVolume`), speed, pitch and the session equalizer act after
+ * this buffer, so its size does not delay them.
  */
-private const val MAX_BUFFERED_SPEED = 2.0
+private const val MAX_BUFFERED_SPEED = 2.5
+
+/** `AudioTrack` playback parameter limits for speed and pitch. */
+private const val MIN_PLAYBACK_SPEED = 0.125f
+private const val MAX_PLAYBACK_SPEED = 8f
+private const val MIN_PLAYBACK_PITCH = 0.25f
+private const val MAX_PLAYBACK_PITCH = 4f
 
 private val cappedSpeedBufferSize =
     DefaultAudioSink.AudioTrackBufferSizeProvider { minBuffer, encoding, outputMode, frameSize, rate, bitrate, speed ->
@@ -239,10 +246,17 @@ internal class Media3Player(
                 applyVolume(volume)
                 result.success(null)
             }
-            "setRate" -> {
-                val rate = call.argument<Number>("rate")?.toFloat()
-                if (rate == null || !rate.isFinite() || rate <= 0f) return invalid(result, "rate must be above 0")
-                exo.setPlaybackSpeed(rate)
+            "setPlaybackParameters" -> {
+                val speed = call.argument<Number>("speed")?.toFloat()
+                if (speed == null || !speed.isFinite() || speed <= 0f) return invalid(result, "speed must be above 0")
+                val pitch = call.argument<Number>("pitch")?.toFloat() ?: 1f
+                if (!pitch.isFinite() || pitch <= 0f) return invalid(result, "pitch must be above 0")
+                // Applied through AudioTrack.setPlaybackParams, which takes
+                // a pitch from 0.25 to 4 (see media3AudioRenderers).
+                exo.playbackParameters = PlaybackParameters(
+                    speed.coerceIn(MIN_PLAYBACK_SPEED, MAX_PLAYBACK_SPEED),
+                    pitch.coerceIn(MIN_PLAYBACK_PITCH, MAX_PLAYBACK_PITCH),
+                )
                 result.success(null)
             }
             "getPosition" -> result.success(if (queue.current == null) 0L else exo.currentPosition.coerceAtLeast(0))
@@ -329,7 +343,7 @@ internal class Media3Player(
     /**
      * Applies live. New attributes make the sink reopen its `AudioTrack`,
      * which the platform attaches to the spatializer or not as it opens, and
-     * drop the audio it had buffered (up to 1 s, see [MAX_BUFFERED_SPEED]).
+     * drop the audio it had buffered (up to 1.25 s, see [MAX_BUFFERED_SPEED]).
      * Seeking to the current position decodes that audio again instead of
      * skipping it, for a short pause rather than a jump.
      */

@@ -37,6 +37,8 @@ class _Deck implements PlaybackDeck, QueuedPlaybackDeck {
   @override
   bool get isDirect => false;
   @override
+  PlaybackTempoSupport tempoSupport = PlaybackTempoSupport.full;
+  @override
   bool get needsSourceReload => false;
   @override
   Stream<PlaybackDeckState> get onPlayerStateChanged => states.stream;
@@ -168,6 +170,23 @@ void main() {
     expect(media3, isEmpty);
     expect(deck.activeDeck, same(audioplayers));
     expect(deck.canQueueNextSource, isFalse);
+  });
+
+  test('reports what the deck playing now does with speed and pitch', () async {
+    var notices = 0;
+    void counted() => notices++;
+    playbackTempoSupportRevision.addListener(counted);
+    addTearDown(() => playbackTempoSupportRevision.removeListener(counted));
+    audioplayers.tempoSupport = PlaybackTempoSupport.none;
+    expect(deck.tempoSupport, PlaybackTempoSupport.none);
+    playbackMedia3Engine.value = true;
+    await deck.configureOutput();
+    await deck.setFileSource('/song.flac');
+    expect(deck.activeDeck, same(media3.single));
+    expect(deck.tempoSupport, PlaybackTempoSupport.full);
+    expect(notices, 1);
+    await deck.setPlaybackRate(1.05);
+    expect(media3.single.calls, contains('rate 1.05'));
   });
 
   test(

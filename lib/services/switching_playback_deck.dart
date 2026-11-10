@@ -201,6 +201,9 @@ abstract class SwitchingPlaybackDeck
     final position = reload ? await previous.getCurrentPosition() : null;
     if (_disposed) return;
     _active = target;
+    if (target.tempoSupport != previous.tempoSupport) {
+      notifyPlaybackTempoSupportChanged();
+    }
     await target.setVolume(_volume);
     await target.setPlaybackRate(_rate);
     if (_positionInterval case final interval?) {
@@ -285,6 +288,11 @@ abstract class SwitchingPlaybackDeck
   PlaybackDeckState get state => _active.state;
   @override
   bool get isDirect => _active.isDirect;
+
+  /// Every deck reads [playbackSpeed] and [playbackPitch] itself, so the one
+  /// taking over already plays at the current values.
+  @override
+  PlaybackTempoSupport get tempoSupport => _active.tempoSupport;
   @override
   bool get needsSourceReload => _active.needsSourceReload;
   @override

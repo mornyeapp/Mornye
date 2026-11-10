@@ -66,6 +66,8 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     playbackOutputVolume.addListener(_outputVolumeChanged);
     playbackSkipSilence.addListener(_skipSilenceChanged);
     playbackSpatialAudio.addListener(_spatialAudioChanged);
+    playbackSpeed.addListener(_parametersChanged);
+    playbackPitch.addListener(_parametersChanged);
   }
 
   static const _channel = MethodChannel('com.zarz.mornye/media3_player');
@@ -118,6 +120,13 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   /// The native player starts with spatialization allowed (auto); only a
   /// change from that is sent.
   bool _spatialAudioSent = true;
+
+  /// The rate [setPlaybackRate] gave, before [playbackSpeed].
+  double _rate = 1;
+
+  /// The native player starts at normal speed and pitch; only a change from
+  /// that is sent.
+  ({double speed, double pitch})? _parametersSent = (speed: 1, pitch: 1);
   Timer? _equalizerTimer;
   Future<void> _equalizerWrite = Future.value();
 
@@ -125,6 +134,8 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   PlaybackDeckState get state => _state;
   @override
   bool get isDirect => false;
+  @override
+  PlaybackTempoSupport get tempoSupport => PlaybackTempoSupport.full;
   @override
   bool get needsSourceReload => false;
   @override
@@ -167,6 +178,43 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     if (playbackSkipSilence.value) await _sendSkipSilence();
     // Before the first source, so its output never opens spatialized.
     if (!playbackSpatialAudio.value) await _sendSpatialAudio();
+    await _sendParameters();
+  }
+
+  ({double speed, double pitch}) get _parameters {
+    final speed = _rate * playbackSpeed.value;
+    return (speed: speed, pitch: playbackPitch.value.factorAt(speed));
+  }
+
+  void _parametersChanged() {
+    final created = _created;
+    if (_disposed || created == null) return;
+    unawaited(
+      created.then((_) async {
+        if (_disposed) return;
+        await _sendParameters();
+      }, onError: (Object _) {}),
+    );
+  }
+
+  /// ExoPlayer applies them at once, keeps them for queued songs, and does
+  /// not start a paused player.
+  Future<void> _sendParameters() async {
+    final parameters = _parameters;
+    if (parameters == _parametersSent) return;
+    _parametersSent = parameters;
+    try {
+      await _channel.invokeMethod<void>('setPlaybackParameters', {
+        'playerId': playerId,
+        'speed': parameters.speed,
+        'pitch': parameters.pitch,
+      });
+    } on PlatformException catch (error) {
+      _parametersSent = null;
+      _log.w('Speed and pitch unavailable: ${error.code}');
+    } on MissingPluginException {
+      // An older native player: normal speed and pitch stay.
+    }
   }
 
   void _spatialAudioChanged() {
@@ -357,7 +405,11 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   @override
   Future<void> setPlaybackRate(double rate) async {
     if (rate <= 0) return;
-    await _invoke<void>('setRate', {'rate': rate});
+    _rate = rate;
+    if (_disposed) return;
+    await _ensureCreated();
+    if (_disposed) return;
+    await _sendParameters();
   }
 
   @override
@@ -593,6 +645,8 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     playbackOutputVolume.removeListener(_outputVolumeChanged);
     playbackSkipSilence.removeListener(_skipSilenceChanged);
     playbackSpatialAudio.removeListener(_spatialAudioChanged);
+    playbackSpeed.removeListener(_parametersChanged);
+    playbackPitch.removeListener(_parametersChanged);
     _equalizerTimer?.cancel();
     reportEqualizerError(playerId, null);
     _disposed = true;

@@ -160,6 +160,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     bool? nativeAvailable,
     bool? equalizerAvailable,
     bool? spatialAudioAvailable,
+    bool? pitchAvailable,
   }) : _ordinary = AudioPlayer(playerId: playerId),
        // The Darwin fork's tap is shared source, so macOS has it as well.
        // isDesktopPlatform keeps host-run tests on the mobile default.
@@ -178,10 +179,19 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
            (Platform.isAndroid ||
                Platform.isIOS ||
                (isDesktopPlatform && Platform.isMacOS)),
+       // Both forks carry `setPitch`; the Windows and Linux plugins (the
+       // fallback without libmpv) change only the speed.
+       _pitchAvailable =
+           pitchAvailable ??
+           (Platform.isAndroid ||
+               Platform.isIOS ||
+               (isDesktopPlatform && Platform.isMacOS)),
        _nativeAvailable = nativeAvailable ?? Platform.isAndroid {
     playbackEqualizer.addListener(_equalizerChanged);
     playbackOutputVolume.addListener(_outputVolumeChanged);
     playbackSpatialAudio.addListener(_spatialAudioChanged);
+    playbackSpeed.addListener(_speedChanged);
+    playbackPitch.addListener(_pitchChanged);
     _subscriptions.addAll([
       _ordinary.onPlayerStateChanged.listen((value) {
         if (!_direct) _states.add(_deckState(value));
@@ -308,6 +318,77 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     }
   }
 
+  final bool _pitchAvailable;
+
+  /// Both forks start a player without a shift, its pitch kept while the
+  /// speed changes; only a change from that is sent. Null when unknown
+  /// after a failed send.
+  PlaybackPitch? _pitchSent = PlaybackPitch.none;
+  Future<void> _pitchWrite = Future.value();
+
+  /// True while the fork refused [playbackPitch] for the current source.
+  bool _pitchFailed = false;
+
+  void _pitchChanged() {
+    _pitchWrite = _pitchWrite.then((_) => _syncPitch());
+  }
+
+  /// The fork keeps the values for this player and applies them to the
+  /// current source and every later one, also when the rate changes.
+  Future<void> _syncPitch() async {
+    if (!_pitchAvailable || _disposed) return;
+    final pitch = playbackPitch.value;
+    if (pitch == _pitchSent) return;
+    _pitchSent = pitch;
+    try {
+      // Public API waits for native player creation without changing playback.
+      await _ordinary.getDuration();
+      if (_disposed) return;
+      await _effects
+          .invokeMethod<void>('setPitch', {
+            'playerId': _ordinary.playerId,
+            'semitones': pitch.semitones,
+            'followsRate': pitch.followsRate,
+          })
+          .timeout(const Duration(seconds: 3));
+      _setPitchFailed(false);
+    } catch (error) {
+      _log.w('Pitch unavailable for this source: $error');
+      // Sent again with the next change or source.
+      _pitchSent = null;
+      if (!_disposed) _setPitchFailed(true);
+    }
+  }
+
+  void _setPitchFailed(bool failed) {
+    if (failed == _pitchFailed) return;
+    _pitchFailed = failed;
+    if (!_direct) notifyPlaybackTempoSupportChanged();
+  }
+
+  /// The rate [setPlaybackRate] gave, before [playbackSpeed].
+  double _rate = 1;
+
+  /// The rate the ordinary player was given last.
+  double _rateSent = 1;
+
+  double get _effectiveRate => _rate * playbackSpeed.value;
+
+  Future<void> _syncRate() async {
+    if (_direct || _disposed) return;
+    final rate = _effectiveRate;
+    _rateSent = rate;
+    // The forks apply it once playing; a paused player stays paused.
+    await _ordinary.setPlaybackRate(rate);
+  }
+
+  void _speedChanged() {
+    if (_direct || _disposed) return;
+    unawaited(
+      _syncRate().catchError((Object error) => _log.w('Speed: $error')),
+    );
+  }
+
   final bool _nativeAvailable;
   final _states = StreamController<PlaybackDeckState>.broadcast();
   final _durations = StreamController<Duration>.broadcast();
@@ -337,6 +418,12 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
 
   @override
   bool get isDirect => _direct;
+  @override
+  PlaybackTempoSupport get tempoSupport => _direct
+      ? PlaybackTempoSupport.none
+      : !_pitchAvailable || _pitchFailed
+      ? PlaybackTempoSupport.speedOnly
+      : PlaybackTempoSupport.full;
   @override
   bool get needsSourceReload => _direct && _routeLost;
   @override
@@ -401,9 +488,11 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     );
   }
 
+  /// Direct (USB) output plays at the source's own rate.
   @override
   Future<void> setPlaybackRate(double rate) async {
-    if (!_direct) await _ordinary.setPlaybackRate(rate);
+    _rate = rate;
+    await _syncRate();
   }
 
   @override
@@ -530,6 +619,8 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     // Android's MediaPlayer reads its audio attributes as the source loads.
     _spatialAudioChanged();
     await _spatialAudioWrite;
+    // A speed change while the direct output played did not reach it.
+    if (_rateSent != _effectiveRate) await _syncRate();
     _ordinaryError = null;
     final abandoned = _ordinaryPreparation = Completer<void>();
     try {
@@ -543,6 +634,13 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     }
     if (abandoned.isCompleted) return;
     await _syncEqualizer();
+    // Sent again for each source with a shift: the fork answers whether
+    // this one takes it (Darwin cannot shift protected audio or HLS).
+    if (_pitchFailed || playbackPitch.value != PlaybackPitch.none) {
+      _pitchSent = null;
+    }
+    _pitchChanged();
+    await _pitchWrite;
   }
 
   /// Reconcile the display with the current native session without reopening it.
@@ -765,6 +863,8 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     playbackEqualizer.removeListener(_equalizerChanged);
     playbackOutputVolume.removeListener(_outputVolumeChanged);
     playbackSpatialAudio.removeListener(_spatialAudioChanged);
+    playbackSpeed.removeListener(_speedChanged);
+    playbackPitch.removeListener(_pitchChanged);
     _equalizerTimer?.cancel();
     reportEqualizerError(_ordinary.playerId, null);
     await stop();
