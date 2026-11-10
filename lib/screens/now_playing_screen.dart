@@ -20,6 +20,7 @@ import 'package:mornye/screens/lyrics_share_screen.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/utils/file_access.dart';
+import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -58,6 +59,8 @@ import 'package:mornye/widgets/mornye_player_artwork.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
 
 export 'package:mornye/routes/now_playing_route.dart';
+
+final _log = AppLogger('NowPlaying');
 
 /// Portrait's "Playing on" row, kept while empty.
 /// Light bar icons over the player. `SystemUiOverlayStyle.light` would also
@@ -929,6 +932,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     });
     _scheduleLyricsControlsHide();
     if (_currentPage == 1) {
+      _logLyricsAutoHideBlockers();
       unawaited(
         _trackMetadata.load(
           ref.read(currentMediaItemProvider).value,
@@ -951,6 +955,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     });
     _scheduleLyricsControlsHide();
     if (_currentPage == 1) {
+      _logLyricsAutoHideBlockers();
       unawaited(
         _trackMetadata.load(
           ref.read(currentMediaItemProvider).value,
@@ -977,6 +982,24 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       _currentPage == 1 &&
       ref.read(playbackPlayingProvider) &&
       !MediaQuery.accessibleNavigationOf(context);
+
+  /// Names what keeps the controls from hiding when lyrics open, so a log
+  /// from a device where automatic fullscreen lyrics never starts says why.
+  void _logLyricsAutoHideBlockers() {
+    // The desktop player has no automatic fullscreen lyrics.
+    if (widget.embedded) return;
+    final size = MediaQuery.sizeOf(context);
+    final blockers = [
+      if (!_lyricsAutoHideLayout)
+        'layout ${size.width.round()}x${size.height.round()}',
+      if (!ref.read(settingsProvider).autoHideLyricsControls) 'setting off',
+      if (!ref.read(playbackPlayingProvider)) 'not playing',
+      if (MediaQuery.accessibleNavigationOf(context)) 'accessible navigation',
+      if (_lyricsPointers.isNotEmpty) 'touch held',
+    ];
+    if (blockers.isEmpty) return;
+    _log.i('Lyrics controls stay visible: ${blockers.join(', ')}');
+  }
 
   void _scheduleLyricsControlsHide() {
     _lyricsIdleTimer?.cancel();
