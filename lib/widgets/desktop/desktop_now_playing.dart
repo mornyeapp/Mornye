@@ -190,6 +190,26 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Mornye reaches Speed and pitch from its More menu;
+                      // the Material player has no More menu.
+                      if (!mornye) ...[
+                        Consumer(
+                          builder: (context, ref, _) => _RoundButton(
+                            key: const ValueKey('desktop-now-playing-tempo'),
+                            tooltip: context.l10n.playbackTempoTitle,
+                            icon: Icons.speed,
+                            selected: ref.watch(
+                              settingsProvider.select(
+                                (settings) =>
+                                    settings.playbackSpeed != 1 ||
+                                    settings.playbackPitch != 0,
+                              ),
+                            ),
+                            onPressed: () => showPlaybackTempoSheet(context),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                       _RoundButton(
                         tooltip: context.l10n.nowPlayingTabLyrics,
                         icon: mornye

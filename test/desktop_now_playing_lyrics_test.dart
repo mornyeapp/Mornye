@@ -410,7 +410,18 @@ void main() {
         await settle();
         expect(find.byType(PlaybackTempoControls), findsOneWidget);
         expect(find.byType(AppSheetDialog), findsOneWidget);
+      } else {
+        // The Material player has no More menu; its Speed button opens it.
+        const button = ValueKey('desktop-now-playing-tempo');
+        await tester.tap(find.byKey(button).hitTestable());
+        await settle();
+        expect(find.byType(PlaybackTempoControls), findsOneWidget);
+        expect(find.byType(AppSheetDialog), findsOneWidget);
       }
+      expect(
+        find.byKey(const ValueKey('desktop-now-playing-tempo')),
+        mornye ? findsNothing : findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
