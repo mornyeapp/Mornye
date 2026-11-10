@@ -62,7 +62,9 @@ import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
+import 'package:mornye/widgets/playback_tempo_sheet.dart';
 import 'package:mornye/widgets/player_artwork.dart';
+import 'package:mornye/widgets/settings_group.dart';
 
 import 'support/app_icon_finder.dart';
 
@@ -5367,6 +5369,127 @@ void main() {
     expect(find.text('45 minutes'), findsOneWidget);
     expect(find.text('60 minutes'), findsOneWidget);
     expect(find.text('Turn off sleep timer'), findsNothing);
+  });
+
+  testWidgets('Now Playing menu opens Speed and pitch with its value', (
+    tester,
+  ) async {
+    await pumpNowPlaying(tester);
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+    ProviderScope.containerOf(
+        tester.element(find.byType(NowPlayingScreen)),
+      ).read(settingsProvider.notifier)
+      ..setPlaybackSpeed(1.25)
+      ..setPlaybackPitch(2);
+    await settlePlayer(tester);
+
+    await tester.tap(findAppIcon(Icons.more_vert));
+    await settlePlayer(tester);
+    final row = find.ancestor(
+      of: find.text('Speed and pitch'),
+      matching: find.byType(SettingsItem),
+    );
+    await tester.scrollUntilVisible(
+      row,
+      100,
+      scrollable: find
+          .descendant(
+            of: find.byType(BottomSheet),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(tester.widget<SettingsItem>(row).subtitle, '1.25x, +2 semitones');
+    await tester.tap(row);
+    await settlePlayer(tester);
+    expect(find.byType(PlaybackTempoControls), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final mornye in [false, true]) {
+    testWidgets(
+      '${mornye ? 'Mornye' : 'Material'} shows a changed speed and pitch '
+      'beside the timeline',
+      (tester) async {
+        await pumpNowPlaying(
+          tester,
+          theme: mornye ? MornyeTheme.build(Brightness.dark) : null,
+          size: mornye ? const Size(393, 852) : const Size(1080, 1920),
+        );
+        mediaItems.add(item('first'));
+        await settlePlayer(tester);
+        const badge = ValueKey('playback-tempo-badge');
+        expect(find.byKey(badge), findsNothing);
+
+        final settings = ProviderScope.containerOf(
+          tester.element(find.byType(NowPlayingScreen)),
+        ).read(settingsProvider.notifier);
+        settings
+          ..setPlaybackSpeed(1.25)
+          ..setPlaybackPitch(-1.5);
+        await settlePlayer(tester);
+        expect(find.byKey(badge).hitTestable(), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(PlayerPlaybackControls),
+            matching: find.text('1.25x · −1.5'),
+          ),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.byKey(badge));
+        await settlePlayer(tester);
+        expect(find.byType(PlaybackTempoControls), findsOneWidget);
+        if (mornye) {
+          expect(
+            Theme.of(
+              tester.element(find.byType(PlaybackTempoControls)),
+            ).brightness,
+            Brightness.dark,
+          );
+        }
+        await tester.tap(find.text('Reset'));
+        await settlePlayer(tester);
+        await tester.tapAt(const Offset(10, 10));
+        await settlePlayer(tester);
+        expect(find.byType(PlaybackTempoControls), findsNothing);
+        expect(find.byKey(badge), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('Mornye player menu opens Speed and pitch', (tester) async {
+    await pumpNowPlaying(
+      tester,
+      theme: MornyeTheme.build(Brightness.dark),
+      size: const Size(393, 780),
+    );
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+    ProviderScope.containerOf(
+      tester.element(find.byType(NowPlayingScreen)),
+    ).read(settingsProvider.notifier).setPlaybackKeepPitch(false);
+    await settlePlayer(tester);
+
+    await tester.tap(findAppIcon(CupertinoIcons.ellipsis).hitTestable());
+    await settlePlayer(tester);
+    final menu = find.byType(MornyePlayerActionsSheet);
+    final row = find.descendant(
+      of: menu,
+      matching: find.text('Speed and pitch'),
+    );
+    await tester.ensureVisible(row);
+    expect(
+      find.descendant(of: menu, matching: find.text('Pitch follows speed')),
+      findsOneWidget,
+    );
+    expect(findAppIcon(CupertinoIcons.gauge), findsOneWidget);
+    await tester.tap(row);
+    await settlePlayer(tester);
+    expect(find.byType(PlaybackTempoControls), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Now Playing menu scrolls to its last action on a short screen', (

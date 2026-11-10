@@ -26,6 +26,7 @@ import 'package:mornye/widgets/mornye_playback_button.dart';
 import 'package:mornye/widgets/mornye_playback_time.dart';
 import 'package:mornye/widgets/mornye_player_slider.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
+import 'package:mornye/widgets/playback_tempo_sheet.dart';
 import 'package:mornye/widgets/playback_time_builder.dart';
 
 const _mornyeTimelinePadding = 28.0;
@@ -193,7 +194,18 @@ class PlayerPlaybackControls extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _QualityBadge(metadata: metadata, colorScheme: colorScheme),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: _QualityBadge(
+                            metadata: metadata,
+                            colorScheme: colorScheme,
+                          ),
+                        ),
+                        PlaybackTempoBadge(colorScheme: colorScheme),
+                      ],
+                    ),
                     const AutoMixStatusBadge(),
                   ],
                 ),

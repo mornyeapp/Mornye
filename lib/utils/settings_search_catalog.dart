@@ -326,6 +326,21 @@ class SettingsSearchCatalog {
           ],
         ),
         SettingsSearchEntry(
+          icon: Icons.speed,
+          title: l10n.playbackTempoTitle,
+          subtitle: l10n.playbackTempoDescription,
+          keywords: const [
+            'speed',
+            'tempo',
+            'pitch',
+            'key',
+            'semitone',
+            'faster',
+            'slower',
+            'nightcore',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.playlist_play_rounded,
           title: l10n.autoplayFromLibrary,
           subtitle: l10n.autoplayDescription,

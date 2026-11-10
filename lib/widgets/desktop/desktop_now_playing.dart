@@ -13,6 +13,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -34,6 +35,7 @@ import 'package:mornye/widgets/player_details_sheet.dart';
 import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/playback_source_label.dart';
+import 'package:mornye/widgets/playback_tempo_sheet.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_track_crossfade.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
@@ -565,11 +567,13 @@ class _PlayerMoreButton extends ConsumerWidget {
       String value,
       String label, {
       IconData? icon,
+      String? subtitle,
       bool disclosure = false,
       bool selected = false,
     }) => MornyeMenuAction(
       icon: icon,
       label: label,
+      subtitle: subtitle,
       disclosure: disclosure,
       selected: selected,
       onPressed: () => Navigator.of(menuContext).pop(value),
@@ -600,6 +604,15 @@ class _PlayerMoreButton extends ConsumerWidget {
               selected: loved,
             ),
             row(menuContext, 'equalizer', l10n.equalizerTitle),
+            row(
+              menuContext,
+              'tempo',
+              l10n.playbackTempoTitle,
+              subtitle: playbackTempoSettingsSummary(
+                l10n,
+                ref.read(settingsProvider),
+              ),
+            ),
           ],
           [
             if ((mediaItem.album ?? '').trim().isNotEmpty)
@@ -634,6 +647,8 @@ class _PlayerMoreButton extends ConsumerWidget {
         );
       case 'equalizer':
         await pushPage<void>(context, (_) => const EqualizerScreen());
+      case 'tempo':
+        await showPlaybackTempoSheet(context);
       case 'album':
         await openPlayingAlbum(
           context,

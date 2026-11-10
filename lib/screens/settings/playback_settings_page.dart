@@ -43,6 +43,7 @@ import 'package:mornye/widgets/automix_settings.dart';
 import 'package:mornye/widgets/autoplay_randomness_slider.dart';
 import 'package:mornye/widgets/music_haptics_settings.dart';
 import 'package:mornye/widgets/playback_normalization_settings.dart';
+import 'package:mornye/widgets/playback_tempo_sheet.dart';
 
 /// Shows the Android audio output section on any host, for tests.
 @visibleForTesting
@@ -223,6 +224,14 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                 subtitle: context.l10n.equalizerDescription,
                 onTap: () =>
                     pushPage<void>(context, (_) => const EqualizerScreen()),
+              ),
+              SettingsItem(
+                icon: Icons.speed,
+                title: context.l10n.playbackTempoTitle,
+                subtitle:
+                    playbackTempoSettingsSummary(context.l10n, settings) ??
+                    context.l10n.playbackTempoDescription,
+                onTap: () => showPlaybackTempoSheet(context),
               ),
               SettingsSwitchItem(
                 icon: Icons.graphic_eq,
