@@ -368,8 +368,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     }
 
     final source = mediaItem.extras?['source']?.toString() ?? '';
+    final materialBackdrop = !mornye && fullScreenCover;
+    // Two-pane landscape keeps its side-by-side cover over the blurred surface.
+    final materialFullScreen =
+        materialBackdrop &&
+        MediaQuery.orientationOf(context) == Orientation.portrait;
+    // Material plays motion artwork only as the full-screen cover; the card
+    // cover stays still.
     final motionState =
-        mornye &&
+        (mornye || materialFullScreen) &&
             ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) &&
             !MediaQuery.disableAnimationsOf(context)
         ? ref.watch(
@@ -403,11 +410,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               ? 1.0
               : (screen.width / (screen.height * 0.56)).clamp(0.5, 1.0)
         : motionRatio;
-    final materialBackdrop = !mornye && fullScreenCover;
-    // Two-pane landscape keeps its side-by-side cover over the blurred surface.
-    final materialFullScreen =
-        materialBackdrop &&
-        MediaQuery.orientationOf(context) == Orientation.portrait;
     final overCover = materialFullScreen && _currentPage != 1;
     // Portrait keeps the "Playing on" row while empty, so the controls stay
     // put when a computer takes over playback. On an iPhone the row reaches
@@ -838,6 +840,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             mediaItem: mediaItem,
             colorScheme: colorScheme,
             showArtwork: materialFullScreen && _currentPage != 1,
+            playsMotionArtwork: true,
+            videoUrl: motionArtwork?.source,
+            resolvingVideo: motionState?.isLoading == true,
+            onVideoError: () {
+              if (mounted) {
+                setState(() => _failedMotionSource = motionArtwork?.source);
+              }
+            },
           ),
           _lyricsPointerListener(player),
         ],

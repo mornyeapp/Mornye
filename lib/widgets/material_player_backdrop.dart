@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/widgets/mornye_player_artwork.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 
 /// Full-screen cover style for the Material player: the cover fills the top
@@ -19,6 +20,10 @@ class MaterialPlayerBackdrop extends StatelessWidget {
     required this.mediaItem,
     required this.colorScheme,
     required this.showArtwork,
+    this.playsMotionArtwork = false,
+    this.videoUrl,
+    this.resolvingVideo = false,
+    this.onVideoError,
   });
 
   final MediaItem mediaItem;
@@ -26,6 +31,19 @@ class MaterialPlayerBackdrop extends StatelessWidget {
 
   /// False behind lyrics, where only the blurred surface remains.
   final bool showArtwork;
+
+  /// Plays [videoUrl] in place of the sharp cover, which shows until the
+  /// video is ready. The phone player sets it; desktop keeps a still cover.
+  final bool playsMotionArtwork;
+
+  /// Motion artwork for [playsMotionArtwork].
+  final String? videoUrl;
+
+  /// True while a newer [videoUrl] is still being looked up, so the current
+  /// video keeps playing instead of dropping back to the still cover.
+  final bool resolvingVideo;
+
+  final VoidCallback? onVideoError;
 
   @override
   Widget build(BuildContext context) {
@@ -62,11 +80,23 @@ class MaterialPlayerBackdrop extends StatelessWidget {
               tag: kNowPlayingArtworkHeroTag,
               // The flying cover must keep its fade in the route overlay.
               child: _FadedArtwork(
-                child: PlayerArtwork(
-                  artUri: artUri,
-                  colorScheme: colorScheme,
-                  cacheWidth: PlayerArtwork.transitionCacheWidth(context),
-                ),
+                child: !playsMotionArtwork
+                    ? PlayerArtwork(
+                        artUri: artUri,
+                        colorScheme: colorScheme,
+                        cacheWidth: PlayerArtwork.transitionCacheWidth(context),
+                      )
+                    // Paused while hidden behind lyrics.
+                    : TickerMode(
+                        enabled: showArtwork,
+                        child: MornyePlayerArtwork(
+                          mediaItem: mediaItem,
+                          videoUrl: videoUrl,
+                          resolvingVideo: resolvingVideo,
+                          squareWhileLoading: false,
+                          onError: onVideoError,
+                        ),
+                      ),
               ),
             ),
           ),

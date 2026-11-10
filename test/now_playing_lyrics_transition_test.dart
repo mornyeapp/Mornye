@@ -690,6 +690,62 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Material plays motion artwork only as the full-screen cover', (
+    tester,
+  ) async {
+    await pumpNowPlaying(
+      tester,
+      theme: AppTheme.light(),
+      size: const Size(390, 844),
+      motionArtwork: const MotionArtwork('file:///cover.mp4'),
+    );
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+
+    final backdropArtwork = find.descendant(
+      of: find.byType(MaterialPlayerBackdrop),
+      matching: find.byType(MornyePlayerArtwork),
+    );
+    expect(backdropArtwork, findsWidgets);
+    expect(
+      {
+        for (final artwork in tester.widgetList<MornyePlayerArtwork>(
+          backdropArtwork,
+        ))
+          artwork.videoUrl,
+      },
+      {'file:///cover.mp4'},
+    );
+    bool videoTicking() => tester
+        .widget<TickerMode>(
+          find
+              .ancestor(
+                of: backdropArtwork.first,
+                matching: find.byType(TickerMode),
+              )
+              .first,
+        )
+        .enabled;
+    expect(videoTicking(), isTrue);
+
+    // Hidden behind lyrics, the video pauses.
+    await tester.tap(find.byKey(const ValueKey('material-lyrics-toggle')));
+    await settlePlayer(tester);
+    expect(videoTicking(), isFalse);
+    await tester.tap(find.byKey(const ValueKey('material-lyrics-toggle')));
+    await settlePlayer(tester);
+    expect(videoTicking(), isTrue);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(NowPlayingScreen)),
+    );
+    container.read(settingsProvider.notifier).setPlayerCoverStyle('default');
+    await settlePlayer(tester);
+    expect(find.byType(MaterialPlayerBackdrop), findsNothing);
+    expect(find.byType(MornyePlayerArtwork), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final mornye in [false, true]) {
     testWidgets('cover style switches live and survives rotation ($mornye)', (
       tester,
