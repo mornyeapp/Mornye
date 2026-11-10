@@ -1224,7 +1224,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             backgroundColor: colorScheme.surfaceContainerHigh,
             title: mediaItem.title,
             subtitle: mediaItem.artist,
-            builder: (sheetContext) => Padding(
+            maxHeightFactor: 0.85,
+            // The list scrolls under its fixed title on a short screen.
+            builder: (sheetContext) => SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: 16),
               child: SettingsGroup(
                 children: [
@@ -1378,7 +1380,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       useRootNavigator: true,
       backgroundColor: colorScheme.surfaceContainerHigh,
       title: context.l10n.nowPlayingSleepTimer,
-      builder: (sheetContext) => Padding(
+      maxHeightFactor: 0.85,
+      builder: (sheetContext) => SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 16),
         child: SettingsGroup(
           children: [

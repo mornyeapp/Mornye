@@ -5313,6 +5313,42 @@ void main() {
     expect(find.text('Turn off sleep timer'), findsNothing);
   });
 
+  testWidgets('Now Playing menu scrolls to its last action on a short screen', (
+    tester,
+  ) async {
+    await pumpNowPlaying(tester, size: const Size(360, 560));
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+
+    await tester.tap(findAppIcon(Icons.more_vert));
+    await settlePlayer(tester);
+    expect(tester.takeException(), isNull);
+
+    final last = find.text('Open in external player');
+    await tester.scrollUntilVisible(
+      last,
+      100,
+      scrollable: find
+          .descendant(
+            of: find.byType(BottomSheet),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(last.hitTestable(), findsOneWidget);
+    // The song title stays above the list it scrolled.
+    expect(
+      find
+          .descendant(
+            of: find.byType(BottomSheet),
+            matching: find.text('First'),
+          )
+          .hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Now Playing menu hides and restores the volume', (tester) async {
     await pumpNowPlaying(tester);
     mediaItems.add(item('first'));
