@@ -269,9 +269,8 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                     "Riduce l'affaticamento acustico in cuffia simulando la risposta di monitor da studio",
                 value: settings.spatialAudio,
                 enabled: !settings.usbBitPerfect,
-                onChanged: (value) => ref
-                    .read(settingsProvider.notifier)
-                    .setSpatialAudio(value),
+                onChanged: (value) =>
+                    ref.read(settingsProvider.notifier).setSpatialAudio(value),
               ),
               SettingsSwitchItem(
                 icon: Icons.graphic_eq_rounded,

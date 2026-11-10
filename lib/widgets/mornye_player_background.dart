@@ -1,8 +1,8 @@
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:mornye/theme/cover_palette.dart';
+import 'package:mornye/widgets/fluid_mesh_glow.dart';
 
 /// Opaque cover-derived surface, with full-bleed artwork on the player page
 /// and a muted two-tone gradient behind lyrics and the queue.
@@ -102,31 +102,13 @@ class MornyePlayerBackground extends StatelessWidget {
                       child: KeyedSubtree(
                         key: const ValueKey('mornye-ambient-glow'),
                         child: IgnorePointer(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: RadialGradient(
-                                center: const Alignment(0.0, -0.28),
-                                radius: 0.95,
-                                colors: [
-                                  dominant
-                                      .withSaturation(
-                                        (dominant.saturation * 1.3).clamp(
-                                          0.2,
-                                          0.75,
-                                        ),
-                                      )
-                                      .withLightness(0.42)
-                                      .toColor()
-                                      .withValues(alpha: 0.38),
-                                  muted
-                                      .withLightness(0.32)
-                                      .toColor()
-                                      .withValues(alpha: 0.16),
-                                  Colors.transparent,
-                                ],
-                                stops: const [0.0, 0.55, 1.0],
-                              ),
-                            ),
+                          child: FluidMeshGlow(
+                            artUri: artUri,
+                            sourceColor: sourceColor,
+                            dominantColor: dominant.toColor(),
+                            opacity: 0.40,
+                            isAmoled:
+                                theme.scaffoldBackgroundColor == Colors.black,
                           ),
                         ),
                       ),
@@ -170,7 +152,36 @@ class MornyePlayerBackground extends StatelessWidget {
                       ? null
                       : KeyedSubtree(
                           key: const ValueKey('full-player-artwork'),
-                          child: artwork!,
+                          child: ShaderMask(
+                            blendMode: BlendMode.dstIn,
+                            shaderCallback: (bounds) => LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: [
+                                0.0,
+                                (fadeStart * 0.75).clamp(0.0, 1.0),
+                                fadeStart.clamp(0.0, 1.0),
+                                (fadeStart + (1.0 - fadeStart) * 0.50).clamp(
+                                  0.0,
+                                  1.0,
+                                ),
+                                (fadeStart + (1.0 - fadeStart) * 0.80).clamp(
+                                  0.0,
+                                  1.0,
+                                ),
+                                1.0,
+                              ],
+                              colors: const [
+                                Colors.white,
+                                Colors.white,
+                                Color(0xe6ffffff),
+                                Color(0x80ffffff),
+                                Color(0x22ffffff),
+                                Colors.transparent,
+                              ],
+                            ).createShader(bounds),
+                            child: artwork!,
+                          ),
                         ),
                 ),
               ),
@@ -202,14 +213,14 @@ class _ArtworkFade extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (bottom <= top) return;
-    // Extend slightly past the artwork bottom to ensure the edge is 100% buried
-    final bleedBottom = math.max(bottom + 12.0, size.height);
+    // Fades smoothly into the background right at the artwork's bottom edge
+    final bleedBottom = bottom + 1.0;
     final rect = Rect.fromLTRB(0, top, size.width, bleedBottom);
     final paint = Paint()..isAntiAlias = false;
     if (background.begin == Alignment.topCenter &&
         background.end == Alignment.bottomCenter) {
-      // Non-linear stops that reach full opacity before the bottom edge
-      final baseStops = const [0.0, 0.25, 0.50, 0.70, 0.85, 0.92, 1.0];
+      // Non-linear stops that reach full opacity at the bottom edge
+      final baseStops = const [0.0, 0.25, 0.50, 0.70, 0.85, 0.95, 1.0];
       final stops = {
         ...baseStops,
         for (final stop in background.stops ?? const <double>[])
@@ -224,8 +235,8 @@ class _ArtworkFade extends CustomPainter {
               _backgroundAt(
                 (top + stop * (bottom - top)) / size.height,
               ).withValues(
-                // Reaches full opacity before stop = 0.92, hiding the bottom edge
-                alpha: Curves.easeInQuad.transform((stop / 0.92).clamp(0.0, 1.0)),
+                // Reaches full opacity at stop = 1.0, seamlessly burying the bottom edge
+                alpha: Curves.easeInQuad.transform(stop.clamp(0.0, 1.0)),
               ),
           ], stops),
       );

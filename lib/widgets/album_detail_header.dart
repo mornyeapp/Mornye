@@ -177,7 +177,8 @@ class AlbumDetailHeader extends StatelessWidget {
         showTitleListenable,
         showTitleInAppBar,
         (showTitle) => AnimatedOpacity(
-          opacity: showTitle ||
+          opacity:
+              showTitle ||
                   appBarTitle != null ||
                   (immersive && collapsed) ||
                   (!immersive && collapsed)
@@ -297,7 +298,9 @@ class AlbumDetailHeader extends StatelessWidget {
       detailsSliver = SliverToBoxAdapter(child: details);
     }
     final collapseOffset =
-        (artworkSize + 20 - (kToolbarHeight + MediaQuery.paddingOf(context).top))
+        (artworkSize +
+                20 -
+                (kToolbarHeight + MediaQuery.paddingOf(context).top))
             .clamp(0.0, double.infinity);
     return [
       Builder(
@@ -335,55 +338,55 @@ class AlbumDetailHeader extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(20, topPadding, 20, 28),
       child: Column(
-      children: [
-        if (!immersive)
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 280),
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.16),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
+        children: [
+          if (!immersive)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 280),
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.16),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) =>
+                          coverBuilder!(context, constraints.maxWidth),
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) =>
-                        coverBuilder!(context, constraints.maxWidth),
                   ),
                 ),
               ),
             ),
+          if (!immersive) const SizedBox(height: 22),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        if (!immersive) const SizedBox(height: 22),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        if (subtitle != null) ...[const SizedBox(height: 5), subtitle!],
-        if (meta != null) ...[const SizedBox(height: 5), meta!],
-        if (actions != null) ...[
-          SizedBox(height: immersive ? 16 : 24),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: actions!,
-          ),
+          if (subtitle != null) ...[const SizedBox(height: 5), subtitle!],
+          if (meta != null) ...[const SizedBox(height: 5), meta!],
+          if (actions != null) ...[
+            SizedBox(height: immersive ? 16 : 24),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: actions!,
+            ),
+          ],
         ],
-      ],
-    ),
-  );
-}
+      ),
+    );
+  }
 
   Widget _buildAppBar(BuildContext context, ColorScheme headerScheme) {
     final tokens = context.tokens;

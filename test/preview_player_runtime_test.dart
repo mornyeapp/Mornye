@@ -197,6 +197,8 @@ class _PreviewDeck implements PlaybackDeck {
   @override
   Future<void> setPlaybackRate(double rate) async => calls.add('rate $rate');
   @override
+  Future<void> setPitch(double pitch) async => calls.add('pitch $pitch');
+  @override
   Future<void> setNetworkSource(String url, {bool arriving = false}) async =>
       calls.add('network $url');
   @override

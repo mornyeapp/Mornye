@@ -59,6 +59,8 @@ class _MockDeck implements PlaybackDeck {
   @override
   Future<void> setPlaybackRate(double rate) async {}
   @override
+  Future<void> setPitch(double pitch) async {}
+  @override
   Future<void> setNetworkSource(String url, {bool arriving = false}) async {}
   @override
   Future<bool> setNextDeck(PlaybackDeck? next) async => true;

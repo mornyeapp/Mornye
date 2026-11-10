@@ -340,5 +340,6 @@ const _$AutoMixEffectEnumMap = {
   AutoMixEffect.muffled: 'muffled',
   AutoMixEffect.echo: 'echo',
   AutoMixEffect.pitch: 'pitch',
+  AutoMixEffect.vinylBrake: 'vinylBrake',
   AutoMixEffect.custom: 'custom',
 };

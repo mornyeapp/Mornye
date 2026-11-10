@@ -236,14 +236,18 @@ class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
                           selected: autoMix,
                           onPressed: () async {
                             final next = !autoMix;
-                            ref.read(settingsProvider.notifier).setAutoMix(next);
+                            ref
+                                .read(settingsProvider.notifier)
+                                .setAutoMix(next);
                             if (next) {
-                              final reordered =
-                                  await controller.orderUpcomingQueueByBpm();
+                              final reordered = await controller
+                                  .orderUpcomingQueueByBpm();
                               if (context.mounted && reordered) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text(context.l10n.djQueueBpmMatched),
+                                    content: Text(
+                                      context.l10n.djQueueBpmMatched,
+                                    ),
                                   ),
                                 );
                               }
@@ -263,14 +267,18 @@ class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
                           selected: autoMix,
                           onPressed: () async {
                             final next = !autoMix;
-                            ref.read(settingsProvider.notifier).setAutoMix(next);
+                            ref
+                                .read(settingsProvider.notifier)
+                                .setAutoMix(next);
                             if (next) {
-                              final reordered =
-                                  await controller.orderUpcomingQueueByBpm();
+                              final reordered = await controller
+                                  .orderUpcomingQueueByBpm();
                               if (context.mounted && reordered) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text(context.l10n.djQueueBpmMatched),
+                                    content: Text(
+                                      context.l10n.djQueueBpmMatched,
+                                    ),
                                   ),
                                 );
                               }
@@ -295,14 +303,15 @@ class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
                           label: repeatLabel,
                           selected:
                               playback.repeat != AudioServiceRepeatMode.none,
-                          onPressed: () =>
-                              controller.setRepeatMode(switch (playback.repeat) {
-                                AudioServiceRepeatMode.none =>
-                                  AudioServiceRepeatMode.all,
-                                AudioServiceRepeatMode.all =>
-                                  AudioServiceRepeatMode.one,
-                                _ => AudioServiceRepeatMode.none,
-                              }),
+                          onPressed: () => controller.setRepeatMode(
+                            switch (playback.repeat) {
+                              AudioServiceRepeatMode.none =>
+                                AudioServiceRepeatMode.all,
+                              AudioServiceRepeatMode.all =>
+                                AudioServiceRepeatMode.one,
+                              _ => AudioServiceRepeatMode.none,
+                            },
+                          ),
                         ),
                         const SizedBox(width: 12),
                         modeButton(
@@ -326,10 +335,9 @@ class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.5),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.5),
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -349,8 +357,8 @@ class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         onPressed: () async {
-                          final reordered =
-                              await controller.orderUpcomingQueueByBpm();
+                          final reordered = await controller
+                              .orderUpcomingQueueByBpm();
                           if (context.mounted && reordered) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -403,8 +411,10 @@ class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               sliver: SliverReorderableList(
                 itemCount: count,
-                onReorderItem: (oldIndex, newIndex) =>
-                    controller.moveQueueItem(start + oldIndex, start + newIndex),
+                onReorderItem: (oldIndex, newIndex) => controller.moveQueueItem(
+                  start + oldIndex,
+                  start + newIndex,
+                ),
                 proxyDecorator: (child, index, animation) => Material(
                   color: widget.colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(12),
@@ -416,8 +426,9 @@ class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
                     key: ObjectKey(item),
                     onRemove: () => controller.removeQueuedItem(item),
                     child: ListTile(
-                      contentPadding:
-                          const EdgeInsetsDirectional.only(start: 12),
+                      contentPadding: const EdgeInsetsDirectional.only(
+                        start: 12,
+                      ),
                       minVerticalPadding: 6,
                       leading: ClipRRect(
                         borderRadius: BorderRadius.circular(5),
@@ -494,43 +505,41 @@ class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final item = playedEarlier[index];
-                      final origIndex = currentIndex - 1 - index;
-                      return ListTile(
-                        contentPadding:
-                            const EdgeInsetsDirectional.only(start: 12),
-                        minVerticalPadding: 6,
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(5),
-                          child: SizedBox.square(
-                            dimension: 40,
-                            child: PlayerQueueArtwork(
-                              item: item,
-                              colorScheme: widget.colorScheme,
-                              cacheWidth: 120,
-                              iconSize: 22,
-                            ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final item = playedEarlier[index];
+                    final origIndex = currentIndex - 1 - index;
+                    return ListTile(
+                      contentPadding: const EdgeInsetsDirectional.only(
+                        start: 12,
+                      ),
+                      minVerticalPadding: 6,
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(5),
+                        child: SizedBox.square(
+                          dimension: 40,
+                          child: PlayerQueueArtwork(
+                            item: item,
+                            colorScheme: widget.colorScheme,
+                            cacheWidth: 120,
+                            iconSize: 22,
                           ),
                         ),
-                        title: Text(
-                          item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: type.bodyLarge?.copyWith(color: Colors.white),
-                        ),
-                        subtitle: Text(
-                          item.artist ?? '',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: type.bodySmall?.copyWith(color: Colors.white70),
-                        ),
-                        onTap: () => controller.jumpTo(origIndex),
-                      );
-                    },
-                    childCount: playedEarlier.length,
-                  ),
+                      ),
+                      title: Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: type.bodyLarge?.copyWith(color: Colors.white),
+                      ),
+                      subtitle: Text(
+                        item.artist ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: type.bodySmall?.copyWith(color: Colors.white70),
+                      ),
+                      onTap: () => controller.jumpTo(origIndex),
+                    );
+                  }, childCount: playedEarlier.length),
                 ),
               ),
             ],
@@ -553,54 +562,53 @@ class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final item = historyItems[index];
-                      return ListTile(
-                        contentPadding:
-                            const EdgeInsetsDirectional.only(start: 12),
-                        minVerticalPadding: 6,
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(5),
-                          child: SizedBox.square(
-                            dimension: 40,
-                            child: item.coverUrl != null &&
-                                    item.coverUrl!.isNotEmpty
-                                ? CachedCoverImage(
-                                    imageUrl: item.coverUrl!,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Container(
-                                    color: widget.colorScheme.surfaceContainerHigh,
-                                    child: const Icon(
-                                      CupertinoIcons.music_note,
-                                      color: Colors.white54,
-                                      size: 20,
-                                    ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final item = historyItems[index];
+                    return ListTile(
+                      contentPadding: const EdgeInsetsDirectional.only(
+                        start: 12,
+                      ),
+                      minVerticalPadding: 6,
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(5),
+                        child: SizedBox.square(
+                          dimension: 40,
+                          child:
+                              item.coverUrl != null && item.coverUrl!.isNotEmpty
+                              ? CachedCoverImage(
+                                  imageUrl: item.coverUrl!,
+                                  fit: BoxFit.cover,
+                                )
+                              : Container(
+                                  color:
+                                      widget.colorScheme.surfaceContainerHigh,
+                                  child: const Icon(
+                                    CupertinoIcons.music_note,
+                                    color: Colors.white54,
+                                    size: 20,
                                   ),
-                          ),
+                                ),
                         ),
-                        title: Text(
-                          item.trackName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: type.bodyLarge?.copyWith(color: Colors.white),
-                        ),
-                        subtitle: Text(
-                          item.artistName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: type.bodySmall?.copyWith(color: Colors.white70),
-                        ),
-                        onTap: () {
-                          ref
-                              .read(playbackProvider.notifier)
-                              .playHistoryQueue(historyItems, startItem: item);
-                        },
-                      );
-                    },
-                    childCount: historyItems.length,
-                  ),
+                      ),
+                      title: Text(
+                        item.trackName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: type.bodyLarge?.copyWith(color: Colors.white),
+                      ),
+                      subtitle: Text(
+                        item.artistName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: type.bodySmall?.copyWith(color: Colors.white70),
+                      ),
+                      onTap: () {
+                        ref
+                            .read(playbackProvider.notifier)
+                            .playHistoryQueue(historyItems, startItem: item);
+                      },
+                    );
+                  }, childCount: historyItems.length),
                 ),
               ),
             ],

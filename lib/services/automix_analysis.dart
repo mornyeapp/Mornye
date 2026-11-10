@@ -85,7 +85,9 @@ AutoMixBeatGrid analyzeAutoMixPcm(Uint8List pcm) {
   final lastAudible = energy.lastIndexWhere(
     (e) => e > math.max(0.00001, peakEnergy * 0.002),
   );
-  final lastSound = lastAudible >= 0 ? lastAudible / framesPerSecond : frames / framesPerSecond;
+  final lastSound = lastAudible >= 0
+      ? lastAudible / framesPerSecond
+      : frames / framesPerSecond;
   // Suppress slow volume changes and constant noise before finding the pulse.
   final prefix = Float64List(frames + 1);
   for (var i = 0; i < frames; i++) {
@@ -227,6 +229,7 @@ class AutoMixPlan {
     this.fallbackReason,
     this.assisted = false,
     this.beatPeriod = Duration.zero,
+    this.harmonicPitchShift = 0.0,
   });
 
   final Duration start;
@@ -237,6 +240,7 @@ class AutoMixPlan {
   final AutoMixFallbackReason? fallbackReason;
   final bool assisted;
   final Duration beatPeriod;
+  final double harmonicPitchShift;
 
   AutoMixPlan withoutBeatMatching() => AutoMixPlan(
     start: start,
@@ -245,6 +249,7 @@ class AutoMixPlan {
     rate: 1,
     beatMatched: false,
     fallbackReason: AutoMixFallbackReason.alignmentUnverified,
+    harmonicPitchShift: harmonicPitchShift,
   );
 
   static AutoMixPlan? create({
@@ -254,6 +259,8 @@ class AutoMixPlan {
     AutoMixBeatGrid? intro,
     double outroOffset = 0,
     AutoMixOptions options = const AutoMixOptions(),
+    int? outgoingKey,
+    int? incomingKey,
   }) {
     final end = outgoingDuration.inMicroseconds / 1e6;
     final nextLength = incomingDuration.inMicroseconds / 1e6;
@@ -295,7 +302,7 @@ class AutoMixPlan {
       // The detector measures leading silence, not the length of a musical
       // intro. A quiet lead-in should not disable an otherwise reliable mix.
       // Bound the trim so an uncertain/very late onset still uses crossfade.
-      if ((candidate - 1).abs() > 0.08) {
+      if ((candidate - 1).abs() > 0.15) {
         fallbackReason = AutoMixFallbackReason.incompatibleTempo;
       } else if (firstBeat > math.min(12, nextLength * 0.1)) {
         fallbackReason = AutoMixFallbackReason.longIntro;
@@ -308,11 +315,25 @@ class AutoMixPlan {
         final phase = outroOffset + outgoing.phase;
         start =
             phase +
-            ((audibleEnd - fade - phase) / outgoing.period).floor() * outgoing.period;
+            ((audibleEnd - fade - phase) / outgoing.period).floor() *
+                outgoing.period;
         incomingStart = firstBeat;
         matched = true;
       }
     }
+    var harmonicShift = 0.0;
+    if (outgoingKey != null &&
+        incomingKey != null &&
+        outgoingKey >= 0 &&
+        incomingKey >= 0) {
+      var diff = (outgoingKey - incomingKey) % 12;
+      if (diff > 6) diff -= 12;
+      if (diff < -6) diff += 12;
+      if (diff.abs() <= 2) {
+        harmonicShift = diff.toDouble();
+      }
+    }
+
     return AutoMixPlan(
       start: Duration(microseconds: (start * 1e6).round()),
       incomingStart: Duration(microseconds: (incomingStart * 1e6).round()),
@@ -336,12 +357,13 @@ class AutoMixPlan {
       beatPeriod: matched
           ? Duration(microseconds: (outro!.period * 1e6).round())
           : Duration.zero,
+      harmonicPitchShift: harmonicShift,
     );
   }
 }
 
-/// Equal-power gain ramps; tempo returns gradually after the outgoing song ends.
-({double outgoing, double incoming, double rate, bool complete})
+/// Equal-power gain ramps; tempo and pitch return gradually after the outgoing song ends.
+({double outgoing, double incoming, double rate, double pitch, bool complete})
 autoMixEnvelope(Duration elapsed, AutoMixPlan plan, {Duration? fadeDuration}) {
   final duration = fadeDuration ?? plan.duration;
   final t = (elapsed.inMicroseconds / duration.inMicroseconds).clamp(0.0, 1.0);
@@ -350,10 +372,14 @@ autoMixEnvelope(Duration elapsed, AutoMixPlan plan, {Duration? fadeDuration}) {
     1.0,
   );
   final smooth = recovery * recovery * (3 - 2 * recovery);
+  final pitchRatio = math.pow(2, plan.harmonicPitchShift / 12).toDouble();
   return (
     outgoing: math.cos(t * math.pi / 2),
     incoming: math.sin(t * math.pi / 2),
     rate: plan.rate + (1 - plan.rate) * smooth,
-    complete: recovery >= 1 || (t >= 1 && plan.rate == 1),
+    pitch: pitchRatio + (1.0 - pitchRatio) * smooth,
+    complete:
+        recovery >= 1 ||
+        (t >= 1 && plan.rate == 1 && plan.harmonicPitchShift == 0),
   );
 }

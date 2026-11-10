@@ -106,6 +106,8 @@ class FakeMpvEngine implements MpvEngine, MpvPlaylistEngine {
   Future<void> setVolume(double volume) async => this.volume = volume;
   @override
   Future<void> setSpeed(double speed) async => calls.add(['speed', '$speed']);
+  @override
+  Future<void> setPitch(double pitch) async => calls.add(['pitch', '$pitch']);
 
   /// libavfilter filters this libmpv lacks; mpv rejects `lavfi-NAME`.
   Set<String> missingFilters = {};

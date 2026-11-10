@@ -44,6 +44,18 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
       _includeCollections ||
       _includeExtensions;
 
+  Future<void> _quickOneClickBackup() async {
+    if (_isBusy) return;
+    setState(() {
+      _includeSettings = true;
+      _includeHistory = true;
+      _includeCollections = true;
+      _includeExtensions = true;
+      _includeSecrets = false;
+    });
+    await _createBackup();
+  }
+
   Future<void> _createBackup() async {
     if (_isBusy || !_hasSelection) return;
     setState(() => _isExporting = true);
@@ -262,6 +274,33 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
       body: CustomScrollView(
         slivers: [
           AppSliverHeader.page(title: l10n.backupTitle),
+          ...settingsSectionSlivers(
+            title: '1-Click Backup & Restore (.mornye-backup)',
+            children: [
+              SettingsItem(
+                icon: Icons.offline_bolt_rounded,
+                title: 'Backup Rapido in 1 Clic',
+                subtitle:
+                    'Salva istantaneamente playlist, preferiti e impostazioni in un file .mornye-backup',
+                onTap: _isBusy ? null : _quickOneClickBackup,
+                trailing: _isExporting
+                    ? const AppLoadingIndicator(size: 20, strokeWidth: 2)
+                    : null,
+                showDivider: true,
+              ),
+              SettingsItem(
+                icon: Icons.restore_page_rounded,
+                title: 'Ripristina Archivio (.mornye-backup)',
+                subtitle:
+                    'Seleziona un file .mornye-backup per ripristinare i tuoi dati',
+                onTap: _isBusy ? null : _restoreBackup,
+                trailing: _isImporting
+                    ? const AppLoadingIndicator(size: 20, strokeWidth: 2)
+                    : null,
+                showDivider: false,
+              ),
+            ],
+          ),
           ...settingsSectionSlivers(
             title: l10n.backupExportSectionTitle,
             children: [

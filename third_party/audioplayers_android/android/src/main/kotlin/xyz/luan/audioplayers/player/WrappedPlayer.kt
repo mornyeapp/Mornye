@@ -59,6 +59,7 @@ class WrappedPlayer internal constructor(
     private fun continueAfterPrevious() {
         if (released || !prepared || playing) return
         playing = true
+        player?.setVolumeAndBalance(volume, balance)
         requestFocusAndStart()
     }
 
@@ -85,21 +86,17 @@ class WrappedPlayer internal constructor(
 
     var volume = 1.0f
         set(value) {
-            if (field != value) {
-                field = value
-                if (!released) {
-                    player?.setVolumeAndBalance(value, balance)
-                }
+            field = value
+            if (!released) {
+                player?.setVolumeAndBalance(value, balance)
             }
         }
 
     var balance = 0.0f
         set(value) {
-            if (field != value) {
-                field = value
-                if (!released) {
-                    player?.setVolumeAndBalance(volume, value)
-                }
+            field = value
+            if (!released) {
+                player?.setVolumeAndBalance(volume, value)
             }
         }
 
@@ -109,6 +106,16 @@ class WrappedPlayer internal constructor(
                 field = value
                 if (playing) {
                     player?.setRate(value)
+                }
+            }
+        }
+
+    var pitch = 1.0f
+        set(value) {
+            if (field != value) {
+                field = value
+                if (playing) {
+                    player?.setPitch(value)
                 }
             }
         }
@@ -329,6 +336,7 @@ class WrappedPlayer internal constructor(
      */
     fun onPrepared() {
         prepared = true
+        player?.setVolumeAndBalance(volume, balance)
         ref.handleDuration(this)
         if (playing) {
             requestFocusAndStart()

@@ -1137,24 +1137,27 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 content = Text(
                   line.text,
                   textAlign: textAlign,
-                  style: _primaryLyricStyle(
-                    context,
-                    background: line.isBackground,
-                  ).copyWith(
-                    color: color,
-                    shadows: mornye && isActive
-                        ? [
-                            Shadow(
-                              color: widget.colorScheme.primary.withValues(alpha: 0.75),
-                              blurRadius: 18,
-                            ),
-                            const Shadow(
-                              color: Colors.white38,
-                              blurRadius: 6,
-                            ),
-                          ]
-                        : null,
-                  ),
+                  style:
+                      _primaryLyricStyle(
+                        context,
+                        background: line.isBackground,
+                      ).copyWith(
+                        color: color,
+                        shadows: mornye && isActive
+                            ? [
+                                Shadow(
+                                  color: widget.colorScheme.primary.withValues(
+                                    alpha: 0.75,
+                                  ),
+                                  blurRadius: 18,
+                                ),
+                                const Shadow(
+                                  color: Colors.white38,
+                                  blurRadius: 6,
+                                ),
+                              ]
+                            : null,
+                      ),
                 );
                 content = _withLyricSupplements(
                   context,

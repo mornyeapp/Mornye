@@ -84,6 +84,7 @@ class _MusicAutoMix {
       !handler._userPaused &&
       !handler._interruptionActive &&
       handler._player.state == PlaybackDeckState.playing &&
+      !handler.isSleepTimerEndOfTrack &&
       handler._repeatMode != AudioServiceRepeatMode.one &&
       handler._media.length > 1;
 
@@ -207,6 +208,22 @@ class _MusicAutoMix {
       if (!_current(generation)) return;
       final intro = await analyzer.analyzeTransition(nextPath);
       if (!_current(generation)) return;
+      int? outgoingKey;
+      int? incomingKey;
+      try {
+        final featMap = await SongAnalysisStore().features([
+          currentPath,
+          nextPath,
+        ]);
+        final outFeat = featMap[currentPath];
+        final inFeat = featMap[nextPath];
+        if (outFeat != null && outFeat[SongFeatures.keyStrength] >= 0.3) {
+          outgoingKey = outFeat[SongFeatures.key].round();
+        }
+        if (inFeat != null && inFeat[SongFeatures.keyStrength] >= 0.3) {
+          incomingKey = inFeat[SongFeatures.key].round();
+        }
+      } catch (_) {}
       final plan = AutoMixPlan.create(
         outgoingDuration: duration,
         incomingDuration: nextDuration,
@@ -214,10 +231,16 @@ class _MusicAutoMix {
         intro: intro,
         outroOffset: offset,
         options: options,
+        outgoingKey: outgoingKey,
+        incomingKey: incomingKey,
       );
       if (plan == null) return;
       await deck.seek(plan.incomingStart);
       await deck.setPlaybackRate(plan.rate);
+      if (plan.harmonicPitchShift != 0) {
+        final pitchRatio = pow(2, plan.harmonicPitchShift / 12).toDouble();
+        await deck.setPitch(pitchRatio);
+      }
       final volume = await handler._normalizationVolumeFor(
         nextPath,
         cacheKey: next.isContentUri ? next.source : null,
@@ -548,6 +571,9 @@ class _MusicAutoMix {
               await incoming.setPlaybackRate(targetRate);
               rate = targetRate;
             }
+            if (transition.harmonicPitchShift != 0) {
+              await incoming.setPitch(levels.pitch);
+            }
             if (generation != _generation) return;
             if (dry != null && progress >= 1) {
               _effectDry = null;
@@ -566,6 +592,10 @@ class _MusicAutoMix {
               _fadeTimer?.cancel();
               _fadeTimer = null;
               rate = 1;
+              if (transition.harmonicPitchShift != 0) {
+                await incoming.setPitch(1.0);
+              }
+              await incoming.setVolume(_incomingVolume);
               _mixPins.clear();
               await handler._cleanupPendingResolvedPaths();
               handler._broadcastState();

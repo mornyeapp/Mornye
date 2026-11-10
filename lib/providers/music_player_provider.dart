@@ -568,8 +568,10 @@ class MusicPlayerController {
   Future<void> setRepeatMode(AudioServiceRepeatMode mode) async =>
       remote?.setRepeatMode(mode) ?? _handler?.setRepeatMode(mode);
 
-  Future<void> setSpeed(double speed) async =>
-      _handler?.setSpeed(speed);
+  Future<void> setSpeed(double speed) async => _handler?.setSpeed(speed);
+
+  Future<void> setPitch(double semitones) async =>
+      _handler?.setPitch(semitones);
 
   Future<void> playNext(PlayableMedia item) async {
     if (remote case final remote?) {

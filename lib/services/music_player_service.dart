@@ -38,6 +38,8 @@ import 'package:mornye/services/automix_phase_lock.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
 import 'package:mornye/services/autoplay_signal.dart';
 import 'package:mornye/services/automix_analyzer.dart';
+import 'package:mornye/services/song_analysis_store.dart';
+import 'package:mornye/services/song_features.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/automix_effect_renderer.dart';
 import 'package:mornye/services/automix_status.dart';
@@ -180,6 +182,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void>? _activePlayOperation;
   Future<void> _sourceChangeTail = Future<void>.value();
   Timer? _sleepTimer;
+  Timer? _sleepFadeTimer;
   Timer? _listeningTimer;
   DateTime? _sleepTimerEndsAt;
   bool _sleepTimerEndOfTrack = false;
@@ -822,29 +825,95 @@ class MusicPlayerHandler extends BaseAudioHandler
   void setSleepTimer(Duration duration) {
     if (duration <= Duration.zero) return;
     _sleepTimer?.cancel();
+    _sleepFadeTimer?.cancel();
+    _sleepFadeTimer = null;
     _sleepTimerEndOfTrack = false;
-    _sleepTimerEndsAt = DateTime.now().add(duration);
-    _sleepTimer = Timer(duration, () {
+    final now = DateTime.now();
+    _sleepTimerEndsAt = now.add(duration);
+
+    // Fade out volume smoothly in the final window (up to 30s, or 35% of duration if duration < 45s)
+    final fadeDuration = duration > const Duration(seconds: 45)
+        ? const Duration(seconds: 30)
+        : Duration(milliseconds: (duration.inMilliseconds * 0.35).round());
+
+    final fadeDelay = duration - fadeDuration;
+    if (fadeDelay > Duration.zero) {
+      _sleepFadeTimer = Timer(fadeDelay, () {
+        _startSleepVolumeFade(fadeDuration);
+      });
+    } else {
+      _startSleepVolumeFade(fadeDuration);
+    }
+
+    _sleepTimer = Timer(duration, () async {
+      _sleepFadeTimer?.cancel();
+      _sleepFadeTimer = null;
       _sleepTimer = null;
       _sleepTimerEndsAt = null;
       if (_disposed) return;
-      _log.i('Sleep timer elapsed; pausing playback');
+      _log.i('Sleep timer elapsed; pausing playback with fade-out complete');
       unawaited(pause());
+      try {
+        await _player.setVolume(_normalizationVolume);
+      } catch (_) {}
+      _broadcastState();
+    });
+    _broadcastState();
+  }
+
+  void _startSleepVolumeFade(Duration fadeDuration) {
+    _sleepFadeTimer?.cancel();
+    if (_disposed || fadeDuration <= Duration.zero) return;
+    final startVolume = _normalizationVolume;
+    final startTime = DateTime.now();
+    final endTime = startTime.add(fadeDuration);
+
+    const interval = Duration(milliseconds: 250);
+    _sleepFadeTimer = Timer.periodic(interval, (timer) {
+      if (_disposed || _sleepTimerEndsAt == null) {
+        timer.cancel();
+        return;
+      }
+      final now = DateTime.now();
+      if (now.isAfter(endTime)) {
+        timer.cancel();
+        unawaited(_player.setVolume(0.0));
+        return;
+      }
+      final elapsed = now.difference(startTime).inMilliseconds;
+      final total = fadeDuration.inMilliseconds;
+      final progress = (elapsed / total).clamp(0.0, 1.0);
+      final currentVol = (startVolume * (1.0 - progress)).clamp(0.0, 1.0);
+      unawaited(_player.setVolume(currentVol));
     });
   }
 
   void setSleepTimerEndOfTrack() {
     _sleepTimer?.cancel();
+    _sleepFadeTimer?.cancel();
+    _sleepFadeTimer = null;
     _sleepTimer = null;
     _sleepTimerEndsAt = null;
     _sleepTimerEndOfTrack = true;
+    try {
+      unawaited(_player.setVolume(_normalizationVolume));
+    } catch (_) {}
+    unawaited(_gapless.cancel());
+    unawaited(_autoMix.cancel());
+    _broadcastState();
   }
 
   void cancelSleepTimer() {
     _sleepTimer?.cancel();
+    _sleepFadeTimer?.cancel();
+    _sleepFadeTimer = null;
     _sleepTimer = null;
     _sleepTimerEndsAt = null;
     _sleepTimerEndOfTrack = false;
+    try {
+      unawaited(_player.setVolume(_normalizationVolume));
+    } catch (_) {}
+    _broadcastState();
   }
 
   Future<bool> _activateAudioSession(int generation) async {
@@ -1062,6 +1131,21 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   void _handlePositionChanged(Duration position) {
     if (!_sourceReady || _switchingGeneration != 0) return;
+    if (_sleepTimerEndsAt != null &&
+        DateTime.now().isAfter(_sleepTimerEndsAt!)) {
+      _sleepTimer?.cancel();
+      _sleepFadeTimer?.cancel();
+      _sleepFadeTimer = null;
+      _sleepTimer = null;
+      _sleepTimerEndsAt = null;
+      _log.i('Sleep timer elapsed during position tick; pausing playback');
+      try {
+        unawaited(_player.setVolume(_normalizationVolume));
+      } catch (_) {}
+      unawaited(pause());
+      _broadcastState();
+      return;
+    }
     final readAt = _positionQueriedAt;
     _positionQueriedAt = null;
     _positionCheckDue = false;
@@ -1684,6 +1768,7 @@ class MusicPlayerHandler extends BaseAudioHandler
           final diffDouble = (bpm * 0.5 - currentBpm).abs();
           return min(diff, min(diffHalf, diffDouble));
         }
+
         return dist(a.bpm).compareTo(dist(b.bpm));
       });
       final best = remaining.removeAt(0);
@@ -1691,10 +1776,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       currentBpm = best.bpm;
     }
 
-    final newQueue = [
-      ..._media.sublist(0, _index + 1),
-      ...sorted,
-    ];
+    final newQueue = [..._media.sublist(0, _index + 1), ...sorted];
     updateQueuePreservingCurrent(newQueue, _index);
     return true;
   }
@@ -1819,6 +1901,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       await _player.seek(position);
       if (!_isCurrentPlayRequest(generation, media)) return path;
     }
+    await _player.setVolume(_normalizationVolume);
     if (!startPaused) await _player.resume();
     if (!_isCurrentPlayRequest(generation, media)) await _player.pause();
     return path;
@@ -1977,6 +2060,13 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (!_isCurrentPlayRequest(generation, media)) return;
       await _player.setVolume(normalizationVolume);
       _normalizationVolume = normalizationVolume;
+      if (_settings.playbackSpeed != 1.0) {
+        await _player.setPlaybackRate(_settings.playbackSpeed);
+      }
+      if (_settings.playbackPitch != 0.0) {
+        final multiplier = pow(2.0, _settings.playbackPitch / 12.0).toDouble();
+        await _player.setPitch(multiplier);
+      }
       if (!_isCurrentPlayRequest(generation, media)) return;
       final startAt = effectiveStartPosition > Duration.zero
           ? effectiveStartPosition
@@ -2240,6 +2330,27 @@ class MusicPlayerHandler extends BaseAudioHandler
       return;
     }
 
+    final duration = mediaItem.value?.duration;
+    final deckPos = await _player.getCurrentPosition();
+    final statePos = playbackState.value.position;
+    final pos = (deckPos != null && deckPos > Duration.zero)
+        ? deckPos
+        : statePos;
+    if (duration != null &&
+        duration > const Duration(seconds: 15) &&
+        pos < duration - const Duration(seconds: 8) &&
+        pos > const Duration(seconds: 2)) {
+      _log.w(
+        'Premature completion event received at $pos of $duration; ignoring',
+      );
+      if (playbackState.value.playing) {
+        unawaited(
+          _player.seek(pos).then((_) => _player.resume()).catchError((_) {}),
+        );
+      }
+      return;
+    }
+
     _completing = true;
     try {
       _runtime.personalization.finish();
@@ -2361,6 +2472,11 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> setSpeed(double speed) async {
     await _player.setPlaybackRate(speed);
     playbackState.add(playbackState.value.copyWith(speed: speed));
+  }
+
+  Future<void> setPitch(double semitones) async {
+    final multiplier = pow(2.0, semitones / 12.0).toDouble();
+    await _player.setPitch(multiplier);
   }
 
   @override
@@ -2673,6 +2789,15 @@ class MusicPlayerHandler extends BaseAudioHandler
     // An edited network file must not play from its copy before the edit.
     await _prefetch.invalidate(source);
     if (_disposed || !_media.any((item) => item.source == source)) return;
+    final currentItem = mediaItem.value;
+    final isCurrentPlayingSaf =
+        source.startsWith('content://') &&
+        currentItem?.extras?['source'] == source &&
+        playbackState.value.playing;
+    if (isCurrentPlayingSaf) {
+      _log.d('Skipping SAF metadata probe on actively playing track $source');
+      return;
+    }
     final token = Object();
     _metadataChanges[source] = token;
     try {

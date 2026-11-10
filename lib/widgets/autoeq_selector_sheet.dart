@@ -64,7 +64,9 @@ class _AutoEqSelectorContentState
         setState(() {
           _customProfiles.insert(0, profile);
         });
-        ref.read(equalizerProvider.notifier).applyPreset(profile.toEqualizerPreset());
+        ref
+            .read(equalizerProvider.notifier)
+            .applyPreset(profile.toEqualizerPreset());
         if (mounted) {
           showAppSnackBar(
             context,
@@ -97,9 +99,11 @@ class _AutoEqSelectorContentState
     final isMornye = context.isMornye;
 
     final results = [
-      ..._customProfiles.where((p) =>
-          _query.isEmpty ||
-          p.displayName.toLowerCase().contains(_query.toLowerCase())),
+      ..._customProfiles.where(
+        (p) =>
+            _query.isEmpty ||
+            p.displayName.toLowerCase().contains(_query.toLowerCase()),
+      ),
       ...AutoEqDatabase.search(_query, brand: _selectedBrand),
     ];
 
@@ -122,7 +126,9 @@ class _AutoEqSelectorContentState
                       hintText: 'Cerca cuffie (es. AirPods, Sony, HD 600...)',
                       hintStyle: TextStyle(
                         fontSize: 13,
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                        color: colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.7,
+                        ),
                       ),
                       prefixIcon: const Icon(Icons.search, size: 20),
                       suffixIcon: _query.isNotEmpty
@@ -136,7 +142,9 @@ class _AutoEqSelectorContentState
                       filled: true,
                       fillColor: isMornye
                           ? Colors.white.withValues(alpha: 0.08)
-                          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          : colorScheme.surfaceContainerHighest.withValues(
+                              alpha: 0.5,
+                            ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 0,
@@ -218,10 +226,14 @@ class _AutoEqSelectorContentState
                 )
               : ListView.separated(
                   itemCount: results.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1, indent: 64),
+                  separatorBuilder: (_, _) =>
+                      const Divider(height: 1, indent: 64),
                   itemBuilder: (context, index) {
                     final profile = results[index];
-                    final isApplied = _isProfileApplied(profile, eqState.settings);
+                    final isApplied = _isProfileApplied(
+                      profile,
+                      eqState.settings,
+                    );
 
                     return ListTile(
                       leading: CircleAvatar(
@@ -241,7 +253,9 @@ class _AutoEqSelectorContentState
                         profile.displayName,
                         style: TextStyle(
                           fontSize: 15,
-                          fontWeight: isApplied ? FontWeight.w700 : FontWeight.w600,
+                          fontWeight: isApplied
+                              ? FontWeight.w700
+                              : FontWeight.w600,
                           color: isApplied ? colorScheme.primary : null,
                         ),
                       ),
@@ -254,7 +268,9 @@ class _AutoEqSelectorContentState
                             ),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(4),
-                              color: colorScheme.onSurface.withValues(alpha: 0.08),
+                              color: colorScheme.onSurface.withValues(
+                                alpha: 0.08,
+                              ),
                             ),
                             child: Text(
                               profile.type,
@@ -279,7 +295,9 @@ class _AutoEqSelectorContentState
                             gains: profile.gains,
                             color: isApplied
                                 ? colorScheme.primary
-                                : colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                                : colorScheme.onSurfaceVariant.withValues(
+                                    alpha: 0.6,
+                                  ),
                           ),
                         ),
                       ),
@@ -289,7 +307,9 @@ class _AutoEqSelectorContentState
                             .applyPreset(profile.toEqualizerPreset());
                         showAppSnackBar(
                           context,
-                          content: Text('AutoEq applicato: ${profile.displayName}'),
+                          content: Text(
+                            'AutoEq applicato: ${profile.displayName}',
+                          ),
                         );
                         Navigator.pop(context);
                       },
@@ -301,7 +321,10 @@ class _AutoEqSelectorContentState
     );
   }
 
-  bool _isProfileApplied(AutoEqProfile profile, EqualizerSettings currentSettings) {
+  bool _isProfileApplied(
+    AutoEqProfile profile,
+    EqualizerSettings currentSettings,
+  ) {
     if (currentSettings.gains.length != profile.gains.length) return false;
     for (var i = 0; i < profile.gains.length; i++) {
       if ((currentSettings.gains[i] - profile.gains[i]).abs() > 0.1) {

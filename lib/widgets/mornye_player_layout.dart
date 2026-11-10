@@ -456,9 +456,15 @@ class MornyePlayerLayout extends ConsumerWidget {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (ref.watch(settingsProvider.select((s) => s.realtimeVisualizer)) && page == 0)
+                if (ref.watch(
+                      settingsProvider.select((s) => s.realtimeVisualizer),
+                    ) &&
+                    page == 0)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 4,
+                    ),
                     child: RealtimeAudioVisualizer(
                       isPlaying: ref.watch(playbackPlayingProvider),
                       accentColor: colorScheme.primary,

@@ -43,6 +43,7 @@ class _PitchTempoControlSheetState
   void _applyPitch(double pitch) {
     setState(() => _pitch = pitch);
     ref.read(settingsProvider.notifier).setPlaybackPitch(pitch);
+    ref.read(musicPlayerControllerProvider).setPitch(pitch);
   }
 
   @override

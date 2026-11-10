@@ -174,6 +174,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
        _nativeAvailable = nativeAvailable ?? Platform.isAndroid {
     playbackEqualizer.addListener(_equalizerChanged);
     playbackOutputVolume.addListener(_outputVolumeChanged);
+    unawaited(_ordinary.setVolume(_gain * playbackOutputVolume.value));
     _subscriptions.addAll([
       _ordinary.onPlayerStateChanged.listen((value) {
         if (!_direct) _states.add(_deckState(value));
@@ -360,9 +361,24 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     );
   }
 
+  double _pitch = 1.0;
+
   @override
   Future<void> setPlaybackRate(double rate) async {
     if (!_direct) await _ordinary.setPlaybackRate(rate);
+  }
+
+  @override
+  Future<void> setPitch(double pitch) async {
+    _pitch = pitch;
+    if (!_direct) {
+      try {
+        await _effects.invokeMethod<void>('setPitch', {
+          'playerId': _ordinary.playerId,
+          'pitch': pitch,
+        });
+      } catch (_) {}
+    }
   }
 
   @override
@@ -498,6 +514,9 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
       }
     }
     if (abandoned.isCompleted) return;
+    if (!_disposed && !_direct) {
+      await _ordinary.setVolume(_gain * playbackOutputVolume.value);
+    }
     await _syncEqualizer();
   }
 
@@ -579,6 +598,9 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
 
       checkError();
       await _ordinary.resume();
+      if (_pitch != 1.0) {
+        unawaited(setPitch(_pitch));
+      }
       checkError();
       return;
     }

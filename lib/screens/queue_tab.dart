@@ -77,6 +77,8 @@ import 'package:mornye/services/album_completeness.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/services/batch_track_actions.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
+import 'package:mornye/screens/smart_playlist_screen.dart';
+import 'package:mornye/services/smart_playlists_service.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/screens/listening_rewind_screen.dart';
 import 'package:mornye/screens/favorite_artists_screen.dart';

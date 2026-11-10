@@ -74,6 +74,8 @@ class _CompletingMockDeck implements PlaybackDeck {
   @override
   Future<void> setPlaybackRate(double rate) async {}
   @override
+  Future<void> setPitch(double pitch) async {}
+  @override
   Future<void> setNetworkSource(String url, {bool arriving = false}) async {}
   @override
   Future<bool> setNextDeck(PlaybackDeck? next) async => true;
@@ -139,4 +141,24 @@ void main() {
     handler.cancelSleepTimer();
     expect(handler.isSleepTimerEndOfTrack, isFalse);
   });
+
+  test(
+    'setSleepTimer initiates smooth fade-out and can be cancelled',
+    () async {
+      final runtime = MusicPlayerRuntime(
+        dependencies: PlaybackDependencies(
+          createDeck: (_) => _CompletingMockDeck(),
+        ),
+      );
+      final handler = MusicPlayerHandler(runtime: runtime);
+
+      expect(handler.sleepTimerEndsAt, isNull);
+      handler.setSleepTimer(const Duration(minutes: 15));
+      expect(handler.sleepTimerEndsAt, isNotNull);
+      expect(handler.sleepTimerEndsAt!.isAfter(DateTime.now()), isTrue);
+
+      handler.cancelSleepTimer();
+      expect(handler.sleepTimerEndsAt, isNull);
+    },
+  );
 }

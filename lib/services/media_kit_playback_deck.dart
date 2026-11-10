@@ -36,6 +36,7 @@ abstract interface class MpvEngine {
   /// mpv's `volume` property, 0 to 100 on a cubic curve.
   Future<void> setVolume(double volume);
   Future<void> setSpeed(double speed);
+  Future<void> setPitch(double pitch);
 
   /// Returns the mpv error code: negative on failure.
   Future<int> setProperty(String name, String value);
@@ -174,6 +175,9 @@ class MediaKitEngine implements MpvEngine, MpvPlaylistEngine {
   Future<void> setVolume(double volume) => _player.setVolume(volume);
   @override
   Future<void> setSpeed(double speed) => _player.setRate(speed);
+  @override
+  Future<void> setPitch(double pitch) =>
+      setProperty('pitch', pitch.toStringAsFixed(4));
 
   @override
   Future<int> setProperty(String name, String value) async {
@@ -631,6 +635,14 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   Future<void> setPlaybackRate(double rate) => _engine.setSpeed(rate);
 
   @override
+  Future<void> setPitch(double pitch) {
+    _pitch = pitch;
+    return _engine.setPitch(pitch);
+  }
+
+  double _pitch = 1.0;
+
+  @override
   Future<void> setNetworkSource(String url, {bool arriving = false}) =>
       _load(url, arriving: arriving);
 
@@ -676,6 +688,9 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     }
     if (_exclusive) {
       playbackExclusiveStatus.value = ExclusiveOutputStatus.active;
+    }
+    if (_pitch != 1.0) {
+      await _engine.setPitch(_pitch);
     }
   }
 

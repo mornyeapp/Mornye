@@ -97,10 +97,7 @@ class _CountUp extends StatelessWidget {
             letterSpacing: -2,
             color: DefaultTextStyle.of(context).style.color,
             shadows: [
-              Shadow(
-                color: primary.withValues(alpha: 0.35),
-                blurRadius: 28,
-              ),
+              Shadow(color: primary.withValues(alpha: 0.35), blurRadius: 28),
             ],
           ),
         ),
@@ -331,12 +328,14 @@ class _RankedRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: isTop3
-            ? (podiumBadge?.withValues(alpha: 0.08) ?? Colors.white.withValues(alpha: 0.06))
+            ? (podiumBadge?.withValues(alpha: 0.08) ??
+                  Colors.white.withValues(alpha: 0.06))
             : Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isTop3
-              ? (podiumBadge?.withValues(alpha: 0.28) ?? Colors.white.withValues(alpha: 0.12))
+              ? (podiumBadge?.withValues(alpha: 0.28) ??
+                    Colors.white.withValues(alpha: 0.12))
               : Colors.white.withValues(alpha: 0.08),
           width: isTop3 ? 1.2 : 0.8,
         ),

@@ -55,6 +55,9 @@ class SongAnalysisStore {
         ),
   );
 
+  /// Opens or retrieves the song analysis database.
+  Future<Database> get database => _open();
+
   static Future<void> _create(Database db, int version) => db.execute('''
     CREATE TABLE song_features (
       path TEXT PRIMARY KEY NOT NULL,

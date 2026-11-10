@@ -46,6 +46,7 @@ class _AutoMixSettingsState extends ConsumerState<AutoMixSettings> {
                     AutoMixEffect.muffled => Icons.graphic_eq,
                     AutoMixEffect.echo => Icons.surround_sound,
                     AutoMixEffect.pitch => Icons.music_note,
+                    AutoMixEffect.vinylBrake => Icons.album,
                     AutoMixEffect.custom => Icons.tune,
                   }),
                   title: Text(names[effect]!),
@@ -81,6 +82,7 @@ class _AutoMixSettingsState extends ConsumerState<AutoMixSettings> {
       AutoMixEffect.muffled: l10n.autoMixEffectMuffled,
       AutoMixEffect.echo: l10n.autoMixEffectEcho,
       AutoMixEffect.pitch: l10n.autoMixEffectPitch,
+      AutoMixEffect.vinylBrake: 'Vinyl Brake',
       AutoMixEffect.custom: l10n.autoMixEffectCustom,
     };
     Widget slider(

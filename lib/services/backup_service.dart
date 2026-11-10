@@ -162,7 +162,7 @@ class BackupService {
   // V3 permits omitted categories. Older readers reject it instead of treating
   // an omitted history as an empty history and clearing existing downloads.
   static const int formatVersion = 3;
-  static const String fileExtension = 'sflb';
+  static const String fileExtension = 'mornye-backup';
   static const int _historyPageSize = 500;
   static const int _maxMetadataBytes = 8 << 20;
   static const int _maxHistoryBytes = 512 << 20;

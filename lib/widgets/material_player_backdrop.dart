@@ -103,20 +103,13 @@ class MaterialPlayerBackdrop extends StatelessWidget {
   }
 }
 
-const _fadeStart = 0.40;
+const _fadeStart = 0.72;
 
 const _fade = LinearGradient(
   begin: Alignment.topCenter,
   end: Alignment.bottomCenter,
-  stops: [0.0, _fadeStart, 0.65, 0.85, 0.94, 1.0],
-  colors: [
-    Colors.white,
-    Colors.white,
-    Color(0xb3ffffff),
-    Color(0x55ffffff),
-    Color(0x10ffffff),
-    Colors.transparent,
-  ],
+  stops: [0, _fadeStart, 1],
+  colors: [Colors.white, Colors.white, Colors.transparent],
 );
 
 /// Top of the band [_fade] changes: a whole device pixel at least one pixel

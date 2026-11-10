@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_metadata.dart';
 import 'package:mornye/services/player_lyrics_persistence.dart';
@@ -39,7 +41,7 @@ class PlayerMetadataController extends ChangeNotifier {
   }) : _readMetadata = readMetadata ?? readPlaybackFileMetadataWithRetry,
        _parseLyrics = parseLyrics ?? LyricsParser.parseAsyncNative,
        _fetchOnline = fetchOnlineLyrics ?? _fetchOnlineLyrics,
-       _saveOnline = saveOnlineLyrics ?? persistPlayerLyrics,
+       _saveOnline = saveOnlineLyrics ?? persistPlayerLyricsSafely,
        _metadataEvents = metadataEvents ?? SourceMetadataEvents.instance {
     _unsubscribeMetadata = _metadataEvents.subscribe((changed) async {
       if (_disposed ||
@@ -140,7 +142,9 @@ class PlayerMetadataController extends ChangeNotifier {
     _savingLyricsSources.add(source);
     try {
       await _saveOnline(source, raw);
-      await _metadataEvents.publish(source);
+      if (!source.startsWith('content://')) {
+        await _metadataEvents.publish(source);
+      }
       if (_disposed || generation != _generation) return;
       _metadata = Map.unmodifiable({...?_metadata, 'lyrics': raw});
       _lyrics = parsed;
@@ -171,7 +175,9 @@ class PlayerMetadataController extends ChangeNotifier {
     _savingLyricsSources.add(source);
     try {
       await _saveOnline(source, raw);
-      await _metadataEvents.publish(source);
+      if (!source.startsWith('content://')) {
+        await _metadataEvents.publish(source);
+      }
     } finally {
       _savingLyricsSources.remove(source);
     }
@@ -182,6 +188,24 @@ class PlayerMetadataController extends ChangeNotifier {
     _onlineSearchMissed = false;
     _onlineLyricsSaveFailed = false;
     notifyListeners();
+  }
+
+  static final Map<String, Map<String, dynamic>> _prefetchedMetadataCache = {};
+
+  /// Pre-fetches file metadata for an upcoming queue item into memory cache.
+  Future<void> prefetch(MediaItem item) async {
+    final source = item.extras?['source']?.toString().trim() ?? '';
+    if (source.isEmpty ||
+        const {'http', 'https'}.contains(Uri.tryParse(source)?.scheme)) {
+      return;
+    }
+    final resolvedSource = item.extras?['resolvedSource']?.toString().trim();
+    final path = _metadataPath(source, resolvedSource);
+    if (_prefetchedMetadataCache.containsKey(path)) return;
+    try {
+      final probed = await _readMetadata(path);
+      _prefetchedMetadataCache[path] = probed;
+    } catch (_) {}
   }
 
   /// Reads deferred file tags when opening technical details. Already loaded
@@ -226,8 +250,16 @@ class PlayerMetadataController extends ChangeNotifier {
     final resolvedSource = item.extras?['resolvedSource']?.toString().trim();
     final key = (item.id, source, resolvedSource);
     final sameItem = key == _requestKey;
+    final sameTrack = _requestKey?.$1 == item.id;
     _item = item;
-    _fallback = Map.unmodifiable(playbackAudioMetadataFromMediaItem(item));
+    final itemFallback = Map<String, dynamic>.unmodifiable(
+      playbackAudioMetadataFromMediaItem(item),
+    );
+    _fallback = sameTrack && _metadata != null
+        ? Map<String, dynamic>.unmodifiable(
+            mergePlaybackFileMetadata(_metadata!, itemFallback),
+          )
+        : itemFallback;
     if (!sameItem) {
       _generation++;
       _probePending = false;
@@ -242,7 +274,17 @@ class PlayerMetadataController extends ChangeNotifier {
       return;
     }
     final path = _metadataPath(source, resolvedSource);
+    final prefetched = _prefetchedMetadataCache[path];
+    if (prefetched != null) {
+      _loadedPath = path;
+      final pending = _replaceMetadata(
+        mergePlaybackFileMetadata(_fallback, prefetched),
+      );
+      if (pending != null) await pending;
+      return;
+    }
     final unresolved = path == source && source.startsWith('content://');
+    Future<void>? pending;
     if (sameItem) {
       if (metadata == null && _fallback.isNotEmpty) {
         _metadata = _fallback;
@@ -250,14 +292,30 @@ class PlayerMetadataController extends ChangeNotifier {
       }
       if (loading || _loadedPath == path) return;
     } else {
-      final pending = _replaceMetadata(_fallback);
+      final initialMetadata = sameTrack && _metadata != null
+          ? mergePlaybackFileMetadata(_metadata!, _fallback)
+          : _fallback;
+      pending = _replaceMetadata(initialMetadata);
       // A fallback parse must never postpone the file probe. Its revision
       // guard discards it as soon as richer metadata supersedes it.
       if (pending != null) unawaited(pending);
     }
     // Opening the player must not copy an unresolved SAF document. Lyrics
-    // requests may inspect it until playback publishes its resolved source.
-    if (unresolved && !inspectUnresolvedContentUri) return;
+    // requests may inspect it only when no lyrics or metadata are present yet,
+    // to avoid disrupting the active playback file descriptor.
+    if (unresolved) {
+      final candidateLyrics =
+          _fallback['lyrics']?.toString() ??
+          item.extras?['lyrics']?.toString() ??
+          '';
+      if (!inspectUnresolvedContentUri ||
+          _loadedPath == path ||
+          lyrics.isNotEmpty ||
+          hasUsableLyricsContent(candidateLyrics)) {
+        if (pending != null) await pending;
+        return;
+      }
+    }
     _probePending = true;
     _loading = true;
     notifyListeners();
@@ -280,10 +338,7 @@ class PlayerMetadataController extends ChangeNotifier {
     }
   }
 
-  String _extractLyricsCandidate(
-    Map<String, dynamic> value,
-    MediaItem? item,
-  ) {
+  String _extractLyricsCandidate(Map<String, dynamic> value, MediaItem? item) {
     for (final key in const [
       'lyrics',
       'LYRICS',
@@ -311,6 +366,15 @@ class PlayerMetadataController extends ChangeNotifier {
 
     final extras = item?.extras;
     if (extras != null) {
+      final direct = extras['lyrics']?.toString().trim() ?? '';
+      if (direct.isNotEmpty && hasUsableLyricsContent(direct)) return direct;
+      final displayMeta = extras['displayMetadata'];
+      if (displayMeta is Map) {
+        final displayLyrics = displayMeta['lyrics']?.toString().trim() ?? '';
+        if (displayLyrics.isNotEmpty && hasUsableLyricsContent(displayLyrics)) {
+          return displayLyrics;
+        }
+      }
       for (final key in const ['lyrics', 'description', 'comment']) {
         final text = extras[key]?.toString().trim() ?? '';
         if (text.isNotEmpty) {
@@ -318,7 +382,6 @@ class PlayerMetadataController extends ChangeNotifier {
           if (extracted.isNotEmpty) return extracted;
         }
       }
-      final displayMeta = extras['displayMetadata'];
       if (displayMeta is Map) {
         for (final key in const ['lyrics', 'description', 'comment']) {
           final text = displayMeta[key]?.toString().trim() ?? '';
@@ -327,6 +390,23 @@ class PlayerMetadataController extends ChangeNotifier {
             if (extracted.isNotEmpty) return extracted;
           }
         }
+      }
+
+      final source = extras['source']?.toString().trim() ?? '';
+      if (source.isNotEmpty &&
+          !source.startsWith('content://') &&
+          !source.startsWith('network://')) {
+        final uri = Uri.tryParse(source);
+        final localPath = uri?.scheme == 'file' ? uri!.toFilePath() : source;
+        try {
+          final lrcFile = File(p.setExtension(localPath, '.lrc'));
+          if (lrcFile.existsSync()) {
+            final lrcText = lrcFile.readAsStringSync().trim();
+            if (lrcText.isNotEmpty && hasUsableLyricsContent(lrcText)) {
+              return lrcText;
+            }
+          }
+        } catch (_) {}
       }
     }
 
@@ -457,8 +537,8 @@ class PlayerMetadataController extends ChangeNotifier {
   }
 
   String? get qualityLabel {
-    final meta = metadata;
-    if (meta == null) return null;
+    final meta = metadata ?? _fallback;
+    if (meta.isEmpty) return null;
     final parts = <String>[];
     final format = (meta['format'] ?? meta['audio_codec'] ?? '')
         .toString()

@@ -33,6 +33,10 @@ String autoMixEffectFilters(
       'atempo=${(options.effectiveSpeed / pitchRatio).toStringAsFixed(6)}',
     if (options.useLowPass) 'lowpass=f=1200',
     if (options.useEcho) 'aecho=0.6:0.75:180|360:0.3|0.15',
+    if (options.effect == AutoMixEffect.vinylBrake) ...[
+      'asetrate=48000*max(0.05,1-pow(clip(t/${seconds.toStringAsFixed(6)},0,1),2))',
+      'aresample=48000',
+    ],
     bounds,
     "volume='$wet':eval=frame",
   ].join(',');

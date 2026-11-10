@@ -37,7 +37,9 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/batch_lyrics_sync_service.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/m3u_playlist_service.dart';
 import 'package:mornye/services/track_file_resolver.dart';
+import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
 import 'package:mornye/widgets/batch_lyrics_sync_dialog.dart';
 
 class PlaylistScreen extends ConsumerStatefulWidget {
@@ -269,6 +271,53 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
     await BatchLyricsSyncDialog.show(context, items: items);
   }
 
+  Future<void> _exportM3u() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
+    try {
+      final tracks = _displayedTracks;
+      if (tracks.isEmpty) return;
+      final resolved = await resolveTrackFiles(
+        tracks,
+        library: LibraryDatabase.instance,
+        history: HistoryDatabase.instance,
+        includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+      );
+      final exportEntries = <M3uExportEntry>[];
+      for (var i = 0; i < tracks.length; i++) {
+        final path = resolved.paths[i] ?? '';
+        final entryPath = M3uPlaylistService.exportPathFor(path);
+        if (entryPath != null) {
+          exportEntries.add(M3uExportEntry(track: tracks[i], path: entryPath));
+        }
+      }
+      if (exportEntries.isEmpty) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.collectionExportM3uNone)),
+        );
+        return;
+      }
+      final file = await M3uPlaylistService.writeExportEntries(
+        _playlistName,
+        exportEntries,
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.collectionExportM3uDone(exportEntries.length, tracks.length),
+          ),
+        ),
+      );
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.path)], text: _playlistName),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.collectionExportM3uFailed)),
+      );
+    }
+  }
+
   Future<void> _fetchTracksIfNeeded() async {
     if (widget.tracks.isNotEmpty || widget.playlistId == null) return;
 
@@ -492,6 +541,12 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
             icon: Icons.lyrics_outlined,
             tooltip: context.l10n.syncLyricsAction,
             onPressed: _syncPlaylistLyrics,
+          ),
+          HeaderCircleButton(
+            key: const ValueKey('playlist-export-m3u-button'),
+            icon: Icons.ios_share,
+            tooltip: context.l10n.collectionExportM3u,
+            onPressed: _exportM3u,
           ),
         ],
         if (ref.watch(linkPhoneClientProvider) != null)

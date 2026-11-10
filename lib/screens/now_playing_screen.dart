@@ -17,6 +17,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/screens/lyrics_share_screen.dart';
+import 'package:mornye/services/queue_lyrics_prefetcher.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -42,6 +43,7 @@ import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_queue_sheet.dart';
 import 'package:mornye/widgets/player_details_sheet.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
+import 'package:mornye/widgets/fluid_mesh_glow.dart';
 import 'package:mornye/widgets/pitch_tempo_control_sheet.dart';
 import 'package:mornye/widgets/material_player_layout.dart';
 import 'package:mornye/widgets/mornye_player_layout.dart';
@@ -156,6 +158,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   final _motionArtworkKey = GlobalKey();
   final _artworkForeground = ValueNotifier<Map<String, Color>>({});
   final _seekPreview = PlaybackSeekPreview();
+  late final QueueLyricsPrefetcher _lyricsPrefetcher = QueueLyricsPrefetcher(
+    onPrefetch: (item) => _trackMetadata.prefetch(item),
+  );
+  ProviderSubscription<AsyncValue<List<MediaItem>>>? _queueSub;
   NowPlayingRoute? _artworkRoute;
 
   @override
@@ -173,6 +179,17 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             inspectUnresolvedContentUri: _currentPage == 1,
           ),
         );
+        final queue = ref.read(playQueueProvider).value ?? const [];
+        final currentIndex = ref.read(currentQueueIndexProvider);
+        _lyricsPrefetcher.updateQueue(queue: queue, currentIndex: currentIndex);
+      },
+    );
+    _queueSub = ref.listenManual<AsyncValue<List<MediaItem>>>(
+      playQueueProvider,
+      (previous, next) {
+        final queue = next.value ?? const [];
+        final currentIndex = ref.read(currentQueueIndexProvider);
+        _lyricsPrefetcher.updateQueue(queue: queue, currentIndex: currentIndex);
       },
     );
     _lyricsPlayingSub = ref.listenManual<bool>(playbackPlayingProvider, (
@@ -266,6 +283,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _artworkRoute?.readArtwork = null;
     _lyricsIdleTimer?.cancel();
     _mediaItemSub?.close();
+    _queueSub?.close();
     _lyricsPlayingSub?.close();
     _lyricsAutoHideSub?.close();
     _lyricsTranslation.cancel(owner: this);
@@ -343,9 +361,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) &&
             !MediaQuery.disableAnimationsOf(context)
         ? ref.watch(
-            playerMotionArtworkProvider((
-              album: mediaItem.album ?? '',
+            trackCanvasProvider((
+              id: mediaItem.id,
+              title: mediaItem.title,
               artist: mediaItem.artist ?? '',
+              album: mediaItem.album ?? '',
+              source: source,
+              spotifyId:
+                  mediaItem.extras?['spotify_id']?.toString() ??
+                  mediaItem.extras?['spotifyId']?.toString(),
+              canvasUrl:
+                  mediaItem.extras?['canvas_url']?.toString() ??
+                  mediaItem.extras?['canvas']?.toString() ??
+                  mediaItem.extras?['header_video']?.toString(),
             )),
           )
         : null;
@@ -710,18 +738,34 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               // Devices entry only takes a slot when paired.
                               if (ref.watch(linkPhoneClientProvider) != null)
                                 const LinkDevicesButton(color: Colors.white),
-                              if (ref.watch(settingsProvider.select((s) => s.pitchTempoControls)))
+                              if (ref.watch(
+                                settingsProvider.select(
+                                  (s) => s.pitchTempoControls,
+                                ),
+                              ))
                                 IconButton(
                                   tooltip: 'Pitch & Tempo',
                                   color: Colors.white,
                                   style: IconButton.styleFrom(
-                                    backgroundColor: (ref.watch(settingsProvider.select((s) => s.playbackPitch)) != 0 ||
-                                            ref.watch(settingsProvider.select((s) => s.playbackSpeed)) != 1.0)
+                                    backgroundColor:
+                                        (ref.watch(
+                                                  settingsProvider.select(
+                                                    (s) => s.playbackPitch,
+                                                  ),
+                                                ) !=
+                                                0 ||
+                                            ref.watch(
+                                                  settingsProvider.select(
+                                                    (s) => s.playbackSpeed,
+                                                  ),
+                                                ) !=
+                                                1.0)
                                         ? Colors.white.withValues(alpha: 0.22)
                                         : Colors.transparent,
                                   ),
                                   icon: const AppIcon(Icons.speed_rounded),
-                                  onPressed: () => PitchTempoControlSheet.show(context),
+                                  onPressed: () =>
+                                      PitchTempoControlSheet.show(context),
                                 ),
                               IconButton(
                                 tooltip: context.l10n.nowPlayingUpNext,
@@ -810,7 +854,29 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       ),
     );
     if (!mornye) {
-      if (!materialBackdrop) return _lyricsPointerListener(player);
+      final isAmoled =
+          Theme.of(context).scaffoldBackgroundColor == Colors.black;
+      if (!materialBackdrop) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: KeyedSubtree(
+                key: const ValueKey('now-playing-fluid-mesh'),
+                child: IgnorePointer(
+                  child: FluidMeshGlow(
+                    artUri: mediaItem.artUri,
+                    colorScheme: colorScheme,
+                    opacity: _currentPage == 1 ? 0.38 : 0.28,
+                    isAmoled: isAmoled,
+                  ),
+                ),
+              ),
+            ),
+            _lyricsPointerListener(player),
+          ],
+        );
+      }
       return Stack(
         fit: StackFit.expand,
         children: [
@@ -818,6 +884,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             mediaItem: mediaItem,
             colorScheme: colorScheme,
             showArtwork: materialFullScreen && _currentPage != 1,
+          ),
+          Positioned.fill(
+            child: KeyedSubtree(
+              key: const ValueKey('now-playing-fluid-mesh'),
+              child: IgnorePointer(
+                child: FluidMeshGlow(
+                  artUri: mediaItem.artUri,
+                  colorScheme: colorScheme,
+                  opacity: _currentPage == 1 ? 0.38 : 0.28,
+                  isAmoled: isAmoled,
+                ),
+              ),
+            ),
           ),
           _lyricsPointerListener(player),
         ],
@@ -1416,6 +1495,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
     if (selection == 'off') {
       controller.cancelSleepTimer();
+      if (mounted) setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.nowPlayingSleepTimerCancelled)),
       );
@@ -1424,6 +1504,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
     if (selection == 'endOfTrack') {
       controller.setSleepTimerEndOfTrack();
+      if (mounted) setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Timer impostato al termine del brano')),
       );
@@ -1433,6 +1514,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final minutes = int.tryParse(selection);
     if (minutes == null) return;
     controller.setSleepTimer(Duration(minutes: minutes));
+    if (mounted) setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(

@@ -1,12 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/motion_artwork_store.dart';
+import 'package:mornye/services/spotify_canvas_service.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/string_utils.dart';
 
 typedef PlayerArtworkAlbum = ({String album, String artist});
 
 final motionArtworkStoreProvider = Provider((ref) => MotionArtworkStore());
+
+final spotifyCanvasServiceProvider = Provider(
+  (ref) => SpotifyCanvasService(store: ref.watch(motionArtworkStoreProvider)),
+);
 
 /// Player and local album pages read artwork saved by downloads or re-enrich.
 /// Opening either must never search extensions or download more artwork.
@@ -19,6 +24,15 @@ final playerMotionArtworkProvider = FutureProvider.autoDispose
         return null;
       }
       return ref.watch(motionArtworkStoreProvider).find(album);
+    });
+
+/// Resolves Spotify Canvas and Apple Music animated artwork for playing tracks.
+final trackCanvasProvider = FutureProvider.autoDispose
+    .family<MotionArtwork?, TrackCanvasRequest>((ref, request) async {
+      if (!ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled))) {
+        return null;
+      }
+      return ref.watch(spotifyCanvasServiceProvider).resolveCanvas(request);
     });
 
 /// Optional video is kept outside audio tags, after the metadata write succeeds.

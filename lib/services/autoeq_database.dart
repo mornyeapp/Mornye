@@ -947,7 +947,10 @@ class AutoEqDatabase {
     final maxGain = gains.reduce(math.max);
     final preamp = maxGain > 0 ? -(maxGain + 0.5) : 0.0;
 
-    final trimmedName = name.trim().replaceAll(RegExp(r'\.txt$', caseSensitive: false), '');
+    final trimmedName = name.trim().replaceAll(
+      RegExp(r'\.txt$', caseSensitive: false),
+      '',
+    );
 
     return AutoEqProfile(
       id: 'custom_${DateTime.now().millisecondsSinceEpoch}',

@@ -86,7 +86,7 @@ class _MornyePlayerArtworkState extends ConsumerState<MornyePlayerArtwork> {
             videoUrl: _displayedSource!,
             fallback: const SizedBox.shrink(),
             controller: _displayedController,
-            fadeDuration: Duration.zero,
+            fadeDuration: const Duration(milliseconds: 500),
             onAspectRatioChanged: (ratio) {
               if (_displayedSource == widget.videoUrl) {
                 widget.onAspectRatioChanged?.call(ratio);

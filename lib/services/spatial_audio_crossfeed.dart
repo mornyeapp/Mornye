@@ -34,10 +34,7 @@ class SpatialAudioCrossfeed {
     return const MpvAudioFilter(
       'spatial_crossfeed',
       'stereotools',
-      options: {
-        'crosslevel': '0.35',
-        'sbal': '0.0',
-      },
+      options: {'crosslevel': '0.35', 'sbal': '0.0'},
     );
   }
 

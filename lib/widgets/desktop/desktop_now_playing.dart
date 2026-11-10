@@ -23,6 +23,7 @@ import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/lyrics_options_button.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
+import 'package:mornye/widgets/fluid_mesh_glow.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/mornye_playback_button.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
@@ -120,13 +121,26 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
           children: [
             if (mornye)
               MornyePlayerBackground(artUri: mediaItem?.artUri)
-            else if (mediaItem != null)
+            else if (mediaItem != null) ...[
               MaterialPlayerBackdrop(
                 mediaItem: mediaItem,
                 colorScheme: colorScheme,
                 showArtwork: false,
-              )
-            else
+              ),
+              Positioned.fill(
+                child: KeyedSubtree(
+                  key: const ValueKey('desktop-fluid-mesh'),
+                  child: IgnorePointer(
+                    child: FluidMeshGlow(
+                      artUri: mediaItem.artUri,
+                      colorScheme: colorScheme,
+                      opacity: 0.28,
+                      isAmoled: theme.scaffoldBackgroundColor == Colors.black,
+                    ),
+                  ),
+                ),
+              ),
+            ] else
               ColoredBox(color: colorScheme.surface),
             ValueListenableBuilder<DesktopInspectorPanel?>(
               valueListenable: desktopInspectorPanel,
