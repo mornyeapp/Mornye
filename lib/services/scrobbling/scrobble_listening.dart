@@ -82,7 +82,11 @@ class ScrobbleListening {
   Object? _instance;
   ScrobbleTrack? _track;
   Duration? _mark;
+
+  /// Song time heard, which passes faster than [elapsed] above normal
+  /// speed: the threshold is half the song, not half its length in time.
   Duration _listened = Duration.zero;
+  double _speed = 1;
   DateTime? _started;
   bool _playing = false;
   bool _submitted = false;
@@ -129,6 +133,7 @@ class ScrobbleListening {
         state.playing &&
         state.speed > 0 &&
         state.processingState == AudioProcessingState.ready;
+    _speed = state.speed;
     _mark = elapsed();
     if (!state.playing) _announced = false;
     if (_playing) {
@@ -149,7 +154,7 @@ class ScrobbleListening {
   void tick() {
     final mark = elapsed();
     if (_playing && _mark != null && mark > _mark!) {
-      _listened += mark - _mark!;
+      _listened += (mark - _mark!) * _speed;
     }
     _mark = mark;
     _submitIfEligible();

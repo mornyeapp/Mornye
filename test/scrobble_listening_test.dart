@@ -64,6 +64,29 @@ void main() {
     expect(scrobbles, hasLength(1));
   });
 
+  test('half the song counts at any playback speed', () {
+    PlaybackState at(double speed) => state().copyWith(speed: speed);
+    listening.update(track(), at(2), enabled: true);
+    // 60 s at 2x plays 120 s of the 240 s song.
+    elapsed = const Duration(seconds: 59);
+    listening.tick();
+    expect(scrobbles, isEmpty);
+    elapsed = const Duration(seconds: 60);
+    listening.tick();
+    expect(scrobbles, hasLength(1));
+
+    listening.update(track(instance: 2), at(0.5), enabled: true);
+    elapsed += const Duration(seconds: 200);
+    // A change of speed counts the time before it at the old speed.
+    listening.update(track(instance: 2), at(1), enabled: true);
+    elapsed += const Duration(seconds: 19);
+    listening.tick();
+    expect(scrobbles, hasLength(1));
+    elapsed += const Duration(seconds: 1);
+    listening.tick();
+    expect(scrobbles, hasLength(2));
+  });
+
   test('seeking does not add listening time or begin another play', () {
     listening.update(track(), state(), enabled: true);
     elapsed = const Duration(seconds: 10);
