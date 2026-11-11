@@ -30,6 +30,35 @@ bool isSameAudioCompareFile({
           otherName.toLowerCase();
 }
 
+/// Whether [path] is the private copy the Android picker made for this pick
+/// alone. It copies every pick to `<cache>/file_picker/<time>/<name>`, so
+/// the copy is never shared with a song opened through Open audio and can
+/// be deleted once the comparison closes.
+@visibleForTesting
+bool isAudioComparePickerCopy(String path, {required String cacheDir}) {
+  final parts = p.split(p.relative(p.normalize(path), from: cacheDir));
+  return parts.length == 3 &&
+      parts[0] == 'file_picker' &&
+      int.tryParse(parts[1]) != null;
+}
+
+Future<void> _deleteAudioComparePickerCopy(
+  String path,
+  String referencePath,
+) async {
+  if (!Platform.isAndroid || path == referencePath) return;
+  try {
+    final cache = await getTemporaryDirectory();
+    if (!isAudioComparePickerCopy(path, cacheDir: cache.path)) return;
+    final file = File(path);
+    await file.delete();
+    // Not recursive: the picker's folder goes only when nothing else is in it.
+    await file.parent.delete();
+  } catch (_) {
+    // The picker clears its cache on its own later.
+  }
+}
+
 /// Lets the user pick another version of the song, then opens the null
 /// test of it against [referencePath].
 Future<void> pickAndShowAudioCompare(
@@ -68,6 +97,7 @@ Future<void> pickAndShowAudioCompare(
     otherSize: otherSize,
   )) {
     say(l10n.audioCompareSameFile);
+    await _deleteAudioComparePickerCopy(path, referencePath);
     return;
   }
   await showAppScrollableBottomSheet<void>(
@@ -81,6 +111,7 @@ Future<void> pickAndShowAudioCompare(
       controller: controller,
     ),
   );
+  await _deleteAudioComparePickerCopy(path, referencePath);
 }
 
 String _mediaSource(MediaItem? item) {
@@ -268,6 +299,7 @@ class AudioCompareView extends StatelessWidget {
           _CompareNotice(
             key: const ValueKey('audio-compare-notice'),
             icon: Icons.warning_amber_rounded,
+            warning: true,
             title: l10n.audioCompareNoticeTitle,
             lines: [
               for (final notice in result.notices)
@@ -665,7 +697,9 @@ class _CompareProgress extends StatelessWidget {
   }
 }
 
-/// The error-container notice of the result sheet, as in [ErrorCard].
+/// The notice of the result sheet, laid out as [ErrorCard]. A [warning]
+/// (the result stands but may mean little) takes the tertiary container
+/// instead of the error container.
 class _CompareNotice extends StatelessWidget {
   const _CompareNotice({
     super.key,
@@ -673,6 +707,7 @@ class _CompareNotice extends StatelessWidget {
     this.title,
     required this.lines,
     this.action,
+    this.warning = false,
   });
 
   final IconData icon;
@@ -682,16 +717,18 @@ class _CompareNotice extends StatelessWidget {
   /// Retries the comparison.
   final VoidCallback? action;
 
+  final bool warning;
+
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final foreground = cs.onErrorContainer;
+    final foreground = warning ? cs.onTertiaryContainer : cs.onErrorContainer;
     final body = theme.textTheme.bodyMedium?.copyWith(color: foreground);
     return AppContentCard(
       elevation: 0,
-      color: cs.errorContainer,
+      color: warning ? cs.tertiaryContainer : cs.errorContainer,
       mornyeSurface: false,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: tokens.borderRadiusCard),

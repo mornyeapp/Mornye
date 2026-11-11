@@ -9,6 +9,7 @@ import 'package:mornye/services/audio_compare_dsp.dart';
 import 'package:mornye/services/audio_compare_engine.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/widgets/audio_analysis_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -79,6 +80,18 @@ Widget _host(Widget child, {required bool mornye}) => ProviderScope(
     home: Scaffold(body: child),
   ),
 );
+
+ColorScheme _scheme(WidgetTester tester) =>
+    Theme.of(tester.element(find.byType(Scaffold))).colorScheme;
+
+Color? _noticeColor(WidgetTester tester, String key) => tester
+    .widget<AppContentCard>(
+      find.descendant(
+        of: find.byKey(ValueKey(key)),
+        matching: find.byType(AppContentCard),
+      ),
+    )
+    .color;
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -230,6 +243,11 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('The lengths differ by'), findsOneWidget);
+      // A notice is a warning, not an error.
+      expect(
+        _noticeColor(tester, 'audio-compare-notice'),
+        _scheme(tester).tertiaryContainer,
+      );
       // The band reading is withheld when the comparison is not meaningful.
       expect(
         find.text('The difference is spread across the whole range.'),
@@ -251,6 +269,10 @@ void main() {
         ),
       );
       expect(find.byKey(const ValueKey('audio-compare-error')), findsOneWidget);
+      expect(
+        _noticeColor(tester, 'audio-compare-error'),
+        _scheme(tester).errorContainer,
+      );
       expect(
         find.text('One of the files could not be decoded.'),
         findsOneWidget,
@@ -335,5 +357,26 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+  test('only the Android picker copy of this pick is deleted', () {
+    const cache = '/data/user/0/app/cache';
+    expect(
+      isAudioComparePickerCopy(
+        '$cache/file_picker/1762800000000/Song.mp3',
+        cacheDir: cache,
+      ),
+      isTrue,
+    );
+    for (final path in [
+      '$cache/file_picker/Song.mp3',
+      '$cache/file_picker/latest/Song.mp3',
+      '$cache/file_picker/1762800000000/sub/Song.mp3',
+      '$cache/other/1762800000000/Song.mp3',
+      '/storage/emulated/0/Music/Song.mp3',
+      '$cache/file_picker/1762800000000/../../Song.mp3',
+    ]) {
+      expect(isAudioComparePickerCopy(path, cacheDir: cache), isFalse);
+    }
   });
 }
