@@ -911,6 +911,7 @@ void main() {
         pauseOnMute: false,
         gaplessPlayback: true,
         autoMix: false,
+        media3Engine: true,
       ),
       createDeck: (_) => deck,
     );

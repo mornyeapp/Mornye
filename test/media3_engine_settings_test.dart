@@ -54,12 +54,17 @@ Finder get _switchFinder => find.byWidgetPredicate(
 void main() {
   tearDown(() => debugAndroidAudioSettingsOverride = null);
 
-  test('the setting defaults to on and round-trips through JSON', () {
-    expect(const AppSettings().media3Engine, isTrue);
-    expect(AppSettings.fromJson(const {}).media3Engine, isTrue);
-    final off = const AppSettings().copyWith(media3Engine: false);
-    expect(off.toJson()['media3Engine'], isFalse);
-    expect(AppSettings.fromJson(off.toJson()).media3Engine, isFalse);
+  test('the setting defaults to off and round-trips through JSON', () {
+    expect(const AppSettings().media3Engine, isFalse);
+    expect(AppSettings.fromJson(const {}).media3Engine, isFalse);
+    final on = const AppSettings().copyWith(media3Engine: true);
+    expect(on.toJson()['media3Engine'], isTrue);
+    expect(AppSettings.fromJson(on.toJson()).media3Engine, isTrue);
+    // A saved choice survives the default.
+    expect(
+      AppSettings.fromJson(const {'media3Engine': true}).media3Engine,
+      isTrue,
+    );
   });
 
   for (final mornye in [false, true]) {
@@ -75,7 +80,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final item = tester.widget<SettingsSwitchItem>(_switchFinder);
-      expect(item.value, isTrue);
+      expect(item.value, isFalse);
       expect(item.titleTrailing, isA<BetaBadge>());
       expect(
         item.subtitle,
@@ -84,8 +89,8 @@ void main() {
 
       await tester.tap(find.text(_title));
       await tester.pumpAndSettle();
-      expect(container.read(settingsProvider).media3Engine, isFalse);
-      expect(tester.widget<SettingsSwitchItem>(_switchFinder).value, isFalse);
+      expect(container.read(settingsProvider).media3Engine, isTrue);
+      expect(tester.widget<SettingsSwitchItem>(_switchFinder).value, isTrue);
       expect(tester.takeException(), isNull);
     });
   }
@@ -143,7 +148,11 @@ void main() {
       tester,
     ) async {
       debugAndroidAudioSettingsOverride = true;
-      final container = await _pumpPage(tester, mornye: mornye);
+      final container = await _pumpPage(
+        tester,
+        mornye: mornye,
+        settings: const AppSettings(media3Engine: true),
+      );
       await tester.scrollUntilVisible(
         skipSwitch(),
         300,
@@ -173,7 +182,11 @@ void main() {
     await _pumpPage(
       tester,
       mornye: false,
-      settings: const AppSettings(autoMix: true, skipSilence: true),
+      settings: const AppSettings(
+        media3Engine: true,
+        autoMix: true,
+        skipSilence: true,
+      ),
     );
     await tester.scrollUntilVisible(
       skipSwitch(),

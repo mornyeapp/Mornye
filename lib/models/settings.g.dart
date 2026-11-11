@@ -75,7 +75,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   usbDsdOverPcm: json['usbDsdOverPcm'] as bool? ?? false,
   usbAllowFixedVolume: json['usbAllowFixedVolume'] as bool? ?? false,
   dapExclusive: json['dapExclusive'] as bool? ?? false,
-  media3Engine: json['media3Engine'] as bool? ?? true,
+  media3Engine: json['media3Engine'] as bool? ?? false,
   skipSilence: json['skipSilence'] as bool? ?? false,
   spatialAudio: json['spatialAudio'] as bool? ?? true,
   queueNoDuplicates: json['queueNoDuplicates'] as bool? ?? false,

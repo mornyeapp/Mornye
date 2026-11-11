@@ -336,7 +336,12 @@ void main() {
     ) async {
       debugAndroidAudioSettingsOverride = true;
       _mockState(_android(stereo: true, headTracking: true));
-      final container = await _pumpPage(tester, mornye: mornye);
+      // The media3 engine applies the switch live, so no next-song note.
+      final container = await _pumpPage(
+        tester,
+        mornye: mornye,
+        settings: const AppSettings(media3Engine: true),
+      );
       var item = await _scrollToRow(tester);
       expect(item.value, isTrue);
       expect(item.subtitle, startsWith(_l10n.spatialAudioDescription));

@@ -53,7 +53,7 @@ Stream<double> playbackOutputVolumeChanges() =>
 /// device.
 final playbackExclusiveOutput = ValueNotifier<bool>(false);
 
-/// Android: the beta `media3Engine` setting, on by default. While it is on,
+/// Android: the beta `media3Engine` setting, off by default. While it is on,
 /// the music player and AutoMix decks play through media3
 /// (`Media3EngineDeck`), except sources for the native USB and AAudio
 /// outputs, which stay on audioplayers. A change applies from the next song.

@@ -200,7 +200,7 @@ class AppSettings {
   final bool usbAllowFixedVolume;
   final bool dapExclusive;
 
-  /// Android beta, on by default: play the music player and AutoMix through
+  /// Android beta, off by default: play the music player and AutoMix through
   /// the app's own media3 engine instead of the platform MediaPlayer, which
   /// turning it off restores. Songs for the USB and AAudio outputs
   /// ([usbBitPerfect]) stay on the platform player. Applies from the next
@@ -500,7 +500,7 @@ class AppSettings {
     this.usbDsdOverPcm = false,
     this.usbAllowFixedVolume = false,
     this.dapExclusive = false,
-    this.media3Engine = true,
+    this.media3Engine = false,
     this.skipSilence = false,
     this.spatialAudio = true,
     this.queueNoDuplicates = false,
