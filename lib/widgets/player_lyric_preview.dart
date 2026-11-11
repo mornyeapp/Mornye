@@ -12,6 +12,7 @@ import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/theme_provider.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
@@ -76,7 +77,21 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
   /// A finished line stays this long before the gap placeholder replaces it.
   static const _lineHold = Duration(seconds: 2);
 
+  /// How long a song known to have no synced lyrics keeps the row before it
+  /// closes. A document still being resolved reports none before it loads.
+  static const _closeGrace = Duration(milliseconds: 600);
+
   static const _placeholder = '•••';
+
+  /// Whether the row holds its height; see [_syncRow].
+  bool _open = false;
+  Timer? _closeTimer;
+
+  /// The synced lyrics last shown and their song, kept on screen while the
+  /// same song's lyrics load again (the file after its catalog entry, a
+  /// saved translation).
+  String? _heldTrack;
+  ParsedLyrics? _heldLyrics;
 
   Timer? _nextLine;
   ParsedLyrics? _timelineSource;
@@ -106,11 +121,31 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
   void dispose() {
     widget.seekPreview.removeListener(_refresh);
     _nextLine?.cancel();
+    _closeTimer?.cancel();
     super.dispose();
   }
 
   void _refresh() {
     if (mounted) setState(() {});
+  }
+
+  /// Opens the row for a song with synced lyrics and keeps it while the
+  /// next song's lyrics are [pending], so a change between two songs with
+  /// lyrics moves nothing around it. Before, each step of loading (the
+  /// catalog entry, then the file) dropped the row and brought it back,
+  /// and the title and cover jumped down and up with it. The row closes,
+  /// once, when the song turns out to have none.
+  void _syncRow({required bool hasLines, required bool pending}) {
+    if (hasLines || pending) {
+      _closeTimer?.cancel();
+      _closeTimer = null;
+      if (hasLines) _open = true;
+    } else if (_open && _closeTimer == null) {
+      _closeTimer = Timer(_closeGrace, () {
+        _closeTimer = null;
+        if (mounted) setState(() => _open = false);
+      });
+    }
   }
 
   /// Lines with the listener's timing offset, instrumental gaps and display
@@ -191,17 +226,26 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
       listenable: widget.metadata,
       builder: (context, _) {
         final metadata = widget.metadata;
-        if (metadata.loading || !metadata.lyrics.synced) {
-          _nextLine?.cancel();
-          return const SizedBox.shrink();
+        final track = metadata.item?.id;
+        final pending = metadata.loading || metadata.searchingOnline;
+        ParsedLyrics? lyrics;
+        if (!metadata.loading && metadata.lyrics.synced) {
+          lyrics = metadata.lyrics;
+          _heldTrack = track;
+          _heldLyrics = lyrics;
+        } else if (pending && track != null && track == _heldTrack) {
+          lyrics = _heldLyrics;
+        } else {
+          _heldTrack = null;
+          _heldLyrics = null;
         }
-        final lines = _timelineFor(
-          translation.shown(metadata.lyrics),
-          offsetMs,
-        );
+        final lines = lyrics == null
+            ? const <LyricLine>[]
+            : _timelineFor(translation.shown(lyrics), offsetMs);
+        _syncRow(hasLines: lines.isNotEmpty, pending: pending);
         if (lines.isEmpty) {
           _nextLine?.cancel();
-          return const SizedBox.shrink();
+          return _row(context, blank: true);
         }
         final position =
             widget.seekPreview.value ?? state?.position ?? Duration.zero;
@@ -231,7 +275,7 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
         _shownLines = lines;
         _shownIndex = index;
         _scheduleNextLine(lines, index, probe, state, visible: visible);
-        return _buildLine(
+        return _row(
           context,
           line: _sungLine(lines, index, probe),
           nextStart: index + 1 < lines.length ? lines[index + 1].time : null,
@@ -254,15 +298,32 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
     return line;
   }
 
-  Widget _buildLine(
+  /// The row: the sung [line], the gap placeholder when it is null, or
+  /// with [blank] its bare height while the next song's lyrics load.
+  Widget _row(
     BuildContext context, {
-    required LyricLine? line,
-    required Duration? nextStart,
-    required Duration position,
-    required bool showTranslation,
-    required bool advancing,
-    required double speed,
+    LyricLine? line,
+    Duration? nextStart,
+    Duration position = Duration.zero,
+    bool showTranslation = false,
+    bool advancing = false,
+    double speed = 1,
+    bool blank = false,
   }) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    AppMotionSpec eased(int milliseconds, Curve curve) => AppMotionSpec(
+      reduceMotion ? Duration.zero : Duration(milliseconds: milliseconds),
+      curve,
+    );
+    // Size is spatial and stops at its target: an overshoot would move the
+    // cover and title past their place and back. Opacity uses the effects
+    // springs, and a line leaves faster than the next one arrives.
+    final resize = AppMotion.spatialSlow(
+      context,
+      eased(300, Curves.easeInOutCubic),
+    );
+    final enter = AppMotion.effects(context, eased(180, Curves.easeOutQuad));
+    final exit = AppMotion.effectsFast(context, eased(120, Curves.easeInQuad));
     final mornye = context.isMornye;
     final colorScheme = widget.colorScheme;
     final textColor = mornye
@@ -280,7 +341,10 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
         : line.text.trim();
 
     final Widget child;
-    if (line == null) {
+    if (blank) {
+      // An empty line is as tall as a written one.
+      child = Text('', key: const ValueKey('blank'), maxLines: 1, style: style);
+    } else if (line == null) {
       child = Text(
         _placeholder,
         key: const ValueKey(_placeholder),
@@ -334,66 +398,97 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
       );
     }
 
-    final onTap = widget.onTap;
-    return Padding(
+    final onTap = blank ? null : widget.onTap;
+    final shownKey = child.key;
+    final row = Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2),
-      child: Semantics(
-        container: true,
-        button: onTap != null,
-        label: context.l10n.trackLyrics,
-        value: text,
-        excludeSemantics: true,
-        onTap: onTap,
-        child: InkWell(
-          onTap: onTap == null
-              ? null
-              : () {
-                  HapticFeedback.selectionClick();
-                  onTap();
-                },
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: AnimatedSwitcher(
-                    duration: MediaQuery.disableAnimationsOf(context)
-                        ? Duration.zero
-                        : const Duration(milliseconds: 180),
-                    switchInCurve: Curves.easeOutQuad,
-                    switchOutCurve: Curves.easeInQuad,
-                    layoutBuilder: (current, previous) => Stack(
-                      alignment: AlignmentDirectional.centerStart,
-                      children: [...previous, ?current],
-                    ),
-                    transitionBuilder: (child, animation) => FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, 0.2),
-                          end: Offset.zero,
-                        ).animate(animation),
-                        child: child,
+      child: ExcludeSemantics(
+        excluding: blank,
+        child: Semantics(
+          container: true,
+          button: onTap != null,
+          label: context.l10n.trackLyrics,
+          value: text,
+          excludeSemantics: true,
+          onTap: onTap,
+          child: InkWell(
+            onTap: onTap == null
+                ? null
+                : () {
+                    HapticFeedback.selectionClick();
+                    onTap();
+                  },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: AnimatedSwitcher(
+                      duration: enter.duration,
+                      reverseDuration: exit.duration,
+                      switchInCurve: enter.curve,
+                      switchOutCurve: exit.curve,
+                      layoutBuilder: (current, previous) => Stack(
+                        alignment: AlignmentDirectional.centerStart,
+                        children: [...previous, ?current],
                       ),
+                      // The arriving line rises into place as it fades in.
+                      // The one it replaces fades where it is: sliding it
+                      // back down read as the row bouncing.
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: child.key == shownKey
+                              ? Tween<Offset>(
+                                  begin: const Offset(0, 0.25),
+                                  end: Offset.zero,
+                                ).animate(animation)
+                              : const AlwaysStoppedAnimation(Offset.zero),
+                          child: child,
+                        ),
+                      ),
+                      child: child,
                     ),
-                    child: child,
                   ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  mornye ? CupertinoIcons.forward : Icons.chevron_right,
-                  size: mornye ? 14 : 16,
-                  color: mornye
-                      ? colorScheme.onSurface.withValues(alpha: 0.55)
-                      : colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                ),
-              ],
+                  const SizedBox(width: 4),
+                  AnimatedOpacity(
+                    opacity: blank ? 0 : 1,
+                    duration: blank ? exit.duration : enter.duration,
+                    curve: blank ? exit.curve : enter.curve,
+                    child: Icon(
+                      mornye ? CupertinoIcons.forward : Icons.chevron_right,
+                      size: mornye ? 14 : 16,
+                      color: mornye
+                          ? colorScheme.onSurface.withValues(alpha: 0.55)
+                          : colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: _open ? 1 : 0),
+      duration: resize.duration,
+      curve: resize.curve,
+      builder: (context, shown, row) {
+        final factor = shown.clamp(0.0, 1.0);
+        if (factor == 0) return const SizedBox.shrink();
+        return ClipRect(
+          child: Align(
+            alignment: AlignmentDirectional.topStart,
+            widthFactor: 1,
+            heightFactor: factor,
+            child: Opacity(opacity: factor, child: row),
+          ),
+        );
+      },
+      child: row,
     );
   }
 }

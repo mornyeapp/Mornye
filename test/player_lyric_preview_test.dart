@@ -394,4 +394,129 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+
+  group('song change', () {
+    MediaItem song(String id, {String? resolved}) => MediaItem(
+      id: id,
+      title: 'Example $id',
+      artist: 'Example Artist',
+      duration: const Duration(minutes: 3),
+      // A network source keeps the lyric file stores off the disk.
+      extras: {'source': 'network://example/$id', 'resolvedSource': ?resolved},
+    );
+    String lrcFor(String id) => '[00:05.00]Line of $id\n[00:10.00]More of $id';
+
+    late Map<String, Completer<String>> reads;
+    PlayerMetadataController controller() {
+      reads = {};
+      final metadata = PlayerMetadataController(
+        parseLyrics: (raw) async => LyricsParser.parse(raw ?? ''),
+        readMetadata: (path) async {
+          final lyrics = await (reads[path] ??= Completer<String>()).future;
+          return {'title': 'Example', 'lyrics': lyrics};
+        },
+      );
+      addTearDown(metadata.dispose);
+      return metadata;
+    }
+
+    /// Lets the song at [path] finish loading with [lyrics].
+    void answer(String path, String lyrics) =>
+        (reads[path] ??= Completer<String>()).complete(lyrics);
+
+    double height(WidgetTester tester) =>
+        tester.getSize(find.byType(PlayerLyricPreview)).height;
+
+    /// The row's height in every frame of the next [milliseconds].
+    Future<List<double>> heights(WidgetTester tester, int milliseconds) async {
+      final seen = <double>[];
+      for (var elapsed = 0; elapsed < milliseconds; elapsed += 16) {
+        await tester.pump(const Duration(milliseconds: 16));
+        seen.add(height(tester));
+      }
+      return seen;
+    }
+
+    for (final mornye in [false, true]) {
+      testWidgets('between two songs with lyrics the row never moves '
+          '(mornye: $mornye)', (tester) async {
+        final metadata = controller();
+        answer('network://example/a', lrcFor('a'));
+        await metadata.load(song('a'));
+        final view = await pumpPreview(
+          tester,
+          metadata: metadata,
+          mornye: mornye,
+        );
+        view.playback.add(_at(const Duration(seconds: 6), playing: false));
+        await tester.pumpAndSettle();
+        expect(find.text('Line of a'), findsOneWidget);
+        final open = height(tester);
+        expect(open, greaterThan(20));
+
+        // The next song starts loading: the row stays, its line leaves.
+        unawaited(metadata.load(song('b')));
+        expect(await heights(tester, 400), everyElement(open));
+        expect(find.text('Line of a'), findsNothing);
+        expect(find.text('•••'), findsNothing);
+
+        answer('network://example/b', lrcFor('b'));
+        expect(await heights(tester, 400), everyElement(open));
+        expect(find.text('Line of b'), findsOneWidget);
+
+        // The same song read again, as when its file replaces the catalog
+        // entry: the line stays on screen throughout.
+        unawaited(metadata.load(song('b', resolved: '/cache/b.flac')));
+        for (var frame = 0; frame < 20; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(height(tester), open);
+          expect(find.text('Line of b'), findsOneWidget);
+        }
+        answer('/cache/b.flac', lrcFor('b'));
+        expect(await heights(tester, 300), everyElement(open));
+        expect(find.text('Line of b'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('the row closes and opens once, without a bounce '
+          '(mornye: $mornye)', (tester) async {
+        final metadata = controller();
+        answer('network://example/a', lrcFor('a'));
+        await metadata.load(song('a'));
+        final view = await pumpPreview(
+          tester,
+          metadata: metadata,
+          mornye: mornye,
+        );
+        view.playback.add(_at(const Duration(seconds: 6), playing: false));
+        await tester.pumpAndSettle();
+        final open = height(tester);
+
+        // A song without lyrics: nothing moves while it loads.
+        unawaited(metadata.load(song('plain')));
+        expect(await heights(tester, 300), everyElement(open));
+        answer('network://example/plain', '');
+        final closing = await heights(tester, 1600);
+        expect(closing.first, open);
+        expect(closing.last, 0);
+        for (var frame = 1; frame < closing.length; frame++) {
+          expect(closing[frame], lessThanOrEqualTo(closing[frame - 1]));
+        }
+        expect(find.text('•••'), findsNothing);
+
+        // Back to a song with lyrics: closed while it loads, then it opens.
+        unawaited(metadata.load(song('c')));
+        expect(await heights(tester, 300), everyElement(0));
+        answer('network://example/c', lrcFor('c'));
+        final opening = await heights(tester, 1000);
+        expect(opening.last, open);
+        for (var frame = 1; frame < opening.length; frame++) {
+          expect(opening[frame], greaterThanOrEqualTo(opening[frame - 1]));
+          expect(opening[frame], lessThanOrEqualTo(open));
+        }
+        expect(find.text('Line of c'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
 }

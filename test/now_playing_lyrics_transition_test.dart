@@ -3352,6 +3352,63 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a Material song change with the lyric line on moves nothing', (
+    tester,
+  ) async {
+    await pumpNowPlaying(tester, theme: AppTheme.dark());
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+    ProviderScope.containerOf(
+      tester.element(find.byType(NowPlayingScreen)),
+    ).read(settingsProvider.notifier).setPlayerShowLyricSnippet(true);
+    await settlePlayer(tester);
+    final line = find.descendant(
+      of: find.byType(MaterialPlayerLayout),
+      matching: find.byType(PlayerLyricPreview),
+    );
+    expect(tester.getSize(line).height, greaterThan(20));
+    final lineState = tester.state(
+      find.descendant(of: line, matching: find.byType(AnimatedSwitcher)),
+    );
+    ({double line, double seek, double cover}) places() => (
+      line: tester.getRect(line).top,
+      seek: tester.getTopLeft(find.byType(PlaybackSeekSlider)).dy,
+      cover: tester
+          .getSize(find.byKey(const ValueKey('material-player-cover')))
+          .height,
+    );
+    final rest = places();
+    final rowHeight = tester.getSize(line).height;
+
+    // Both songs have synced lyrics and a one-line title. Through the
+    // metadata read, the lyrics parse and every frame after, the line's
+    // row, the cover and the controls stay where they are.
+    mediaItems.add(item('second'));
+    for (var frame = 0; frame < 12; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(places(), rest, reason: 'frame $frame, loading');
+      expect(tester.getSize(line).height, rowHeight);
+    }
+    await completeLyrics(tester);
+    for (var frame = 0; frame < 45; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      await completeLyrics(tester);
+      expect(places(), rest, reason: 'frame $frame, loaded');
+      expect(tester.getSize(line).height, rowHeight);
+    }
+    await settlePlayer(tester);
+    expect(find.text('Second'), findsWidgets);
+    expect(places(), rest);
+    // The row is the same one, not a new one built for the next song.
+    expect(
+      tester.state(
+        find.descendant(of: line, matching: find.byType(AnimatedSwitcher)),
+      ),
+      same(lineState),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   for (final size in [
     const Size(320, 568),
     const Size(430, 932),

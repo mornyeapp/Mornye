@@ -304,6 +304,18 @@ class MaterialPlayerLayout extends StatelessWidget {
     );
   }
 
+  /// [child] changing size on [motion]. Reduced motion takes no time, which
+  /// `AnimatedSize` cannot lay out, so the child then resizes by itself.
+  static Widget _resized(AppMotionSpec motion, Widget child) =>
+      motion.duration == Duration.zero
+      ? child
+      : AnimatedSize(
+          duration: motion.duration,
+          curve: motion.curve,
+          alignment: AlignmentDirectional.topStart,
+          child: child,
+        );
+
   /// Title/artist, seek slider, transport buttons and volume, shared by the
   /// portrait column and the landscape right pane.
   List<Widget> _metadataAndControls(
@@ -313,68 +325,99 @@ class MaterialPlayerLayout extends StatelessWidget {
     bool showMetadata = true,
     bool showControls = true,
   }) {
+    final titleResize = AppMotion.spatialSlow(
+      context,
+      AppMotionSpec(
+        MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        Curves.easeInOutCubic,
+      ),
+    );
     return [
       if (showMetadata) ...[
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
-          // A skip the app started crossfades in place, without moving.
-          child: PlayerTrackCrossfade(
-            trackKey: mediaItem.id,
-            alignment: AlignmentDirectional.topStart,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // A skip the app started crossfades in place. When the next
+              // title takes another number of lines, the block resizes
+              // once on the slow spatial spring, which stops at its size,
+              // instead of jumping when the old title leaves.
+              _resized(
+                titleResize,
+                PlayerTrackCrossfade(
+                  trackKey: mediaItem.id,
+                  alignment: AlignmentDirectional.topStart,
+                  child: Row(
                     children: [
-                      PlayerMetadataTitle(
-                        mediaItem: mediaItem,
-                        metadata: metadata,
-                        style:
-                            (compact
-                                    ? Theme.of(context).textTheme.titleLarge
-                                    : Theme.of(context).textTheme.headlineSmall)
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                ),
-                        textAlign: TextAlign.start,
-                        maxLines: compact ? 1 : 2,
-                      ),
-                      SizedBox(height: compact ? 4 : 6),
-                      if (showSourceLabel)
-                        PlaybackSourceLabel(
-                          item: mediaItem,
-                          color: colorScheme.onSurfaceVariant,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            PlayerMetadataTitle(
+                              mediaItem: mediaItem,
+                              metadata: metadata,
+                              style:
+                                  (compact
+                                          ? Theme.of(
+                                              context,
+                                            ).textTheme.titleLarge
+                                          : Theme.of(
+                                              context,
+                                            ).textTheme.headlineSmall)
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onSurface,
+                                      ),
+                              textAlign: TextAlign.start,
+                              maxLines: compact ? 1 : 2,
+                            ),
+                            SizedBox(height: compact ? 4 : 6),
+                            if (showSourceLabel)
+                              PlaybackSourceLabel(
+                                item: mediaItem,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            Consumer(
+                              builder: (context, ref, _) {
+                                final track = ref
+                                    .watch(
+                                      playerCollectionTrackProvider(mediaItem),
+                                    )
+                                    .value;
+                                // No extensionId: a downloaded track's
+                                // source is its download service, not a
+                                // metadata catalog.
+                                return ClickableArtistName(
+                                  artistName: mediaItem.artist ?? '',
+                                  artistId: track?.artistId,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                  textAlign: TextAlign.start,
+                                );
+                              },
+                            ),
+                          ],
                         ),
-                      Consumer(
-                        builder: (context, ref, _) {
-                          final track = ref
-                              .watch(playerCollectionTrackProvider(mediaItem))
-                              .value;
-                          // No extensionId: a downloaded track's source is
-                          // its download service, not a metadata catalog.
-                          return ClickableArtistName(
-                            artistName: mediaItem.artist ?? '',
-                            artistId: track?.artistId,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(color: colorScheme.onSurfaceVariant),
-                            textAlign: TextAlign.start,
-                          );
-                        },
                       ),
-                      if (!showLyrics && !compact)
-                        PlayerLyricPreview(
-                          metadata: metadata,
-                          seekPreview: seekPreview,
-                          colorScheme: colorScheme,
-                          onTap: onOpenLyrics,
-                        ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              // Outside the crossfade: the line keeps its row from one
+              // song to the next, so a skip moves nothing around it.
+              if (!showLyrics && !compact)
+                PlayerLyricPreview(
+                  metadata: metadata,
+                  seekPreview: seekPreview,
+                  colorScheme: colorScheme,
+                  onTap: onOpenLyrics,
+                ),
+            ],
           ),
         ),
         SizedBox(height: compact ? 12 : 24),
