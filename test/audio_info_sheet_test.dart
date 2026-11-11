@@ -91,6 +91,17 @@ void main() {
     );
   });
 
+  test('a direct path fed by a lossy decoder is not called bit-perfect', () {
+    expect(
+      audioBitPerfectStatus(
+        directActive: true,
+        exclusiveActive: false,
+        lossySource: true,
+      ),
+      AudioBitPerfectStatus.lossySource,
+    );
+  });
+
   for (final mornye in [false, true]) {
     testWidgets(
       'exclusive path and bit-perfect facts stay consistent (Mornye=$mornye)',

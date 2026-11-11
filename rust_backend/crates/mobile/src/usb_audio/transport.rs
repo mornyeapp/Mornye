@@ -55,7 +55,7 @@ impl Output {
             return Err("Invalid USB device/configuration".into());
         }
         if candidates.is_empty() {
-            return Err("No compatible USB format".into());
+            return Err(descriptors::mismatch(&device, rate, channels, bits, dsd));
         }
         let shared = Arc::new((Mutex::new(State::default()), Condvar::new()));
         let state = shared.clone();

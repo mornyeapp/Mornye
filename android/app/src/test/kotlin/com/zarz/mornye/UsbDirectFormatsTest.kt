@@ -1,0 +1,162 @@
+package com.zarz.mornye
+
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import kotlin.random.Random
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Test
+
+class UsbDirectFormatsTest {
+    private fun bytes(buffer: ByteBuffer): ByteArray = ByteArray(buffer.remaining()).also { buffer.get(it) }
+
+    private fun floats(vararg values: Float): ByteBuffer =
+        ByteBuffer.allocate(values.size * 4).order(ByteOrder.LITTLE_ENDIAN).apply {
+            values.forEach { putFloat(it) }
+            flip()
+        }
+
+    @Test
+    fun classifiesTransportErrorsWithoutLosingUnknownOnes() {
+        val cases = mapOf(
+            "No compatible USB format for 1ch 16-bit 44100 Hz; DAC offers 2ch 16-bit" to UsbDirectFormats.DAC_FORMAT,
+            "USB clock rate could not be verified" to UsbDirectFormats.DAC_FORMAT,
+            "Variable USB clock has no rate control" to UsbDirectFormats.DAC_FORMAT,
+            "USB error -9" to UsbDirectFormats.DAC_FORMAT,
+            "USB error -6" to UsbDirectFormats.DAC_OPEN,
+            "USB error -3" to UsbDirectFormats.DAC_OPEN,
+            "Cannot open USB device" to UsbDirectFormats.DAC_OPEN,
+            "Invalid USB device/configuration" to UsbDirectFormats.DAC_OPEN,
+            "Implicit feedback is not supported" to UsbDirectFormats.DAC_UNSUPPORTED,
+            "USB bus speed unavailable or unsupported" to UsbDirectFormats.DAC_UNSUPPORTED,
+            "USB endpoint bandwidth too small" to UsbDirectFormats.DAC_UNSUPPORTED,
+            "Multiple USB configurations are not supported" to UsbDirectFormats.DAC_UNSUPPORTED,
+            "No supported USB endpoint" to UsbDirectFormats.DAC_UNSUPPORTED,
+            "Decoder timed out" to UsbDirectFormats.TIMEOUT,
+            "Something new" to UsbDirectFormats.UNSUPPORTED,
+        )
+        for ((message, reason) in cases) assertEquals(message, reason, UsbDirectFormats.classifyOutput(message))
+        assertEquals(UsbDirectFormats.UNSUPPORTED, UsbDirectFormats.classifyOutput(null))
+    }
+
+    @Test
+    fun namesCodecsAndDescribesSources() {
+        assertEquals("ALAC", UsbDirectFormats.codecName("audio/alac"))
+        assertEquals("AAC", UsbDirectFormats.codecName("audio/mp4a-latm"))
+        assertEquals("MP3", UsbDirectFormats.codecName("audio/mpeg"))
+        assertEquals("Opus", UsbDirectFormats.codecName("audio/opus"))
+        assertEquals("WMA", UsbDirectFormats.codecName("audio/x-wma"))
+        val info = UsbSourceInfo("ALAC", 96000, 24, 2)
+        assertEquals("ALAC 24-bit 96000 Hz 2ch", info.describe())
+        assertEquals(
+            mapOf("codec" to "ALAC", "lossy" to false, "sampleRate" to 96000, "sourceBitDepth" to 24, "channels" to 2),
+            info.toMap(),
+        )
+        // A lossy source reports no depth of its own.
+        assertEquals(false, UsbSourceInfo("AAC", 44100, 0, 2, true).toMap().containsKey("sourceBitDepth"))
+    }
+
+    @Test
+    fun losslessSourcesAbove24BitsCannotStayExact() {
+        assertEquals(16, UsbDirectFormats.losslessContainerBits(8))
+        assertEquals(16, UsbDirectFormats.losslessContainerBits(16))
+        assertEquals(24, UsbDirectFormats.losslessContainerBits(20))
+        assertEquals(24, UsbDirectFormats.losslessContainerBits(24))
+        assertNull(UsbDirectFormats.losslessContainerBits(32))
+        assertNull(UsbDirectFormats.losslessContainerBits(0))
+        // Why: a 32-bit integer needs more than a float's 24 significant bits.
+        val sample = 0x7fffff7f
+        assertEquals(false, (sample.toFloat().toDouble()).toLong() == sample.toLong())
+    }
+
+    /** Decoders scale an n-bit integer by 2^-(n-1); every value must come back unchanged. */
+    private fun assertFloatRoundTrip(bits: Int) {
+        val count = 1 shl bits
+        val chunk = minOf(count, 1 shl 20)
+        val input = ByteBuffer.allocateDirect(chunk * 4).order(ByteOrder.LITTLE_ENDIAN)
+        var reuse: ByteBuffer? = null
+        var start = -(1 shl (bits - 1))
+        val end = 1 shl (bits - 1)
+        val scale = 1.0f / (1 shl (bits - 1))
+        while (start < end) {
+            val size = minOf(chunk, end - start)
+            input.clear()
+            for (i in 0 until size) input.putFloat((start + i) * scale)
+            input.flip()
+            val output = BitPerfectPcm.convert(input, 32, bits, 32, true, reuse).also { reuse = it }
+            for (i in 0 until size) assertEquals(start + i, output.int shr (32 - bits))
+            start += size
+        }
+    }
+
+    @Test
+    fun everySixteenBitValueSurvivesFloatDecoding() = assertFloatRoundTrip(16)
+
+    @Test
+    fun everyTwentyFourBitValueSurvivesFloatDecoding() = assertFloatRoundTrip(24)
+
+    @Test
+    fun floatOutputWithMorePrecisionThanTheSourceIsRejected() {
+        val inexact = floats(0.5f + 1f / (1 shl 20))
+        assertThrows(IllegalArgumentException::class.java) { BitPerfectPcm.convert(inexact, 32, 16, 24, true) }
+    }
+
+    @Test
+    fun lossyFloatsRoundWithoutDitherAndClip() {
+        val step = 1f / (1 shl 23)
+        val input = floats(0f, 0.4f * step, 0.6f * step, -0.6f * step, 1.5f, -1.5f, Float.NaN, 0.5f)
+        val output = UsbDirectFormats.quantize(input, 24, 32)
+        val samples = IntArray(8) { output.int shr 8 }
+        assertArrayEquals(intArrayOf(0, 0, 1, -1, (1 shl 23) - 1, -(1 shl 23), 0, 1 shl 22), samples)
+        val sixteen = UsbDirectFormats.quantize(floats(0.5f, -1f), 16, 16)
+        assertEquals(16384.toShort(), sixteen.short)
+        assertEquals(Short.MIN_VALUE, sixteen.short)
+        val packed = bytes(UsbDirectFormats.quantize(floats(-step), 24, 24))
+        assertArrayEquals(byteArrayOf(-1, -1, -1), packed)
+    }
+
+    @Test
+    fun tailHoldsBackExactlyThePadding() {
+        val random = Random(7)
+        val stream = ByteArray(10000) { random.nextInt().toByte() }
+        for (hold in listOf(0, 1, 6, 4096, 20000)) {
+            val tail = PcmTail(hold)
+            val result = java.io.ByteArrayOutputStream()
+            var offset = 0
+            while (offset < stream.size) {
+                val size = minOf(random.nextInt(1, 3000), stream.size - offset)
+                result.write(bytes(tail.push(ByteBuffer.wrap(stream, offset, size))))
+                offset += size
+            }
+            tail.clear()
+            assertArrayEquals("hold $hold", stream.copyOf(maxOf(0, stream.size - hold)), result.toByteArray())
+        }
+    }
+
+    @Test
+    fun seekSkipMatchesThePcmPath() {
+        assertEquals(0, UsbDirectFormats.skipFrames(1000000, 500000, 44100))
+        assertEquals(44100, UsbDirectFormats.skipFrames(0, 1000000, 44100))
+        // Rounds up so the first sent frame is never before the target.
+        assertEquals(1, UsbDirectFormats.skipFrames(0, 1, 44100))
+        assertEquals(4410, UsbDirectFormats.skipFrames(-100000, 0, 44100))
+        assertEquals(48000 * 3, UsbDirectFormats.skipFrames(2000000, 5000000, 48000))
+    }
+
+    @Test
+    fun readsAlacBitDepthFromBareAndBoxedCookies() {
+        val cookie = ByteArray(24).also {
+            it[3] = 16 // frame length 4096
+            it[4] = 0
+            it[5] = 24
+            it[9] = 2
+        }
+        assertEquals(24, UsbDirectFormats.alacBitDepth(cookie))
+        val boxed = byteArrayOf(0, 0, 0, 36, 'a'.code.toByte(), 'l'.code.toByte(), 'a'.code.toByte(), 'c'.code.toByte(), 0, 0, 0, 0) + cookie
+        assertEquals(24, UsbDirectFormats.alacBitDepth(boxed))
+        assertNull(UsbDirectFormats.alacBitDepth(ByteArray(10)))
+        assertNull(UsbDirectFormats.alacBitDepth(cookie.copyOf().also { it[4] = 1 }))
+    }
+}

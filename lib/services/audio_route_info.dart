@@ -3,19 +3,31 @@ import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('AudioRoute');
 
-enum AudioBitPerfectStatus { verified, systemMixed, processed, unverified }
+enum AudioBitPerfectStatus {
+  verified,
+  systemMixed,
+  processed,
+  unverified,
+  lossySource,
+}
 
 /// Exclusive access bypasses mixing but does not verify unchanged PCM samples.
 /// Only an active verified direct path proves that. Applied software gain or
-/// tempo changes rule it out even when the output is exclusive.
+/// tempo changes rule it out even when the output is exclusive. A direct path
+/// fed by a decoded lossy source has no lossless original to preserve.
 AudioBitPerfectStatus audioBitPerfectStatus({
   required bool directActive,
   required bool exclusiveActive,
   double normalizationGain = 1,
   double tempo = 1,
   double softwareVolume = 1,
+  bool lossySource = false,
 }) {
-  if (directActive) return AudioBitPerfectStatus.verified;
+  if (directActive) {
+    return lossySource
+        ? AudioBitPerfectStatus.lossySource
+        : AudioBitPerfectStatus.verified;
+  }
   if (!exclusiveActive) return AudioBitPerfectStatus.systemMixed;
   if ([
     normalizationGain,

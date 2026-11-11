@@ -255,6 +255,45 @@ pub fn formats(
     result
 }
 
+/// Names the request and the PCM layouts the DAC offers when no alternate
+/// setting matched, so a log explains a refused stream format.
+pub fn mismatch(device: &Device, rate: u32, channels: u8, bits: u8, dsd: bool) -> String {
+    let mut offered: Vec<String> = Vec::new();
+    for a in device.alternates.iter().filter(|a| a.pcm && a.channels > 0) {
+        let mut entry = format!("{}ch {}-bit", a.channels, a.bits);
+        if !a.uac2 && !a.rates.is_empty() {
+            let rates: Vec<String> = a
+                .rates
+                .iter()
+                .map(|(min, max)| {
+                    if min == max {
+                        min.to_string()
+                    } else {
+                        format!("{min}-{max}")
+                    }
+                })
+                .collect();
+            entry.push_str(&format!(" at {} Hz", rates.join("/")));
+        }
+        if !offered.contains(&entry) {
+            offered.push(entry);
+        }
+    }
+    let request = if dsd {
+        format!("{channels}ch DSD {rate} Hz")
+    } else {
+        format!("{channels}ch {bits}-bit {rate} Hz")
+    };
+    if offered.is_empty() {
+        format!("No compatible USB format for {request}; DAC offers no PCM output")
+    } else {
+        format!(
+            "No compatible USB format for {request}; DAC offers {}",
+            offered.join(", ")
+        )
+    }
+}
+
 pub struct PacketClock {
     nominal: f64,
     feedback: Option<f64>,
@@ -402,6 +441,35 @@ mod tests {
         assert_eq!(f[0].1.sample_rate, 176400);
         assert_eq!(f[0].1.encoding, "dop");
         assert!(formats(&device, 96000, 2, 32, false, false).is_empty());
+    }
+    #[test]
+    fn mismatch_names_the_request_and_the_offered_layouts() {
+        let stereo = Alternate {
+            channels: 2,
+            bits: 16,
+            subslot: 2,
+            pcm: true,
+            rates: vec![(44100, 44100), (48000, 96000)],
+            ..Default::default()
+        };
+        let deep = Alternate {
+            bits: 24,
+            subslot: 3,
+            ..stereo.clone()
+        };
+        let device = Device {
+            alternates: vec![stereo.clone(), deep, stereo],
+            ..Default::default()
+        };
+        assert_eq!(
+            mismatch(&device, 44100, 1, 16, false),
+            "No compatible USB format for 1ch 16-bit 44100 Hz; DAC offers \
+             2ch 16-bit at 44100/48000-96000 Hz, 2ch 24-bit at 44100/48000-96000 Hz"
+        );
+        assert_eq!(
+            mismatch(&Device::default(), 2822400, 2, 1, true),
+            "No compatible USB format for 2ch DSD 2822400 Hz; DAC offers no PCM output"
+        );
     }
     #[test]
     fn native_requires_exact_firmware_and_altsetting() {

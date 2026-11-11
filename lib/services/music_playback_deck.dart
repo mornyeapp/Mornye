@@ -68,14 +68,41 @@ class UsbAudioStatus {
     this.bitDepth,
     this.transport = 'pcm',
     this.driver = 'android',
+    this.codec,
+    this.lossy = false,
+    this.sourceBitDepth,
+    this.channels,
   });
+
+  /// A native reply that did not start the output. Keeps the specific
+  /// reason and the source or DAC format the label names.
+  factory UsbAudioStatus.failure(Map<String, dynamic>? reply) => UsbAudioStatus(
+    reason: reply?['reason'] as String? ?? 'unsupported',
+    sampleRate: (reply?['sampleRate'] as num?)?.toInt(),
+    bitDepth: (reply?['bitDepth'] as num?)?.toInt(),
+    codec: reply?['codec'] as String?,
+    lossy: reply?['lossy'] == true,
+    sourceBitDepth: (reply?['sourceBitDepth'] as num?)?.toInt(),
+    channels: (reply?['channels'] as num?)?.toInt(),
+  );
 
   final String reason;
   final String? device;
   final int? sampleRate;
+
+  /// The depth sent to the DAC; for a refused format, the depth asked for.
   final int? bitDepth;
   final String transport;
   final String driver;
+
+  /// The source codec, such as FLAC, ALAC or AAC, when native reports it.
+  final String? codec;
+
+  /// A lossy source decoded by the phone: the transport may be direct, but
+  /// the chain is not bit-perfect to a lossless original.
+  final bool lossy;
+  final int? sourceBitDepth;
+  final int? channels;
 }
 
 final AudioContext _musicAudioContext = AudioContext(
@@ -573,10 +600,16 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
             bitDepth: (response?['bitDepth'] as num?)?.toInt(),
             transport: response?['transport'] as String? ?? 'pcm',
             driver: response?['driver'] as String? ?? 'android',
+            codec: response?['codec'] as String?,
+            lossy: response?['lossy'] == true,
+            sourceBitDepth: (response?['sourceBitDepth'] as num?)?.toInt(),
           );
+          final codec = _preparedStatus.codec;
           _log.i(
             'Native output prepared: ${_preparedStatus.driver}, '
-            '${_preparedStatus.sampleRate} Hz, ${_preparedStatus.bitDepth}-bit',
+            '${_preparedStatus.sampleRate} Hz, ${_preparedStatus.bitDepth}-bit'
+            '${codec == null ? '' : ', $codec'}'
+            '${_preparedStatus.lossy ? ' (lossy source)' : ''}',
           );
           usbAudioStatus.value = _volumeBlocked
               ? const UsbAudioStatus(reason: 'volume_unavailable')
@@ -584,9 +617,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
           _durations.add(_duration!);
           return;
         }
-        usbAudioStatus.value = UsbAudioStatus(
-          reason: response?['reason'] as String? ?? 'unsupported',
-        );
+        usbAudioStatus.value = UsbAudioStatus.failure(response);
         final detail = response?['detail'] as String?;
         if (detail != null && detail.isNotEmpty) {
           _log.w('Native output ${usbAudioStatus.value.reason}: $detail');
@@ -690,7 +721,11 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
         _routeLost = true;
         _timer?.cancel();
         _setState(PlaybackDeckState.paused);
-        usbAudioStatus.value = const UsbAudioStatus(reason: 'route_changed');
+        // A source that stopped decoding is not a lost USB route. Constant
+        // values keep a repeated report from notifying listeners again.
+        usbAudioStatus.value = event['reason'] == 'decode_failed'
+            ? const UsbAudioStatus(reason: 'decode_failed')
+            : const UsbAudioStatus(reason: 'route_changed');
       case 'complete':
         _timer?.cancel();
         _setState(PlaybackDeckState.completed);

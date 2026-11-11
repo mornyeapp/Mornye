@@ -17,6 +17,8 @@ import com.mornye.backend.UsbDirectOutput
 import com.mornye.backend.UsbOutputFormat
 import com.mornye.backend.UsbHardwareVolume
 import io.flutter.plugin.common.MethodCall
+import java.io.FileNotFoundException
+import java.io.IOException
 import java.nio.ByteBuffer
 
 /** Android owns permission/connection; the Rust worker owns isochronous I/O. */
@@ -97,15 +99,16 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
             }
             val request = Permission(device, call, revision, done)
             if (manager.hasPermission(device)) prepare(request)
-            else {
-                permission = request
-                val flags = PendingIntent.FLAG_CANCEL_CURRENT or if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
-                val intent = PendingIntent.getBroadcast(context, revision, Intent(permissionAction).setPackage(context.packageName).putExtra("revision", revision), flags)
-                try { manager.requestPermission(device, intent) }
-                catch (error: Exception) { permission = null; done(mapOf("reason" to "permission_denied"), null) }
-                main.postDelayed({
-                    if (permission === request) { permission = null; done(mapOf("reason" to "permission_denied"), null) }
-                }, 60000)
+            else worker.post {
+                // A file Direct USB cannot play says why without a permission prompt.
+                val failure = probeFailure(call.argument<String>("path"))
+                main.post {
+                    when {
+                        request.revision != revision -> done(mapOf("reason" to "cancelled"), null)
+                        failure != null -> done(failure, null)
+                        else -> requestPermission(request)
+                    }
+                }
             }
             return
         }
@@ -139,28 +142,96 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
         }
     }
 
+    private fun requestPermission(request: Permission) {
+        permission = request
+        val flags = PendingIntent.FLAG_CANCEL_CURRENT or if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
+        val intent = PendingIntent.getBroadcast(context, request.revision, Intent(permissionAction).setPackage(context.packageName).putExtra("revision", request.revision), flags)
+        try { manager.requestPermission(request.device, intent) }
+        catch (error: Exception) { permission = null; request.done(mapOf("reason" to "permission_denied"), null) }
+        main.postDelayed({
+            if (permission === request) { permission = null; request.done(mapOf("reason" to "permission_denied"), null) }
+        }, 60000)
+    }
+
+    /** Reads headers only, never the device; null lets preparation decide. */
+    private fun probeFailure(path: String?): Map<String, Any>? {
+        if (path == null) return null
+        return try {
+            if (!DsdSource.isDsd(path)) UsbPcmSource.probe(path, decodeCompressed = true)
+            null
+        } catch (error: Exception) {
+            if (error !is UsbDirectException && (error !is IOException || error is FileNotFoundException)) null
+            else failure(error, isDsd = false, stage = Stage.SOURCE, info = null, bits = 0)
+        }
+    }
+
+    private enum class Stage { SOURCE, DEVICE, DECODE }
+
+    /** A specific reason for the app, with the source and the full error for the log. */
+    private fun failure(error: Exception, isDsd: Boolean, stage: Stage, info: UsbSourceInfo?, bits: Int): Map<String, Any> {
+        val typed = error as? UsbDirectException
+        val source = typed?.info ?: info
+        val reason = when {
+            isDsd -> "dsd_unsupported"
+            // Before playback starts, normal playback takes over instead of a pause.
+            typed?.reason == UsbDirectFormats.DECODE_FAILED -> UsbDirectFormats.UNSUPPORTED
+            typed != null -> typed.reason
+            // An unreadable file is not a format problem.
+            stage == Stage.SOURCE -> if (error is FileNotFoundException || error is SecurityException) {
+                UsbDirectFormats.UNSUPPORTED
+            } else UsbDirectFormats.FORMAT
+            else -> UsbDirectFormats.classifyOutput(error.message)
+        }
+        val detail = listOfNotNull(source?.describe(), error.message ?: "USB preparation failed").joinToString(": ")
+        android.util.Log.i("UsbDirect", "Direct output unavailable ($reason): $detail")
+        return buildMap {
+            source?.let { putAll(it.toMap()) }
+            put("reason", reason)
+            put("fatal", isDsd)
+            put("detail", detail)
+            if (reason == UsbDirectFormats.DAC_FORMAT && bits > 0) put("bitDepth", bits)
+        }
+    }
+
     private fun prepare(request: Permission) {
         worker.post {
             var isDsd = false
+            var stage = Stage.SOURCE
+            var info: UsbSourceInfo? = null
+            var requestedBits = 0
             try {
                 if (request.revision != revision) { request.done(mapOf("reason" to "cancelled"), null); return@post }
                 closeSource()
                 token = request.call.argument<Int>("token") ?: 0
                 allowFixedVolume = request.call.argument<Boolean>("allowFixedVolume") == true
                 val path = requireNotNull(request.call.argument<String>("path"))
+                // Bounds priming a compressed decoder before the device opens.
+                val deadline = android.os.SystemClock.elapsedRealtime() + 5000
                 isDsd = DsdSource.isDsd(path)
                 dsd = DsdSource.open(path)
                 isDsd = isDsd || dsd != null
                 if (isDsd) requireNotNull(dsd) { "DSD decoder unavailable" }
-                if (!isDsd) pcm = UsbPcmSource(path)
+                if (!isDsd) pcm = UsbPcmSource(path, decodeCompressed = true, deadline = deadline)
+                info = pcm?.info
                 val rate = dsd?.rate ?: requireNotNull(pcm).rate
                 val channels = dsd?.channels ?: requireNotNull(pcm).channels
                 val bits = if (isDsd) 1 else requireNotNull(pcm).bits
                 durationUs = dsd?.durationUs ?: requireNotNull(pcm).durationUs
+                stage = Stage.DEVICE
                 val usb = manager.openDevice(request.device) ?: error("Cannot open USB device")
                 connection = usb
                 deviceId = request.device.deviceId
-                val audio = UsbDirectOutput.open(usb.fileDescriptor, usb.rawDescriptors, rate.toUInt(), channels.toUByte(), bits.toUByte(), isDsd, request.call.argument<Boolean>("allowDop") == true)
+                val allowDop = request.call.argument<Boolean>("allowDop") == true
+                requestedBits = bits
+                val audio = try {
+                    UsbDirectOutput.open(usb.fileDescriptor, usb.rawDescriptors, rate.toUInt(), channels.toUByte(), bits.toUByte(), isDsd, allowDop)
+                } catch (error: Exception) {
+                    // A lossy source has no depth of its own, so a 16-bit DAC can take it.
+                    // The format check fails before libusb touches the device.
+                    if (info?.lossy != true || bits <= 16 || error.message?.startsWith("No compatible USB format") != true) throw error
+                    requestedBits = 16
+                    UsbDirectOutput.open(usb.fileDescriptor, usb.rawDescriptors, rate.toUInt(), channels.toUByte(), 16u, false, false)
+                }
                 output = audio
                 format = audio.format()
                 if (audio.volume().available) {
@@ -169,25 +240,29 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                     }
                 }
                 if (request.revision != revision) { closeSource(); request.done(mapOf("reason" to "cancelled"), null); return@post }
-                val deadline = android.os.SystemClock.elapsedRealtime() + 5000
+                stage = Stage.DECODE
+                val firstBuffer = android.os.SystemClock.elapsedRealtime() + 5000
                 while (pending == null && !ended) {
                     require(request.revision == revision) { "USB prepare cancelled" }
-                    require(android.os.SystemClock.elapsedRealtime() < deadline) { "Decoder timed out" }
+                    require(android.os.SystemClock.elapsedRealtime() < firstBuffer) { "Decoder timed out" }
                     decode()
                     if (pending == null) Thread.sleep(2)
                 }
                 val f = requireNotNull(format)
+                val source = info ?: UsbSourceInfo("DSD", rate, 1, channels)
                 request.done(mapOf("ready" to true, "device" to (request.device.productName ?: "USB audio"),
-                    "sampleRate" to rate, "bitDepth" to f.bits.toInt(), "sourceBitDepth" to bits,
+                    "sampleRate" to rate, "bitDepth" to f.bits.toInt(),
+                    // A lossy source reports 0: its depth is the DAC's, not the file's.
+                    "sourceBitDepth" to if (isDsd) 1 else source.bits,
+                    "codec" to source.codec, "lossy" to source.lossy,
                     "duration" to durationUs / 1000,
                     "transport" to f.encoding, "carrierRate" to f.sampleRate.toLong(), "driver" to "usb_direct",
                     "volume" to volumeMap(audio.volume()),
                     "volumeBlocked" to (!audio.volume().available && !allowFixedVolume)), null)
             } catch (error: Exception) {
-                android.util.Log.i("UsbDirect", "Direct output unavailable: ${error.message}")
                 closeSource()
-                request.done(mapOf("reason" to if (isDsd) "dsd_unsupported" else "unsupported",
-                    "fatal" to isDsd, "detail" to (error.message ?: "USB preparation failed")), null)
+                if (request.revision != revision) request.done(mapOf("reason" to "cancelled"), null)
+                else request.done(failure(error, isDsd, stage, info, requestedBits), null)
             }
         }
     }
@@ -200,7 +275,12 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
             val data = dsdFile.readFrames(f.encoding, f.subslot.toInt())
             if (data == null) ended = true else pending = ByteBuffer.wrap(data)
         } else {
-            pending = requireNotNull(pcm).read(f.subslot.toInt() * 8)
+            pending = try { requireNotNull(pcm).read(f.subslot.toInt() * 8) }
+            catch (error: Exception) {
+                // Separates a source that stopped decoding from a USB transfer failure.
+                throw error as? UsbDirectException
+                    ?: UsbDirectException(UsbDirectFormats.DECODE_FAILED, error.message ?: "Decoding failed", pcm?.info)
+            }
             ended = requireNotNull(pcm).ended
         }
     }
@@ -257,7 +337,11 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                     pause()
                     emit(mapOf("token" to token, "event" to "complete"))
                 } else worker.postDelayed(this, 5)
-            } catch (error: Exception) { fail(error.message ?: "USB transfer failed") }
+            } catch (error: Exception) {
+                val reason = if (error is UsbDirectException) UsbDirectFormats.DECODE_FAILED else "route_changed"
+                fail(listOfNotNull((error as? UsbDirectException)?.info?.describe(), error.message ?: "USB transfer failed")
+                    .joinToString(": "), reason)
+            }
         }
     }
 
@@ -296,8 +380,8 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
         if (wasPlaying) resume()
     }
 
-    private fun fail(reason: String) {
-        android.util.Log.w("UsbDirect", reason)
+    private fun fail(message: String, reason: String = "route_changed") {
+        android.util.Log.w("UsbDirect", "$reason: $message")
         runCatching { pause() }
         failed = true
         output?.shutdown()
@@ -305,7 +389,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
         output = null
         connection?.close()
         connection = null
-        emit(mapOf("token" to token, "event" to "paused", "reason" to "route_changed"))
+        emit(mapOf("token" to token, "event" to "paused", "reason" to reason))
     }
 
     private fun closeSource() {
