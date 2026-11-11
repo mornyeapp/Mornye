@@ -21,6 +21,7 @@ void main() {
       late Directory temporary;
       late NetworkFileEditor editor;
       late List<String> changes;
+      late List<String> awake;
       const original = {
         'title': 'Old title',
         'artist': 'Artist',
@@ -38,6 +39,10 @@ void main() {
           'network-editor-test-',
         );
         changes = [];
+        awake = [];
+        NetworkStorageService.debugEditRecoveryDelaysOverride = const [
+          Duration(milliseconds: 1),
+        ];
         editor = NetworkFileEditor(
           storage: nas.storage,
           input: NetworkAudioAnalysisInput(
@@ -45,9 +50,14 @@ void main() {
             temporaryDirectory: () async => temporary,
           ),
           changed: (source) async => changes.add(source),
+          keepAwake: () async {
+            awake.add('acquire');
+            return () async => awake.add('release');
+          },
         );
       });
       tearDown(() async {
+        NetworkStorageService.debugEditRecoveryDelaysOverride = null;
         await nas.close();
         expect(nas.openHandles, 0);
         expect(nas.openSessions, 0);
@@ -229,6 +239,23 @@ void main() {
       test('a failed final rename restores the original', () async {
         nas.rejectPublish = true;
         expect((await save()).failure, isNotNull);
+        expect(nas.files, {'song.flac': originalBytes()});
+        expect(changes, isEmpty);
+        // The save held its screen-off lease until the restore was done.
+        expect(awake, ['acquire', 'release']);
+      });
+
+      test('a restore that fails once is tried again', () async {
+        // The phone slept: the final rename and the first restore both fail.
+        nas.rejectPublish = true;
+        var restores = 0;
+        nas.beforeMove = (from, to) {
+          if (from.startsWith('mornye-original-') && restores++ == 0) {
+            throw const SocketException('offline');
+          }
+        };
+        expect((await save()).failure, isNotNull);
+        expect(restores, 2);
         expect(nas.files, {'song.flac': originalBytes()});
         expect(changes, isEmpty);
       });

@@ -74,6 +74,10 @@
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
   },
+  "networkEditSaving": "Menyimpan ke penyimpanan jaringan",
+  "@networkEditSaving": {
+    "description": "Notification title while an edited song is saved back to network storage with the screen off"
+  },
   "networkDownloadDescription": "Lagu disiapkan di perangkat, lalu diupload ke NAS. Biarkan aplikasi terbuka sampai upload selesai. Mencoba lagi akan gunakan audio yang disiapkan. File yang ada tetap disimpan; download baru dengan nama sama diberi akhiran nomor.",
   "@networkDownloadDescription": {
     "description": "Help below the network download destination action explaining local preparation, upload, retry behavior, and preservation of existing files; NAS means network-attached storage"

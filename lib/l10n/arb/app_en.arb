@@ -125,6 +125,10 @@
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
   },
+  "networkEditSaving": "Saving to network storage",
+  "@networkEditSaving": {
+    "description": "Notification title while an edited song is saved back to network storage with the screen off"
+  },
   "networkUpload": "Upload to network storage",
   "@networkUpload": {
     "description": "Library song action that copies songs stored on this device to a NAS or WebDAV folder; also the title of the folder choice sheet"

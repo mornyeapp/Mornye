@@ -369,6 +369,17 @@ class NetworkStorageService {
   /// after all upload bytes have been flushed. Accommodates slow NAS disk I/O.
   static const uploadResponseTimeout = Duration(minutes: 30);
 
+  /// Waits between attempts to restore or clean up after a failed edit.
+  static const editRecoveryDelays = [
+    Duration(seconds: 2),
+    Duration(seconds: 5),
+    Duration(seconds: 15),
+    Duration(seconds: 30),
+  ];
+
+  @visibleForTesting
+  static List<Duration>? debugEditRecoveryDelaysOverride;
+
   @visibleForTesting
   static Duration? debugTimeoutOverride;
 
