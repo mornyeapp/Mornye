@@ -129,29 +129,37 @@ extension _LocalLibrarySources on LocalLibraryNotifier {
     _isLoaded = true;
   }
 
+  /// Moves the one folder of builds before multiple folders into the folder
+  /// list, once: the old setting is cleared afterwards. Every reload runs
+  /// this, including the one after each metadata save, so a setting left
+  /// behind would bring a removed folder back as offline.
   Future<void> _migrateLegacySource() async {
     final settings = ref.read(settingsProvider);
     final path = settings.localLibraryPath.trim();
     if (path.isEmpty) return;
-    if (await _db.getSourceByPath(path) != null) return;
-    DateTime? legacyLastScannedAt;
-    try {
-      legacyLastScannedAt = readLocalLibraryLastScannedAt(await _prefs);
-    } catch (_) {}
-    _sourceVersion++;
-    await _db.migrateLegacySource(
-      path: path,
-      displayName: _displayNameForPath(path),
-      bookmark: settings.localLibraryBookmark.trim().isEmpty
-          ? null
-          : settings.localLibraryBookmark,
-      isRemovable: _looksLikeRemovablePath(path),
-      available: await _isPathAvailable(
-        path,
-        bookmark: settings.localLibraryBookmark,
-      ),
-      lastScannedAt: legacyLastScannedAt,
-    );
+    if (await _db.getSourceByPath(path) == null) {
+      DateTime? legacyLastScannedAt;
+      try {
+        legacyLastScannedAt = readLocalLibraryLastScannedAt(await _prefs);
+      } catch (_) {}
+      _sourceVersion++;
+      await _db.migrateLegacySource(
+        path: path,
+        displayName: _displayNameForPath(path),
+        bookmark: settings.localLibraryBookmark.trim().isEmpty
+            ? null
+            : settings.localLibraryBookmark,
+        isRemovable: _looksLikeRemovablePath(path),
+        available: await _isPathAvailable(
+          path,
+          bookmark: settings.localLibraryBookmark,
+        ),
+        lastScannedAt: legacyLastScannedAt,
+      );
+    }
+    // The folder list keeps the path and bookmark from here on.
+    if (!ref.mounted) return;
+    ref.read(settingsProvider.notifier).setLocalLibraryPathAndBookmark('', '');
   }
 
   String _displayNameForPath(String path) {
