@@ -7,7 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show ValueListenable, listEquals;
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter/rendering.dart'
-    show OverflowBoxFit, RenderAbstractViewport, ScrollDirection;
+    show
+        ItemExtentBuilder,
+        OverflowBoxFit,
+        RenderAbstractViewport,
+        ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -176,10 +180,18 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   bool _measurementFramePending = false;
   double? _viewportHeight;
   Offset? _layoutVisibility;
-  late final AnimationController _rowReveal = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-  )..addListener(_revealTick);
+  late final AnimationController _rowReveal =
+      AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 420),
+        )
+        ..addListener(_revealTick)
+        ..addStatusListener(_revealStatusChanged);
+  // Rows are rebuilt only when their inputs change. A reveal tick moves row
+  // extents and the rows being revealed, which listen to it themselves.
+  bool _rowsDirty = true;
+  int _rowsRevision = 0;
+  Object? _rowInputs;
   List<double> _revealFrom = [];
   List<double> _revealTo = [];
   _LyricExtentSnapshot? _targetLineExtents;
@@ -217,8 +229,21 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     _scrollMotion.forward(from: 0);
   }
 
+  @override
+  void setState(VoidCallback fn) {
+    _rowsDirty = true;
+    super.setState(fn);
+  }
+
+  /// Rebuilds the list shell for the new extents and leaves the rows alone:
+  /// rebuilding every visible row on each frame of a reveal made backing
+  /// vocals and instrumental gaps stutter as they opened.
   void _revealTick() {
-    if (mounted) setState(() {});
+    if (mounted) super.setState(() {});
+  }
+
+  void _revealStatusChanged(AnimationStatus status) {
+    if (mounted && status.isCompleted) setState(() {});
   }
 
   List<double> get _rowVisibility {
@@ -228,6 +253,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   }
 
   void _updateRowVisibility({bool immediate = false, bool sameFocus = false}) {
+    _rowsDirty = true;
     _preserveRevealAnchor = sameFocus;
     final target = List.generate(_lines.length, (index) {
       final line = _lines[index];
@@ -274,6 +300,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _rowsDirty = true;
     // Appearance can rebuild when transport controls fade (for example with
     // custom glass clarity). Keep the existing playback subscription and the
     // user's scroll ownership; only new lyrics/page activation should reset it.
@@ -295,6 +322,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   @override
   void didUpdateWidget(covariant SyncedLyricsView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _rowsDirty = true;
     if (oldWidget.seekPreview != widget.seekPreview) {
       oldWidget.seekPreview.removeListener(_previewChanged);
       widget.seekPreview.addListener(_previewChanged);
@@ -319,6 +347,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   }
 
   void _resetLineKeys() {
+    _rowsDirty = true;
     _stopScrollMotion();
     _measurementTimer?.cancel();
     _measurementTimer = null;
@@ -351,6 +380,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   }
 
   void _syncPositionSubscription({bool resetUserScroll = true}) {
+    _rowsDirty = true;
     _positionSubscription?.close();
     _playingSubscription?.close();
     _loadingSubscription?.close();
@@ -1093,7 +1123,27 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                   double.infinity,
                 )
               : topPadding;
-          final list = ListView.builder(
+          final rowInputs = (
+            visibility,
+            loading,
+            mornye,
+            highContrast,
+            blurStrength,
+            blurLyrics,
+            motion,
+            constraints.maxWidth,
+            _measurementRevision,
+            widget.seekPreview.value != null,
+            _visible,
+            _rowReveal.isAnimating,
+          );
+          if (_rowsDirty || rowInputs != _rowInputs) {
+            _rowsDirty = false;
+            _rowInputs = rowInputs;
+            _rowsRevision++;
+          }
+          final list = _lyricList(
+            revision: _rowsRevision,
             controller: _scroll,
             itemExtentBuilder: mornye
                 ? (index, _) => index < lines.length
@@ -1113,8 +1163,12 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
               final line = lines[index];
               final leadIndex = _displayLayout.leadForLine[index];
               final textAlign = _lyricTextAlign(context, lines[leadIndex]);
-              final reveal = rowVisibility[index];
-              if (reveal == 0) return SizedBox.shrink(key: _lineKeys[index]);
+              // A row about to open is built now: no later frame of its
+              // reveal rebuilds it.
+              if (rowVisibility[index] == 0 &&
+                  !(_rowReveal.isAnimating && _revealTo[index] != 0)) {
+                return SizedBox.shrink(key: _lineKeys[index]);
+              }
               final isActive = _activeLines.contains(index);
               final isPast = index < active;
 
@@ -1129,7 +1183,6 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
               if (line.text.isEmpty) {
                 return _revealRow(
                   index,
-                  reveal,
                   textAlign,
                   Padding(
                     padding: EdgeInsets.symmetric(
@@ -1259,7 +1312,6 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
               );
               return _revealRow(
                 index,
-                reveal,
                 textAlign,
                 Padding(
                   padding: _linePadding(index),
@@ -1310,12 +1362,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     );
   }
 
-  Widget _revealRow(
-    int index,
-    double visibility,
-    TextAlign align,
-    Widget child,
-  ) {
+  Widget _revealRow(int index, TextAlign align, Widget child) {
     final AlignmentGeometry alignment = align == TextAlign.end
         ? AlignmentDirectional.topEnd
         : align == TextAlign.center
@@ -1334,19 +1381,28 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       key: _lineKeys[index],
       child: !_lines[index].isBackground && _lines[index].text.isNotEmpty
           ? child
-          : IgnorePointer(
-              ignoring: visibility < 1,
-              child: _lines[index].isBackground
-                  ? LyricBackingTransition(
-                      visibility: visibility,
-                      alignment: alignment,
-                      child: fullHeight,
-                    )
-                  : LyricSupplementTransition(
-                      visibility: visibility,
-                      alignment: alignment,
-                      child: fullHeight,
-                    ),
+          // Only these rows open and close. They follow the reveal clock
+          // themselves, so the other rows are not rebuilt on its frames.
+          : ListenableBuilder(
+              listenable: _rowReveal,
+              child: fullHeight,
+              builder: (context, fullHeight) {
+                final visibility = _rowVisibility[index];
+                return IgnorePointer(
+                  ignoring: visibility < 1,
+                  child: _lines[index].isBackground
+                      ? LyricBackingTransition(
+                          visibility: visibility,
+                          alignment: alignment,
+                          child: fullHeight!,
+                        )
+                      : LyricSupplementTransition(
+                          visibility: visibility,
+                          alignment: alignment,
+                          child: fullHeight!,
+                        ),
+                );
+              },
             ),
     );
   }
@@ -1364,6 +1420,40 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       bottom: hasBackingBelow ? 0 : context.tokens.lyricsLinePaddingV,
     );
   }
+}
+
+/// A [ListView.builder] whose built rows stay as they are until [revision]
+/// changes. Rows that scroll into view are still built on demand.
+ListView _lyricList({
+  required int revision,
+  required ScrollController controller,
+  required ItemExtentBuilder? itemExtentBuilder,
+  required EdgeInsets padding,
+  required int itemCount,
+  required NullableIndexedWidgetBuilder itemBuilder,
+}) => ListView.custom(
+  controller: controller,
+  itemExtentBuilder: itemExtentBuilder,
+  padding: padding,
+  childrenDelegate: _LyricRowsDelegate(
+    itemBuilder,
+    childCount: itemCount,
+    revision: revision,
+  ),
+);
+
+class _LyricRowsDelegate extends SliverChildBuilderDelegate {
+  _LyricRowsDelegate(
+    super.builder, {
+    required super.childCount,
+    required this.revision,
+  });
+
+  final int revision;
+
+  @override
+  bool shouldRebuild(covariant _LyricRowsDelegate oldDelegate) =>
+      oldDelegate.revision != revision;
 }
 
 class _LyricRowVisibility extends ListBase<double> {

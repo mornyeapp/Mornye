@@ -126,5 +126,108 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
+
+    testWidgets('$style opens a backing row without rebuilding the others', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(412, 892);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final playback = StreamController<PlaybackState>.broadcast();
+      final preview = ValueNotifier<Duration?>(null);
+      addTearDown(playback.close);
+      addTearDown(preview.dispose);
+      final theme = mornye
+          ? MornyeTheme.build(Brightness.dark)
+          : AppTheme.dark();
+      const lyrics = ParsedLyrics(
+        synced: true,
+        wordSynced: false,
+        plainText: '',
+        lines: [
+          LyricLine(
+            time: Duration.zero,
+            end: Duration(seconds: 4),
+            text: 'Lead phrase',
+          ),
+          LyricLine(
+            time: Duration(seconds: 1),
+            end: Duration(seconds: 3),
+            text: 'Backing phrase',
+            isBackground: true,
+          ),
+          LyricLine(time: Duration(seconds: 5), text: 'Second phrase'),
+          LyricLine(time: Duration(seconds: 10), text: 'Third phrase'),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            playbackStateProvider.overrideWith((ref) => playback.stream),
+          ],
+          child: MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: SyncedLyricsView(
+                lyrics: lyrics,
+                seekPreview: preview,
+                colorScheme: theme.colorScheme,
+                isActive: true,
+                showPronunciation: false,
+                showTranslation: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      Future<void> report(int milliseconds) async {
+        playback.add(
+          PlaybackState(
+            processingState: AudioProcessingState.ready,
+            updatePosition: Duration(milliseconds: milliseconds),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+      }
+
+      await report(100);
+      await tester.pumpAndSettle();
+      expect(find.text('Backing phrase'), findsNothing);
+      Widget row(String text) => tester.widget(
+        find.ancestor(
+          of: find.text(text),
+          matching: find.byType(LyricScrollMotion),
+        ),
+      );
+      double top(String text) => tester.getTopLeft(find.text(text)).dy;
+
+      await report(1000);
+      final second = row('Second phrase');
+      final third = row('Third phrase');
+      final tops = <double>[top('Second phrase')];
+      for (var frame = 0; frame < 12; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        tops.add(top('Second phrase'));
+        expect(
+          row('Second phrase'),
+          same(second),
+          reason: 'A reveal frame rebuilds only the row that opens',
+        );
+        expect(row('Third phrase'), same(third));
+      }
+      expect(find.text('Backing phrase'), findsOneWidget);
+      expect(
+        tops.last,
+        greaterThan(tops.first + 4),
+        reason: 'The row below still moves as the backing row opens',
+      );
+      for (var frame = 1; frame < tops.length; frame++) {
+        expect(tops[frame], greaterThanOrEqualTo(tops[frame - 1] - 0.01));
+      }
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 }
