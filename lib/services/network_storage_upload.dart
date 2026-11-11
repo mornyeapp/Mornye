@@ -260,8 +260,12 @@ extension NetworkStorageUpload on NetworkStorageService {
     }
   }
 
-  /// Publish using a hidden temporary name and a non-overwriting rename.
-  /// A lost rename response is reconciled by content, never length alone.
+  /// Publish using a temporary name and a non-overwriting rename. A lost
+  /// rename response is reconciled by content, never length alone.
+  ///
+  /// The temporary name has no leading dot: Samba-based servers store the
+  /// hidden attribute a dot name gets at creation, and the rename keeps it,
+  /// which left every uploaded or edited song hidden.
   Future<void> publishUpload(
     String source,
     File file,
@@ -283,7 +287,7 @@ extension NetworkStorageUpload on NetworkStorageService {
       throw StateError('Network destination already contains a different file');
     }
     final token = sha256.convert(utf8.encode(transferId)).toString();
-    final temporary = '$parent.mornye-$token.part';
+    final temporary = '${parent}mornye-$token.part';
     if (c.protocol == NetworkProtocol.webdav) {
       try {
         await _uploadCommand(

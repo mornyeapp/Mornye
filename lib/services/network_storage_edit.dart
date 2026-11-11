@@ -68,8 +68,10 @@ extension NetworkStorageEdit on NetworkStorageService {
     )).where((entry) => entry.path == path && !entry.directory).firstOrNull;
     if (entry == null) throw const FileSystemException('File is unavailable');
     final token = NetworkStorageService.newId();
-    final staging = '$parent.mornye-edit-$token.part';
-    final backup = '$parent.mornye-original-$token.part';
+    // No leading dot, which Samba would keep as a hidden attribute on the
+    // song (see publishUpload).
+    final staging = '${parent}mornye-edit-$token.part';
+    final backup = '${parent}mornye-original-$token.part';
     final stagingSource = NetworkStorageService.source(connection.id, staging);
     final backupSource = NetworkStorageService.source(connection.id, backup);
     final editedLength = await edited.length();

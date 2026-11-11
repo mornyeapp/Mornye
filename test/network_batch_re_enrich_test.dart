@@ -172,7 +172,7 @@ void main() {
         () async {
           nas.files['song.lrc'] = utf8.encode('Old lyrics');
           nas.beforeMove = (from, to) {
-            if (from.startsWith('.mornye-edit-') && to == 'song.lrc') {
+            if (from.startsWith('mornye-edit-') && to == 'song.lrc') {
               throw const Smb2Exception(
                 'Cannot publish lyrics',
                 type: Smb2ErrorType.accessDenied,

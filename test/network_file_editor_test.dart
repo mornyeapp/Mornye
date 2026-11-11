@@ -115,6 +115,18 @@ void main() {
         });
         expect(nas.files.keys, ['song.flac']);
         expect(changes, [NetworkEditFixture.source]);
+        // Samba keeps the hidden attribute of a dot name through a rename,
+        // so no file on the way to the song may start with a dot.
+        final written = [
+          for (final method in nas.methods)
+            if (method.startsWith('PUT ') || method.startsWith('MOVE '))
+              ...method.split(' ').skip(1),
+        ];
+        expect(written, isNotEmpty);
+        expect(
+          written.where((path) => path.split('/').last.startsWith('.')),
+          isEmpty,
+        );
       });
 
       if (protocol == NetworkProtocol.webdav) {
@@ -226,7 +238,7 @@ void main() {
           jsonEncode({...original, 'title': 'Other editor'}),
         );
         nas.beforeMove = (from, to) {
-          if (from == 'song.flac' && to.startsWith('.mornye-original-')) {
+          if (from == 'song.flac' && to.startsWith('mornye-original-')) {
             nas.files[from] = external;
           }
         };
