@@ -677,6 +677,7 @@ class _NetworkConnectionFormState extends State<_NetworkConnectionForm> {
   late final _apiKey = TextEditingController(text: widget.connection?.apiKey);
   late var _auth = widget.connection?.subsonicAuth ?? SubsonicAuth.saltedToken;
   late var _protocol = widget.connection?.protocol ?? NetworkProtocol.smb;
+  late var _smbEncrypt = widget.connection?.smbEncrypt ?? false;
   late String? _trustedCertificate =
       widget.connection?.trustedCertificateSha256;
   late String? _trustedOrigin = widget.connection?.root.scheme == 'https'
@@ -728,6 +729,7 @@ class _NetworkConnectionFormState extends State<_NetworkConnectionForm> {
             ? ''
             : _password.text,
         domain: _domain.text.trim(),
+        smbEncrypt: _protocol == NetworkProtocol.smb && _smbEncrypt,
         subsonicAuth: _auth,
         apiKey:
             _protocol == NetworkProtocol.subsonic &&
@@ -1004,6 +1006,16 @@ class _NetworkConnectionFormState extends State<_NetworkConnectionForm> {
                       if (_protocol == NetworkProtocol.smb)
                         _field(_domain, context.l10n.networkDomain),
                       const SizedBox(height: 12),
+                      if (_protocol == NetworkProtocol.smb)
+                        SettingsSwitchItem(
+                          title: context.l10n.networkSmbEncrypt,
+                          subtitle: context.l10n.networkSmbEncryptDescription,
+                          value: _smbEncrypt,
+                          enabled: !_busy,
+                          showDivider: false,
+                          onChanged: (value) =>
+                              setState(() => _smbEncrypt = value),
+                        ),
                     ],
                   ),
                   Padding(

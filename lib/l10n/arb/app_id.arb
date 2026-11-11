@@ -182,6 +182,14 @@
   "@networkDomain": {
     "description": "Optional connection form field shown only for SMB; refers to the authentication domain, not the server's internet domain name"
   },
+  "networkSmbEncrypt": "Enkripsi koneksi (SMB3)",
+  "@networkSmbEncrypt": {
+    "description": "Switch in the SMB connection form that requires SMB3 encryption; preserve the name SMB3"
+  },
+  "networkSmbEncryptDescription": "Nyalakan jika server mewajibkan enkripsi. Server harus mendukung SMB3, dan alamat harus menyertakan folder bersama, misalnya smb://server/Music/.",
+  "@networkSmbEncryptDescription": {
+    "description": "Explains the SMB3 encryption switch: when to use it, that it needs SMB3, and that shared folders cannot be listed so the address needs the share name"
+  },
   "networkConnectSave": "Hubungkan dan simpan",
   "@networkConnectSave": {
     "description": "Connection form action that checks access to the network source before saving the connection"

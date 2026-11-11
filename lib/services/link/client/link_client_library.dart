@@ -86,6 +86,7 @@ class LinkNetworkLibraryBridge implements LinkLibraryBridge {
         username: current.username,
         password: current.password,
         domain: current.domain,
+        smbEncrypt: current.smbEncrypt,
         trustedCertificateSha256: current.trustedCertificateSha256,
         subsonicAuth: current.subsonicAuth,
         apiKey: current.apiKey,

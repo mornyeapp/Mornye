@@ -399,6 +399,25 @@ void main() {
     },
   );
 
+  test('the SMB3 encryption choice is saved and reaches the logon', () async {
+    setUpStorage(idle: const Duration(seconds: 5));
+    final plain = _connection();
+    expect(plain.toJson().containsKey('smbEncrypt'), isFalse);
+    await storage.save(plain);
+    await storage.list(plain);
+    expect(server.logins.single.encrypt, isFalse);
+
+    final encrypted = NetworkConnection.fromJson({
+      ...plain.toJson(),
+      'smbEncrypt': true,
+    });
+    expect(encrypted.toJson()['smbEncrypt'], isTrue);
+    await storage.save(encrypted);
+    await storage.list(encrypted);
+    // The choice is part of the logon, so it opens its own session.
+    expect(server.logins.last.encrypt, isTrue);
+  });
+
   test('an idle session closes and the next call logs on again', () async {
     const idle = Duration(milliseconds: 200);
     setUpStorage(idle: idle);

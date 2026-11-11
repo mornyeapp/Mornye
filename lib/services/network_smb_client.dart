@@ -41,6 +41,9 @@ typedef NetworkSmbLogin = ({
   String username,
   String password,
   String domain,
+  // SMB3 encryption for the whole session; servers that require it refuse
+  // a session without it.
+  bool encrypt,
   Duration timeout,
 });
 
@@ -67,12 +70,14 @@ class NetworkSmbClient {
     required String password,
     required String domain,
     required Duration timeout,
+    bool encrypt = false,
   }) async {
     final (:login, :path) = _target(
       target,
       username: username,
       password: password,
       domain: domain,
+      encrypt: encrypt,
       timeout: timeout,
     );
     final share = await _native.synchronized(() => _connectPool(login));
@@ -89,6 +94,7 @@ class NetworkSmbClient {
     required String password,
     required String domain,
     required Duration timeout,
+    bool encrypt = false,
   }) {
     final segments = target.pathSegments.where((s) => s.isNotEmpty).toList();
     return (
@@ -98,6 +104,7 @@ class NetworkSmbClient {
         username: username,
         password: password,
         domain: domain,
+        encrypt: encrypt,
         timeout: timeout,
       ),
       path: segments.skip(1).join('/'),
@@ -292,12 +299,14 @@ class NetworkSmbSessions {
     required String password,
     required String domain,
     required Duration timeout,
+    bool encrypt = false,
   }) async {
     final (:login, :path) = NetworkSmbClient._target(
       target,
       username: username,
       password: password,
       domain: domain,
+      encrypt: encrypt,
       timeout: timeout,
     );
     final share = await NetworkSmbClient._native.synchronized(
@@ -319,12 +328,14 @@ class NetworkSmbSessions {
     required String password,
     required String domain,
     required Duration timeout,
+    bool encrypt = false,
   }) async {
     final (:login, :path) = NetworkSmbClient._target(
       target,
       username: username,
       password: password,
       domain: domain,
+      encrypt: encrypt,
       timeout: timeout,
     );
     final key = (id: id, login: login);
@@ -426,7 +437,9 @@ Future<NetworkSmbShare> _connectPool(NetworkSmbLogin login) async => _PoolShare(
     domain: login.domain,
     workers: 1,
     timeout: login.timeout,
-    version: Smb2Version.any,
+    // Encryption exists only in SMB 3.x, so never fall back to 2.x with it.
+    seal: login.encrypt,
+    version: login.encrypt ? Smb2Version.any3 : Smb2Version.any,
   ),
 );
 

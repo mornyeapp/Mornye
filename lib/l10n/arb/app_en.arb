@@ -274,6 +274,14 @@
   "@networkDomain": {
     "description": "Optional connection form field shown only for SMB; refers to the authentication domain, not the server's internet domain name"
   },
+  "networkSmbEncrypt": "Encrypt connection (SMB3)",
+  "@networkSmbEncrypt": {
+    "description": "Switch in the SMB connection form that requires SMB3 encryption; preserve the name SMB3"
+  },
+  "networkSmbEncryptDescription": "Turn on when the server requires encryption. The server must support SMB3, and the address must include the shared folder, such as smb://server/Music/.",
+  "@networkSmbEncryptDescription": {
+    "description": "Explains the SMB3 encryption switch: when to use it, that it needs SMB3, and that shared folders cannot be listed so the address needs the share name"
+  },
   "networkConnectSave": "Connect and save",
   "@networkConnectSave": {
     "description": "Connection form action that checks access to the network source before saving the connection"

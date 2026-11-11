@@ -104,9 +104,13 @@ class NetworkConnection {
     this.trustedCertificateSha256,
     this.subsonicAuth = SubsonicAuth.saltedToken,
     this.apiKey = '',
+    this.smbEncrypt = false,
   });
   final String id, name, address, username, password, domain;
   final NetworkProtocol protocol;
+
+  /// SMB only: require SMB3 encryption for the session.
+  final bool smbEncrypt;
   final String? trustedCertificateSha256;
   final SubsonicAuth subsonicAuth;
   final String apiKey;
@@ -121,6 +125,7 @@ class NetworkConnection {
     'username': username,
     'password': password,
     'domain': domain,
+    if (protocol == NetworkProtocol.smb && smbEncrypt) 'smbEncrypt': true,
     if (protocol == NetworkProtocol.subsonic) ...{
       'subsonicAuth': subsonicAuth.name,
       'apiKey': apiKey,
@@ -142,6 +147,7 @@ class NetworkConnection {
           json['subsonicAuth'] as String? ?? 'saltedToken',
         ),
         apiKey: json['apiKey'] as String? ?? '',
+        smbEncrypt: json['smbEncrypt'] as bool? ?? false,
       );
 
   void validate() {
@@ -755,6 +761,7 @@ class NetworkStorageService {
             username: c.username,
             password: c.password,
             domain: c.domain,
+            encrypt: c.smbEncrypt,
             timeout: timeout,
           )
         : _smbSessions.connect(
@@ -762,6 +769,7 @@ class NetworkStorageService {
             username: c.username,
             password: c.password,
             domain: c.domain,
+            encrypt: c.smbEncrypt,
             timeout: timeout,
           );
     unawaited(

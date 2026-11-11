@@ -22,6 +22,16 @@ import 'package:mornye/services/music_player_service.dart'
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 
+/// Scrolls [finder] into view. The page header shrinks while scrolling, so
+/// the first pass stops short; a second one, with the header collapsed,
+/// lands on the widget.
+Future<void> _reveal(WidgetTester tester, Finder finder) async {
+  for (var pass = 0; pass < 2; pass++) {
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+  }
+}
+
 void main() {
   testWidgets('network browser honors external player mode', (tester) async {
     final opened = <String>[];
@@ -181,7 +191,7 @@ void main() {
       'smb://server/share',
     );
     final save = find.widgetWithText(AppActionButton, 'Connect and save');
-    await tester.ensureVisible(save);
+    await _reveal(tester, save);
     await tester.pumpAndSettle();
     await tester.tap(save);
     await tester.pumpAndSettle();
@@ -226,7 +236,7 @@ void main() {
             'http://nas.test:8080/music/',
           );
           final save = find.widgetWithText(AppActionButton, 'Connect and save');
-          await tester.ensureVisible(save);
+          await _reveal(tester, save);
           await tester.pumpAndSettle();
           await tester.tap(save);
           await tester.pumpAndSettle();
@@ -318,7 +328,7 @@ void main() {
         await tester.enterText(address, 'https://nas.test:6008/music');
         await tester.pumpAndSettle();
         final save = find.widgetWithText(AppActionButton, 'Connect and save');
-        await tester.ensureVisible(save);
+        await _reveal(tester, save);
         await tester.pumpAndSettle();
         await tester.tap(save);
         await tester.pumpAndSettle();
@@ -489,7 +499,7 @@ void main() {
           'smb://nas.test/Music/',
         );
         final save = find.widgetWithText(AppActionButton, 'Connect and save');
-        await tester.ensureVisible(save);
+        await _reveal(tester, save);
         await tester.pumpAndSettle();
         await tester.tap(save);
         await tester.pumpAndSettle();
