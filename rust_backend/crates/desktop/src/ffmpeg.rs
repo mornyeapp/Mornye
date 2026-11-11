@@ -120,7 +120,10 @@ fn pump_commands(commands: &FfmpegCommands, running: &AtomicBool, ffmpeg: Option
 mod staging {
     use super::*;
 
-    pub(super) const PREFIX: &str = ".mornye-ffmpeg-mornye-desktop-";
+    /// No leading dot: Samba and NTFS drivers with hide_dot_files keep a dot
+    /// name's hidden attribute through the rename onto the song. Library
+    /// scans skip the `.partial.<ext>` stage instead.
+    pub(super) const PREFIX: &str = "mornye-ffmpeg-mornye-desktop-";
 
     static SWEPT: Mutex<Option<HashSet<PathBuf>>> = Mutex::new(None);
 
@@ -128,7 +131,11 @@ mod staging {
         for entry in fs::read_dir(directory)? {
             let entry = entry?;
             let name = entry.file_name();
-            let Some(suffix) = name.to_str().and_then(|name| name.strip_prefix(PREFIX)) else {
+            // Earlier versions put a dot in front of the same prefix.
+            let Some(suffix) = name
+                .to_str()
+                .and_then(|name| name.strip_prefix('.').unwrap_or(name).strip_prefix(PREFIX))
+            else {
                 continue;
             };
             let token = suffix.get(..36).unwrap_or("");
@@ -160,7 +167,7 @@ mod staging {
             .extension()
             .map(|extension| extension.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let staged = directory.join(format!("{PREFIX}{}.{extension}", paths::uuid()));
+        let staged = directory.join(format!("{PREFIX}{}.partial.{extension}", paths::uuid()));
         fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -349,12 +356,10 @@ mod tests {
         let result = execute_command(&command(&output), &|| false, &|arguments, _| {
             let staged = PathBuf::from(arguments.last().unwrap());
             assert_ne!(staged, output);
+            let name = staged.file_name().unwrap().to_string_lossy().into_owned();
             assert!(
-                staged
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .starts_with(staging::PREFIX)
+                name.starts_with(staging::PREFIX) && name.ends_with(".partial.flac"),
+                "{name}"
             );
             fs::write(&staged, b"new").unwrap();
             seen.borrow_mut().push(staged);
@@ -363,6 +368,25 @@ mod tests {
         assert_eq!(result, (true, "log".into()));
         assert_eq!(fs::read(&output).unwrap(), b"new");
         assert!(!seen.borrow()[0].exists());
+    }
+
+    #[test]
+    fn first_command_sweeps_current_and_earlier_dotted_stages() {
+        let directory = tempfile::tempdir().unwrap();
+        let current =
+            directory
+                .path()
+                .join(format!("{}{}.partial.flac", staging::PREFIX, paths::uuid()));
+        let dotted = directory
+            .path()
+            .join(format!(".{}{}.flac", staging::PREFIX, paths::uuid()));
+        let foreign = directory.path().join("mornye-ffmpeg-other-app-x.flac");
+        for path in [&current, &dotted, &foreign] {
+            fs::write(path, b"left over").unwrap();
+        }
+        let staged = staging::create(&directory.path().join("song.flac")).unwrap();
+        assert!(!current.exists() && !dotted.exists());
+        assert!(foreign.exists() && staged.exists());
     }
 
     #[test]

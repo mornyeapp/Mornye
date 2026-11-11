@@ -963,7 +963,7 @@ mod tests {
                             .unwrap()
                             .file_name()
                             .to_string_lossy()
-                            .starts_with('.')
+                            .ends_with(".partial")
                     })
                     .count()
             });

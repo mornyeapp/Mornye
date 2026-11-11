@@ -123,7 +123,8 @@ fn is_content_change(kind: &EventKind) -> bool {
     }
 }
 
-/// Hidden files (`.DS_Store`, editor swap files) and partial downloads.
+/// Hidden files (`.DS_Store`, editor swap files) and partial downloads,
+/// including FFmpeg stages that keep their format after `.partial`.
 pub(crate) fn is_ignored(path: &Path) -> bool {
     let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
         return false;
@@ -134,6 +135,9 @@ pub(crate) fn is_ignored(path: &Path) -> bool {
         || [".part", ".tmp", ".crdownload", ".partial"]
             .iter()
             .any(|suffix| lower.ends_with(suffix))
+        || lower
+            .rsplit_once('.')
+            .is_some_and(|(stem, _)| stem.ends_with(".partial"))
 }
 
 #[cfg(test)]
@@ -146,7 +150,10 @@ mod tests {
         assert!(is_ignored(Path::new("/m/.DS_Store")));
         assert!(is_ignored(Path::new("/m/a.flac.part")));
         assert!(is_ignored(Path::new("/m/a.TMP")));
+        assert!(is_ignored(Path::new("/m/mornye-00ff.partial")));
+        assert!(is_ignored(Path::new("/m/a.mornye-1.partial.flac")));
         assert!(!is_ignored(Path::new("/m/a.flac")));
+        assert!(!is_ignored(Path::new("/m/partial.flac")));
         assert!(!is_content_change(&EventKind::Access(
             notify::event::AccessKind::Any
         )));

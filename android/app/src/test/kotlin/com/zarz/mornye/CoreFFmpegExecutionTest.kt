@@ -435,7 +435,10 @@ class CoreFFmpegExecutionTest {
         val directory = createTempDirectory()
         try {
             val prefix = ".mornye-ffmpeg-${BuildConfig.APPLICATION_ID}-"
+            // Earlier versions' dotted stage and the current undotted one.
             val ownOrphan = File(directory, "$prefix${UUID.randomUUID()}.flac")
+                .also { it.writeText("orphan") }
+            val currentOrphan = File(directory, "${prefix.drop(1)}${UUID.randomUUID()}.partial.flac")
                 .also { it.writeText("orphan") }
             val foreignFile = File(directory, ".mornye-ffmpeg-foreign-${UUID.randomUUID()}.flac")
                 .also { it.writeText("foreign") }
@@ -455,6 +458,10 @@ class CoreFFmpegExecutionTest {
             var staged: File? = null
             val result = executeCoreFFmpegCommand(command, cancelled = { false }) { arguments, _ ->
                 assertFalse(ownOrphan.exists())
+                assertFalse(currentOrphan.exists())
+                // A dot name can become a hidden attribute that the rename keeps.
+                val name = File(arguments.last()).name
+                assertTrue(name, name.startsWith(prefix.drop(1)) && name.endsWith(".partial.flac"))
                 assertEquals("foreign", foreignFile.readText())
                 assertEquals("malformed", malformedFile.readText())
                 assertTrue(preservedDirectory.isDirectory)

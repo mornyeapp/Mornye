@@ -13,6 +13,21 @@ void main() {
   Future<File> write(String name, String data) =>
       File('${directory.path}/$name').writeAsString(data);
 
+  test('an in-place conversion stages without a leading dot', () async {
+    final source = await write('song.flac', 'original');
+    final plan = await FFmpegOutput.plan(
+      source.path,
+      '.flac',
+      deleteOriginal: true,
+    );
+    // A dot name can become a hidden attribute that the rename keeps, and a
+    // `.partial.<ext>` stage stays out of library scans.
+    final name = File(plan.workingPath).uri.pathSegments.last;
+    expect(name, startsWith('song.mornye-'));
+    expect(name, endsWith('.partial.flac'));
+    expect(plan.finalPath, source.path);
+  });
+
   test(
     'metadata promotion publishes the complete output and removes staging',
     () async {

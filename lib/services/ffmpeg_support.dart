@@ -198,9 +198,11 @@ abstract final class FFmpegOutput {
     final base = dot > 0 ? name.substring(0, dot) : name;
     final requested = '${file.parent.path}${Platform.pathSeparator}$base$ext';
     if (samePath(requested, inputPath) && deleteOriginal) {
+      // No leading dot: some file systems keep a dot name's hidden attribute
+      // through the rename onto the song. Library scans skip `.partial.<ext>`.
       return FFmpegOutputPlan(
         workingPath: await reserve(
-          '${file.parent.path}${Platform.pathSeparator}.$base.mornye-${DateTime.now().microsecondsSinceEpoch}$ext',
+          '${file.parent.path}${Platform.pathSeparator}$base.mornye-${DateTime.now().microsecondsSinceEpoch}.partial$ext',
         ),
         finalPath: inputPath,
       );

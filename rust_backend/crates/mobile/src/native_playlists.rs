@@ -40,10 +40,12 @@ pub(crate) fn execute(
                 .parent()
                 .filter(|parent| !parent.as_os_str().is_empty())
                 .unwrap_or(Path::new("."));
+            // No leading dot: some file systems keep a dot name's hidden
+            // attribute through the rename onto the playlist.
             write_atomic(
                 parent,
                 Path::new(path),
-                ".mornye-m3u-",
+                "mornye-m3u-",
                 |staging| {
                     let mut file = BufWriter::with_capacity(64 * 1024, staging);
                     file.write_all(b"#EXTM3U\n")?;

@@ -45,7 +45,12 @@ internal fun parseCoreFFmpegCommands(raw: String): List<CoreFFmpegCommand> {
 
 private object CoreFFmpegStaging {
     private val directories = mutableSetOf<String>()
-    private val prefix = ".mornye-ffmpeg-${BuildConfig.APPLICATION_ID}-"
+    // No leading dot: some file systems keep a dot name's hidden attribute
+    // through the rename onto the song. Library scans skip `.partial.<ext>`.
+    private val prefix = "mornye-ffmpeg-${BuildConfig.APPLICATION_ID}-"
+
+    /** Earlier versions' prefix, still swept after an interrupted run. */
+    private val legacyPrefix = ".$prefix"
 
     @Synchronized
     fun create(target: File): File {
@@ -55,8 +60,8 @@ private object CoreFFmpegStaging {
         if (directory.path !in directories) {
             val entries = checkNotNull(directory.listFiles()) { "Cannot read FFmpeg output directory" }
             for (file in entries) {
-                if (!file.name.startsWith(prefix)) continue
-                val suffix = file.name.removePrefix(prefix)
+                val own = listOf(prefix, legacyPrefix).firstOrNull { file.name.startsWith(it) } ?: continue
+                val suffix = file.name.removePrefix(own)
                 if (suffix.length <= 36 || suffix[36] != '.') continue
                 if (runCatching { UUID.fromString(suffix.take(36)) }.isFailure) continue
                 if (Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)) {
@@ -65,7 +70,7 @@ private object CoreFFmpegStaging {
             }
             directories.add(directory.path)
         }
-        val staged = File(directory, "$prefix${UUID.randomUUID()}.${target.extension}")
+        val staged = File(directory, "$prefix${UUID.randomUUID()}.partial.${target.extension}")
         check(staged.createNewFile()) { "Failed to create FFmpeg staging" }
         return staged
     }
