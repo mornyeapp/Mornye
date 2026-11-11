@@ -81,6 +81,7 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
           slivers: [
             AppSliverHeader.page(title: context.l10n.extensionsTitle),
 
+            const SliverToBoxAdapter(child: ExtensionStorageRecoveryNotice()),
             const SliverToBoxAdapter(child: ExtensionStorageSetting()),
 
             if (extState.isLoading)

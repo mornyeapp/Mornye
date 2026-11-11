@@ -190,6 +190,73 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     }, variant: TargetPlatformVariant({TargetPlatform.linux}));
 
+    testWidgets('Linux can start over when the keyring is gone ($mornye)', (
+      tester,
+    ) async {
+      final data = File(
+        '${directory.path}/extension_data/example/settings.enc',
+      );
+      await tester.runAsync(() async {
+        await data.parent.create(recursive: true);
+        await data.writeAsBytes([1, 2, 3]);
+      });
+      await tester.pumpWidget(app(const ExtensionsPage(), mornye));
+      await settleStorage(tester);
+      expect(find.text('Extension sign-ins were reset'), findsNothing);
+      final toggle = find.descendant(
+        of: find.byType(ExtensionStorageSetting),
+        matching: find.byType(AppSwitch),
+      );
+      Future<void> tapUntil(Finder target, Finder shown) async {
+        await tester.runAsync(() => tester.tap(target));
+        for (var attempt = 0; attempt < 100; attempt++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pumpAndSettle();
+          if (shown.evaluate().isNotEmpty) return;
+        }
+        fail('Never shown: $shown');
+      }
+
+      await tapUntil(toggle, find.text('Start over'));
+      expect(find.textContaining('Unlock the system keyring'), findsOneWidget);
+      // Leaving the dialog changes nothing.
+      await tester.tapAt(const Offset(4, 4));
+      await settleStorage(tester);
+      expect(await tester.runAsync(data.readAsBytes), [1, 2, 3]);
+      expect(container.read(extensionProvider).isInitialized, isFalse);
+
+      await tapUntil(toggle, find.text('Start over'));
+      await tapUntil(
+        find.text('Start over'),
+        find.text('Extension sign-ins were reset'),
+      );
+      await settleStorage(tester);
+      expect(container.read(extensionProvider).isInitialized, isTrue);
+      expect(await tester.runAsync(data.exists), isFalse);
+      expect(await tester.runAsync(File('${data.path}.lost').readAsBytes), [
+        1,
+        2,
+        3,
+      ]);
+      expect(tester.takeException(), isNull);
+
+      // Having seen it once is enough.
+      await tester.pumpWidget(const SizedBox.shrink());
+      var notice = true;
+      for (var attempt = 0; notice && attempt < 100; attempt++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump();
+        notice = (await tester.runAsync(
+          ExtensionStorageService.hasRecoveryNotice,
+        ))!;
+      }
+      expect(notice, isFalse);
+    }, variant: TargetPlatformVariant({TargetPlatform.linux}));
+
     testWidgets('Linux folder setup offers unsecured storage ($mornye)', (
       tester,
     ) async {

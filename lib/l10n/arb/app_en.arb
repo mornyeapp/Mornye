@@ -9,7 +9,12 @@
   "extensionsUnsecuredStorage": "Use unsecured extension storage",
   "extensionsUnsecuredStorageDescription": "Run extensions without a Linux keyring. The key is saved locally, so anyone with access to your app files can read extension credentials. Off uses the system keyring.",
   "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",
-  "extensionsStorageKeyConflict": "The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
+  "extensionsStorageStartOverTitle": "Start over without the key?",
+  "extensionsStorageStartOverMessage": "Or start over now. Your extensions stay installed, but their saved settings and sign-ins are set aside and you set them up again.",
+  "extensionsStorageStartOver": "Start over",
+  "extensionsStorageRecoveredTitle": "Extension sign-ins were reset",
+  "extensionsStorageRecoveredMessage": "This device lost the key that protects extension settings and sign-ins, so they could not be read. Your extensions are still installed. Set them up and sign in again.",
+  "extensionsStorageKeyConflict":"The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
   "extensionsStorageKeyringUnavailable": "The system keyring is unavailable or locked. Start or unlock it before switching to secure storage. Your local key has been preserved.",
   "linkFileActionOn": "{action} on {name}",
   "@linkFileActionOn": {
