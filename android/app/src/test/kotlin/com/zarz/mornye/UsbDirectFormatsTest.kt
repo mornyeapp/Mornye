@@ -145,6 +145,43 @@ class UsbDirectFormatsTest {
         assertEquals(48000 * 3, UsbDirectFormats.skipFrames(2000000, 5000000, 48000))
     }
 
+    /** A configuration descriptor with [value] and one interface descriptor of [interfaceClass]. */
+    private fun configuration(value: Int, interfaceClass: Int): ByteArray =
+        byteArrayOf(9, 2, 18, 0, 1, value.toByte(), 0, 0x80.toByte(), 50) +
+            byteArrayOf(9, 4, 0, 0, 0, interfaceClass.toByte(), 1, 0x20, 0)
+
+    private val deviceDescriptor = ByteArray(18).also {
+        it[0] = 18
+        it[1] = 1
+        it[17] = 2
+    }
+
+    @Test
+    fun keepsOnlyTheActiveUsbConfiguration() {
+        val first = configuration(1, 1)
+        val second = configuration(2, 0xff)
+        val raw = deviceDescriptor + first + second
+        assertArrayEquals(deviceDescriptor + second, UsbDirectFormats.activeConfiguration(raw, 2))
+        assertArrayEquals(deviceDescriptor + first, UsbDirectFormats.activeConfiguration(raw, 1))
+        // Unknown or unlisted: the first configuration, as the kernel picks for UAC1/UAC2.
+        assertArrayEquals(deviceDescriptor + first, UsbDirectFormats.activeConfiguration(raw, null))
+        assertArrayEquals(deviceDescriptor + first, UsbDirectFormats.activeConfiguration(raw, 3))
+    }
+
+    @Test
+    fun leavesSingleAndMalformedUsbConfigurationsUnchanged() {
+        val single = deviceDescriptor + configuration(1, 1)
+        assertArrayEquals(single, UsbDirectFormats.activeConfiguration(single, 1))
+        assertArrayEquals(single, UsbDirectFormats.activeConfiguration(single, null))
+        // wTotalLength runs past the end.
+        val truncated = deviceDescriptor + configuration(1, 1) + configuration(2, 1).copyOf(12)
+        assertArrayEquals(truncated, UsbDirectFormats.activeConfiguration(truncated, 2))
+        // Something other than a configuration follows the device descriptor.
+        val stray = deviceDescriptor + configuration(1, 1) + byteArrayOf(9, 4, 0, 0, 0, 1, 1, 0, 0)
+        assertArrayEquals(stray, UsbDirectFormats.activeConfiguration(stray, 1))
+        assertArrayEquals(ByteArray(0), UsbDirectFormats.activeConfiguration(ByteArray(0), 1))
+    }
+
     @Test
     fun readsAlacBitDepthFromBareAndBoxedCookies() {
         val cookie = ByteArray(24).also {

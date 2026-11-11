@@ -114,6 +114,33 @@ internal object UsbDirectFormats {
         return (cookie[offset + 5].toInt() and 255).takeIf { it in 1..32 }
     }
 
+    /**
+     * Android's raw descriptors (the device descriptor, then every
+     * configuration in full) cut down to the configuration whose
+     * bConfigurationValue is [active]. The first configuration stands in
+     * when [active] is unknown or not listed, as the kernel picks it for a
+     * UAC1/UAC2 device. A malformed list comes back unchanged for the parser
+     * to reject.
+     */
+    fun activeConfiguration(raw: ByteArray, active: Int?): ByteArray {
+        if (raw.size < 2 || raw[1].toInt() != 1) return raw
+        val head = raw[0].toInt() and 255
+        if (head < 2 || head > raw.size) return raw
+        val blocks = mutableListOf<Pair<Int, Int>>()
+        var offset = head
+        while (offset < raw.size) {
+            if (offset + 9 > raw.size || (raw[offset].toInt() and 255) < 9 || raw[offset + 1].toInt() != 2) return raw
+            val total = (raw[offset + 2].toInt() and 255) or ((raw[offset + 3].toInt() and 255) shl 8)
+            if (total < 9 || offset + total > raw.size) return raw
+            blocks += offset to offset + total
+            offset += total
+        }
+        if (blocks.size < 2) return raw
+        val (start, end) = blocks.firstOrNull { (start, _) -> (raw[start + 5].toInt() and 255) == active }
+            ?: blocks.first()
+        return raw.copyOfRange(0, head) + raw.copyOfRange(start, end)
+    }
+
     /** Frames before [targetUs] in a buffer starting at [timeUs], rounded up like the PCM path. */
     fun skipFrames(timeUs: Long, targetUs: Long, rate: Int): Long =
         if (timeUs < targetUs) ((targetUs - timeUs) * rate + 999999) / 1000000 else 0

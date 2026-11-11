@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbManager
@@ -180,6 +181,13 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
     /** Stable across replugging, unlike the device id. */
     private fun UsbDevice.declineKey() = "$vendorId:$productId"
 
+    /** The bConfigurationValue the kernel set (GET_CONFIGURATION), or null when the DAC does not answer. */
+    private fun UsbDeviceConnection.activeConfiguration(): Int? {
+        val value = ByteArray(1)
+        val read = controlTransfer(UsbConstants.USB_DIR_IN or UsbConstants.USB_TYPE_STANDARD, 8, 0, 0, value, 1, 1000)
+        return if (read == 1) (value[0].toInt() and 255).takeIf { it != 0 } else null
+    }
+
     /** Reads headers only, never the device; null lets preparation decide. */
     private fun probeFailure(path: String?): Map<String, Any>? {
         if (path == null) return null
@@ -249,6 +257,14 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 connection = usb
                 deviceId = request.device.deviceId
                 val allowDop = request.call.argument<Boolean>("allowDop") == true
+                // A DAC with several configurations (UAC2 plus a UAC1 fallback)
+                // is described by the one the kernel set.
+                val raw = usb.rawDescriptors
+                val activeConfiguration = usb.activeConfiguration()
+                val descriptors = UsbDirectFormats.activeConfiguration(raw, activeConfiguration)
+                if (descriptors.size != raw.size) {
+                    android.util.Log.i("UsbDirect", "Using USB configuration ${activeConfiguration ?: "listed first"} of several")
+                }
                 requestedBits = bits
                 // Fallbacks keep every sample exact: a mono sample goes to both
                 // channels of a stereo-only DAC, and a lossy source, which has
@@ -265,7 +281,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 var refused: Exception? = null
                 for ((outChannels, outBits) in attempts) {
                     try {
-                        opened = UsbDirectOutput.open(usb.fileDescriptor, usb.rawDescriptors, rate.toUInt(), outChannels.toUByte(), outBits.toUByte(), isDsd, allowDop)
+                        opened = UsbDirectOutput.open(usb.fileDescriptor, descriptors, rate.toUInt(), outChannels.toUByte(), outBits.toUByte(), isDsd, allowDop)
                         requestedBits = outBits
                         upmixMono = outChannels != channels
                         break
