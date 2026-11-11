@@ -81,6 +81,7 @@ class _WordHighlightedLyricLineState
   bool _tickerEnabled = true;
   bool _useInitialPosition = true;
   Duration _visualEnd = Duration.zero;
+  Duration _displayLead = Duration.zero;
 
   // An inactive app is still on screen, as in [SyncedLyricsView]: the sweep
   // keeps pace with the lines behind another app's window.
@@ -133,6 +134,9 @@ class _WordHighlightedLyricLineState
   void didChangeDependencies() {
     super.didChangeDependencies();
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    _displayLead = lyricsDisplayLead(
+      View.maybeOf(context)?.display.refreshRate,
+    );
     _updateVisualEnd();
     _syncSubscriptions();
   }
@@ -208,7 +212,7 @@ class _WordHighlightedLyricLineState
       _anchorAt(
         _advancing
             ? reconcileSyncedLyricsPosition(
-                predictedPosition: _currentPosition(),
+                predictedPosition: _audioPosition(),
                 reportedPosition: widget.initialPosition,
               )
             : widget.initialPosition,
@@ -220,8 +224,16 @@ class _WordHighlightedLyricLineState
     }
   }
 
-  Duration _currentPosition() =>
+  /// The audio position, which anchors and playback reports are kept in.
+  Duration _audioPosition() =>
       widget.seekPreview.value ?? _positionAt(advance: _advancing);
+
+  /// The position the sweep is drawn for: while it advances, the audio
+  /// position plus the time a frame takes to reach the screen.
+  Duration _currentPosition() {
+    final position = _audioPosition();
+    return _advancing ? position + _displayLead * _speed : position;
+  }
 
   void _previewChanged() {
     if (!mounted || !_visible) return;
@@ -241,7 +253,7 @@ class _WordHighlightedLyricLineState
     _anchorAt(
       _advancing
           ? reconcileSyncedLyricsPosition(
-              predictedPosition: predicted,
+              predictedPosition: _audioPosition(),
               reportedPosition: position,
             )
           : position,
@@ -257,7 +269,7 @@ class _WordHighlightedLyricLineState
 
   void _updateTransportState({bool? playing, bool? loading, double? speed}) {
     if (!mounted) return;
-    final position = _currentPosition();
+    final position = _audioPosition();
     if (playing != null) _playing = playing;
     if (loading != null) _loading = loading;
     if (speed != null) _speed = speed.isFinite && speed > 0 ? speed : 0;

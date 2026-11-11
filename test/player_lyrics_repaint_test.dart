@@ -332,6 +332,73 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
+
+    testWidgets('a playing word sweep is drawn a display delay ahead '
+        '($mornye)', (tester) async {
+      tester.view.display.refreshRate = 60;
+      addTearDown(tester.view.display.reset);
+      final playback = StreamController<PlaybackState>.broadcast();
+      final preview = ValueNotifier<Duration?>(null);
+      addTearDown(playback.close);
+      addTearDown(preview.dispose);
+      final theme = mornye
+          ? MornyeTheme.build(Brightness.dark)
+          : ThemeData.dark();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            playbackStateProvider.overrideWith((ref) => playback.stream),
+          ],
+          child: MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: WordTimedLyricLine(
+                line: _lyrics.lines.single,
+                initialPosition: const Duration(seconds: 2),
+                seekPreview: preview,
+                style: theme.textTheme.titleLarge!,
+              ),
+            ),
+          ),
+        ),
+      );
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+      int position() {
+        final painter = tester.widget<CustomPaint>(_paint).painter!;
+        // Inspect the clock already supplied to the painter.
+        // ignore: avoid_dynamic_calls
+        return ((painter as dynamic).currentPosition() as Duration)
+            .inMicroseconds;
+      }
+
+      Future<void> report({required bool playing, double speed = 1}) async {
+        playback.add(
+          PlaybackState(
+            playing: playing,
+            processingState: AudioProcessingState.ready,
+            updatePosition: const Duration(seconds: 2),
+            speed: speed,
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+      }
+
+      await report(playing: false);
+      expect(position(), 2000000, reason: 'A paused sweep is exact');
+      // Two 60 Hz frames, in track time. The few milliseconds above are the
+      // real time this test takes to read the clock.
+      await report(playing: true);
+      expect(position() - 2000000, inInclusiveRange(33333, 60000));
+      await report(playing: true, speed: 2);
+      expect(position() - 2000000, inInclusiveRange(66666, 120000));
+      // Scrubbing previews the exact position under the finger.
+      preview.value = const Duration(seconds: 7);
+      await tester.pump();
+      expect(position(), 7000000);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   for (final (tier, liquid, lowEnd) in [

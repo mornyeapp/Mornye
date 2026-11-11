@@ -52,6 +52,16 @@ int steadySyncedLyricsIndex({
   Duration seekThreshold = const Duration(milliseconds: 750),
 }) => index < shown && shownStart - position < seekThreshold ? shown : index;
 
+/// How far ahead of the audio clock playing lyrics are drawn. A frame reaches
+/// the screen about two refresh intervals after it is drawn, so lyrics drawn
+/// for the position at that moment always showed that much behind the sound.
+Duration lyricsDisplayLead(double? refreshRate) {
+  final rate = refreshRate != null && refreshRate.isFinite && refreshRate >= 30
+      ? refreshRate
+      : 60.0;
+  return Duration(microseconds: (2e6 / rate).round().clamp(8000, 40000));
+}
+
 /// Extrapolates the latest player position for the lyrics animation only.
 ///
 /// The global playback state intentionally updates at a lower frequency to

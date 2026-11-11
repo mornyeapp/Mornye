@@ -148,6 +148,19 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   Duration _activeTransitionPosition = Duration.zero;
   bool _playing = false;
   bool _loading = false;
+  Duration _displayLead = Duration.zero;
+
+  /// How far ahead of the audio lines change while lyrics advance, in track
+  /// time; see [lyricsDisplayLead]. Paused, loading and scrubbed lyrics show
+  /// the exact position.
+  Duration get _lead {
+    if (!_playing || _loading || widget.seekPreview.value != null) {
+      return Duration.zero;
+    }
+    final speed = ref.read(playbackStateProvider).value?.speed ?? 1.0;
+    return speed.isFinite && speed > 0 ? _displayLead * speed : Duration.zero;
+  }
+
   bool _hasStarted = false;
   bool _userScrolling = false;
 
@@ -301,6 +314,9 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _rowsDirty = true;
+    _displayLead = lyricsDisplayLead(
+      View.maybeOf(context)?.display.refreshRate,
+    );
     // Appearance can rebuild when transport controls fade (for example with
     // custom glass clarity). Keep the existing playback subscription and the
     // user's scroll ownership; only new lyrics/page activation should reset it.
@@ -401,14 +417,14 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     if (_userScrolling) _scheduleUserScrollReturn();
     _scheduleLineMeasurements();
 
-    final position = _displayPosition;
     _playing = ref.read(playbackPlayingProvider);
     _loading = ref.read(playbackLoadingProvider);
+    final position = _displayPosition;
     _active = _activeIndexAt(position);
     _activeLines = _timeline.activeIndices(position, _active);
     _focus = _focusFor(_active, _activeLines, position);
     _updateRowVisibility(immediate: true);
-    _activeTransitionPosition = position;
+    _activeTransitionPosition = position - _lead;
     // Only before the first layout: a list already on screen keeps its
     // lines while it moves.
     _awaitingFirstScroll = !_scroll.hasClients && _focus >= 0;
@@ -424,9 +440,10 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       playbackPositionProvider,
       (previous, next) {
         if (widget.seekPreview.value != null) return;
-        final active = _steadyActiveIndex(_activeIndexAt(next), next);
-        _setActiveLine(active, position: next);
-        _scheduleNextLine(next);
+        final shown = next + _lead;
+        final active = _steadyActiveIndex(_activeIndexAt(shown), shown);
+        _setActiveLine(active, position: shown);
+        _scheduleNextLine(shown);
       },
     );
     _playingSubscription = ref.listenManual<bool>(playbackPlayingProvider, (
@@ -461,10 +478,12 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     return time < Duration.zero ? Duration.zero : time;
   }
 
+  /// The position lyrics are drawn for: the scrub preview, else the audio
+  /// position plus [_lead].
   Duration get _displayPosition =>
       widget.seekPreview.value ??
-      ref.read(playbackStateProvider).value?.position ??
-      Duration.zero;
+      (ref.read(playbackStateProvider).value?.position ?? Duration.zero) +
+          _lead;
 
   void _scheduleUserScrollReturn() {
     _userScrollIdleTimer?.cancel();
@@ -566,7 +585,8 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       _active = active;
       _activeLines = activeLines;
       _focus = focus;
-      _activeTransitionPosition = position;
+      // The word sweep keeps the audio position and adds the lead itself.
+      _activeTransitionPosition = position - _lead;
       _updateRowVisibility(sameFocus: focus >= 0 && focus == previousFocus);
     });
     if (focus == previousFocus) return;
@@ -1253,7 +1273,9 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 );
               }
               content = AnimatedSwitcher(
-                duration: const Duration(milliseconds: 320),
+                // The first word of a timed line is already being sung:
+                // its sweep must not arrive under a slow fade.
+                duration: Duration(milliseconds: timed ? 160 : 320),
                 reverseDuration: const Duration(milliseconds: 260),
                 switchInCurve: Curves.easeOutCubic,
                 switchOutCurve: Curves.easeInCubic,
@@ -1346,7 +1368,11 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                             ? (isActive || highContrast ? 1 : 0.48)
                             : (isActive ? 1.0 : (isPast ? 0.55 : 0.85)),
                         duration: motion,
-                        curve: Curves.easeInOutCubic,
+                        // A word-timed line brightens at once for the same
+                        // reason; other lines brighten as they arrive.
+                        curve: timed
+                            ? Curves.easeOutCubic
+                            : Curves.easeInOutCubic,
                         child: content,
                       ),
                     ),

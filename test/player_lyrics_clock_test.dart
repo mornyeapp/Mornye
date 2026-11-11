@@ -91,6 +91,88 @@ void main() {
       });
     });
 
+    for (final refreshRate in [60.0, 120.0]) {
+      testWidgets('playing lyrics change line a display delay early '
+          '($mornye, $refreshRate Hz)', (tester) async {
+        tester.view.display.refreshRate = refreshRate;
+        addTearDown(tester.view.display.reset);
+        final now = DateTime(2026);
+        await withClock(Clock(() => now), () async {
+          final playback = StreamController<PlaybackState>.broadcast();
+          final preview = ValueNotifier<Duration?>(null);
+          addTearDown(playback.close);
+          addTearDown(preview.dispose);
+          final theme = mornye
+              ? MornyeTheme.build(Brightness.dark)
+              : AppTheme.dark();
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                playbackStateProvider.overrideWith((ref) => playback.stream),
+              ],
+              child: MaterialApp(
+                theme: theme,
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: Scaffold(
+                  body: SyncedLyricsView(
+                    lyrics: LyricsParser.parse(
+                      '[00:01.00]First phrase\n[00:04.00]Second phrase\n'
+                      '[00:07.00]Third phrase',
+                    ),
+                    seekPreview: preview,
+                    colorScheme: theme.colorScheme,
+                    isActive: true,
+                    showPronunciation: false,
+                    showTranslation: false,
+                  ),
+                ),
+              ),
+            ),
+          );
+          Future<void> report(int milliseconds, {required bool playing}) async {
+            playback.add(
+              PlaybackState(
+                playing: playing,
+                processingState: AudioProcessingState.ready,
+                updatePosition: Duration(milliseconds: milliseconds),
+              ),
+            );
+            await tester.pump();
+            await tester.pump();
+          }
+
+          double emphasis(String phrase) => tester
+              .widget<AnimatedOpacity>(
+                find.ancestor(
+                  of: find.text(phrase),
+                  matching: find.byType(AnimatedOpacity),
+                ),
+              )
+              .opacity;
+
+          // Two frames at this refresh rate: 33 ms at 60 Hz, 17 ms at 120 Hz.
+          final lead = (2000 / refreshRate).ceil();
+          await report(4000 - lead - 5, playing: true);
+          expect(emphasis('First phrase'), 1);
+          await report(4000 - lead + 1, playing: true);
+          expect(
+            emphasis('Second phrase'),
+            1,
+            reason: 'The frame drawn now is on screen as the line starts',
+          );
+          expect(emphasis('First phrase'), lessThan(1));
+
+          // A paused song shows the line its position is in.
+          await report(4000 - lead + 1, playing: false);
+          expect(emphasis('First phrase'), 1);
+          expect(emphasis('Second phrase'), lessThan(1));
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        });
+      });
+    }
+
     for (final speed in [1.0, 1.5]) {
       testWidgets('late lyric timers catch up to playback ($mornye, $speed)', (
         tester,
