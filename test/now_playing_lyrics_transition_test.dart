@@ -5792,13 +5792,13 @@ void main() {
         ).read(settingsProvider.notifier);
         settings
           ..setPlaybackSpeed(1.25)
-          ..setPlaybackPitch(-1.5);
+          ..setPlaybackPitch(-2);
         await settlePlayer(tester);
         expect(find.byKey(badge).hitTestable(), findsOneWidget);
         expect(
           find.descendant(
             of: find.byType(PlayerPlaybackControls),
-            matching: find.text('1.25x · −1.5'),
+            matching: find.text('1.25x · −2'),
           ),
           findsOneWidget,
         );
