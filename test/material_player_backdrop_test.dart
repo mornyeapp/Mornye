@@ -7,7 +7,7 @@ import 'dart:ui' as ui;
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
-    show PictureLayer, RenderRepaintBoundary, ShaderMaskLayer;
+    show ClipRectLayer, PictureLayer, RenderRepaintBoundary, ShaderMaskLayer;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
@@ -203,12 +203,12 @@ Widget _app(Widget child) => MaterialApp(
   home: RepaintBoundary(key: _key, child: child),
 );
 
-Widget _backdrop({ColorScheme? scheme}) => _app(
+Widget _backdrop({ColorScheme? scheme, File? cover}) => _app(
   MaterialPlayerBackdrop(
     mediaItem: MediaItem(
       id: 'cover',
       title: 'Track',
-      artUri: Uri.file(_cover.path),
+      artUri: Uri.file((cover ?? _cover).path),
     ),
     colorScheme: scheme ?? _scheme,
     showArtwork: false,
@@ -410,20 +410,26 @@ void main() {
     expect(_blur(tester), same(first));
     expect(first.debugDisposed, isFalse);
 
-    // A new surface colour draws a new image and releases the old one.
+    // A new surface colour, as each frame of the artwork scheme moving to
+    // the next track's colours brings, keeps the image: the surface and
+    // the tint are layers of their own.
     await tester.pumpWidget(
       _backdrop(scheme: _scheme.copyWith(surface: Colors.black)),
     );
-    final dark = _blur(tester);
-    expect(dark, isNot(same(first)));
-    expect(first.debugDisposed, isTrue);
+    expect(_blur(tester), same(first));
+    expect(first.debugDisposed, isFalse);
+    final surfaces = tester
+        .widgetList<ColoredBox>(find.byType(ColoredBox))
+        .map((box) => box.color);
+    expect(surfaces, contains(Colors.black));
+    expect(surfaces, contains(Colors.black.withValues(alpha: 0.72)));
 
-    // So does a new size.
+    // A new size draws a new image and releases the old one.
     tester.view.physicalSize = const Size(800, 400);
     await tester.pump();
     final landscape = _blur(tester);
     expect((landscape.width, landscape.height), (200, 100));
-    expect(dark.debugDisposed, isTrue);
+    expect(first.debugDisposed, isTrue);
     expect(
       find.byType(Hero),
       findsNothing,
@@ -529,22 +535,103 @@ void main() {
     expect(band.height / box.height, lessThan(0.282));
 
     // The masked copy draws nothing above the band, so the offscreen
-    // layer holds the band alone.
-    final picture = (layer.firstChild! as PictureLayer).picture!;
-    final width = box.width.ceil();
-    final height = box.height.ceil();
-    final image = picture.toImageSync(width, height);
-    final pixels = (await tester.runAsync(
-      () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
-    ))!;
-    image.dispose();
-    bool rowDrawn(int y) => Iterable.generate(
-      width,
-      (x) => pixels.getUint8((y * width + x) * 4 + 3),
-    ).any((alpha) => alpha > 0);
-    expect(Iterable<int>.generate(band.top.floor()).where(rowDrawn), isEmpty);
-    expect(rowDrawn(band.top.ceil()), isTrue);
-    expect(rowDrawn(box.height.floor() - 1), isTrue);
+    // layer holds the band alone. The cover's track change fade gives it
+    // a layer of its own, so a clip layer bounds it to the band.
+    final clip = layer.firstChild! as ClipRectLayer;
+    expect(clip.clipRect, band);
+    expect(
+      clip.depthFirstIterateChildren().whereType<PictureLayer>(),
+      isNotEmpty,
+    );
+  });
+
+  testWidgets('a skip fades the sharp cover in without growing it', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_app(_bandMask(_item(_cover), true)));
+    // Both copies of the cover, above the fade and in it, fade together.
+    final covers = tester.widgetList<PlayerArtwork>(
+      find.byWidgetPredicate(
+        (widget) => widget is PlayerArtwork && widget.cacheWidth == 400,
+      ),
+    );
+    expect(covers, hasLength(2));
+    for (final cover in covers) {
+      expect(cover.crossfade?.duration, greaterThan(Duration.zero));
+      expect(cover.crossfadeScale, isNull);
+    }
+  });
+
+  testWidgets('a new cover fades its blur in over the previous one', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_backdrop());
+    await _waitForCover(tester, _cached);
+    final first = _blur(tester);
+
+    await tester.pumpWidget(_backdrop(cover: _noise));
+    // The previous blur stays alone until the next cover decodes.
+    expect(_blur(tester), same(first));
+    for (var i = 0; i < 200 && _cached.evaluate().length < 2; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 5)),
+      );
+      await tester.pump();
+    }
+    final layers = tester.widgetList<RawImage>(_cached).toList();
+    expect(layers, hasLength(2));
+    expect(layers.first.image, same(first));
+    final next = layers.last.image!;
+    final fade = tester.widget<FadeTransition>(
+      find
+          .ancestor(
+            of: find.byWidget(layers.last),
+            matching: find.byType(FadeTransition),
+          )
+          .first,
+    );
+    expect(fade.opacity.value, lessThan(0.1));
+
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(fade.opacity.value, inExclusiveRange(0.1, 1));
+    expect(first.debugDisposed, isFalse);
+
+    await tester.pumpAndSettle();
+    expect(_blur(tester), same(next));
+    expect(first.debugDisposed, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('reduced motion swaps the blur at once', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+
+    await tester.pumpWidget(_backdrop());
+    await _waitForCover(tester, _cached);
+    final first = _blur(tester);
+
+    await tester.pumpWidget(_backdrop(cover: _noise));
+    for (var i = 0; i < 200 && identical(_blur(tester), first); i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 5)),
+      );
+      await tester.pump();
+    }
+    expect(_cached, findsOneWidget);
+    expect(_blur(tester), isNot(same(first)));
+    expect(first.debugDisposed, isTrue);
   });
 
   for (final dpr in [1.0, 3.0]) {

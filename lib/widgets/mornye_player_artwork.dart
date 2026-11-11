@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/player_artwork_video_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:video_player/video_player.dart';
@@ -16,6 +17,7 @@ class MornyePlayerArtwork extends ConsumerStatefulWidget {
     this.onError,
     this.resolvingVideo = false,
     this.squareWhileLoading = true,
+    this.crossfade,
   });
 
   final MediaItem mediaItem;
@@ -28,6 +30,10 @@ class MornyePlayerArtwork extends ConsumerStatefulWidget {
   /// video that may be wider than its box. False fills the box with the
   /// cover, cropped the way the video will be.
   final bool squareWhileLoading;
+
+  /// Fades the still cover of the next track in over this one, as
+  /// [PlayerArtwork.crossfade] does. Null swaps it at once.
+  final AppMotionSpec? crossfade;
 
   @override
   ConsumerState<MornyePlayerArtwork> createState() =>
@@ -44,6 +50,7 @@ class _MornyePlayerArtworkState extends ConsumerState<MornyePlayerArtwork> {
       artUri: widget.mediaItem.artUri?.toString(),
       colorScheme: Theme.of(context).colorScheme,
       cacheWidth: PlayerArtwork.transitionCacheWidth(context),
+      crossfade: widget.crossfade,
     );
     // Without a video, the still cover fills its box (a full-screen box is
     // taller than wide and crops the sides). A video keeps the square cover
