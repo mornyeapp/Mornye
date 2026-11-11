@@ -91,7 +91,7 @@ internal object UsbDirectFormats {
                 "Implicit feedback", "bus speed", "packet interval", "interval/packet size",
                 "bandwidth too small", "feedback endpoint", "Multiple USB configurations",
                 "malformed USB descriptor", "No supported USB endpoint", "Short USB control response",
-                "USB transfer allocation failed",
+                "USB transfer allocation failed", "USB clock selector", "USB clock topology",
             ).any { text.contains(it) } -> DAC_UNSUPPORTED
             text.startsWith("Decoder timed out") -> TIMEOUT
             else -> UNSUPPORTED

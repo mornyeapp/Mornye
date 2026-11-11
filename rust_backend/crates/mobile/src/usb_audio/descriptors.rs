@@ -13,6 +13,15 @@ pub struct Endpoint {
     pub rate_control: bool,
 }
 
+/// A UAC2 clock entity of an audio control interface (UAC2 4.7.2.1 to 4.7.2.3).
+#[derive(Clone, Debug, PartialEq)]
+pub enum ClockEntity {
+    Source,
+    /// Source IDs by input pin; pin 1 is the first.
+    Selector(Vec<u8>),
+    Multiplier(u8),
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Alternate {
     pub control: u8,
@@ -20,7 +29,11 @@ pub struct Alternate {
     pub alternate: u8,
     pub uac2: bool,
     pub terminal: u8,
+    /// The clock entity the terminal names: a source, or a selector or
+    /// multiplier in front of one (see [`clock_source`]).
     pub clock: u8,
+    /// The clock entities of this alternate's audio control interface.
+    pub clocks: Vec<(u8, ClockEntity)>,
     pub channels: u8,
     pub bits: u8,
     pub subslot: u8,
@@ -66,14 +79,16 @@ fn u24le(b: &[u8]) -> u32 {
     u32::from_le_bytes([b[0], b[1], b[2], 0])
 }
 
-/// Only UAC1/2 Type I, mono/stereo output. Ambiguous clock selectors and
-/// implicit feedback are rejected instead of guessing a configuration.
+/// Only UAC1/2 Type I, mono/stereo output. Clock selectors are followed to
+/// their current input (see [`clock_source`]); implicit feedback is rejected
+/// instead of guessing a configuration.
 pub fn parse(bytes: &[u8]) -> Result<Device, String> {
     let mut device = Device::default();
     let mut current: Option<Alternate> = None;
     let mut control = 0;
     let mut is_control = false;
     let mut clocks = HashMap::new();
+    let mut entities: Vec<(u8, u8, ClockEntity)> = Vec::new();
     let mut offset = 0;
     let mut configurations = 0;
     while offset < bytes.len() {
@@ -115,6 +130,21 @@ pub fn parse(bytes: &[u8]) -> Result<Device, String> {
             }
             0x24 if is_control && length >= 9 && d[2] == 2 => {
                 clocks.insert((control, d[3]), d[7]);
+            }
+            // Clock source, selector and multiplier: XMOS-based DACs put a
+            // selector between the terminals and their clock source.
+            0x24 if is_control && length >= 7 && matches!(d[2], 0x0a..=0x0c) => {
+                let entity = match d[2] {
+                    0x0a => (length >= 8).then_some(ClockEntity::Source),
+                    0x0b => {
+                        let pins = d[4] as usize;
+                        (length >= 7 + pins).then(|| ClockEntity::Selector(d[5..5 + pins].to_vec()))
+                    }
+                    _ => Some(ClockEntity::Multiplier(d[4])),
+                };
+                if let Some(entity) = entity {
+                    entities.push((control, d[3], entity));
+                }
             }
             0x24 => {
                 if let Some(a) = current.as_mut() {
@@ -178,8 +208,43 @@ pub fn parse(bytes: &[u8]) -> Result<Device, String> {
     }
     for a in &mut device.alternates {
         a.clock = clocks.get(&(a.control, a.terminal)).copied().unwrap_or(0);
+        a.clocks = entities
+            .iter()
+            .filter(|(control, _, _)| *control == a.control)
+            .map(|(_, id, entity)| (*id, entity.clone()))
+            .collect();
     }
     Ok(device)
+}
+
+/// The clock source whose sample rate the terminal follows, reached through
+/// selectors and multipliers. A selector's current input pin (1-based) comes
+/// from `selected`; one with a single input needs no request. An ID without a
+/// clock descriptor is taken as the source, as before.
+pub fn clock_source(
+    a: &Alternate,
+    mut selected: impl FnMut(u8) -> Result<u8, String>,
+) -> Result<u8, String> {
+    let mut id = a.clock;
+    for _ in 0..8 {
+        match a.clocks.iter().find(|(entity, _)| *entity == id) {
+            None | Some((_, ClockEntity::Source)) => return Ok(id),
+            Some((_, ClockEntity::Multiplier(source))) => id = *source,
+            Some((_, ClockEntity::Selector(pins))) => {
+                let pin = if pins.len() == 1 { 1 } else { selected(id)? };
+                id = *(pin as usize)
+                    .checked_sub(1)
+                    .and_then(|index| pins.get(index))
+                    .ok_or_else(|| {
+                        format!(
+                            "USB clock selector {id} reports input {pin} of {}",
+                            pins.len()
+                        )
+                    })?;
+            }
+        }
+    }
+    Err("USB clock topology loops".into())
 }
 
 /// A deliberately small exact-match registry based on documented USB transport
@@ -366,6 +431,69 @@ mod tests {
         assert_eq!(matches[0].0.endpoints[1].address, 0x81);
         assert_eq!(matches[0].1.subslot, 4);
         assert!(formats(&device, 96000, 2, 32, false, false).is_empty());
+        // No clock descriptors: the terminal's clock ID is the source.
+        assert_eq!(
+            clock_source(&matches[0].0, |_| panic!("no selector")),
+            Ok(9)
+        );
+    }
+    #[test]
+    fn follows_an_xmos_clock_selector_to_its_source() {
+        // Clock source 41 behind selector 40, which the input terminal names.
+        let raw = [
+            9, 4, 2, 0, 0, 1, 1, 0x20, 0, 8, 0x24, 0x0a, 41, 1, 7, 0, 0, 8, 0x24, 0x0b, 40, 1, 41,
+            3, 0, 17, 0x24, 2, 7, 1, 1, 0, 40, 2, 3, 0, 0, 0, 0, 0, 0, 0, 9, 4, 3, 1, 2, 1, 2,
+            0x20, 0, 16, 0x24, 1, 7, 0, 1, 1, 0, 0, 0, 2, 3, 0, 0, 0, 0, 6, 0x24, 2, 1, 2, 16, 7,
+            5, 1, 5, 0, 4, 1, 7, 5, 0x81, 0x11, 4, 0, 4,
+        ];
+        let device = parse(&raw).unwrap();
+        let matches = formats(&device, 44100, 2, 16, false, false);
+        assert_eq!(matches.len(), 1);
+        let a = &matches[0].0;
+        assert_eq!(a.clock, 40);
+        assert_eq!(
+            a.clocks,
+            vec![
+                (41, ClockEntity::Source),
+                (40, ClockEntity::Selector(vec![41]))
+            ]
+        );
+        // A single input needs no GET_CUR.
+        assert_eq!(clock_source(a, |_| panic!("single input")), Ok(41));
+    }
+    #[test]
+    fn reads_a_multi_input_selector_and_rejects_bad_topologies() {
+        let a = Alternate {
+            uac2: true,
+            clock: 40,
+            clocks: vec![
+                (40, ClockEntity::Selector(vec![41, 42])),
+                (41, ClockEntity::Source),
+                (42, ClockEntity::Multiplier(43)),
+                (43, ClockEntity::Source),
+            ],
+            ..Default::default()
+        };
+        assert_eq!(
+            clock_source(&a, |id| Ok(if id == 40 { 1 } else { 0 })),
+            Ok(41)
+        );
+        assert_eq!(clock_source(&a, |_| Ok(2)), Ok(43));
+        assert!(clock_source(&a, |_| Ok(0)).is_err());
+        assert!(clock_source(&a, |_| Ok(3)).is_err());
+        assert_eq!(
+            clock_source(&a, |_| Err("USB error -9".into())),
+            Err("USB error -9".into())
+        );
+        let looped = Alternate {
+            clock: 40,
+            clocks: vec![(40, ClockEntity::Selector(vec![40]))],
+            ..a
+        };
+        assert_eq!(
+            clock_source(&looped, |_| Ok(1)),
+            Err("USB clock topology loops".into())
+        );
     }
     #[test]
     fn fractional_rates_do_not_drift() {

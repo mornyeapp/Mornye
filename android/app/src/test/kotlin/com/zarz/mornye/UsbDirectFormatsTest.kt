@@ -34,6 +34,8 @@ class UsbDirectFormatsTest {
             "USB endpoint bandwidth too small" to UsbDirectFormats.DAC_UNSUPPORTED,
             "Multiple USB configurations are not supported" to UsbDirectFormats.DAC_UNSUPPORTED,
             "No supported USB endpoint" to UsbDirectFormats.DAC_UNSUPPORTED,
+            "USB clock selector 40 reports input 3 of 2" to UsbDirectFormats.DAC_UNSUPPORTED,
+            "USB clock topology loops" to UsbDirectFormats.DAC_UNSUPPORTED,
             "Decoder timed out" to UsbDirectFormats.TIMEOUT,
             "Something new" to UsbDirectFormats.UNSUPPORTED,
         )

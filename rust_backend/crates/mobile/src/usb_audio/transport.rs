@@ -472,7 +472,15 @@ impl Session {
             ))?;
         }
         if a.uac2 {
-            let index = ((a.clock as u16) << 8) | a.control as u16;
+            // The rate belongs to the clock source; a selector in front of it
+            // answers this request with its 1-byte input pin instead.
+            let clock = descriptors::clock_source(&a, |selector| {
+                let mut pin = [0];
+                let index = ((selector as u16) << 8) | a.control as u16;
+                self.control(true, 1, 0x100, index, &mut pin, false)?;
+                Ok(pin[0])
+            })?;
+            let index = ((clock as u16) << 8) | a.control as u16;
             let mut rate = f.sample_rate.to_le_bytes();
             // A read-only clock already at the exact rate needs no SET_CUR.
             let mut current = [0; 4];
