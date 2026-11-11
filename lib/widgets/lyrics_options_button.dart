@@ -167,11 +167,13 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     final apiKey =
         ref.watch(lyricsAiKeyProvider(settings.lyricsAiProvider)).value ?? '';
     final ready = lyricsAiReady(settings, apiKey);
+    // The button sits over lyric text, so it fades whether or not the
+    // player's own controls stay. Accessible navigation keeps it unless
+    // hiding was chosen there.
     final autoHide =
-        settings.shouldAutoHideLyricsControls(
-          accessibleNavigation: MediaQuery.accessibleNavigationOf(context),
-        ) &&
-        !isAndroidTv;
+        !isAndroidTv &&
+        (!MediaQuery.accessibleNavigationOf(context) ||
+            settings.autoHideLyricsControlsWithAccessibility);
     return ListenableBuilder(
       listenable: widget.metadata,
       builder: (context, _) {

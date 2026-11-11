@@ -191,7 +191,7 @@ class PlayerLyricsSection extends ConsumerWidget {
           ),
           if (options != null)
             PositionedDirectional(
-              start: context.isMornye ? mornyeLyricsContentInset : 24,
+              end: context.isMornye ? mornyeLyricsContentInset : 24,
               bottom: 8,
               child: options!,
             ),
@@ -225,7 +225,7 @@ class PlayerLyricsSection extends ConsumerWidget {
       children: [
         plain,
         PositionedDirectional(
-          start: context.isMornye ? mornyeLyricsContentInset : 24,
+          end: context.isMornye ? mornyeLyricsContentInset : 24,
           bottom: 8,
           child: options!,
         ),

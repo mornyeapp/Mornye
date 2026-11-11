@@ -731,7 +731,10 @@ class _PlayerHeaderLayout extends MultiChildLayoutDelegate {
       );
       positionChild(
         _PlayerHeaderSlot.lyricsOptions,
-        Offset(_mornyeContentInset, contentHeight - options.height - 8),
+        Offset(
+          size.width - options.width - _mornyeContentInset,
+          contentHeight - options.height - 8,
+        ),
       );
     }
   }

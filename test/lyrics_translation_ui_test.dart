@@ -295,6 +295,65 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('lyrics options sit at the end and fade with fullscreen lyrics '
+        'off ($mornye)', (tester) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final metadata = _Lyrics(_lyrics);
+      final preview = PlaybackSeekPreview();
+      addTearDown(metadata.dispose);
+      addTearDown(preview.dispose);
+      await tester.pumpWidget(
+        _app(
+          mornye: mornye,
+          overrides: [
+            initialSettingsProvider.overrideWithValue(
+              const AppSettings(
+                lyricsAiModel: 'gpt-4.1-mini',
+                autoHideLyricsControls: false,
+              ),
+            ),
+            playbackStateProvider.overrideWith(
+              (ref) => const Stream<PlaybackState>.empty(),
+            ),
+            musicPlayerControllerProvider.overrideWith(
+              (ref) => throw StateError('Unexpected audio access'),
+            ),
+            currentMediaItemProvider.overrideWith(_MediaItems.new),
+            lyricsAiKeyStoreProvider.overrideWithValue(
+              MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+            ),
+            lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+          ],
+          home: Scaffold(
+            body: PlayerLyricsSection(
+              metadata: metadata,
+              seekPreview: preview,
+              colorScheme: const ColorScheme.dark(),
+              isActive: true,
+              options: LyricsOptionsButton(
+                metadata: metadata,
+                colorScheme: const ColorScheme.dark(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final options = find.byKey(const ValueKey('lyrics-language-options'));
+      final pane = tester.getRect(find.byType(PlayerLyricsSection));
+      expect(tester.getCenter(options).dx, greaterThan(pane.center.dx));
+      expect(options.hitTestable(), findsOneWidget);
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      expect(options.hitTestable(), findsNothing);
+      await tester.tapAt(Offset(pane.left + 4, pane.top + 8));
+      await tester.pumpAndSettle();
+      expect(options.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     for (final desktop in [false, true]) {
       testWidgets('lyrics options fade and reveal without interrupting a menu '
           '(desktop=$desktop, mornye=$mornye)', (tester) async {
@@ -407,7 +466,8 @@ void main() {
             .setAutoHideLyricsControls(false);
         await tester.pumpAndSettle();
         await tester.pump(const Duration(seconds: 6));
-        expect(options.hitTestable(), findsOneWidget);
+        // The switch is about the player's controls; this button still fades.
+        expect(options.hitTestable(), findsNothing);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       });
