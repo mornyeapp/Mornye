@@ -747,6 +747,7 @@ class SettingsChoiceChip extends StatelessWidget {
     this.icon,
     this.layout = SettingsChipLayout.row,
     this.expand = false,
+    this.enabled = true,
   });
 
   final String label;
@@ -757,6 +758,9 @@ class SettingsChoiceChip extends StatelessWidget {
 
   /// Wraps the chip in [Expanded] so a row of chips divides the width evenly.
   final bool expand;
+
+  /// False dims the chip and ignores taps, keeping the selection visible.
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -769,7 +773,9 @@ class SettingsChoiceChip extends StatelessWidget {
     final unselectedColor = context.isMornye
         ? Colors.transparent
         : colorScheme.surfaceContainerHigh;
-    final foreground = context.isMornye && isSelected
+    final foreground = !enabled
+        ? colorScheme.onSurface.withValues(alpha: 0.38)
+        : context.isMornye && isSelected
         ? colorScheme.primary
         : isSelected
         ? colorScheme.onPrimaryContainer
@@ -784,7 +790,7 @@ class SettingsChoiceChip extends StatelessWidget {
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
         // Like an iOS segment, the filled chip marks the choice; accent text
         // on Mornye's grey fill falls below readable contrast.
-        color: context.isMornye && isSelected
+        color: enabled && context.isMornye && isSelected
             ? colorScheme.onSurface
             : foreground,
       ),
@@ -814,18 +820,21 @@ class SettingsChoiceChip extends StatelessWidget {
     }
 
     final chip = Material(
-      color: isSelected
-          ? (context.isMornye
-                ? colorScheme.surfaceContainerHighest
-                : colorScheme.primaryContainer)
-          : unselectedColor,
+      color: !isSelected
+          ? unselectedColor
+          : !enabled
+          ? colorScheme.onSurface.withValues(alpha: 0.12)
+          : context.isMornye
+          ? colorScheme.surfaceContainerHighest
+          : colorScheme.primaryContainer,
       borderRadius: borderRadius,
       child: Semantics(
         button: true,
+        enabled: enabled,
         selected: isSelected,
         inMutuallyExclusiveGroup: true,
         child: InkWell(
-          onTap: onTap,
+          onTap: enabled ? onTap : null,
           borderRadius: borderRadius,
           child: ConstrainedBox(
             // Keeps every chip a comfortable tap target regardless of layout.
@@ -872,12 +881,16 @@ class SettingsSegmentedChoice<T> extends StatelessWidget {
     required this.selected,
     required this.onChanged,
     this.semanticLabel,
+    this.enabled = true,
   });
 
   final List<SettingsSegmentOption<T>> options;
   final T selected;
   final ValueChanged<T> onChanged;
   final String? semanticLabel;
+
+  /// False shows every option in its disabled style and ignores taps.
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -899,6 +912,7 @@ class SettingsSegmentedChoice<T> extends StatelessWidget {
           actions: [
             for (final option in options)
               M3EButtonGroupAction(
+                enabled: enabled,
                 icon: option.icon == null
                     ? null
                     : AppIcon.adaptive(option.icon!, size: 18, fill: 0),
@@ -919,6 +933,7 @@ class SettingsSegmentedChoice<T> extends StatelessWidget {
           for (final option in options)
             ButtonSegment(
               value: option.value,
+              enabled: enabled,
               label: Text(option.label),
               icon: option.icon == null ? null : AppIcon(option.icon!),
             ),
@@ -937,6 +952,7 @@ class SettingsSegmentedChoice<T> extends StatelessWidget {
             icon: option.icon,
             label: option.label,
             isSelected: option.value == selected,
+            enabled: enabled,
             onTap: () => onChanged(option.value),
           ),
         ],
