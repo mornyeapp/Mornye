@@ -141,7 +141,7 @@ class _Repo extends RepoNotifier {
     return true;
   }
 
-  List<String> get updates =>
+  List<String> get _updates =>
       calls.where((call) => call.startsWith('update:')).toList();
 }
 
@@ -349,7 +349,7 @@ void main() {
       );
       addTearDown(harness.container.dispose);
       await harness.notifier.checkAfterStartup();
-      expect(harness.repo.updates, isEmpty);
+      expect(harness.repo._updates, isEmpty);
       expect(harness.container.read(repoProvider).updatesAvailableCount, 2);
       expect(harness.notice, isNull);
     });
@@ -360,7 +360,7 @@ void main() {
       harness.repo.failing.add('ext-a');
 
       await harness.notifier.checkAfterStartup();
-      expect(harness.repo.updates, ['update:ext-a:true', 'update:ext-b:true']);
+      expect(harness.repo._updates, ['update:ext-a:true', 'update:ext-b:true']);
       expect(harness.notice?.count, 1);
       expect(harness.container.read(repoProvider).updatesAvailableCount, 1);
 
@@ -368,7 +368,7 @@ void main() {
       harness.now = harness.now.add(extensionUpdateCheckInterval);
       await harness.notifier.checkOnResume();
       expect(harness.repo.calls.last, 'refresh');
-      expect(harness.repo.updates, hasLength(2));
+      expect(harness.repo._updates, hasLength(2));
       expect(identical(harness.notice, firstNotice), isTrue);
     });
 
@@ -379,7 +379,7 @@ void main() {
       );
       addTearDown(harness.container.dispose);
       await harness.notifier.checkAfterStartup();
-      expect(harness.repo.updates, isEmpty);
+      expect(harness.repo._updates, isEmpty);
       expect(harness.notice, isNull);
     });
 
@@ -395,7 +395,7 @@ void main() {
 
       harness.queue.setBusy(false);
       await check;
-      expect(harness.repo.updates, ['update:ext-a:true', 'update:ext-b:true']);
+      expect(harness.repo._updates, ['update:ext-a:true', 'update:ext-b:true']);
       expect(harness.notice?.count, 2);
     });
 
@@ -410,7 +410,7 @@ void main() {
       harness.settings.setAutoUpdate(false);
       harness.queue.setBusy(false);
       await check;
-      expect(harness.repo.updates, isEmpty);
+      expect(harness.repo._updates, isEmpty);
       expect(harness.notice, isNull);
     });
   });
