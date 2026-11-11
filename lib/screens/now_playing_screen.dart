@@ -356,9 +356,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       child: mornye
           ? _buildPlayer(context, mediaItem, fullScreenCover: fullScreenCover)
           // Material takes the track's artwork scheme. The providers it needs
-          // are read above, so the scoped builder reads none.
+          // are read above, so the scoped builder reads none. A skip moves
+          // only the page background, so the whole player is not rebuilt
+          // on every frame of the colour change.
           : PlayerArtworkTheme(
               artUri: mediaItem?.artUri?.toString(),
+              fadesSurfaceOnly: true,
               child: Builder(
                 builder: (context) => _buildPlayer(
                   context,
@@ -549,18 +552,16 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         !widget.embedded &&
         MediaQuery.orientationOf(context) == Orientation.landscape &&
         ref.watch(settingsProvider.select((s) => s.landscapeLyricsArtwork));
+    // The Material page background is painted below the scaffold, where it
+    // moves to the next track's colour on its own.
     final player = Scaffold(
       extendBodyBehindAppBar: materialLandscapeArtwork,
-      backgroundColor: mornye || materialBackdrop
-          ? Colors.transparent
-          : colorScheme.surface,
+      backgroundColor: Colors.transparent,
       appBar: _FadingAppBar(
         opacity: contentOpacity,
         hidden: !mornye && _lyricsImmersive,
         child: AppBar(
-          backgroundColor: mornye || materialBackdrop
-              ? Colors.transparent
-              : colorScheme.surface,
+          backgroundColor: Colors.transparent,
           foregroundColor: overCover ? Colors.white : colorScheme.onSurface,
           surfaceTintColor: Colors.transparent,
           systemOverlayStyle: mornye
@@ -870,7 +871,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       ),
     );
     if (!mornye) {
-      if (!materialBackdrop) return _lyricsPointerListener(player);
+      if (!materialBackdrop) {
+        return _lyricsPointerListener(
+          PlayerArtworkSurface(surface: colorScheme.surface, child: player),
+        );
+      }
       return Stack(
         fit: StackFit.expand,
         children: [

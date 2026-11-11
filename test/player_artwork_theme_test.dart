@@ -96,20 +96,24 @@ void main() {
     ColorScheme shown(WidgetTester tester) =>
         Theme.of(tester.element(find.byKey(probe))).colorScheme;
 
-    Widget host(String? artUri, ThemeData theme, {bool reduceMotion = false}) =>
-        MaterialApp(
-          theme: theme,
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(disableAnimations: reduceMotion),
-            child: child!,
-          ),
-          home: PlayerArtworkTheme(
-            artUri: artUri,
-            child: const SizedBox(key: probe),
-          ),
-        );
+    Widget host(
+      String? artUri,
+      ThemeData theme, {
+      bool reduceMotion = false,
+      bool fadesSurfaceOnly = false,
+      Widget child = const SizedBox(key: probe),
+    }) => MaterialApp(
+      theme: theme,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(disableAnimations: reduceMotion),
+        child: child!,
+      ),
+      home: PlayerArtworkTheme(
+        artUri: artUri,
+        fadesSurfaceOnly: fadesSurfaceOnly,
+        child: child,
+      ),
+    );
 
     testWidgets('shows a cached cover scheme from the first frame', (
       tester,
@@ -181,6 +185,124 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(shown(tester), green);
+    });
+
+    group('moving only the page background', () {
+      var builds = 0;
+      // Builds whenever the scheme it reads changes.
+      final page = PlayerArtworkSurface(
+        surface: Colors.pink,
+        child: Builder(
+          builder: (context) {
+            builds++;
+            Theme.of(context);
+            return const SizedBox(key: probe);
+          },
+        ),
+      );
+      Color background(WidgetTester tester) => tester
+          .widget<ColoredBox>(
+            find.descendant(
+              of: find.byType(PlayerArtworkSurface),
+              matching: find.byType(ColoredBox),
+            ),
+          )
+          .color;
+
+      setUp(() => builds = 0);
+
+      testWidgets('swaps the scheme in one step while the background moves', (
+        tester,
+      ) async {
+        final theme = AppTheme.light();
+        palette.cached[_coverA] = red;
+        await tester.pumpWidget(
+          host(_coverA, theme, fadesSurfaceOnly: true, child: page),
+        );
+        expect(shown(tester), red);
+        expect(background(tester), red.surface);
+
+        await tester.pumpWidget(
+          host(_coverB, theme, fadesSurfaceOnly: true, child: page),
+        );
+        palette.complete(_coverB, green);
+        await tester.pump();
+        final before = builds;
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 40));
+        expect(shown(tester), green);
+        final midway = background(tester);
+        expect(midway, isNot(red.surface));
+        expect(midway, isNot(green.surface));
+        for (var i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        await tester.pumpAndSettle();
+        // The page under the theme built only for the swap itself.
+        expect(builds - before, lessThanOrEqualTo(1));
+        expect(background(tester), green.surface);
+      });
+
+      testWidgets('a skip partway through starts from the colour on screen', (
+        tester,
+      ) async {
+        final theme = AppTheme.light();
+        palette.cached[_coverA] = red;
+        palette.cached[_coverB] = green;
+        await tester.pumpWidget(
+          host(_coverA, theme, fadesSurfaceOnly: true, child: page),
+        );
+        await tester.pumpWidget(
+          host(_coverB, theme, fadesSurfaceOnly: true, child: page),
+        );
+        await tester.pump(const Duration(milliseconds: 40));
+        final midway = background(tester);
+        expect(midway, isNot(green.surface));
+
+        await tester.pumpWidget(
+          host(_coverA, theme, fadesSurfaceOnly: true, child: page),
+        );
+        expect(shown(tester), red);
+        expect(background(tester), midway);
+        await tester.pumpAndSettle();
+        expect(background(tester), red.surface);
+      });
+
+      testWidgets('reduced motion swaps the background with the scheme', (
+        tester,
+      ) async {
+        final theme = AppTheme.light();
+        palette.cached[_coverA] = red;
+        palette.cached[_coverB] = green;
+        await tester.pumpWidget(
+          host(
+            _coverA,
+            theme,
+            reduceMotion: true,
+            fadesSurfaceOnly: true,
+            child: page,
+          ),
+        );
+        await tester.pumpWidget(
+          host(
+            _coverB,
+            theme,
+            reduceMotion: true,
+            fadesSurfaceOnly: true,
+            child: page,
+          ),
+        );
+        expect(shown(tester), green);
+        expect(background(tester), green.surface);
+      });
+
+      testWidgets('outside it the background is the given surface', (
+        tester,
+      ) async {
+        palette.cached[_coverA] = red;
+        await tester.pumpWidget(host(_coverA, AppTheme.light(), child: page));
+        expect(background(tester), Colors.pink);
+      });
     });
 
     testWidgets('AMOLED keeps the page background pure black', (tester) async {
@@ -314,22 +436,22 @@ void main() {
       );
       palette.cached[_coverA] = cover;
       await tester.pumpWidget(app(const NowPlayingScreen(), mornye: false));
-      // The card, whose scaffold shows the scheme's surface.
+      // The card, whose page shows the scheme's surface.
       ProviderScope.containerOf(
         tester.element(find.byType(NowPlayingScreen)),
       ).read(settingsProvider.notifier).setPlayerCoverStyle('default');
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
 
-      final scaffold = tester.widget<Scaffold>(
+      final background = tester.widget<ColoredBox>(
         find
             .descendant(
-              of: find.byType(NowPlayingScreen),
-              matching: find.byType(Scaffold),
+              of: find.byType(PlayerArtworkSurface),
+              matching: find.byType(ColoredBox),
             )
             .first,
       );
-      expect(scaffold.backgroundColor, cover.surface);
+      expect(background.color, cover.surface);
       expect(Theme.of(tester.element(find.text('Song'))).colorScheme, cover);
     });
 

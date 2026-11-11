@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/mornye_player_artwork.dart';
 import 'package:mornye/widgets/player_artwork.dart';
@@ -450,9 +451,9 @@ class _BlurredCoverState extends State<_BlurredCover>
     return Stack(
       fit: StackFit.expand,
       children: [
-        ColoredBox(color: surface),
+        PlayerArtworkSurface(surface: surface),
         blurred,
-        ColoredBox(color: surface.withValues(alpha: 0.72)),
+        PlayerArtworkSurface(surface: surface, opacity: 0.72),
       ],
     );
   }
