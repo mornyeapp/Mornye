@@ -15,6 +15,22 @@ import 'package:mornye/widgets/player_lyrics.dart';
 void main() {
   tearDown(() => debugDesktopPlatformOverride = null);
 
+  test('the line scroll eases in, arrives on time and never steps back', () {
+    final curve = LyricScrollMotion.scrollCurve;
+    final total = LyricScrollMotion.scrollDuration.inMilliseconds;
+    double at(int milliseconds) => curve.transform(milliseconds / total);
+    // The first frames barely move, so a late one cannot show as a jump.
+    expect(at(16), lessThan(0.01));
+    expect(at(33), lessThan(0.04));
+    expect(at(33) - at(16), greaterThan(at(16)));
+    expect(at(200), greaterThan(0.7));
+    expect(at(300), greaterThan(0.9));
+    expect(at(total), 1);
+    for (var ms = 1; ms <= total; ms++) {
+      expect(at(ms), greaterThanOrEqualTo(at(ms - 1)));
+    }
+  });
+
   for (final mornye in [false, true]) {
     final style = mornye ? 'Mornye' : 'Material';
     testWidgets(
