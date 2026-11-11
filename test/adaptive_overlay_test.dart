@@ -226,6 +226,30 @@ void main() {
             container.read(settingsProvider).autoConvertSmartDither,
             isTrue,
           );
+          // The M3E button group builds each label twice.
+          Future<void> tapSmartType(String label) async {
+            final finder = find.text(label).first;
+            await tester.ensureVisible(finder);
+            await tester.pumpAndSettle();
+            await tester.tap(finder, warnIfMissed: false);
+            await tester.pumpAndSettle();
+          }
+
+          expect(find.text('Smart Dither type'), findsOneWidget);
+          expect(
+            container.read(settingsProvider).autoConvertSmartDitherHighPass,
+            isFalse,
+          );
+          await tapSmartType('TPDF HP');
+          expect(
+            container.read(settingsProvider).autoConvertSmartDitherHighPass,
+            isTrue,
+          );
+          await tapSmartType('TPDF');
+          expect(
+            container.read(settingsProvider).autoConvertSmartDitherHighPass,
+            isFalse,
+          );
           final smartDither = find.text('Smart Dither');
           await tester.ensureVisible(smartDither);
           await tester.pumpAndSettle();
@@ -233,6 +257,12 @@ void main() {
           await tester.pumpAndSettle();
           expect(
             container.read(settingsProvider).autoConvertSmartDither,
+            isFalse,
+          );
+          // Without Smart Dither the type choice is disabled.
+          await tapSmartType('TPDF HP');
+          expect(
+            container.read(settingsProvider).autoConvertSmartDitherHighPass,
             isFalse,
           );
           expect(tester.takeException(), isNull);

@@ -40,13 +40,31 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      Future<void> tap(String label) async {
-        final finder = find.text(label);
+      Future<void> tapFinder(Finder finder) async {
         await tester.ensureVisible(finder);
         await tester.pumpAndSettle();
         await tester.tap(finder);
         await tester.pumpAndSettle();
       }
+
+      Future<void> tap(String label) => tapFinder(find.text(label));
+
+      // TPDF and TPDF HP are also manual dither choices, so look inside the
+      // Smart Dither type choice. The M3E button group builds each label
+      // twice, so take the first.
+      Finder smartType(String label) => find
+          .descendant(
+            of: find.byKey(const ValueKey('smart-dither-type')),
+            matching: find.text(label),
+          )
+          .first;
+
+      const plainDescription =
+          'Smart Dither adds plain TPDF, which spreads the added noise '
+          'evenly across all frequencies.';
+      const highPassDescription =
+          'Smart Dither adds high-pass TPDF, which moves the added noise to '
+          'high frequencies where it is harder to hear.';
 
       await tap('16-bit');
       expect(find.text('Smart'), findsOneWidget);
@@ -54,15 +72,26 @@ void main() {
         find.text('Automatically applies dither only when lowering bit depth.'),
         findsOneWidget,
       );
+      expect(find.text('Smart Dither type'), findsOneWidget);
+      expect(smartType('TPDF'), findsOneWidget);
+      expect(smartType('TPDF HP'), findsOneWidget);
+      expect(find.text(plainDescription), findsOneWidget);
       await tap('Convert now');
       expect(selected?.normalizedDither, 'auto');
       expect(selected?.highPass, isFalse);
+      expect(
+        selected
+            ?.resolveDither(sourceBitDepth: 24, targetBitDepth: 16)
+            .normalizedDither,
+        'triangular',
+      );
       await tap('None');
-      expect(find.text('Use TPDF HP'), findsNothing);
+      expect(find.text('Smart Dither type'), findsNothing);
       await tap('Convert now');
       expect(selected?.normalizedDither, 'none');
       await tap('Smart');
-      await tap('Use TPDF HP');
+      await tapFinder(smartType('TPDF HP'));
+      expect(find.text(highPassDescription), findsOneWidget);
       await tap('Convert now');
       expect(selected?.normalizedDither, 'auto');
       expect(selected?.highPass, isTrue);
@@ -72,6 +101,10 @@ void main() {
             .normalizedDither,
         'triangular_hp',
       );
+      await tapFinder(smartType('TPDF'));
+      expect(find.text(plainDescription), findsOneWidget);
+      await tap('Convert now');
+      expect(selected?.highPass, isFalse);
       await tap('MP3');
       expect(find.text('Dithering'), findsNothing);
       expect(tester.takeException(), isNull);

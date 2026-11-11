@@ -202,20 +202,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                         ? context.l10n.trackConvertDitherSmartDescription
                         : null,
                     footer: _selectedDither == 'auto'
-                        ? AppSwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              context.l10n.trackConvertDitherHighPass,
-                            ),
-                            subtitle: Text(
-                              context
-                                  .l10n
-                                  .trackConvertDitherHighPassDescription,
-                            ),
-                            value: _smartDitherHighPass,
-                            onChanged: (value) =>
-                                setState(() => _smartDitherHighPass = value),
-                          )
+                        ? _smartDitherType(cs)
                         : null,
                   ),
 
@@ -345,6 +332,54 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
     return context.isMornye
         ? MornyeGlassPanel.overlay(child: content)
         : content;
+  }
+
+  /// Which TPDF Smart dither adds: plain or high-pass.
+  Widget _smartDitherType(ColorScheme cs) {
+    final l10n = context.l10n;
+    final textTheme = Theme.of(context).textTheme;
+    final title = l10n.trackConvertDitherSmartType;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 2, bottom: 8),
+          child: Text(
+            title,
+            style: textTheme.labelMedium?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.1,
+            ),
+          ),
+        ),
+        SettingsSegmentedChoice<bool>(
+          key: const ValueKey('smart-dither-type'),
+          selected: _smartDitherHighPass,
+          onChanged: (value) => setState(() => _smartDitherHighPass = value),
+          semanticLabel: title,
+          options: [
+            SettingsSegmentOption(
+              value: false,
+              label: l10n.trackConvertDitherTriangular,
+            ),
+            SettingsSegmentOption(
+              value: true,
+              label: l10n.trackConvertDitherTriangularHp,
+            ),
+          ],
+        ),
+        Padding(
+          padding: EdgeInsets.only(top: context.tokens.gapMd),
+          child: Text(
+            _smartDitherHighPass
+                ? l10n.trackConvertDitherHighPassDescription
+                : l10n.trackConvertDitherPlainDescription,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _card(ColorScheme cs, {required Widget child}) {

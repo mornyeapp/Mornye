@@ -7177,9 +7177,13 @@
   "@downloadAutoConvertSmartDither": {
     "description": "Toggle for automatic dither during FLAC download conversion"
   },
-  "trackConvertDitherHighPass": "Pakai TPDF HP",
-  "@trackConvertDitherHighPass": {
-    "description": "Toggle that makes Smart Dither use high-pass TPDF instead of plain TPDF"
+  "trackConvertDitherSmartType": "Jenis Smart Dither",
+  "@trackConvertDitherSmartType": {
+    "description": "Label of the choice between plain TPDF and high-pass TPDF for Smart Dither"
+  },
+  "trackConvertDitherPlainDescription": "Smart Dither memakai TPDF biasa, yang menyebarkan derau tambahan merata di semua frekuensi.",
+  "@trackConvertDitherPlainDescription": {
+    "description": "Explains the plain TPDF option of Smart Dither"
   },
   "trackConvertDitherHighPassDescription": "Smart Dither memakai TPDF high-pass, yang memindahkan derau tambahan ke frekuensi tinggi sehingga lebih sulit terdengar.",
   "@trackConvertDitherHighPassDescription": {

@@ -8300,9 +8300,13 @@
   "@downloadAutoConvertSmartDither": {
     "description": "Toggle for automatic dither during FLAC download conversion"
   },
-  "trackConvertDitherHighPass": "Use TPDF HP",
-  "@trackConvertDitherHighPass": {
-    "description": "Toggle that makes Smart Dither use high-pass TPDF instead of plain TPDF"
+  "trackConvertDitherSmartType": "Smart Dither type",
+  "@trackConvertDitherSmartType": {
+    "description": "Label of the choice between plain TPDF and high-pass TPDF for Smart Dither"
+  },
+  "trackConvertDitherPlainDescription": "Smart Dither adds plain TPDF, which spreads the added noise evenly across all frequencies.",
+  "@trackConvertDitherPlainDescription": {
+    "description": "Explains the plain TPDF option of Smart Dither"
   },
   "trackConvertDitherHighPassDescription": "Smart Dither adds high-pass TPDF, which moves the added noise to high frequencies where it is harder to hear.",
   "@trackConvertDitherHighPassDescription": {

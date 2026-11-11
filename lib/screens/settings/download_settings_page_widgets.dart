@@ -370,3 +370,93 @@ class _DefaultSearchTabSelector extends ConsumerWidget {
     );
   }
 }
+
+/// Which TPDF Smart Dither adds: plain or high-pass, a two-way choice under
+/// its title and the current choice's description.
+class _SmartDitherTypeChoice extends StatelessWidget {
+  const _SmartDitherTypeChoice({
+    required this.highPass,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final bool highPass;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final title = l10n.trackConvertDitherSmartType;
+    final showIcon = !context.isMornye;
+    final content = Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: context.tokens.rowPaddingH,
+        vertical: context.tokens.rowPaddingVCompact,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (showIcon) ...[
+                AppIcon(
+                  Icons.waves,
+                  color: enabled
+                      ? colorScheme.onSurfaceVariant
+                      : colorScheme.outline,
+                  size: 24,
+                ),
+                SizedBox(width: context.tokens.rowIconGap),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: enabled ? null : colorScheme.outline,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      highPass
+                          ? l10n.trackConvertDitherHighPassDescription
+                          : l10n.trackConvertDitherPlainDescription,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: enabled
+                            ? colorScheme.onSurfaceVariant
+                            : colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SettingsSegmentedChoice<bool>(
+            selected: highPass,
+            enabled: enabled,
+            onChanged: onChanged,
+            semanticLabel: title,
+            options: [
+              SettingsSegmentOption(
+                value: false,
+                label: l10n.trackConvertDitherTriangular,
+              ),
+              SettingsSegmentOption(
+                value: true,
+                label: l10n.trackConvertDitherTriangularHp,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    return SettingsSearchTarget(label: title, child: content);
+  }
+}
