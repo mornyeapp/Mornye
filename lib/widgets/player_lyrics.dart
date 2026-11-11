@@ -161,6 +161,32 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     return speed.isFinite && speed > 0 ? _displayLead * speed : Duration.zero;
   }
 
+  /// The position the lines were last set for, and how far [_steady] held
+  /// it ahead of the one it was given.
+  Duration? _shownPosition;
+  Duration _heldAhead = Duration.zero;
+
+  /// [position], or the later one already shown when playback advances and
+  /// [position] is only a little behind it. Position reports land a few
+  /// tens of milliseconds either side of the lyric clock. One just behind
+  /// the end of a line brought that line back for a moment: it lit again,
+  /// and a list holding on it scrolled back and forward again. A seek back
+  /// is further away and moves at once.
+  Duration _steady(Duration position) {
+    final shown = _shownPosition;
+    if (shown != null &&
+        _playing &&
+        !_loading &&
+        widget.seekPreview.value == null &&
+        position < shown &&
+        shown - position < const Duration(milliseconds: 750)) {
+      _heldAhead = shown - position;
+      return shown;
+    }
+    _heldAhead = Duration.zero;
+    return _shownPosition = position;
+  }
+
   bool _hasStarted = false;
   bool _userScrolling = false;
 
@@ -419,7 +445,8 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
 
     _playing = ref.read(playbackPlayingProvider);
     _loading = ref.read(playbackLoadingProvider);
-    final position = _displayPosition;
+    _shownPosition = null;
+    final position = _steady(_displayPosition);
     _active = _activeIndexAt(position);
     _activeLines = _timeline.activeIndices(position, _active);
     _focus = _focusFor(_active, _activeLines, position);
@@ -440,7 +467,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       playbackPositionProvider,
       (previous, next) {
         if (widget.seekPreview.value != null) return;
-        final shown = next + _lead;
+        final shown = _steady(next + _lead);
         final active = _steadyActiveIndex(_activeIndexAt(shown), shown);
         _setActiveLine(active, position: shown);
         _scheduleNextLine(shown);
@@ -451,7 +478,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       next,
     ) {
       _playing = next;
-      final position = _displayPosition;
+      final position = _steady(_displayPosition);
       _setActiveLine(_activeIndexAt(position), position: position);
       _scheduleNextLine(position);
     });
@@ -460,7 +487,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       next,
     ) {
       _loading = next;
-      final position = _displayPosition;
+      final position = _steady(_displayPosition);
       _setActiveLine(_activeIndexAt(position), position: position);
       _scheduleNextLine(position);
     });
@@ -497,7 +524,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
 
   void _previewChanged() {
     if (!mounted || !_visible) return;
-    final position = _displayPosition;
+    final position = _steady(_displayPosition);
     final wasUserScrolling = _userScrolling;
     _userScrolling = false;
     _userScrollIdleTimer?.cancel();
@@ -631,7 +658,9 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     }
     if (nextBoundary == null) return;
     final boundary = nextBoundary;
-    final remaining = boundary - position;
+    // A held position is ahead of the audio, which has that much further
+    // to go to the boundary.
+    final remaining = boundary - position + _heldAhead;
     final speed = ref.read(playbackStateProvider).value?.speed ?? 1.0;
     final delay = speed.isFinite && speed > 0
         ? Duration(microseconds: (remaining.inMicroseconds / speed).ceil())
@@ -640,7 +669,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       if (!mounted || !_visible || !_playing || _loading) return;
       // A delayed callback must catch up to the audio clock, rather than
       // treating its scheduled boundary as the current playback position.
-      _scheduleNextLine(_displayPosition);
+      _scheduleNextLine(_steady(_displayPosition));
     });
   }
 

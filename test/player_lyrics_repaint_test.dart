@@ -401,6 +401,79 @@ void main() {
     });
   }
 
+  testWidgets('a late position report slows the word sweep, never steps it '
+      'back', (tester) async {
+    final playback = StreamController<PlaybackState>.broadcast();
+    final preview = ValueNotifier<Duration?>(null);
+    addTearDown(playback.close);
+    addTearDown(preview.dispose);
+    final theme = ThemeData.dark();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          playbackStateProvider.overrideWith((ref) => playback.stream),
+        ],
+        child: MaterialApp(
+          theme: theme,
+          home: Scaffold(
+            body: WordTimedLyricLine(
+              line: _lyrics.lines.single,
+              initialPosition: const Duration(seconds: 2),
+              seekPreview: preview,
+              style: theme.textTheme.titleLarge!,
+            ),
+          ),
+        ),
+      ),
+    );
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+    int position() {
+      final painter = tester.widget<CustomPaint>(_paint).painter!;
+      // Inspect the clock already supplied to the painter.
+      // ignore: avoid_dynamic_calls
+      return ((painter as dynamic).currentPosition() as Duration)
+          .inMicroseconds;
+    }
+
+    Future<void> report(int milliseconds) async {
+      playback.add(
+        PlaybackState(
+          playing: true,
+          processingState: AudioProcessingState.ready,
+          updatePosition: Duration(milliseconds: milliseconds),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+    }
+
+    await report(2000);
+    final before = position();
+    // The engine says 0.1 s less than the sweep's own clock.
+    await report(1900);
+    final after = position();
+    expect(after, greaterThanOrEqualTo(before));
+    expect(after - before, lessThan(20000));
+
+    // It runs 5% slow instead, which closes the gap in two seconds.
+    final clock = Stopwatch()..start();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    final moved = position() - after;
+    final elapsed = clock.elapsedMicroseconds;
+    expect(
+      moved,
+      inInclusiveRange(elapsed * 0.95 - 5000, elapsed * 0.95 + 5000),
+    );
+
+    // A seek back is applied at once.
+    await report(500);
+    expect(position(), lessThan(600000));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   for (final (tier, liquid, lowEnd) in [
     ('standard', false, false),
     ('low', false, true),

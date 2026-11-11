@@ -91,6 +91,115 @@ void main() {
       });
     });
 
+    testWidgets('a late position report keeps a finished line finished '
+        '($mornye)', (tester) async {
+      var now = DateTime(2026);
+      await withClock(Clock(() => now), () async {
+        final playback = StreamController<PlaybackState>.broadcast();
+        final preview = ValueNotifier<Duration?>(null);
+        addTearDown(playback.close);
+        addTearDown(preview.dispose);
+        final theme = mornye
+            ? MornyeTheme.build(Brightness.dark)
+            : AppTheme.dark();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              playbackStateProvider.overrideWith((ref) => playback.stream),
+            ],
+            child: MaterialApp(
+              theme: theme,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: SyncedLyricsView(
+                  // As in TTML, the first line is still sung when the second
+                  // starts.
+                  lyrics: const ParsedLyrics(
+                    synced: true,
+                    wordSynced: false,
+                    plainText: '',
+                    lines: [
+                      LyricLine(
+                        time: Duration(seconds: 1),
+                        end: Duration(milliseconds: 4300),
+                        text: 'First phrase',
+                      ),
+                      LyricLine(
+                        time: Duration(seconds: 4),
+                        end: Duration(seconds: 7),
+                        text: 'Second phrase',
+                      ),
+                      LyricLine(
+                        time: Duration(seconds: 7),
+                        end: Duration(seconds: 9),
+                        text: 'Third phrase',
+                      ),
+                    ],
+                  ),
+                  seekPreview: preview,
+                  colorScheme: theme.colorScheme,
+                  isActive: true,
+                  showPronunciation: false,
+                  showTranslation: false,
+                ),
+              ),
+            ),
+          ),
+        );
+        PlaybackState at(int milliseconds) => PlaybackState(
+          playing: true,
+          processingState: AudioProcessingState.ready,
+          updatePosition: Duration(milliseconds: milliseconds),
+        );
+        double emphasis(String phrase) => tester
+            .widget<AnimatedOpacity>(
+              find.ancestor(
+                of: find.text(phrase),
+                matching: find.byType(AnimatedOpacity),
+              ),
+            )
+            .opacity;
+        Future<void> advance(int milliseconds) async {
+          now = now.add(Duration(milliseconds: milliseconds));
+          await tester.pump(Duration(milliseconds: milliseconds));
+        }
+
+        playback.add(at(3500));
+        await tester.pump();
+        await tester.pump();
+        await advance(600);
+        expect(emphasis('First phrase'), 1);
+        expect(emphasis('Second phrase'), 1);
+        await advance(250);
+        expect(emphasis('First phrase'), lessThan(1));
+
+        // The report says 4.25 s where the lyric clock is at 4.35 s. The
+        // first line ended in between and stays ended.
+        playback.add(at(4250));
+        await tester.pump();
+        await tester.pump();
+        expect(emphasis('First phrase'), lessThan(1));
+        expect(emphasis('Second phrase'), 1);
+        // Playback goes on from the report without the line coming back.
+        for (var step = 0; step < 10; step++) {
+          await advance(20);
+          expect(emphasis('First phrase'), lessThan(1));
+        }
+        await advance(2600);
+        expect(emphasis('Third phrase'), 1);
+
+        // A seek back still moves at once.
+        playback.add(at(4100));
+        await tester.pump();
+        await tester.pump();
+        expect(emphasis('First phrase'), 1);
+        expect(emphasis('Third phrase'), lessThan(1));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    });
+
     for (final refreshRate in [60.0, 120.0]) {
       testWidgets('playing lyrics change line a display delay early '
           '($mornye, $refreshRate Hz)', (tester) async {

@@ -78,6 +78,10 @@ class _WordHighlightedLyricLineState
   bool _playing = false;
   bool _loading = false;
   double _speed = 1;
+
+  /// Runs the clock a little fast or slow toward the reported position;
+  /// see [_follow].
+  double _catchUp = 1;
   bool _tickerEnabled = true;
   bool _useInitialPosition = true;
   Duration _visualEnd = Duration.zero;
@@ -103,12 +107,14 @@ class _WordHighlightedLyricLineState
   bool get _shouldAnimate => _advancing && _currentPosition() < _visualEnd;
 
   Duration _positionAt({required bool advance}) {
+    final elapsed = (_elapsedClock.elapsed - _anchorElapsed).inMicroseconds;
+    // The catch-up pace has closed its gap after the window. Reports come
+    // every half second; without one the clock keeps playback's pace.
+    final paced = elapsed.clamp(0, syncedLyricsCatchUpWindow.inMicroseconds);
     return interpolatedSyncedLyricsPosition(
       anchorPosition: _anchorPosition,
       elapsedSinceAnchor: Duration(
-        microseconds:
-            ((_elapsedClock.elapsed - _anchorElapsed).inMicroseconds * _speed)
-                .round(),
+        microseconds: ((elapsed + paced * (_catchUp - 1)) * _speed).round(),
       ),
       isPlaying: advance,
     );
@@ -206,17 +212,9 @@ class _WordHighlightedLyricLineState
       _syncAnimationClock();
     } else if (oldWidget.initialPosition != widget.initialPosition &&
         widget.seekPreview.value == null) {
-      // A parent rebuilding passes the position again. Like a playback
-      // report, a small difference eases in rather than moving the sweep
-      // back a few letters.
-      _anchorAt(
-        _advancing
-            ? reconcileSyncedLyricsPosition(
-                predictedPosition: _audioPosition(),
-                reportedPosition: widget.initialPosition,
-              )
-            : widget.initialPosition,
-      );
+      // A parent rebuilding passes the position again, like a playback
+      // report.
+      _follow(widget.initialPosition);
       _syncAnimationClock();
     }
     if (oldWidget.animate != widget.animate) {
@@ -245,19 +243,28 @@ class _WordHighlightedLyricLineState
   void _anchorAt(Duration position) {
     _anchorPosition = position;
     _anchorElapsed = _elapsedClock.elapsed;
+    _catchUp = 1;
+  }
+
+  /// Brings the clock to [reported]: at once for a seek or while it stands
+  /// still, else from where it is at a slightly different pace, so the
+  /// sweep never steps back.
+  void _follow(Duration reported) {
+    final predicted = _audioPosition();
+    final rate = _advancing
+        ? syncedLyricsCatchUpRate(
+            predictedPosition: predicted,
+            reportedPosition: reported,
+          )
+        : null;
+    _anchorAt(rate == null ? reported : predicted);
+    if (rate != null) _catchUp = rate;
   }
 
   void _updateReportedPosition(Duration position) {
     if (!mounted || widget.seekPreview.value != null) return;
     final predicted = _currentPosition();
-    _anchorAt(
-      _advancing
-          ? reconcileSyncedLyricsPosition(
-              predictedPosition: _audioPosition(),
-              reportedPosition: position,
-            )
-          : position,
-    );
+    _follow(position);
     _syncAnimationClock();
     // A held line stays visible through an instrumental/outro. Once every
     // envelope has settled, later position reports cannot change its pixels.
