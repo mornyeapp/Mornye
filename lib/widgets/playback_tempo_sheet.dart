@@ -17,13 +17,19 @@ import 'package:mornye/widgets/slider_value_header.dart';
 /// The quick speed choices under the speed slider.
 const playbackTempoQuickSpeeds = [0.75, 1.0, 1.25, 1.5];
 
-/// [speed] on the slider's 0.05 grid.
+/// Speed slider steps of 0.1x from 0.5x to 2x. Fewer stops keep the track
+/// readable; the quick choices add 0.75x and 1.25x between them.
+const _speedDivisions = 15;
+
+/// Pitch slider steps of one semitone from -12 to +12.
+const _pitchDivisions = 24;
+
+/// [speed] on the 0.05 grid the slider steps and quick choices share.
 double _snapSpeed(double speed) =>
     playbackSpeedFromJson((speed * 20).round() / 20);
 
-/// [semitones] on the slider's half-semitone grid.
-double _snapPitch(double semitones) =>
-    playbackPitchFromJson((semitones * 2).round() / 2);
+/// [semitones] in whole semitones.
+double _snapPitch(double semitones) => playbackPitchFromJson(semitones);
 
 /// [speed] with its unit, such as `1.25x`, in the locale's number format.
 String playbackSpeedLabel(AppLocalizations l10n, double speed) =>
@@ -31,7 +37,7 @@ String playbackSpeedLabel(AppLocalizations l10n, double speed) =>
       NumberFormat('0.##', l10n.localeName).format(speed),
     );
 
-/// [semitones] with its sign, such as `+2`, `−1.5` (a real minus sign) or
+/// [semitones] with its sign, such as `+2`, `−1` (a real minus sign) or
 /// `0`, in the locale's number format.
 String playbackPitchLabel(AppLocalizations l10n, double semitones) {
   final number = NumberFormat('0.#', l10n.localeName).format(semitones.abs());
@@ -140,6 +146,7 @@ class _PlaybackTempoControlsState extends ConsumerState<PlaybackTempoControls> {
     );
     final quickChoices = SettingsSegmentedChoice<double>(
       selected: speed,
+      enabled: speedEnabled,
       semanticLabel: l10n.playbackTempoSpeed,
       onChanged: (value) {
         setState(() => _speedDraft = null);
@@ -203,7 +210,7 @@ class _PlaybackTempoControlsState extends ConsumerState<PlaybackTempoControls> {
                     value: speed,
                     min: minPlaybackSpeed,
                     max: maxPlaybackSpeed,
-                    divisions: 30,
+                    divisions: _speedDivisions,
                     label: speedLabel,
                     semanticLabel: l10n.playbackTempoSpeed,
                     semanticFormatterCallback: (value) =>
@@ -223,17 +230,7 @@ class _PlaybackTempoControlsState extends ConsumerState<PlaybackTempoControls> {
                         : null,
                   ),
                   SizedBox(height: tokens.gapSm),
-                  // The segmented choice has no disabled look of its own.
-                  IgnorePointer(
-                    ignoring: !speedEnabled,
-                    child: ExcludeFocus(
-                      excluding: !speedEnabled,
-                      child: Opacity(
-                        opacity: speedEnabled ? 1 : 0.38,
-                        child: quickChoices,
-                      ),
-                    ),
-                  ),
+                  quickChoices,
                 ],
               ),
             ),
@@ -265,7 +262,7 @@ class _PlaybackTempoControlsState extends ConsumerState<PlaybackTempoControls> {
                     value: pitch,
                     min: -maxPlaybackPitch,
                     max: maxPlaybackPitch,
-                    divisions: 48,
+                    divisions: _pitchDivisions,
                     centered: true,
                     label: pitchLabel,
                     semanticLabel: l10n.playbackTempoPitch,
@@ -325,7 +322,8 @@ class _PlaybackTempoControlsState extends ConsumerState<PlaybackTempoControls> {
 }
 
 /// The speed and pitch in Now Playing while either differs from normal,
-/// beside the audio format; a tap opens [showPlaybackTempoSheet].
+/// beside the audio format and in Material's compact player; a tap opens
+/// [showPlaybackTempoSheet].
 class PlaybackTempoBadge extends ConsumerWidget {
   const PlaybackTempoBadge({super.key, required this.colorScheme});
 

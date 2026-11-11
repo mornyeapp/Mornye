@@ -55,8 +55,12 @@ double playbackSpeedFromJson(Object? value) => value is num && value.isFinite
 /// Largest pitch shift either way, in semitones.
 const double maxPlaybackPitch = 12;
 
+/// The pitch shift in whole semitones, the steps a key changes by.
 double playbackPitchFromJson(Object? value) => value is num && value.isFinite
-    ? value.toDouble().clamp(-maxPlaybackPitch, maxPlaybackPitch)
+    ? value.toDouble().roundToDouble().clamp(
+        -maxPlaybackPitch,
+        maxPlaybackPitch,
+      )
     : 0;
 
 /// Smallest and largest Interface size, as a factor of the normal size.
@@ -177,7 +181,7 @@ class AppSettings {
   /// follow the speed, as a record played faster or slower.
   final bool playbackKeepPitch;
 
-  /// Pitch shift in semitones on top of [playbackKeepPitch], from
+  /// Pitch shift in whole semitones on top of [playbackKeepPitch], from
   /// -[maxPlaybackPitch] to [maxPlaybackPitch]; 0 is the original key.
   @JsonKey(fromJson: playbackPitchFromJson)
   final double playbackPitch;

@@ -125,8 +125,8 @@ void main() {
     expect(playbackSpeedLabel(en, 1.25), '1.25x');
     expect(playbackSpeedLabel(id, 1.25), '1,25x');
     expect(playbackPitchLabel(en, 2), '+2');
-    expect(playbackPitchLabel(en, -1.5), '−1.5');
-    expect(playbackPitchLabel(id, -1.5), '−1,5');
+    expect(playbackPitchLabel(en, -3), '−3');
+    expect(playbackPitchLabel(id, -12), '−12');
     expect(playbackPitchLabel(en, 0), '0');
     expect(
       playbackTempoSummary(en, speed: 1, keepPitch: true, pitch: 0),
@@ -141,8 +141,8 @@ void main() {
       '−1 semitone',
     );
     expect(
-      playbackTempoSummary(en, speed: 1, keepPitch: true, pitch: 1.5),
-      '+1.5 semitones',
+      playbackTempoSummary(en, speed: 1, keepPitch: true, pitch: 3),
+      '+3 semitones',
     );
     expect(
       playbackTempoSummary(en, speed: 1, keepPitch: false, pitch: 0),
@@ -174,6 +174,9 @@ void main() {
       expect(_value('+2'), findsOneWidget);
       expect(_slider(tester, _speedSlider).value, 1.25);
       expect(_slider(tester, _pitchSlider).value, 2);
+      // Few enough stops to read: 0.1x and one semitone apart.
+      expect(_slider(tester, _speedSlider).divisions, 15);
+      expect(_slider(tester, _pitchSlider).divisions, 24);
       expect(_keepPitch(tester).value, isFalse);
       expect(_reset(tester).onPressed, isNotNull);
 
@@ -206,7 +209,7 @@ void main() {
       );
       final saved = container.read(settingsProvider).playbackSpeed;
       expect(saved, greaterThan(1.4));
-      expect(saved * 20, closeTo((saved * 20).roundToDouble(), 1e-9));
+      expect(saved * 10, closeTo((saved * 10).roundToDouble(), 1e-9));
       expect(playbackSpeed.value, saved);
       expect(_reset(tester).onPressed, isNotNull);
       expect(tester.takeException(), isNull);
@@ -232,7 +235,7 @@ void main() {
       );
       final saved = container.read(settingsProvider).playbackPitch;
       expect(saved, lessThan(-5));
-      expect(saved * 2, closeTo((saved * 2).roundToDouble(), 1e-9));
+      expect(saved, saved.roundToDouble());
       expect(
         _value(
           playbackPitchLabel(lookupAppLocalizations(const Locale('en')), saved),
@@ -286,7 +289,15 @@ void main() {
       expect(_slider(tester, _pitchSlider).onChanged, isNull);
       expect(_keepPitch(tester).enabled, isFalse);
       expect(_reset(tester).onPressed, isNull);
-      // The quick choices ignore taps.
+      // The quick choices show their disabled style and ignore taps.
+      expect(
+        tester
+            .widget<SettingsSegmentedChoice<double>>(
+              find.byType(SettingsSegmentedChoice<double>),
+            )
+            .enabled,
+        isFalse,
+      );
       await tester.tap(find.text('1.5x').first, warnIfMissed: false);
       await tester.pumpAndSettle();
       expect(container.read(settingsProvider).playbackSpeed, 1.25);

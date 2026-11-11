@@ -13,6 +13,7 @@ import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/expressive_playback_transport.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
+import 'package:mornye/widgets/playback_tempo_sheet.dart';
 
 /// Material's compact player: idle lyrics shrink the full player to this
 /// smaller one (title, timeline and transport, with the times beside the
@@ -140,6 +141,8 @@ class PlayerCompactBar extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    // The full player's format row folds away with it.
+                    PlaybackTempoBadge(colorScheme: colorScheme),
                     AppIconButton(
                       tooltip: context.l10n.nowPlayingUpNext,
                       color: colorScheme.onSurfaceVariant,

@@ -64,12 +64,15 @@ void main() {
     final changed = defaults.copyWith(
       playbackSpeed: 1.25,
       playbackKeepPitch: false,
-      playbackPitch: -3.5,
+      playbackPitch: -3,
     );
     final restored = AppSettings.fromJson(changed.toJson());
     expect(restored.playbackSpeed, 1.25);
     expect(restored.playbackKeepPitch, isFalse);
-    expect(restored.playbackPitch, -3.5);
+    expect(restored.playbackPitch, -3);
+    // Half semitones from earlier builds restore as whole ones.
+    expect(AppSettings.fromJson({'playbackPitch': 2.5}).playbackPitch, 3);
+    expect(AppSettings.fromJson({'playbackPitch': -1.4}).playbackPitch, -1);
     expect(restored.copyWith(locale: 'id').playbackSpeed, 1.25);
 
     for (final invalid in ['', double.nan, double.infinity]) {
