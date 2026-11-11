@@ -58,6 +58,7 @@ import 'package:mornye/widgets/mornye_player_actions_sheet.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/mornye_player_artwork.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
+import 'package:mornye/services/motion_artwork_store.dart';
 
 export 'package:mornye/routes/now_playing_route.dart';
 
@@ -159,6 +160,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   String? _measuredMotionSource;
   double? _motionAspectRatio;
   String? _failedMotionSource;
+
+  /// The motion artwork last shown, kept while the next song's is looked up,
+  /// and the shape its layout used.
+  MotionArtwork? _shownMotionArtwork;
+  double? _shownMotionRatio;
   bool _lyricsControlsHidden = false;
   bool _lyricsOptionsOpen = false;
   bool _audioOutputOpen = false;
@@ -402,15 +408,26 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             )),
           )
         : null;
-    final resolvedMotion = motionState?.value;
+    // A new song looks up its artwork for a few frames. The outgoing motion
+    // cover keeps its layout meanwhile, so the gradient and its fade do not
+    // drop to the still cover's layout and come back.
+    final lookingUp =
+        motionState != null && motionState.isLoading && !motionState.hasValue;
+    final resolvedMotion = lookingUp ? _shownMotionArtwork : motionState?.value;
+    _shownMotionArtwork = resolvedMotion;
     final motionArtwork = resolvedMotion?.source == _failedMotionSource
         ? null
         : resolvedMotion;
-    final motionRatio =
-        motionArtwork?.aspectRatio ??
-        (_measuredMotionSource == motionArtwork?.source
-            ? _motionAspectRatio
-            : null);
+    final motionRatio = motionArtwork == null
+        ? null
+        : motionArtwork.aspectRatio ??
+              (_measuredMotionSource == motionArtwork.source
+                  ? _motionAspectRatio
+                  : null) ??
+              // The outgoing video stays on screen until the next one
+              // measures itself, so its shape keeps the layout until then.
+              _shownMotionRatio;
+    _shownMotionRatio = motionRatio;
     final squareArtwork =
         motionArtwork == null || (motionRatio != null && motionRatio >= 0.95);
     // Motion artwork is always full-bleed in Mornye; still covers follow the

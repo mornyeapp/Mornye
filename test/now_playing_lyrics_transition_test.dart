@@ -179,6 +179,7 @@ void main() {
     Stream<PlaybackState>? playbackEvents,
     Widget Function(Widget)? wrapPlayer,
     MotionArtwork? motionArtwork,
+    MotionArtwork? Function(PlayerArtworkAlbum album)? motionArtworkOf,
     MusicPlayerController? controller,
     List<MediaItem> queue = const [],
     RemotePlayback? remote,
@@ -199,7 +200,7 @@ void main() {
             (ref, notifier) => mediaItems.stream,
           ),
           playerMotionArtworkProvider.overrideWith(
-            (ref, album) async => motionArtwork,
+            (ref, album) async => motionArtworkOf?.call(album) ?? motionArtwork,
           ),
           playerArtworkVideoProvider.overrideWith(
             (ref, source) => Completer<VideoPlayerController>().future,
@@ -3678,6 +3679,82 @@ void main() {
       }
       await settlePlayer(tester);
       expect(find.byType(NowPlayingScreen), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Mornye keeps the motion cover layout while the next song looks up its '
+    'artwork',
+    (tester) async {
+      await pumpNowPlaying(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        size: const Size(393, 852),
+        motionArtwork: const MotionArtwork('file:///cover.mp4', aspectRatio: 1),
+      );
+      mediaItems.add(item('first'));
+      await settlePlayer(tester);
+      MornyePlayerBackground background() =>
+          tester.widget(find.byType(MornyePlayerBackground));
+      expect(background().artwork, isNotNull);
+      expect(background().dimControls, isTrue);
+
+      // The gradient and its fade must not fall back to the still cover's
+      // layout for the frames the lookup takes, and then return.
+      mediaItems.add(item('second'));
+      for (var frame = 0; frame < 10; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(background().artwork, isNotNull, reason: 'frame $frame');
+        expect(background().dimControls, isTrue, reason: 'frame $frame');
+      }
+      await settlePlayer(tester);
+      expect(background().dimControls, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Mornye keeps the outgoing motion cover shape until the next video '
+    'measures itself',
+    (tester) async {
+      await pumpNowPlaying(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        size: const Size(393, 852),
+        // A cover.mp4 in a song's folder has no stored shape.
+        motionArtworkOf: (album) => album.album == 'Album'
+            ? const MotionArtwork('file:///first.mp4', aspectRatio: 1)
+            : const MotionArtwork('file:///other.mp4'),
+      );
+      mediaItems.add(item('first'));
+      await settlePlayer(tester);
+      double artworkHeight() => tester
+          .getSize(
+            find.descendant(
+              of: find.byType(MornyePlayerBackground),
+              matching: find.byType(MornyePlayerArtwork),
+            ),
+          )
+          .height;
+      expect(artworkHeight(), closeTo(393, 0.01));
+
+      mediaItems.add(
+        const MediaItem(
+          id: 'other',
+          title: 'Other',
+          artist: 'Artist',
+          album: 'Other album',
+          duration: Duration(minutes: 3),
+          extras: {'source': 'content://library/other.flac'},
+        ),
+      );
+      for (var frame = 0; frame < 10; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(artworkHeight(), closeTo(393, 0.01), reason: 'frame $frame');
+      }
+      await settlePlayer(tester);
+      expect(artworkHeight(), closeTo(393, 0.01));
       expect(tester.takeException(), isNull);
     },
   );
