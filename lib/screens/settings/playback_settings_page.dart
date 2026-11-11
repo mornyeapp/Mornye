@@ -160,6 +160,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final accessibleNavigation = MediaQuery.accessibleNavigationOf(context);
     final autoMixActive =
         settings.autoMix && !(isDesktopPlatform && settings.exclusiveOutput);
     // Linux opens a chosen ALSA device; the other desktops use the default.
@@ -471,11 +472,20 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                   key: const ValueKey('auto-hide-lyrics-controls'),
                   icon: Icons.fullscreen,
                   title: context.l10n.autoHideLyricsControls,
-                  subtitle: context.l10n.autoHideLyricsControlsDescription,
-                  value: settings.autoHideLyricsControls,
-                  onChanged: ref
+                  subtitle: accessibleNavigation
+                      ? context
+                            .l10n
+                            .autoHideLyricsControlsAccessibilityDescription
+                      : context.l10n.autoHideLyricsControlsDescription,
+                  value: settings.shouldAutoHideLyricsControls(
+                    accessibleNavigation: accessibleNavigation,
+                  ),
+                  onChanged: (enabled) => ref
                       .read(settingsProvider.notifier)
-                      .setAutoHideLyricsControls,
+                      .setAutoHideLyricsControls(
+                        enabled,
+                        accessibleNavigation: accessibleNavigation,
+                      ),
                 ),
               SettingsSwitchItem(
                 icon: Icons.short_text,

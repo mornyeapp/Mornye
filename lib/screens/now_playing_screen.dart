@@ -142,7 +142,7 @@ class NowPlayingScreen extends ConsumerStatefulWidget {
 class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   ProviderSubscription<AsyncValue<MediaItem?>>? _mediaItemSub;
   ProviderSubscription<bool>? _lyricsPlayingSub;
-  ProviderSubscription<bool>? _lyricsAutoHideSub;
+  ProviderSubscription<(bool, bool)>? _lyricsAutoHideSub;
   ProviderSubscription<bool>? _lyricsLayoutSub;
   ProviderSubscription<bool>? _lyricLineSub;
 
@@ -224,10 +224,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       }
       _scheduleLyricsControlsHide();
     });
-    _lyricsAutoHideSub = ref.listenManual<bool>(
-      settingsProvider.select((settings) => settings.autoHideLyricsControls),
-      (_, enabled) {
-        if (!enabled) {
+    _lyricsAutoHideSub = ref.listenManual<(bool, bool)>(
+      settingsProvider.select(
+        (settings) => (
+          settings.autoHideLyricsControls,
+          settings.autoHideLyricsControlsWithAccessibility,
+        ),
+      ),
+      (_, _) {
+        if (!_lyricsAutoHideEnabled) {
           _lyricsPointers.clear();
           _lyricsScrollDistance = 0;
           if (_lyricsControlsHidden) {
@@ -262,7 +267,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     super.didChangeDependencies();
     final size = MediaQuery.sizeOf(context);
     _landscape = context.isMornye && size.width > size.height;
-    if (!_lyricsAutoHideLayout || MediaQuery.accessibleNavigationOf(context)) {
+    if (!_lyricsAutoHideLayout || !_lyricsAutoHideEnabled) {
       _lyricsControlsHidden = false;
     }
     _scheduleLyricsControlsHide(restart: false);
@@ -1005,12 +1010,17 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             (MediaQuery.orientationOf(context) == Orientation.portrait ||
                 ref.read(settingsProvider).landscapeLyricsArtwork);
 
+  bool get _lyricsAutoHideEnabled => ref
+      .read(settingsProvider)
+      .shouldAutoHideLyricsControls(
+        accessibleNavigation: MediaQuery.accessibleNavigationOf(context),
+      );
+
   bool get _canAutoHideLyricsControls =>
       _lyricsAutoHideLayout &&
-      ref.read(settingsProvider).autoHideLyricsControls &&
+      _lyricsAutoHideEnabled &&
       _currentPage == 1 &&
-      ref.read(playbackPlayingProvider) &&
-      !MediaQuery.accessibleNavigationOf(context);
+      ref.read(playbackPlayingProvider);
 
   /// Names what keeps the controls from hiding when lyrics open, so a log
   /// from a device where automatic fullscreen lyrics never starts says why.
@@ -1023,7 +1033,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         'layout ${size.width.round()}x${size.height.round()}',
       if (!ref.read(settingsProvider).autoHideLyricsControls) 'setting off',
       if (!ref.read(playbackPlayingProvider)) 'not playing',
-      if (MediaQuery.accessibleNavigationOf(context)) 'accessible navigation',
+      if (MediaQuery.accessibleNavigationOf(context) &&
+          !ref.read(settingsProvider).autoHideLyricsControlsWithAccessibility)
+        'accessible navigation',
       if (_lyricsPointers.isNotEmpty) 'touch held',
     ];
     if (blockers.isEmpty) return;
@@ -1070,7 +1082,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
   bool _onLyricsScroll(ScrollUpdateNotification notification) {
     if (_currentPage != 1 ||
-        !ref.read(settingsProvider).autoHideLyricsControls ||
+        !_lyricsAutoHideEnabled ||
         _landscape ||
         notification.dragDetails == null ||
         notification.metrics.axis != Axis.vertical) {

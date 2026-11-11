@@ -25,6 +25,7 @@ class MornyeLandscapePlayer extends StatefulWidget {
     this.lyricsOptions,
     this.controlsHeldOpen = false,
     this.autoHideLyricsControls = true,
+    this.autoHideLyricsControlsWithAccessibility = false,
   });
 
   final Widget artwork;
@@ -39,6 +40,7 @@ class MornyeLandscapePlayer extends StatefulWidget {
   final bool isPlaying;
   final bool controlsHeldOpen;
   final bool autoHideLyricsControls;
+  final bool autoHideLyricsControlsWithAccessibility;
   final ValueChanged<int> onPageChanged;
   final Widget? lyricsOptions;
 
@@ -51,12 +53,16 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
   bool _actionsVisible = true;
   bool _audioOutputOpen = false;
 
+  bool get _accessibilityBlocksAutoHide =>
+      MediaQuery.accessibleNavigationOf(context) &&
+      !widget.autoHideLyricsControlsWithAccessibility;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!widget.autoHideLyricsControls ||
         isAndroidTv ||
-        MediaQuery.accessibleNavigationOf(context)) {
+        _accessibilityBlocksAutoHide) {
       _actionsVisible = true;
       _hideTimer?.cancel();
     } else {
@@ -69,7 +75,9 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.page != widget.page ||
         oldWidget.isPlaying != widget.isPlaying ||
-        oldWidget.autoHideLyricsControls != widget.autoHideLyricsControls) {
+        oldWidget.autoHideLyricsControls != widget.autoHideLyricsControls ||
+        oldWidget.autoHideLyricsControlsWithAccessibility !=
+            widget.autoHideLyricsControlsWithAccessibility) {
       _actionsVisible = true;
       _scheduleHide();
     } else if (oldWidget.controlsHeldOpen != widget.controlsHeldOpen) {
@@ -86,7 +94,7 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
         widget.controlsHeldOpen ||
         !_actionsVisible ||
         _audioOutputOpen ||
-        MediaQuery.accessibleNavigationOf(context)) {
+        _accessibilityBlocksAutoHide) {
       return;
     }
     _hideTimer = Timer(const Duration(seconds: 5), () {
@@ -125,7 +133,7 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
               onTap:
                   widget.page == 1 &&
                       !isAndroidTv &&
-                      !MediaQuery.accessibleNavigationOf(context)
+                      !_accessibilityBlocksAutoHide
                   ? () {
                       setState(() => _actionsVisible = !_actionsVisible);
                       _scheduleHide();

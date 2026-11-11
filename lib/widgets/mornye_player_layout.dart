@@ -403,6 +403,12 @@ class MornyePlayerLayout extends ConsumerWidget {
                   (settings) => settings.autoHideLyricsControls,
                 ),
               ),
+              autoHideLyricsControlsWithAccessibility: ref.watch(
+                settingsProvider.select(
+                  (settings) =>
+                      settings.autoHideLyricsControlsWithAccessibility,
+                ),
+              ),
               controlsHeldOpen: lyricsOptionsOpen,
               onPageChanged: onPageChanged,
               artwork: stage(artworkOnly: true),

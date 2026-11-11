@@ -8663,6 +8663,10 @@
   "@autoHideLyricsControlsDescription": {
     "description": "Subtitle explaining the five-second Now Playing lyrics timeout"
   },
+  "autoHideLyricsControlsAccessibilityDescription": "Controls stay visible by default when accessibility is active. Turn on to hide them after 5 seconds while lyrics are open. Tap the lyrics to show them again",
+  "@autoHideLyricsControlsAccessibilityDescription": {
+    "description": "Explains that the fullscreen lyrics switch explicitly allows auto-hide with accessible navigation active"
+  },
   "compactPlayer": "Compact player",
   "@compactPlayer": {
     "description": "Material player setting: idle lyrics shrink the player to a slim bar instead of hiding it"

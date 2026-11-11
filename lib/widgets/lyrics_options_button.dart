@@ -168,9 +168,10 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
         ref.watch(lyricsAiKeyProvider(settings.lyricsAiProvider)).value ?? '';
     final ready = lyricsAiReady(settings, apiKey);
     final autoHide =
-        settings.autoHideLyricsControls &&
-        !isAndroidTv &&
-        !MediaQuery.accessibleNavigationOf(context);
+        settings.shouldAutoHideLyricsControls(
+          accessibleNavigation: MediaQuery.accessibleNavigationOf(context),
+        ) &&
+        !isAndroidTv;
     return ListenableBuilder(
       listenable: widget.metadata,
       builder: (context, _) {

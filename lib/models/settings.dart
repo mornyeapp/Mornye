@@ -256,6 +256,10 @@ class AppSettings {
   final String playerCoverStyle; // 'default' (card), 'fullscreen' or ''
   final bool landscapeLyricsArtwork;
   final bool autoHideLyricsControls;
+
+  /// Only enabled by choosing auto-hide while accessible navigation is active.
+  /// The default keeps playback controls available to assistive navigation.
+  final bool autoHideLyricsControlsWithAccessibility;
   // Material: idle lyrics shrink the player to a slim bar, not hide it.
   final bool compactPlayer;
   final bool isFirstLaunch;
@@ -518,6 +522,7 @@ class AppSettings {
     this.playerCoverStyle = '',
     this.landscapeLyricsArtwork = false,
     this.autoHideLyricsControls = true,
+    this.autoHideLyricsControlsWithAccessibility = false,
     this.compactPlayer = false,
     this.isFirstLaunch = true,
     this.checkForUpdates = true,
@@ -645,6 +650,10 @@ class AppSettings {
       ? 'default'
       : 'fullscreen';
 
+  bool shouldAutoHideLyricsControls({required bool accessibleNavigation}) =>
+      autoHideLyricsControls &&
+      (!accessibleNavigation || autoHideLyricsControlsWithAccessibility);
+
   AppSettings copyWith({
     String? defaultService,
     String? audioQuality,
@@ -702,6 +711,7 @@ class AppSettings {
     String? playerCoverStyle,
     bool? landscapeLyricsArtwork,
     bool? autoHideLyricsControls,
+    bool? autoHideLyricsControlsWithAccessibility,
     bool? compactPlayer,
     bool? isFirstLaunch,
     bool? checkForUpdates,
@@ -872,6 +882,9 @@ class AppSettings {
           landscapeLyricsArtwork ?? this.landscapeLyricsArtwork,
       autoHideLyricsControls:
           autoHideLyricsControls ?? this.autoHideLyricsControls,
+      autoHideLyricsControlsWithAccessibility:
+          autoHideLyricsControlsWithAccessibility ??
+          this.autoHideLyricsControlsWithAccessibility,
       compactPlayer: compactPlayer ?? this.compactPlayer,
       isFirstLaunch: isFirstLaunch ?? this.isFirstLaunch,
       checkForUpdates: checkForUpdates ?? this.checkForUpdates,

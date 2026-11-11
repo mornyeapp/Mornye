@@ -2068,6 +2068,63 @@ void main() {
     }
   }
 
+  testWidgets('Mornye fullscreen lyrics survives playback ticks on its route', (
+    tester,
+  ) async {
+    final playback = StreamController<PlaybackState>.broadcast();
+    addTearDown(playback.close);
+    metadataOverrides['lyrics'] = List.generate(
+      20,
+      (index) => '[00:${index.toString().padLeft(2, '0')}.00]Line $index',
+    ).join('\n');
+    await pumpNowPlaying(
+      tester,
+      theme: MornyeTheme.build(Brightness.dark),
+      size: const Size(393, 852),
+      playbackEvents: playback.stream,
+      wrapPlayer: (player) => Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () =>
+                Navigator.of(context).push(NowPlayingRoute(child: player)),
+            child: const Text('Open player'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open player'));
+    await settlePlayer(tester);
+    mediaItems.add(item('many'));
+    playback.add(PlaybackState(playing: true));
+    await settlePlayer(tester);
+    final toggle = findAppIcon(CupertinoIcons.quote_bubble);
+    await tester.tap(toggle);
+    await settlePlayer(tester);
+    for (var tick = 1; tick <= 12; tick++) {
+      await tester.pump(const Duration(milliseconds: 500));
+      playback.add(
+        PlaybackState(
+          playing: true,
+          updatePosition: Duration(milliseconds: tick * 500),
+        ),
+      );
+      await tester.pump();
+    }
+    await settlePlayer(tester);
+    expect(toggle.hitTestable(), findsNothing);
+    expect(find.byType(PlayerVolumeControl).hitTestable(), findsNothing);
+    expect(find.byType(PlayerPlaybackControls).hitTestable(), findsNothing);
+
+    final bounds = tester.getRect(find.byType(ListView));
+    await tester.tapAt(Offset(bounds.right - 6, bounds.top + 10));
+    await settlePlayer(tester);
+    expect(toggle.hitTestable(), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await settlePlayer(tester);
+    expect(toggle.hitTestable(), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('fullscreen lyrics starts when landscape artwork is enabled', (
     tester,
   ) async {
@@ -2310,6 +2367,86 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final mornye in [false, true]) {
+    for (final landscape in [false, true]) {
+      testWidgets('fullscreen lyrics honors an accessible navigation opt-in '
+          '(Mornye: $mornye, landscape: $landscape)', (tester) async {
+        final accessibility = ValueNotifier(true);
+        addTearDown(accessibility.dispose);
+        await pumpNowPlaying(
+          tester,
+          theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.light(),
+          size: landscape ? const Size(852, 393) : const Size(393, 852),
+          playback: PlaybackState(playing: true),
+          wrapPlayer: (player) => ValueListenableBuilder<bool>(
+            valueListenable: accessibility,
+            child: player,
+            builder: (context, accessible, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(accessibleNavigation: accessible),
+              child: child!,
+            ),
+          ),
+        );
+        mediaItems.add(item('many'));
+        await settlePlayer(tester);
+        final settings = ProviderScope.containerOf(
+          tester.element(find.byType(NowPlayingScreen)),
+        ).read(settingsProvider.notifier);
+        if (!mornye && landscape) settings.setLandscapeLyricsArtwork(true);
+        await settlePlayer(tester);
+        final toggle = mornye
+            ? findAppIcon(CupertinoIcons.quote_bubble)
+            : find.byKey(const ValueKey('material-lyrics-toggle'));
+        await tester.tap(toggle);
+        await settlePlayer(tester);
+        await tester.pump(const Duration(seconds: 6));
+        expect(toggle.hitTestable(), findsOneWidget);
+
+        // The stored default is already true, so changing just the explicit
+        // accessibility choice must start the countdown while lyrics are open.
+        settings.setAutoHideLyricsControls(true, accessibleNavigation: true);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 4900));
+        expect(toggle.hitTestable(), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 100));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsNothing);
+        if (!landscape) {
+          expect(find.byType(PlayerVolumeControl).hitTestable(), findsNothing);
+        }
+        final bounds = tester.getRect(find.byType(ListView));
+        await tester.tapAt(Offset(bounds.right - 6, bounds.top + 10));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsOneWidget);
+        await tester.pump(const Duration(seconds: 5));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsNothing);
+
+        // Revoking the opt-in reveals the controls without leaving lyrics.
+        settings.setAutoHideLyricsControls(false, accessibleNavigation: true);
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsOneWidget);
+        await tester.pump(const Duration(seconds: 6));
+        expect(toggle.hitTestable(), findsOneWidget);
+        settings.setAutoHideLyricsControls(true);
+        await settlePlayer(tester);
+        await tester.pump(const Duration(seconds: 6));
+        expect(toggle.hitTestable(), findsOneWidget);
+        accessibility.value = false;
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 5));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsNothing);
+        accessibility.value = true;
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets('Mornye player background does not reveal the page below', (
     tester,

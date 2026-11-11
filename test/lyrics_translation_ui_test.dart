@@ -29,6 +29,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/lyrics_options_button.dart';
+import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -242,6 +243,58 @@ void main() {
   }
 
   for (final mornye in [false, true]) {
+    testWidgets('lyrics options honor accessible navigation opt-in ($mornye)', (
+      tester,
+    ) async {
+      final metadata = _Lyrics(_lyrics);
+      addTearDown(metadata.dispose);
+      await tester.pumpWidget(
+        _app(
+          mornye: mornye,
+          overrides: [
+            initialSettingsProvider.overrideWithValue(
+              const AppSettings(lyricsAiModel: 'gpt-4.1-mini'),
+            ),
+            lyricsAiKeyStoreProvider.overrideWithValue(
+              MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+            ),
+            lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+          ],
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(accessibleNavigation: true),
+              child: LyricsOptionsActivity(
+                child: Scaffold(
+                  body: Center(
+                    child: LyricsOptionsButton(
+                      metadata: metadata,
+                      colorScheme: const ColorScheme.dark(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final options = find.byKey(const ValueKey('lyrics-language-options'));
+      await tester.pump(const Duration(seconds: 6));
+      expect(options.hitTestable(), findsOneWidget);
+      final settings = ProviderScope.containerOf(
+        tester.element(find.byType(LyricsOptionsButton)),
+      ).read(settingsProvider.notifier);
+      settings.setAutoHideLyricsControls(true, accessibleNavigation: true);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(options.hitTestable(), findsNothing);
+      settings.setAutoHideLyricsControls(false, accessibleNavigation: true);
+      await tester.pumpAndSettle();
+      expect(options.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     for (final desktop in [false, true]) {
       testWidgets('lyrics options fade and reveal without interrupting a menu '
           '(desktop=$desktop, mornye=$mornye)', (tester) async {

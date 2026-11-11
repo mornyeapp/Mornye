@@ -7521,6 +7521,10 @@
   "@autoHideLyricsControlsDescription": {
     "description": "Subtitle explaining the five-second Now Playing lyrics timeout"
   },
+  "autoHideLyricsControlsAccessibilityDescription": "Kontrol tetap terlihat secara default saat aksesibilitas aktif. Aktifkan untuk menyembunyikannya setelah 5 detik saat lirik terbuka. Ketuk lirik untuk menampilkannya kembali",
+  "@autoHideLyricsControlsAccessibilityDescription": {
+    "description": "Explains that the fullscreen lyrics switch explicitly allows auto-hide with accessible navigation active"
+  },
   "playerCoverStyleDefault": "Default",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"

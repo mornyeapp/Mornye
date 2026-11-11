@@ -102,6 +102,8 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       : playerCoverStyleFromJson(json['playerCoverStyle']),
   landscapeLyricsArtwork: json['landscapeLyricsArtwork'] as bool? ?? false,
   autoHideLyricsControls: json['autoHideLyricsControls'] as bool? ?? true,
+  autoHideLyricsControlsWithAccessibility:
+      json['autoHideLyricsControlsWithAccessibility'] as bool? ?? false,
   compactPlayer: json['compactPlayer'] as bool? ?? false,
   isFirstLaunch: json['isFirstLaunch'] as bool? ?? true,
   checkForUpdates: json['checkForUpdates'] as bool? ?? true,
@@ -297,6 +299,8 @@ Map<String, dynamic> _$AppSettingsToJson(
   'playerCoverStyle': instance.playerCoverStyle,
   'landscapeLyricsArtwork': instance.landscapeLyricsArtwork,
   'autoHideLyricsControls': instance.autoHideLyricsControls,
+  'autoHideLyricsControlsWithAccessibility':
+      instance.autoHideLyricsControlsWithAccessibility,
   'compactPlayer': instance.compactPlayer,
   'isFirstLaunch': instance.isFirstLaunch,
   'checkForUpdates': instance.checkForUpdates,
