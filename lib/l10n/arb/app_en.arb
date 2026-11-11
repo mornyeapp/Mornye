@@ -9450,6 +9450,10 @@
   "audioInfoBitPerfect": "Bit-perfect",
   "audioInfoBitPerfectActive": "Yes, unaltered samples",
   "audioInfoBitPerfectNo": "No, mixed by the system",
+  "audioInfoBitPerfectNoIos": "No, iOS mixes all app audio",
+  "@audioInfoBitPerfectNoIos": {
+    "description": "Audio info sheet, Bit-perfect row on iPhone and iPad: iOS sends every app's sound through its mixer, so no setting can make playback bit-perfect"
+  },
   "audioInfoBitPerfectUnverified": "Not verified",
   "audioInfoBitPerfectProcessed": "No, audio processing is active",
   "audioInfoBitPerfectLossy": "No, decoded from a lossy source",

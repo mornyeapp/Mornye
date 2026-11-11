@@ -648,7 +648,12 @@ class _AudioFacts {
       if (_resampling case final value?) _Fact(l10n.audioInfoResampling, value),
       _Fact(l10n.audioInfoBitPerfect, switch (_bitPerfect) {
         AudioBitPerfectStatus.verified => l10n.audioInfoBitPerfectActive,
-        AudioBitPerfectStatus.systemMixed => l10n.audioInfoBitPerfectNo,
+        // iOS offers apps no direct or exclusive output, so no setting
+        // changes this there.
+        AudioBitPerfectStatus.systemMixed =>
+          route?.platform == 'ios'
+              ? l10n.audioInfoBitPerfectNoIos
+              : l10n.audioInfoBitPerfectNo,
         AudioBitPerfectStatus.processed => l10n.audioInfoBitPerfectProcessed,
         AudioBitPerfectStatus.unverified => l10n.audioInfoBitPerfectUnverified,
         AudioBitPerfectStatus.lossySource => l10n.audioInfoBitPerfectLossy,

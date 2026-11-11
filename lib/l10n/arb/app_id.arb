@@ -8145,6 +8145,10 @@
   "audioInfoBitPerfect": "Bit-perfect",
   "audioInfoBitPerfectActive": "Ya, sampel tidak diubah",
   "audioInfoBitPerfectNo": "Tidak, dicampur oleh sistem",
+  "audioInfoBitPerfectNoIos": "Tidak, iOS mencampur semua audio aplikasi",
+  "@audioInfoBitPerfectNoIos": {
+    "description": "Audio info sheet, Bit-perfect row on iPhone and iPad: iOS sends every app's sound through its mixer, so no setting can make playback bit-perfect"
+  },
   "audioInfoBitPerfectLossy": "Tidak, di-decode dari sumber lossy",
   "audioInfoDevice": "Perangkat",
   "audioInfoDeviceType": "{type, select, speaker{Speaker ponsel} earpiece{Speaker telepon} wired_headphones{Headphone kabel} wired_headset{Headset kabel} line{Line out} bluetooth{Bluetooth} bluetooth_le{Bluetooth LE Audio} usb{Audio USB} usb_headset{Headset USB} hdmi{HDMI} dock{Dock} cast{Cast} hearing_aid{Alat bantu dengar} airplay{AirPlay} car{Audio mobil} other{Lainnya}}",

@@ -426,6 +426,54 @@ void main() {
     expect(find.text('2.0 ms · 96 frames'), findsOneWidget);
   });
 
+  testWidgets('iOS says its mixer, not a setting, rules out bit-perfect', (
+    tester,
+  ) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          _route,
+          (call) async => {
+            'platform': 'ios',
+            'mixerSampleRate': 48000,
+            'device': {'type': 'usb', 'name': 'Example DAC'},
+          },
+        );
+    final metadata = PlayerMetadataController();
+    addTearDown(metadata.dispose);
+    await metadata.load(
+      const MediaItem(
+        id: 'track',
+        title: 'Track',
+        extras: {
+          'source': 'https://example.com/track.flac',
+          'format': 'flac',
+          'bit_depth': 16,
+          'sample_rate': 44100,
+        },
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showAudioInfoSheet(context, metadata: metadata),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('Bit-perfect'), 200);
+    expect(find.text('No, iOS mixes all app audio'), findsOneWidget);
+    expect(find.text('No, mixed by the system'), findsNothing);
+    expect(find.text('44.1 kHz → 48 kHz'), findsOneWidget);
+  });
+
   for (final mornye in [false, true]) {
     testWidgets('USB changes refresh an open audio sheet (Mornye=$mornye)', (
       tester,
