@@ -34,7 +34,7 @@ Future<void> showPlayerQueueSheet(
   ),
 );
 
-class PlayerQueueSheet extends ConsumerWidget {
+class PlayerQueueSheet extends ConsumerStatefulWidget {
   const PlayerQueueSheet({
     super.key,
     required this.colorScheme,
@@ -50,13 +50,47 @@ class PlayerQueueSheet extends ConsumerWidget {
   /// keeps the panel open.
   final bool embedded;
 
+  @override
+  ConsumerState<PlayerQueueSheet> createState() => _PlayerQueueSheetState();
+}
+
+class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
   static const _rowRadius = 16.0;
   static final _liftSpring = SpringCurve(M3EMotion.expressiveSpatialFast);
 
+  /// Measures the first row until the list has opened at the playing song.
+  GlobalKey? _firstRowKey = GlobalKey();
+  bool _openScheduled = false;
+
+  /// Opens the list at the playing song, with the song before it still in
+  /// view, once and without motion, so a later song change never moves it.
+  void _openAtPlayingSong() {
+    if (_openScheduled) return;
+    _openScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final rowHeight = _firstRowKey?.currentContext?.size?.height;
+      final index = ref.read(currentQueueIndexProvider);
+      final scroll = widget.scrollController;
+      if (rowHeight != null && index > 1 && scroll.hasClients) {
+        final position = scroll.position;
+        final offset = ((index - 1) * rowHeight).clamp(
+          0.0,
+          position.maxScrollExtent,
+        );
+        if (offset > position.pixels) scroll.jumpTo(offset);
+      }
+      setState(() => _firstRowKey = null);
+    });
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final colorScheme = widget.colorScheme;
+    final embedded = widget.embedded;
     final queue = ref.watch(playQueueProvider).value ?? const [];
     final current = ref.watch(currentMediaItemProvider).value;
+    if (queue.isNotEmpty && current != null) _openAtPlayingSong();
     final controller = ref.read(musicPlayerControllerProvider);
     // Locked: no reordering or swiping songs away here; adding still works.
     final locked = ref.watch(settingsProvider.select((s) => s.queueLocked));
@@ -143,7 +177,7 @@ class PlayerQueueSheet extends ConsumerWidget {
         else
           Expanded(
             child: ReorderableListView.builder(
-              scrollController: scrollController,
+              scrollController: widget.scrollController,
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
               itemCount: queue.length,
               buildDefaultDragHandles: !locked,
@@ -185,6 +219,7 @@ class PlayerQueueSheet extends ConsumerWidget {
                   enabled: !isCurrent && !locked,
                   onRemove: () => controller.removeQueuedItem(item),
                   child: ListTile(
+                    key: i == 0 ? _firstRowKey : null,
                     selected: isCurrent,
                     selectedTileColor: colorScheme.secondaryContainer
                         .withValues(alpha: 0.55),
@@ -273,7 +308,9 @@ class PlayerQueueSheet extends ConsumerWidget {
         );
         return;
       }
-      if (context.mounted && !embedded) Navigator.of(context).maybePop();
+      if (context.mounted && !widget.embedded) {
+        Navigator.of(context).maybePop();
+      }
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
