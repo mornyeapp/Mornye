@@ -142,6 +142,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   ProviderSubscription<AsyncValue<MediaItem?>>? _mediaItemSub;
   ProviderSubscription<bool>? _lyricsPlayingSub;
   ProviderSubscription<bool>? _lyricsAutoHideSub;
+  ProviderSubscription<bool>? _lyricsLayoutSub;
   ProviderSubscription<bool>? _lyricLineSub;
 
   /// Whether to read the song file itself, even an SAF document playback
@@ -230,6 +231,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         _scheduleLyricsControlsHide();
       },
     );
+    _lyricsLayoutSub = ref.listenManual<bool>(
+      settingsProvider.select((settings) => settings.landscapeLyricsArtwork),
+      (_, _) {
+        if (!_lyricsAutoHideLayout && _lyricsControlsHidden) {
+          setState(() => _lyricsControlsHidden = false);
+        }
+        _scheduleLyricsControlsHide(restart: false);
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(
@@ -249,7 +259,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     if (!_lyricsAutoHideLayout || MediaQuery.accessibleNavigationOf(context)) {
       _lyricsControlsHidden = false;
     }
-    _scheduleLyricsControlsHide();
+    _scheduleLyricsControlsHide(restart: false);
   }
 
   void _onInspectorChanged() {
@@ -301,6 +311,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _mediaItemSub?.close();
     _lyricsPlayingSub?.close();
     _lyricsAutoHideSub?.close();
+    _lyricsLayoutSub?.close();
     _lyricLineSub?.close();
     _lyricsTranslation.cancel(owner: this);
     _trackMetadata.dispose();
@@ -1002,15 +1013,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _log.i('Lyrics controls stay visible: ${blockers.join(', ')}');
   }
 
-  void _scheduleLyricsControlsHide() {
-    _lyricsIdleTimer?.cancel();
+  void _scheduleLyricsControlsHide({bool restart = true}) {
     if (!_canAutoHideLyricsControls ||
         _lyricsOptionsOpen ||
         _audioOutputOpen ||
         _lyricsControlsHidden ||
         _lyricsPointers.isNotEmpty) {
+      _lyricsIdleTimer?.cancel();
       return;
     }
+    // Viewport and inherited-widget updates are not user activity. Keep an
+    // eligible countdown running while system chrome or window metrics change.
+    if (!restart && (_lyricsIdleTimer?.isActive ?? false)) return;
+    _lyricsIdleTimer?.cancel();
     _lyricsIdleTimer = Timer(const Duration(seconds: 5), () {
       if (!mounted || !_canAutoHideLyricsControls) return;
       if (ModalRoute.of(context)?.isCurrent == false) {

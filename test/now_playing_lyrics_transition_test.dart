@@ -2026,6 +2026,87 @@ void main() {
     }
   }
 
+  for (final mornye in [false, true]) {
+    for (final landscape in [false, true]) {
+      testWidgets('fullscreen lyrics countdown survives viewport updates '
+          '(Mornye: $mornye, landscape: $landscape)', (tester) async {
+        final size = landscape ? const Size(852, 393) : const Size(393, 852);
+        await pumpNowPlaying(
+          tester,
+          theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.light(),
+          size: size,
+          playback: PlaybackState(playing: true),
+        );
+        mediaItems.add(item('many'));
+        await settlePlayer(tester);
+        if (!mornye && landscape) {
+          ProviderScope.containerOf(
+            tester.element(find.byType(NowPlayingScreen)),
+          ).read(settingsProvider.notifier).setLandscapeLyricsArtwork(true);
+          await settlePlayer(tester);
+        }
+        final toggle = mornye
+            ? findAppIcon(CupertinoIcons.quote_bubble)
+            : find.byKey(const ValueKey('material-lyrics-toggle'));
+        await tester.tap(toggle);
+        await settlePlayer(tester);
+        // Window metrics can change without any touch, for example while
+        // system chrome adjusts the available viewport.
+        for (var second = 0; second < 6; second++) {
+          await tester.pump(const Duration(seconds: 1));
+          tester.view.physicalSize = Size(
+            size.width,
+            size.height + (second.isEven ? 2 : 0),
+          );
+          await tester.pump();
+        }
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('fullscreen lyrics starts when landscape artwork is enabled', (
+    tester,
+  ) async {
+    await pumpNowPlaying(
+      tester,
+      theme: AppTheme.light(),
+      size: const Size(852, 393),
+      playback: PlaybackState(playing: true),
+    );
+    mediaItems.add(item('many'));
+    await settlePlayer(tester);
+    final toggle = find.byKey(const ValueKey('material-lyrics-toggle'));
+    await tester.tap(toggle);
+    await settlePlayer(tester);
+    await tester.pump(const Duration(seconds: 6));
+    expect(toggle.hitTestable(), findsOneWidget);
+
+    ProviderScope.containerOf(
+      tester.element(find.byType(NowPlayingScreen)),
+    ).read(settingsProvider.notifier).setLandscapeLyricsArtwork(true);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 5));
+    await settlePlayer(tester);
+    expect(toggle.hitTestable(), findsNothing);
+    final settings = ProviderScope.containerOf(
+      tester.element(find.byType(NowPlayingScreen)),
+    ).read(settingsProvider.notifier);
+    settings.setLandscapeLyricsArtwork(false);
+    await settlePlayer(tester);
+    expect(toggle.hitTestable(), findsOneWidget);
+    await tester.pump(const Duration(seconds: 6));
+    expect(toggle.hitTestable(), findsOneWidget);
+    settings.setLandscapeLyricsArtwork(true);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 5));
+    await settlePlayer(tester);
+    expect(toggle.hitTestable(), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final landscape in [false, true]) {
     testWidgets(
       'Material lyrics fill the player while idle (landscape: $landscape)',
