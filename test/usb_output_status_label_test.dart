@@ -22,10 +22,12 @@ void main() {
           'timeout',
           'decode_failed',
           'android_version',
+          'permission_denied',
+          'permission_declined',
         ])
           usbOutputStatusLabel(l10n, UsbAudioStatus(reason: reason)),
       ];
-      expect(labels.toSet(), hasLength(12));
+      expect(labels.toSet(), hasLength(14));
       expect(
         usbOutputStatusLabel(l10n, const UsbAudioStatus(reason: 'active')),
         l10n.usbBitPerfectFallback,

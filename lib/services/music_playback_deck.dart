@@ -250,6 +250,18 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
 
   static const _channel = MethodChannel('com.zarz.mornye/usb_pcm');
   static const _events = EventChannel('com.zarz.mornye/usb_pcm/events');
+
+  /// Lets the next Direct USB song ask for USB access again after the user
+  /// declined it this session.
+  static Future<void> forgetUsbPermissionDenial() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod<void>('forgetPermissionDenial');
+    } on PlatformException catch (_) {
+      // No USB plugin; nothing was remembered.
+    } on MissingPluginException catch (_) {}
+  }
+
   static Stream<dynamic>? _nativeEvents;
   static int _nextToken = 0;
   final AudioPlayer _ordinary;

@@ -51,6 +51,24 @@ internal object BitPerfectPcm {
         return output
     }
 
+    /** Each mono sample twice, for a stereo-only output; no sample changes. */
+    fun duplicateMono(input: ByteBuffer, sampleBytes: Int, reuse: ByteBuffer? = null): ByteBuffer {
+        require(sampleBytes > 0 && input.remaining() % sampleBytes == 0)
+        val size = input.remaining() * 2
+        val output = (reuse?.takeIf { it.isDirect && !it.isReadOnly && it.capacity() >= size }
+            ?: ByteBuffer.allocateDirect(size)).order(ByteOrder.LITTLE_ENDIAN)
+        output.clear()
+        output.limit(size)
+        val sample = ByteArray(sampleBytes)
+        while (input.hasRemaining()) {
+            input.get(sample)
+            output.put(sample)
+            output.put(sample)
+        }
+        output.flip()
+        return output
+    }
+
     fun flacFormat(header: ByteArray): Triple<Int, Int, Int>? {
         if (header.size < 42 || header.take(4) != listOf<Byte>(102, 76, 97, 67) ||
             header[4].toInt() and 127 != 0 || header[5].toInt() != 0 ||

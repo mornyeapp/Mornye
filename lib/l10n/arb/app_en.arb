@@ -477,6 +477,7 @@
   "usbDsdOverPcmDescription": "Enable only if your DAC explicitly supports DoP. Sends DSF/DFF and WavPack DSD inside a PCM carrier when native DSD is unavailable. An incompatible device may play noise; leave off for ordinary USB headsets.",
   "usbDsdUnsupported": "This DSD format or connected DAC is not supported. Playback stopped.",
   "usbPermissionDenied": "USB permission was not granted. Using normal playback.",
+  "usbPermissionDeclined": "USB access was declined. Turn the Direct USB driver off and on, or plug the DAC in again, to be asked again. Using normal playback.",
   "usbBitPerfectPending": "Waiting for the next track and a compatible USB output.",
   "usbOutputReady": "USB output is ready. Start playback to activate it.",
   "usbOutputPreparing": "Preparing USB audio output...",

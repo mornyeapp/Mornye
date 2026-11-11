@@ -262,6 +262,13 @@ class MusicPlayerHandler extends BaseAudioHandler
         engineChanged) {
       unawaited(_gapless.cancel());
     }
+    // Turning the Direct USB driver on asks for USB access again after the
+    // user declined it.
+    if (settings.usbBitPerfect &&
+        settings.usbDirect &&
+        !(previous.usbBitPerfect && previous.usbDirect)) {
+      unawaited(AudioplayersPlaybackDeck.forgetUsbPermissionDenial());
+    }
     // USB changes apply at the next source boundary, without raising volume.
     if ((previous.playerMode == 'internal') !=
             (settings.playerMode == 'internal') ||

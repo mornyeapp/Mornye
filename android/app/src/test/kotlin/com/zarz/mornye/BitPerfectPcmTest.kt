@@ -108,4 +108,26 @@ class BitPerfectPcmTest {
         assertNull(BitPerfectPcm.flacFormat(header))
         assertNull(BitPerfectPcm.flacFormat(ByteArray(4)))
     }
+
+    @Test
+    fun duplicatesEachMonoSampleUnchangedOnBothChannels() {
+        // 24-bit packed: two samples, the sign extremes.
+        val mono = byteArrayOf(0, 0, -128, -1, -1, 127)
+        assertArrayEquals(
+            byteArrayOf(0, 0, -128, 0, 0, -128, -1, -1, 127, -1, -1, 127),
+            bytes(BitPerfectPcm.duplicateMono(ByteBuffer.wrap(mono), 3)),
+        )
+        // 32-bit containers, reusing a buffer that is large enough.
+        val wide = Random(7).nextBytes(64)
+        val reuse = ByteBuffer.allocateDirect(256)
+        val result = BitPerfectPcm.duplicateMono(ByteBuffer.wrap(wide), 4, reuse)
+        assertSame(reuse, result)
+        val stereo = bytes(result)
+        assertEquals(128, stereo.size)
+        for (frame in 0 until 16) {
+            val sample = wide.copyOfRange(frame * 4, frame * 4 + 4)
+            assertArrayEquals(sample, stereo.copyOfRange(frame * 8, frame * 8 + 4))
+            assertArrayEquals(sample, stereo.copyOfRange(frame * 8 + 4, frame * 8 + 8))
+        }
+    }
 }

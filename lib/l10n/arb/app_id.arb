@@ -285,6 +285,7 @@
   "usbDsdOverPcmDescription": "Hidupkan bila DAC Anda mendukung DoP. Mengirim DSF/DFF & WavPack DSD dalam carrier PCM saat DSD native tidak tersedia. Bila tak didukung mungkin membuat suara desis; biarkan mati bila menggunakan headset USB biasa.",
   "usbDsdUnsupported": "Format DSD/DAC terhubung tidak didukung. Pemutaran berhenti.",
   "usbPermissionDenied": "Izin USB tidak diberikan. Menggunakan pemutaran normal.",
+  "usbPermissionDeclined": "Akses USB ditolak. Matikan lalu nyalakan lagi Driver Direct USB, atau colok ulang DAC, agar diminta lagi. Menggunakan pemutaran normal.",
   "usbBitPerfectPending": "Menunggu lagu selanjutnya dan output USB yang didukung.",
   "usbOutputReady": "Output USB siap. Mulai pemutaran untuk mengaktifkannya.",
   "usbOutputPreparing": "Menyiapkan output audio USB...",

@@ -52,12 +52,20 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
     private var needsSeek = false
     private var allowFixedVolume = false
     private val deviceVolumes = mutableMapOf<Int, Double>()
+    // DACs whose access prompt the user declined this session, so later
+    // tracks do not prompt again. Touched on the main thread only.
+    private val declinedDevices = mutableSetOf<String>()
+    // A mono source sent to a stereo-only DAC, each sample on both channels.
+    private var upmixMono = false
+    private var upmixBuffer: ByteBuffer? = null
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             @Suppress("DEPRECATION")
             val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE) ?: return
             if (intent.action == UsbManager.ACTION_USB_DEVICE_DETACHED) {
+                // Plugging the DAC in again asks for access again.
+                declinedDevices.remove(device.declineKey())
                 worker.post {
                     deviceVolumes.remove(device.deviceId)
                     if (device.deviceId == deviceId) fail("USB disconnected")
@@ -69,7 +77,10 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 permission = null
                 if (request.revision != revision) { request.done(mapOf("reason" to "cancelled"), null); return }
                 if (manager.hasPermission(device)) prepare(request)
-                else request.done(mapOf("reason" to "permission_denied"), null)
+                else {
+                    declinedDevices += device.declineKey()
+                    request.done(mapOf("reason" to "permission_declined"), null)
+                }
             }
         }
     }
@@ -81,6 +92,11 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
     }
 
     fun command(call: MethodCall, done: (Any?, String?) -> Unit) {
+        if (call.method == "forgetPermissionDenial") {
+            declinedDevices.clear()
+            done(null, null)
+            return
+        }
         if (call.method == "prepare" || call.method == "stop") {
             revision++
             permission?.done?.invoke(mapOf("reason" to "cancelled"), null)
@@ -99,6 +115,10 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
             }
             val request = Permission(device, call, revision, done)
             if (manager.hasPermission(device)) prepare(request)
+            else if (device.declineKey() in declinedDevices) {
+                // Turning Direct USB off and on, or replugging, asks again.
+                worker.post { done(mapOf("reason" to "permission_declined"), null) }
+            }
             else worker.post {
                 // A file Direct USB cannot play says why without a permission prompt.
                 val failure = probeFailure(call.argument<String>("path"))
@@ -149,9 +169,16 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
         try { manager.requestPermission(request.device, intent) }
         catch (error: Exception) { permission = null; request.done(mapOf("reason" to "permission_denied"), null) }
         main.postDelayed({
-            if (permission === request) { permission = null; request.done(mapOf("reason" to "permission_denied"), null) }
+            if (permission === request) {
+                permission = null
+                declinedDevices += request.device.declineKey()
+                request.done(mapOf("reason" to "permission_denied"), null)
+            }
         }, 60000)
     }
+
+    /** Stable across replugging, unlike the device id. */
+    private fun UsbDevice.declineKey() = "$vendorId:$productId"
 
     /** Reads headers only, never the device; null lets preparation decide. */
     private fun probeFailure(path: String?): Map<String, Any>? {
@@ -223,15 +250,33 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 deviceId = request.device.deviceId
                 val allowDop = request.call.argument<Boolean>("allowDop") == true
                 requestedBits = bits
-                val audio = try {
-                    UsbDirectOutput.open(usb.fileDescriptor, usb.rawDescriptors, rate.toUInt(), channels.toUByte(), bits.toUByte(), isDsd, allowDop)
-                } catch (error: Exception) {
-                    // A lossy source has no depth of its own, so a 16-bit DAC can take it.
-                    // The format check fails before libusb touches the device.
-                    if (info?.lossy != true || bits <= 16 || error.message?.startsWith("No compatible USB format") != true) throw error
-                    requestedBits = 16
-                    UsbDirectOutput.open(usb.fileDescriptor, usb.rawDescriptors, rate.toUInt(), channels.toUByte(), 16u, false, false)
+                // Fallbacks keep every sample exact: a mono sample goes to both
+                // channels of a stereo-only DAC, and a lossy source, which has
+                // no depth of its own, may go out at 16-bit.
+                val attempts = buildList {
+                    add(channels to bits)
+                    if (!isDsd && channels == 1) add(2 to bits)
+                    if (!isDsd && info?.lossy == true && bits > 16) {
+                        add(channels to 16)
+                        if (channels == 1) add(2 to 16)
+                    }
                 }
+                var opened: UsbDirectOutput? = null
+                var refused: Exception? = null
+                for ((outChannels, outBits) in attempts) {
+                    try {
+                        opened = UsbDirectOutput.open(usb.fileDescriptor, usb.rawDescriptors, rate.toUInt(), outChannels.toUByte(), outBits.toUByte(), isDsd, allowDop)
+                        requestedBits = outBits
+                        upmixMono = outChannels != channels
+                        break
+                    } catch (error: Exception) {
+                        // The format check fails before libusb touches the device.
+                        if (error.message?.startsWith("No compatible USB format") != true) throw error
+                        if (refused == null) refused = error
+                    }
+                }
+                // The first refusal names the format the song asked for.
+                val audio = opened ?: throw requireNotNull(refused)
                 output = audio
                 format = audio.format()
                 if (audio.volume().available) {
@@ -275,8 +320,12 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
             val data = dsdFile.readFrames(f.encoding, f.subslot.toInt())
             if (data == null) ended = true else pending = ByteBuffer.wrap(data)
         } else {
-            pending = try { requireNotNull(pcm).read(f.subslot.toInt() * 8) }
-            catch (error: Exception) {
+            pending = try {
+                val data = requireNotNull(pcm).read(f.subslot.toInt() * 8)
+                if (upmixMono && data != null) {
+                    BitPerfectPcm.duplicateMono(data, f.subslot.toInt(), upmixBuffer).also { upmixBuffer = it }
+                } else data
+            } catch (error: Exception) {
                 // Separates a source that stopped decoding from a USB transfer failure.
                 throw error as? UsbDirectException
                     ?: UsbDirectException(UsbDirectFormats.DECODE_FAILED, error.message ?: "Decoding failed", pcm?.info)
@@ -406,6 +455,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
         dsd = null
         format = null
         pending = null
+        upmixMono = false
         ended = false
         failed = false
         needsSeek = false

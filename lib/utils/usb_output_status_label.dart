@@ -18,6 +18,7 @@ String usbOutputStatusLabel(
   'volume_unavailable' => l10n.usbVolumeUnavailable,
   'exclusive_unavailable' => l10n.dapExclusiveUnavailable,
   'permission_denied' => l10n.usbPermissionDenied,
+  'permission_declined' => l10n.usbPermissionDeclined,
   'no_usb' => l10n.usbBitPerfectNoDevice,
   'route_changed' => l10n.usbBitPerfectRouteChanged,
   'idle' => l10n.usbBitPerfectPending,
