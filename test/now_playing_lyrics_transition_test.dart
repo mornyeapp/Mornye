@@ -2002,9 +2002,16 @@ void main() {
         await tester.pump(const Duration(seconds: 6));
         expect(toggle.hitTestable(), findsOneWidget);
 
-        // Manual scrolling must not hide controls when the option is off.
+        // The setting controls the timer. Mornye's portrait gesture remains
+        // available when automatic hiding is disabled.
         await tester.drag(find.byType(ListView), const Offset(0, -100));
         await settlePlayer(tester);
+        if (mornye && !landscape) {
+          expect(toggle.hitTestable(), findsNothing);
+          final bounds = tester.getRect(find.byType(ListView));
+          await tester.tapAt(Offset(bounds.right - 6, bounds.top + 10));
+          await settlePlayer(tester);
+        }
         expect(toggle.hitTestable(), findsOneWidget);
 
         settings.setAutoHideLyricsControls(true);
@@ -2022,6 +2029,70 @@ void main() {
         await tester.pump(const Duration(seconds: 6));
         expect(toggle.hitTestable(), findsOneWidget);
         await tester.pumpWidget(const SizedBox());
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final accessible in [false, true]) {
+    for (final playing in [false, true]) {
+      testWidgets('manual fullscreen lyrics works without an idle timer '
+          '(accessible: $accessible, playing: $playing)', (tester) async {
+        metadataOverrides['lyrics'] = List.generate(
+          20,
+          (index) => '[00:${index.toString().padLeft(2, '0')}.00]Line $index',
+        ).join('\n');
+        await pumpNowPlaying(
+          tester,
+          theme: MornyeTheme.build(Brightness.dark),
+          size: const Size(393, 852),
+          playback: PlaybackState(playing: playing),
+          wrapPlayer: (player) => Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(accessibleNavigation: accessible),
+              child: player,
+            ),
+          ),
+        );
+        mediaItems.add(item('many'));
+        await settlePlayer(tester);
+        if (!accessible) {
+          ProviderScope.containerOf(
+            tester.element(find.byType(NowPlayingScreen)),
+          ).read(settingsProvider.notifier).setAutoHideLyricsControls(false);
+          await settlePlayer(tester);
+        }
+        final toggle = findAppIcon(CupertinoIcons.quote_bubble);
+        await tester.tap(toggle);
+        await settlePlayer(tester);
+        await tester.pump(const Duration(seconds: 6));
+        expect(toggle.hitTestable(), findsOneWidget);
+
+        final list = find.byType(ListView);
+        await tester.drag(list, const Offset(0, -100));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsNothing);
+        expect(find.byType(PlayerVolumeControl).hitTestable(), findsNothing);
+
+        // A viewport update must preserve the user's manual choice.
+        tester.view.physicalSize = const Size(393, 854);
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsNothing);
+        final bounds = tester.getRect(list);
+        await tester.tapAt(Offset(bounds.right - 6, bounds.top + 10));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsOneWidget);
+
+        await tester.drag(list, const Offset(0, -100));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsNothing);
+        await tester.drag(list, const Offset(0, 100));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsOneWidget);
+        await tester.pump(const Duration(seconds: 6));
+        expect(toggle.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
     }
@@ -2407,7 +2478,7 @@ void main() {
 
         // The stored default is already true, so changing just the explicit
         // accessibility choice must start the countdown while lyrics are open.
-        settings.setAutoHideLyricsControls(true, accessibleNavigation: true);
+        settings.setAutoHideLyricsControls(true);
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 4900));
         expect(toggle.hitTestable(), findsOneWidget);
@@ -2426,23 +2497,22 @@ void main() {
         expect(toggle.hitTestable(), findsNothing);
 
         // Revoking the opt-in reveals the controls without leaving lyrics.
-        settings.setAutoHideLyricsControls(false, accessibleNavigation: true);
+        settings.setAutoHideLyricsControls(false);
         await settlePlayer(tester);
         expect(toggle.hitTestable(), findsOneWidget);
-        await tester.pump(const Duration(seconds: 6));
-        expect(toggle.hitTestable(), findsOneWidget);
-        settings.setAutoHideLyricsControls(true);
-        await settlePlayer(tester);
         await tester.pump(const Duration(seconds: 6));
         expect(toggle.hitTestable(), findsOneWidget);
         accessibility.value = false;
         await tester.pump();
+        settings.setAutoHideLyricsControls(true);
+        await tester.pump();
+        // A choice made without accessibility must still apply if Android
+        // reports accessible navigation after returning to the player.
+        accessibility.value = true;
+        await tester.pump();
         await tester.pump(const Duration(seconds: 5));
         await settlePlayer(tester);
         expect(toggle.hitTestable(), findsNothing);
-        accessibility.value = true;
-        await settlePlayer(tester);
-        expect(toggle.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
     }

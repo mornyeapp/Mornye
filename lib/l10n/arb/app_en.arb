@@ -8659,7 +8659,7 @@
   "@autoHideLyricsControls": {
     "description": "Playback switch that lets lyrics take more screen space after five idle seconds"
   },
-  "autoHideLyricsControlsDescription": "Hide player controls after 5 seconds while lyrics are open. Turn off to keep the current view",
+  "autoHideLyricsControlsDescription": "Hide player controls after 5 seconds while lyrics are open. Turn off to keep controls visible while idle",
   "@autoHideLyricsControlsDescription": {
     "description": "Subtitle explaining the five-second Now Playing lyrics timeout"
   },

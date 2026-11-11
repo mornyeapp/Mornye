@@ -284,12 +284,12 @@ void main() {
       final settings = ProviderScope.containerOf(
         tester.element(find.byType(LyricsOptionsButton)),
       ).read(settingsProvider.notifier);
-      settings.setAutoHideLyricsControls(true, accessibleNavigation: true);
+      settings.setAutoHideLyricsControls(true);
       await tester.pump();
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
       expect(options.hitTestable(), findsNothing);
-      settings.setAutoHideLyricsControls(false, accessibleNavigation: true);
+      settings.setAutoHideLyricsControls(false);
       await tester.pumpAndSettle();
       expect(options.hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);

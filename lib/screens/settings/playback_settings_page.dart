@@ -480,12 +480,9 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                   value: settings.shouldAutoHideLyricsControls(
                     accessibleNavigation: accessibleNavigation,
                   ),
-                  onChanged: (enabled) => ref
+                  onChanged: ref
                       .read(settingsProvider.notifier)
-                      .setAutoHideLyricsControls(
-                        enabled,
-                        accessibleNavigation: accessibleNavigation,
-                      ),
+                      .setAutoHideLyricsControls,
                 ),
               SettingsSwitchItem(
                 icon: Icons.short_text,

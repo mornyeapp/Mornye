@@ -198,6 +198,17 @@ void main() {
           jsonDecode(prefs.getString('app_settings')!) as Map<String, dynamic>,
         );
         expect(restored.autoHideLyricsControls, isFalse);
+        // Enabling the option is an explicit choice even if the system only
+        // reports accessible navigation later, on the player route.
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+        final chosen = AppSettings.fromJson(
+          jsonDecode(prefs.getString('app_settings')!) as Map<String, dynamic>,
+        );
+        expect(
+          chosen.shouldAutoHideLyricsControls(accessibleNavigation: true),
+          isTrue,
+        );
         final l10n = AppLocalizations.of(tester.element(option));
         expect(
           SettingsSearchCatalog(l10n).playback.where(

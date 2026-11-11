@@ -257,7 +257,7 @@ class AppSettings {
   final bool landscapeLyricsArtwork;
   final bool autoHideLyricsControls;
 
-  /// Only enabled by choosing auto-hide while accessible navigation is active.
+  /// An explicit auto-hide choice also applies if accessibility changes later.
   /// The default keeps playback controls available to assistive navigation.
   final bool autoHideLyricsControlsWithAccessibility;
   // Material: idle lyrics shrink the player to a slim bar, not hide it.

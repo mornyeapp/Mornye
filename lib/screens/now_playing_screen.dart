@@ -166,11 +166,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   MotionArtwork? _shownMotionArtwork;
   double? _shownMotionRatio;
   bool _lyricsControlsHidden = false;
+  bool _lyricsControlsHiddenManually = false;
   bool _lyricsOptionsOpen = false;
   bool _audioOutputOpen = false;
   bool _sharingLyrics = false;
   double _lyricsScrollDistance = 0;
   Timer? _lyricsIdleTimer;
+  String? _lastLyricsControlsStatus;
   final _lyricsPointers = <int, Offset>{};
   bool _lyricsPointerMoved = false;
   // Skipping, seeking or opening the queue from the compact player keeps it
@@ -220,7 +222,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       playing,
     ) {
       if (!playing && _lyricsControlsHidden) {
-        setState(() => _lyricsControlsHidden = false);
+        setState(_showLyricsControls);
       }
       _scheduleLyricsControlsHide();
     });
@@ -236,7 +238,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
           _lyricsPointers.clear();
           _lyricsScrollDistance = 0;
           if (_lyricsControlsHidden) {
-            setState(() => _lyricsControlsHidden = false);
+            setState(_showLyricsControls);
           }
         }
         _scheduleLyricsControlsHide();
@@ -246,7 +248,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       settingsProvider.select((settings) => settings.landscapeLyricsArtwork),
       (_, _) {
         if (!_lyricsAutoHideLayout && _lyricsControlsHidden) {
-          setState(() => _lyricsControlsHidden = false);
+          setState(_showLyricsControls);
         }
         _scheduleLyricsControlsHide(restart: false);
       },
@@ -267,8 +269,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     super.didChangeDependencies();
     final size = MediaQuery.sizeOf(context);
     _landscape = context.isMornye && size.width > size.height;
-    if (!_lyricsAutoHideLayout || !_lyricsAutoHideEnabled) {
-      _lyricsControlsHidden = false;
+    if (!_lyricsAutoHideLayout ||
+        (!_lyricsAutoHideEnabled && !_lyricsControlsHiddenManually)) {
+      _showLyricsControls();
     }
     _scheduleLyricsControlsHide(restart: false);
   }
@@ -940,10 +943,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     child: Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (event) {
-        if (!_canAutoHideLyricsControls) return;
+        if (_currentPage != 1 || !_lyricsAutoHideLayout) return;
         if (_lyricsPointers.isEmpty) _lyricsPointerMoved = false;
         _lyricsPointers[event.pointer] = event.position;
         _lyricsIdleTimer?.cancel();
+        if (!_lyricsControlsHidden) _logLyricsAutoHideBlockers();
       },
       onPointerMove: (event) {
         final origin = _lyricsPointers[event.pointer];
@@ -962,7 +966,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     if (_toggleInspector(1)) return;
     setState(() {
       _currentPage = _currentPage == 1 ? 0 : 1;
-      _lyricsControlsHidden = false;
+      _showLyricsControls();
+      _lastLyricsControlsStatus = null;
     });
     _scheduleLyricsControlsHide();
     if (_currentPage == 1) {
@@ -984,7 +989,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     if (_toggleInspector(page)) return;
     setState(() {
       _currentPage = page;
-      _lyricsControlsHidden = false;
+      _showLyricsControls();
+      _lastLyricsControlsStatus = null;
       _lyricsScrollDistance = 0;
     });
     _scheduleLyricsControlsHide();
@@ -1037,9 +1043,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
           !ref.read(settingsProvider).autoHideLyricsControlsWithAccessibility)
         'accessible navigation',
       if (_lyricsPointers.isNotEmpty) 'touch held',
+      if (_lyricsOptionsOpen) 'lyrics menu open',
+      if (_audioOutputOpen) 'audio output menu open',
     ];
     if (blockers.isEmpty) return;
-    _log.i('Lyrics controls stay visible: ${blockers.join(', ')}');
+    _logLyricsControlsStatus(
+      'Lyrics controls stay visible: ${blockers.join(', ')}',
+    );
+  }
+
+  void _logLyricsControlsStatus(String status) {
+    if (_lastLyricsControlsStatus == status) return;
+    _lastLyricsControlsStatus = status;
+    _log.i(status);
   }
 
   void _scheduleLyricsControlsHide({bool restart = true}) {
@@ -1049,6 +1065,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         _lyricsControlsHidden ||
         _lyricsPointers.isNotEmpty) {
       _lyricsIdleTimer?.cancel();
+      if (_currentPage == 1 && !_lyricsControlsHidden) {
+        _logLyricsAutoHideBlockers();
+      }
       return;
     }
     // Viewport and inherited-widget updates are not user activity. Keep an
@@ -1056,13 +1075,27 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     if (!restart && (_lyricsIdleTimer?.isActive ?? false)) return;
     _lyricsIdleTimer?.cancel();
     _lyricsIdleTimer = Timer(const Duration(seconds: 5), () {
-      if (!mounted || !_canAutoHideLyricsControls) return;
+      if (!mounted) return;
+      if (!_canAutoHideLyricsControls) {
+        _logLyricsAutoHideBlockers();
+        return;
+      }
       if (ModalRoute.of(context)?.isCurrent == false) {
+        _logLyricsControlsStatus(
+          'Lyrics controls stay visible: another route is active',
+        );
         _scheduleLyricsControlsHide();
         return;
       }
-      setState(() => _lyricsControlsHidden = true);
+      setState(() {
+        _lyricsControlsHidden = true;
+        _lyricsControlsHiddenManually = false;
+      });
+      _logLyricsControlsStatus('Lyrics controls hidden automatically');
     });
+    _logLyricsControlsStatus(
+      'Lyrics controls auto-hide timer started: 5 seconds',
+    );
   }
 
   void _endLyricsInteraction(int pointer, {bool cancelled = false}) {
@@ -1075,15 +1108,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         !_lyricsPointerMoved &&
         !compactTouch &&
         _lyricsControlsHidden) {
-      setState(() => _lyricsControlsHidden = false);
+      setState(_showLyricsControls);
     }
     _scheduleLyricsControlsHide();
   }
 
   bool _onLyricsScroll(ScrollUpdateNotification notification) {
     if (_currentPage != 1 ||
-        !_lyricsAutoHideEnabled ||
-        _landscape ||
+        !_lyricsAutoHideLayout ||
         notification.dragDetails == null ||
         notification.metrics.axis != Axis.vertical) {
       return false;
@@ -1094,11 +1126,22 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     if (_lyricsScrollDistance.abs() >= 16) {
       final hidden = _lyricsScrollDistance > 0;
       if (hidden != _lyricsControlsHidden) {
-        setState(() => _lyricsControlsHidden = hidden);
+        setState(() {
+          _lyricsControlsHidden = hidden;
+          _lyricsControlsHiddenManually = hidden;
+        });
+        _logLyricsControlsStatus(
+          'Lyrics controls ${hidden ? 'hidden' : 'shown'} by scrolling',
+        );
       }
       _lyricsScrollDistance = 0;
     }
     return false;
+  }
+
+  void _showLyricsControls() {
+    _lyricsControlsHidden = false;
+    _lyricsControlsHiddenManually = false;
   }
 
   bool get _lyricsImmersive =>

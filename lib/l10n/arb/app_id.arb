@@ -7517,7 +7517,7 @@
   "@autoHideLyricsControls": {
     "description": "Playback switch that lets lyrics take more screen space after five idle seconds"
   },
-  "autoHideLyricsControlsDescription": "Sembunyikan kontrol player setelah 5 detik saat lirik terbuka. Nonaktifkan untuk mempertahankan tampilan saat ini",
+  "autoHideLyricsControlsDescription": "Sembunyikan kontrol player setelah 5 detik saat lirik terbuka. Nonaktifkan agar kontrol tetap terlihat saat tidak ada interaksi",
   "@autoHideLyricsControlsDescription": {
     "description": "Subtitle explaining the five-second Now Playing lyrics timeout"
   },
