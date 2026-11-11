@@ -29,7 +29,7 @@ void main() {
           MornyeArtworkContrast.debugReadback = null;
           if (!release.isCompleted) release.complete();
         });
-        Map<String, Color> colors = {};
+        final reports = <bool>[];
         Widget app(Color color, {bool enabled = true, bool tickers = true}) =>
             MaterialApp(
               home: TickerMode(
@@ -41,7 +41,7 @@ void main() {
                       key: capture,
                       enabled: enabled,
                       targets: {'header': target},
-                      onChanged: (value) => colors = value,
+                      onDimChanged: reports.add,
                       child: ColoredBox(color: color),
                     ),
                     Positioned(
@@ -76,12 +76,13 @@ void main() {
         }
         release.complete();
         await finishReadback();
-        if (interruption != 'none') expect(colors, isEmpty);
+        // The held black frame needs no layer, whether or not it was read.
+        expect(reports, isEmpty);
         await tester.pump(const Duration(milliseconds: 334));
         await finishReadback();
         if (interruption == 'none') {
           expect(MornyeArtworkContrast.debugReadbackCount(capture), 2);
-          expect(colors['header'], Colors.black);
+          expect(reports, [true]);
         } else {
           expect(MornyeArtworkContrast.debugReadbackCount(capture), 1);
           if (interruption == 'disabled' || interruption == 'hidden') {
@@ -94,7 +95,7 @@ void main() {
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 334));
           await finishReadback();
-          expect(colors['header'], Colors.black);
+          expect(reports, [true]);
         }
         final settled = MornyeArtworkContrast.debugReadbackCount(capture);
         for (var frame = 0; frame < 4; frame++) {
@@ -125,7 +126,7 @@ void main() {
       provider,
       () => OneFrameImageStreamCompleter(pending.future),
     );
-    Map<String, Color> colors = {};
+    final reports = <bool>[];
     await tester.pumpWidget(
       MaterialApp(
         home: Stack(
@@ -135,7 +136,7 @@ void main() {
               key: capture,
               enabled: true,
               targets: {'header': target},
-              onChanged: (value) => colors = value,
+              onDimChanged: reports.add,
               child: RepaintBoundary(
                 child: ColoredBox(
                   color: Colors.black,
@@ -165,7 +166,7 @@ void main() {
     }
 
     await sample();
-    expect(colors['header'], Colors.white);
+    expect(reports, isEmpty);
     final initial = MornyeArtworkContrast.debugReadbackCount(capture);
     for (var i = 0; i < 4; i++) {
       await sample();
@@ -188,7 +189,7 @@ void main() {
     pending.complete(ImageInfo(image: image!));
     await tester.pumpAndSettle();
     await sample();
-    expect(colors['header'], Colors.black);
+    expect(reports, [true]);
     final decoded = MornyeArtworkContrast.debugReadbackCount(capture);
     expect(decoded, greaterThan(initial));
     await sample();
@@ -197,7 +198,7 @@ void main() {
     targetTop.value = 500;
     await tester.pump();
     await sample();
-    expect(colors['header'], Colors.white);
+    expect(reports, [true, false]);
     expect(MornyeArtworkContrast.debugReadbackCount(capture), decoded + 1);
     await tester.pumpWidget(const SizedBox());
   });
@@ -221,13 +222,12 @@ void main() {
     }
   });
 
-  testWidgets('foreground follows changing frames separately for each region', (
+  testWidgets('any region too light for white labels turns the layer on', (
     tester,
   ) async {
     final header = GlobalKey();
     final controls = GlobalKey();
-    Map<String, Color> colors = {};
-    var changes = 0;
+    final reports = <bool>[];
     Widget app(Color top, Color bottom) => MaterialApp(
       home: Stack(
         fit: StackFit.expand,
@@ -235,10 +235,7 @@ void main() {
           MornyeArtworkContrast(
             enabled: true,
             targets: {'header': header, 'controls': controls},
-            onChanged: (value) {
-              colors = value;
-              changes++;
-            },
+            onDimChanged: reports.add,
             child: Column(
               children: [
                 Expanded(
@@ -279,41 +276,52 @@ void main() {
 
     await tester.pumpWidget(app(Colors.white, Colors.black));
     await sample();
-    expect(colors, {'header': Colors.black, 'controls': Colors.white});
+    expect(reports, [true]);
+    // A light region anywhere keeps the one layer on.
     await tester.pumpWidget(app(Colors.black, Colors.white));
     await sample();
-    expect(colors, {'header': Colors.white, 'controls': Colors.black});
-    final previousChanges = changes;
+    expect(reports, [true]);
+    await tester.pumpWidget(app(Colors.black, Colors.black));
     await sample();
-    expect(changes, previousChanges);
+    expect(reports, [true, false]);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pumpWidget(app(Colors.white, Colors.black));
     await sample();
-    expect(changes, previousChanges);
+    expect(reports, [true, false]);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
     await sample();
-    expect(colors, {'header': Colors.black, 'controls': Colors.white});
+    expect(reports, [true, false, true]);
 
-    // A muted pink frame still supports white player labels, including after
-    // a bright frame temporarily required black labels.
+    // A muted pink frame gives white text under 4.5:1, so it is dimmed too
+    // rather than given black labels.
     const pastel = Color(0xffa08398);
+    expect(1.05 / (pastel.computeLuminance() + 0.05), lessThan(4.5));
     await tester.pumpWidget(app(pastel, pastel));
     await sample();
-    expect(colors, {'header': Colors.white, 'controls': Colors.white});
-    final pastelChanges = changes;
-    await tester.pumpWidget(app(const Color(0xff939393), pastel));
+    expect(reports, [true, false, true]);
+
+    // A gray between the two thresholds keeps whichever state it finds.
+    const dark = Color(0xff606060);
+    const between = Color(0xff727272);
+    const light = Color(0xff808080);
+    expect(between.computeLuminance(), inExclusiveRange(0.16, 0.18));
+    reports.clear();
+    await tester.pumpWidget(app(dark, dark));
     await sample();
-    expect(changes, pastelChanges);
-    await tester.pumpWidget(app(Colors.white, pastel));
+    expect(reports, [false]);
+    await tester.pumpWidget(app(between, dark));
     await sample();
-    expect(colors, {'header': Colors.black, 'controls': Colors.white});
-    await tester.pumpWidget(app(const Color(0xff939393), pastel));
+    expect(reports, [false]);
+    await tester.pumpWidget(app(light, dark));
     await sample();
-    expect(colors, {'header': Colors.black, 'controls': Colors.white});
-    await tester.pumpWidget(app(pastel, pastel));
+    expect(reports, [false, true]);
+    await tester.pumpWidget(app(between, dark));
     await sample();
-    expect(colors, {'header': Colors.white, 'controls': Colors.white});
+    expect(reports, [false, true]);
+    await tester.pumpWidget(app(dark, dark));
+    await sample();
+    expect(reports, [false, true, false]);
     await tester.pumpWidget(const SizedBox());
   });
 }

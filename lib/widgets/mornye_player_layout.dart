@@ -1,5 +1,4 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -50,7 +49,6 @@ class MornyePlayerLayout extends ConsumerWidget {
     required this.insetArtwork,
     required this.artworkTopInset,
     required this.artworkKeys,
-    required this.artworkForeground,
     required this.lyricsControlsHidden,
     required this.lyricsOptionsOpen,
     required this.lyricsBuilder,
@@ -77,7 +75,6 @@ class MornyePlayerLayout extends ConsumerWidget {
   final bool insetArtwork;
   final double artworkTopInset;
   final MornyePlayerArtworkKeys artworkKeys;
-  final ValueListenable<Map<String, Color>> artworkForeground;
 
   /// False where the Playing on row names the song's source instead.
   final bool showSourceLabel;
@@ -95,17 +92,13 @@ class MornyePlayerLayout extends ConsumerWidget {
     final showLyrics = page == 1;
     final showQueue = page == 2;
     final compactStage = showLyrics || showQueue;
-    ColorScheme foreground(String region) {
-      final color = compactStage
-          ? null
-          : artworkForeground.value[region] ?? colorScheme.onSurface;
-      return color == null
-          ? colorScheme
-          : colorScheme.copyWith(
-              onSurface: color,
-              onSurfaceVariant: color.withValues(alpha: 0.72),
-            );
-    }
+    // White labels over the full cover, which dims behind them when it is
+    // too light; the secondary text lets the cover show through.
+    final foreground = compactStage
+        ? colorScheme
+        : colorScheme.copyWith(
+            onSurfaceVariant: colorScheme.onSurface.withValues(alpha: 0.72),
+          );
 
     final motion = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
@@ -379,18 +372,15 @@ class MornyePlayerLayout extends ConsumerWidget {
           0.0,
           controlsHeadroom,
         );
-        Widget controls() => AnimatedBuilder(
-          animation: artworkForeground,
-          builder: (context, _) => PlayerPlaybackControls(
-            key: artworkKeys.controls,
-            mediaId: mediaItem.id,
-            duration: mediaItem.duration ?? Duration.zero,
-            seekPreview: seekPreview,
-            colorScheme: foreground('controls'),
-            metadata: metadata,
-            compact: landscape,
-            transportTopPadding: 16 + transportShift,
-          ),
+        Widget controls() => PlayerPlaybackControls(
+          key: artworkKeys.controls,
+          mediaId: mediaItem.id,
+          duration: mediaItem.duration ?? Duration.zero,
+          seekPreview: seekPreview,
+          colorScheme: foreground,
+          metadata: metadata,
+          compact: landscape,
+          transportTopPadding: 16 + transportShift,
         );
 
         if (landscape) {
@@ -443,12 +433,11 @@ class MornyePlayerLayout extends ConsumerWidget {
                 id: _PlayerHeaderSlot.header,
                 child: KeyedSubtree(
                   key: const ValueKey('player-track-header'),
-                  child: AnimatedBuilder(
+                  child: KeyedSubtree(
                     key: artworkKeys.header,
-                    animation: artworkForeground,
-                    builder: (context, _) => _trackHeader(
+                    child: _trackHeader(
                       context,
-                      foreground('header'),
+                      foreground,
                       compactProgress: progress,
                     ),
                   ),
@@ -469,12 +458,9 @@ class MornyePlayerLayout extends ConsumerWidget {
                 controls(),
                 if (showVolume) ...[
                   SizedBox(height: volumeGap - transportShift + headroom),
-                  AnimatedBuilder(
-                    animation: artworkForeground,
-                    builder: (context, _) => PlayerVolumeControl(
-                      key: artworkKeys.volume,
-                      foreground: foreground('volume').onSurface,
-                    ),
+                  PlayerVolumeControl(
+                    key: artworkKeys.volume,
+                    foreground: foreground.onSurface,
                   ),
                 ],
                 SizedBox(height: showVolume ? 8 : 8 + headroom),

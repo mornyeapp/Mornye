@@ -184,7 +184,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   final _expandedArtworkKey = GlobalKey();
   final _compactArtworkKey = GlobalKey();
   final _motionArtworkKey = GlobalKey();
-  final _artworkForeground = ValueNotifier<Map<String, Color>>({});
+  final _artworkDim = ValueNotifier(false);
   final _seekPreview = PlaybackSeekPreview();
   NowPlayingRoute? _artworkRoute;
 
@@ -329,7 +329,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _lyricLineSub?.close();
     _lyricsTranslation.cancel(owner: this);
     _trackMetadata.dispose();
-    _artworkForeground.dispose();
+    _artworkDim.dispose();
     _seekPreview.dispose();
     super.dispose();
   }
@@ -463,11 +463,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         reservesPlayingOnRow && Theme.of(context).platform == TargetPlatform.iOS
         ? bottomInset.clamp(0.0, _homeIndicatorBelowRow)
         : null;
-    // Moving artwork keeps the theme's white labels over its dimmed fade.
+    // Labels stay white. Moving artwork is always dimmed behind them; a still
+    // cover is sampled to decide.
     final samplesArtwork = fullBleed && motionArtwork == null;
-    if (!samplesArtwork && _artworkForeground.value.isNotEmpty) {
-      _artworkForeground.value = {};
-    }
+    if (!samplesArtwork) _artworkDim.value = false;
     Widget artwork() => MornyePlayerArtwork(
       mediaItem: mediaItem,
       videoUrl: motionArtwork?.source,
@@ -679,7 +678,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             expanded: _expandedArtworkKey,
                             compact: _compactArtworkKey,
                           ),
-                          artworkForeground: _artworkForeground,
                           lyricsControlsHidden: _lyricsControlsHidden,
                           lyricsOptionsOpen: _lyricsOptionsOpen,
                           lyricsBuilder: (showOptions) => _lyricsSection(
@@ -893,6 +891,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         ],
       );
     }
+    final showsFullArtwork = fullBleed && !_landscape && _currentPage == 0;
+    final fadeStart = stillFullBleed ? 0.72 : 0.58;
     return HeroMode(
       // A route Hero renders outside the panel's gradient and slide, briefly
       // exposing a detached rectangle. Keep Mornye artwork inside its panel.
@@ -909,17 +909,16 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 'controls': _artworkControlsKey,
                 'volume': _artworkVolumeKey,
               },
-              onChanged: (colors) {
+              onDimChanged: (dim) {
                 if (!mounted) return;
-                _artworkForeground.value = colors;
+                _artworkDim.value = dim;
               },
               child: MornyePlayerBackground(
                 artUri: mediaItem.artUri,
                 squareArtwork: squareArtwork,
                 artworkAspectRatio: artworkRatio,
-                fadeStart: stillFullBleed ? 0.72 : 0.58,
-                dimControls: motionArtwork != null,
-                artwork: fullBleed && !_landscape && _currentPage == 0
+                fadeStart: fadeStart,
+                artwork: showsFullArtwork
                     ? PlayerTransitionArtwork(
                         artworkKey: _motionArtworkKey,
                         child: Hero(
@@ -928,6 +927,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         ),
                       )
                     : null,
+              ),
+            ),
+            ValueListenableBuilder<bool>(
+              valueListenable: _artworkDim,
+              builder: (context, dim, _) => MornyeControlsDim(
+                visible: showsFullArtwork && (motionArtwork != null || dim),
+                squareArtwork: squareArtwork,
+                artworkAspectRatio: artworkRatio,
+                fadeStart: fadeStart,
               ),
             ),
             _lyricsPointerListener(player),

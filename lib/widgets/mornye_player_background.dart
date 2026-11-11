@@ -46,6 +46,17 @@ LinearGradient mornyePlayerGradient(
   );
 }
 
+/// Height of the full-bleed artwork on a screen of [size].
+double _artworkHeight(
+  Size size, {
+  required bool squareArtwork,
+  required double? aspectRatio,
+}) => aspectRatio != null && aspectRatio > 0
+    ? (size.width / aspectRatio).clamp(0.0, size.height * 0.75)
+    : squareArtwork
+    ? size.width
+    : size.height * 0.66;
+
 /// Opaque cover-derived surface, with full-bleed artwork on the player page
 /// and a muted two-tone gradient behind lyrics and the queue.
 class MornyePlayerBackground extends StatelessWidget {
@@ -56,7 +67,6 @@ class MornyePlayerBackground extends StatelessWidget {
     this.squareArtwork = true,
     this.artworkAspectRatio,
     this.fadeStart = 0.58,
-    this.dimControls = false,
   });
 
   final Uri? artUri;
@@ -66,10 +76,6 @@ class MornyePlayerBackground extends StatelessWidget {
 
   /// Fraction of the artwork's height that stays sharp before fading out.
   final double fadeStart;
-
-  /// Keeps white labels readable over moving artwork, whose changing frames
-  /// cannot settle on a label colour: a soft dark layer from the fade down.
-  final bool dimControls;
 
   @override
   Widget build(BuildContext context) {
@@ -93,23 +99,10 @@ class MornyePlayerBackground extends StatelessWidget {
             sourceColor,
             fullBleed: artwork != null,
           );
-          final size = MediaQuery.sizeOf(context);
-          final artworkHeight =
-              artworkAspectRatio != null && artworkAspectRatio! > 0
-              ? (size.width / artworkAspectRatio!).clamp(
-                  0.0,
-                  size.height * 0.75,
-                )
-              : squareArtwork
-              ? size.width
-              : size.height * 0.66;
-          final dimStart = (artworkHeight * fadeStart / size.height).clamp(
-            0.0,
-            1.0,
-          );
-          final dimEnd = ((dimStart + artworkHeight / size.height) / 2).clamp(
-            dimStart,
-            1.0,
+          final artworkHeight = _artworkHeight(
+            MediaQuery.sizeOf(context),
+            squareArtwork: squareArtwork,
+            aspectRatio: artworkAspectRatio,
           );
           return TweenAnimationBuilder<LinearGradient>(
             tween: _GradientTween(end: background),
@@ -131,27 +124,6 @@ class MornyePlayerBackground extends StatelessWidget {
                         artworkHeight,
                       ),
                     ),
-                  IgnorePointer(
-                    child: AnimatedOpacity(
-                      opacity: dimControls && artwork != null ? 1 : 0,
-                      duration: motion,
-                      curve: Curves.easeInOutCubic,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            stops: [dimStart, dimEnd],
-                            colors: [
-                              Colors.black.withValues(alpha: 0),
-                              // 4.5:1 for white over a white frame mid-fade.
-                              Colors.black.withValues(alpha: 0.4),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -187,6 +159,61 @@ class MornyePlayerBackground extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Keeps the player's white labels readable from the artwork's fade down: a
+/// soft dark layer over [MornyePlayerBackground] with the same artwork
+/// geometry. Moving artwork always has it; a still cover has it when the
+/// contrast sample finds a label background too light for white. It stays
+/// outside that sample, so turning it on does not change what is read.
+class MornyeControlsDim extends StatelessWidget {
+  const MornyeControlsDim({
+    super.key,
+    required this.visible,
+    this.squareArtwork = true,
+    this.artworkAspectRatio,
+    this.fadeStart = 0.58,
+  });
+
+  final bool visible;
+  final bool squareArtwork;
+  final double? artworkAspectRatio;
+  final double fadeStart;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final artworkHeight = _artworkHeight(
+      size,
+      squareArtwork: squareArtwork,
+      aspectRatio: artworkAspectRatio,
+    );
+    final start = (artworkHeight * fadeStart / size.height).clamp(0.0, 1.0);
+    final end = ((start + artworkHeight / size.height) / 2).clamp(start, 1.0);
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 380),
+        curve: Curves.easeInOutCubic,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [start, end],
+              colors: [
+                Colors.black.withValues(alpha: 0),
+                // 4.5:1 for white over a white frame mid-fade.
+                Colors.black.withValues(alpha: 0.4),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

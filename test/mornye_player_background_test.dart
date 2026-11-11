@@ -331,12 +331,17 @@ void main() {
     expect(await difference(tester), greaterThan(3));
   });
 
-  testWidgets('moving artwork dims behind white labels, even when bright', (
+  testWidgets('the controls dim keeps white labels readable, even over white', (
     tester,
   ) async {
     const bright = ColoredBox(color: Colors.white);
-    Widget background({required bool dim}) =>
-        MornyePlayerBackground(artUri: null, artwork: bright, dimControls: dim);
+    Widget background({required bool dim}) => Stack(
+      fit: StackFit.expand,
+      children: [
+        const MornyePlayerBackground(artUri: null, artwork: bright),
+        MornyeControlsDim(visible: dim),
+      ],
+    );
     await tester.pumpWidget(
       Directionality(
         textDirection: TextDirection.ltr,

@@ -32,20 +32,25 @@ double artworkPixelLuminance(int red, int green, int blue) =>
 
 /// Samples the rendered still artwork and its fade, rather than an album
 /// palette, and reads it again only after its scene or target geometry
-/// changes. Moving artwork stays out: labels that followed its frames would
-/// flip between black and white, so the player dims behind them instead.
+/// changes. The player's labels stay white over every cover; this reports
+/// when any target is too light for white text, so the player darkens behind
+/// the labels instead of turning them black. Moving artwork stays out: its
+/// frames would turn the layer on and off, so it is always dimmed.
 class MornyeArtworkContrast extends StatefulWidget {
   const MornyeArtworkContrast({
     super.key,
     required this.enabled,
     required this.targets,
-    required this.onChanged,
+    required this.onDimChanged,
     required this.child,
   });
 
   final bool enabled;
   final Map<String, GlobalKey> targets;
-  final ValueChanged<Map<String, Color>> onChanged;
+
+  /// Whether white labels need the dark layer. Keep that layer outside
+  /// [child], so turning it on does not change what the sample reads.
+  final ValueChanged<bool> onDimChanged;
   final Widget child;
 
   @visibleForTesting
@@ -70,7 +75,7 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
   int _readbacks = 0;
   int? _sampledRevision;
   Map<String, Rect> _sampledTargets = {};
-  Map<String, Color> _colors = {};
+  bool _dim = false;
 
   @override
   void initState() {
@@ -101,7 +106,7 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
     _sampledRevision = null;
     _resamplePending = false;
     if (!widget.enabled || !_tickersEnabled) {
-      _colors = {};
+      _dim = false;
       return;
     }
     // Playback can keep the Dart isolate alive after the UI is backgrounded.
@@ -186,9 +191,8 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
       }
       _sampledRevision = revision;
       _sampledTargets = targets;
-      final next = <String, Color>{};
-      for (final entry in targets.entries) {
-        final rect = entry.value;
+      bool? dim;
+      for (final rect in targets.values) {
         final left = (rect.left * scale).floor().clamp(0, image.width);
         final right = (rect.right * scale).ceil().clamp(0, image.width);
         final top = (rect.top * scale).floor().clamp(0, image.height);
@@ -207,20 +211,17 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
           }
         }
         if (count == 0) continue;
-        // Prefer the player's white labels/icons while they retain 3:1
-        // contrast. Pastel frames need not switch to black merely because
-        // black has a higher contrast ratio. Hysteresis prevents flicker.
-        final threshold = _colors[entry.key] == Colors.black ? 0.28 : 0.30;
-        next[entry.key] = luminance / count > threshold
-            ? Colors.black
-            : Colors.white;
+        // White text keeps 4.5:1 up to a luminance of 0.183, as over moving
+        // artwork. Hysteresis prevents flicker.
+        dim = luminance / count > (_dim ? 0.16 : 0.18);
+        if (dim) break;
       }
-      if (next.entries.any((entry) => _colors[entry.key] != entry.value)) {
-        _colors = next;
-        widget.onChanged(next);
+      if (dim != null && dim != _dim) {
+        _dim = dim;
+        widget.onDimChanged(dim);
       }
     } catch (_) {
-      // Unreadable surfaces keep the light controls over the dark fade.
+      // An unreadable surface keeps the current layer.
     } finally {
       image?.dispose();
       _sampling = false;

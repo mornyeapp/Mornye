@@ -1218,19 +1218,23 @@ void main() {
     );
   }
 
-  testWidgets('video contrast updates controls without rebuilding artwork', (
+  testWidgets('a light still cover dims behind white labels in place', (
     tester,
   ) async {
+    // The sample's own result is driven below instead.
+    MornyeArtworkContrast.debugReadback = (_, _) =>
+        Completer<ui.Image>().future;
+    addTearDown(() => MornyeArtworkContrast.debugReadback = null);
     await pumpNowPlaying(
       tester,
       theme: MornyeTheme.build(Brightness.dark),
       size: const Size(393, 852),
-      motionArtwork: const MotionArtwork(
-        'file:///cover.mp4',
-        aspectRatio: 0.75,
-      ),
     );
     mediaItems.add(item('first'));
+    await settlePlayer(tester);
+    ProviderScope.containerOf(
+      tester.element(find.byType(NowPlayingScreen)),
+    ).read(settingsProvider.notifier).setPlayerCoverStyle('fullscreen');
     await settlePlayer(tester);
     final background = tester.widget<MornyePlayerBackground>(
       find.byType(MornyePlayerBackground),
@@ -1240,9 +1244,14 @@ void main() {
     final contrast = tester.widget<MornyeArtworkContrast>(
       find.byType(MornyeArtworkContrast),
     );
-    for (final color in [Colors.black, Colors.white]) {
-      contrast.onChanged({'header': color, 'controls': color, 'volume': color});
+    MornyeControlsDim dim() => tester.widget(find.byType(MornyeControlsDim));
+    expect(contrast.enabled, isTrue);
+    expect(dim().visible, isFalse);
+    const color = Colors.white;
+    for (final light in [true, false]) {
+      contrast.onDimChanged(light);
       await tester.pump();
+      expect(dim().visible, light);
       expect(
         tester.widget<MornyePlayerBackground>(
           find.byType(MornyePlayerBackground),
@@ -3904,8 +3913,9 @@ void main() {
       await settlePlayer(tester);
       MornyePlayerBackground background() =>
           tester.widget(find.byType(MornyePlayerBackground));
+      MornyeControlsDim dim() => tester.widget(find.byType(MornyeControlsDim));
       expect(background().artwork, isNotNull);
-      expect(background().dimControls, isTrue);
+      expect(dim().visible, isTrue);
 
       // The gradient and its fade must not fall back to the still cover's
       // layout for the frames the lookup takes, and then return.
@@ -3913,10 +3923,10 @@ void main() {
       for (var frame = 0; frame < 10; frame++) {
         await tester.pump(const Duration(milliseconds: 16));
         expect(background().artwork, isNotNull, reason: 'frame $frame');
-        expect(background().dimControls, isTrue, reason: 'frame $frame');
+        expect(dim().visible, isTrue, reason: 'frame $frame');
       }
       await settlePlayer(tester);
-      expect(background().dimControls, isTrue);
+      expect(dim().visible, isTrue);
       expect(tester.takeException(), isNull);
     },
   );
