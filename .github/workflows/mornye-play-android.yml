@@ -84,7 +84,7 @@ jobs:
         run: dart analyze lib/controllers/play_online.dart lib/controllers/online_stream_settings.dart lib/services/music_player_service.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart lib/widgets/collection_suggestions_section.dart lib/screens/artist_screen.dart lib/widgets/preview_button.dart
 
       - name: Run multi-provider streaming unit tests
-        run: flutter test test/online_stream_test.dart --reporter expanded
+        run: flutter test test/online_stream_test.dart test/extension_update_policy_test.dart --reporter expanded
 
       - name: Configure optional private release signing
         env:
