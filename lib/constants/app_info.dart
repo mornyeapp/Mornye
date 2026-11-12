@@ -25,7 +25,7 @@ class AppInfo {
 
   static const String mobileAuthor = 'zarzet';
 
-  static const String githubRepo = 'mornyeapp/Mornye';
+  static const String githubRepo = 'famous37/Mornye';
   static const String githubUrl = 'https://github.com/$githubRepo';
 
   /// Desktop packages are published here; the source stays in [githubRepo].
