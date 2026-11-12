@@ -76,6 +76,20 @@ jobs:
           [Вихідний код](https://github.com/famous37/Mornye/tree/feature/mornye-play-standalone) · [Зміни](https://github.com/famous37/Mornye/pull/4)
           NOTES
 
+      - name: Створити тег Beta 2 окремо від Release API
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=mornye-play-v5.3.1-beta.2
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "Тег уже існує"
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$tag" \
+              -f sha="6055a718ab6394409f2c3e60d52d6643656de4b9"
+          fi
+
       - name: Опублікувати новий Beta 2 з правильним Android ID
         env:
           GH_TOKEN: ${{ github.token }}
@@ -91,7 +105,7 @@ jobs:
             release/Mornye_Qobuz_Online_v1.2.29.sflx \
             release/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" \
-            --target 6055a718ab6394409f2c3e60d52d6643656de4b9 \
+            --verify-tag \
             --title "Mornye Play v5.3.1 — Beta 2 (famous37)" \
             --notes-file notes.md \
             --prerelease
