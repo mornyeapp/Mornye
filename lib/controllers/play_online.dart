@@ -93,38 +93,7 @@ Future<void> playOnline(
           : '';
 
   if (!context.mounted) return;
-  if (isrc.isNotEmpty || RegExp(r'^[A-Za-z0-9]{22}
-  if (link != null) {
-    try {
-      if (await launchUrl(link.appUri, mode: LaunchMode.externalApplication)) {
-        return;
-      }
-    } catch (_) {
-      // The native provider app may not be installed.
-    }
-    try {
-      if (await launchUrl(
-        Uri.parse(link.webUrl),
-        mode: LaunchMode.externalApplication,
-      )) {
-        return;
-      }
-    } catch (_) {
-      // Fall through to a visible error.
-    }
-  }
-
-  if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'No full-length online playback source is available for this track.',
-        ),
-      ),
-    );
-  }
-}
-).hasMatch(spotifyId)) {
+  if (isrc.isNotEmpty || RegExp(r'^[A-Za-z0-9]{22}$').hasMatch(spotifyId)) {
     try {
       final links = await PlatformBridge.getTrackPlatformLinks(
         spotifyId: spotifyId,
