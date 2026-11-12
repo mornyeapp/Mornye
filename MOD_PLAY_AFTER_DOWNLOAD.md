@@ -116,3 +116,7 @@ Qobuz (Experimental Online) v1.2.29 `.sflx`. Actual Android auto-advance,
 URL expiration, and average bitrate availability require on-device testing.
 The signed stream may stop if authentication or its expiration policy prevents
 refreshing the URL.
+
+The Home and search result lists also expose a direct ▶ control, without
+opening the track options dialog. The chooser for alternate quality uses a
+long press on this control.
