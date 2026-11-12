@@ -43,7 +43,11 @@ function resolvePlaybackStream(request) {
 
     // resolveDownloadInfo fetches an expiring URL; the normal download
     // implementation calls file.download on it. We return the URL instead.
-    var info = resolveDownloadInfo(matched.track_id, "LOSSLESS", {});
+    var requestedQuality = String(request.quality || "HI_RES_LOSSLESS");
+    if (["HI_RES_LOSSLESS", "HI_RES", "LOSSLESS"].indexOf(requestedQuality) < 0) {
+      requestedQuality = "HI_RES_LOSSLESS";
+    }
+    var info = resolveDownloadInfo(matched.track_id, requestedQuality, {});
     var url = String(info && info.directURL || "").trim();
     if (!/^https:\/\//i.test(url)) {
       return { success: false, error: "Qobuz did not return a secure stream URL" };
@@ -54,6 +58,9 @@ function resolvePlaybackStream(request) {
       url: url,
       full_track: true,
       format: "flac",
+      bit_depth: Number(info.bitDepth || 0),
+      sample_rate: Number(info.sampleRate || 0),
+      quality_requested: requestedQuality,
       provider: "qobuz-web",
       expires: "provider-controlled"
     };
@@ -85,7 +92,7 @@ def main(root: pathlib.Path) -> None:
 
     manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
     assert manifest["name"] == "qobuz-web"
-    manifest["version"] = "1.2.28"
+    manifest["version"] = "1.2.29"
     manifest["displayName"] = "Qobuz (Experimental Online)"
     manifest["description"] += (
         " Experimental direct HTTPS audio playback. Signed URLs may expire or "
