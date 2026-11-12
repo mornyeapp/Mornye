@@ -1,4 +1,4 @@
-name: Mornye custom Android APK — Play after download
+name: Mornye custom Android APK — Play online
 
 on:
   push:
@@ -74,10 +74,10 @@ jobs:
         run: |
           flutter pub get
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
-          dart format lib/controllers/play_after_download.dart lib/widgets/track_collection_quick_actions.dart
+          dart format lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart
 
       - name: Analyze new Dart controller and menu
-        run: dart analyze lib/controllers/play_after_download.dart lib/widgets/track_collection_quick_actions.dart
+        run: dart analyze lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart
 
       - name: Configure optional private release signing
         env:
@@ -111,7 +111,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Mornye-Play-ARM64-APK
+          name: Mornye-Online-ARM64-APK
           retention-days: 30
           if-no-files-found: error
           path: |
