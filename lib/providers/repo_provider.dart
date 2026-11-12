@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/services/extension_storage_service.dart';
+import 'package:mornye/services/extension_update_policy.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/providers/extension_provider.dart';
@@ -49,6 +50,7 @@ class RepoExtension {
   final String? minAppVersion;
   final bool isInstalled;
   final bool hasUpdate;
+  final bool updateProtected;
 
   const RepoExtension({
     required this.id,
@@ -63,6 +65,7 @@ class RepoExtension {
     this.minAppVersion,
     this.isInstalled = false,
     this.hasUpdate = false,
+    this.updateProtected = false,
   });
 
   factory RepoExtension.fromJson(Map<String, dynamic> json) {
@@ -80,6 +83,7 @@ class RepoExtension {
       minAppVersion: json['min_app_version'] as String?,
       isInstalled: json['is_installed'] as bool? ?? false,
       hasUpdate: json['has_update'] as bool? ?? false,
+      updateProtected: json['update_protected'] as bool? ?? false,
     );
   }
 
@@ -197,6 +201,34 @@ class RepoNotifier extends Notifier<RepoState> {
     return const RepoState();
   }
 
+  /// Disabled manually installed online mods must remain protected too.
+  bool _blocksUpstreamPackage(String extensionId, String registryUrl) {
+    final installed = ref.read(extensionProvider).extensions;
+    final matching = installed.where((ext) => ext.id == extensionId).firstOrNull;
+    return isOfficialRepoUpdateBlocked(
+      registryUrl: registryUrl,
+      extensionId: extensionId,
+      installedCapabilities: matching?.capabilities,
+    );
+  }
+
+  List<RepoExtension> _storeEntries(
+    List<Map<String, dynamic>> entries,
+    String registryUrl,
+  ) {
+    return [
+      for (final entry in entries)
+        RepoExtension.fromJson({
+          ...entry,
+          if (_blocksUpstreamPackage(
+            entry['id']?.toString() ?? '',
+            registryUrl,
+          ))
+            ...{'has_update': false, 'update_protected': true},
+        }),
+    ];
+  }
+
   Future<void> initialize(String cacheDir) {
     if (state.isInitialized) return Future<void>.value();
     _cacheDir = cacheDir;
@@ -274,7 +306,7 @@ class RepoNotifier extends Notifier<RepoState> {
 
       state = state.copyWith(
         registryUrl: resolvedUrl,
-        extensions: extensions.map((e) => RepoExtension.fromJson(e)).toList(),
+        extensions: _storeEntries(extensions, resolvedUrl),
         isLoading: false,
       );
 
@@ -326,7 +358,7 @@ class RepoNotifier extends Notifier<RepoState> {
         forceRefresh: forceRefresh,
       );
       state = state.copyWith(
-        extensions: extensions.map((e) => RepoExtension.fromJson(e)).toList(),
+        extensions: _storeEntries(extensions, state.registryUrl),
         isLoading: false,
       );
       _log.d('Loaded ${state.extensions.length} extensions from store');
@@ -405,6 +437,21 @@ class RepoNotifier extends Notifier<RepoState> {
     );
 
     try {
+      // Check the active registry before each install/upgrade, even when
+      // triggered from a stale store tile or a direct notifier call.
+      final registryUrl = await PlatformBridge.getRepoRegistryUrl();
+      if (_blocksUpstreamPackage(extensionId, registryUrl)) {
+        const message =
+            'Protected online .sflx: official repository updates are blocked. '
+            'Import your own .sflx from Settings → Extensions instead.';
+        _log.w('Blocked official upstream $action for $extensionId');
+        state = state.copyWith(
+          isDownloading: false,
+          clearDownloadingId: true,
+          error: message,
+        );
+        return false;
+      }
       _log.i('Downloading extension: $extensionId');
       final downloadPath = await PlatformBridge.downloadRepoExtension(
         extensionId,
