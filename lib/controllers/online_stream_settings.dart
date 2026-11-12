@@ -42,11 +42,12 @@ class OnlineStreamSettings {
               subtitle: Text('Applied to the next stream. Best available is the default.'),
             ),
             for (final option in qualities.entries)
-              RadioListTile<String>(
+              ListTile(
                 title: Text(option.value),
-                value: option.key,
-                groupValue: selected,
-                onChanged: (value) => Navigator.pop(sheetContext, value),
+                trailing: option.key == selected
+                    ? const Icon(Icons.check_circle)
+                    : const Icon(Icons.circle_outlined),
+                onTap: () => Navigator.pop(sheetContext, option.key),
               ),
             const SizedBox(height: 12),
           ],
