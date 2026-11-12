@@ -515,9 +515,8 @@ class _CollectionItemWidget extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         subtitleOf(context, item),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -712,9 +711,8 @@ class _QuickPicksPageViewState extends State<_QuickPicksPageView> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             widget.section.title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
         ),
         SizedBox(
@@ -830,9 +828,8 @@ class _QuickPicksPageViewState extends State<_QuickPicksPageView> {
                     explicit: item.explicit == true,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: widget.colorScheme.onSurface,
-                    ),
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: widget.colorScheme.onSurface),
                   ),
                   if (item.artists.isNotEmpty)
                     ClickableArtistName(

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1062,9 +1063,8 @@ class _HomeTabState extends ConsumerState<HomeTab>
             ?.displayName ??
         context.l10n.librarySourceOnline;
     // Equal segments, each hugging the longer label.
-    final labelStyle = Theme.of(
-      context,
-    ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
+    final labelStyle = Theme.of(context).textTheme.bodyMedium
+        ?.copyWith(fontWeight: FontWeight.w600);
     double labelWidth(String label) {
       final painter = TextPainter(
         text: TextSpan(text: label, style: labelStyle),
@@ -1544,9 +1544,8 @@ class _HomeTabState extends ConsumerState<HomeTab>
                 Text(
                   context.l10n.homeEmptySubtitle,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
                 ),
               ],
             ),

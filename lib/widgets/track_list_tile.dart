@@ -134,11 +134,7 @@ class TrackListTile extends ConsumerWidget {
       ),
       onTap: isSelectionMode
           ? onToggleSelection
-          : () => _handleTap(
-              context,
-              ref,
-              isInLocalLibrary: isInLocalLibrary,
-            ),
+          : () => _handleTap(context, ref, isInLocalLibrary: isInLocalLibrary),
       onLongPress: isSelectionMode
           ? null
           : onEnterSelectionMode ??

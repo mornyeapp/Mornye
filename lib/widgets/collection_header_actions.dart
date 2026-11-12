@@ -94,10 +94,7 @@ class CollectionHeaderActions extends StatelessWidget {
           const SizedBox(width: 8),
           if (play != null) ...[play, const SizedBox(width: 8)],
           Flexible(
-            child: SizedBox(
-              width: play == null ? 176 : 120,
-              child: download,
-            ),
+            child: SizedBox(width: play == null ? 176 : 120, child: download),
           ),
           const SizedBox(width: 8),
           addToPlaylist,
