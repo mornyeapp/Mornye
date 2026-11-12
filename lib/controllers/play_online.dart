@@ -1,132 +1,152 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/online_stream_settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 
-/// Play a full-length online stream *inside Mornye*, never through the
-/// download queue, local media storage, or another streaming-service app.
-///
-/// The installed extension must advertise fullTrackStreaming and implement
-/// resolvePlaybackStream. Legacy download-only providers are not suitable.
-Future<void> playOnline(
+const onlineStreamScheme = 'mornye-online';
+
+Map<String, dynamic> onlineStreamRequest(Track track, String quality) => {
+  'id': track.id,
+  'title': track.name,
+  'artist': track.artistName,
+  'album': track.albumName,
+  'isrc': track.isrc ?? '',
+  'duration_ms': track.duration * 1000,
+  'quality': quality,
+};
+
+bool isFullOnlineStream(Map<String, dynamic> result) {
+  final uri = Uri.tryParse(result['url']?.toString().trim() ?? '');
+  return result['success'] != false &&
+      result['full_track'] == true &&
+      result['encrypted'] != true &&
+      result['requires_headers'] != true &&
+      uri != null &&
+      uri.scheme == 'https' &&
+      uri.host.isNotEmpty;
+}
+
+PlayableMedia _item(
+  Track track,
+  String provider,
+  String quality,
+  int index, {
+  Map<String, dynamic>? resolved,
+}) {
+  final source = resolved == null
+      ? Uri(scheme: onlineStreamScheme, host: provider, pathSegments: [track.id]).toString()
+      : resolved['url'].toString();
+  int? positive(Object? value) {
+    final number = value is num ? value.toInt() : int.tryParse('$value');
+    return number != null && number > 0 ? number : null;
+  }
+  return PlayableMedia(
+    id: 'online:$provider:$index:${track.id}',
+    source: source,
+    title: track.name,
+    artist: track.artistName,
+    album: track.albumName,
+    artUri: normalizeArtUri(track.coverUrl ?? ''),
+    duration: track.duration > 0 ? Duration(seconds: track.duration) : null,
+    explicit: track.isExplicit,
+    format: 'FLAC',
+    bitDepth: positive(resolved?['bit_depth']),
+    sampleRate: positive(resolved?['sample_rate']),
+    bitrate: positive(resolved?['bitrate']),
+    displayMetadata: {
+      'online_stream': true,
+      'online_provider': provider,
+      'online_quality': quality,
+      'online_request': onlineStreamRequest(track, quality),
+    },
+  );
+}
+
+/// Play an album/playlist in original order. Later URLs resolve only on play.
+Future<void> playOnlineQueue(
   BuildContext context,
   WidgetRef ref,
-  Track track,
-) async {
+  List<Track> tracks, {
+  int startIndex = 0,
+  String? qualityOverride,
+}) async {
+  if (tracks.isEmpty || startIndex < 0 || startIndex >= tracks.length) return;
   final container = ProviderScope.containerOf(context, listen: false);
-
-  void notify(String message, {bool busy = false}) {
+  void notify(String message) {
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) return;
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: Duration(seconds: busy ? 3 : 9),
-      ),
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 7)),
     );
   }
 
-  notify('Connecting to online audio stream…', busy: true);
   try {
     await container.read(extensionProvider.notifier).ensureInitialized();
   } catch (error) {
-    notify('Extension initialization failed: $error');
+    notify('Online provider initialization failed: $error');
+    return;
+  }
+  final extensions = container.read(extensionProvider).extensions.where(
+    (extension) => extension.enabled &&
+        extension.capabilities['fullTrackStreaming'] == true,
+  );
+  if (extensions.isEmpty) {
+    notify('No streaming provider enabled. Enable Qobuz Online extension.');
     return;
   }
 
-  final candidates = container
-      .read(extensionProvider)
-      .extensions
-      .where(
-        (extension) =>
-            extension.enabled &&
-            extension.capabilities['fullTrackStreaming'] == true,
-      )
-      .toList();
-
-  if (candidates.isEmpty) {
-    notify(
-      'No online audio provider installed. Install and enable the '
-      'experimental Qobuz Online .sflx extension in Mornye. '
-      'The original Qobuz download extension cannot stream.',
-    );
-    return;
-  }
-
+  final quality = qualityOverride ?? await OnlineStreamSettings.current();
+  final track = tracks[startIndex];
   final failures = <String>[];
-  for (final extension in candidates) {
+  for (final extension in extensions) {
     try {
       final result = await PlatformBridge.invokeExtensionAction(
-        extension.id,
-        'resolvePlaybackStream',
-        input: {
-          'id': track.id,
-          'title': track.name,
-          'artist': track.artistName,
-          'album': track.albumName,
-          'isrc': track.isrc ?? '',
-          'duration_ms': track.duration * 1000,
-        },
+        extension.id, 'resolvePlaybackStream',
+        input: onlineStreamRequest(track, quality),
       );
-
-      final url = result['url']?.toString().trim() ?? '';
-      final uri = Uri.tryParse(url);
-      final playable = result['full_track'] == true &&
-          result['success'] != false &&
-          result['encrypted'] != true &&
-          result['requires_headers'] != true &&
-          uri != null &&
-          uri.scheme == 'https' &&
-          uri.host.isNotEmpty;
-
-      if (!playable) {
-        final message = result['error']?.toString().trim();
-        failures.add(
-          '${extension.displayName}: '
-          '${message != null && message.isNotEmpty ? message : "No playable full-track HTTPS URL"}',
-        );
+      if (!isFullOnlineStream(result)) {
+        failures.add('${extension.displayName}: ${result['error'] ?? 'No full-track HTTPS URL'}');
         continue;
       }
-
+      final queue = [
+        for (var i = 0; i < tracks.length; i++)
+          _item(tracks[i], extension.id, quality, i,
+            resolved: i == startIndex ? result : null),
+      ];
       final player = container.read(musicPlayerControllerProvider);
-      final handler = await player.ensureInitialized();
-      if (handler == null) {
-        notify('Mornye internal audio player could not be initialized.');
+      if (await player.ensureInitialized() == null) {
+        notify('Internal audio player unavailable.');
         return;
       }
-      await player.playSingle(
-        PlayableMedia(
-          id: 'online:${extension.id}:${track.id}',
-          source: url,
-          title: track.name,
-          artist: track.artistName,
-          album: track.albumName,
-          artUri: normalizeArtUri(track.coverUrl ?? ''),
-          duration: track.duration > 0
-              ? Duration(seconds: track.duration)
-              : null,
-          explicit: track.isExplicit,
-        ),
-      );
-      notify('Playing online in Mornye: ${track.name}');
+      await player.playAll(queue, initialIndex: startIndex);
       return;
     } catch (error) {
-      // Do not silently open a streaming service or download as a fallback.
-      // A failed authorized stream remains an error that the user can act on.
       failures.add('${extension.displayName}: $error');
     }
   }
+  notify('Online playback failed: ${failures.join('; ')}');
+}
 
-  final detail = failures.join('; ');
-  notify(
-    detail.isEmpty
-        ? 'No full-length online audio stream is available for this track.'
-        : 'Online playback unavailable: '
-            '${detail.length <= 300 ? detail : detail.substring(0, 300)}',
+Future<void> playOnline(BuildContext context, WidgetRef ref, Track track) =>
+    playOnlineQueue(context, ref, [track]);
+
+Future<void> chooseOnlineQuality(
+  BuildContext context,
+  WidgetRef ref,
+  List<Track> queue, {
+  int startIndex = 0,
+}) async {
+  final quality = await OnlineStreamSettings.choose(context);
+  if (quality == null) return;
+  await OnlineStreamSettings.save(quality);
+  if (!context.mounted) return;
+  await playOnlineQueue(
+    context, ref, queue,
+    startIndex: startIndex, qualityOverride: quality,
   );
 }
