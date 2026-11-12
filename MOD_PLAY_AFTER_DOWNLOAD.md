@@ -1,64 +1,61 @@
-# Mornye — external player mod
+# Mornye — Play online experimental mod
 
-This experimental fork adds **Play after download** to the track options menus
-on Android and desktop. The original **Download** action remains available.
+This fork replaces the previous **Play after download** action with a
+**Play online** action in Mornye's track menu.
 
-## Operation
+## Important difference
 
-1. Open any track's options menu.
-2. Choose **Play after download**.
-3. If configured, select a provider and quality in the normal Mornye picker.
-4. Mornye downloads, decrypts, finalizes and saves the file normally.
-5. On successful completion, Android opens the audio via its external player
-   chooser or default music player. A compatible player (e.g. VLC) must be
-   installed. The saved file remains in the library.
+**Play online never invokes the download queue and does not save a song file.**
 
-**This is not progressive streaming:** full-file playback starts only after
-the provider has finished downloading and processing the audio. Online streaming
-would require an additional extension/backend API to expose an authorized audio
-stream that remains valid during playback (and handles any necessary auth,
-headers, encryption or transcoding). Do not use preview clips to represent
-full-length streaming.
+It tries two genuine online mechanisms:
 
-## Build
+1. If an installed extension explicitly advertises
+   `capabilities.fullTrackStreaming: true` and implements the custom action
+   `resolvePlaybackStream`, it requests a full-length HTTPS audio URL and
+   uses Mornye's existing internal player. The action must return
+   `{"url":"https://...","full_track":true}`; it must be immediately
+   decodable without extra authorization headers or client decryption.
+   Preview clips are rejected. **The official download providers do not
+   currently expose this action.**
+2. Otherwise, it resolves track links using the existing Mornye
+   cross-platform link lookup and presents the available streaming services.
+   Selecting a service opens the track in that provider's official app or
+   browser, not in VLC. Full-length playback may require a subscription or
+   sign-in. When no cross-platform match exists, it falls back to the track's
+   own service link.
 
-A GitHub Actions workflow lives in
-`.github/workflows/mornye-play-android.yml` and targets the branch
-`feature/play-after-download`. It builds a Lite arm64 APK using Mornye's
-pinned Flutter/Rust/Android toolchain.
+No part of this action downloads the file via Mornye. The target service
+might use its own transient streaming cache; that is controlled by the
+service, not by Mornye.
 
-- In the repo, open **Actions** and enable workflows if GitHub asks.
-- Opening a pull request from `feature/play-after-download` into `main`,
-  or pushing a source change to the feature branch, triggers the build
-  when GitHub Actions is enabled.
-- **Run workflow** also becomes available after this workflow file is
-  merged into the default branch (`main`).
-- When the job succeeds, open its **Artifacts** and download
-  `Mornye-Play-ARM64-APK`; extract
-  `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`.
+**Not yet implemented:** direct in-app or VLC playback of full-length
+FLAC from the currently installed Qobuz, Tidal, Amazon or Deezer download
+extensions. Their download APIs do not currently offer a reusable,
+authorized full-track HTTP stream URL. Supporting these directly needs a
+matching update to those extensions and potentially the Rust backend for
+headers, session renewal, segmented media, or encryption handling.
 
-### Signing
+## Build APK
 
-Without private signing secrets, the workflow produces an APK signed with
-Gradle's default test/debug key. This is installable for testing but its
-signature is not guaranteed to remain stable between hosted runners.
+GitHub Actions workflow:
+`.github/workflows/mornye-play-android.yml`
 
-For a **stable release signing key**, generate a private JKS locally and set
-these GitHub repository Actions secrets:
+Branch:
+`feature/play-after-download` (historical branch name retained).
 
-- `MOD_KEYSTORE_BASE64` — base64-encoded contents of the JKS
+The workflow builds Mornye Lite for Android ARM64. Open **Actions** in the
+fork to view runs and download the successful
+`Mornye-Online-ARM64-APK` artifact.
+
+Private signing secrets can be configured as described below; otherwise
+the APK uses the default Gradle development signing key, not a permanent
+release key. Keep a stable key backup before installing future updates:
+
+- `MOD_KEYSTORE_BASE64`
 - `MOD_KEYSTORE_PASSWORD`
 - `MOD_KEY_ALIAS`
 - `MOD_KEY_PASSWORD`
 
-Never commit the keystore or passwords. Keep an offline backup of the JKS.
-Because this fork uses Mornye's package identifier, a different signing
-certificate means it cannot replace an installation signed by another key.
-Back up user data before uninstalling the existing app.
-
-## Verification
-
-The code was committed and structurally matched against the source tree;
-on-device functionality and CI build results must be checked separately.
-A successful CI build does not by itself prove an external player opens every
-provider's result, especially SAF URIs and nonstandard audio codecs.
+Building an APK doesn't guarantee provider account permissions, reliable
+track matching, or successful online playback on every phone. Device
+testing is still required.
