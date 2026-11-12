@@ -20,7 +20,11 @@ class OnlineStreamSettings {
 
   static Future<void> save(String quality) async {
     if (!qualities.containsKey(quality)) {
-      throw ArgumentError.value(quality, 'quality', 'Unsupported stream quality');
+      throw ArgumentError.value(
+        quality,
+        'quality',
+        'Unsupported stream quality',
+      );
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, quality);
@@ -39,7 +43,9 @@ class OnlineStreamSettings {
           children: [
             const ListTile(
               title: Text('Online audio quality'),
-              subtitle: Text('Applied to the next stream. Best available is the default.'),
+              subtitle: Text(
+                'Applied to the next stream. Best available is the default.',
+              ),
             ),
             for (final option in qualities.entries)
               ListTile(

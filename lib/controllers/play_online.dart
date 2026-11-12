@@ -56,6 +56,7 @@ PlayableMedia _item(
     final number = value is num ? value.toInt() : int.tryParse('$value');
     return number != null && number > 0 ? number : null;
   }
+
   return PlayableMedia(
     id: 'online:$provider:$index:${track.id}',
     source: source,
@@ -103,10 +104,14 @@ Future<void> playOnlineQueue(
     notify('Online provider initialization failed: $error');
     return;
   }
-  final extensions = container.read(extensionProvider).extensions.where(
-    (extension) => extension.enabled &&
-        extension.capabilities['fullTrackStreaming'] == true,
-  );
+  final extensions = container
+      .read(extensionProvider)
+      .extensions
+      .where(
+        (extension) =>
+            extension.enabled &&
+            extension.capabilities['fullTrackStreaming'] == true,
+      );
   if (extensions.isEmpty) {
     notify('No streaming provider enabled. Enable Qobuz Online extension.');
     return;
@@ -118,17 +123,25 @@ Future<void> playOnlineQueue(
   for (final extension in extensions) {
     try {
       final result = await PlatformBridge.invokeExtensionAction(
-        extension.id, 'resolvePlaybackStream',
+        extension.id,
+        'resolvePlaybackStream',
         input: onlineStreamRequest(track, quality),
       );
       if (!isFullOnlineStream(result)) {
-        failures.add('${extension.displayName}: ${result['error'] ?? 'No full-track HTTPS URL'}');
+        failures.add(
+          '${extension.displayName}: ${result['error'] ?? 'No full-track HTTPS URL'}',
+        );
         continue;
       }
       final queue = [
         for (var i = 0; i < tracks.length; i++)
-          _item(tracks[i], extension.id, quality, i,
-            resolved: i == startIndex ? result : null),
+          _item(
+            tracks[i],
+            extension.id,
+            quality,
+            i,
+            resolved: i == startIndex ? result : null,
+          ),
       ];
       final player = container.read(musicPlayerControllerProvider);
       if (await player.ensureInitialized() == null) {
@@ -158,7 +171,10 @@ Future<void> chooseOnlineQuality(
   await OnlineStreamSettings.save(quality);
   if (!context.mounted) return;
   await playOnlineQueue(
-    context, ref, queue,
-    startIndex: startIndex, qualityOverride: quality,
+    context,
+    ref,
+    queue,
+    startIndex: startIndex,
+    qualityOverride: quality,
   );
 }

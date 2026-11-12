@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,30 +18,34 @@ final _sourceNameProvider = FutureProvider.family<String?, String>((
   }
 });
 
-
 /// Average encoded bitrate from the full HTTP Content-Length, not a guessed
 /// PCM bitrate. FLAC is variable-bit-rate; this is a file-wide average only.
-final _onlineAverageKbpsProvider = FutureProvider.family<int?, ({String url, int seconds})>(
-  (ref, request) async {
-    if (request.seconds <= 0) return null;
-    final uri = Uri.tryParse(request.url);
-    if (uri?.scheme != 'https') return null;
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
-    try {
-      final head = await client.openUrl('HEAD', uri!).timeout(const Duration(seconds: 6));
-      final response = await head.close().timeout(const Duration(seconds: 6));
-      final length = response.contentLength;
-      if (response.statusCode != HttpStatus.ok || length < 128 * 1024) {
+final _onlineAverageKbpsProvider =
+    FutureProvider.family<int?, ({String url, int seconds})>((
+      ref,
+      request,
+    ) async {
+      if (request.seconds <= 0) return null;
+      final uri = Uri.tryParse(request.url);
+      if (uri?.scheme != 'https') return null;
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 5);
+      try {
+        final head = await client
+            .openUrl('HEAD', uri!)
+            .timeout(const Duration(seconds: 6));
+        final response = await head.close().timeout(const Duration(seconds: 6));
+        final length = response.contentLength;
+        if (response.statusCode != HttpStatus.ok || length < 128 * 1024) {
+          return null;
+        }
+        return (length * 8 / request.seconds / 1000).round();
+      } catch (_) {
         return null;
+      } finally {
+        client.close(force: true);
       }
-      return (length * 8 / request.seconds / 1000).round();
-    } catch (_) {
-      return null;
-    } finally {
-      client.close(force: true);
-    }
-  },
-);
+    });
 
 /// Describes the file actually opened, including an offline copy preferred
 /// over a network source already in the queue.
@@ -54,20 +59,26 @@ class PlaybackSourceLabel extends ConsumerWidget {
     final source = item.extras?['source']?.toString() ?? '';
     if (item.id.startsWith('online:')) {
       final extras = item.extras ?? const <String, dynamic>{};
-      final resolved = extras['resolvedSource']?.toString() ??
+      final resolved =
+          extras['resolvedSource']?.toString() ??
           (source.startsWith('https://') ? source : '');
       int? positive(Object? raw) {
         final number = raw is num ? raw.toInt() : int.tryParse('$raw');
         return number != null && number > 0 ? number : null;
       }
+
       final bits = positive(extras['bit_depth']);
       final sample = positive(extras['sample_rate']);
       final providerBitrate = positive(extras['bitrate']);
       final average = resolved.isNotEmpty && item.duration != null
-          ? ref.watch(_onlineAverageKbpsProvider((
-              url: resolved,
-              seconds: item.duration!.inSeconds,
-            ))).value
+          ? ref
+                .watch(
+                  _onlineAverageKbpsProvider((
+                    url: resolved,
+                    seconds: item.duration!.inSeconds,
+                  )),
+                )
+                .value
           : null;
       final parts = <String>[
         'Online · ${extras['format'] ?? 'FLAC'}',

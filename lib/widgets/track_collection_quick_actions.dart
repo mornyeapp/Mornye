@@ -506,7 +506,10 @@ class _TrackOptionsSheet extends ConsumerWidget {
                 icon: Icons.play_circle_outline_rounded,
                 title: 'Play online',
                 onTap: () {
-                  final root = Navigator.of(context, rootNavigator: true).context;
+                  final root = Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).context;
                   Navigator.pop(context);
                   playOnline(root, ref, track);
                 },

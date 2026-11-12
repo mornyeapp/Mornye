@@ -57,12 +57,14 @@ class CollectionHeaderActions extends StatelessWidget {
         );
       },
     );
-    final play = onPlayOnline == null ? null : HeaderCircleButton(
-      icon: Icons.play_circle_fill_rounded,
-      tonal: true,
-      tooltip: 'Play album / playlist online',
-      onPressed: enabled ? onPlayOnline : null,
-    );
+    final play = onPlayOnline == null
+        ? null
+        : HeaderCircleButton(
+            icon: Icons.play_circle_fill_rounded,
+            tonal: true,
+            tooltip: 'Play album / playlist online',
+            onPressed: enabled ? onPlayOnline : null,
+          );
     final download = HeaderFilledButton(
       icon: mornye ? CupertinoIcons.arrow_down_circle_fill : downloadIcon,
       tonal: tonalDownload,

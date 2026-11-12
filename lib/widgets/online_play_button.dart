@@ -27,12 +27,9 @@ class OnlinePlayButton extends ConsumerWidget {
       label: 'Play online; hold to select quality',
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        onTap: () => playOnlineQueue(
-          context, ref, tracks, startIndex: index,
-        ),
-        onLongPress: () => chooseOnlineQuality(
-          context, ref, tracks, startIndex: index,
-        ),
+        onTap: () => playOnlineQueue(context, ref, tracks, startIndex: index),
+        onLongPress: () =>
+            chooseOnlineQuality(context, ref, tracks, startIndex: index),
         child: SizedBox(
           width: 44,
           height: 44,

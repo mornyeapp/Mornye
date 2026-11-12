@@ -524,9 +524,9 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHighest,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(

@@ -1200,7 +1200,8 @@ class MusicPlayerHandler extends BaseAudioHandler
         'artist': query['artist'] ?? media.artist,
         'album': query['album'] ?? media.album,
         'isrc': query['isrc'] ?? '',
-        'duration_ms': int.tryParse(query['duration_ms'] ?? '') ??
+        'duration_ms':
+            int.tryParse(query['duration_ms'] ?? '') ??
             (media.duration?.inMilliseconds ?? 0),
         'quality': query['quality'] ?? 'HI_RES_LOSSLESS',
       };
@@ -1218,13 +1219,16 @@ class MusicPlayerHandler extends BaseAudioHandler
             result['requires_headers'] == true ||
             parsed?.scheme != 'https' ||
             parsed?.host.isEmpty != false) {
-          _log.w('Online stream provider did not return playable full audio: '
-              '${result['error'] ?? 'unavailable'}');
+          _log.w(
+            'Online stream provider did not return playable full audio: '
+            '${result['error'] ?? 'unavailable'}',
+          );
           return null;
         }
         // Add verified technical data for the *current* item only; metadata
         // must not be inferred from the requested quality.
-        if (_index >= 0 && _index < _media.length &&
+        if (_index >= 0 &&
+            _index < _media.length &&
             _media[_index].id == media.id) {
           final current = mediaItem.value;
           if (current?.id == media.id) {
