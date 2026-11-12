@@ -12,6 +12,7 @@ import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
 import 'package:mornye/widgets/preview_button.dart';
+import 'package:mornye/widgets/online_play_button.dart';
 import 'package:mornye/widgets/track_collection_quick_actions.dart';
 
 /// Track row shared by the album and playlist screens. Tap offers another
@@ -21,6 +22,8 @@ import 'package:mornye/widgets/track_collection_quick_actions.dart';
 /// ...) and choose whether the artist name links to the artist screen.
 class TrackListTile extends ConsumerWidget {
   final Track track;
+  final List<Track>? onlineTracks;
+  final int? onlineIndex;
   final bool isInHistory;
   final void Function({bool forceQualityPicker}) onDownload;
   final Widget leading;
@@ -37,6 +40,8 @@ class TrackListTile extends ConsumerWidget {
   const TrackListTile({
     super.key,
     required this.track,
+    this.onlineTracks,
+    this.onlineIndex,
     required this.isInHistory,
     required this.onDownload,
     required this.leading,
@@ -116,6 +121,11 @@ class TrackListTile extends ConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (!isSelectionMode)
+            OnlinePlayButton(
+              tracks: onlineTracks ?? [track],
+              index: onlineIndex ?? 0,
+            ),
           PreviewButton(track: track),
           TrackCollectionQuickActions(
             track: track,
