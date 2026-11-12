@@ -7,6 +7,7 @@ on:
       - feature/play-after-download
       - feature/hifi-listening-library
       - feature/mornye-play-standalone
+      - feature/mornye-play-multiprovider
     paths:
       - 'lib/**'
       - '.github/workflows/mornye-play-android.yml'
@@ -77,10 +78,13 @@ jobs:
         run: |
           flutter pub get
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
-          dart format lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart lib/screens/home_tab_widgets.dart lib/widgets/collection_suggestions_section.dart lib/screens/artist_screen.dart lib/screens/artist_screen_widgets.dart lib/widgets/preview_button.dart
+          dart format lib/controllers/play_online.dart lib/controllers/online_stream_settings.dart lib/services/music_player_service.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart lib/screens/home_tab_widgets.dart lib/widgets/collection_suggestions_section.dart lib/screens/artist_screen.dart lib/screens/artist_screen_widgets.dart lib/widgets/preview_button.dart
 
       - name: Analyze new Dart controller and menu
-        run: dart analyze lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart lib/widgets/collection_suggestions_section.dart lib/screens/artist_screen.dart lib/widgets/preview_button.dart
+        run: dart analyze lib/controllers/play_online.dart lib/controllers/online_stream_settings.dart lib/services/music_player_service.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart lib/widgets/collection_suggestions_section.dart lib/screens/artist_screen.dart lib/widgets/preview_button.dart
+
+      - name: Run multi-provider streaming unit tests
+        run: flutter test test/online_stream_test.dart --reporter expanded
 
       - name: Configure optional private release signing
         env:
