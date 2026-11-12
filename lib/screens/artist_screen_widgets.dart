@@ -941,12 +941,6 @@ extension _ArtistScreenSections on _ArtistScreenState {
   }) {
     return Consumer(
       builder: (context, ref, child) {
-        final queueItem = ref.watch(
-          downloadQueueLookupProvider.select(
-            (lookup) => lookup.byTrackId[track.id],
-          ),
-        );
-
         final showLocalLibraryIndicator = ref.watch(
           settingsProvider.select(
             (s) => s.localLibraryEnabled && s.localLibraryShowDuplicates,
@@ -964,8 +958,6 @@ extension _ArtistScreenSections on _ArtistScreenState {
               )
             : false;
 
-        final isQueued = queueItem != null;
-
         final row = DesktopContextMenuRegion(
           onContextMenu: (position) =>
               TrackCollectionQuickActions.showTrackOptionsSheet(
@@ -976,12 +968,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
                 hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
               ),
           child: InkWell(
-            onTap: () => _handlePopularTrackTap(
-              track,
-              isQueued: isQueued,
-              isInHistory: isInHistory,
-              isInLocalLibrary: isInLocalLibrary,
-            ),
+            onTap: () => _handlePopularTrackTap(track, rank - 1),
             onLongPress: () =>
                 TrackCollectionQuickActions.showTrackOptionsSheet(
                   context,
@@ -1108,6 +1095,11 @@ extension _ArtistScreenSections on _ArtistScreenState {
                       ],
                     ),
                   ),
+                  OnlinePlayButton(
+                    tracks: _topTracks ?? [track],
+                    index: rank - 1,
+                  ),
+                  OfflineDownloadButton(track: track),
                   TrackCollectionQuickActions(
                     track: track,
                     hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
@@ -1137,26 +1129,15 @@ extension _ArtistScreenSections on _ArtistScreenState {
     );
   }
 
-  void _handlePopularTrackTap(
-    Track track, {
-    required bool isQueued,
-    required bool isInHistory,
-    required bool isInLocalLibrary,
-  }) async {
-    if (isQueued) return;
-
-    final settings = ref.read(settingsProvider);
-    if (settings.allowQualityVariants && (isInHistory || isInLocalLibrary)) {
-      _downloadTrack(track);
-      return;
-    }
-
+  Future<void> _handlePopularTrackTap(Track track, int index) async {
     final playedLocal = await playLocalIfAvailable(context, ref, track);
-    if (playedLocal) {
-      return;
-    }
-
-    _downloadTrack(track);
+    if (playedLocal || !mounted) return;
+    await playOnlineQueue(
+      context,
+      ref,
+      _topTracks ?? [track],
+      startIndex: _topTracks == null ? 0 : index,
+    );
   }
 
   void _downloadTrack(Track track) {
