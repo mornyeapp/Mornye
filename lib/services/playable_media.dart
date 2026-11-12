@@ -57,7 +57,9 @@ class PlayableMedia {
 
   bool get isContentUri => source.startsWith('content://');
   bool get isNetwork =>
-      const {'network', 'http', 'https'}.contains(Uri.tryParse(source)?.scheme);
+      const {'network', 'http', 'https', 'mornye-online'}.contains(
+        Uri.tryParse(source)?.scheme,
+      );
 
   Map<String, dynamic> toJson() => {
     'id': id,
