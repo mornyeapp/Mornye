@@ -17,69 +17,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - name: Перекласти опис першого релізу українською
+      - name: Завантажити перевірений Mornye Play APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          cat > previous-release.md <<'NOTES'
-          ## Mornye Play v5.3.1 — Beta 1 (архівна версія)
-
-          Неофіційна модифікація Mornye з незалежним встановленням на Android ARM64.
-
-          ### Що змінено
-          - **Suggested songs:** ▶ для відтворення повної композиції, ↓ для завантаження, + для додавання до плейлиста.
-          - **Popular:** окремі кнопки ▶ та ↓ біля кожного треку.
-          - Короткі прев'ю замінено на відтворення повних композицій із доступного джерела.
-          - Збережено чергу, вибір якости й підтримку FLAC/Hi-Res за наявности відповідного джерела.
-
-          ### Установлення
-          Установіть APK і окремо ввімкніть розширення Qobuz Online v1.2.29, якщо використовуєте цей провайдер.
-
-          **Увага:** це архівна Beta 1 зі старим Android package ID. У новішій Beta 2 ідентифікатор змінено на `com.famous37.mornyeplay`, тому Android вважає їх різними застосунками. Перенесення даних між ними не відбувається автоматично.
-
-          Неофіційний застосунок; робота потоків і завантажень залежить від підтримуваного авторизованого провайдера. Частина функцій потребує перевірки на телефоні.
-
-          [Вихідний код](https://github.com/famous37/Mornye/tree/feature/mornye-play-standalone)
-          NOTES
-          gh release edit mornye-play-v5.3.1-beta.1 --repo "$GITHUB_REPOSITORY" --notes-file previous-release.md
-
-      - name: Знайти успішну збірку цього коміту й завантажити APK
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          run_id=''
-          for i in $(seq 1 50); do
-            runs=$(gh run list --repo "$GITHUB_REPOSITORY" \
-              --branch feature/mornye-play-standalone \
-              --limit 70 --json databaseId,headSha,name,status,conclusion)
-            run_id=$(printf '%s' "$runs" | jq -r --arg sha "$SOURCE_SHA" \
-              '[.[] | select(.headSha == $sha and .name == "Mornye Play standalone Android APK")] | first | .databaseId // empty')
-            if [ -n "$run_id" ]; then break; fi
-            sleep 12
-          done
-          test -n "$run_id"
-          echo "APK build run: $run_id; source commit: $SOURCE_SHA"
-          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status --interval 15
+          # Source commit 6055a718ab6394409f2c3e60d52d6643656de4b9 was
+          # successfully built and verified in workflow run 43297523551.
+          gh run watch 43297523551 --repo "$GITHUB_REPOSITORY" --exit-status --interval 15
           mkdir -p release
-          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
+          gh run download 43297523551 --repo "$GITHUB_REPOSITORY" \
             --name Mornye-Play-Standalone-ARM64-APK --dir release
           test -s release/Mornye_Play_v5.3.1_ARM64.apk
           test "$(stat -c %s release/Mornye_Play_v5.3.1_ARM64.apk)" -gt 20000000
           unzip -tq release/Mornye_Play_v5.3.1_ARM64.apk >/dev/null
-          # The build workflow verifies APK signing and the *real*
-          # com.famous37.mornyeplay application ID and Mornye Play launcher name.
 
       - name: Додати розширення й контрольні суми
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release download hifi-v5.3.1-beta.1 \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern 'Mornye_Qobuz_Online_v1.2.29.sflx' --dir release
+          mkdir -p extension-artifact
+          gh run download 43286702448 --repo "$GITHUB_REPOSITORY" \
+            --name Qobuz-Online-Experimental-sflx --dir extension-artifact
+          extension=$(find extension-artifact -type f -name '*.sflx' -print -quit)
+          test -n "$extension"
+          cp "$extension" release/Mornye_Qobuz_Online_v1.2.29.sflx
           test -s release/Mornye_Qobuz_Online_v1.2.29.sflx
           (cd release && sha256sum Mornye_Play_v5.3.1_ARM64.apk \
             Mornye_Qobuz_Online_v1.2.29.sflx > SHA256SUMS.txt)
@@ -128,7 +91,7 @@ jobs:
             release/Mornye_Qobuz_Online_v1.2.29.sflx \
             release/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
+            --target 6055a718ab6394409f2c3e60d52d6643656de4b9 \
             --title "Mornye Play v5.3.1 — Beta 2 (famous37)" \
             --notes-file notes.md \
             --prerelease
