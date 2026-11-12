@@ -10,6 +10,7 @@ on:
     paths:
       - 'lib/**'
       - '.github/workflows/mornye-play-android.yml'
+      - '.github/workflows/publish-mornye-play.yml'
       - 'scripts/**'
       - 'rust_backend/**'
       - 'android/**'
@@ -109,7 +110,7 @@ jobs:
           test -s "$apk"
           "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose "$apk"
           echo "Checking clone package ID, to prevent accidental replacement of official Mornye"
-          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$apk" | grep -F "package: name='com.drshlemko.mornyeplay'"
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$apk" | grep -F "package: name='com.famous37.mornyeplay'"
           "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$apk" | grep -F "application-label:'Mornye Play'"
           cp "$apk" Mornye_Play_v5.3.1_ARM64.apk
           sha256sum Mornye_Play_v5.3.1_ARM64.apk > Mornye-Play-APK.sha256
