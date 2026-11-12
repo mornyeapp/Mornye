@@ -23,7 +23,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/track_collection_action_policy.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
-import 'package:mornye/controllers/play_after_download.dart';
+import 'package:mornye/controllers/play_online.dart';
 
 class TrackCollectionQuickActions extends ConsumerWidget {
   final Track track;
@@ -180,8 +180,8 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
         ),
       ContextMenuAction(
         icon: Icons.play_circle_outline_rounded,
-        label: 'Play after download',
-        onSelected: () => playAfterDownload(root, ref, track),
+        label: 'Play online',
+        onSelected: () => playOnline(root, ref, track),
       ),
       ContextMenuAction(
         icon: Icons.download_outlined,
@@ -293,11 +293,11 @@ class _TrackOptionsSheet extends ConsumerWidget {
         quickActions: [
           MornyeMenuAction(
             icon: CupertinoIcons.play_circle_fill,
-            label: 'Play after download',
+            label: 'Play online',
             onPressed: () {
               final root = Navigator.of(context, rootNavigator: true).context;
               Navigator.pop(context);
-              playAfterDownload(root, ref, track);
+              playOnline(root, ref, track);
             },
           ),
           MornyeMenuAction(
@@ -504,11 +504,11 @@ class _TrackOptionsSheet extends ConsumerWidget {
 
               _OptionTile(
                 icon: Icons.play_circle_outline_rounded,
-                title: 'Play after download',
+                title: 'Play online',
                 onTap: () {
                   final root = Navigator.of(context, rootNavigator: true).context;
                   Navigator.pop(context);
-                  playAfterDownload(root, ref, track);
+                  playOnline(root, ref, track);
                 },
               ),
               if (qualityVariantAction == QualityVariantMenuAction.playLocal)
