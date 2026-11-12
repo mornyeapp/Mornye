@@ -53,11 +53,10 @@ jobs:
           run_id=''
           for i in $(seq 1 50); do
             runs=$(gh run list --repo "$GITHUB_REPOSITORY" \
-              --workflow 'Mornye Play standalone Android APK' \
               --branch feature/mornye-play-standalone \
-              --limit 30 --json databaseId,headSha,status,conclusion)
+              --limit 70 --json databaseId,headSha,name,status,conclusion)
             run_id=$(printf '%s' "$runs" | jq -r --arg sha "$SOURCE_SHA" \
-              '[.[] | select(.headSha == $sha)] | first | .databaseId // empty')
+              '[.[] | select(.headSha == $sha and .name == "Mornye Play standalone Android APK")] | first | .databaseId // empty')
             if [ -n "$run_id" ]; then break; fi
             sleep 12
           done
