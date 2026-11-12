@@ -1,0 +1,60 @@
+name: Format online player mod
+
+on:
+  push:
+    branches:
+      - feature/play-after-download
+    paths:
+      - '.github/workflows/format-online-mod.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feature/play-after-download
+          persist-credentials: true
+
+      - name: Setup pinned Flutter and Dart
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+          cache: true
+
+      - name: Format modified Dart files
+        run: |
+          dart format \
+            lib/controllers/online_stream_settings.dart \
+            lib/controllers/play_online.dart \
+            lib/services/music_player_service.dart \
+            lib/services/playable_media.dart \
+            lib/widgets/playback_source_label.dart \
+            lib/widgets/online_play_button.dart \
+            lib/widgets/track_list_tile.dart \
+            lib/widgets/collection_header_actions.dart \
+            lib/widgets/track_collection_quick_actions.dart \
+            lib/screens/album_screen.dart \
+            lib/screens/playlist_screen.dart \
+            test/online_stream_test.dart
+
+      - name: Commit only formatter changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- lib/controllers lib/services/music_player_service.dart lib/services/playable_media.dart \
+            lib/widgets/playback_source_label.dart lib/widgets/online_play_button.dart \
+            lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart \
+            lib/widgets/track_collection_quick_actions.dart lib/screens/album_screen.dart \
+            lib/screens/playlist_screen.dart test/online_stream_test.dart
+          if ! git diff --cached --quiet; then
+            git commit -m "style: apply Dart formatter to online streaming mod"
+            git push origin HEAD:feature/play-after-download
+          fi
