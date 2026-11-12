@@ -3,6 +3,7 @@ name: Mornye custom Android APK — Play after download
 on:
   push:
     branches:
+      - main
       - feature/play-after-download
     paths:
       - 'lib/**'
@@ -10,6 +11,9 @@ on:
       - 'scripts/**'
       - 'rust_backend/**'
       - 'android/**'
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
