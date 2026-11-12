@@ -1,15 +1,14 @@
 name: Format Hi-Fi listening mod
 
 on:
-  push:
-    branches:
-      - feature/hifi-listening-library
-    paths:
-      - '.github/workflows/format-online-mod.yml'
   pull_request:
     branches:
       - main
   workflow_dispatch:
+
+concurrency:
+  group: hifi-dart-format
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -61,6 +60,8 @@ jobs:
             lib/widgets/track_collection_quick_actions.dart lib/screens/album_screen.dart \
             lib/screens/playlist_screen.dart lib/screens/home_tab.dart lib/screens/home_tab_widgets.dart test/online_stream_test.dart
           if ! git diff --cached --quiet; then
-            git commit -m "style: apply Dart formatter to online streaming mod"
+            git commit -m "style: apply Dart formatter to Hi-Fi interface"
+            git fetch origin feature/hifi-listening-library
+            git rebase origin/feature/hifi-listening-library
             git push origin HEAD:feature/hifi-listening-library
           fi
