@@ -240,8 +240,8 @@ class _ExtensionDetailsScreenState
                         const SizedBox(width: 8),
                         const Expanded(
                           child: Text(
-                            'Custom online .sflx protected from official '
-                            'repository updates. Import your mod file to update.',
+                            'Modified online .sflx protected from automatic '
+                            'repository updates. Import a trusted .sflx to update.',
                           ),
                         ),
                       ],
