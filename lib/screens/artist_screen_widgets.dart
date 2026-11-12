@@ -1100,10 +1100,13 @@ extension _ArtistScreenSections on _ArtistScreenState {
                     index: rank - 1,
                   ),
                   OfflineDownloadButton(track: track),
-                  TrackCollectionQuickActions(
-                    track: track,
-                    hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
-                  ),
+                  // On phone, the options sheet stays on long-press:
+                  // show only the two useful quick actions (▶ and ↓).
+                  if (!context.isMornye)
+                    TrackCollectionQuickActions(
+                      track: track,
+                      hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
+                    ),
                 ],
               ),
             ),
