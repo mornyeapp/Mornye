@@ -3,6 +3,7 @@ import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/controllers/online_stream_settings.dart';
 import 'package:mornye/controllers/play_online.dart';
+import 'package:mornye/models/track.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -98,6 +99,53 @@ void main() {
         throwsA(isA<OnlineStreamVerificationRequired>()),
       );
       expect(attempts, 1);
+    });
+  });
+
+  group('multiple streaming providers', () {
+    test('uses the original service before cross-provider fallbacks', () {
+      expect(preferredOnlineProvider('Jellyfin'), 'jellyfin');
+      expect(preferredOnlineProvider('soundcloud'), 'soundcloud');
+      expect(preferredOnlineProvider('qobuz'), 'qobuz-web');
+      expect(preferredOnlineProvider('qobuz-web'), 'qobuz-web');
+      expect(preferredOnlineProvider('spotify-web'), isNull);
+      expect(preferredOnlineProvider(null), isNull);
+    });
+
+    test('original provider is included in lazy stream resolver request', () {
+      const track = Track(
+        id: '123456',
+        name: 'Test track',
+        artistName: 'Test artist',
+        albumName: 'Test album',
+        source: 'soundcloud',
+        duration: 180,
+      );
+      final request = onlineStreamRequest(track, OnlineStreamSettings.best);
+      expect(request['source'], 'soundcloud');
+      expect(request['id'], '123456');
+      expect(request['duration_ms'], 180000);
+    });
+
+    test('accepts HTTPS AAC and Jellyfin original, rejects HTTP', () {
+      expect(isFullOnlineStream({
+        'success': true,
+        'full_track': true,
+        'url': 'https://media.example.org/play.aac',
+        'format': 'aac',
+      }), isTrue);
+      expect(isFullOnlineStream({
+        'success': true,
+        'full_track': true,
+        'url': 'https://jellyfin.example.org/Items/uuid/Download?api_key=secret',
+        'format': 'flac',
+        'url_contains_credentials': true,
+      }), isTrue);
+      expect(isFullOnlineStream({
+        'success': true,
+        'full_track': true,
+        'url': 'http://jellyfin.example.org/Items/uuid/Download',
+      }), isFalse);
     });
   });
 
