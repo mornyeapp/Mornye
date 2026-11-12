@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/controllers/online_stream_settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/extension_provider.dart';
@@ -8,6 +9,15 @@ import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 
 const onlineStreamScheme = 'mornye-online';
+
+/// Raised only for the signed-session grant required by the extension.
+/// The stock Mornye grant flow opens the provider's actual auth URL.
+class OnlineStreamVerificationRequired implements Exception {
+  const OnlineStreamVerificationRequired();
+  @override
+  String toString() => 'VERIFY_REQUIRED';
+}
+
 
 Map<String, dynamic> onlineStreamRequest(Track track, String quality) => {
   'id': track.id,
@@ -122,10 +132,28 @@ Future<void> playOnlineQueue(
   final failures = <String>[];
   for (final extension in extensions) {
     try {
-      final result = await PlatformBridge.invokeExtensionAction(
-        extension.id,
-        'resolvePlaybackStream',
-        input: onlineStreamRequest(track, quality),
+      // The Qobuz extension may return {success:false,error:'VERIFY_REQUIRED'}
+      // instead of throwing. Convert that *specific* result into a verification
+      // request so the existing signed-session browser grant flow can complete.
+      // The helper retries exactly once after a successful grant.
+      final result = await runExtensionOperationWithVerificationRetry<
+        Map<String, dynamic>
+      >(
+        extensionId: extension.id,
+        browserMode: 'external_first',
+        operation: () async {
+          final response = await PlatformBridge.invokeExtensionAction(
+            extension.id,
+            'resolvePlaybackStream',
+            input: onlineStreamRequest(track, quality),
+          );
+          if (isExtensionVerificationRequired(
+            response['error']?.toString() ?? '',
+          )) {
+            throw const OnlineStreamVerificationRequired();
+          }
+          return response;
+        },
       );
       if (!isFullOnlineStream(result)) {
         failures.add(
@@ -151,6 +179,13 @@ Future<void> playOnlineQueue(
       await player.playAll(queue, initialIndex: startIndex);
       return;
     } catch (error) {
+      if (isExtensionVerificationRequired(error)) {
+        notify(
+          'Qobuz verification is required. Complete the browser '
+          'verification and try Play again.',
+        );
+        return;
+      }
       failures.add('${extension.displayName}: $error');
     }
   }
