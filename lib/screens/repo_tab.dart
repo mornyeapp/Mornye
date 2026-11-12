@@ -976,7 +976,14 @@ class _ExtensionItem extends StatelessWidget {
           ),
         ],
       ),
-      subtitle: extension.requiresNewerApp
+      subtitle: extension.updateProtected
+          ? Text(
+              'Custom online .sflx protected · update from a local file',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            )
+          : extension.requiresNewerApp
           ? Container(
               padding: tokens.badgePadding,
               decoration: BoxDecoration(
