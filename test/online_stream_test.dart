@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/controllers/online_stream_settings.dart';
 import 'package:mornye/controllers/play_online.dart';
@@ -54,6 +55,49 @@ void main() {
         }),
         isFalse,
       );
+    });
+  });
+
+  group('online signed-session verification', () {
+    test('VERIFY_REQUIRED starts grant flow and retries once', () async {
+      var attempts = 0;
+      var verifications = 0;
+      final result = await runExtensionOperationWithVerificationRetry<
+          Map<String, dynamic>>(
+        extensionId: 'qobuz-web',
+        browserMode: 'external_first',
+        verify: () async {
+          verifications++;
+          return true;
+        },
+        operation: () async {
+          attempts++;
+          if (attempts == 1) {
+            throw const OnlineStreamVerificationRequired();
+          }
+          return {'success': true, 'full_track': true};
+        },
+      );
+      expect(result['success'], isTrue);
+      expect(verifications, 1);
+      expect(attempts, 2);
+    });
+
+    test('unverified session never retries signed operation', () async {
+      var attempts = 0;
+      await expectLater(
+        runExtensionOperationWithVerificationRetry<Map<String, dynamic>>(
+          extensionId: 'qobuz-web',
+          browserMode: 'external_first',
+          verify: () async => false,
+          operation: () async {
+            attempts++;
+            throw const OnlineStreamVerificationRequired();
+          },
+        ),
+        throwsA(isA<OnlineStreamVerificationRequired>()),
+      );
+      expect(attempts, 1);
     });
   });
 
