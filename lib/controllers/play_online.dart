@@ -21,6 +21,7 @@ class OnlineStreamVerificationRequired implements Exception {
 
 Map<String, dynamic> onlineStreamRequest(Track track, String quality) => {
   'id': track.id,
+  'source': track.source ?? '',
   'title': track.name,
   'artist': track.artistName,
   'album': track.albumName,
@@ -28,6 +29,22 @@ Map<String, dynamic> onlineStreamRequest(Track track, String quality) => {
   'duration_ms': track.duration * 1000,
   'quality': quality,
 };
+
+/// Prefer the service the track was retrieved from, not the first extension
+/// in an arbitrary provider list. Other enabled sources remain fallbacks.
+String? preferredOnlineProvider(String? source) {
+  switch (source?.trim().toLowerCase()) {
+    case 'jellyfin':
+      return 'jellyfin';
+    case 'soundcloud':
+      return 'soundcloud';
+    case 'qobuz':
+    case 'qobuz-web':
+      return 'qobuz-web';
+    default:
+      return null;
+  }
+}
 
 bool isFullOnlineStream(Map<String, dynamic> result) {
   final uri = Uri.tryParse(result['url']?.toString().trim() ?? '');
@@ -47,13 +64,16 @@ PlayableMedia _item(
   int index, {
   Map<String, dynamic>? resolved,
 }) {
-  final source = resolved == null
+  // A self-hosted Jellyfin URL may contain an access token.
+  // Keep ONLY a resolver descriptor in persistent queues and media metadata.
+  final source = resolved == null || resolved['url_contains_credentials'] == true
       ? Uri(
           scheme: onlineStreamScheme,
           host: provider,
           pathSegments: [track.id],
           queryParameters: {
             'title': track.name,
+            'source': track.source ?? '',
             'artist': track.artistName,
             'album': track.albumName,
             'isrc': track.isrc ?? '',
@@ -76,7 +96,8 @@ PlayableMedia _item(
     artUri: normalizeArtUri(track.coverUrl ?? ''),
     duration: track.duration > 0 ? Duration(seconds: track.duration) : null,
     explicit: track.isExplicit,
-    format: 'FLAC',
+    // Do not claim FLAC when the provider actually serves AAC/MP3/Opus.
+    format: resolved?['format']?.toString().toUpperCase(),
     bitDepth: positive(resolved?['bit_depth']),
     sampleRate: positive(resolved?['sample_rate']),
     bitrate: positive(resolved?['bitrate']),
@@ -121,9 +142,16 @@ Future<void> playOnlineQueue(
         (extension) =>
             extension.enabled &&
             extension.capabilities['fullTrackStreaming'] == true,
-      );
+      )
+      .toList();
+  final preferred = preferredOnlineProvider(tracks[startIndex].source);
+  extensions.sort((a, b) {
+    final aRank = a.id == preferred ? 0 : 1;
+    final bRank = b.id == preferred ? 0 : 1;
+    return aRank.compareTo(bRank);
+  });
   if (extensions.isEmpty) {
-    notify('No streaming provider enabled. Enable Qobuz Online extension.');
+    notify('No streaming provider enabled. Enable a streaming extension.');
     return;
   }
 
@@ -161,11 +189,18 @@ Future<void> playOnlineQueue(
         );
         continue;
       }
+      final enabledProviderIds = extensions.map((e) => e.id).toSet();
       final queue = [
         for (var i = 0; i < tracks.length; i++)
           _item(
             tracks[i],
-            extension.id,
+            i == startIndex
+                ? extension.id
+                : (enabledProviderIds.contains(
+                      preferredOnlineProvider(tracks[i].source),
+                    )
+                    ? preferredOnlineProvider(tracks[i].source)!
+                    : extension.id),
             quality,
             i,
             resolved: i == startIndex ? result : null,
@@ -181,7 +216,7 @@ Future<void> playOnlineQueue(
     } catch (error) {
       if (isExtensionVerificationRequired(error)) {
         notify(
-          'Qobuz verification is required. Complete the browser '
+          'Provider verification is required. Complete the browser '
           'verification and try Play again.',
         );
         return;
