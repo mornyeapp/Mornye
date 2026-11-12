@@ -359,6 +359,8 @@ class _TrackItemWithStatus extends ConsumerWidget {
   /// A tap on a search song: skip a queued song, refuse a duplicate unless
   /// variants are allowed, otherwise download it. The desktop song table
   /// runs the same on a click, reading the queue and library itself.
+  /// A search-result tap plays the entire local track or full online stream.
+  /// Saving for offline use remains an explicit ↓ action.
   static Future<void> activate(
     BuildContext context,
     WidgetRef ref,
@@ -368,51 +370,9 @@ class _TrackItemWithStatus extends ConsumerWidget {
     required bool isInLocalLibrary,
     required void Function({bool forceQualityPicker}) onDownload,
   }) async {
-    if (isQueued) return;
-
-    final settings = ref.read(settingsProvider);
-    final allowExistingDownload =
-        settings.allowQualityVariants || !settings.deduplicateDownloads;
-
-    if (!allowExistingDownload && isInLocalLibrary) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10n.snackbarAlreadyInLibrary(track.name)),
-          ),
-        );
-      }
-      return;
-    }
-
-    if (!allowExistingDownload) {
-      final historyNotifier = ref.read(downloadHistoryProvider.notifier);
-      final historyItem = await historyNotifier.findExistingTrackAsync(
-        historyLookupForTrack(track),
-      );
-      if (historyItem != null) {
-        final exists = await fileExists(historyItem.filePath);
-        if (exists) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  context.l10n.snackbarAlreadyDownloaded(track.name),
-                ),
-              ),
-            );
-          }
-          return;
-        } else {
-          historyNotifier.removeFromHistory(historyItem.id);
-        }
-      }
-    }
-
-    onDownload(
-      forceQualityPicker:
-          settings.allowQualityVariants && (isInHistory || isInLocalLibrary),
-    );
+    final playedLocal = await playLocalIfAvailable(context, ref, track);
+    if (playedLocal || !context.mounted) return;
+    await playOnline(context, ref, track);
   }
 }
 
