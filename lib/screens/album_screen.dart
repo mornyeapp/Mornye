@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mornye/controllers/play_online.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/cover_palette.dart';
@@ -643,6 +644,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
           : CollectionHeaderActions(
               tracks: tracks,
               onLoveAll: () => loveAllTracks(this.context, ref, tracks),
+              onPlayOnline: () => playOnlineQueue(context, ref, tracks),
               downloadIcon: Icons.download,
               onDownloadAll: () => _downloadAll(context),
               addToPlaylistIcon: Icons.add,
@@ -752,6 +754,8 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
               index: index,
               child: TrackListTile(
                 track: track,
+                onlineTracks: tracks,
+                onlineIndex: index,
                 isInHistory: isInHistory,
                 onDownload: ({bool forceQualityPicker = false}) =>
                     _downloadTrack(
