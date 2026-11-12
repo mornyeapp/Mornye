@@ -71,6 +71,8 @@ import 'package:mornye/screens/extension_collection_screens.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/home_search_logic.dart';
 import 'package:mornye/controllers/track_history_snapshot.dart';
+import 'package:mornye/controllers/local_playback.dart';
+import 'package:mornye/controllers/play_online.dart';
 import 'package:mornye/services/csv_import_service.dart';
 import 'package:mornye/services/cover_download_service.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
