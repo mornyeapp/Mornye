@@ -1,0 +1,32 @@
+name: Verify online streaming session grant
+on:
+  push:
+    branches:
+      - feature/mornye-play-standalone
+    paths:
+      - '.github/workflows/test-online-verification.yml'
+      - 'test/online_stream_test.dart'
+      - 'lib/controllers/play_online.dart'
+      - 'lib/controllers/extension_auth_launcher.dart'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+          cache: true
+      - name: Configure pinned Flutter
+        run: dart scripts/prepare_flutter_sdk.dart
+      - name: Install test dependencies
+        run: flutter pub get
+      - name: Test stream validation, quality, and signed-session retry
+        run: flutter test test/online_stream_test.dart --reporter expanded
