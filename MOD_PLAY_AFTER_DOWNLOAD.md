@@ -87,3 +87,32 @@ unavailable, the app offers streaming service links instead.
 The experimental package reuses existing signed-session authentication and
 does not disable or bypass service authentication. Users must comply with
 their service's terms and content rights.
+
+## Playback features (experimental v2)
+
+- **Play online** appears inline beside each album and playlist track; the
+  collection header has a direct ▶ control for the complete album/playlist.
+- Normal tap starts the selected track. A **long press on the inline ▶**
+  opens a global stream quality picker and immediately restarts that track
+  using the new choice.
+- The default quality for new installs is `HI_RES_LOSSLESS` (highest offered
+  Qobuz tier). Alternatives: `HI_RES` and `LOSSLESS`. Selection persists
+  on the device.
+- Album and playlist playback uses one native player queue, with each
+  following track's signed HTTPS URL resolved only when that track starts.
+  Native skip/next and normal end-of-track transitions can advance the queue.
+- The player shows FLAC, provider-reported bit depth and sample rate.
+  A file-wide **average encoded kbps** estimate appears only if HTTP HEAD
+  exposes a trustworthy Content-Length and the track has a known duration.
+  FLAC's instantaneous bitrate varies; unavailable data is not fabricated.
+- These are **in-app network streams**; Mornye does not enqueue downloads or
+  save completed audio files. Ordinary decoder/network buffering may occur.
+
+### Limitations
+
+Only the experimental Qobuz extension currently supports the resolver in
+this fork. Changes must be installed **as a pair**: the new Lite APK and
+Qobuz (Experimental Online) v1.2.29 `.sflx`. Actual Android auto-advance,
+URL expiration, and average bitrate availability require on-device testing.
+The signed stream may stop if authentication or its expiration policy prevents
+refreshing the URL.
