@@ -22,17 +22,22 @@ class OnlinePlayButton extends ConsumerWidget {
     if (tracks.isEmpty || index < 0 || index >= tracks.length) {
       return const SizedBox.shrink();
     }
-    return Tooltip(
-      message: 'Play online · hold to choose quality',
-      child: GestureDetector(
+    return Semantics(
+      button: true,
+      label: 'Play online; hold to select quality',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: () => playOnlineQueue(
+          context, ref, tracks, startIndex: index,
+        ),
         onLongPress: () => chooseOnlineQuality(
           context, ref, tracks, startIndex: index,
         ),
-        child: IconButton(
-          icon: Icon(Icons.play_circle_outline_rounded, size: size),
-          tooltip: 'Play online',
-          onPressed: () => playOnlineQueue(
-            context, ref, tracks, startIndex: index,
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: Icon(Icons.play_circle_outline_rounded, size: size),
           ),
         ),
       ),
