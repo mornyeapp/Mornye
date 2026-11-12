@@ -1,9 +1,9 @@
-name: Format online player mod
+name: Format Hi-Fi listening mod
 
 on:
   push:
     branches:
-      - feature/play-after-download
+      - feature/hifi-listening-library
     paths:
       - '.github/workflows/format-online-mod.yml'
   pull_request:
@@ -22,7 +22,7 @@ jobs:
       - name: Checkout feature branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: feature/play-after-download
+          ref: feature/hifi-listening-library
           persist-credentials: true
 
       - name: Setup pinned Flutter and Dart
@@ -42,10 +42,13 @@ jobs:
             lib/widgets/playback_source_label.dart \
             lib/widgets/online_play_button.dart \
             lib/widgets/track_list_tile.dart \
+            lib/widgets/offline_download_button.dart \
             lib/widgets/collection_header_actions.dart \
             lib/widgets/track_collection_quick_actions.dart \
             lib/screens/album_screen.dart \
             lib/screens/playlist_screen.dart \
+            lib/screens/home_tab.dart \
+            lib/screens/home_tab_widgets.dart \
             test/online_stream_test.dart
 
       - name: Commit only formatter changes
@@ -54,10 +57,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- lib/controllers lib/services/music_player_service.dart lib/services/playable_media.dart \
             lib/widgets/playback_source_label.dart lib/widgets/online_play_button.dart \
-            lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart \
+            lib/widgets/track_list_tile.dart lib/widgets/offline_download_button.dart lib/widgets/collection_header_actions.dart \
             lib/widgets/track_collection_quick_actions.dart lib/screens/album_screen.dart \
-            lib/screens/playlist_screen.dart test/online_stream_test.dart
+            lib/screens/playlist_screen.dart lib/screens/home_tab.dart lib/screens/home_tab_widgets.dart test/online_stream_test.dart
           if ! git diff --cached --quiet; then
             git commit -m "style: apply Dart formatter to online streaming mod"
-            git push origin HEAD:feature/play-after-download
+            git push origin HEAD:feature/hifi-listening-library
           fi
