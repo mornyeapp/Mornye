@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/track.dart';
-import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
@@ -63,12 +62,6 @@ class TrackListTile extends ConsumerWidget {
     final playback = context.isMornye
         ? null
         : ref.watch(catalogTrackPlaybackUiProvider(catalogTrackKey(track)));
-
-    final isQueued = ref.watch(
-      downloadQueueLookupProvider.select(
-        (lookup) => lookup.byTrackId.containsKey(track.id),
-      ),
-    );
 
     final showLocalLibraryIndicator = ref.watch(
       settingsProvider.select(
@@ -144,7 +137,6 @@ class TrackListTile extends ConsumerWidget {
           : () => _handleTap(
               context,
               ref,
-              isQueued: isQueued,
               isInLocalLibrary: isInLocalLibrary,
             ),
       onLongPress: isSelectionMode
@@ -162,7 +154,6 @@ class TrackListTile extends ConsumerWidget {
   void _handleTap(
     BuildContext context,
     WidgetRef ref, {
-    required bool isQueued,
     required bool isInLocalLibrary,
   }) async {
     // A song-row tap now means PLAY, like a dedicated music player. Download
