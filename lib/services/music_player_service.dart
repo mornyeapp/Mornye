@@ -1196,6 +1196,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       final query = uri.queryParameters;
       final request = <String, dynamic>{
         'id': uri.pathSegments.first,
+        'source': query['source'] ?? '',
         'title': query['title'] ?? media.title,
         'artist': query['artist'] ?? media.artist,
         'album': query['album'] ?? media.album,
@@ -1232,10 +1233,17 @@ class MusicPlayerHandler extends BaseAudioHandler
             _media[_index].id == media.id) {
           final current = mediaItem.value;
           if (current?.id == media.id) {
+            // Token-bearing Jellyfin URLs are transient playback inputs.
+            // Never attach them to a media item or restoreable queue.
             final extras = <String, dynamic>{
               ...?current?.extras,
-              'resolvedSource': url,
+              if (result['url_contains_credentials'] != true)
+                'resolvedSource': url,
             };
+            final actualFormat = result['format']?.toString().trim();
+            if (actualFormat != null && actualFormat.isNotEmpty) {
+              extras['format'] = actualFormat.toUpperCase();
+            }
             for (final key in ['bit_depth', 'sample_rate', 'bitrate']) {
               final number = result[key];
               if (number is num && number > 0) {
