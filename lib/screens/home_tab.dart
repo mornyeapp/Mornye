@@ -95,6 +95,7 @@ import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
 import 'package:mornye/widgets/preview_button.dart';
+import 'package:mornye/widgets/offline_download_button.dart';
 import 'package:mornye/widgets/online_play_button.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
