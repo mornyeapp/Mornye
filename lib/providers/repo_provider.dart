@@ -201,29 +201,23 @@ class RepoNotifier extends Notifier<RepoState> {
     return const RepoState();
   }
 
-  /// Disabled manually installed online mods must remain protected too.
-  bool _blocksUpstreamPackage(String extensionId, String registryUrl) {
+  /// Pin only a manually installed Mornye Play online mod, regardless of
+  /// its origin or the currently configured extension repository.
+  bool _blocksModifiedSflx(String extensionId) {
     final installed = ref.read(extensionProvider).extensions;
     final matching = installed.where((ext) => ext.id == extensionId).firstOrNull;
-    return isOfficialRepoUpdateBlocked(
-      registryUrl: registryUrl,
+    return isModifiedSflxRepoUpdateBlocked(
       extensionId: extensionId,
       installedCapabilities: matching?.capabilities,
     );
   }
 
-  List<RepoExtension> _storeEntries(
-    List<Map<String, dynamic>> entries,
-    String registryUrl,
-  ) {
+  List<RepoExtension> _storeEntries(List<Map<String, dynamic>> entries) {
     return [
       for (final entry in entries)
         RepoExtension.fromJson({
           ...entry,
-          if (_blocksUpstreamPackage(
-            entry['id']?.toString() ?? '',
-            registryUrl,
-          ))
+          if (_blocksModifiedSflx(entry['id']?.toString() ?? ''))
             ...{'has_update': false, 'update_protected': true},
         }),
     ];
@@ -306,7 +300,7 @@ class RepoNotifier extends Notifier<RepoState> {
 
       state = state.copyWith(
         registryUrl: resolvedUrl,
-        extensions: _storeEntries(extensions, resolvedUrl),
+        extensions: _storeEntries(extensions),
         isLoading: false,
       );
 
@@ -358,7 +352,7 @@ class RepoNotifier extends Notifier<RepoState> {
         forceRefresh: forceRefresh,
       );
       state = state.copyWith(
-        extensions: _storeEntries(extensions, state.registryUrl),
+        extensions: _storeEntries(extensions),
         isLoading: false,
       );
       _log.d('Loaded ${state.extensions.length} extensions from store');
@@ -437,14 +431,14 @@ class RepoNotifier extends Notifier<RepoState> {
     );
 
     try {
-      // Check the active registry before each install/upgrade, even when
-      // triggered from a stale store tile or a direct notifier call.
-      final registryUrl = await PlatformBridge.getRepoRegistryUrl();
-      if (_blocksUpstreamPackage(extensionId, registryUrl)) {
+      // Protect installed, modified .sflx from ALL repository replacements,
+      // including a stale store button or a direct notifier action.
+      // Official, unmodified packages still update normally.
+      if (_blocksModifiedSflx(extensionId)) {
         const message =
-            'Protected online .sflx: official repository updates are blocked. '
-            'Import your own .sflx from Settings → Extensions instead.';
-        _log.w('Blocked official upstream $action for $extensionId');
+            'Custom online .sflx is pinned. Repository updates are disabled. '
+            'Import a trusted .sflx through Settings → Extensions to update it.';
+        _log.w('Blocked repository $action for modified .sflx $extensionId');
         state = state.copyWith(
           isDownloading: false,
           clearDownloadingId: true,
