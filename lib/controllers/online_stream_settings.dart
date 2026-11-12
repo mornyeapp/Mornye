@@ -6,10 +6,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 class OnlineStreamSettings {
   static const _key = 'online_stream_quality_v1';
   static const best = 'HI_RES_LOSSLESS';
+  // A universal chooser: source capabilities differ. Qobuz may offer FLAC;
+  // SoundCloud serves AAC, while Jellyfin can serve original or transcode.
   static const qualities = <String, String>{
-    best: 'Best available · up to 24-bit / 192 kHz',
-    'HI_RES': 'Hi-Res FLAC · prefer 24-bit',
-    'LOSSLESS': 'Lossless FLAC · 16-bit',
+    best: 'Best available · source-dependent',
+    'HI_RES': 'Prefer Hi-Res when offered',
+    'LOSSLESS': 'Prefer lossless when offered',
+    'ORIGINAL': 'Jellyfin · original file',
+    'MP3_320': 'Jellyfin · MP3 320 kbps',
+    'MP3_192': 'Jellyfin · MP3 192 kbps',
+    'OPUS_128': 'Jellyfin · Opus 128 kbps',
   };
 
   static Future<String> current() async {
@@ -44,7 +50,7 @@ class OnlineStreamSettings {
             const ListTile(
               title: Text('Online audio quality'),
               subtitle: Text(
-                'Applied to the next stream. Best available is the default.',
+                'Applied to the next stream. Actual formats depend on the provider.',
               ),
             ),
             for (final option in qualities.entries)
