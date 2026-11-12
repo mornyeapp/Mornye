@@ -6,6 +6,9 @@ on:
       - feature/play-after-download
     paths:
       - '.github/workflows/format-online-mod.yml'
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
