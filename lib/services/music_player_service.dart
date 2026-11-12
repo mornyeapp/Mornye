@@ -1190,8 +1190,20 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (media.source.startsWith('mornye-online://')) {
       final uri = Uri.tryParse(media.source);
       final provider = uri?.host ?? '';
-      final request = media.displayMetadata['online_request'];
-      if (provider.isEmpty || request is! Map) return null;
+      if (provider.isEmpty || uri == null || uri.pathSegments.isEmpty) {
+        return null;
+      }
+      final query = uri.queryParameters;
+      final request = <String, dynamic>{
+        'id': uri.pathSegments.first,
+        'title': query['title'] ?? media.title,
+        'artist': query['artist'] ?? media.artist,
+        'album': query['album'] ?? media.album,
+        'isrc': query['isrc'] ?? '',
+        'duration_ms': int.tryParse(query['duration_ms'] ?? '') ??
+            (media.duration?.inMilliseconds ?? 0),
+        'quality': query['quality'] ?? 'HI_RES_LOSSLESS',
+      };
       try {
         final result = await PlatformBridge.invokeExtensionAction(
           provider,
