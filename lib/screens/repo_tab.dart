@@ -978,7 +978,7 @@ class _ExtensionItem extends StatelessWidget {
       ),
       subtitle: extension.updateProtected
           ? Text(
-              'Custom online .sflx protected · update from a local file',
+              'Modified .sflx pinned · manual updates only',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
