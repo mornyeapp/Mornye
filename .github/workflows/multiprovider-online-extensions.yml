@@ -1,0 +1,66 @@
+name: Build Mornye Play multi-provider online extensions
+
+on:
+  push:
+    branches:
+      - feature/mornye-play-multiprovider
+    paths:
+      - 'scripts/patch_extra_streaming_extensions.py'
+      - '.github/workflows/multiprovider-online-extensions.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Mornye Play fork
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkout upstream open source extensions
+        run: git clone --depth=1 https://github.com/mornyeapp/Mornye-Extension.git build/extension-registry
+
+      - name: Add authorized Jellyfin and public SoundCloud playback resolvers
+        run: python3 scripts/patch_extra_streaming_extensions.py build/extension-registry
+
+      - name: Validate JavaScript and manifest capabilities
+        run: |
+          set -euo pipefail
+          node --check build/extension-registry/sources/jellyfin/index.js
+          node --check build/extension-registry/sources/soundcloud/index.js
+          python3 - <<'PY'
+          import json, pathlib
+          root = pathlib.Path('build/extension-registry/sources')
+          for name, ver in [('jellyfin','1.1.2'), ('soundcloud','1.0.15')]:
+              manifest = json.loads((root / name / 'manifest.json').read_text())
+              source = (root / name / 'index.js').read_text()
+              assert manifest['version'] == ver
+              assert manifest['capabilities']['fullTrackStreaming'] is True
+              assert 'resolvePlaybackStream: resolvePlaybackStream' in source
+          print('Both extension resolvers and manifests validated')
+          PY
+
+      - name: Build verified SFLX extension packages
+        run: |
+          set -euo pipefail
+          cd build/extension-registry
+          for provider in jellyfin soundcloud; do
+            python3 scripts/build_packages.py "$provider"
+            test -s "extensions/$provider.sflx"
+            python3 scripts/build_packages.py --check "$provider"
+          done
+          sha256sum extensions/jellyfin.sflx extensions/soundcloud.sflx > multi-stream-SHA256SUMS.txt
+
+      - name: Upload both streaming provider extensions
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Mornye-Play-Jellyfin-SoundCloud-Online-SFLX
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            build/extension-registry/extensions/jellyfin.sflx
+            build/extension-registry/extensions/soundcloud.sflx
+            build/extension-registry/multi-stream-SHA256SUMS.txt
