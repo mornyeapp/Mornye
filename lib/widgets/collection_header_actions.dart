@@ -59,15 +59,15 @@ class CollectionHeaderActions extends StatelessWidget {
     );
     final play = onPlayOnline == null
         ? null
-        : HeaderCircleButton(
-            icon: Icons.play_circle_fill_rounded,
-            tonal: true,
-            tooltip: 'Play album / playlist online',
+        : HeaderFilledButton(
+            icon: Icons.play_arrow_rounded,
+            tonal: false,
+            label: 'Play',
             onPressed: enabled ? onPlayOnline : null,
           );
     final download = HeaderFilledButton(
       icon: mornye ? CupertinoIcons.arrow_down_circle_fill : downloadIcon,
-      tonal: tonalDownload,
+      tonal: onPlayOnline != null ? true : tonalDownload,
       label: mornye
           ? context.l10n.dialogDownload
           : context.l10n.downloadAllCount(tracks.length),
@@ -93,7 +93,12 @@ class CollectionHeaderActions extends StatelessWidget {
           love,
           const SizedBox(width: 8),
           if (play != null) ...[play, const SizedBox(width: 8)],
-          Flexible(child: SizedBox(width: 144, child: download)),
+          Flexible(
+            child: SizedBox(
+              width: play == null ? 176 : 120,
+              child: download,
+            ),
+          ),
           const SizedBox(width: 8),
           addToPlaylist,
         ],
