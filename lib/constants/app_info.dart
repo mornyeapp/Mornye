@@ -19,7 +19,7 @@ class AppInfo {
   static String versionLabel({bool debug = kDebugMode}) =>
       debug ? 'Internal' : version;
 
-  static const String appName = 'Mornye';
+  static const String appName = 'Mornye Play';
   static const String license = 'LGPL-3.0-only';
   static const String copyright = '© 2026 Zarz Eleutherius';
 
