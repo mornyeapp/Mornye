@@ -59,3 +59,31 @@ release key. Keep a stable key backup before installing future updates:
 Building an APK doesn't guarantee provider account permissions, reliable
 track matching, or successful online playback on every phone. Device
 testing is still required.
+
+## Experimental direct Qobuz FLAC streaming
+
+The GitHub workflow `.github/workflows/qobuz-online-extension.yml`
+builds `Qobuz-Online-Experimental-sflx` from the public Qobuz source in
+`mornyeapp/Mornye-Extension` and applies
+`scripts/patch_qobuz_online_extension.py`.
+
+1. Build and install the **modified Mornye APK**.
+2. Download the `Qobuz-Online-Experimental-sflx` GitHub Actions artifact,
+   extract `qobuz-web.sflx`, and install/update it as a local extension in
+   Mornye's extension management UI.
+3. Enable that experimental Qobuz extension.
+4. Select **Play online** on a track; the extension resolves a verified Qobuz
+   track match, retrieves the signed HTTPS FLAC URL, and hands the URL to the
+   internal Mornye network player without using Mornye's download queue.
+
+This is **experimental and not validated on a device**. The signed URL may
+expire or be inaccessible to Android's player because the normal downloader
+uses a custom user-agent. Some provider URLs contain previews, despite being
+returned by the full-track download resolver; unlike the normal download
+pipeline, this mod does not download the file to validate duration. Full
+track playback is therefore **not guaranteed**. If direct streaming is
+unavailable, the app offers streaming service links instead.
+
+The experimental package reuses existing signed-session authentication and
+does not disable or bypass service authentication. Users must comply with
+their service's terms and content rights.
