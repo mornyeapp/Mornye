@@ -1,10 +1,11 @@
-name: Mornye custom Android APK — Play online
+name: Mornye Hi-Fi Android APK
 
 on:
   push:
     branches:
       - main
       - feature/play-after-download
+      - feature/hifi-listening-library
     paths:
       - 'lib/**'
       - '.github/workflows/mornye-play-android.yml'
@@ -74,10 +75,10 @@ jobs:
         run: |
           flutter pub get
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
-          dart format lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart
+          dart format lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart lib/screens/home_tab_widgets.dart
 
       - name: Analyze new Dart controller and menu
-        run: dart analyze lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart
+        run: dart analyze lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart
 
       - name: Configure optional private release signing
         env:
