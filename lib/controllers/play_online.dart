@@ -38,7 +38,19 @@ PlayableMedia _item(
   Map<String, dynamic>? resolved,
 }) {
   final source = resolved == null
-      ? Uri(scheme: onlineStreamScheme, host: provider, pathSegments: [track.id]).toString()
+      ? Uri(
+          scheme: onlineStreamScheme,
+          host: provider,
+          pathSegments: [track.id],
+          queryParameters: {
+            'title': track.name,
+            'artist': track.artistName,
+            'album': track.albumName,
+            'isrc': track.isrc ?? '',
+            'duration_ms': '${track.duration * 1000}',
+            'quality': quality,
+          },
+        ).toString()
       : resolved['url'].toString();
   int? positive(Object? value) {
     final number = value is num ? value.toInt() : int.tryParse('$value');
