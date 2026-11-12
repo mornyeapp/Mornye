@@ -11,7 +11,8 @@ import 'package:mornye/controllers/local_playback.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
-import 'package:mornye/widgets/preview_button.dart';
+import 'package:mornye/widgets/offline_download_button.dart';
+import 'package:mornye/controllers/play_online.dart';
 import 'package:mornye/widgets/online_play_button.dart';
 import 'package:mornye/widgets/track_collection_quick_actions.dart';
 
@@ -126,7 +127,12 @@ class TrackListTile extends ConsumerWidget {
               tracks: onlineTracks ?? [track],
               index: onlineIndex ?? 0,
             ),
-          PreviewButton(track: track),
+          if (!isSelectionMode)
+            OfflineDownloadButton(
+              track: track,
+              onDownload: () => onDownload(),
+              onChooseQuality: () => onDownload(forceQualityPicker: true),
+            ),
           TrackCollectionQuickActions(
             track: track,
             hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
@@ -159,20 +165,17 @@ class TrackListTile extends ConsumerWidget {
     required bool isQueued,
     required bool isInLocalLibrary,
   }) async {
-    if (isQueued) return;
-
-    final settings = ref.read(settingsProvider);
-    if (settings.allowQualityVariants && (isInHistory || isInLocalLibrary)) {
-      onDownload(forceQualityPicker: true);
-      return;
-    }
-
+    // A song-row tap now means PLAY, like a dedicated music player. Download
+    // is an explicit button; streaming never silently saves a track.
     final playedLocal = await playLocalIfAvailable(context, ref, track);
-    if (playedLocal) {
-      return;
-    }
-
-    onDownload();
+    if (playedLocal) return;
+    if (!context.mounted) return;
+    await playOnlineQueue(
+      context,
+      ref,
+      onlineTracks ?? <Track>[track],
+      startIndex: onlineIndex ?? 0,
+    );
   }
 
   /// What a tap on the row does, for the desktop song table: offers another
