@@ -1,4 +1,4 @@
-name: Mornye Hi-Fi Android APK
+name: Mornye Play standalone Android APK
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - main
       - feature/play-after-download
       - feature/hifi-listening-library
+      - feature/mornye-play-standalone
     paths:
       - 'lib/**'
       - '.github/workflows/mornye-play-android.yml'
@@ -75,10 +76,10 @@ jobs:
         run: |
           flutter pub get
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
-          dart format lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart lib/screens/home_tab_widgets.dart
+          dart format lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart lib/screens/home_tab_widgets.dart lib/widgets/collection_suggestions_section.dart lib/screens/artist_screen.dart lib/screens/artist_screen_widgets.dart lib/widgets/preview_button.dart
 
       - name: Analyze new Dart controller and menu
-        run: dart analyze lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart
+        run: dart analyze lib/controllers/play_online.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart lib/widgets/collection_suggestions_section.dart lib/screens/artist_screen.dart lib/widgets/preview_button.dart
 
       - name: Configure optional private release signing
         env:
@@ -107,14 +108,18 @@ jobs:
           apk=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           test -s "$apk"
           "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose "$apk"
-          sha256sum "$apk" > Mornye-Play-APK.sha256
+          echo "Checking clone package ID, to prevent accidental replacement of official Mornye"
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$apk" | grep -F "package: name='com.drshlemko.mornyeplay'"
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$apk" | grep -F "application-label:'Mornye Play'"
+          cp "$apk" Mornye_Play_v5.3.1_ARM64.apk
+          sha256sum Mornye_Play_v5.3.1_ARM64.apk > Mornye-Play-APK.sha256
 
       - name: Upload installable APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Mornye-Online-ARM64-APK
+          name: Mornye-Play-Standalone-ARM64-APK
           retention-days: 30
           if-no-files-found: error
           path: |
-            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            Mornye_Play_v5.3.1_ARM64.apk
             Mornye-Play-APK.sha256
