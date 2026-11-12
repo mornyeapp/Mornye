@@ -27,10 +27,12 @@ A GitHub Actions workflow lives in
 `feature/play-after-download`. It builds a Lite arm64 APK using Mornye's
 pinned Flutter/Rust/Android toolchain.
 
-- In the repo, open **Actions → Mornye custom Android APK — Play after download**
-  and enable workflows if GitHub asks.
-- Choose **Run workflow** on `feature/play-after-download`, or push a change
-  to that branch.
+- In the repo, open **Actions** and enable workflows if GitHub asks.
+- Opening a pull request from `feature/play-after-download` into `main`,
+  or pushing a source change to the feature branch, triggers the build
+  when GitHub Actions is enabled.
+- **Run workflow** also becomes available after this workflow file is
+  merged into the default branch (`main`).
 - When the job succeeds, open its **Artifacts** and download
   `Mornye-Play-ARM64-APK`; extract
   `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`.
