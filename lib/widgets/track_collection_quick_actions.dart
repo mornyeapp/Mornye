@@ -23,6 +23,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/track_collection_action_policy.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
+import 'package:mornye/controllers/play_online.dart';
 
 class TrackCollectionQuickActions extends ConsumerWidget {
   final Track track;
@@ -178,6 +179,11 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
           },
         ),
       ContextMenuAction(
+        icon: Icons.play_circle_outline_rounded,
+        label: 'Play online',
+        onSelected: () => playOnline(root, ref, track),
+      ),
+      ContextMenuAction(
         icon: Icons.download_outlined,
         label: l10n.dialogDownload,
         onSelected: () => downloadSingleTrack(root, ref, track),
@@ -285,6 +291,15 @@ class _TrackOptionsSheet extends ConsumerWidget {
       final l10n = context.l10n;
       return MornyeContextMenu(
         quickActions: [
+          MornyeMenuAction(
+            icon: CupertinoIcons.play_circle_fill,
+            label: 'Play online',
+            onPressed: () {
+              final root = Navigator.of(context, rootNavigator: true).context;
+              Navigator.pop(context);
+              playOnline(root, ref, track);
+            },
+          ),
           MornyeMenuAction(
             icon: CupertinoIcons.arrow_down_circle_fill,
             label: l10n.dialogDownload,
@@ -487,6 +502,18 @@ class _TrackOptionsSheet extends ConsumerWidget {
                   color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                 ),
 
+              _OptionTile(
+                icon: Icons.play_circle_outline_rounded,
+                title: 'Play online',
+                onTap: () {
+                  final root = Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).context;
+                  Navigator.pop(context);
+                  playOnline(root, ref, track);
+                },
+              ),
               if (qualityVariantAction == QualityVariantMenuAction.playLocal)
                 _OptionTile(
                   icon: Icons.play_arrow_rounded,

@@ -1,0 +1,114 @@
+name: Publish Mornye Play Ukrainian Beta 2
+
+on:
+  push:
+    branches:
+      - feature/mornye-play-standalone
+    paths:
+      - '.github/workflows/publish-mornye-play.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Завантажити перевірений Mornye Play APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Source commit 6055a718ab6394409f2c3e60d52d6643656de4b9 was
+          # successfully built and verified in workflow run 43297523551.
+          gh run watch 43297523551 --repo "$GITHUB_REPOSITORY" --exit-status --interval 15
+          mkdir -p release
+          gh run download 43297523551 --repo "$GITHUB_REPOSITORY" \
+            --name Mornye-Play-Standalone-ARM64-APK --dir release
+          test -s release/Mornye_Play_v5.3.1_ARM64.apk
+          test "$(stat -c %s release/Mornye_Play_v5.3.1_ARM64.apk)" -gt 20000000
+          unzip -tq release/Mornye_Play_v5.3.1_ARM64.apk >/dev/null
+
+      - name: Додати розширення й контрольні суми
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p extension-artifact
+          gh run download 43286702448 --repo "$GITHUB_REPOSITORY" \
+            --name Qobuz-Online-Experimental-sflx --dir extension-artifact
+          extension=$(find extension-artifact -type f -name '*.sflx' -print -quit)
+          test -n "$extension"
+          cp "$extension" release/Mornye_Qobuz_Online_v1.2.29.sflx
+          test -s release/Mornye_Qobuz_Online_v1.2.29.sflx
+          (cd release && sha256sum Mornye_Play_v5.3.1_ARM64.apk \
+            Mornye_Qobuz_Online_v1.2.29.sflx > SHA256SUMS.txt)
+
+      - name: Підготувати український опис Beta 2
+        run: |
+          cat > notes.md <<'NOTES'
+          ## Mornye Play v5.3.1 — Beta 2
+
+          **Mornye Play** — окрема неофіційна версія музичного застосунку Mornye для Android. Можна встановити **поруч з офіційним Mornye**.
+
+          **Ідентифікатор застосунку:** `com.famous37.mornyeplay`
+
+          ### Що нового
+          - **Suggested songs:** ▶ відтворює повну композицію замість короткого прев'ю, ↓ завантажує трек, + додає до плейлиста.
+          - **Popular:** кнопки ▶ та ↓ безпосередньо біля пісень; натискання на назву запускає відтворення.
+          - Інші старі кнопки прев'ю переведено на повне відтворення через локальну бібліотеку або підтримуваний онлайн-потік.
+          - У головному розділі, пошуку, альбомах і плейлистах доступні окремі ▶ та ↓.
+          - Вибір якости відтворення — довге натискання ▶, якости завантаження — довге натискання ↓.
+          - Збережено FLAC/Hi-Res, чергу, автоматичний перехід між треками та відображення технічних параметрів, якщо вони доступні.
+
+          ### Установлення
+          1. Завантажте й установіть **Mornye_Play_v5.3.1_ARM64.apk** на Android ARM64.
+          2. У новому застосунку встановіть і ввімкніть **Mornye_Qobuz_Online_v1.2.29.sflx**, якщо користуєтеся цим джерелом.
+          3. Для офлайн-завантаження налаштуйте підтримуваний авторизований провайдер.
+
+          **Важливо:** Beta 1 мала інший Android package ID, тому Beta 2 не оновлює її поверх і не переносить її дані автоматично. Надалі для оновлень знадобиться постійний ключ підпису APK.
+
+          **Beta:** збірка й цифровий підпис перевірені автоматично; онлайн-відтворення, переходи між треками та завантаження потребують випробування на пристрої. Доступність контенту й Hi-Res залежить від прав і можливостей провайдера. Модифікація не є офіційним застосунком Qobuz.
+
+          [Вихідний код](https://github.com/famous37/Mornye/tree/feature/mornye-play-standalone) · [Зміни](https://github.com/famous37/Mornye/pull/4)
+          NOTES
+
+      - name: Створити тег Beta 2 окремо від Release API
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=mornye-play-v5.3.1-beta.2
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "Тег уже існує"
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$tag" \
+              -f sha="6055a718ab6394409f2c3e60d52d6643656de4b9"
+          fi
+
+      - name: Опублікувати новий Beta 2 з правильним Android ID
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=mornye-play-v5.3.1-beta.2
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release already exists; refusing to overwrite."
+            exit 1
+          fi
+          gh release create "$tag" \
+            release/Mornye_Play_v5.3.1_ARM64.apk \
+            release/Mornye_Qobuz_Online_v1.2.29.sflx \
+            release/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "Mornye Play v5.3.1 — Beta 2 (famous37)" \
+            --notes-file notes.md \
+            --prerelease
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" \
+            --json name,url,assets,isPrerelease \
+            --jq '{name,url,isPrerelease,assets:[.assets[].name]}'

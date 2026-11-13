@@ -11,7 +11,9 @@ import 'package:mornye/controllers/local_playback.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
-import 'package:mornye/widgets/preview_button.dart';
+import 'package:mornye/widgets/offline_download_button.dart';
+import 'package:mornye/controllers/play_online.dart';
+import 'package:mornye/widgets/online_play_button.dart';
 import 'package:mornye/widgets/track_collection_quick_actions.dart';
 
 /// Track row shared by the album and playlist screens. Tap offers another
@@ -21,6 +23,8 @@ import 'package:mornye/widgets/track_collection_quick_actions.dart';
 /// ...) and choose whether the artist name links to the artist screen.
 class TrackListTile extends ConsumerWidget {
   final Track track;
+  final List<Track>? onlineTracks;
+  final int? onlineIndex;
   final bool isInHistory;
   final void Function({bool forceQualityPicker}) onDownload;
   final Widget leading;
@@ -37,6 +41,8 @@ class TrackListTile extends ConsumerWidget {
   const TrackListTile({
     super.key,
     required this.track,
+    this.onlineTracks,
+    this.onlineIndex,
     required this.isInHistory,
     required this.onDownload,
     required this.leading,
@@ -57,12 +63,6 @@ class TrackListTile extends ConsumerWidget {
     final playback = context.isMornye
         ? null
         : ref.watch(catalogTrackPlaybackUiProvider(catalogTrackKey(track)));
-
-    final isQueued = ref.watch(
-      downloadQueueLookupProvider.select(
-        (lookup) => lookup.byTrackId.containsKey(track.id),
-      ),
-    );
 
     final showLocalLibraryIndicator = ref.watch(
       settingsProvider.select(
@@ -116,7 +116,17 @@ class TrackListTile extends ConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          PreviewButton(track: track),
+          if (!isSelectionMode)
+            OnlinePlayButton(
+              tracks: onlineTracks ?? [track],
+              index: onlineIndex ?? 0,
+            ),
+          if (!isSelectionMode)
+            OfflineDownloadButton(
+              track: track,
+              onDownload: () => onDownload(),
+              onChooseQuality: () => onDownload(forceQualityPicker: true),
+            ),
           TrackCollectionQuickActions(
             track: track,
             hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
@@ -125,12 +135,7 @@ class TrackListTile extends ConsumerWidget {
       ),
       onTap: isSelectionMode
           ? onToggleSelection
-          : () => _handleTap(
-              context,
-              ref,
-              isQueued: isQueued,
-              isInLocalLibrary: isInLocalLibrary,
-            ),
+          : () => _handleTap(context, ref, isInLocalLibrary: isInLocalLibrary),
       onLongPress: isSelectionMode
           ? null
           : onEnterSelectionMode ??
@@ -146,23 +151,19 @@ class TrackListTile extends ConsumerWidget {
   void _handleTap(
     BuildContext context,
     WidgetRef ref, {
-    required bool isQueued,
     required bool isInLocalLibrary,
   }) async {
-    if (isQueued) return;
-
-    final settings = ref.read(settingsProvider);
-    if (settings.allowQualityVariants && (isInHistory || isInLocalLibrary)) {
-      onDownload(forceQualityPicker: true);
-      return;
-    }
-
+    // A song-row tap now means PLAY, like a dedicated music player. Download
+    // is an explicit button; streaming never silently saves a track.
     final playedLocal = await playLocalIfAvailable(context, ref, track);
-    if (playedLocal) {
-      return;
-    }
-
-    onDownload();
+    if (playedLocal) return;
+    if (!context.mounted) return;
+    await playOnlineQueue(
+      context,
+      ref,
+      onlineTracks ?? <Track>[track],
+      startIndex: onlineIndex ?? 0,
+    );
   }
 
   /// What a tap on the row does, for the desktop song table: offers another

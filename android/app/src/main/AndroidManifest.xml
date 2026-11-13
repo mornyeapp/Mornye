@@ -36,8 +36,8 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <application
-        android:label="Mornye"
-        android:name=".MornyeApplication"
+        android:label="Mornye Play"
+        android:name="com.zarz.mornye.MornyeApplication"
         android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/tv_banner"
         android:allowBackup="false"
@@ -54,12 +54,12 @@
         <service android:name="com.discord.socialsdk.ForegroundService" tools:node="remove" />
         <activity android:name="com.discord.socialsdk.AuthenticationActivity" tools:node="remove" />
         <activity
-            android:name=".AudioOutputActivity"
+            android:name="com.zarz.mornye.AudioOutputActivity"
             android:exported="false"
             android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <activity
-            android:name=".MainActivity"
+            android:name="com.zarz.mornye.MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:theme="@style/LaunchTheme"
@@ -156,7 +156,7 @@
         </activity>
 
         <receiver
-            android:name=".PlayerWidgetProvider"
+            android:name="com.zarz.mornye.PlayerWidgetProvider"
             android:label="@string/player_widget_name"
             android:exported="false">
             <intent-filter>
@@ -167,7 +167,7 @@
                 android:resource="@xml/widget_player_info" />
         </receiver>
         <activity
-            android:name=".PlayerWidgetConfigurationActivity"
+            android:name="com.zarz.mornye.PlayerWidgetConfigurationActivity"
             android:exported="true"
             android:theme="@style/WidgetConfigTheme">
             <intent-filter>
@@ -176,24 +176,24 @@
         </activity>
 
         <service
-            android:name=".DownloadService"
+            android:name="com.zarz.mornye.DownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
         <!-- Library scans and app update downloads with the screen off -->
         <service
-            android:name=".BackgroundWorkService"
+            android:name="com.zarz.mornye.BackgroundWorkService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
         <service
-            android:name=".LinkConnectionService"
+            android:name="com.zarz.mornye.LinkConnectionService"
             android:exported="false"
             android:stopWithTask="true"
             android:foregroundServiceType="connectedDevice" />
 
         <receiver
-            android:name=".DownloadQueueWidgetProvider"
+            android:name="com.zarz.mornye.DownloadQueueWidgetProvider"
             android:label="@string/download_widget_name"
             android:exported="false">
             <intent-filter>
@@ -255,7 +255,7 @@
              hold a permission, so it is exported and serves read-only cover
              files of the app's cover folders (see CoverProviderFiles). -->
         <provider
-            android:name=".CoverContentProvider"
+            android:name="com.zarz.mornye.CoverContentProvider"
             android:authorities="${applicationId}.covers"
             android:exported="true"
             android:grantUriPermissions="false" />

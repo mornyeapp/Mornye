@@ -333,7 +333,8 @@ class _TrackItemWithStatus extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  PreviewButton(track: track),
+                  OnlinePlayButton(tracks: [track], index: 0),
+                  OfflineDownloadButton(track: track),
                   TrackCollectionQuickActions(
                     track: track,
                     hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
@@ -358,6 +359,8 @@ class _TrackItemWithStatus extends ConsumerWidget {
   /// A tap on a search song: skip a queued song, refuse a duplicate unless
   /// variants are allowed, otherwise download it. The desktop song table
   /// runs the same on a click, reading the queue and library itself.
+  /// A search-result tap plays the entire local track or full online stream.
+  /// Saving for offline use remains an explicit ↓ action.
   static Future<void> activate(
     BuildContext context,
     WidgetRef ref,
@@ -367,51 +370,9 @@ class _TrackItemWithStatus extends ConsumerWidget {
     required bool isInLocalLibrary,
     required void Function({bool forceQualityPicker}) onDownload,
   }) async {
-    if (isQueued) return;
-
-    final settings = ref.read(settingsProvider);
-    final allowExistingDownload =
-        settings.allowQualityVariants || !settings.deduplicateDownloads;
-
-    if (!allowExistingDownload && isInLocalLibrary) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10n.snackbarAlreadyInLibrary(track.name)),
-          ),
-        );
-      }
-      return;
-    }
-
-    if (!allowExistingDownload) {
-      final historyNotifier = ref.read(downloadHistoryProvider.notifier);
-      final historyItem = await historyNotifier.findExistingTrackAsync(
-        historyLookupForTrack(track),
-      );
-      if (historyItem != null) {
-        final exists = await fileExists(historyItem.filePath);
-        if (exists) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  context.l10n.snackbarAlreadyDownloaded(track.name),
-                ),
-              ),
-            );
-          }
-          return;
-        } else {
-          historyNotifier.removeFromHistory(historyItem.id);
-        }
-      }
-    }
-
-    onDownload(
-      forceQualityPicker:
-          settings.allowQualityVariants && (isInHistory || isInLocalLibrary),
-    );
+    final playedLocal = await playLocalIfAvailable(context, ref, track);
+    if (playedLocal || !context.mounted) return;
+    await playOnline(context, ref, track);
   }
 }
 
@@ -514,9 +475,8 @@ class _CollectionItemWidget extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         subtitleOf(context, item),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -711,9 +671,8 @@ class _QuickPicksPageViewState extends State<_QuickPicksPageView> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             widget.section.title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
         ),
         SizedBox(
@@ -829,9 +788,8 @@ class _QuickPicksPageViewState extends State<_QuickPicksPageView> {
                     explicit: item.explicit == true,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: widget.colorScheme.onSurface,
-                    ),
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: widget.colorScheme.onSurface),
                   ),
                   if (item.artists.isNotEmpty)
                     ClickableArtistName(

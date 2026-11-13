@@ -231,6 +231,23 @@ class _ExtensionDetailsScreenState
                   ],
                 ),
 
+                if (ext.updateProtected)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.lock_outline, size: 18),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Modified online .sflx protected from automatic '
+                            'repository updates. Import a trusted .sflx to update.',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 const SizedBox(height: 24),
 
                 if (isDownloading)

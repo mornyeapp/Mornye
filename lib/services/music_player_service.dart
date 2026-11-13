@@ -1185,6 +1185,80 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   Future<String?> _resolveSource(PlayableMedia media) async {
+    // Catalog queue items are lazily resolved when they actually start, not
+    // when the album opens. This avoids storing/downloads and expired URLs.
+    if (media.source.startsWith('mornye-online://')) {
+      final uri = Uri.tryParse(media.source);
+      final provider = uri?.host ?? '';
+      if (provider.isEmpty || uri == null || uri.pathSegments.isEmpty) {
+        return null;
+      }
+      final query = uri.queryParameters;
+      final request = <String, dynamic>{
+        'id': uri.pathSegments.first,
+        'source': query['source'] ?? '',
+        'title': query['title'] ?? media.title,
+        'artist': query['artist'] ?? media.artist,
+        'album': query['album'] ?? media.album,
+        'isrc': query['isrc'] ?? '',
+        'duration_ms':
+            int.tryParse(query['duration_ms'] ?? '') ??
+            (media.duration?.inMilliseconds ?? 0),
+        'quality': query['quality'] ?? 'HI_RES_LOSSLESS',
+      };
+      try {
+        final result = await PlatformBridge.invokeExtensionAction(
+          provider,
+          'resolvePlaybackStream',
+          input: Map<String, dynamic>.from(request),
+        );
+        final url = result['url']?.toString().trim() ?? '';
+        final parsed = Uri.tryParse(url);
+        if (result['success'] == false ||
+            result['full_track'] != true ||
+            result['encrypted'] == true ||
+            result['requires_headers'] == true ||
+            parsed?.scheme != 'https' ||
+            parsed?.host.isEmpty != false) {
+          _log.w(
+            'Online stream provider did not return playable full audio: '
+            '${result['error'] ?? 'unavailable'}',
+          );
+          return null;
+        }
+        // Add verified technical data for the *current* item only; metadata
+        // must not be inferred from the requested quality.
+        if (_index >= 0 &&
+            _index < _media.length &&
+            _media[_index].id == media.id) {
+          final current = mediaItem.value;
+          if (current?.id == media.id) {
+            // Token-bearing Jellyfin URLs are transient playback inputs.
+            // Never attach them to a media item or restoreable queue.
+            final extras = <String, dynamic>{
+              ...?current?.extras,
+              if (result['url_contains_credentials'] != true)
+                'resolvedSource': url,
+            };
+            final actualFormat = result['format']?.toString().trim();
+            if (actualFormat != null && actualFormat.isNotEmpty) {
+              extras['format'] = actualFormat.toUpperCase();
+            }
+            for (final key in ['bit_depth', 'sample_rate', 'bitrate']) {
+              final number = result[key];
+              if (number is num && number > 0) {
+                extras[key] = number.toInt();
+              }
+            }
+            mediaItem.add(current!.copyWith(extras: extras));
+          }
+        }
+        return url;
+      } catch (error) {
+        _log.w('Online stream resolution failed for $provider: $error');
+        return null;
+      }
+    }
     if (_dependencies.sourceDeletionEvents.isDeleting(media.source)) {
       return null;
     }

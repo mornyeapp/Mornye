@@ -1,0 +1,87 @@
+name: Publish Mornye Hi-Fi Beta Release
+
+on:
+  push:
+    branches:
+      - feature/hifi-listening-library
+    paths:
+      - '.github/workflows/publish-hifi-release.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Retrieve successful signed APK and extension artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p downloads/apk downloads/extension release
+          gh run download 43280647026 --repo "$GITHUB_REPOSITORY" --name Mornye-Online-ARM64-APK --dir downloads/apk
+          gh run download 43280646887 --repo "$GITHUB_REPOSITORY" --name Qobuz-Online-Experimental-sflx --dir downloads/extension
+          apk=$(find downloads/apk -type f -name '*.apk' -print -quit)
+          ext=$(find downloads/extension -type f -name '*.sflx' -print -quit)
+          test -n "$apk"
+          test -n "$ext"
+          test "$(stat -c %s "$apk")" -gt 20000000
+          unzip -tq "$apk" >/dev/null
+          cp "$apk" release/Mornye_HiFi_Mod_v5.3.1_Qobuz_Online_ARM64.apk
+          cp "$ext" release/Mornye_Qobuz_Online_v1.2.29.sflx
+          cd release
+          sha256sum *.apk *.sflx > SHA256SUMS.txt
+          ls -lah
+
+      - name: Write release notes
+        run: |
+          cat > notes.md <<'NOTES'
+          ## Mornye Hi-Fi Mod v5.3.1 — Qobuz Online (Beta)
+
+          Неофициальная модификация Mornye с интерфейсом для онлайн-прослушивания и сохранения музыки офлайн.
+
+          ### Что изменилось
+          - Отдельные кнопки **▶ Play** и **↓ Download** для композиций, альбомов и плейлистов.
+          - Нажатие на композицию запускает воспроизведение вместо автоматического скачивания.
+          - Для доступных локальных файлов используется офлайн-воспроизведение; иначе — онлайн-поток.
+          - Выбор качества онлайн-воспроизведения долгим нажатием ▶.
+          - Выбор качества скачивания долгим нажатием ↓.
+          - Максимальная доступная Hi-Res FLAC по умолчанию, с возможностью выбора другого качества.
+          - Автоматическое переключение треков и очередь воспроизведения.
+          - Отображение параметров потока и среднего битрейта, если доступны достоверные данные.
+          - Сохранены штатная медиатека, плейлисты, фоновое воспроизведение и система скачивания.
+
+          ### Установка
+          1. Скачайте и установите **Mornye_HiFi_Mod_v5.3.1_Qobuz_Online_ARM64.apk**.
+          2. Установите и включите расширение **Mornye_Qobuz_Online_v1.2.29.sflx**.
+          3. Выберите трек или альбом и используйте ▶ для воспроизведения или ↓ для сохранения в офлайн-библиотеке (при поддержке вашим провайдером).
+
+          **Важно:** экспериментальная Beta-версия. Требуется проверка на устройстве. Доступность полного потока, Hi-Res и офлайн-загрузок зависит от авторизованного музыкального провайдера. Мод не является официальным приложением Qobuz; платные и защищённые возможности сервиса не обходятся.
+
+          **Совместимость:** Android ARM64; на сборке без приватного ключа релиз подписывается тестовым ключом. Перед переустановкой сохраните данные: установка поверх приложения с другой подписью невозможна.
+
+          [Исходный код](https://github.com/famous37/Mornye/tree/feature/hifi-listening-library) · [Изменения](https://github.com/famous37/Mornye/pull/3)
+          NOTES
+
+      - name: Publish beta release and assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag='hifi-v5.3.1-beta.1'
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release $tag already exists, refusing to overwrite."
+            exit 1
+          fi
+          gh release create "$tag" release/Mornye_HiFi_Mod_v5.3.1_Qobuz_Online_ARM64.apk release/Mornye_Qobuz_Online_v1.2.29.sflx release/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target a0b10b5ca4fdf417bf1203dbdb4a7fb6143665a5 \
+            --title "Mornye Hi-Fi Mod v5.3.1 — Qobuz Online (Beta 1)" \
+            --notes-file notes.md \
+            --prerelease
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json name,url,assets,isPrerelease \
+            --jq '{name,url,isPrerelease,assets:[.assets[].name]}'

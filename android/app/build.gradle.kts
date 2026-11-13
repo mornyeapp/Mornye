@@ -101,7 +101,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.zarz.mornye"
+        // Independent install ID: official Mornye remains installed alongside this mod.
+        applicationId = "com.famous37.mornyeplay"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = flutter.minSdkVersion
         targetSdk = 37

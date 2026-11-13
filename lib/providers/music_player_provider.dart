@@ -35,11 +35,12 @@ final playerUiEnabledProvider = Provider<bool>((ref) {
     return true;
   }
   return ref.watch(
-    localMediaItemProvider.select(
-      (state) =>
-          state.value?.extras?['source']?.toString().startsWith('network://') ??
-          false,
-    ),
+    localMediaItemProvider.select((state) {
+      final source = state.value?.extras?['source']?.toString() ?? '';
+      return source.startsWith('network://') ||
+          source.startsWith('https://') ||
+          source.startsWith('http://');
+    }),
   );
 });
 

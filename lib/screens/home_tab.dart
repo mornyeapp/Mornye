@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -70,6 +71,8 @@ import 'package:mornye/screens/extension_collection_screens.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/home_search_logic.dart';
 import 'package:mornye/controllers/track_history_snapshot.dart';
+import 'package:mornye/controllers/local_playback.dart';
+import 'package:mornye/controllers/play_online.dart';
 import 'package:mornye/services/csv_import_service.dart';
 import 'package:mornye/services/cover_download_service.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
@@ -95,6 +98,8 @@ import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
 import 'package:mornye/widgets/preview_button.dart';
+import 'package:mornye/widgets/offline_download_button.dart';
+import 'package:mornye/widgets/online_play_button.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
 import 'package:mornye/widgets/view_queue_snackbar_action.dart';
@@ -1060,9 +1065,8 @@ class _HomeTabState extends ConsumerState<HomeTab>
             ?.displayName ??
         context.l10n.librarySourceOnline;
     // Equal segments, each hugging the longer label.
-    final labelStyle = Theme.of(
-      context,
-    ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
+    final labelStyle = Theme.of(context).textTheme.bodyMedium
+        ?.copyWith(fontWeight: FontWeight.w600);
     double labelWidth(String label) {
       final painter = TextPainter(
         text: TextSpan(text: label, style: labelStyle),
@@ -1542,9 +1546,8 @@ class _HomeTabState extends ConsumerState<HomeTab>
                 Text(
                   context.l10n.homeEmptySubtitle,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
                 ),
               ],
             ),

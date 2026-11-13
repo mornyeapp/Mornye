@@ -56,8 +56,12 @@ class PlayableMedia {
       networkArtworkSource ?? (CoverStore.fetches(artUri) ? artUri : null);
 
   bool get isContentUri => source.startsWith('content://');
-  bool get isNetwork =>
-      const {'network', 'http', 'https'}.contains(Uri.tryParse(source)?.scheme);
+  bool get isNetwork => const {
+    'network',
+    'http',
+    'https',
+    'mornye-online',
+  }.contains(Uri.tryParse(source)?.scheme);
 
   Map<String, dynamic> toJson() => {
     'id': id,

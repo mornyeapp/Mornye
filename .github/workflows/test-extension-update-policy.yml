@@ -1,0 +1,38 @@
+name: Protect Mornye Play custom extensions
+
+on:
+  push:
+    branches:
+      - feature/mornye-play-multiprovider
+    paths:
+      - 'lib/services/extension_update_policy.dart'
+      - 'lib/providers/repo_provider.dart'
+      - 'lib/screens/repo_tab.dart'
+      - 'lib/screens/repo/extension_details_screen.dart'
+      - 'test/extension_update_policy_test.dart'
+      - '.github/workflows/test-extension-update-policy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-protected-extensions:
+    name: Analyze and test protected online .sflx
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+          cache: true
+      - name: Prepare Flutter
+        run: dart scripts/prepare_flutter_sdk.dart
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze official-repository update guard and UI
+        run: dart analyze lib/services/extension_update_policy.dart lib/providers/repo_provider.dart lib/screens/repo_tab.dart lib/screens/repo/extension_details_screen.dart
+      - name: Test protected and normal extension update policies
+        run: flutter test test/extension_update_policy_test.dart --reporter expanded

@@ -13,14 +13,16 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
-import 'package:mornye/widgets/preview_button.dart';
+import 'package:mornye/widgets/online_play_button.dart';
+import 'package:mornye/widgets/offline_download_button.dart';
+import 'package:mornye/controllers/play_online.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/track_collection_quick_actions.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
-import 'package:mornye/widgets/track_list_tile.dart';
 
-/// Songs like an album's, single's or playlist's under it, each with a
-/// preview, an add button and a tap that downloads it. Phones list them as
+/// Full-length suggestions with separate Play and Download controls.
+/// Song title taps start streaming; downloads require the explicit ↓ button.
+/// Phones list them as
 /// rows, desktop in the song table the page uses. Shows nothing while
 /// loading, without a source extension, or when nothing new was found: the
 /// section is a bonus below the collection, not part of it.
@@ -159,28 +161,34 @@ class _CollectionSuggestionsSliverState
             isInHistory: List.filled(tracks.length, false),
             selectedIds: _selectedIds,
             onSelect: (id, _, _) => setState(() => _selectedIds = {id}),
-            onActivate: (index) => TrackListTile.activate(
+            onActivate: (index) => playOnlineQueue(
               context,
               ref,
-              tracks[index],
-              isInHistory: false,
-              onDownload: ({bool forceQualityPicker = false}) => _download(
-                tracks[index],
-                forceQualityPicker: forceQualityPicker,
-              ),
+              tracks,
+              startIndex: index,
             ),
             showArtwork: true,
             showAlbum: true,
-            showPreview: true,
-            rowAction: (index) => AppIconButton(
-              icon: const AppIcon.adaptive(Icons.add_circle_outline, size: 20),
-              tooltip: addTooltip,
-              onPressed: () => _add(tracks[index]),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              style: IconButton.styleFrom(
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
+            showPreview: false,
+            rowAction: (index) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                OnlinePlayButton(tracks: tracks, index: index, size: 20),
+                OfflineDownloadButton(track: tracks[index]),
+                AppIconButton(
+                  icon: const AppIcon.adaptive(
+                    Icons.add_circle_outline,
+                    size: 20,
+                  ),
+                  tooltip: addTooltip,
+                  onPressed: () => _add(tracks[index]),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -191,10 +199,12 @@ class _CollectionSuggestionsSliverState
       sliver: SliverList.list(
         children: [
           header,
-          for (final track in tracks)
+          for (final (index, track) in tracks.indexed)
             _SuggestionRow(
               key: ValueKey('suggestion:${track.source}:${track.id}'),
               track: track,
+              tracks: tracks,
+              index: index,
               addTooltip: addTooltip,
               onAdd: () => _add(track),
               onDownload: () => _download(track),
@@ -256,12 +266,16 @@ class _SuggestionRow extends ConsumerWidget {
   const _SuggestionRow({
     super.key,
     required this.track,
+    required this.tracks,
+    required this.index,
     required this.addTooltip,
     required this.onAdd,
     required this.onDownload,
   });
 
   final Track track;
+  final List<Track> tracks;
+  final int index;
   final String addTooltip;
   final VoidCallback onAdd;
   final VoidCallback onDownload;
@@ -294,7 +308,8 @@ class _SuggestionRow extends ConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          PreviewButton(track: track),
+          OnlinePlayButton(tracks: tracks, index: index),
+          OfflineDownloadButton(track: track, onDownload: onDownload),
           AppIconButton(
             icon: const AppIcon.adaptive(Icons.add_circle_outline),
             tooltip: addTooltip,
@@ -302,7 +317,7 @@ class _SuggestionRow extends ConsumerWidget {
           ),
         ],
       ),
-      onTap: onDownload,
+      onTap: () => playOnlineQueue(context, ref, tracks, startIndex: index),
       onLongPress: () => TrackCollectionQuickActions.showTrackOptionsSheet(
         context,
         ref,

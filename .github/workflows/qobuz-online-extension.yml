@@ -1,0 +1,48 @@
+name: Experimental Qobuz Play Online extension
+
+on:
+  push:
+    branches:
+      - feature/play-after-download
+    paths:
+      - 'scripts/patch_qobuz_online_extension.py'
+      - '.github/workflows/qobuz-online-extension.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-qobuz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download original open-source extension registry
+        run: git clone --depth=1 https://github.com/mornyeapp/Mornye-Extension.git build/extension-registry
+
+      - name: Add full-track HTTPS URL resolver to Qobuz extension
+        run: python3 scripts/patch_qobuz_online_extension.py build/extension-registry
+
+      - name: Check JavaScript syntax and package extension
+        run: |
+          node --check build/extension-registry/sources/qobuz-web/index.js
+          cd build/extension-registry
+          python3 scripts/build_packages.py qobuz-web
+          test -s extensions/qobuz-web.sflx
+          python3 scripts/build_packages.py --check qobuz-web
+          sha256sum extensions/qobuz-web.sflx > qobuz-online.sha256
+
+      - name: Upload modified Qobuz extension
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Qobuz-Online-Experimental-sflx
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            build/extension-registry/extensions/qobuz-web.sflx
+            build/extension-registry/qobuz-online.sha256

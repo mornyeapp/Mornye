@@ -976,7 +976,14 @@ class _ExtensionItem extends StatelessWidget {
           ),
         ],
       ),
-      subtitle: extension.requiresNewerApp
+      subtitle: extension.updateProtected
+          ? Text(
+              'Modified .sflx pinned · manual updates only',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            )
+          : extension.requiresNewerApp
           ? Container(
               padding: tokens.badgePadding,
               decoration: BoxDecoration(

@@ -17,6 +17,7 @@ class CollectionHeaderActions extends StatelessWidget {
     super.key,
     required this.tracks,
     required this.onLoveAll,
+    this.onPlayOnline,
     required this.downloadIcon,
     required this.onDownloadAll,
     required this.addToPlaylistIcon,
@@ -26,6 +27,7 @@ class CollectionHeaderActions extends StatelessWidget {
 
   final List<Track> tracks;
   final VoidCallback onLoveAll;
+  final VoidCallback? onPlayOnline;
 
   /// The Material download glyph; Mornye uses its filled arrow.
   final IconData downloadIcon;
@@ -55,9 +57,17 @@ class CollectionHeaderActions extends StatelessWidget {
         );
       },
     );
+    final play = onPlayOnline == null
+        ? null
+        : HeaderFilledButton(
+            icon: Icons.play_arrow_rounded,
+            tonal: false,
+            label: 'Play',
+            onPressed: enabled ? onPlayOnline : null,
+          );
     final download = HeaderFilledButton(
       icon: mornye ? CupertinoIcons.arrow_down_circle_fill : downloadIcon,
-      tonal: tonalDownload,
+      tonal: onPlayOnline != null ? true : tonalDownload,
       label: mornye
           ? context.l10n.dialogDownload
           : context.l10n.downloadAllCount(tracks.length),
@@ -73,7 +83,7 @@ class CollectionHeaderActions extends StatelessWidget {
       return Row(
         mainAxisSize: MainAxisSize.min,
         spacing: 10,
-        children: [love, download, addToPlaylist],
+        children: [love, if (play != null) play, download, addToPlaylist],
       );
     }
     if (mornye) {
@@ -81,16 +91,19 @@ class CollectionHeaderActions extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           love,
-          const SizedBox(width: 16),
-          Flexible(child: SizedBox(width: 172, child: download)),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
+          if (play != null) ...[play, const SizedBox(width: 8)],
+          Flexible(
+            child: SizedBox(width: play == null ? 176 : 120, child: download),
+          ),
+          const SizedBox(width: 8),
           addToPlaylist,
         ],
       );
     }
     return ExpressiveButtonGroup(
-      flexible: const {1},
-      children: [love, download, addToPlaylist],
+      flexible: play == null ? const {1} : const {2},
+      children: [love, if (play != null) play, download, addToPlaylist],
     );
   }
 }

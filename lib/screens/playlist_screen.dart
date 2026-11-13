@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mornye/controllers/play_online.dart';
 import 'package:mornye/controllers/track_history_snapshot.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/collection_header_actions.dart';
@@ -376,6 +377,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       actions: CollectionHeaderActions(
         tracks: _tracks,
         onLoveAll: () => loveAllTracks(this.context, ref, _tracks),
+        onPlayOnline: () => playOnlineQueue(context, ref, _tracks),
         downloadIcon: Icons.download_rounded,
         tonalDownload: true,
         onDownloadAll: () => confirmDownloadAllDialog(
@@ -491,6 +493,8 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
               index: index,
               child: TrackListTile(
                 track: track,
+                onlineTracks: _tracks,
+                onlineIndex: index,
                 isInHistory: isInHistory,
                 isSelectionMode: isSelectionMode,
                 isSelected: selectedIds.contains(selectionId),
@@ -520,9 +524,9 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHighest,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(

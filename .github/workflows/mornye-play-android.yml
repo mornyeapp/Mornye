@@ -1,0 +1,130 @@
+name: Mornye Play standalone Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - feature/play-after-download
+      - feature/hifi-listening-library
+      - feature/mornye-play-standalone
+      - feature/mornye-play-multiprovider
+    paths:
+      - 'lib/**'
+      - '.github/workflows/mornye-play-android.yml'
+      - '.github/workflows/publish-mornye-play.yml'
+      - 'scripts/**'
+      - 'rust_backend/**'
+      - 'android/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mornye-play-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-arm64:
+    name: Build custom arm64 APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MORNYE_DISCORD_SDK: '0'
+      MORNYE_RUST_ANDROID_ABIS: arm64-v8a
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Java 25
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Setup pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+          cache: true
+
+      - name: Patch pinned Flutter framework
+        run: dart scripts/prepare_flutter_sdk.dart
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          gradle-version: '9.8.2'
+
+      - name: Install Android SDK and native dependencies
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "ndk;30.0.16248370" \
+            "platforms;android-37.0" \
+            "build-tools;37.0.0" \
+            "cmake;4.1.2"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/30.0.16248370" >> "$GITHUB_ENV"
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev ffmpeg
+          (cd rust_backend && rustup show)
+
+      - name: Prepare application
+        run: |
+          flutter pub get
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+          dart format lib/controllers/play_online.dart lib/controllers/online_stream_settings.dart lib/services/music_player_service.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart lib/screens/home_tab_widgets.dart lib/widgets/collection_suggestions_section.dart lib/screens/artist_screen.dart lib/screens/artist_screen_widgets.dart lib/widgets/preview_button.dart
+
+      - name: Analyze new Dart controller and menu
+        run: dart analyze lib/controllers/play_online.dart lib/controllers/online_stream_settings.dart lib/services/music_player_service.dart lib/widgets/track_collection_quick_actions.dart lib/widgets/offline_download_button.dart lib/widgets/track_list_tile.dart lib/widgets/collection_header_actions.dart lib/screens/home_tab.dart lib/widgets/collection_suggestions_section.dart lib/screens/artist_screen.dart lib/widgets/preview_button.dart
+
+      - name: Run multi-provider streaming unit tests
+        run: flutter test test/online_stream_test.dart test/extension_update_policy_test.dart --reporter expanded
+
+      - name: Configure optional private release signing
+        env:
+          MOD_KEYSTORE_BASE64: ${{ secrets.MOD_KEYSTORE_BASE64 }}
+          MOD_KEY_ALIAS: ${{ secrets.MOD_KEY_ALIAS }}
+          MOD_KEY_PASSWORD: ${{ secrets.MOD_KEY_PASSWORD }}
+          MOD_KEYSTORE_PASSWORD: ${{ secrets.MOD_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$MOD_KEYSTORE_BASE64" ]; then
+            test -n "$MOD_KEY_ALIAS"
+            test -n "$MOD_KEY_PASSWORD"
+            test -n "$MOD_KEYSTORE_PASSWORD"
+            printf '%s' "$MOD_KEYSTORE_BASE64" | base64 --decode > android/app/mornye-mod-release.jks
+            printf 'storeFile=mornye-mod-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "$MOD_KEYSTORE_PASSWORD" "$MOD_KEY_ALIAS" "$MOD_KEY_PASSWORD" > android/key.properties
+            echo "Using user-provided signing key from repository secrets"
+          else
+            echo "No private signing secrets configured; Gradle's test/debug signing will be used."
+          fi
+
+      - name: Build Mornye Lite APK (arm64)
+        run: bash scripts/build_android.sh --lite --target lib/main.dart
+
+      - name: Verify APK and Android signing
+        run: |
+          apk=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose "$apk"
+          echo "Checking clone package ID, to prevent accidental replacement of official Mornye"
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$apk" | grep -F "package: name='com.famous37.mornyeplay'"
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$apk" | grep -F "application-label:'Mornye Play'"
+          cp "$apk" Mornye_Play_v5.3.1_ARM64.apk
+          sha256sum Mornye_Play_v5.3.1_ARM64.apk > Mornye-Play-APK.sha256
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Mornye-Play-Standalone-ARM64-APK
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            Mornye_Play_v5.3.1_ARM64.apk
+            Mornye-Play-APK.sha256
