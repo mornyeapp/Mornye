@@ -64,7 +64,7 @@ extern "C" JNIEXPORT void JNICALL JNI_METHOD(nativeUpdate)(
 #ifdef MORNYE_DISCORD_SDK
     if (!client) return;
     discordpp::Activity activity;
-    activity.SetName("Mornye");
+    activity.SetName(utf8(env, artist));
     activity.SetType(discordpp::ActivityTypes::Listening);
     activity.SetDetails(utf8(env, title));
     activity.SetState(utf8(env, artist));

@@ -121,7 +121,7 @@
         result(nil);
     } else if ([call.method isEqualToString:@"update"]) {
         discordpp::Activity activity;
-        activity.SetName("Mornye");
+        activity.SetName([args[@"state"] UTF8String]);
         activity.SetType(discordpp::ActivityTypes::Listening);
         activity.SetDetails([args[@"title"] UTF8String]);
         activity.SetState([args[@"state"] UTF8String]);
