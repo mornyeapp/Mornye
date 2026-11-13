@@ -34,6 +34,7 @@ void _check(DownloadQueueState state) {
   );
   expect(actual.itemIds, expected.itemIds);
   expect(actual.notCompletedItemIds, expected.notCompletedItemIds);
+  expect(actual.activeItemIds, expected.activeItemIds);
   expect(actual.queuedCount, expected.queuedCount);
   expect(actual.completedCount, expected.completedCount);
   expect(actual.failedCount, expected.failedCount);
