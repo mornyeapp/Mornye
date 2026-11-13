@@ -39,13 +39,17 @@ class _Queue extends DownloadQueueNotifier {
   final cancelled = <String>[];
 
   @override
-  DownloadQueueState build() => DownloadQueueState(items: _items);
+  DownloadQueueState build() =>
+      const DownloadQueueState().copyWith(items: _items);
 
   @override
   void cancelItem(String id) => cancelled.add(id);
 
   void replace(List<DownloadItem> items) =>
-      state = DownloadQueueState(items: items);
+      state = state.copyWith(items: items);
+
+  void update(int index, DownloadItem item) =>
+      state = state.withItemReplacements({index: item});
 }
 
 DownloadItem _download(
@@ -525,6 +529,94 @@ void main() {
       expect(requested, mornye ? isEmpty : [ShellTab.library]);
       expect(links, mornye ? ['downloads'] : isEmpty);
       expect(popover, findsNothing);
+    });
+
+    testWidgets('$style downloads popover builds only visible rows', (
+      tester,
+    ) async {
+      await setWindow(tester, 1200);
+      final queue = _Queue([
+        for (var i = 0; i < 200; i++)
+          _download('$i', 'Waiting song $i', DownloadStatus.queued),
+      ]);
+      await tester.pumpWidget(
+        app(
+          mornye: mornye,
+          overrides: [downloadQueueProvider.overrideWith(() => queue)],
+          home: const Scaffold(body: Center(child: DesktopDownloadsButton())),
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('desktop-downloads-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Waiting song 0'), findsOneWidget);
+      expect(find.byType(PlayerArtwork).evaluate().length, lessThan(20));
+      expect(find.text('Waiting song 49'), findsNothing);
+      final list = find.byKey(const ValueKey('desktop-downloads-list'));
+      await tester.drag(list, const Offset(0, -4000));
+      await tester.pumpAndSettle();
+      expect(find.text('Waiting song 49'), findsOneWidget);
+      expect(find.text('Waiting song 50'), findsNothing);
+      expect(find.byType(PlayerArtwork).evaluate().length, lessThan(20));
+      expect(
+        find.byKey(const ValueKey('desktop-downloads-show-all')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('$style progress updates keep unrelated download rows', (
+      tester,
+    ) async {
+      await setWindow(tester, 1200);
+      final running = _download(
+        'a',
+        'Running song',
+        DownloadStatus.downloading,
+        progress: 0.4,
+      );
+      final queue = _Queue([
+        running,
+        _download('b', 'Waiting song', DownloadStatus.queued),
+      ]);
+      await tester.pumpWidget(
+        app(
+          mornye: mornye,
+          overrides: [downloadQueueProvider.overrideWith(() => queue)],
+          home: const Scaffold(body: Center(child: DesktopDownloadsButton())),
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('desktop-downloads-button')));
+      await tester.pumpAndSettle();
+      final waitingTitle = tester.widget<Text>(find.text('Waiting song'));
+      final list = tester.widget<ListView>(
+        find.byKey(const ValueKey('desktop-downloads-list')),
+      );
+
+      queue.update(0, running.copyWith(progress: 0.7));
+      await tester.pump();
+      expect(find.textContaining('70%'), findsOneWidget);
+      expect(tester.widget(find.text('Waiting song')), same(waitingTitle));
+      expect(
+        tester.widget(find.byKey(const ValueKey('desktop-downloads-list'))),
+        same(list),
+      );
+
+      queue.update(0, running.copyWith(status: DownloadStatus.completed));
+      await tester.pumpAndSettle();
+      expect(find.text('Running song'), findsNothing);
+      expect(find.text('Waiting song'), findsOneWidget);
+      queue.replace([]);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('desktop-downloads-list')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('desktop-downloads-show-all')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('$style downloads button rebuilds only for its ring', (
