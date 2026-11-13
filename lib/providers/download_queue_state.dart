@@ -338,6 +338,10 @@ class DownloadQueueLookup {
   final Map<String, int> indexByItemId;
   final List<String> itemIds;
   final List<String> notCompletedItemIds;
+
+  /// Waiting, downloading and finalizing rows, in queue order. Progress-only
+  /// snapshots share this list so panels can watch membership separately.
+  final List<String> activeItemIds;
   final int queuedCount;
   final int completedCount;
   final int failedCount;
@@ -360,6 +364,7 @@ class DownloadQueueLookup {
       indexByItemId = const {},
       itemIds = const [],
       notCompletedItemIds = const [],
+      activeItemIds = const [],
       queuedCount = 0,
       completedCount = 0,
       failedCount = 0,
@@ -377,6 +382,7 @@ class DownloadQueueLookup {
     required this.indexByItemId,
     required this.itemIds,
     required this.notCompletedItemIds,
+    required this.activeItemIds,
     required this.queuedCount,
     required this.completedCount,
     required this.failedCount,
@@ -502,6 +508,9 @@ class DownloadQueueLookup {
           : List.unmodifiable(
               notCompletedItemIds.where((id) => id != removed.id),
             ),
+      activeItemIds: _countsAsQueued(removed.status)
+          ? List.unmodifiable(activeItemIds.where((id) => id != removed.id))
+          : activeItemIds,
       queuedCount: queuedCount - (_countsAsQueued(removed.status) ? 1 : 0),
       completedCount:
           completedCount - (removed.status == DownloadStatus.completed ? 1 : 0),
@@ -538,6 +547,7 @@ class DownloadQueueLookup {
     final indexByItemId = <String, int>{};
     final itemIds = <String>[];
     final notCompletedItemIds = <String>[];
+    final activeItemIds = <String>[];
     var queuedCount = 0;
     var completedCount = 0;
     var failedCount = 0;
@@ -554,7 +564,10 @@ class DownloadQueueLookup {
       if (item.status != DownloadStatus.completed) {
         notCompletedItemIds.add(item.id);
       }
-      if (_countsAsQueued(item.status)) queuedCount++;
+      if (_countsAsQueued(item.status)) {
+        queuedCount++;
+        activeItemIds.add(item.id);
+      }
       if (item.status == DownloadStatus.queued) {
         queuedWords[index >> 5] |= 1 << (index & 31);
       }
@@ -577,6 +590,7 @@ class DownloadQueueLookup {
       indexByItemId: itemIndex,
       itemIds: List.unmodifiable(itemIds),
       notCompletedItemIds: List.unmodifiable(notCompletedItemIds),
+      activeItemIds: List.unmodifiable(activeItemIds),
       queuedCount: queuedCount,
       completedCount: completedCount,
       failedCount: failedCount,
@@ -631,6 +645,7 @@ class DownloadQueueLookup {
     var nextActiveDownloadsCount = activeDownloadsCount;
     var nextFinalizingCount = finalizingCount;
     var notCompletedMembershipChanged = false;
+    var activeMembershipChanged = false;
 
     for (final index in normalizedChanged) {
       final previous = previousItems[index];
@@ -642,6 +657,9 @@ class DownloadQueueLookup {
       if ((previous.status == DownloadStatus.completed) !=
           (next.status == DownloadStatus.completed)) {
         notCompletedMembershipChanged = true;
+      }
+      if (_countsAsQueued(previous.status) != _countsAsQueued(next.status)) {
+        activeMembershipChanged = true;
       }
 
       nextQueuedCount += _deltaForStatus(
@@ -689,6 +707,12 @@ class DownloadQueueLookup {
                 if (item.status != DownloadStatus.completed) item.id,
             ])
           : notCompletedItemIds,
+      activeItemIds: activeMembershipChanged
+          ? List.unmodifiable([
+              for (final item in nextItems)
+                if (_countsAsQueued(item.status)) item.id,
+            ])
+          : activeItemIds,
       queuedCount: nextQueuedCount,
       completedCount: nextCompletedCount,
       failedCount: nextFailedCount,
