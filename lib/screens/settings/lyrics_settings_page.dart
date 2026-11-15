@@ -152,6 +152,18 @@ class LyricsSettingsPage extends ConsumerWidget {
                       context,
                       (_) => const LyricsProviderPriorityPage(),
                     ),
+                  ),
+                  SettingsSwitchItem(
+                    key: const ValueKey('lyrics-prefer-best-timing'),
+                    icon: Icons.timer_outlined,
+                    title: context.l10n.lyricsPreferBestTiming,
+                    subtitle: settings.lyricsPreferBestTiming
+                        ? context.l10n.lyricsPreferBestTimingEnabled
+                        : context.l10n.lyricsPreferBestTimingDisabled,
+                    value: settings.lyricsPreferBestTiming,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setLyricsPreferBestTiming(value),
                     showDivider: false,
                   ),
                 ],

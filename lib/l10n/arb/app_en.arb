@@ -4993,6 +4993,18 @@
   "@lyricsProvidersTitle": {
     "description": "Settings item title for lyrics provider order"
   },
+  "lyricsPreferBestTiming": "Best timing first",
+  "@lyricsPreferBestTiming": {
+    "description": "Lyrics settings switch: choose lyrics by timing quality across providers instead of by provider order alone"
+  },
+  "lyricsPreferBestTimingEnabled": "Word-synced lyrics beat synced lyrics, and synced beat plain text, from any enabled provider. May ask more providers per song.",
+  "@lyricsPreferBestTimingEnabled": {
+    "description": "Subtitle of the best timing first switch when on"
+  },
+  "lyricsPreferBestTimingDisabled": "Provider order only: the first provider with lyrics is used.",
+  "@lyricsPreferBestTimingDisabled": {
+    "description": "Subtitle of the best timing first switch when off"
+  },
   "lyricsProvidersDescription": "Enable, disable and reorder lyrics sources. Providers are tried top-to-bottom until lyrics are found.",
   "@lyricsProvidersDescription": {
     "description": "Description on the lyrics provider priority page"

@@ -591,6 +591,7 @@ void main() {
       ];
       const persisted = AppSettings(
         lyricsProviders: providers,
+        lyricsPreferBestTiming: false,
         lyricsIncludeTranslationNetease: true,
         lyricsIncludeRomanizationNetease: true,
         lyricsMultiPersonWordByWord: true,
@@ -611,6 +612,7 @@ void main() {
       await first;
       final loaded = container.read(settingsProvider);
       expect(loaded.lyricsProviders, providers);
+      expect(loaded.lyricsPreferBestTiming, isFalse);
       expect(loaded.lyricsIncludeTranslationNetease, isTrue);
       expect(loaded.lyricsIncludeRomanizationNetease, isTrue);
       expect(loaded.lyricsMultiPersonWordByWord, isTrue);
@@ -622,6 +624,7 @@ void main() {
         'multi_person_word_by_word': true,
         'apple_elrc_word_sync': true,
         'musixmatch_language': 'id',
+        'prefer_best_timing': false,
       });
     },
   );

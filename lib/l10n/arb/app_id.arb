@@ -4505,6 +4505,18 @@
   "@lyricsProvidersTitle": {
     "description": "Settings item title for lyrics provider order"
   },
+  "lyricsPreferBestTiming": "Utamakan waktu terbaik",
+  "@lyricsPreferBestTiming": {
+    "description": "Lyrics settings switch: choose lyrics by timing quality across providers instead of by provider order alone"
+  },
+  "lyricsPreferBestTimingEnabled": "Lirik per kata menang atas lirik berwaktu, dan lirik berwaktu atas lirik biasa, dari provider mana pun yang hidup. Bisa memeriksa lebih banyak provider untuk tiap lagu.",
+  "@lyricsPreferBestTimingEnabled": {
+    "description": "Subtitle of the best timing first switch when on"
+  },
+  "lyricsPreferBestTimingDisabled": "Urutan provider saja: provider pertama yang punya lirik yang dipakai.",
+  "@lyricsPreferBestTimingDisabled": {
+    "description": "Subtitle of the best timing first switch when off"
+  },
   "lyricsProvidersDescription": "Hidupkan, matikan, dan atur sumber lirik. Provider akan diperiksa dari atas ke bawah hingga lirik ditemukan.",
   "@lyricsProvidersDescription": {
     "description": "Description on the lyrics provider priority page"

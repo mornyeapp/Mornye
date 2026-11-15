@@ -207,6 +207,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
           ?.map((e) => e as String)
           .toList() ??
       const ['apple_music', 'lrcred', 'mornye_lyrics', 'lyricsplus', 'lrclib'],
+  lyricsPreferBestTiming: json['lyricsPreferBestTiming'] as bool? ?? true,
   lyricsIncludeTranslationNetease:
       json['lyricsIncludeTranslationNetease'] as bool? ?? false,
   lyricsIncludeRomanizationNetease:
@@ -376,6 +377,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'linkHideDisconnectedSongs': instance.linkHideDisconnectedSongs,
   'hasCompletedTutorial': instance.hasCompletedTutorial,
   'lyricsProviders': instance.lyricsProviders,
+  'lyricsPreferBestTiming': instance.lyricsPreferBestTiming,
   'lyricsIncludeTranslationNetease': instance.lyricsIncludeTranslationNetease,
   'lyricsIncludeRomanizationNetease': instance.lyricsIncludeRomanizationNetease,
   'lyricsMultiPersonWordByWord': instance.lyricsMultiPersonWordByWord,

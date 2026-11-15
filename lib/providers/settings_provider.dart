@@ -849,6 +849,11 @@ class SettingsNotifier extends Notifier<AppSettings> {
     _syncLyricsSettingsToBackend();
   }
 
+  void setLyricsPreferBestTiming(bool enabled) {
+    _commit(state.copyWith(lyricsPreferBestTiming: enabled));
+    _syncLyricsSettingsToBackend();
+  }
+
   void setLyricsIncludeTranslationNetease(bool enabled) {
     _commit(state.copyWith(lyricsIncludeTranslationNetease: enabled));
     _syncLyricsSettingsToBackend();

@@ -703,6 +703,16 @@ class SettingsSearchCatalog {
           keywords: const ['lyrics priority', 'lyrics source'],
         ),
         SettingsSearchEntry(
+          icon: Icons.timer_outlined,
+          title: l10n.lyricsPreferBestTiming,
+          keywords: const [
+            'synced lyrics',
+            'word synced',
+            'karaoke',
+            'plain lyrics',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.translate_outlined,
           title: l10n.downloadNeteaseIncludeTranslation,
           keywords: const ['translated lyrics'],

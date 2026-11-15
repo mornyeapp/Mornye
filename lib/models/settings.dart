@@ -394,6 +394,11 @@ class AppSettings {
   final bool hasCompletedTutorial;
 
   final List<String> lyricsProviders;
+
+  /// Take the best-timed lyrics any enabled provider has (word-synced, then
+  /// line-synced, then plain) instead of the first provider's lyrics.
+  /// [lyricsProviders] order still decides between equals.
+  final bool lyricsPreferBestTiming;
   final bool
   lyricsIncludeTranslationNetease; // Append translated lyrics (Netease)
   final bool
@@ -614,6 +619,7 @@ class AppSettings {
       'lyricsplus',
       'lrclib',
     ],
+    this.lyricsPreferBestTiming = true,
     this.lyricsIncludeTranslationNetease = false,
     this.lyricsIncludeRomanizationNetease = false,
     this.lyricsMultiPersonWordByWord = true,
@@ -651,6 +657,7 @@ class AppSettings {
     'multi_person_word_by_word': lyricsMultiPersonWordByWord,
     'apple_elrc_word_sync': lyricsAppleElrcWordSync,
     'musixmatch_language': musixmatchLanguage,
+    'prefer_best_timing': lyricsPreferBestTiming,
   };
 
   /// The cover art style the player shows: the one chosen, else the app
@@ -797,6 +804,7 @@ class AppSettings {
     bool? linkHideDisconnectedSongs,
     bool? hasCompletedTutorial,
     List<String>? lyricsProviders,
+    bool? lyricsPreferBestTiming,
     bool? lyricsIncludeTranslationNetease,
     bool? lyricsIncludeRomanizationNetease,
     bool? lyricsMultiPersonWordByWord,
@@ -995,6 +1003,8 @@ class AppSettings {
           linkHideDisconnectedSongs ?? this.linkHideDisconnectedSongs,
       hasCompletedTutorial: hasCompletedTutorial ?? this.hasCompletedTutorial,
       lyricsProviders: lyricsProviders ?? this.lyricsProviders,
+      lyricsPreferBestTiming:
+          lyricsPreferBestTiming ?? this.lyricsPreferBestTiming,
       lyricsIncludeTranslationNetease:
           lyricsIncludeTranslationNetease ??
           this.lyricsIncludeTranslationNetease,
