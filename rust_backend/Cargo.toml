@@ -38,7 +38,7 @@ blowfish = { version = "=0.10.0", features = ["zeroize"] }
 zeroize = "1.8"
 getrandom = "0.4"
 tempfile = "3.27"
-zip = { version = "=9.4.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "=9.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["float_roundtrip", "raw_value"] }
 thiserror = "2.0"
@@ -76,11 +76,11 @@ httpdate = "=1.0.3"
 cap-std = "=4.0.3"
 rustix = { version = "=1.1.6", features = ["fs"] }
 roxmltree = "=0.21.2"
-rusqlite = { version = "=0.41.1", features = ["bundled", "modern_sqlite", "hooks"] }
+rusqlite = { version = "=0.43.0", features = ["bundled", "modern_sqlite", "hooks"] }
 libc = "=0.2.191"
 windows-sys = "0.61"
 # Desktop library folder watching (crates/desktop).
-notify = "=8.2.1"
+notify = "=8.2.2"
 # Mornye Link server (crates/link): HTTPS, WebSocket, mDNS, certificates.
 mornye-link = { path = "crates/link" }
 hyper = { version = "=1.12.0", features = ["server", "http1"] }

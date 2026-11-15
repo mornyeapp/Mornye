@@ -93,7 +93,7 @@ dependencies:
 
   xml: ^7.1.0
   html: ^0.15.7
-  dart_smb2: 0.2.5
+  dart_smb2: 0.4.1
   synchronized: ^3.6.1
 
   # Notifications
