@@ -10,6 +10,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/error_card.dart';
@@ -168,45 +169,65 @@ Future<void> _importFile(BuildContext context, WidgetRef ref) async {
   );
 }
 
-class _FolderList extends StatelessWidget {
+class _FolderList extends StatefulWidget {
   const _FolderList({required this.folders, required this.controller});
 
   final Future<List<LibraryFolder>> folders;
   final ScrollController controller;
 
+  @override
+  State<_FolderList> createState() => _FolderListState();
+}
+
+class _FolderListState extends State<_FolderList> {
+  bool _browsing = false;
+
+  /// Why the last browse added nothing. It shows on the Browse row, as a
+  /// page snackbar would be painted behind this sheet.
+  String? _browseNotice;
+
   /// Picks any folder with the system dialog and returns it with the tracks
   /// of all its subfolders.
-  Future<void> _browse(BuildContext context) async {
+  Future<void> _browse() async {
+    final l10n = context.l10n;
     final String? dir;
     try {
       dir = await FilePicker.getDirectoryPath();
     } catch (e) {
       _log.e('Folder picker failed: $e');
+      if (!mounted) return;
+      setState(() => _browseNotice = l10n.snackbarFolderPickerFailed('$e'));
       return;
     }
-    if (dir == null || dir.isEmpty || !context.mounted) return;
-    final LibraryFolder folder;
+    if (dir == null || dir.isEmpty || !mounted) return;
+    setState(() {
+      _browsing = true;
+      _browseNotice = null;
+    });
+    LibraryFolder? folder;
     try {
       folder = await libraryFolderTree(dir, LibraryDatabase.instance);
     } catch (e) {
       _log.e('Failed to read Library folder $dir: $e');
+    }
+    if (!mounted) return;
+    if (folder != null && folder.ids.isNotEmpty) {
+      Navigator.pop(context, folder);
       return;
     }
-    if (!context.mounted) return;
-    if (folder.ids.isEmpty) {
-      showAppSnackBar(
-        context,
-        content: Text(context.l10n.playlistBrowseFolderNoTracks),
-      );
-      return;
-    }
-    Navigator.pop(context, folder);
+    setState(() {
+      _browsing = false;
+      _browseNotice = folder == null
+          ? l10n.libraryFoldersLoadFailed
+          : l10n.playlistBrowseFolderNoTracks;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
     return FutureBuilder<List<LibraryFolder>>(
-      future: folders,
+      future: widget.folders,
       builder: (context, snapshot) {
         final folders = snapshot.hasError
             ? const <LibraryFolder>[]
@@ -252,8 +273,14 @@ class _FolderList extends StatelessWidget {
             ? AppSheetOption(
                 leading: const AppIcon(Icons.folder_open),
                 title: Text(context.l10n.playlistBrowseFolder),
-                subtitle: Text(context.l10n.playlistBrowseFolderSubtitle),
-                onTap: () => _browse(context),
+                subtitle: Text(
+                  _browseNotice ?? context.l10n.playlistBrowseFolderSubtitle,
+                ),
+                trailing: _browsing
+                    ? const AppLoadingIndicator(size: 24)
+                    : null,
+                enabled: !_browsing,
+                onTap: _browse,
               )
             : null;
         if (folders.isEmpty) {

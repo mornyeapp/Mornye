@@ -470,8 +470,9 @@ class _ReEnrichReviewContentState extends State<_ReEnrichReviewContent> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               context.l10n.trackReEnrichSmallerCover,
+              // A caution, not an error: the change is only off by default.
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
+                color: theme.colorScheme.tertiary,
               ),
             ),
           ),
