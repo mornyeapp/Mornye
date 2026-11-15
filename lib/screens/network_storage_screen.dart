@@ -24,6 +24,8 @@ import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
+import 'package:mornye/widgets/link/link_transfer_tile.dart';
+import 'package:mornye/widgets/network_upload_actions.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 class NetworkStorageScreen extends ConsumerStatefulWidget {
@@ -389,6 +391,8 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
                       ),
                     ),
                   ),
+                if (connection == null && !widget.pickUploadFolder)
+                  const SliverToBoxAdapter(child: _NetworkUploadStatus()),
                 if (_loading || _starting)
                   SliverToBoxAdapter(child: _NetworkProgress()),
                 if (!_loading &&
@@ -1184,6 +1188,60 @@ class _NetworkIconAction extends StatelessWidget {
           tooltip: tooltip,
           onPressed: onPressed,
         );
+}
+
+/// The running upload of Library songs with its progress, which opens the
+/// progress sheet again, or how the last one ended until it is cleared.
+class _NetworkUploadStatus extends ConsumerWidget {
+  const _NetworkUploadStatus();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(networkUploadProvider);
+    if (status == null) return const SizedBox.shrink();
+    final l10n = context.l10n;
+    final progress = status.progress;
+    final result = status.result;
+    final failed = !status.running && (result == null || result.failed > 0);
+    return SettingsGroup(
+      children: [
+        SettingsItem(
+          key: const ValueKey('network-upload-status'),
+          icon: status.running || (result?.cancelled ?? false)
+              ? Icons.cloud_upload_outlined
+              : failed
+              ? Icons.error_outline
+              : Icons.check_circle_outline,
+          iconColor: failed ? Theme.of(context).colorScheme.error : null,
+          showIconInMornye: true,
+          title: status.running
+              ? l10n.networkUploading
+              : l10n.networkUploadLast,
+          subtitle: status.running
+              ? [
+                  '${progress.done} / ${progress.total}',
+                  if (progress.title.isNotEmpty) progress.title,
+                ].join(' · ')
+              : networkUploadOutcome(l10n, result: result, error: status.error),
+          footer: status.running
+              ? LinkTransferProgressBar(value: progress.fraction)
+              : null,
+          onTap: status.running
+              ? () => showNetworkUploadProgress(context)
+              : null,
+          trailing: status.running
+              ? null
+              : _NetworkIconAction(
+                  tooltip: l10n.dialogClear,
+                  onPressed: ref.read(networkUploadProvider.notifier).clear,
+                  icon: Icons.close,
+                  cupertinoIcon: CupertinoIcons.xmark,
+                ),
+          showDivider: false,
+        ),
+      ],
+    );
+  }
 }
 
 class _NetworkProgress extends StatelessWidget {

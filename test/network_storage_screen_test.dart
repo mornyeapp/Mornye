@@ -9,12 +9,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/network_upload_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
+import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/link_source_names.dart';
 import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/services/network_certificate.dart';
+import 'package:mornye/services/network_library_upload.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/music_player_service.dart'
@@ -409,6 +412,62 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+    testWidgets('the upload stays reachable here (Mornye: $mornye)', (
+      tester,
+    ) async {
+      final upload = _Uploading(
+        const NetworkUploadStatus(
+          LinkOfflineProgress(done: 1, total: 3, title: 'Second song'),
+        ),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [networkUploadProvider.overrideWith(() => upload)],
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : ThemeData(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: NetworkStorageScreen(service: _NetworkFixture()),
+          ),
+        ),
+      );
+      // The Material progress bar waves without end; pump, never settle.
+      Future<void> settle() async {
+        for (var frame = 0; frame < 10; frame++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+      }
+
+      await settle();
+      expect(find.text('Uploading to network storage'), findsOneWidget);
+      await tester.tap(find.text('1 / 3 · Second song'));
+      await settle();
+      // The progress sheet again, with its Cancel.
+      expect(find.text('1 / 3'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+
+      upload.finish(
+        const NetworkUploadResult(
+          saved: 2,
+          skipped: 1,
+          failed: 0,
+          cancelled: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Cancel'), findsNothing);
+      expect(find.text('Last upload'), findsOneWidget);
+      expect(
+        find.text('Uploaded 2, already there 1, failed 0'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byTooltip('Clear'));
+      await tester.pumpAndSettle();
+      expect(find.text('Last upload'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
     testWidgets('a paired computer shows as Mornye Link (Mornye: $mornye)', (
       tester,
     ) async {
@@ -551,6 +610,17 @@ class _PlayedController extends MusicPlayerController {
     List<PlayableMedia> items, {
     int initialIndex = 0,
   }) async => played.addAll(items);
+}
+
+class _Uploading extends NetworkUploadNotifier {
+  _Uploading(this.initial);
+  final NetworkUploadStatus initial;
+
+  @override
+  NetworkUploadStatus? build() => initial;
+
+  void finish(NetworkUploadResult result) =>
+      state = NetworkUploadStatus(state!.progress, result: result);
 }
 
 class _NetworkFixture extends NetworkStorageService {

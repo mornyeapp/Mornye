@@ -6,6 +6,8 @@ import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/network_upload_provider.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
+import 'package:mornye/services/link/features/link_save_offline.dart';
+import 'package:mornye/services/network_library_upload.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
@@ -22,6 +24,14 @@ UnifiedLibraryItem song(String path) => UnifiedLibraryItem.fromLocalLibrary(
   ),
 );
 
+/// The Material progress bar waves without end, so this pumps a second of
+/// frames instead of settling.
+Future<void> settle(WidgetTester tester) async {
+  for (var frame = 0; frame < 10; frame++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
 const nas = NetworkConnection(
   id: 'nas',
   name: 'NAS',
@@ -37,6 +47,7 @@ void main() {
     required List<UnifiedLibraryItem> items,
     required List<NetworkConnection> writable,
     bool mornye = false,
+    NetworkUploadNotifier? upload,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -44,6 +55,7 @@ void main() {
           networkUploadConnectionsProvider.overrideWith(
             (ref) async => writable,
           ),
+          if (upload != null) networkUploadProvider.overrideWith(() => upload),
         ],
         child: MaterialApp(
           theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
@@ -78,6 +90,74 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  for (final mornye in [false, true]) {
+    testWidgets('a closed progress sheet leads back to it ($mornye)', (
+      tester,
+    ) async {
+      final upload = _Uploading();
+      await pump(
+        tester,
+        items: [song('/music/a.flac')],
+        writable: [nas],
+        mornye: mornye,
+        upload: upload,
+      );
+      // While one runs, the action shows its progress.
+      await tester.tap(find.byTooltip(label));
+      await settle(tester);
+      expect(find.text('Second song'), findsOneWidget);
+      expect(find.text('1 / 3'), findsOneWidget);
+
+      Navigator.of(tester.element(find.text('Second song'))).pop();
+      await settle(tester);
+      expect(find.text('Second song'), findsNothing);
+      expect(
+        find.text('The upload continues. Network storage shows its progress.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('View'));
+      await settle(tester);
+      expect(find.text('Second song'), findsOneWidget);
+
+      // The sheet closes by itself when the upload ends.
+      upload.finish();
+      await settle(tester);
+      expect(find.text('Second song'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  test('the outcome names the counts, a stop or the failure', () {
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    expect(
+      networkUploadOutcome(
+        l10n,
+        result: const NetworkUploadResult(
+          saved: 2,
+          skipped: 1,
+          failed: 1,
+          cancelled: false,
+        ),
+      ),
+      'Uploaded 2, already there 1, failed 1',
+    );
+    expect(
+      networkUploadOutcome(
+        l10n,
+        result: const NetworkUploadResult(saved: 1, failed: 0, cancelled: true),
+      ),
+      'Upload stopped',
+    );
+    expect(
+      networkUploadOutcome(l10n, error: const NetworkUploadReadOnly()),
+      l10n.networkUploadReadOnly,
+    );
+    expect(
+      networkUploadOutcome(l10n, error: StateError('offline')),
+      l10n.networkUploadFailed,
+    );
+  });
 
   testWidgets('network songs never offer the upload', (tester) async {
     await pump(
@@ -142,6 +222,18 @@ void main() {
     expect(networkUploadOffered(null, [song('/music/a.flac')]), isFalse);
     expect(networkUploadOffered([nas], [song('/music/a.flac')]), isTrue);
   });
+}
+
+class _Uploading extends NetworkUploadNotifier {
+  @override
+  NetworkUploadStatus? build() => const NetworkUploadStatus(
+    LinkOfflineProgress(done: 1, total: 3, title: 'Second song'),
+  );
+
+  void finish() => state = NetworkUploadStatus(
+    state!.progress,
+    result: const NetworkUploadResult(saved: 3, failed: 0, cancelled: false),
+  );
 }
 
 class _Folders extends NetworkStorageService {

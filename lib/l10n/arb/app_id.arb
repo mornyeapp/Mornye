@@ -79,6 +79,18 @@
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
   },
+  "networkUploadContinues": "Upload tetap berjalan. Progresnya ada di Penyimpanan jaringan.",
+  "@networkUploadContinues": {
+    "description": "Snackbar after the upload progress sheet is closed while songs still upload; Network storage is the settings page that lists the upload"
+  },
+  "networkUploadView": "Lihat",
+  "@networkUploadView": {
+    "description": "Snackbar action that opens the progress of the running upload to network storage again"
+  },
+  "networkUploadLast": "Upload terakhir",
+  "@networkUploadLast": {
+    "description": "Title of the Network storage row that shows how the last upload of Library songs ended"
+  },
   "networkEditSaving": "Menyimpan ke penyimpanan jaringan",
   "@networkEditSaving": {
     "description": "Notification title while an edited song is saved back to network storage with the screen off"

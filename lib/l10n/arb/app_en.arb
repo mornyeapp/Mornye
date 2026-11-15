@@ -163,6 +163,18 @@
   "@networkUploadCancelled": {
     "description": "Snackbar when the listener cancels uploading Library songs to network storage"
   },
+  "networkUploadContinues": "The upload continues. Network storage shows its progress.",
+  "@networkUploadContinues": {
+    "description": "Snackbar after the upload progress sheet is closed while songs still upload; Network storage is the settings page that lists the upload"
+  },
+  "networkUploadView": "View",
+  "@networkUploadView": {
+    "description": "Snackbar action that opens the progress of the running upload to network storage again"
+  },
+  "networkUploadLast": "Last upload",
+  "@networkUploadLast": {
+    "description": "Title of the Network storage row that shows how the last upload of Library songs ended"
+  },
   "networkUploadFailed": "Couldn't upload the songs. Check the server connection and that this account can write to the folder.",
   "@networkUploadFailed": {
     "description": "Snackbar when uploading Library songs to network storage fails as a whole"

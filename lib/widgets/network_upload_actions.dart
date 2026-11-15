@@ -33,7 +33,7 @@ Future<void> uploadToNetworkStorage(
   // Menus and selection bars close as this starts, so their ref may go.
   final container = ProviderScope.containerOf(context, listen: false);
   final root = Navigator.of(context, rootNavigator: true).context;
-  if (container.read(networkUploadProvider) == null) {
+  if (container.read(networkUploadProvider)?.running != true) {
     if (!items.any(canUploadLibraryItem)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.networkUploadNoSongs)),
@@ -46,45 +46,69 @@ Future<void> uploadToNetworkStorage(
     final l10n = root.l10n;
     final controller = container.read(networkUploadProvider.notifier);
     unawaited(() async {
+      NetworkUploadResult? result;
+      Object? error;
       try {
-        final result = await controller.upload(items, folder);
-        if (result != null && messenger.mounted) {
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text(
-                result.cancelled
-                    ? l10n.networkUploadCancelled
-                    : l10n.networkUploadResult(
-                        result.saved,
-                        result.skipped,
-                        result.failed,
-                      ),
-              ),
+        result = await controller.upload(items, folder);
+        if (result == null) return;
+      } catch (e) {
+        error = e;
+      }
+      if (messenger.mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              networkUploadOutcome(l10n, result: result, error: error),
             ),
-          );
-        }
-      } on NetworkUploadReadOnly {
-        if (messenger.mounted) {
-          messenger.showSnackBar(
-            SnackBar(content: Text(l10n.networkUploadReadOnly)),
-          );
-        }
-      } catch (_) {
-        if (messenger.mounted) {
-          messenger.showSnackBar(
-            SnackBar(content: Text(l10n.networkUploadFailed)),
-          );
-        }
+          ),
+        );
       }
     }());
   }
   if (!root.mounted) return;
-  await showAppBottomSheet<void>(
-    context: root,
-    useRootNavigator: true,
-    title: root.l10n.networkUploading,
-    builder: (_) => const _UploadProgress(),
+  await showNetworkUploadProgress(root);
+  if (!root.mounted || container.read(networkUploadProvider)?.running != true) {
+    return;
+  }
+  // Closed while it runs: the upload goes on, and this leads back to it.
+  ScaffoldMessenger.of(root).showSnackBar(
+    SnackBar(
+      content: Text(root.l10n.networkUploadContinues),
+      action: SnackBarAction(
+        label: root.l10n.networkUploadView,
+        onPressed: () {
+          if (root.mounted) unawaited(showNetworkUploadProgress(root));
+        },
+      ),
+    ),
   );
+}
+
+/// The progress sheet of the running upload, with Cancel. It closes by
+/// itself when the upload ends; closing it earlier leaves the upload running.
+Future<void> showNetworkUploadProgress(BuildContext context) =>
+    showAppBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      title: context.l10n.networkUploading,
+      builder: (_) => const _UploadProgress(),
+    );
+
+/// How an upload ended, as its snackbar and the Network storage page say:
+/// its counts, that it was stopped, or why it failed as a whole.
+String networkUploadOutcome(
+  AppLocalizations l10n, {
+  NetworkUploadResult? result,
+  Object? error,
+}) {
+  if (result != null) {
+    return result.cancelled
+        ? l10n.networkUploadCancelled
+        : l10n.networkUploadResult(result.saved, result.skipped, result.failed);
+  }
+  return error is NetworkUploadReadOnly
+      ? l10n.networkUploadReadOnly
+      : l10n.networkUploadFailed;
 }
 
 /// The network download destination when it accepts uploads, or a
@@ -165,7 +189,8 @@ class _UploadProgressState extends ConsumerState<_UploadProgress> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = ref.watch(networkUploadProvider);
+    final status = ref.watch(networkUploadProvider);
+    final progress = status != null && status.running ? status.progress : null;
     if (progress == null && !_closing) {
       _closing = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
