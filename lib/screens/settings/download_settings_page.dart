@@ -139,8 +139,9 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
                       settings.autoConvertFormat,
                     ),
                   ),
-                  if (normalizeAutoConvertFormat(settings.autoConvertFormat) ==
-                      'flac') ...[
+                  if (isLosslessAutoConvertFormat(
+                    settings.autoConvertFormat,
+                  )) ...[
                     SettingsItem(
                       icon: Icons.high_quality_outlined,
                       title: context.l10n.downloadAutoConvertMaxBitDepth,
@@ -410,6 +411,7 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
             'aac' => context.l10n.downloadAutoConvertM4aSubtitle,
             'opus' => context.l10n.downloadAutoConvertOpusSubtitle,
             'flac' => context.l10n.downloadAutoConvertFlacSubtitle,
+            'alac' => context.l10n.downloadAutoConvertAlacSubtitle,
             _ => context.l10n.downloadAutoConvertMp3Subtitle,
           },
         ),

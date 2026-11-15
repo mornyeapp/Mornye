@@ -357,7 +357,7 @@ class AppSettings {
   final bool autoConvertDownloads;
   // Re-download a Hi-Res request at LOSSLESS when the file measures as fake.
   final bool redownloadFakeHiRes;
-  final String autoConvertFormat; // 'mp3', 'aac' (M4A), 'opus', or 'flac'
+  final String autoConvertFormat; // 'mp3', 'aac'/'alac' (M4A), 'opus', 'flac'
   final String autoConvertBitrate; // '128k', '160k', '192k', '256k', or '320k'
   final int autoConvertMaxBitDepth; // 0 retains the source bit depth.
   final int autoConvertMaxSampleRate; // 0 retains the source sample rate.

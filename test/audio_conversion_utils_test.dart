@@ -196,5 +196,56 @@ void main() {
         isFalse,
       );
     });
+
+    test('accepts ALAC as a lossless target in an M4A file', () {
+      expect(autoConvertFormats, contains('alac'));
+      expect(normalizeAutoConvertFormat(' ALAC '), 'alac');
+      expect(autoConvertFormatLabel('alac'), 'M4A (ALAC)');
+      expect(isLosslessAutoConvertFormat('alac'), isTrue);
+      expect(isLosslessAutoConvertFormat('flac'), isTrue);
+      for (final lossy in ['mp3', 'aac', 'm4a', 'opus']) {
+        expect(isLosslessAutoConvertFormat(lossy), isFalse);
+      }
+      expect(
+        convertedOutputFileName(
+          originalFileName: 'Artist - Song.flac',
+          targetFormat: 'alac',
+        ),
+        'Artist - Song.m4a',
+      );
+    });
+
+    test('an ALAC M4A matches ALAC only by its codec and caps', () {
+      bool satisfied(String? codec, int depth, int rate) =>
+          autoConversionAlreadySatisfied(
+            filePath: '/music/Track.m4a',
+            targetFormat: 'alac',
+            targetBitrate: '320k',
+            codec: codec,
+            bitDepth: depth,
+            sampleRate: rate,
+            maxBitDepth: 16,
+            maxSampleRate: 48000,
+          );
+      expect(satisfied('alac', 16, 44100), isTrue);
+      expect(satisfied('alac', 24, 96000), isFalse);
+      // The .m4a name alone never proves ALAC: AAC uses the same container.
+      expect(satisfied('aac', 16, 44100), isFalse);
+      expect(satisfied(null, 16, 44100), isFalse);
+      expect(satisfied('flac', 16, 44100), isFalse);
+      // FLAC keeps its path-based rule.
+      expect(
+        autoConversionAlreadySatisfied(
+          filePath: '/music/Track.flac',
+          targetFormat: 'flac',
+          targetBitrate: '320k',
+          bitDepth: 16,
+          sampleRate: 44100,
+          maxBitDepth: 16,
+          maxSampleRate: 48000,
+        ),
+        isTrue,
+      );
+    });
   });
 }

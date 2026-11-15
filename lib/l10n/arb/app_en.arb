@@ -2901,6 +2901,10 @@
   "downloadAutoConvertAllFormatsSubtitle": "Convert completed downloads or limit FLAC bit depth and sample rate. The original is replaced only after conversion succeeds.",
   "downloadAutoConvertOutputSubtitle": "Choose the output format for newly completed downloads.",
   "downloadAutoConvertFlacSubtitle": "Lossless FLAC with quality limits. Lower bit depths and sample rates are preserved.",
+  "downloadAutoConvertAlacSubtitle": "Lossless Apple audio in an M4A file, with the same quality limits as FLAC.",
+  "@downloadAutoConvertAlacSubtitle": {
+    "description": "ALAC (Apple Lossless in M4A) automatic conversion option description"
+  },
   "downloadAutoConvertMaxBitDepth": "Maximum bit depth",
   "downloadAutoConvertMaxSampleRate": "Maximum sample rate",
   "downloadAutoConvertFlacLimitsSubtitle": "These are upper limits. For example, a 44.1 kHz source stays at 44.1 kHz when 48 kHz is selected. Lossy sources are kept in their original format.",

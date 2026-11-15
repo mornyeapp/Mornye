@@ -2569,6 +2569,7 @@
   "downloadAutoConvertAllFormatsSubtitle": "Ubah format hasil download atau batasi bit depth dan sample rate FLAC. File asli diganti hanya setelah konversi berhasil.",
   "downloadAutoConvertOutputSubtitle": "Pilih format output untuk download yang baru selesai.",
   "downloadAutoConvertFlacSubtitle": "FLAC lossless dengan batas kualitas. Bit depth dan sample rate yang lebih rendah tetap dipertahankan.",
+  "downloadAutoConvertAlacSubtitle": "Audio lossless Apple dalam file M4A, dengan batas kualitas yang sama seperti FLAC.",
   "downloadAutoConvertMaxBitDepth": "Bit depth maksimal",
   "downloadAutoConvertMaxSampleRate": "Sample rate maksimal",
   "downloadAutoConvertFlacLimitsSubtitle": "Ini adalah batas maksimal. Misalnya, sumber 44,1 kHz tetap 44,1 kHz saat 48 kHz dipilih. Sumber lossy tetap dalam format aslinya.",

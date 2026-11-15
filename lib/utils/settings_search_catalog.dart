@@ -771,6 +771,8 @@ class SettingsSearchCatalog {
             'm4a',
             'aac',
             'opus',
+            'alac',
+            'apple lossless',
             'bitrate',
           ],
         ),

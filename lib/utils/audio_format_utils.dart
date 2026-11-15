@@ -359,7 +359,7 @@ String displayFormatForLossyFormat(String format) {
   return format == 'aac' ? 'AAC' : format.toUpperCase();
 }
 
-const List<String> autoConvertFormats = ['mp3', 'aac', 'opus', 'flac'];
+const List<String> autoConvertFormats = ['mp3', 'aac', 'opus', 'flac', 'alac'];
 const List<String> autoConvertBitrates = [
   '128k',
   '160k',
@@ -372,6 +372,13 @@ String normalizeAutoConvertFormat(String value) {
   final normalized = value.trim().toLowerCase();
   if (normalized == 'm4a') return 'aac';
   return autoConvertFormats.contains(normalized) ? normalized : 'mp3';
+}
+
+/// FLAC and ALAC share the lossless rules: lossy sources are kept, and the
+/// bit depth and sample rate caps apply instead of a bitrate.
+bool isLosslessAutoConvertFormat(String value) {
+  final normalized = normalizeAutoConvertFormat(value);
+  return normalized == 'flac' || normalized == 'alac';
 }
 
 String normalizeAutoConvertBitrate(String value) {
@@ -389,10 +396,13 @@ String autoConvertFormatLabel(String format) {
     'aac' => 'M4A (AAC)',
     'opus' => 'Opus',
     'flac' => 'FLAC',
+    'alac' => 'M4A (ALAC)',
     _ => 'MP3',
   };
 }
 
+/// [codec] is the probed audio codec. An `.m4a` name holds AAC or ALAC, so
+/// only the codec can show that a file is already ALAC.
 bool autoConversionAlreadySatisfied({
   required String? filePath,
   String? fileName,
@@ -404,11 +414,15 @@ bool autoConversionAlreadySatisfied({
   int? sampleRate,
   int? maxBitDepth,
   int? maxSampleRate,
+  String? codec,
 }) {
   final sourceFormat = audioFormatForPath(filePath, fileName: fileName);
   final normalizedTarget = normalizeAutoConvertFormat(targetFormat);
-  if (normalizedTarget == 'flac') {
-    return sourceFormat == 'FLAC' &&
+  if (isLosslessAutoConvertFormat(normalizedTarget)) {
+    final matchesFormat = normalizedTarget == 'alac'
+        ? normalizeAudioFormatValue(codec) == 'alac'
+        : sourceFormat == 'FLAC';
+    return matchesFormat &&
         (maxBitDepth == null ||
             (bitDepth != null && bitDepth > 0 && bitDepth <= maxBitDepth)) &&
         (maxSampleRate == null ||

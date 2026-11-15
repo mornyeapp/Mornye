@@ -12,6 +12,7 @@ import 'package:mornye/services/update_checker.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/material_symbols.dart';
 import 'package:mornye/theme/mornye_icons.dart';
+import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_announcement_dialog.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -161,6 +162,8 @@ void main() {
             ('Output format', 'MP3', 'Opus'),
             ('Output quality', '320 kbps', '160 kbps'),
             ('Output format', 'Opus', 'FLAC'),
+            // ALAC keeps the lossless limits and Smart Dither below.
+            ('Output format', 'FLAC', 'M4A (ALAC)'),
             ('Maximum bit depth', '16-bit', '24-bit'),
             ('Maximum sample rate', '48 kHz', '96 kHz'),
             (
@@ -202,7 +205,10 @@ void main() {
             final settings = container.read(settingsProvider);
             switch (picker) {
               case 'Output format':
-                expect(settings.autoConvertFormat, next.toLowerCase());
+                expect(
+                  autoConvertFormatLabel(settings.autoConvertFormat),
+                  next,
+                );
               case 'Output quality':
                 expect(settings.autoConvertBitrate, '160k');
               case 'Maximum bit depth':

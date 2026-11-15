@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/models/download_result.dart';
+import 'package:mornye/services/download_file_finalizer.dart';
 import 'package:mornye/services/ffmpeg_conversion.dart';
 import 'package:mornye/models/ffmpeg_models.dart';
 import 'package:mornye/services/ffmpeg_desktop.dart';
@@ -410,6 +412,104 @@ void main() {
       expect(hashes['auto'], isNot(hashes['none']));
     });
   }
+
+  test('auto conversion writes ALAC M4A and then keeps it', () async {
+    if (!haveTools()) return;
+    final wav = await source(24, 96000);
+    final input = '${directory.path}/Song.flac';
+    await ffmpeg(['-i', wav, '-c:a', 'flac', '-metadata', 'TITLE=Song', input]);
+    final aac = '${directory.path}/Other.m4a';
+    await ffmpeg(['-i', wav, '-c:a', 'aac', '-b:a', '128k', aac]);
+    final embedded = <String>[];
+    // The same converter and probe the download queue wires in.
+    final stage = DownloadFileFinalizer(
+      decryptFile:
+          ({
+            required inputPath,
+            required descriptor,
+            required deleteOriginal,
+            prepareOutput,
+          }) async => null,
+      probeCodec: FFmpegProbe.audioCodec,
+      repairAc4: (_, _) async {},
+      convertAudio:
+          ({
+            required inputPath,
+            required targetFormat,
+            required bitrate,
+            required deleteOriginal,
+            required losslessQuality,
+            required losslessProcessing,
+          }) => FFmpegConversion.convertAudioFormat(
+            inputPath: inputPath,
+            targetFormat: targetFormat,
+            bitrate: bitrate,
+            metadata: const {},
+            deleteOriginal: deleteOriginal,
+            losslessQuality: losslessQuality,
+            losslessProcessing: losslessProcessing,
+          ),
+      replaceSafFile:
+          ({
+            required uri,
+            required treeUri,
+            required relativeDir,
+            required op,
+            avoidOverwrite = false,
+            onPublishedFileName,
+          }) async => null,
+      warn: (message) => fail(message),
+      info: (_) {},
+    );
+    Future<DownloadConversionOutcome> convert(String path) => stage.autoConvert(
+      result: DownloadResult.fromMap({}),
+      filePath: path,
+      fileName: path.split('/').last,
+      quality: '24-bit/96kHz',
+      enabled: true,
+      targetFormat: 'alac',
+      targetBitrate: '320k',
+      useSaf: false,
+      losslessQuality: const LosslessConversionQuality(
+        maxBitDepth: 16,
+        maxSampleRate: 48000,
+      ),
+      embedMetadata: (_, format) async => embedded.add(format),
+    );
+
+    final outcome = await convert(input);
+    expect(outcome.converted, isTrue);
+    expect(outcome.filePath, '${directory.path}/Song.m4a');
+    expect(outcome.fileName, 'Song.m4a');
+    expect(outcome.quality, '16-bit/48kHz');
+    expect(await File(input).exists(), isFalse);
+    expect(embedded, ['m4a']);
+    final properties = await FFmpegProbe.audioProperties(outcome.filePath);
+    expect(properties.codec, 'alac');
+    expect(properties.bitDepth, 16);
+    expect(properties.sampleRate, 48000);
+    final format = await Process.run(tools.ffprobePath!, [
+      '-v',
+      'error',
+      '-show_entries',
+      'format=format_name:format_tags=major_brand',
+      '-of',
+      'json',
+      outcome.filePath,
+    ]);
+    final container =
+        (jsonDecode(format.stdout as String) as Map)['format'] as Map;
+    expect(container['format_name'], contains('m4a'));
+    expect((container['tags'] as Map)['major_brand'], 'M4A ');
+
+    // A second pass finds ALAC within the caps; AAC in .m4a is lossy.
+    for (final path in [outcome.filePath, aac]) {
+      final kept = await convert(path);
+      expect(kept.converted, isFalse);
+      expect(kept.filePath, path);
+    }
+    expect(embedded, ['m4a']);
+  });
 
   test('invalid WAV preserves the source and removes partial FLAC', () async {
     if (!haveTools()) return;
