@@ -274,6 +274,15 @@ void main() {
     expect(await service.isOrphanedSource('network://gone/a.flac'), isTrue);
     expect(await service.isOrphanedSource('/music/a.flac'), isFalse);
 
+    // A paired phone's songs stay while Link is off.
+    service.virtualSources = null;
+    expect(
+      await service.isOrphanedSource(
+        'network://link-phone-0123456789abcdef/a.flac',
+      ),
+      isFalse,
+    );
+
     await service.remove('nas');
     expect(await service.isOrphanedSource('network://nas/a.flac'), isTrue);
   });

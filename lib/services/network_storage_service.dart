@@ -10,6 +10,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:html/parser.dart' as html;
+import 'package:mornye/services/link/link_protocol.dart'
+    show isLinkPhoneSourceId;
 import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/services/network_certificate.dart';
 import 'package:mornye/services/network_smb_client.dart';

@@ -42,7 +42,11 @@ extension NetworkStorageDelete on NetworkStorageService {
     if (uri == null || uri.scheme != 'network' || uri.host.isEmpty) {
       return false;
     }
-    if (virtualFor(uri.host) != null) return false;
+    // A paired phone's songs have no saved connection either, and with Link
+    // off no virtual source: they come back when the phone does.
+    if (virtualFor(uri.host) != null || isLinkPhoneSourceId(uri.host)) {
+      return false;
+    }
     try {
       return !(await connections()).any((c) => c.id == uri.host);
     } catch (error) {
