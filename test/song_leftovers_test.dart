@@ -103,6 +103,7 @@ void main() {
     )?
     documentPlace,
     Future<bool> Function(String? source)? deleteSong,
+    Future<bool> Function(String source)? orphanedNetworkSong,
     List<String> libraryFolders = const [],
   }) {
     final queue = _Queue();
@@ -111,6 +112,7 @@ void main() {
         ref,
         home: p.join(temp.path, 'home'),
         deleteSong: deleteSong,
+        orphanedNetworkSong: orphanedNetworkSong,
         documents: documents ?? const DocumentSongFolderStore(),
         documentPlace: documentPlace,
       ),
@@ -251,6 +253,24 @@ void main() {
     expect(await leftovers.delete(song), isFalse);
     await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(exists('Artist/Album/Song.lrc'), isTrue);
+  });
+
+  test('a song of a removed network server counts as gone', () async {
+    final deleted = <String?>[];
+    final (:leftovers, queue: _) = setUpLeftovers(
+      deleteSong: (source) async {
+        deleted.add(source);
+        return false;
+      },
+      orphanedNetworkSong: (source) async =>
+          Uri.parse(source).host == 'removed',
+    );
+
+    expect(await leftovers.delete('network://removed/Album/Song.flac'), isTrue);
+    expect(deleted, isEmpty);
+    // A server the app still has is asked to delete the file.
+    expect(await leftovers.delete('network://saved/Album/Song.flac'), isFalse);
+    expect(deleted, ['network://saved/Album/Song.flac']);
   });
 
   test('removes document folders up to the granted folder', () async {

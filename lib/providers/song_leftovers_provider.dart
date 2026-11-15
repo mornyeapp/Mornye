@@ -10,6 +10,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/lyrics_sidecar.dart' show mlrcExtension;
 import 'package:mornye/services/motion_artwork_folder.dart'
     show motionArtworkFileName;
+import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
@@ -135,7 +136,11 @@ class SongLeftovers {
     )?
     documentPlace,
     String? home,
+    Future<bool> Function(String source)? orphanedNetworkSong,
   }) : _deleteSong = deleteSong ?? deleteFile,
+       _orphanedNetworkSong =
+           orphanedNetworkSong ??
+           NetworkStorageService.instance.isOrphanedSource,
        _files = files,
        _documents = documents,
        _documentPlace = documentPlace ?? PlatformBridge.safSongFolders,
@@ -151,6 +156,7 @@ class SongLeftovers {
 
   final Ref _ref;
   final Future<bool> Function(String? source) _deleteSong;
+  final Future<bool> Function(String source) _orphanedNetworkSong;
   final SongFolderStore _files;
   final SongFolderStore _documents;
   final Future<({String name, List<({String uri, bool root})> folders})?>
@@ -164,7 +170,17 @@ class SongLeftovers {
 
   /// Deletes the song at [source] as [deleteFile] does, then what it leaves
   /// behind. Returns whether the song is gone.
+  ///
+  /// A network song whose server connection was removed cannot be reached
+  /// to delete. It counts as gone, so the caller removes it from the
+  /// Library instead of keeping a song nothing can delete.
   Future<bool> delete(String? source) async {
+    if (source != null &&
+        source.startsWith('network://') &&
+        await _orphanedNetworkSong(source)) {
+      _log.i('Removing a song of a removed network server from the Library');
+      return true;
+    }
     final place = await _placeOf(source);
     if (!await _deleteSong(source)) return false;
     if (place == null || _disposed) return true;
