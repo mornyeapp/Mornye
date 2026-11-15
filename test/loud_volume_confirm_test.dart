@@ -293,7 +293,9 @@ void main() {
       addTearDown(tester.view.reset);
       final container = ProviderContainer(
         overrides: [
-          initialSettingsProvider.overrideWithValue(const AppSettings()),
+          initialSettingsProvider.overrideWithValue(
+            const AppSettings(confirmLoudVolume: false),
+          ),
         ],
       );
       addTearDown(container.dispose);

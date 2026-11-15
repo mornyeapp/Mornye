@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/settings.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_output_volume.dart';
 import 'package:mornye/services/system_volume_service.dart';
@@ -73,6 +75,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // The drag crosses the loud volume level, which asks by default.
+          initialSettingsProvider.overrideWithValue(
+            const AppSettings(confirmLoudVolume: false),
+          ),
           systemVolumeProvider.overrideWith((ref) => volumes.stream),
           systemVolumeWriterProvider.overrideWith(
             (ref) => (value) {

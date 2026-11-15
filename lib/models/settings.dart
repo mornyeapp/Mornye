@@ -500,7 +500,7 @@ class AppSettings {
     this.playbackNormalization = false,
     this.playbackNormalizationPreamp = 0,
     this.playbackNormalizationMode = 'track',
-    this.confirmLoudVolume = false,
+    this.confirmLoudVolume = true,
     this.loudVolumeLevel = 80,
     this.pauseOnMute = true,
     this.headphoneResume = 'off',

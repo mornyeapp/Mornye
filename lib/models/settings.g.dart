@@ -37,7 +37,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   playbackNormalizationMode: json['playbackNormalizationMode'] == null
       ? 'track'
       : playbackNormalizationModeFromJson(json['playbackNormalizationMode']),
-  confirmLoudVolume: json['confirmLoudVolume'] as bool? ?? false,
+  confirmLoudVolume: json['confirmLoudVolume'] as bool? ?? true,
   loudVolumeLevel: json['loudVolumeLevel'] == null
       ? 80
       : loudVolumeLevelFromJson(json['loudVolumeLevel']),

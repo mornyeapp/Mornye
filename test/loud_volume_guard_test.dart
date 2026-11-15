@@ -107,12 +107,13 @@ void main() {
     expect(loudVolumeLevelFromJson(90.0), 80);
     expect(loudVolumeLevelFromJson('90'), 80);
     expect(loudVolumeLevelFromJson(null), 80);
-    expect(const AppSettings().confirmLoudVolume, isFalse);
+    expect(const AppSettings().confirmLoudVolume, isTrue);
     expect(const AppSettings().loudVolumeLevel, 80);
+    expect(AppSettings.fromJson(const {}).confirmLoudVolume, isTrue);
     final restored = AppSettings.fromJson(
-      const AppSettings(confirmLoudVolume: true, loudVolumeLevel: 60).toJson(),
+      const AppSettings(confirmLoudVolume: false, loudVolumeLevel: 60).toJson(),
     );
-    expect(restored.confirmLoudVolume, isTrue);
+    expect(restored.confirmLoudVolume, isFalse);
     expect(restored.loudVolumeLevel, 60);
   });
 }
