@@ -32,6 +32,7 @@ class TrackListTable extends ConsumerStatefulWidget {
     this.showAlbum = false,
     this.albumLayout = false,
     this.albumArtist,
+    this.covers,
     this.showPreview = false,
     this.onSaveCover,
     this.rowAction,
@@ -63,6 +64,11 @@ class TrackListTable extends ConsumerStatefulWidget {
   final bool showArtwork;
   final bool showAlbum;
 
+  /// The artwork of each row where the page looked it up, such as a
+  /// playlist whose stored covers this device cannot load. Null shows each
+  /// track's own cover.
+  final List<String?>? covers;
+
   /// Search results keep the preview button of their phone rows beside the
   /// title.
   final bool showPreview;
@@ -91,6 +97,7 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
         widget.showPreview != oldWidget.showPreview ||
         (widget.onSaveCover == null) != (oldWidget.onSaveCover == null) ||
         (widget.rowAction == null) != (oldWidget.rowAction == null) ||
+        !listEquals(widget.covers, oldWidget.covers) ||
         !listEquals(widget.tracks, oldWidget.tracks) ||
         !listEquals(widget.ids, oldWidget.ids) ||
         !listEquals(widget.isInHistory, oldWidget.isInHistory)) {
@@ -104,6 +111,7 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
       :ids,
       :isInHistory,
       :showArtwork,
+      :covers,
       :showPreview,
       :onSaveCover,
     ) = widget;
@@ -123,7 +131,7 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
               : null,
           leading: showArtwork
               ? _Artwork(
-                  url: tracks[i].coverUrl,
+                  url: covers != null ? covers[i] : tracks[i].coverUrl,
                   title: tracks[i].name,
                   // Reads the current callback, as the rows outlive it.
                   onSave: onSaveCover == null

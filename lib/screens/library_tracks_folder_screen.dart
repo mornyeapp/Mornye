@@ -62,15 +62,8 @@ import 'package:mornye/services/playable_media.dart';
 export 'package:mornye/models/library_collections.dart'
     show LibraryTracksFolderMode;
 
-String? _resolveRawCoverUrl(Track track) {
-  final rawCover = track.coverUrl?.trim();
-  if (rawCover != null &&
-      rawCover.isNotEmpty &&
-      !rawCover.startsWith('content://')) {
-    return rawCover;
-  }
-  return null;
-}
+String? _resolveRawCoverUrl(Track track) =>
+    LocalLibraryCoverRequest.of(track).cover;
 
 class LibraryTracksFolderScreen extends ConsumerStatefulWidget {
   final LibraryTracksFolderMode mode;
@@ -94,6 +87,10 @@ class _LibraryTracksFolderScreenState
         CollapsingHeaderScrollMixin<LibraryTracksFolderScreen> {
   UserPlaylistCollection? playlist;
   final _folderData = LibraryTracksFolderData();
+
+  /// The looked-up cover of each desktop row by entry key. The last answer
+  /// stays while a changed list is looked up again.
+  Map<String, String?> _desktopCovers = const {};
   List<CollectionTrackEntry>? _orderDraft;
   List<String> _orderBefore = const [];
   bool _savingOrder = false;
@@ -284,17 +281,9 @@ class _LibraryTracksFolderScreenState
   LocalLibraryCoverBatchRequest _coverBatchRequest(
     List<CollectionTrackEntry> entries,
   ) {
-    return LocalLibraryCoverBatchRequest(
-      entries
-          .map(
-            (entry) => LocalLibraryCoverRequest(
-              isrc: entry.track.isrc?.trim(),
-              trackName: entry.track.name,
-              artistName: entry.track.artistName,
-            ),
-          )
-          .toList(growable: false),
-    );
+    return LocalLibraryCoverBatchRequest([
+      for (final entry in entries) LocalLibraryCoverRequest.of(entry.track),
+    ]);
   }
 
   void _downloadSelected(List<CollectionTrackEntry> entries) {
@@ -410,6 +399,23 @@ class _LibraryTracksFolderScreenState
 
     final inHistory = _folderData.inHistory(existingHistoryKeys);
     final ids = [for (final entry in entries) entry.key];
+    // The desktop table builds every row at once, so one lookup answers the
+    // covers the rows cannot load from their own stored path.
+    if (isDesktopPlatform &&
+        !_editingOrder &&
+        entries.any(
+          (entry) =>
+              !collectionCoverIsPortable(_resolveRawCoverUrl(entry.track)),
+        )) {
+      final covers = ref
+          .watch(localLibraryCoversProvider(_coverBatchRequest(entries)))
+          .maybeWhen(data: (covers) => covers, orElse: () => null);
+      if (covers != null && covers.length == entries.length) {
+        _desktopCovers = {
+          for (var i = 0; i < entries.length; i++) entries[i].key: covers[i],
+        };
+      }
+    }
     final scaffold = CollectionScaffold(
       scrollController: scrollController,
       isSelectionMode: showsSelectionBar,
@@ -481,6 +487,12 @@ class _LibraryTracksFolderScreenState
             ),
             showArtwork: true,
             showAlbum: true,
+            covers: [
+              for (final entry in entries)
+                _desktopCovers.containsKey(entry.key)
+                    ? _desktopCovers[entry.key]
+                    : entry.track.coverUrl,
+            ],
           )
         else
           SliverPadding(
@@ -943,15 +955,16 @@ class _LibraryTracksFolderScreenState
     final isLovedMode = widget.mode == LibraryTracksFolderMode.loved;
     final isPlaylistMode = widget.mode == LibraryTracksFolderMode.playlist;
     final rawCoverUrl = isLovedMode ? null : _firstRawCoverUrl(entries);
-    final localCoverUrl =
-        rawCoverUrl == null && !isLovedMode && entries.isNotEmpty
-        ? ref
+    // A stored file path can name a file this device does not have, so the
+    // Library answers every cover that is not a web address.
+    final coverUrl =
+        isLovedMode || entries.isEmpty || collectionCoverIsPortable(rawCoverUrl)
+        ? rawCoverUrl
+        : ref
               .watch(
                 localLibraryFirstCoverProvider(_coverBatchRequest(entries)),
               )
-              .maybeWhen(data: (cover) => cover, orElse: () => null)
-        : null;
-    final coverUrl = rawCoverUrl ?? localCoverUrl;
+              .maybeWhen(data: (cover) => cover, orElse: () => rawCoverUrl);
     final hasCustomCover =
         customCoverPath != null && customCoverPath.isNotEmpty;
     final hasCoverUrl = coverUrl != null;
@@ -1299,20 +1312,13 @@ class _CollectionTrackTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final track = entry.track;
     final rawCoverUrl = _resolveRawCoverUrl(track);
-    final localCoverUrl = rawCoverUrl == null
-        ? ref
+    final effectiveCoverUrl = collectionCoverIsPortable(rawCoverUrl)
+        ? rawCoverUrl
+        : ref
               .watch(
-                localLibraryCoverProvider(
-                  LocalLibraryCoverRequest(
-                    isrc: track.isrc?.trim(),
-                    trackName: track.name,
-                    artistName: track.artistName,
-                  ),
-                ),
+                localLibraryCoverProvider(LocalLibraryCoverRequest.of(track)),
               )
-              .maybeWhen(data: (cover) => cover, orElse: () => null)
-        : null;
-    final effectiveCoverUrl = rawCoverUrl ?? localCoverUrl;
+              .maybeWhen(data: (cover) => cover, orElse: () => rawCoverUrl);
 
     // Fine-grained provider watches – only this tile rebuilds when its own
     // history / local-library entry changes.

@@ -404,20 +404,39 @@ extension _QueueTabNavigation on _QueueTabState {
                   .firstOrNull ??
               playlist.previewCover;
 
-    if (cover != null) {
-      return LocalOrNetworkCoverImage(
-        url: cover,
-        width: size,
-        height: size,
-        borderRadius: borderRadius,
-        localCacheWidth: cacheExtent,
-        networkCacheWidth: cacheExtent,
-        fadeInDuration: Duration.zero,
-        placeholder: (_) => placeholder,
-      );
-    }
+    Widget image(String? cover) => cover == null
+        ? placeholder
+        : LocalOrNetworkCoverImage(
+            url: cover,
+            width: size,
+            height: size,
+            borderRadius: borderRadius,
+            localCacheWidth: cacheExtent,
+            networkCacheWidth: cacheExtent,
+            fadeInDuration: Duration.zero,
+            placeholder: (_) => placeholder,
+          );
 
-    return placeholder;
+    if ((customCoverPath != null && customCoverPath.isNotEmpty) ||
+        collectionCoverIsPortable(cover) ||
+        playlist.trackCount == 0) {
+      return image(cover);
+    }
+    // The first song's stored cover can name a file this device does not
+    // have, such as a playlist another device made: the Library answers.
+    return Consumer(
+      builder: (context, ref, _) => image(
+        ref
+            .watch(
+              playlistCoverProvider((
+                id: playlist.id,
+                cover: cover,
+                updatedAt: playlist.updatedAt,
+              )),
+            )
+            .maybeWhen(data: (cover) => cover, orElse: () => cover),
+      ),
+    );
   }
 
   /// Icon fallback for playlists with no cover.

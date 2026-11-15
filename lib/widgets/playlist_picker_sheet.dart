@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/app_action_button.dart';
@@ -607,18 +608,35 @@ class _PlaylistPickerThumbnail extends StatelessWidget {
       );
     }
 
-    final firstCoverUrl = playlist.previewCover;
-    if (firstCoverUrl != null) {
-      return LocalOrNetworkCoverImage(
-        url: firstCoverUrl,
-        width: size,
-        height: size,
-        networkCacheWidth: (size * 2).toInt(),
-        placeholder: (_) => _iconFallback(context, colorScheme, size),
-      );
-    }
+    Widget image(String? cover) => cover == null
+        ? _iconFallback(context, colorScheme, size)
+        : LocalOrNetworkCoverImage(
+            url: cover,
+            width: size,
+            height: size,
+            networkCacheWidth: (size * 2).toInt(),
+            placeholder: (_) => _iconFallback(context, colorScheme, size),
+          );
 
-    return _iconFallback(context, colorScheme, size);
+    final firstCoverUrl = playlist.previewCover;
+    if (collectionCoverIsPortable(firstCoverUrl) || playlist.trackCount == 0) {
+      return image(firstCoverUrl);
+    }
+    // As the Library's playlist tiles: the Library answers a cover this
+    // device cannot load from the first song's stored path.
+    return Consumer(
+      builder: (context, ref, _) => image(
+        ref
+            .watch(
+              playlistCoverProvider((
+                id: playlist.id,
+                cover: firstCoverUrl,
+                updatedAt: null,
+              )),
+            )
+            .maybeWhen(data: (cover) => cover, orElse: () => firstCoverUrl),
+      ),
+    );
   }
 
   Widget _iconFallback(
