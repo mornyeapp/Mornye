@@ -167,8 +167,9 @@ extension NetworkStorageEdit on NetworkStorageService {
         await _recoverEdit(
           'restore network file; recovery copy: $backup',
           action: () async {
-            if (!await exists(path))
+            if (!await exists(path)) {
               await _moveEditedFile(connection, backup, path);
+            }
           },
           done: () => exists(path),
         );

@@ -581,7 +581,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
   Future<void> _findArtwork(String albumKey, {required bool motion}) async {
     final artwork = ref.read(libraryAlbumArtworkProvider.notifier);
     final l10n = context.l10n;
-    if (!artwork.canLookUp) {
+    if (!artwork.canLookUp()) {
       showAppSnackBar(
         context,
         content: Text(l10n.libraryFindArtworkNoProvider),

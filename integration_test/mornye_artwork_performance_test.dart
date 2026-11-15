@@ -80,11 +80,9 @@ void runArtworkPerformanceTests({required bool mornye}) {
     final page = ValueNotifier(0);
     final metadata = PlayerMetadataController();
     final seek = PlaybackSeekPreview();
-    final foreground = ValueNotifier(<String, Color>{});
     addTearDown(page.dispose);
     addTearDown(metadata.dispose);
     addTearDown(seek.dispose);
-    addTearDown(foreground.dispose);
     final keys = (
       header: GlobalKey(),
       controls: GlobalKey(),
@@ -159,7 +157,6 @@ void runArtworkPerformanceTests({required bool mornye}) {
                         insetArtwork: true,
                         artworkTopInset: 0,
                         artworkKeys: keys,
-                        artworkForeground: foreground,
                         lyricsControlsHidden: false,
                         lyricsOptionsOpen: false,
                         lyricsBuilder: (_) => ListView.builder(

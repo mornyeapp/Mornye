@@ -78,7 +78,7 @@ class LibraryAlbumArtworkNotifier extends Notifier<LibraryAlbumArtworkState> {
   };
 
   /// Whether an enabled extension can look albums up.
-  bool get canLookUp => _providers().isNotEmpty;
+  bool canLookUp() => _providers().isNotEmpty;
 
   AlbumArtworkJob _job() {
     final extensions = ref.read(extensionProvider);

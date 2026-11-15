@@ -302,7 +302,7 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
     if (ref.read(libraryAlbumArtworkProvider).running) return;
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.of(context);
-    if (!ref.read(libraryAlbumArtworkProvider.notifier).canLookUp) {
+    if (!ref.read(libraryAlbumArtworkProvider.notifier).canLookUp()) {
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.libraryFindArtworkNoProvider)),
       );
