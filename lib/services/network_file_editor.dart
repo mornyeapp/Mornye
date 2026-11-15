@@ -74,6 +74,21 @@ class NetworkFileEditor {
     });
   }
 
+  /// Writes [file] as [destination], a file beside a song on an SMB or
+  /// WebDAV connection, replacing one already there as Save Cover Art and
+  /// Save Lyrics do on this device.
+  Future<void> saveSidecar(String destination, File file) async {
+    if (!await _storage.canEditFile(destination)) {
+      throw const FormatException('File editing requires SMB or WebDAV');
+    }
+    final release = await _keepAwake?.call();
+    try {
+      await _replaceOrCreate(destination, file);
+    } finally {
+      await release?.call();
+    }
+  }
+
   Future<void> _publishLyrics(String source, File working) async {
     final sidecar = File(p.setExtension(working.path, '.lrc'));
     if (!await sidecar.exists()) return;
@@ -81,6 +96,13 @@ class NetworkFileEditor {
     final destination = uri
         .replace(path: p.url.setExtension(uri.path, '.lrc'))
         .toString();
+    await _replaceOrCreate(destination, sidecar);
+  }
+
+  /// Replaces the file at [destination] with [sidecar], checked against a
+  /// copy of the old one, or uploads it without overwriting when none is
+  /// there.
+  Future<void> _replaceOrCreate(String destination, File sidecar) async {
     if (await _storage.editableFileExists(destination)) {
       await _input.withFile(destination, (original) async {
         await _storage.replaceFile(

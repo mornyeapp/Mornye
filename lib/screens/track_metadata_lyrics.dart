@@ -702,15 +702,26 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
     }
   }
 
+  /// [fileName] in the NAS folder of the current network song.
+  String _networkSidecarSource(String fileName) {
+    final uri = Uri.parse(cleanFilePath);
+    final folder = uri.pathSegments.take(uri.pathSegments.length - 1);
+    return NetworkStorageService.source(
+      uri.host,
+      [...folder, fileName].join('/'),
+    );
+  }
+
   /// Writes `baseName.extension` as a sidecar of the current track.
   ///
   /// `writeTo` renders the file at the given path and returns the bridge
   /// result, or null when it has already told the user why nothing was
-  /// written. SAF tracks are rendered into a temp directory and published to
-  /// the download tree or the scanned audio document's parent; filesystem
-  /// tracks are written next to the audio file. Once the audio file is gone,
-  /// its old folder says nothing about where the song went, so the user picks
-  /// the folder instead.
+  /// written. SAF and network tracks are rendered into a temp directory and
+  /// published to the download tree or the scanned audio document's parent,
+  /// or uploaded to the song's NAS folder, replacing a file of that name as
+  /// a local save does; filesystem tracks are written next to the audio
+  /// file. Once the audio file is gone, its old folder says nothing about
+  /// where the song went, so the user picks the folder instead.
   /// Exceptions propagate to the caller.
   Future<void> _publishSidecarFile({
     required String baseName,
@@ -740,12 +751,11 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
       return;
     }
 
-    if (folder == null ? _isSafFile : folder.treeUri != null) {
-      final audioUri = cleanFilePath;
-      final treeUri = folder?.treeUri ?? _downloadItem?.downloadTreeUri;
-      final relativeDir = folder == null
-          ? _downloadItem?.safRelativeDir ?? ''
-          : '';
+    // Renders the file in a temp directory for `publish`, which says whether
+    // it reached its place.
+    Future<void> publishFromTemp(
+      Future<bool> Function(String tempOutput) publish,
+    ) async {
       final tempDir = await Directory.systemTemp.createTemp(tempDirPrefix);
       final tempOutput = '${tempDir.path}${Platform.pathSeparator}$fileName';
       try {
@@ -761,6 +771,39 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
           }
           return;
         }
+        final published = await publish(tempOutput);
+        if (mounted) {
+          showMessage(
+            published
+                ? successMessage()
+                : context.l10n.trackSaveFailed('No storage access'),
+          );
+        }
+      } finally {
+        try {
+          await tempDir.delete(recursive: true);
+        } catch (_) {}
+      }
+    }
+
+    if (folder == null && _isNetworkItem) {
+      await publishFromTemp((tempOutput) async {
+        await NetworkFileEditor.instance.saveSidecar(
+          _networkSidecarSource(fileName),
+          File(tempOutput),
+        );
+        return true;
+      });
+      return;
+    }
+
+    if (folder == null ? _isSafFile : folder.treeUri != null) {
+      final audioUri = cleanFilePath;
+      final treeUri = folder?.treeUri ?? _downloadItem?.downloadTreeUri;
+      final relativeDir = folder == null
+          ? _downloadItem?.safRelativeDir ?? ''
+          : '';
+      await publishFromTemp((tempOutput) async {
         final safUri = treeUri != null && treeUri.isNotEmpty
             ? await PlatformBridge.createSafFileFromPath(
                 treeUri: treeUri,
@@ -775,18 +818,8 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
                 mimeType: mimeType,
                 srcPath: tempOutput,
               );
-        if (mounted) {
-          showMessage(
-            safUri != null && safUri.isNotEmpty
-                ? successMessage()
-                : context.l10n.trackSaveFailed('No storage access'),
-          );
-        }
-      } finally {
-        try {
-          await tempDir.delete(recursive: true);
-        } catch (_) {}
-      }
+        return safUri != null && safUri.isNotEmpty;
+      });
       return;
     }
 
@@ -833,6 +866,18 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
       final coverUrl = _coverUrl;
       final cachedCover = _embeddedCoverPreviewPath ?? _localCoverPath;
       final hasFile = _fileExists;
+      final networkFile = _isNetworkItem;
+
+      Future<bool> copyCover(String? path, String outputPath) async {
+        if (path == null || path.isEmpty) return false;
+        final uri = Uri.tryParse(path);
+        final file = uri?.scheme == 'file' ? File.fromUri(uri!) : File(path);
+        if (!await file.exists() || await file.length() == 0) return false;
+        if (file.absolute.path != File(outputPath).absolute.path) {
+          await file.copy(outputPath);
+        }
+        return true;
+      }
 
       await _publishSidecarFile(
         baseName: baseName,
@@ -843,7 +888,26 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
         hideCurrentSnackBar: false,
         writeTo: (outputPath) async {
           Map<String, dynamic>? result;
-          if (hasFile) {
+          if (networkFile) {
+            // The artwork embedded in the NAS file, as Now Playing reads it.
+            try {
+              final metadata = await readPlaybackFileMetadataWithRetry(
+                audioPath,
+              );
+              final embedded = metadata['cover_path']?.toString();
+              if (await copyCover(embedded, outputPath)) {
+                return {'success': true};
+              }
+            } catch (e) {
+              _log.d('Could not read the network cover: $e');
+            }
+            if (coverUrl != null && coverUrl.isNotEmpty) {
+              result = await PlatformBridge.downloadCoverToFile(
+                coverUrl,
+                outputPath,
+              );
+            }
+          } else if (hasFile) {
             // Imported files carry their own embedded artwork as well.
             result = await PlatformBridge.extractCoverToFile(
               audioPath,
@@ -864,17 +928,8 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
             );
           }
           if ((result == null || result['error'] != null) &&
-              cachedCover != null) {
-            final uri = Uri.tryParse(cachedCover);
-            final file = uri?.scheme == 'file'
-                ? File.fromUri(uri!)
-                : File(cachedCover);
-            if (await file.exists() && await file.length() > 0) {
-              if (file.absolute.path != File(outputPath).absolute.path) {
-                await file.copy(outputPath);
-              }
-              return {'success': true};
-            }
+              await copyCover(cachedCover, outputPath)) {
+            return {'success': true};
           }
           if (result == null && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -909,6 +964,7 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
           );
       }
 
+      final networkFile = _isNetworkItem;
       await _publishSidecarFile(
         baseName: baseName,
         tempDirPrefix: 'lyrics_',
@@ -916,14 +972,30 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
         mimeType: 'application/octet-stream',
         successMessage: () => context.l10n.trackLyricsSaved(baseName),
         hideCurrentSnackBar: true,
-        writeTo: (outputPath) => PlatformBridge.fetchAndSaveLyrics(
-          trackName: trackName,
-          artistName: artistName,
-          spotifyId: _spotifyId ?? '',
-          durationMs: durationMs,
-          outputPath: outputPath,
-          audioFilePath: _fileExists ? cleanFilePath : '',
-        ),
+        writeTo: (outputPath) async {
+          if (networkFile) {
+            // The native writer reads only files on this device, so the
+            // lyrics the NAS file holds are written here, as it would.
+            try {
+              final stored = await _readLocalLyrics(cleanFilePath);
+              final lyrics = stored['lyrics']?.toString() ?? '';
+              if (hasUsableLyricsContent(lyrics)) {
+                await File(outputPath).writeAsString(lyrics);
+                return {'success': true};
+              }
+            } catch (e) {
+              _log.d('Could not read the network lyrics: $e');
+            }
+          }
+          return PlatformBridge.fetchAndSaveLyrics(
+            trackName: trackName,
+            artistName: artistName,
+            spotifyId: _spotifyId ?? '',
+            durationMs: durationMs,
+            outputPath: outputPath,
+            audioFilePath: _fileExists && !networkFile ? cleanFilePath : '',
+          );
+        },
       );
     } catch (e) {
       if (mounted) {

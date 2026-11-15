@@ -120,8 +120,8 @@ finds the server file gone leaves the offline copy alone. Playback prefers an
 available local copy even for network songs already queued. This does not change
 the network destination for new provider downloads or synchronize later edits.
 
-Remote metadata editing, separate sidecar lyric files,
-AutoMix and direct USB/DAP bit-perfect output are not part of this browser.
+Remote metadata editing, AutoMix and direct USB/DAP bit-perfect output are not
+part of this browser.
 Normal playback uses the platform audio decoder, so codec support follows the
 device. On iOS and macOS, formats AVPlayer cannot open (APE, WavPack, DSD and
 others) are converted with FFmpeg to a temporary lossless copy first; a song
@@ -133,6 +133,15 @@ land under the chosen folder in the folders **Settings → Files → Folder
 Organization** gives a download of the song, from its tags, and never replace
 a remote file. Rules that name the source playlist keep the folder the song has
 inside the download folder, since the Library does not record the playlist.
+A `.lrc` file beside the song, including an Android storage document, goes
+along under the same name unless the server already has one.
+
+On an SMB or WebDAV connection, a song's **Save Cover Art** and **Save Lyrics
+(.lrc)** write `Artist - Title.jpg` or `.lrc` into the song's folder on the
+server, replacing a file of that name as they do on the device. The cover is the
+artwork embedded in the file, else the song's Library artwork; the lyrics are
+the embedded ones, else fetched online. HTTP and Subsonic songs do not offer
+them.
 
 ## Validation
 

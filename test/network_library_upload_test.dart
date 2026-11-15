@@ -374,6 +374,53 @@ void main() {
       ]);
     });
 
+    test('an Android document takes its lyrics sidecar along too', () async {
+      const document = 'content://tree/document/primary%3AMusic%2Fa.flac';
+      const silent = 'content://tree/document/primary%3AMusic%2Fb.flac';
+      final audio = await file('copy.flac');
+      final published = <String, String>{};
+      final transfers = <String>[];
+      final sidecars = <String>[];
+      final result =
+          await NetworkLibraryUploader(
+            connections: () async => writable,
+            prepare: (_, relativeDir, fileName) async =>
+                NetworkStorageService.source('nas', '$relativeDir/$fileName'),
+            publish:
+                (
+                  target,
+                  file,
+                  transferId, {
+                  required checkpoint,
+                  required progress,
+                }) async {
+                  transfers.add(transferId);
+                  if (target.endsWith('.lrc')) sidecars.add(file.path);
+                  published[target] = target.endsWith('.lrc')
+                      ? await file.readAsString()
+                      : 'audio';
+                },
+            openFile: (path) async =>
+                NetworkUploadFile(File(audio), () async {}),
+            readDocumentLyrics: (uri) async =>
+                uri == document ? '[00:01.00]Line' : null,
+          ).upload([
+            song(document, 'a.flac'),
+            song(silent, 'b.flac'),
+          ], folder: 'network://nas/');
+      expect(result.saved, 2);
+      expect(published, {
+        'network://nas/Artist/Album/a.flac': 'audio',
+        'network://nas/Artist/Album/a.lrc': '[00:01.00]Line',
+        'network://nas/Artist/Album/b.flac': 'audio',
+      });
+      // The sidecar is a transfer of its own, never the audio's.
+      expect(transfers.toSet(), hasLength(3));
+      // The sidecar's temporary copy is gone once it is uploaded.
+      expect(sidecars, hasLength(1));
+      expect(File(sidecars.single).parent.existsSync(), isFalse);
+    });
+
     test('cancelling stops the run without counting a failure', () async {
       final cancel = LinkOfflineCancel();
       final a = await file('a.flac');

@@ -202,6 +202,44 @@ void main() {
         });
       }
 
+      test(
+        'a saved sidecar goes beside the song and replaces an older one',
+        () async {
+          final local = await Directory.systemTemp.createTemp(
+            'network-sidecar-test-',
+          );
+          addTearDown(() => local.delete(recursive: true));
+          final sidecar = File('${local.path}/Artist - Song.lrc');
+          final target = NetworkStorageService.source(
+            'edit-nas',
+            'Artist - Song.lrc',
+          );
+          await sidecar.writeAsString('[00:01.00]First');
+          await editor.saveSidecar(target, sidecar);
+          expect(
+            utf8.decode(nas.files['Artist - Song.lrc']!),
+            '[00:01.00]First',
+          );
+          await sidecar.writeAsString('[00:01.00]Second');
+          await editor.saveSidecar(target, sidecar);
+          expect(
+            utf8.decode(nas.files['Artist - Song.lrc']!),
+            '[00:01.00]Second',
+          );
+          expect(nas.files.keys.toSet(), {'song.flac', 'Artist - Song.lrc'});
+          expect(nas.files['song.flac'], originalBytes());
+          // Each save keeps the device awake only while it runs.
+          expect(awake, ['acquire', 'release', 'acquire', 'release']);
+          // The song itself did not change, so nothing reloads it.
+          expect(changes, isEmpty);
+
+          await expectLater(
+            editor.saveSidecar('network://gone/cover.jpg', sidecar),
+            throwsFormatException,
+          );
+        },
+      );
+
       test('a failed tag writer never uploads or publishes a change', () async {
         expect(
           (await save(failEdit: true)).failure,

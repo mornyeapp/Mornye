@@ -130,7 +130,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         remote(LinkLibraryAction.editMetadata),
       if (remoteFile)
         remote(LinkLibraryAction.saveCover)
-      else if (!_isNetworkItem &&
+      else if (_canSaveSidecarFiles &&
           (_coverUrl != null || _fileExists || _hasPath(_localCoverPath)))
         _MetadataOption(
           icon: Icons.image_outlined,
@@ -139,7 +139,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         ),
       if (remoteFile)
         remote(LinkLibraryAction.saveLyrics)
-      else if (!_isNetworkItem)
+      else if (_canSaveSidecarFiles)
         _MetadataOption(
           icon: Icons.lyrics_outlined,
           label: l10n.trackSaveLyrics,
