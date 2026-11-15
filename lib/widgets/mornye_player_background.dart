@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:mornye/theme/cover_palette.dart';
+import 'package:mornye/widgets/material_player_backdrop.dart';
 
 /// The player's background for a cover whose average is [sourceColor]. With
 /// [fullBleed] it runs behind the artwork and the controls, otherwise behind
@@ -67,6 +68,7 @@ class MornyePlayerBackground extends StatelessWidget {
     this.squareArtwork = true,
     this.artworkAspectRatio,
     this.fadeStart = 0.58,
+    this.coverBlur = true,
   });
 
   final Uri? artUri;
@@ -76,6 +78,10 @@ class MornyePlayerBackground extends StatelessWidget {
 
   /// Fraction of the artwork's height that stays sharp before fading out.
   final double fadeStart;
+
+  /// Whether the full-bleed cover fades into a blur of itself. Without it,
+  /// as where blur effects are off, it fades into the flat gradient.
+  final bool coverBlur;
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +130,27 @@ class MornyePlayerBackground extends StatelessWidget {
                         artworkHeight,
                       ),
                     ),
+                  // The cover carries on under the controls as a blur, so
+                  // its colours stay around the buttons instead of ending
+                  // in one flat tone. The gradient shows until it is ready
+                  // and for a song without a cover.
+                  AnimatedSwitcher(
+                    duration: motion,
+                    switchInCurve: Curves.easeInOutCubic,
+                    switchOutCurve: Curves.easeInOutCubic,
+                    layoutBuilder: (current, previous) => Stack(
+                      fit: StackFit.expand,
+                      children: [...previous, ?current],
+                    ),
+                    child: artwork == null || !coverBlur
+                        ? const SizedBox.shrink()
+                        : _CoverBlur(
+                            key: const ValueKey('full-player-blur'),
+                            artUri: artUri,
+                            top: artworkHeight * fadeStart,
+                            bottom: artworkHeight,
+                          ),
+                  ),
                 ],
               ),
             ),
@@ -214,6 +241,58 @@ class MornyeControlsDim extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The blurred cover from the artwork's fade down, under a shade that keeps
+/// a vivid cover from competing with the controls.
+class _CoverBlur extends StatelessWidget {
+  const _CoverBlur({
+    super.key,
+    required this.artUri,
+    required this.top,
+    required this.bottom,
+  });
+
+  final Uri? artUri;
+  final double top;
+  final double bottom;
+
+  @override
+  Widget build(BuildContext context) {
+    final height = MediaQuery.sizeOf(context).height;
+    return IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          PlayerCoverBlur(
+            artUri: artUri?.toString(),
+            colorScheme: Theme.of(context).colorScheme,
+            // Opaque by the middle of the artwork's own fade, before the
+            // flat gradient under it shows as a dull band between the two.
+            reveal: (top: top, bottom: (top + bottom) / 2),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: [
+                  (top / height).clamp(0.0, 1.0),
+                  (bottom / height).clamp(0.0, 1.0),
+                  1,
+                ],
+                colors: const [
+                  Color(0x00000000),
+                  Color(0x2e000000),
+                  Color(0x52000000),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

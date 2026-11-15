@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/theme/cover_palette.dart';
+import 'package:mornye/widgets/material_player_backdrop.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
 
 const _width = 200.0;
@@ -213,6 +214,8 @@ void main() {
             artwork: artwork ? _artwork : null,
             artworkAspectRatio: ratio,
             fadeStart: overlayFadeStart ?? fadeStart,
+            // The reference composite ends in the flat gradient.
+            coverBlur: false,
           ),
         ),
       ],
@@ -239,6 +242,84 @@ void main() {
     }
     return largest;
   }
+
+  testWidgets('the cover carries on under the controls as a blur', (
+    tester,
+  ) async {
+    final directory = Directory.systemTemp.createTempSync('player-blur-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    // Far from the tone the flat gradient derives from it.
+    final cover = (await tester.runAsync(
+      () => _cover(directory, const Color(0xffe8e010)),
+    ))!;
+
+    Future<void> show({required bool artwork, bool coverBlur = true}) =>
+        tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: side(
+                overlay,
+                MornyePlayerBackground(
+                  artUri: cover,
+                  artwork: artwork ? _artwork : null,
+                  coverBlur: coverBlur,
+                ),
+              ),
+            ),
+          ),
+        );
+    final blur = find.descendant(
+      of: find.byType(PlayerCoverBlur),
+      matching: find.byType(RawImage),
+    );
+    Future<void> settle({bool untilBlurred = false}) async {
+      // The cover decodes off the test clock.
+      for (var i = 0; i < 200; i++) {
+        if (i >= 5 && (!untilBlurred || blur.evaluate().isNotEmpty)) break;
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 5)),
+        );
+        await tester.pump();
+      }
+      // Past the fades of the switch and of a new cover.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    int channel(Uint8List data, int x, int y, int offset) =>
+        data[(y * _width.toInt() + x) * 4 + offset];
+
+    await show(artwork: true, coverBlur: false);
+    await settle();
+    expect(find.byType(PlayerCoverBlur), findsNothing);
+    final flat = await pixels(tester, overlay);
+
+    await show(artwork: true);
+    await settle(untilBlurred: true);
+    expect(tester.widget<RawImage>(blur).image, isNotNull);
+    final blurred = await pixels(tester, overlay);
+    // The sharp part of the cover is untouched.
+    for (final offset in [0, 1, 2]) {
+      expect(channel(blurred, 100, 40, offset), channel(flat, 100, 40, offset));
+    }
+    // Under the controls the cover's own yellow shows, where the flat
+    // gradient was a muted gray-green: far more red than blue.
+    final red = channel(blurred, 100, 360, 0);
+    final blue = channel(blurred, 100, 360, 2);
+    expect(red - blue, greaterThan(60));
+    expect(
+      channel(flat, 100, 360, 0) - channel(flat, 100, 360, 2),
+      lessThan(red - blue),
+    );
+
+    // Lyrics and the queue keep their plain gradient.
+    await show(artwork: false);
+    await settle();
+    expect(find.byType(PlayerCoverBlur), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   setUp(() {
     final view =
