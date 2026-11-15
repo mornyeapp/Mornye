@@ -279,10 +279,15 @@ class PlayerCoverBlur extends StatefulWidget {
     required this.artUri,
     required this.colorScheme,
     this.reveal,
+    this.sigma = 48,
   });
 
   final String? artUri;
   final ColorScheme colorScheme;
+
+  /// The blur radius in logical pixels. The default keeps the cover's
+  /// larger shapes; a few times that leaves only its colours.
+  final double sigma;
 
   /// Without it the blur sits between two layers of the surface colour and
   /// is blurred live while the cover decodes. With it, only the blur is
@@ -297,7 +302,6 @@ class PlayerCoverBlur extends StatefulWidget {
 
 class _PlayerCoverBlurState extends State<PlayerCoverBlur>
     with SingleTickerProviderStateMixin {
-  static const _sigma = 48.0;
   static const _artWidth = PlayerArtwork.miniCacheWidth;
 
   late final _listener = ImageStreamListener(
@@ -392,18 +396,26 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
     Size size,
     double dpr,
     ({double top, double bottom})? reveal,
+    double logicalSigma,
   ) {
     final scale = dpr / 4;
     final width = math.max(1, (size.width * scale).ceil());
     final height = math.max(1, (size.height * scale).ceil());
     final rect = Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble());
-    final sigma = _sigma * scale;
+    final sigma = logicalSigma * scale;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     if (reveal != null) canvas.saveLayer(rect, Paint());
     canvas.saveLayer(
       rect,
-      Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+      Paint()
+        ..imageFilter = ui.ImageFilter.blur(
+          sigmaX: sigma,
+          sigmaY: sigma,
+          // Alone over a sharp cover the blur has to stay opaque up to its
+          // edges; between the surface layers it fades into them instead.
+          tileMode: reveal == null ? null : TileMode.clamp,
+        ),
     );
     paintImage(
       canvas: canvas,
@@ -453,7 +465,10 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
       if (reveal != null) return const SizedBox.shrink();
       // Blur live while the cover decodes and for the placeholder.
       blurred = ImageFiltered(
-        imageFilter: ui.ImageFilter.blur(sigmaX: _sigma, sigmaY: _sigma),
+        imageFilter: ui.ImageFilter.blur(
+          sigmaX: widget.sigma,
+          sigmaY: widget.sigma,
+        ),
         child: PlayerArtwork(
           artUri: widget.artUri,
           colorScheme: widget.colorScheme,
@@ -464,10 +479,11 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
       final dpr = MediaQuery.devicePixelRatioOf(context);
       blurred = LayoutBuilder(
         builder: (context, constraints) {
-          final inputs = (art, constraints.biggest, dpr, reveal);
+          final sigma = widget.sigma;
+          final inputs = (art, constraints.biggest, dpr, reveal, sigma);
           if (inputs != _blurInputs) {
             _blur?.dispose();
-            _blur = _render(art, constraints.biggest, dpr, reveal);
+            _blur = _render(art, constraints.biggest, dpr, reveal, sigma);
             _blurInputs = inputs;
           }
           final outgoing = _outgoing;

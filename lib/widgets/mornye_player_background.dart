@@ -273,6 +273,10 @@ class _CoverBlur extends StatelessWidget {
             // Opaque by the middle of the artwork's own fade, before the
             // flat gradient under it shows as a dull band between the two.
             reveal: (top: top, bottom: (top + bottom) / 2),
+            // Far past the cover's shapes: they would read as a second,
+            // see-through cover under the sharp one. Only its colours stay,
+            // as one tone that shifts slowly down the screen.
+            sigma: 120,
           ),
           DecoratedBox(
             decoration: BoxDecoration(
