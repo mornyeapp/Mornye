@@ -743,6 +743,202 @@ fn fetch_from_asks_only_the_chosen_provider_and_bypasses_the_cache() {
     );
 }
 
+/// Three installed providers, asked in this order. Each result's source
+/// names its provider the way installed providers report it.
+fn ranked_service(
+    handler: impl Fn(&str, &str, &Check<'_>) -> FetchResult + Send + Sync + 'static,
+) -> Arc<LyricsService> {
+    let service = Arc::new(LyricsService::new(Arc::new(Mock {
+        handler: Box::new(
+            move |provider: &str, _: &SearchRequest, check: &Check<'_>| {
+                let source = provider.replace("extension:", "Extension: ");
+                handler(provider, &source, check)
+            },
+        ),
+        extensions: vec!["first".into(), "second".into(), "third".into()],
+    })));
+    service
+        .set_providers(&[
+            "extension:first".into(),
+            "extension:second".into(),
+            "extension:third".into(),
+        ])
+        .unwrap();
+    service
+}
+fn plain(source: &str) -> LyricsResponse {
+    LyricsResponse::from_text("First line\nSecond line", "Example", source)
+}
+fn word_synced(source: &str) -> LyricsResponse {
+    LyricsResponse::from_text(
+        "[00:01.00]<00:01.00>First <00:01.50>line<00:02.00>",
+        "Example",
+        source,
+    )
+}
+fn instrumental(source: &str) -> LyricsResponse {
+    LyricsResponse {
+        instrumental: true,
+        provider: "Example".into(),
+        source: source.into(),
+        ..LyricsResponse::default()
+    }
+}
+
+#[test]
+fn best_timing_takes_a_later_word_synced_result_over_plain_and_line_lyrics() {
+    let asked = Arc::new(AtomicUsize::new(0));
+    let service = ranked_service({
+        let asked = asked.clone();
+        move |provider, source, _| {
+            asked.fetch_add(1, Ordering::AcqRel);
+            match provider {
+                "extension:first" => Ok(plain(source)),
+                "extension:second" => Ok(lyrics(source)),
+                _ => {
+                    thread::sleep(Duration::from_millis(40));
+                    Ok(word_synced(source))
+                }
+            }
+        }
+    });
+    let found = service.fetch(request(), &|| Ok(())).unwrap();
+    assert_eq!(found.source, "Extension: third");
+    assert!(found.is_word_synced());
+    assert_eq!(asked.load(Ordering::Acquire), 3);
+    // The choice is cached: asking again sends no request.
+    assert_eq!(
+        service.fetch(request(), &|| Ok(())).unwrap().source,
+        "Extension: third (cached)"
+    );
+    assert_eq!(asked.load(Ordering::Acquire), 3);
+}
+
+#[test]
+fn a_word_synced_result_ends_the_search_without_waiting_for_later_providers() {
+    let started = Arc::new(AtomicUsize::new(0));
+    let cancelled = Arc::new(AtomicUsize::new(0));
+    let service = ranked_service({
+        let started = started.clone();
+        let cancelled = cancelled.clone();
+        move |provider, source, check| {
+            started.fetch_add(1, Ordering::AcqRel);
+            if provider == "extension:first" {
+                // Answer once the others are in flight.
+                while started.load(Ordering::Acquire) < 3 {
+                    check().map_err(LyricsError::Cancelled)?;
+                    thread::sleep(Duration::from_millis(2));
+                }
+                return Ok(word_synced(source));
+            }
+            while check().is_ok() {
+                thread::sleep(Duration::from_millis(2));
+            }
+            cancelled.fetch_add(1, Ordering::AcqRel);
+            Err(LyricsError::Cancelled("cancelled later provider".into()))
+        }
+    });
+    let start = Instant::now();
+    assert_eq!(
+        service.fetch(request(), &|| Ok(())).unwrap().source,
+        "Extension: first"
+    );
+    assert!(start.elapsed() < PRIORITY_GRACE);
+    assert_eq!(cancelled.load(Ordering::Acquire), 2);
+}
+
+#[test]
+fn provider_order_decides_between_results_with_the_same_timing() {
+    let line = ranked_service(|provider, source, _| match provider {
+        "extension:first" => {
+            thread::sleep(Duration::from_millis(40));
+            Ok(lyrics(source))
+        }
+        "extension:second" => Ok(lyrics(source)),
+        _ => Ok(plain(source)),
+    });
+    assert_eq!(
+        line.fetch(request(), &|| Ok(())).unwrap().source,
+        "Extension: first"
+    );
+    let word = ranked_service(|provider, source, _| match provider {
+        "extension:first" => Ok(plain(source)),
+        "extension:second" => {
+            thread::sleep(Duration::from_millis(40));
+            Ok(word_synced(source))
+        }
+        _ => Ok(word_synced(source)),
+    });
+    assert_eq!(
+        word.fetch(request(), &|| Ok(())).unwrap().source,
+        "Extension: second"
+    );
+}
+
+#[test]
+fn provider_order_only_keeps_the_first_provider_with_lyrics() {
+    let service = ranked_service(|provider, source, _| match provider {
+        "extension:first" => {
+            thread::sleep(Duration::from_millis(40));
+            Ok(plain(source))
+        }
+        _ => Ok(word_synced(source)),
+    });
+    service
+        .set_options(FetchOptions {
+            prefer_best_timing: false,
+            ..FetchOptions::default()
+        })
+        .unwrap();
+    assert_eq!(
+        service.fetch(request(), &|| Ok(())).unwrap().source,
+        "Extension: first"
+    );
+    // As before the choice existed, an instrumental answer counts as well.
+    let service = ranked_service(|provider, source, _| match provider {
+        "extension:first" => Ok(instrumental(source)),
+        _ => Ok(word_synced(source)),
+    });
+    service
+        .set_options(FetchOptions {
+            prefer_best_timing: false,
+            ..FetchOptions::default()
+        })
+        .unwrap();
+    assert!(service.fetch(request(), &|| Ok(())).unwrap().instrumental);
+}
+
+#[test]
+fn instrumental_and_empty_results_lose_to_real_lyrics() {
+    let service = ranked_service(|provider, source, _| match provider {
+        "extension:first" => Ok(LyricsResponse {
+            source: source.into(),
+            ..LyricsResponse::default()
+        }),
+        "extension:second" => Ok(instrumental(source)),
+        _ => {
+            thread::sleep(Duration::from_millis(40));
+            Ok(plain(source))
+        }
+    });
+    let found = service.fetch(request(), &|| Ok(())).unwrap();
+    assert_eq!(found.source, "Extension: third");
+    assert!(!found.instrumental);
+    // Without real lyrics, an instrumental answer beats tags and markers.
+    let service = ranked_service(|provider, source, _| match provider {
+        "extension:first" => Ok(LyricsResponse::from_text(
+            "[ar:Artist]\n[instrumental:true]",
+            "Example",
+            source,
+        )),
+        "extension:second" => Ok(instrumental(source)),
+        _ => Err(LyricsError::NotFound("missing".into())),
+    });
+    let found = service.fetch(request(), &|| Ok(())).unwrap();
+    assert_eq!(found.source, "Extension: second");
+    assert!(found.instrumental);
+}
+
 #[test]
 fn fetch_from_rejects_disabled_providers_and_honours_cancellation() {
     let service = service(|provider, _, _| Ok(lyrics(provider)));

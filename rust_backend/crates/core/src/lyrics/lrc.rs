@@ -133,6 +133,23 @@ pub fn has_usable_timing(lines: &[LyricsLine]) -> bool {
     })
 }
 
+/// Whether any line times its words: an inline timestamp that starts some
+/// text, as enhanced LRC writes it. A lone closing timestamp only ends the
+/// line.
+pub fn has_word_timing(lines: &[LyricsLine]) -> bool {
+    lines.iter().any(|line| {
+        let words = &line.words;
+        let mut times = INLINE_TIME.find_iter(words).peekable();
+        while let Some(time) = times.next() {
+            let end = times.peek().map_or(words.len(), |next| next.start());
+            if !words[time.end()..end].trim().is_empty() {
+                return true;
+            }
+        }
+        false
+    })
+}
+
 pub(super) fn untimed_text(lines: &[LyricsLine]) -> String {
     INLINE_TIME
         .replace_all(&plain_from_timed_lines(lines), "")
@@ -321,6 +338,26 @@ mod tests {
                 assert!(saved.contains("<00:01.00>"));
             }
         }
+    }
+
+    #[test]
+    fn word_timing_needs_a_timestamp_that_starts_text() {
+        let word = LyricsResponse::from_text(
+            "[00:01.00]v1:<00:01.00>First <00:01.50>line<00:02.00>",
+            "Example",
+            "Example",
+        );
+        assert!(word.is_word_synced());
+        // A closing timestamp after the text only ends the line.
+        let line =
+            LyricsResponse::from_text("[00:01.00]First line<00:02.00>", "Example", "Example");
+        assert!(line.is_synced());
+        assert!(!line.is_word_synced());
+        // Word timestamps without line timestamps are plain lyrics.
+        let plain =
+            LyricsResponse::from_text("<00:01.00>First <00:01.50>line", "Example", "Example");
+        assert!(!plain.is_synced());
+        assert!(!plain.is_word_synced());
     }
 
     #[test]

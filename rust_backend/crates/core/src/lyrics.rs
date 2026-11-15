@@ -118,6 +118,12 @@ impl LyricsResponse {
         self.sync_type == "LINE_SYNCED" && lrc::has_usable_timing(self.lines())
     }
 
+    /// Synced lyrics that also time each word, as TTML and enhanced LRC
+    /// sources give them.
+    pub fn is_word_synced(&self) -> bool {
+        self.is_synced() && lrc::has_word_timing(self.lines())
+    }
+
     pub fn normalize_timing(&mut self) {
         if self.sync_type == "LINE_SYNCED" && !self.is_synced() {
             self.sync_type = "UNSYNCED".into();

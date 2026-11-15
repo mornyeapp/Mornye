@@ -3,8 +3,9 @@
 
 use super::{CallGraph, CallNode, Check, LyricsError, cache::LyricsCache};
 use crate::coalescer::{Coalescer, Flight, Waiter};
-use mornye_core::lyrics::{LyricsResponse, config, config::FetchOptions, matching};
+use mornye_core::lyrics::{LyricsResponse, config, config::FetchOptions, lrc, matching};
 use mornye_core::matching::lowercase;
+use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
@@ -18,8 +19,42 @@ const NEGATIVE_TTL: Duration = Duration::from_secs(5 * 60);
 // A transient outage must not disable lyrics for the rest of an album.
 const UNAVAILABLE_COOLDOWN: Duration = Duration::from_secs(2);
 const RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(60);
+// After each better result, the longest wait for a provider that could still
+// beat it: an earlier one, or with the timing choice a later one too.
 const PRIORITY_GRACE: Duration = Duration::from_secs(5);
 const MAX_NEGATIVE: usize = 500;
+
+/// How closely a provider's result follows the song, worst first. With
+/// [`FetchOptions::prefer_best_timing`] a later provider's better result
+/// replaces an earlier one; provider order decides between equals.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum Timing {
+    /// Text without a line of lyrics, such as tags or an instrumental
+    /// marker alone.
+    Empty,
+    Instrumental,
+    Plain,
+    Line,
+    Word,
+}
+
+impl Timing {
+    fn of(lyrics: &LyricsResponse) -> Self {
+        if lyrics.instrumental {
+            Self::Instrumental
+        } else if lyrics.is_word_synced() {
+            Self::Word
+        } else if lyrics.is_synced() {
+            Self::Line
+        } else if lyrics.lines().iter().any(|line| {
+            !lrc::is_instrumental_marker(&line.words) && lrc::has_usable_content(&line.words)
+        }) {
+            Self::Plain
+        } else {
+            Self::Empty
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct SearchRequest {
@@ -544,8 +579,11 @@ impl Inner {
                 });
             }
             drop(sender);
+            let prefer_timing = request.options.prefer_best_timing;
             let mut completed = vec![false; providers.len()];
-            let mut best: Option<(usize, LyricsResponse)> = None;
+            // Without the timing choice every result ranks alike (None), so
+            // the first provider in order with lyrics wins.
+            let mut best: Option<(Option<Timing>, usize, LyricsResponse)> = None;
             let mut deadline = None;
             let mut last_error = None;
             let mut other_error = None;
@@ -557,12 +595,15 @@ impl Inner {
                 if let Err(error) = self.check(check) {
                     break Err(error);
                 }
-                if let Some((index, _)) = &best {
+                if let Some((timing, index, _)) = &best {
+                    // An earlier provider wins a tie, so it can still replace
+                    // the result; a later one only with better timing.
+                    let later_can_win = timing.is_some_and(|timing| timing < Timing::Word);
                     let pending = candidates
                         .iter()
-                        .any(|(earlier, _)| earlier < index && !completed[*earlier]);
+                        .any(|(other, _)| !completed[*other] && (other < index || later_can_win));
                     if !pending || deadline.is_some_and(|limit| Instant::now() >= limit) {
-                        break Ok(best.take().expect("best lyrics result").1);
+                        break Ok(best.take().expect("best lyrics result").2);
                     }
                 }
                 match receiver.recv_timeout(POLL) {
@@ -584,15 +625,19 @@ impl Inner {
                         }
                         if let Ok(lyrics) = result
                             && lyrics.has_usable_text()
-                            && best.as_ref().is_none_or(|(current, _)| index < *current)
                         {
-                            best = Some((index, lyrics));
-                            deadline = Some(Instant::now() + grace);
+                            let timing = prefer_timing.then(|| Timing::of(&lyrics));
+                            if best.as_ref().is_none_or(|(current, earlier, _)| {
+                                (timing, Reverse(index)) > (*current, Reverse(*earlier))
+                            }) {
+                                best = Some((timing, index, lyrics));
+                                deadline = Some(Instant::now() + grace);
+                            }
                         }
                     }
                     Err(mpsc::RecvTimeoutError::Timeout) => {}
                     Err(mpsc::RecvTimeoutError::Disconnected) => {
-                        break best.map(|(_, lyrics)| lyrics).ok_or_else(|| {
+                        break best.map(|(_, _, lyrics)| lyrics).ok_or_else(|| {
                             recursive
                                 .or(unavailable)
                                 .or(other_error)
