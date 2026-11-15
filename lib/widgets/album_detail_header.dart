@@ -148,10 +148,14 @@ class AlbumDetailHeader extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final edgeInset = detailHeaderEdgeInset(context);
     final screenSize = MediaQuery.sizeOf(context);
-    // Landscape tablets are short: the artwork also yields to the height so
-    // the title and actions stay on the first screen.
+    // On a phone the artwork spans the width, however wide the phone or
+    // small its Interface size; only tablets cap it. Landscape screens are
+    // short: the artwork also yields to the height so the title and actions
+    // stay on the first screen.
     final artworkSize = math.min(
-      screenSize.width.clamp(0.0, 440.0),
+      screenSize.shortestSide >= 600
+          ? screenSize.width.clamp(0.0, 440.0)
+          : screenSize.width,
       math.max(240.0, screenSize.height * 0.55),
     );
     final details = _buildMornyeDetails(context);

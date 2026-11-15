@@ -707,6 +707,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final (size, width) in [
+    // A wide phone, or a small Interface size, spans the width.
+    (const Size(480, 1120), 480.0),
+    // A portrait tablet keeps the cap.
+    (const Size(820, 1180), 440.0),
+  ]) {
+    testWidgets('square album artwork is $width wide on $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: MornyeTheme.build(Brightness.dark),
+            home: CollectionScaffold(
+              scrollController: controller,
+              isSelectionMode: false,
+              onExitSelectionMode: () {},
+              bottomInset: 0,
+              appBar: const AlbumDetailHeader(
+                title: 'Album title',
+                expandedHeight: 400,
+                showTitleInAppBar: false,
+                immersive: true,
+                background: ColoredBox(
+                  key: ValueKey('album-cover'),
+                  color: Colors.orange,
+                ),
+              ),
+              slivers: const [
+                SliverToBoxAdapter(child: SizedBox(height: 2000)),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final cover = tester.getRect(find.byKey(const ValueKey('album-cover')));
+      expect(cover.width, width);
+      expect(cover.center.dx, size.width / 2);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'artist identity grows with text and retains navigation after scroll',
     (tester) async {
