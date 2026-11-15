@@ -92,11 +92,21 @@ class ContentUriPlaybackCache {
 
   /// Editing tags waits for an older copy; deleting a source retires its copy
   /// immediately so queue removal never waits for an unavailable provider.
+  ///
+  /// A copy an edit retires may just have gone to a deck that has not pinned
+  /// it yet, so it is only deleted by the next [releaseUnpinned] that finds
+  /// no deck holding it. Later resolutions make a fresh copy either way.
   Future<bool> invalidate(String source, {bool waitForPending = false}) async {
     final pending = waitForPending ? _pending[source] : _pending.remove(source);
     if (waitForPending) await pending;
     final entry = _entries.remove(source);
-    if (entry != null) await _discard(entry.path);
+    if (entry != null) {
+      if (waitForPending) {
+        _pendingDeletes.add(entry.path);
+      } else {
+        await _discard(entry.path);
+      }
+    }
     return pending != null;
   }
 

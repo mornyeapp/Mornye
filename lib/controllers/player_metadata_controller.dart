@@ -93,8 +93,24 @@ class PlayerMetadataController extends ChangeNotifier {
           _savingLyricsSources.contains(changed)) {
         return;
       }
+      final item = _item;
+      // Read again what was read before: a copy is probed on every load, an
+      // unresolved document only when something asked for its tags.
+      final readFile =
+          _loadedPath != null ||
+          _probePending ||
+          _metadataPath(changed, _requestKey?.$3) != changed;
       _requestKey = null;
-      await load(_item);
+      if (item == null || !changed.startsWith('content://')) {
+        await load(item);
+        return;
+      }
+      // A document's playback copy keeps the tags it was made with, so the
+      // changed document itself is read again rather than that copy.
+      await load(
+        item.copyWith(extras: {...?item.extras, 'resolvedSource': null}),
+        inspectUnresolvedContentUri: readFile,
+      );
     });
   }
 

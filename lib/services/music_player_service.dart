@@ -1170,15 +1170,22 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> _refreshNormalizationSource(String source) async {
     _normalizationGeneration++;
     _normalizationCache.invalidate(source);
-    await _sourceCache.invalidate(source, waitForPending: true);
-    // A FLAC copy carries the tags it was made with.
-    await _formats.invalidate(source);
+    await _retireTaggedCopies(source);
     if (_disposed) return;
     if (_index >= 0 &&
         _index < _media.length &&
         _media[_index].source == source) {
       reapplyNormalization();
     }
+  }
+
+  /// Retires the playback copies made before [source]'s tags changed, so the
+  /// next play and metadata probe read the edited file. A copy a deck plays,
+  /// or is about to open, stays on disk until the deck lets go of it.
+  Future<void> _retireTaggedCopies(String source) async {
+    await _sourceCache.invalidate(source, waitForPending: true);
+    // A FLAC copy carries the tags it was made with.
+    await _formats.invalidate(source);
   }
 
   Future<double> _normalizationVolumeFor(
@@ -2696,6 +2703,9 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> onSourceMetadataChanged(String source) async {
     // An edited network file must not play from its copy before the edit.
     await _prefetch.invalidate(source);
+    // Nor a document from its copy: coming back to the song would read the
+    // old tags, lyrics too, from that copy again.
+    await _retireTaggedCopies(source);
     if (_disposed || !_media.any((item) => item.source == source)) return;
     final token = Object();
     _metadataChanges[source] = token;
@@ -2751,6 +2761,10 @@ class MusicPlayerHandler extends BaseAudioHandler
             ...?item.extras,
             ...?facts.extras,
             'explicit': updated.explicit,
+            // The resolved path names a copy made before this edit, so
+            // metadata probes read the document itself until playback
+            // resolves a fresh copy.
+            if (previous.isContentUri) 'resolvedSource': null,
           },
         );
         final old = _queueItems[i];

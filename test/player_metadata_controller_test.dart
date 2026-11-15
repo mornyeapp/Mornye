@@ -203,6 +203,51 @@ void main() {
   });
 
   test(
+    'a tag change reloads a document from its URI, not its playback copy',
+    () async {
+      final events = SourceMetadataEvents();
+      final paths = <String>[];
+      const source = 'content://library/song.flac';
+      final controller = PlayerMetadataController(
+        metadataEvents: events,
+        readMetadata: (path) async {
+          paths.add(path);
+          return {
+            'lyrics': path == source ? '[00:02.00]Fresh' : '[00:01.00]Copy',
+          };
+        },
+      );
+      addTearDown(controller.dispose);
+      await controller.load(
+        _item('a', source: source, resolved: '/tmp/song.flac'),
+      );
+      expect(controller.lyrics.lines.single.text, 'Copy');
+      await events.publish(source);
+      expect(paths, ['/tmp/song.flac', source]);
+      expect(controller.lyrics.lines.single.text, 'Fresh');
+      expect(controller.filePath, source);
+    },
+  );
+
+  test('a tag change leaves an unread document unread', () async {
+    final events = SourceMetadataEvents();
+    final paths = <String>[];
+    const source = 'content://library/song.flac';
+    final controller = PlayerMetadataController(
+      metadataEvents: events,
+      readMetadata: (path) async {
+        paths.add(path);
+        return {'lyrics': '[00:01.00]Read'};
+      },
+    );
+    addTearDown(controller.dispose);
+    await controller.load(_item('a', source: source));
+    await events.publish(source);
+    expect(paths, isEmpty);
+    expect(controller.source, source);
+  });
+
+  test(
     'disposal prevents outstanding reads from notifying or mutating',
     () async {
       final read = Completer<Map<String, dynamic>>();

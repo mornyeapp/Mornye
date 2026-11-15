@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/unified_library_item.dart';
@@ -46,6 +47,7 @@ import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'
     show databaseFactoryFfi, sqfliteFfiInit;
@@ -3522,6 +3524,106 @@ void main() {
       expect(await cached.exists(), isFalse);
       expect(handler.queue.value.map((item) => item.id), ['one']);
       expect(handler.mediaItem.value?.id, 'one');
+    },
+  );
+
+  test(
+    'lyrics synced for a SAF song stay synced after leaving the song',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('saf-lyrics-');
+      addTearDown(() => directory.delete(recursive: true));
+      const source = 'content://test.provider/document/song.mp3';
+      const plain = 'First line\nSecond line';
+      const synced = '[00:01.00]First line\n[00:04.00]Second line';
+      // The document's lyrics tag. A playback copy keeps the tag the
+      // document had when it was copied, as a real copy keeps its tags.
+      var document = plain;
+      final copyTags = <String, String>{};
+      final copies = <File>[];
+      const channel = MethodChannel('com.zarz.mornye/backend');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method != 'safCopyToTemp') return null;
+        final copy = File('${directory.path}/copy-${copies.length}.mp3');
+        await copy.writeAsString('audio');
+        copies.add(copy);
+        copyTags[copy.path] = document;
+        return copy.path;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      Future<Map<String, dynamic>> tags(String path) async => {
+        'title': 'Song',
+        'lyrics': path == source ? document : copyTags[path] ?? '',
+      };
+      final events = SourceMetadataEvents();
+      final handler = await _runtime(
+        sourceMetadataEvents: events,
+        readMetadata: (path, {displayName}) => tags(path),
+      ).initialize();
+      final metadata = PlayerMetadataController(
+        readMetadata: tags,
+        parseLyrics: (raw) async => LyricsParser.parse(raw),
+        metadataEvents: events,
+        saveOnlineLyrics: (target, raw) async {
+          document = raw;
+          // The tag writer announces every lyrics change it makes.
+          await events.publish(target);
+        },
+      );
+      addTearDown(metadata.dispose);
+      final shown = handler.mediaItem.listen(
+        (item) =>
+            unawaited(metadata.load(item, inspectUnresolvedContentUri: true)),
+      );
+      addTearDown(shown.cancel);
+      Future<void> idle() async {
+        for (var i = 0; i < 100 && (i < 3 || metadata.loading); i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+        }
+        expect(metadata.loading, isFalse);
+      }
+
+      const song = PlayableMedia(
+        id: 'song',
+        source: source,
+        title: 'Song',
+        artist: 'Artist',
+      );
+      await handler.setQueueAndPlay([song, _track]);
+      await idle();
+      expect(
+        handler.mediaItem.value?.extras?['resolvedSource'],
+        copies[0].path,
+      );
+      expect(metadata.rawLyrics, plain);
+
+      final edit = metadata.beginLyricsEdit()!;
+      await metadata.saveEditedLyrics(synced, edit: edit);
+      await idle();
+      expect(document, synced);
+      expect(metadata.lyrics.synced, isTrue);
+      // The song keeps playing from its copy, which stays on disk, while
+      // probes read the edited document instead of that copy.
+      expect(await copies[0].exists(), isTrue);
+      expect(handler.mediaItem.value?.extras?['resolvedSource'], isNull);
+
+      await handler.skipToNext();
+      await idle();
+      expect(handler.mediaItem.value?.id, _track.id);
+      // No deck holds the retired copy any longer.
+      expect(await copies[0].exists(), isFalse);
+
+      await handler.skipToQueueItem(0);
+      await idle();
+      expect(handler.mediaItem.value?.id, 'song');
+      expect(copies, hasLength(2));
+      expect(
+        handler.mediaItem.value?.extras?['resolvedSource'],
+        copies[1].path,
+      );
+      expect(metadata.rawLyrics, synced);
+      expect(metadata.lyrics.synced, isTrue);
     },
   );
 

@@ -95,6 +95,32 @@ void main() {
     expect(await resolution, path);
     expect(await edit, isTrue);
     expect(sources.cachedPath('content://music/one'), isNull);
+    await sources.releaseUnpinned();
+    expect(await File(path).exists(), isFalse);
+    await sources.dispose();
+  });
+
+  test('an edit keeps a copy a deck opens until the deck lets go', () async {
+    final copy = Completer<String?>();
+    final sources = cache((_) => copy.future);
+    final resolution = sources.resolve('content://music/one');
+    final edit = sources.invalidate(
+      'content://music/one',
+      waitForPending: true,
+    );
+    final path = await file('handed-out');
+    copy.complete(path);
+    expect(await edit, isTrue);
+    // The copy reached its deck after the edit retired it; the deck pins it
+    // only once it has opened the file.
+    expect(await resolution, path);
+    expect(await File(path).exists(), isTrue);
+    pins.add(path);
+    await sources.releaseUnpinned();
+    expect(await File(path).exists(), isTrue);
+    expect(sources.cachedPath('content://music/one'), isNull);
+    pins.clear();
+    await sources.releaseUnpinned();
     expect(await File(path).exists(), isFalse);
     await sources.dispose();
   });
