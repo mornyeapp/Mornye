@@ -137,9 +137,7 @@ class _PlayerQueueDismissibleState extends State<PlayerQueueDismissible>
       actions: actions,
       enabled: widget.enabled,
       // Matches the queue sheet's row corners, as the removal strip does.
-      borderRadius: context.isMornye
-          ? BorderRadius.zero
-          : BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(context.isMornye ? 12 : 16),
       // One node, so screen readers find Play next on the row itself.
       child: MergeSemantics(
         child: Stack(
