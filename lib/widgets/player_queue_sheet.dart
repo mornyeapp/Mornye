@@ -8,11 +8,13 @@ import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_queue_artwork.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 
 Future<void> showPlayerQueueSheet(
   BuildContext context,
@@ -27,9 +29,17 @@ Future<void> showPlayerQueueSheet(
     initialChildSize: 0.6,
     maxChildSize: 0.9,
     minChildSize: 0.4,
-    builder: (context, scrollController) => PlayerQueueSheet(
-      colorScheme: colorScheme,
-      scrollController: scrollController,
+    // The sheet's own messenger, so a swipe's confirmation shows over the
+    // sheet instead of behind it.
+    builder: (context, scrollController) => AppScaffoldMessenger(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: false,
+        body: PlayerQueueSheet(
+          colorScheme: colorScheme,
+          scrollController: scrollController,
+        ),
+      ),
     ),
   ),
 );
@@ -94,6 +104,7 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
     final controller = ref.read(musicPlayerControllerProvider);
     // Locked: no reordering or swiping songs away here; adding still works.
     final locked = ref.watch(settingsProvider.select((s) => s.queueLocked));
+    final swipeToPlayNext = queueEntrySwipeEnabled(ref);
     final textTheme = Theme.of(context).textTheme;
     final expressive = materialExpressiveEnabled(context);
     final artworkMotion = AppMotion.spatial(
@@ -218,6 +229,9 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
                   key: ObjectKey(item),
                   enabled: !isCurrent && !locked,
                   onRemove: () => controller.removeQueuedItem(item),
+                  playNext: swipeToPlayNext
+                      ? queueEntrySwipe(controller, item)
+                      : null,
                   child: ListTile(
                     key: i == 0 ? _firstRowKey : null,
                     selected: isCurrent,

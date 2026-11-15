@@ -4,20 +4,32 @@ import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/swipe_commit_haptic.dart';
 
 /// Removing a row affects the queue only, never the song on disk.
+///
+/// The row swipes toward its start to remove the song. With [playNext] it
+/// also swipes toward its end to play a copy of the song next, as song rows
+/// swipe to play next ([QueueSwipe]), mirrored right to left.
 class PlayerQueueDismissible extends StatefulWidget {
   const PlayerQueueDismissible({
     super.key,
     required this.onRemove,
     required this.child,
     this.enabled = true,
+    this.playNext,
   });
 
   final VoidCallback onRemove;
   final Widget child;
+
+  /// False (the current song, a locked queue) turns both swipes off.
   final bool enabled;
+
+  /// The swipe toward the row's end, from [queueEntrySwipe]; null offers
+  /// none.
+  final QueueSwipeActions? playNext;
 
   @override
   State<PlayerQueueDismissible> createState() => _PlayerQueueDismissibleState();
@@ -113,8 +125,32 @@ class _PlayerQueueDismissibleState extends State<PlayerQueueDismissible>
               ).deleteButtonTooltip,
             ),
           ),
-    child: widget.child,
+    child: _withPlayNext(context, widget.child),
   );
+
+  /// Inside the row, so its recognizer sees a drag first: it takes the
+  /// swipe toward the end and leaves the one toward the start to removal.
+  Widget _withPlayNext(BuildContext context, Widget row) {
+    final actions = widget.playNext;
+    if (actions == null) return row;
+    return QueueSwipe(
+      actions: actions,
+      enabled: widget.enabled,
+      // Matches the queue sheet's row corners, as the removal strip does.
+      borderRadius: context.isMornye
+          ? BorderRadius.zero
+          : BorderRadius.circular(16),
+      // One node, so screen readers find Play next on the row itself.
+      child: MergeSemantics(
+        child: Stack(
+          children: [
+            const Positioned.fill(child: QueueSwipeSemantics()),
+            row,
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildMornyeBackground(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(

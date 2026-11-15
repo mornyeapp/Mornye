@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -26,11 +27,16 @@ import 'package:mornye/widgets/swipe_progress_haptic.dart';
 /// plays the song next and the swipe toward its start adds it to the end of
 /// the queue, in both styles.
 class QueueSwipeActions {
-  const QueueSwipeActions(this.enqueue);
+  const QueueSwipeActions(this.enqueue, {this.addToQueue = true});
 
   /// Queues the row's song next ([playNext]) or last. Resolves false when
   /// it found nothing to queue, so no confirmation shows.
   final Future<bool> Function({required bool playNext}) enqueue;
+
+  /// False offers only the swipe toward the end (play next) and leaves the
+  /// swipe toward the start to what encloses the row, such as the play
+  /// queue's swipe to remove.
+  final bool addToQueue;
 }
 
 /// Phones and tablets offer the swipe and its setting. Desktop and Android
@@ -65,6 +71,23 @@ QueueSwipeActions? resolvedLibraryItemQueueSwipe(
     return true;
   });
 }
+
+/// Whether the play queue's rows take the swipe to play a copy next: as
+/// song rows do ([queueSwipeEnabled]), while this device plays the queue.
+bool queueEntrySwipeEnabled(WidgetRef ref) =>
+    queueSwipeEnabled(ref) && ref.watch(activeRemotePlaybackProvider) == null;
+
+/// The swipe for [item], an entry of the play queue: toward the end of the
+/// row it queues a copy of the song right after the playing one, leaving
+/// the entry in place. The swipe toward the start stays the queue's swipe
+/// to remove.
+QueueSwipeActions queueEntrySwipe(
+  MusicPlayerController controller,
+  MediaItem item,
+) => QueueSwipeActions(
+  ({required playNext}) => controller.playQueuedItemNext(item),
+  addToQueue: false,
+);
 
 /// The swipe for a row whose files resolve on demand, such as a playlist
 /// song matched to a download or a local file.
@@ -217,6 +240,11 @@ class _QueueSwipeState extends State<QueueSwipe>
   bool _playsNext(double drag) =>
       Directionality.of(context) == TextDirection.rtl ? drag < 0 : drag > 0;
 
+  /// Whether a drag of [drag] runs one of the row's actions. Without
+  /// [QueueSwipeActions.addToQueue] the swipe toward the start is not ours.
+  bool _offers(double drag) =>
+      (widget.actions?.addToQueue ?? true) || _playsNext(drag);
+
   /// The row follows the finger up to the threshold and with resistance
   /// beyond, never further than half its width.
   double _visualOffset(double drag) {
@@ -236,6 +264,9 @@ class _QueueSwipeState extends State<QueueSwipe>
 
   void _onUpdate(DragUpdateDetails details) {
     _drag += details.primaryDelta ?? 0;
+    // Dragging back past the start stops there rather than turning into
+    // a swipe the row does not offer.
+    if (_drag != 0 && !_offers(_drag)) _drag = 0;
     _offset.value = _visualOffset(_drag);
     _haptic.update(_drag / _threshold);
   }
@@ -308,6 +339,7 @@ class _QueueSwipeState extends State<QueueSwipe>
     final active = _active;
     return _QueueSwipeScope(
       run: active ? _run : null,
+      addToQueue: widget.actions?.addToQueue ?? true,
       child: RawGestureDetector(
         gestures: active
             ? {
@@ -316,6 +348,7 @@ class _QueueSwipeState extends State<QueueSwipe>
                       () => _QueueSwipeRecognizer(debugOwner: this),
                       (recognizer) => recognizer
                         ..allowStart = _allowStart
+                        ..allowTravel = _offers
                         ..onStart = _onStart
                         ..onUpdate = _onUpdate
                         ..onEnd = _onEnd
@@ -459,14 +492,22 @@ class _QueueSwipeState extends State<QueueSwipe>
 }
 
 class _QueueSwipeScope extends InheritedWidget {
-  const _QueueSwipeScope({required this.run, required super.child});
+  const _QueueSwipeScope({
+    required this.run,
+    required this.addToQueue,
+    required super.child,
+  });
 
   /// Runs an action with the swipe's confirmation; null while inactive.
   final Future<void> Function({required bool playNext})? run;
 
+  /// See [QueueSwipeActions.addToQueue].
+  final bool addToQueue;
+
   @override
   bool updateShouldNotify(_QueueSwipeScope oldWidget) =>
-      (run == null) != (oldWidget.run == null);
+      (run == null) != (oldWidget.run == null) ||
+      addToQueue != oldWidget.addToQueue;
 }
 
 /// Offers the enclosing [QueueSwipe]'s actions to screen readers as custom
@@ -477,9 +518,9 @@ class QueueSwipeSemantics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final run = context
-        .dependOnInheritedWidgetOfExactType<_QueueSwipeScope>()
-        ?.run;
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<_QueueSwipeScope>();
+    final run = scope?.run;
     final l10n = context.l10n;
     return Semantics(
       customSemanticsActions: run == null
@@ -487,8 +528,9 @@ class QueueSwipeSemantics extends StatelessWidget {
           : {
               CustomSemanticsAction(label: l10n.trackPlayNext): () =>
                   run(playNext: true),
-              CustomSemanticsAction(label: l10n.trackAddToQueue): () =>
-                  run(playNext: false),
+              if (scope!.addToQueue)
+                CustomSemanticsAction(label: l10n.trackAddToQueue): () =>
+                    run(playNext: false),
             },
       child: const SizedBox.expand(),
     );
@@ -509,6 +551,11 @@ class _QueueSwipeRecognizer extends HorizontalDragGestureRecognizer {
       );
 
   bool Function(Offset position)? allowStart;
+
+  /// Whether a sideways travel of this many logical pixels (positive is
+  /// rightward) is a swipe to win; one it refuses goes to what encloses
+  /// the row.
+  bool Function(double dx)? allowTravel;
   final _origins = <int, Offset>{};
   Offset _travel = Offset.zero;
 
@@ -545,5 +592,6 @@ class _QueueSwipeRecognizer extends HorizontalDragGestureRecognizer {
         pointerDeviceKind,
         deviceTouchSlop,
       ) &&
-      _travel.dx.abs() >= _travel.dy.abs() * 2;
+      _travel.dx.abs() >= _travel.dy.abs() * 2 &&
+      (allowTravel?.call(_travel.dx) ?? true);
 }

@@ -600,6 +600,14 @@ class MusicPlayerController {
   Future<void> jumpTo(int index) async =>
       remote?.jumpTo(index) ?? _handler?.skipToQueueItem(index);
 
+  /// Queues a copy of [item], an entry of the local queue other than the
+  /// current one, right after the current song. False when nothing was
+  /// queued: the entry left the queue, or another device plays.
+  Future<bool> playQueuedItemNext(MediaItem item) async {
+    if (remote != null) return false;
+    return await _handler?.playQueuedItemNext(item) ?? false;
+  }
+
   void moveQueueItem(int oldIndex, int newIndex) {
     if (remote case final remote?) {
       unawaited(remote.moveQueueItem(oldIndex, newIndex));

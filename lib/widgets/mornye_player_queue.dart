@@ -8,6 +8,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/player_queue_artwork.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 
 /// Upcoming tracks share the player's artwork backdrop and transport controls.
 class MornyePlayerQueue extends ConsumerWidget {
@@ -33,6 +34,7 @@ class MornyePlayerQueue extends ConsumerWidget {
     final autoplay = ref.watch(settingsProvider.select((s) => s.autoplay));
     // Locked: no reordering or swiping songs away here; adding still works.
     final locked = ref.watch(settingsProvider.select((s) => s.queueLocked));
+    final swipeToPlayNext = queueEntrySwipeEnabled(ref);
     final type = Theme.of(context).textTheme;
     final repeatLabel = switch (playback.repeat) {
       AudioServiceRepeatMode.one => context.l10n.nowPlayingRepeatOne,
@@ -279,6 +281,9 @@ class MornyePlayerQueue extends ConsumerWidget {
                   key: ObjectKey(item),
                   enabled: !locked,
                   onRemove: () => controller.removeQueuedItem(item),
+                  playNext: swipeToPlayNext
+                      ? queueEntrySwipe(controller, item)
+                      : null,
                   child: ListTile(
                     contentPadding: const EdgeInsetsDirectional.only(start: 12),
                     minVerticalPadding: 6,

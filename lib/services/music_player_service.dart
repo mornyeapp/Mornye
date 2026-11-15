@@ -1650,6 +1650,17 @@ class MusicPlayerHandler extends BaseAudioHandler
     unawaited(_persistSession(position: playbackState.value.position));
   }
 
+  /// Queues a copy of [item], a queue entry found by identity, right after
+  /// the current song, leaving the entry where it is (unless
+  /// `queueNoDuplicates` moves it, as any Play next does). False when [item]
+  /// left the queue or is the current song.
+  Future<bool> playQueuedItemNext(MediaItem item) async {
+    final at = _queueItems.indexWhere((entry) => identical(entry, item));
+    if (_disposed || at < 0 || at == _index) return false;
+    await enqueue(_media[at].chosenByListener, playNext: true);
+    return true;
+  }
+
   void moveQueueItem(int oldIndex, int newIndex) {
     if (oldIndex < 0 ||
         oldIndex >= _media.length ||
