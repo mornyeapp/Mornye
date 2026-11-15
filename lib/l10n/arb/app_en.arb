@@ -1,16 +1,4 @@
 {
-  "playlistBrowseFolder": "Browse for a folder…",
-  "@playlistBrowseFolder": {
-    "description": "Create-playlist folder sheet: opens the system folder picker"
-  },
-  "playlistBrowseFolderSubtitle": "Includes every subfolder inside it",
-  "@playlistBrowseFolderSubtitle": {
-    "description": "Subtitle of the browse-for-a-folder row: the playlist gets tracks from all nested folders"
-  },
-  "playlistBrowseFolderNoTracks": "No tracks from that folder are in your library yet. Add it as a library source first.",
-  "@playlistBrowseFolderNoTracks": {
-    "description": "Snackbar when the picked folder holds no library tracks"
-  },
   "libraryLyricsSearchDescription": "Search lyrics saved in your songs. The first search may take a while; you can switch filters to stop it.",
   "libraryLyricsIndexing": "Preparing lyrics search: {count} songs checked",
   "@libraryLyricsIndexing": {"placeholders": {"count": {"type": "int"}}},
@@ -10888,6 +10876,18 @@
   "playlistFolderPickerEmpty": "No scanned tracks yet. Add a Library folder and scan it first.",
   "@playlistFolderPickerEmpty": {
     "description": "Shown when no Library folder has tracks to create a playlist from"
+  },
+  "playlistBrowseFolder": "Browse for a folder…",
+  "@playlistBrowseFolder": {
+    "description": "Desktop row in the create playlist folder sheet that opens the system folder picker"
+  },
+  "playlistBrowseFolderSubtitle": "Includes every subfolder inside it",
+  "@playlistBrowseFolderSubtitle": {
+    "description": "Subtitle of the browse for a folder row: the playlist gets the Library tracks of all nested folders"
+  },
+  "playlistBrowseFolderNoTracks": "No tracks from that folder are in your Library yet. Add it as a Library folder and scan it first.",
+  "@playlistBrowseFolderNoTracks": {
+    "description": "Snackbar when the picked folder holds no Library tracks"
   },
   "playlistCreatedWithTracks": "Created {name} with {count, plural, =1{1 track} other{{count} tracks}}",
   "@playlistCreatedWithTracks": {

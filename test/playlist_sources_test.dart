@@ -171,6 +171,29 @@ void main() {
     );
   });
 
+  test('a browsed folder takes every Library track nested inside it', () async {
+    final library = _Library([
+      _row('deep', '/music/A/x/b.flac'),
+      _row('top-b', '/music/A/b.flac'),
+      _row('top-a', '/music/A/a.flac'),
+      _row('sibling', '/music/AB/c.flac'),
+      _row('parent', '/music/d.flac'),
+      _row('share', 'network://nas/music/A/e.flac'),
+    ]);
+
+    final folder = await libraryFolderTree('/music/A/', library);
+    expect((folder.name, folder.path), ('A', '/music/A'));
+    expect(folder.ids, ['deep', 'top-b', 'top-a']);
+    expect(
+      [
+        for (final track in await libraryFolderTreeTracks(folder, library))
+          track.id,
+      ],
+      ['top-a', 'top-b', 'deep'],
+    );
+    expect((await libraryFolderTree('/elsewhere', library)).ids, isEmpty);
+  });
+
   test('one numbered album plays by disc and track, others by file', () {
     LocalLibraryItem item(
       String id,

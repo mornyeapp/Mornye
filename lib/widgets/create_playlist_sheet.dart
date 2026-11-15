@@ -185,7 +185,13 @@ class _FolderList extends StatelessWidget {
       return;
     }
     if (dir == null || dir.isEmpty || !context.mounted) return;
-    final folder = await libraryFolderTree(dir, LibraryDatabase.instance);
+    final LibraryFolder folder;
+    try {
+      folder = await libraryFolderTree(dir, LibraryDatabase.instance);
+    } catch (e) {
+      _log.e('Failed to read Library folder $dir: $e');
+      return;
+    }
     if (!context.mounted) return;
     if (folder.ids.isEmpty) {
       showAppSnackBar(
@@ -240,33 +246,43 @@ class _FolderList extends StatelessWidget {
             ),
           );
         }
-        if (folders.isEmpty) {
-          return SingleChildScrollView(
-            controller: controller,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: EmptyState(
-                icon: Icons.folder_outlined,
-                title: context.l10n.playlistFolderPickerEmptyTitle,
-                message: context.l10n.playlistFolderPickerEmpty,
-              ),
-            ),
-          );
-        }
-        return ListView.builder(
-          controller: controller,
-          padding: const EdgeInsets.only(bottom: 16),
-          itemCount: folders.length + (isDesktopPlatform ? 1 : 0),
-          itemBuilder: (context, index) {
-            if (isDesktopPlatform && index == 0) {
-              return AppSheetOption(
-                leading: const AppIcon(Icons.drive_folder_upload_outlined),
+        // Desktop can also pick any folder with the system dialog, even
+        // when no Library folder is listed yet.
+        final browse = isDesktopPlatform
+            ? AppSheetOption(
+                leading: const AppIcon(Icons.folder_open),
                 title: Text(context.l10n.playlistBrowseFolder),
                 subtitle: Text(context.l10n.playlistBrowseFolderSubtitle),
                 onTap: () => _browse(context),
-              );
-            }
-            final folder = folders[index - (isDesktopPlatform ? 1 : 0)];
+              )
+            : null;
+        if (folders.isEmpty) {
+          return SingleChildScrollView(
+            controller: controller,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ?browse,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: EmptyState(
+                    icon: Icons.folder_outlined,
+                    title: context.l10n.playlistFolderPickerEmptyTitle,
+                    message: context.l10n.playlistFolderPickerEmpty,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final offset = browse == null ? 0 : 1;
+        return ListView.builder(
+          controller: controller,
+          padding: const EdgeInsets.only(bottom: 16),
+          itemCount: folders.length + offset,
+          itemBuilder: (context, index) {
+            if (browse != null && index == 0) return browse;
+            final folder = folders[index - offset];
             final count = context.l10n.tracksCount(folder.ids.length);
             return AppSheetOption(
               leading: const AppIcon(Icons.folder_outlined),

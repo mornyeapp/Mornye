@@ -267,8 +267,17 @@ Future<LibraryFolder> libraryFolderTree(
   String root,
   LibraryDatabase library,
 ) async {
-  final base = p.normalize(_visiblePath(root) ?? root);
   final rows = await library.getFilePathRows();
+  return compute(_folderTree, (root: root, rows: rows));
+}
+
+LibraryFolder _folderTree(
+  ({String root, List<LibraryFilePathRow> rows}) request,
+) => folderTreeOfRows(request.root, request.rows);
+
+/// The [rows] inside [root] and all of its subfolders, as one folder.
+LibraryFolder folderTreeOfRows(String root, List<LibraryFilePathRow> rows) {
+  final base = p.normalize(_visiblePath(root) ?? root);
   final ids = <String>[];
   for (final row in rows) {
     final folder = libraryFolderPath(row.filePath);
