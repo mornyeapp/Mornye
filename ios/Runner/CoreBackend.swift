@@ -557,8 +557,16 @@ final class RustCoreBackend: CoreBackend {
 
     func editFileMetadata(path: String, metadataJson: String) throws -> String {
         let fields = try JSONSerialization.jsonObject(with: Data(metadataJson.utf8), options: [.fragmentsAllowed]) as? [String: Any]
-        return try withMediaFiles([path, fields?["cover_path"] as? String ?? ""]) {
-            try $0.editFileMetadata(path: mediaPath(path), metadataJson: metadataJson, lease: nil)
+        let cover = fields?["cover_path"] as? String ?? ""
+        var resolved = metadataJson
+        // The cover's folder is granted under its standardized spelling, which
+        // drops /private from a temporary path; the cover must use it too.
+        if var object = fields, cover.hasPrefix("/") {
+            object["cover_path"] = mediaPath(cover)
+            resolved = String(decoding: try JSONSerialization.data(withJSONObject: object), as: UTF8.self)
+        }
+        return try withMediaFiles([path, cover]) {
+            try $0.editFileMetadata(path: mediaPath(path), metadataJson: resolved, lease: nil)
         }
     }
 
