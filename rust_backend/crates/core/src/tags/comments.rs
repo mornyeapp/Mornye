@@ -68,14 +68,16 @@ pub(super) fn flac(metadata: &mut AudioMetadata, items: &[(String, String)]) {
         .map(get)
         .find(|value| !value.trim().is_empty())
         .unwrap_or_default();
-    for (names, target, total) in [
+    for (names, total_names, target, total) in [
         (
             ["TRACKNUMBER", "TRACK"],
+            ["TRACKTOTAL", "TOTALTRACKS"],
             &mut metadata.track_number,
             &mut metadata.total_tracks,
         ),
         (
             ["DISCNUMBER", "DISC"],
+            ["DISCTOTAL", "TOTALDISCS"],
             &mut metadata.disc_number,
             &mut metadata.total_discs,
         ),
@@ -88,6 +90,13 @@ pub(super) fn flac(metadata: &mut AudioMetadata, items: &[(String, String)]) {
             if !value.is_empty() {
                 (*target, *total) = pair(&value);
             }
+        }
+        if *total == 0 {
+            *total = total_names
+                .into_iter()
+                .map(|name| pair(&get(name)).0)
+                .find(|value| *value > 0)
+                .unwrap_or(0);
         }
     }
     metadata.genre = get("GENRE");
@@ -141,8 +150,27 @@ pub(super) fn apply(metadata: &mut AudioMetadata, key: &str, value: &str, ape: b
             }
         }
         "GENRE" => metadata.genre = value.into(),
-        "TRACK" | "TRACKNUMBER" => (metadata.track_number, metadata.total_tracks) = pair(value),
-        "DISC" | "DISCNUMBER" => (metadata.disc_number, metadata.total_discs) = pair(value),
+        "TRACK" | "TRACKNUMBER" => {
+            let (number, total) = pair(value);
+            metadata.track_number = number;
+            // A `TRACKTOTAL` read before this field stays.
+            if total > 0 {
+                metadata.total_tracks = total;
+            }
+        }
+        "DISC" | "DISCNUMBER" => {
+            let (number, total) = pair(value);
+            metadata.disc_number = number;
+            if total > 0 {
+                metadata.total_discs = total;
+            }
+        }
+        "TRACKTOTAL" | "TOTALTRACKS" if metadata.total_tracks <= 0 => {
+            metadata.total_tracks = pair(value).0
+        }
+        "DISCTOTAL" | "TOTALDISCS" if metadata.total_discs <= 0 => {
+            metadata.total_discs = pair(value).0
+        }
         "ISRC" => metadata.isrc = value.into(),
         "COMPOSER" => metadata.composer = value.into(),
         "COMMENT" => metadata.comment = value.into(),

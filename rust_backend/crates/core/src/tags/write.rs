@@ -367,6 +367,15 @@ fn flac_header(
                         comments.push(format!("{key}={value}").into_bytes());
                     }
                 }
+            } else if matches!(key.as_str(), "TRACKNUMBER" | "DISCNUMBER") && pair(value).0 > 0 {
+                // A total the fields leave out keeps the file's own.
+                let (number, total) = pair(value);
+                set_comment(&mut comments, key, &number.to_string());
+                if total > 0 {
+                    for total_key in vorbis_total_keys(key) {
+                        set_comment(&mut comments, total_key, &total.to_string());
+                    }
+                }
             } else {
                 set_comment(
                     &mut comments,
@@ -558,7 +567,24 @@ fn edit_comments(comments: &mut Vec<Vec<u8>>, fields: &Fields) {
             if current == (0, 0) {
                 current = pair(&get_comment(comments, alias));
             }
-            set_comment(comments, key, &edit_index(current, fields, field, total));
+            let total_keys = vorbis_total_keys(key);
+            if current.1 <= 0 {
+                current.1 = total_keys
+                    .iter()
+                    .map(|total| pair(&get_comment(comments, total)).0)
+                    .find(|total| *total > 0)
+                    .unwrap_or(0);
+            }
+            let (number, count) = edit_pair(current, fields, field, total);
+            let count = if number > 0 {
+                positive_text(count)
+            } else {
+                String::new()
+            };
+            set_comment(comments, key, &positive_text(number));
+            for total_key in total_keys {
+                set_comment(comments, total_key, &count);
+            }
             set_comment(comments, alias, "");
         }
     }
@@ -569,24 +595,45 @@ fn edit_comments(comments: &mut Vec<Vec<u8>>, fields: &Fields) {
     }
 }
 
-fn edit_index(
+fn edit_index(current: (i64, i64), fields: &Fields, key: &str, total_key: &str) -> String {
+    match edit_pair(current, fields, key, total_key) {
+        (number, _) if number <= 0 => String::new(),
+        (number, total) if total > 0 => format!("{number}/{total}"),
+        (number, _) => number.to_string(),
+    }
+}
+
+fn edit_pair(
     (mut number, mut total): (i64, i64),
     fields: &Fields,
     key: &str,
     total_key: &str,
-) -> String {
+) -> (i64, i64) {
     if let Some(value) = fields.get(key) {
         number = value.trim().parse::<i64>().unwrap_or(0);
     }
     if let Some(value) = fields.get(total_key) {
         total = value.trim().parse::<i64>().unwrap_or(0);
     }
-    if number <= 0 {
-        String::new()
-    } else if total > 0 {
-        format!("{number}/{total}")
+    (number, total)
+}
+
+/// Vorbis comments keep a total in fields of its own, `TRACKNUMBER=6` with
+/// `TRACKTOTAL=6` and `TOTALTRACKS=6`, which players and tag editors read;
+/// a combined `6/6` leaves their total empty. ID3, APE and RIFF keep `6/6`.
+fn vorbis_total_keys(key: &str) -> [&'static str; 2] {
+    if key == "DISCNUMBER" {
+        ["DISCTOTAL", "TOTALDISCS"]
     } else {
-        number.to_string()
+        ["TRACKTOTAL", "TOTALTRACKS"]
+    }
+}
+
+fn positive_text(value: i64) -> String {
+    if value > 0 {
+        value.to_string()
+    } else {
+        String::new()
     }
 }
 
