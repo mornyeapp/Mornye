@@ -212,4 +212,60 @@ void main() {
       expect(result.values.containsKey('lyrics'), !instrumental);
     });
   }
+
+  test('a chosen lyrics extension is the only provider asked', () async {
+    const channel = MethodChannel('com.zarz.mornye/backend');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'getLyricsFromProvider');
+      expect((call.arguments as Map)['provider'], 'extension:example.lyrics');
+      return jsonEncode({'lyrics': '[00:01.00]Lyric'});
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    final result = await service.enrich(
+      null,
+      currentValues: const {'title': 'Song', 'artist': 'Artist'},
+      fields: {'lyrics'},
+      providerId: null,
+      sourceTrackId: null,
+      durationMs: 180000,
+      syncLyricsSettings: () async {},
+      isCurrent: () => true,
+      lyricsExtensionId: 'Example.Lyrics',
+    );
+    expect(result!.values['lyrics'], '[00:01.00]Lyric');
+    expect(result.sourceId, 'Example.Lyrics');
+  });
+
+  test('the source choice for lyrics alone lists lyrics extensions only', () {
+    Extension extension(String id, {bool lyrics = false, bool on = true}) =>
+        Extension(
+          id: id,
+          name: id,
+          displayName: id,
+          version: '1.0.0',
+          description: '',
+          enabled: on,
+          status: 'loaded',
+          hasMetadataProvider: !lyrics,
+          hasLyricsProvider: lyrics,
+        );
+    final state = ExtensionState(
+      extensions: [
+        extension('metadata'),
+        extension('words-b', lyrics: true),
+        extension('words-a', lyrics: true),
+        extension('words-off', lyrics: true, on: false),
+      ],
+    );
+    expect(MetadataAutofillService.lyricsOnly({'lyrics'}), isTrue);
+    expect(MetadataAutofillService.lyricsOnly({'lyrics', 'cover'}), isFalse);
+    expect(MetadataAutofillService.lyricsOnly({'cover'}), isFalse);
+    expect(service.lyricsProviders(state).map((e) => e.id), [
+      'words-a',
+      'words-b',
+    ]);
+    expect(service.orderedProviders(state).map((e) => e.id), ['metadata']);
+  });
 }

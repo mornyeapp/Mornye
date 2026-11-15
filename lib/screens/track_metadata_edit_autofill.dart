@@ -223,6 +223,15 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
       final usesAutomaticProvider =
           selectedProviderId == null || selectedProviderId.isEmpty;
       final needsTrackLookup = fields.any((key) => key != 'lyrics');
+      final lyricsExtensionId =
+          configuredProviderId == null ||
+              !MetadataAutofillService.lyricsOnly(fields)
+          ? null
+          : _autofill
+                .lyricsProviders(extensionState)
+                .where((extension) => extension.id == configuredProviderId)
+                .firstOrNull
+                ?.id;
       Map<String, dynamic>? best;
 
       final queryParts = <String>[];
@@ -313,6 +322,7 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
         durationMs: widget.durationMs,
         syncLyricsSettings: settingsNotifier.syncLyricsSettingsToBackend,
         isCurrent: isCurrent,
+        lyricsExtensionId: lyricsExtensionId,
       );
       if (!mounted || !isCurrent() || result == null) return;
       final availableValues = result.values;
@@ -462,7 +472,10 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
           Consumer(
             builder: (context, ref, _) {
               final extensionState = ref.watch(extensionProvider);
-              final providers = _autofill.orderedProviders(extensionState);
+              final providers =
+                  MetadataAutofillService.lyricsOnly(_form.autoFillFields)
+                  ? _autofill.lyricsProviders(extensionState)
+                  : _autofill.orderedProviders(extensionState);
               final selectedProviderIsAvailable = providers.any(
                 (extension) => extension.id == _selectedMetadataProviderId,
               );
