@@ -74,7 +74,13 @@ default. Other manufacturers keep the platform's normal output path: even
 without processing stages, `DynamicsProcessing` participates in native volume
 handling. The forced effect is a suspect in reports of speaker volume behaving
 as mute or full volume on Realme GT6, so it is no longer attached there.
-Validation on the reported device is still needed. If a Nothing device refuses
+Validation on the reported device is still needed. While a USB audio output
+is attached the effect is not created either (and an existing one is
+released at the next `start()`): with a USB DAC on a Nothing Phone (3a) every
+track change left the song at full volume until a pause and resume (Mornye
+issue 864), which fits the effect owning the volume of a track it was
+attached to before the track existed. Not yet confirmed on that phone. If a
+Nothing device refuses
 the effect, playback continues and the plugin logs the reason.
 
 ### Next player
