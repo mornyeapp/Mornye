@@ -43,6 +43,8 @@ Widget _collection(
 );
 
 void _phone(WidgetTester tester) {
+  // The header settles its blur only in a resumed app.
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.view.physicalSize = const Size(1079, 2339);
   tester.view.devicePixelRatio = 2.625;
   addTearDown(tester.view.reset);
