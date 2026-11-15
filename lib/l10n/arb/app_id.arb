@@ -3939,6 +3939,74 @@
   "@trackReEnrichApplyChanges": {
     "description": "Confirmation button in the batch metadata review sheet"
   },
+  "trackReEnrichReviewSelected": "{selected} dari {total} perubahan dipilih",
+  "@trackReEnrichReviewSelected": {
+    "description": "Summary above the changes of one song in the re-enrich review, where each change has its own switch",
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trackReEnrichAlreadyMatches": "Hasil ini sama dengan metadata lagu sekarang, jadi tidak ada yang diubah.",
+  "@trackReEnrichAlreadyMatches": {
+    "description": "Shown instead of an empty review when the picked re-enrich result would change nothing"
+  },
+  "trackReEnrichSmallerCover": "Lebih kecil dari cover sekarang",
+  "@trackReEnrichSmallerCover": {
+    "description": "Note under a proposed cover in the re-enrich review; the change starts switched off"
+  },
+  "trackReEnrichHasLyrics": "Ada lirik",
+  "@trackReEnrichHasLyrics": {
+    "description": "Current value of the lyrics row in the re-enrich review when the song already has lyrics"
+  },
+  "trackReEnrichUndo": "Batalkan re-enrich",
+  "@trackReEnrichUndo": {
+    "description": "Song metadata menu action that restores the metadata the song had before its last re-enrich"
+  },
+  "trackReEnrichUndoAction": "Urungkan",
+  "@trackReEnrichUndoAction": {
+    "description": "Action in the re-enrich result for one song that restores its previous metadata"
+  },
+  "trackReEnrichUndoAll": "Urungkan semua",
+  "@trackReEnrichUndoAll": {
+    "description": "Action in the result of a re-enrich of several songs that restores the previous metadata of every song it changed"
+  },
+  "trackReEnrichUndoConfirmTitle": "Batalkan re-enrich?",
+  "@trackReEnrichUndoConfirmTitle": {
+    "description": "Title of the confirmation before restoring a song's metadata from before its last re-enrich"
+  },
+  "trackReEnrichUndoConfirmMessage": "Tag, cover, dan lirik yang diubah re-enrich terakhir kembali seperti sebelumnya. Perubahan yang dibuat setelahnya akan diganti.",
+  "@trackReEnrichUndoConfirmMessage": {
+    "description": "Message of the confirmation before undoing a re-enrich"
+  },
+  "trackReEnrichUndoProgress": "Memulihkan metadata sebelumnya...",
+  "@trackReEnrichUndoProgress": {
+    "description": "Progress title while undoing a re-enrich of several songs"
+  },
+  "trackReEnrichUndoDone": "Metadata sebelumnya dipulihkan",
+  "@trackReEnrichUndoDone": {
+    "description": "Result after undoing the re-enrich of one song"
+  },
+  "trackReEnrichUndoAllDone": "{count} dari {total} lagu dipulihkan",
+  "@trackReEnrichUndoAllDone": {
+    "description": "Result after undoing the re-enrich of several songs",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trackReEnrichUndoCoverKept": "Cover yang ditambahkan re-enrich tetap ada, karena cover tidak bisa dihapus dari lagu yang sebelumnya tidak punya cover.",
+  "@trackReEnrichUndoCoverKept": {
+    "description": "Added to the undo result when re-enrich gave a song its first cover, which undo cannot remove"
+  },
   "trackReEnrichRefreshOnline": "Refresh dari internet",
   "@trackReEnrichRefreshOnline": {
     "description": "Proposed value when lyrics will be refreshed during re-enrich"

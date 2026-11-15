@@ -153,6 +153,14 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         )
       else if (remoteFile)
         remote(LinkLibraryAction.reEnrich),
+      // Restored through the metadata editor, so network songs that it can
+      // write qualify too.
+      if (_reEnrichUndoAvailable && _canEditMetadataFile)
+        _MetadataOption(
+          icon: Icons.undo,
+          label: l10n.trackReEnrichUndo,
+          onTap: _undoReEnrich,
+        ),
       if (canEditFile && _isConvertibleFormat)
         _MetadataOption(
           icon: Icons.swap_horiz,

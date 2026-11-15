@@ -218,6 +218,7 @@ final Map<IconData, IconData> _filledSymbols = {
   Icons.trending_up: Symbols.trending_up_rounded,
   Icons.tune: Symbols.tune_rounded,
   Icons.tune_rounded: Symbols.tune_rounded,
+  Icons.undo: Symbols.undo_rounded,
   Icons.update: Symbols.update_rounded,
   Icons.usb: Symbols.usb_rounded,
   Icons.usb_rounded: Symbols.usb_rounded,

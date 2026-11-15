@@ -155,6 +155,7 @@ IconData _cupertinoFor(IconData icon) {
     Icons.refresh_rounded ||
     Icons.update ||
     Icons.system_update => CupertinoIcons.arrow_clockwise,
+    Icons.undo => CupertinoIcons.arrow_uturn_left,
     Icons.content_copy_outlined ||
     Icons.content_copy_rounded ||
     Icons.copy_all_rounded ||

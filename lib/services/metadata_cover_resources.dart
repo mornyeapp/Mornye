@@ -115,10 +115,19 @@ class MetadataCoverResources {
     }
   }
 
-  Future<MetadataCoverPreview?> download(String url) async {
+  /// Downloads the cover at [url], scaled down to [maxDimension] like an
+  /// embedded cover when it is above zero.
+  Future<MetadataCoverPreview?> download(
+    String url, {
+    int maxDimension = 0,
+  }) async {
     try {
       return await _create('metadata_cover_', 'cover.jpg', (path) async {
-        final result = await PlatformBridge.downloadCoverToFile(url, path);
+        final result = await PlatformBridge.downloadCoverToFile(
+          url,
+          path,
+          maxDimension: maxDimension,
+        );
         if (result['error'] != null || result['success'] == false) {
           throw StateError(
             result['error']?.toString() ?? 'Cover download failed',

@@ -17,10 +17,13 @@ import 'package:mornye/providers/song_leftovers_provider.dart';
 import 'package:mornye/services/batch_metadata_re_enrich.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/metadata_cover_resources.dart';
 import 'package:mornye/services/network_file_editor.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/ffmpeg_reenrich.dart';
+import 'package:mornye/services/re_enrich_undo.dart';
+import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/lyrics_metadata_helper.dart';
 import 'package:mornye/utils/logger.dart';
@@ -278,6 +281,9 @@ Future<void> reEnrichLocalTracks(
   /// wrote to. Defaults to a scan of the Library folders.
   Future<void> Function(Set<String> written)? refreshLibrary,
   Map<String, String> sourceTrackIds = const {},
+
+  /// Where the songs' previous states are kept; app storage by default.
+  ReEnrichUndo? undo,
 }) async {
   if (selected.isEmpty) return;
   final container = ProviderScope.containerOf(context, listen: false);
@@ -318,6 +324,7 @@ Future<void> reEnrichLocalTracks(
 
   final artworkContainer = ProviderScope.containerOf(context, listen: false);
   final runner = BatchReEnrichRunner(
+    undo: undo,
     sourceTrackIds: sourceTrackIds,
     saveMotionArtwork: (item, metadata) => saveReEnrichedMotionArtwork(
       artworkContainer,
@@ -399,15 +406,34 @@ Future<void> reEnrichLocalTracks(
     }
     final picked = await runner.choose(single, candidate);
     if (!context.mounted || !isActive()) return;
+    if (picked != null && picked.changes.isEmpty) {
+      await showReEnrichResultDialog(
+        context,
+        message: context.l10n.trackReEnrichAlreadyMatches,
+      );
+      if (context.mounted && isActive()) onSelectionRestore();
+      return;
+    }
     if (picked != null) reviewed = [picked];
   }
 
-  final approved = await showReEnrichReviewSheet(
-    context,
-    previews: reviewed,
-    onChoose: runner.choose,
-    providerName: providerName,
-  );
+  // One song is reviewed change by change; a batch is approved as a whole.
+  final covers = MetadataCoverResources();
+  final maxDimension = ref.read(settingsProvider).embeddedCoverMaxDimension;
+  final List<BatchReEnrichPreview>? approved;
+  try {
+    approved = await showReEnrichReviewSheet(
+      context,
+      previews: reviewed,
+      onChoose: runner.choose,
+      providerName: providerName,
+      chooseFields: selected.length == 1,
+      loadCovers: (preview) =>
+          loadReEnrichReviewCovers(covers, preview, maxDimension: maxDimension),
+    );
+  } finally {
+    await covers.dispose();
+  }
   final toApply = [
     for (final preview in approved ?? const <BatchReEnrichPreview>[])
       if (preview.changes.isNotEmpty) preview,
@@ -450,7 +476,16 @@ Future<void> reEnrichLocalTracks(
   // take much longer than the batch and must not hide its completed result.
   ScaffoldMessenger.of(context).clearSnackBars();
   final summary = lyricsSummary.message(context.l10n, successCount, total);
-  final resultClosed = showReEnrichResultDialog(context, message: summary);
+  final undoable = [...runner.undoSources];
+  final resultClosed = showReEnrichResultDialog(
+    context,
+    message: summary,
+    undoLabel: undoable.isEmpty
+        ? null
+        : total == 1
+        ? context.l10n.trackReEnrichUndoAction
+        : context.l10n.trackReEnrichUndoAll,
+  );
 
   if (refreshLibrary != null) {
     await refreshLibrary(written);
@@ -460,7 +495,87 @@ Future<void> reEnrichLocalTracks(
 
   if (!context.mounted || !isActive()) return;
   onComplete();
-  await resultClosed;
+  if (!await resultClosed || !context.mounted || !isActive()) return;
+  await _undoReEnrichRun(
+    context,
+    ref,
+    runner,
+    undoable,
+    ids: {
+      for (final preview in toApply) preview.item.filePath: preview.item.id,
+    },
+    isActive: isActive,
+    refreshLibrary: refreshLibrary,
+  );
+}
+
+/// Restores the songs [runner] re-enriched, from its result. Only states
+/// that run saved are restored, so a song re-enriched again since keeps it.
+Future<void> _undoReEnrichRun(
+  BuildContext context,
+  WidgetRef ref,
+  BatchReEnrichRunner runner,
+  List<String> sources, {
+  required Map<String, String> ids,
+  required bool Function() isActive,
+  Future<void> Function(Set<String> written)? refreshLibrary,
+}) async {
+  final artistTagMode = artistTagModeForExistingTags(
+    ref.read(settingsProvider).artistTagMode,
+  );
+  final l10n = context.l10n;
+  final many = sources.length > 1;
+  var cancelled = false;
+  if (many) {
+    BatchProgressDialog.show(
+      context: context,
+      title: l10n.trackReEnrichUndoProgress,
+      total: sources.length,
+      icon: Icons.undo,
+      onCancel: () {
+        cancelled = true;
+        BatchProgressDialog.dismiss(context);
+      },
+    );
+  }
+  final restored = <String>{};
+  var coverKept = false;
+  Object? error;
+  for (var index = 0; index < sources.length; index++) {
+    if (cancelled || !context.mounted || !isActive()) break;
+    if (many) BatchProgressDialog.update(current: index + 1);
+    final result = await runner.undo.restore(
+      sources[index],
+      artistTagMode: artistTagMode,
+      batch: runner.undoBatch,
+    );
+    if (result.restored) {
+      restored.add(ids[sources[index]] ?? sources[index]);
+      coverKept |= result.outcome == ReEnrichUndoOutcome.coverKept;
+    } else {
+      error ??= result.error;
+    }
+  }
+  if (!context.mounted || !isActive()) return;
+  if (many && !cancelled) BatchProgressDialog.dismiss(context);
+  final message = [
+    if (many)
+      l10n.trackReEnrichUndoAllDone(restored.length, sources.length)
+    else if (restored.isNotEmpty)
+      l10n.trackReEnrichUndoDone
+    else
+      l10n.trackSaveFailed(context.friendlyError(error)),
+    if (coverKept) l10n.trackReEnrichUndoCoverKept,
+  ].join('\n');
+  final closed = showReEnrichResultDialog(context, message: message);
+  if (restored.isNotEmpty) {
+    if (refreshLibrary != null) {
+      await refreshLibrary(restored);
+    } else {
+      await _refreshReEnrichedLocalLibrary(ref);
+    }
+  }
+  await closed;
 }
 
 /// Runs a batch against one settings snapshot per phase. Dependencies are
@@ -488,6 +603,16 @@ class BatchReEnrichRunner {
   )?
   saveMotionArtwork;
 
+  /// Saves what each write replaces, so a song can be restored later.
+  final ReEnrichUndo undo;
+
+  /// Marks the states this runner saves, so undoing the run restores only
+  /// those.
+  final String undoBatch;
+
+  /// The songs whose previous state this runner saved, in write order.
+  final List<String> undoSources = [];
+
   BatchReEnrichRunner({
     required this.beginPhase,
     this.networkEditor,
@@ -496,7 +621,9 @@ class BatchReEnrichRunner {
     this.writeSidecar = writeReEnrichSidecarLrc,
     this.applyFfmpeg = applyFfmpegReEnrichResult,
     this.saveMotionArtwork,
-  });
+    ReEnrichUndo? undo,
+  }) : undo = undo ?? ReEnrichUndo.instance,
+       undoBatch = 'reenrich-${DateTime.now().microsecondsSinceEpoch}';
 
   /// The settings of the last preview, which picks reuse.
   AppSettings? _previewSettings;
@@ -600,6 +727,10 @@ class BatchReEnrichRunner {
     required void Function(int, LocalLibraryItem) onProgress,
     void Function(Map<String, dynamic>)? onResult,
     void Function(LocalLibraryItem)? onWritten,
+
+    /// A song that was not written, with the backend error or exception
+    /// when there is one.
+    void Function(LocalLibraryItem item, Object? error)? onFailed,
   }) async {
     if (shouldStop()) return 0;
     // Settings may have changed while the review sheet was open.
@@ -609,14 +740,25 @@ class BatchReEnrichRunner {
       if (shouldStop()) break;
       final preview = previews[index];
       onProgress(index, preview.item);
+      ReEnrichUndoDraft? draft;
+      Future<({bool written, Map<String, dynamic> result})> write(
+        LocalLibraryItem target,
+      ) async {
+        draft = await _captureUndo(preview, target.filePath, settings);
+        return _write(preview, settings, target);
+      }
+
       try {
         final source = preview.item.filePath;
-        final applied = source.startsWith('network://')
+        // A review can keep only what the file does not hold, such as motion
+        // artwork. Nothing is written then: the backend reads an empty field
+        // list as every field.
+        final applied = preview.updateFields.isEmpty
+            ? (written: true, result: const <String, dynamic>{})
+            : source.startsWith('network://')
             ? await (networkEditor ?? NetworkFileEditor.instance).edit(
                 source,
-                (path) => _write(
-                  preview,
-                  settings,
+                (path) => write(
                   LocalLibraryItem.fromJson({
                     ...preview.item.toJson(),
                     'filePath': path,
@@ -625,20 +767,50 @@ class BatchReEnrichRunner {
                 succeeded: (result) => result.written,
                 publishLyricsSidecar: true,
               )
-            : await _write(preview, settings, preview.item);
+            : await write(preview.item);
         if (applied.written) {
           successes++;
           onWritten?.call(preview.item);
+          final saved = draft;
+          if (saved != null &&
+              await undo.commit(
+                saved,
+                source,
+                applied.result,
+                batch: undoBatch,
+              )) {
+            undoSources.add(source);
+          }
           await _saveMotionArtwork(preview, applied.result);
           onResult?.call(applied.result);
+        } else {
+          onFailed?.call(preview.item, applied.result['error']);
         }
       } catch (error, stack) {
         _reEnrichLog.w('Re-enrich failed for ${preview.item.id}: $error');
         _reEnrichLog.d('$stack');
+        onFailed?.call(preview.item, error);
         // Keep successful files and continue with the rest of the selection.
+      } finally {
+        await draft?.discard();
       }
     }
     return successes;
+  }
+
+  /// Reading the previous state never stops the write: a song whose state
+  /// could not be read is written without one.
+  Future<ReEnrichUndoDraft?> _captureUndo(
+    BatchReEnrichPreview preview,
+    String path,
+    AppSettings settings,
+  ) async {
+    try {
+      return await undo.capture(preview, path, settings);
+    } catch (error) {
+      _reEnrichLog.w('Could not read ${preview.item.id} before re-enrich');
+      return null;
+    }
   }
 
   Future<({bool written, Map<String, dynamic> result})> _write(
@@ -686,7 +858,10 @@ class BatchReEnrichRunner {
     BatchReEnrichPreview preview,
     Map<String, dynamic> result,
   ) async {
-    if (!preview.updateFields.contains(ReEnrichFields.cover)) return;
+    // Listed only with the cover; a review can keep it without the cover.
+    if (!preview.changes.any((change) => change.field == 'header_video')) {
+      return;
+    }
     final applied = result['enriched_metadata'];
     try {
       await saveMotionArtwork?.call(preview.item, {

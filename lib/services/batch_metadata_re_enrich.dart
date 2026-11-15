@@ -223,6 +223,60 @@ class ReEnrichMetadataChange {
   });
 }
 
+/// The current value of a lyrics change when the song already has lyrics.
+const reEnrichHasLyricsValue = '__has_lyrics__';
+
+/// The change fields a review can list. Other keys of a preview's metadata,
+/// such as `spotify_id`, go with every write.
+const reEnrichReviewFields = {
+  'track_name',
+  'artist_name',
+  'album_name',
+  'album_artist',
+  'track_number',
+  'total_tracks',
+  'disc_number',
+  'total_discs',
+  'release_date',
+  'isrc',
+  'genre',
+  'composer',
+  'label',
+  'copyright',
+  'cover_url',
+  'header_video',
+  'lyrics',
+};
+
+/// The backend update field that writes the change to [field], or null for
+/// motion artwork, which is saved in app storage instead of the file.
+String? reEnrichUpdateField(String field) => switch (field) {
+  'cover_url' => ReEnrichFields.cover,
+  'header_video' => null,
+  _ => field,
+};
+
+/// A cover's size in pixels.
+typedef ReEnrichCoverSize = ({int width, int height});
+
+/// Whether [change] likely makes the song's metadata worse, so a review
+/// starts with it switched off: a new cover with fewer pixels than the
+/// current one ([currentCover] and [newCover], when both were measured), or
+/// an empty value replacing one the song has.
+bool reEnrichChangeIsDowngrade(
+  ReEnrichMetadataChange change, {
+  ReEnrichCoverSize? currentCover,
+  ReEnrichCoverSize? newCover,
+}) {
+  if (change.field == 'cover_url') {
+    return currentCover != null &&
+        newCover != null &&
+        newCover.width * newCover.height <
+            currentCover.width * currentCover.height;
+  }
+  return change.newValue.trim().isEmpty && change.oldValue.trim().isNotEmpty;
+}
+
 class BatchReEnrichPreview {
   final LocalLibraryItem item;
   final List<String> updateFields;
@@ -266,6 +320,35 @@ class BatchReEnrichPreview {
     candidates: candidates,
     chosen: candidate,
   );
+
+  /// This preview with only the changes to [fields]. Its write touches only
+  /// those: every other value stays as the song has it, never the result's.
+  /// Choosing nothing the file holds leaves [updateFields] empty, and such a
+  /// preview must not be written, since the backend reads an empty list as
+  /// every field.
+  BatchReEnrichPreview selecting(Set<String> fields) {
+    final kept = [
+      for (final change in changes)
+        if (fields.contains(change.field)) change,
+    ];
+    final keptFields = {for (final change in kept) change.field};
+    return BatchReEnrichPreview(
+      item: item,
+      updateFields: {
+        for (final change in kept) ?reEnrichUpdateField(change.field),
+      }.toList(growable: false),
+      enrichedMetadata: {
+        for (final entry in enrichedMetadata.entries)
+          if (!reEnrichReviewFields.contains(entry.key) ||
+              keptFields.contains(entry.key))
+            entry.key: entry.value,
+      },
+      changes: kept,
+      match: match,
+      candidates: candidates,
+      chosen: chosen,
+    );
+  }
 }
 
 BatchReEnrichPreview? buildManualBatchReEnrichPreview(
@@ -354,9 +437,9 @@ List<ReEnrichMetadataChange> buildReEnrichMetadataChanges(
   if (updateFields.contains(ReEnrichFields.lyrics) ||
       updateFields.contains('lyrics')) {
     changes.add(
-      const ReEnrichMetadataChange(
+      ReEnrichMetadataChange(
         field: 'lyrics',
-        oldValue: '',
+        oldValue: item.hasLyrics ? reEnrichHasLyricsValue : '',
         newValue: '__refresh_online__',
       ),
     );

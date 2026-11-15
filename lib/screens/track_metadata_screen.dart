@@ -103,6 +103,10 @@ import 'package:mornye/constants/music_services.dart';
 import 'package:mornye/controllers/batch_track_actions.dart'
     show convertLibraryTrack;
 import 'package:mornye/controllers/clickable_metadata.dart';
+import 'package:mornye/controllers/local_track_batch_actions.dart'
+    show BatchReEnrichRunner;
+import 'package:mornye/services/re_enrich_undo.dart'
+    show ReEnrichUndo, ReEnrichUndoOutcome;
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/screens/track_metadata_edit_sheet.dart';
 
@@ -224,6 +228,9 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
   bool _embeddedLyricsChecked = false;
   bool _isConverting = false;
   bool _hasMetadataChanges = false;
+
+  /// The song has a state saved before its last re-enrich.
+  bool _reEnrichUndoAvailable = false;
   bool _hasLoadedResolvedAudioMetadata = false;
   bool _isTrackSwipeNavigationInFlight = false;
   int _metadataLoadGeneration = 0;
@@ -328,6 +335,7 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
       _fileAccess = check;
       _networkFileDeletable = networkFileDeletable;
     });
+    unawaited(_refreshReEnrichUndo());
     if (!_fileExists) return;
 
     if (_lyrics == null && !_lyricsLoading) {

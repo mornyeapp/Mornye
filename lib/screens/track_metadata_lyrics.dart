@@ -1021,6 +1021,8 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
       final artistTagMode = settings.artistTagMode;
       final messenger = ScaffoldMessenger.of(context);
       final l10n = context.l10n;
+      final source = cleanFilePath;
+      final item = _reEnrichItem();
       await ref.read(settingsProvider.notifier).syncLyricsSettingsToBackend();
       if (!mounted) return;
       messenger.showSnackBar(
@@ -1029,7 +1031,7 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
 
       final durationMs = (duration ?? 0) * 1000;
       final request = <String, dynamic>{
-        'file_path': cleanFilePath,
+        'file_path': source,
         'cover_url': _coverUrl ?? '',
         'cover_max_dimension': settings.embeddedCoverMaxDimension,
         'embed_lyrics': settings.embedLyrics,
@@ -1058,7 +1060,9 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
       };
 
       // A common title also finds other songs, so the person picks the
-      // result instead of the search guessing for them.
+      // result instead of the search guessing for them. The list comes from
+      // every provider, unlike a batch, which stops at the first confident
+      // one.
       final preview = await PlatformBridge.reEnrichFile({
         ...request,
         'preview_only': true,
@@ -1086,206 +1090,116 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
       );
       if (chosen == null || !mounted) return;
       messenger.showSnackBar(
+        SnackBar(content: Text(l10n.trackReEnrichSearching)),
+      );
+
+      // The pick is previewed, reviewed change by change and written through
+      // the Library's re-enrich path, which saves the song's previous state.
+      final runner = BatchReEnrichRunner(
+        sourceTrackIds: {item.id: ?_spotifyId},
+        saveMotionArtwork: (item, metadata) => saveReEnrichedMotionArtwork(
+          container,
+          metadata: metadata,
+          albumName: item.albumName,
+          artistName: item.artistName,
+        ),
+        beginPhase: () async {
+          final settings = ref.read(settingsProvider);
+          await ref
+              .read(settingsProvider.notifier)
+              .syncLyricsSettingsToBackend(settings: settings);
+          return settings;
+        },
+      );
+      final picked = await runner.choose(
+        BatchReEnrichPreview(
+          item: item,
+          updateFields: ReEnrichFields.all,
+          enrichedMetadata: const {},
+          changes: const [],
+          candidates: candidates,
+        ),
+        chosen,
+      );
+      if (!mounted) return;
+      messenger.hideCurrentSnackBar();
+      if (picked == null || picked.changes.isEmpty) {
+        await showReEnrichResultDialog(
+          context,
+          message: picked == null
+              ? l10n.trackSaveFailed(context.friendlyError(null))
+              : l10n.trackReEnrichAlreadyMatches,
+        );
+        return;
+      }
+
+      final covers = MetadataCoverResources();
+      final List<BatchReEnrichPreview>? approved;
+      try {
+        approved = await showReEnrichReviewSheet(
+          context,
+          previews: [picked],
+          onChoose: runner.choose,
+          providerName: reEnrichProviderNames(ref.read(extensionProvider)),
+          chooseFields: true,
+          loadCovers: (preview) => loadReEnrichReviewCovers(
+            covers,
+            preview,
+            maxDimension: settings.embeddedCoverMaxDimension,
+          ),
+        );
+      } finally {
+        await covers.dispose();
+      }
+      final reviewed = approved?.singleOrNull;
+      if (reviewed == null || reviewed.changes.isEmpty || !mounted) return;
+      messenger.showSnackBar(
         SnackBar(content: Text(l10n.trackReEnrichProgress)),
       );
 
-      final result = await PlatformBridge.reEnrichFile({
-        ...request,
-        'selected_candidate': chosen,
-      });
-      final method = result['method'] as String?;
-
-      final enriched = result['enriched_metadata'] as Map<String, dynamic>?;
-      if (enriched != null && mounted) {
-        _setState(() {
-          _editedMetadata = {
-            'title': enriched['track_name'] ?? trackName,
-            'artist': enriched['artist_name'] ?? artistName,
-            'album': enriched['album_name'] ?? albumName,
-            'album_artist': enriched['album_artist'] ?? albumArtist,
-            'date': enriched['release_date'] ?? releaseDate,
-            'track_number': enriched['track_number'] ?? trackNumber,
-            'total_tracks': enriched['total_tracks'] ?? totalTracks,
-            'disc_number': enriched['disc_number'] ?? discNumber,
-            'total_discs': enriched['total_discs'] ?? totalDiscs,
-            'isrc': enriched['isrc'] ?? isrc,
-            'genre': enriched['genre'] ?? genre,
-            'label': enriched['label'] ?? label,
-            'copyright': enriched['copyright'] ?? copyright,
-            'composer': enriched['composer'] ?? composer,
-          };
-        });
-      }
-
-      if (method == 'native') {
-        // FLAC - handled natively by Go (SAF write-back handled in Kotlin).
-        // External .lrc sidecar for filesystem files is written here; SAF
-        // sidecars are created natively in the Kotlin reEnrichFile handler.
-        await writeReEnrichSidecarLrc(
-          audioFilePath: cleanFilePath,
-          reEnrichResult: result,
-        );
-        await saveReEnrichedMotionArtwork(
-          container,
-          metadata: enriched ?? const {},
-          albumName: albumName,
-          artistName: artistName,
-        );
-        await _refreshEmbeddedCoverPreview(force: true);
-        _markMetadataChanged();
-        await _syncDownloadHistoryMetadata(
-          hasLyrics: hasUsableLyricsContent(
-            (result['lyrics'] ?? result['lyrics_lrc'])?.toString() ?? '',
+      var result = const <String, dynamic>{};
+      Object? failure;
+      final written = await runner.apply(
+        [reviewed],
+        shouldStop: () => !mounted,
+        onProgress: (_, _) {},
+        onResult: (value) => result = value,
+        onFailed: (_, error) => failure = error,
+      );
+      if (!mounted) return;
+      if (written == 0) {
+        messenger.hideCurrentSnackBar();
+        await showReEnrichResultDialog(
+          context,
+          message: l10n.trackSaveFailed(
+            context.friendlyError(
+              failure,
+              fallback: l10n.metadataSaveFailedFfmpeg,
+            ),
           ),
         );
-        await _checkEmbeddedLyrics();
-        if (mounted) {
-          messenger.hideCurrentSnackBar();
-          await showReEnrichResultDialog(
-            context,
-            message: reEnrichCompletionMessage(context.l10n, result),
-          );
-        }
-      } else if (method == 'ffmpeg') {
-        // MP3/Opus - need FFmpeg from Dart side
-        // For SAF files, Kotlin returns temp_path + saf_uri
-        final tempPath = result['temp_path'] as String?;
-        final safUri = result['saf_uri'] as String?;
-        final ffmpegTarget = tempPath ?? cleanFilePath;
-
-        final downloadedCoverPath = result['cover_path'] as String?;
-        String? effectiveCoverPath = downloadedCoverPath;
-        String? extractedCoverPath;
-        try {
-          if (!_hasPath(effectiveCoverPath)) {
-            try {
-              final tempDir = await Directory.systemTemp.createTemp(
-                'reenrich_cover_',
-              );
-              final coverOutput =
-                  '${tempDir.path}${Platform.pathSeparator}cover.jpg';
-              final extracted = await PlatformBridge.extractCoverToFile(
-                ffmpegTarget,
-                coverOutput,
-              );
-              if (extracted['error'] == null) {
-                effectiveCoverPath = coverOutput;
-                extractedCoverPath = coverOutput;
-              } else {
-                try {
-                  await tempDir.delete(recursive: true);
-                } catch (_) {}
-              }
-            } catch (_) {}
-          }
-          final metadata = (result['metadata'] as Map<String, dynamic>?)?.map(
-            (k, v) => MapEntry(k, v.toString()),
-          );
-          final lower = cleanFilePath.toLowerCase();
-
-          String? ffmpegResult;
-          if (lower.endsWith('.mp3')) {
-            ffmpegResult = await FFmpegMetadata.embedMetadataToMp3(
-              mp3Path: ffmpegTarget,
-              coverPath: effectiveCoverPath,
-              metadata: metadata,
-              artistTagMode: artistTagMode,
-            );
-          } else if (lower.endsWith('.m4a') || lower.endsWith('.aac')) {
-            ffmpegResult = await FFmpegMetadata.embedMetadataToM4a(
-              m4aPath: ffmpegTarget,
-              coverPath: effectiveCoverPath,
-              metadata: metadata,
-              artistTagMode: artistTagMode,
-            );
-          } else if (lower.endsWith('.opus') || lower.endsWith('.ogg')) {
-            ffmpegResult = await FFmpegMetadata.embedMetadataToOpus(
-              opusPath: ffmpegTarget,
-              coverPath: effectiveCoverPath,
-              metadata: metadata,
-              artistTagMode: artistTagMode,
-            );
-          }
-
-          if (ffmpegResult != null && tempPath != null && safUri != null) {
-            final ok = await PlatformBridge.writeTempToSaf(
-              ffmpegResult,
-              safUri,
-            );
-            if (!ok && mounted) {
-              messenger.hideCurrentSnackBar();
-              await showReEnrichResultDialog(
-                context,
-                message: context.l10n.trackSaveFailed(
-                  context.l10n.snackbarFailedToWriteStorage,
-                ),
-              );
-              return;
-            }
-            await writeReEnrichSafSidecarLrc(
-              safUri: safUri,
-              reEnrichResult: result,
-            );
-          }
-
-          if (ffmpegResult != null) {
-            // Filesystem .lrc sidecar. SAF sidecar is written only after
-            // writeTempToSaf succeeds.
-            await writeReEnrichSidecarLrc(
-              audioFilePath: cleanFilePath,
-              reEnrichResult: result,
-            );
-            await saveReEnrichedMotionArtwork(
-              container,
-              metadata: enriched ?? const {},
-              albumName: albumName,
-              artistName: artistName,
-            );
-            await _refreshEmbeddedCoverPreview(force: true);
-            _markMetadataChanged();
-            await _syncDownloadHistoryMetadata(
-              hasLyrics: hasUsableLyricsContent(
-                (result['lyrics'] ?? result['lyrics_lrc'])?.toString() ?? '',
-              ),
-            );
-            await _checkEmbeddedLyrics();
-            if (mounted) {
-              messenger.hideCurrentSnackBar();
-              await showReEnrichResultDialog(
-                context,
-                message: reEnrichCompletionMessage(context.l10n, result),
-              );
-            }
-          } else if (mounted) {
-            messenger.hideCurrentSnackBar();
-            await showReEnrichResultDialog(
-              context,
-              message: context.l10n.trackReEnrichFfmpegFailed,
-            );
-          }
-        } finally {
-          for (final path in [downloadedCoverPath, tempPath]) {
-            if (!_hasPath(path)) continue;
-            try {
-              await File(path!).delete();
-            } catch (_) {}
-          }
-          if (_hasPath(extractedCoverPath)) {
-            await _cleanupTempFileAndParent(extractedCoverPath);
-          }
-        }
-      } else {
-        if (mounted) {
-          final error = context.friendlyError(
-            result['error'],
-            fallback: context.l10n.metadataSaveFailedFfmpeg,
-          );
-          messenger.hideCurrentSnackBar();
-          await showReEnrichResultDialog(
-            context,
-            message: context.l10n.trackSaveFailed(error),
-          );
-        }
+        return;
+      }
+      await _reloadAfterReEnrichWrite(
+        source,
+        hasLyrics:
+            hasUsableLyricsContent(
+              (result['lyrics'] ?? result['lyrics_lrc'])?.toString() ?? '',
+            )
+            ? true
+            : null,
+      );
+      if (!mounted) return;
+      messenger.hideCurrentSnackBar();
+      final undo = await showReEnrichResultDialog(
+        context,
+        message: reEnrichCompletionMessage(l10n, result),
+        undoLabel: runner.undoSources.isEmpty
+            ? null
+            : l10n.trackReEnrichUndoAction,
+      );
+      if (undo && mounted && source == cleanFilePath) {
+        await _undoReEnrich(batch: runner.undoBatch, confirm: false);
       }
     } catch (e) {
       if (mounted) {
@@ -1296,6 +1210,105 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
         );
       }
     }
+  }
+
+  /// The song as re-enrich compares and writes it: what this page shows.
+  LocalLibraryItem _reEnrichItem() => LocalLibraryItem(
+    id: _itemId,
+    trackName: trackName,
+    artistName: artistName,
+    albumName: albumName,
+    albumArtist: albumArtist,
+    filePath: cleanFilePath,
+    coverPath: _localCoverPath ?? _coverUrl,
+    scannedAt: DateTime.now(),
+    isrc: isrc,
+    trackNumber: trackNumber,
+    totalTracks: totalTracks,
+    discNumber: discNumber,
+    totalDiscs: totalDiscs,
+    duration: duration,
+    releaseDate: releaseDate,
+    genre: genre,
+    composer: composer,
+    label: label,
+    copyright: copyright,
+    hasLyrics: _lyricsEmbedded,
+    format: _storedAudioFormat,
+  );
+
+  /// Shows what a re-enrich or its undo wrote to the file at [sourcePath].
+  Future<void> _reloadAfterReEnrichWrite(
+    String sourcePath, {
+    bool? hasLyrics,
+  }) async {
+    try {
+      final refreshed = await readPlaybackFileMetadataWithRetry(sourcePath);
+      if (!mounted || sourcePath != cleanFilePath) return;
+      if (refreshed['error'] == null) {
+        _setState(() => _editedMetadata = refreshed);
+        if (_isNetworkItem) await _syncNetworkLibraryMetadata(refreshed);
+      }
+    } catch (error) {
+      _log.w('Could not read the song after re-enrich: $error');
+    }
+    if (!mounted || sourcePath != cleanFilePath) return;
+    if (!_isNetworkItem) await _refreshEmbeddedCoverPreview(force: true);
+    if (!mounted || sourcePath != cleanFilePath) return;
+    _markMetadataChanged();
+    await _checkEmbeddedLyrics();
+    await _syncDownloadHistoryMetadata(hasLyrics: hasLyrics);
+    await _refreshReEnrichUndo();
+  }
+
+  /// Whether this song has a state saved before its last re-enrich.
+  Future<void> _refreshReEnrichUndo() async {
+    final source = cleanFilePath;
+    final available =
+        _fileExists && await ReEnrichUndo.instance.canUndo(source);
+    if (mounted && source == cleanFilePath) {
+      _setState(() => _reEnrichUndoAvailable = available);
+    }
+  }
+
+  /// Restores the song's metadata from before its last re-enrich. With
+  /// [batch], only a state that run saved is restored.
+  Future<void> _undoReEnrich({String? batch, bool confirm = true}) async {
+    final l10n = context.l10n;
+    if (confirm &&
+        !await showAppConfirmDialog(
+          context,
+          title: l10n.trackReEnrichUndoConfirmTitle,
+          message: l10n.trackReEnrichUndoConfirmMessage,
+          confirmLabel: l10n.trackReEnrichUndoAction,
+        )) {
+      return;
+    }
+    if (!mounted) return;
+    final source = cleanFilePath;
+    final result = await ReEnrichUndo.instance.restore(
+      source,
+      artistTagMode: artistTagModeForExistingTags(
+        ref.read(settingsProvider).artistTagMode,
+      ),
+      batch: batch,
+    );
+    if (!mounted) return;
+    if (result.restored) {
+      await _reloadAfterReEnrichWrite(source);
+    } else {
+      await _refreshReEnrichUndo();
+    }
+    if (!mounted) return;
+    await showReEnrichResultDialog(
+      context,
+      message: switch (result.outcome) {
+        ReEnrichUndoOutcome.restored => l10n.trackReEnrichUndoDone,
+        ReEnrichUndoOutcome.coverKept =>
+          '${l10n.trackReEnrichUndoDone}\n${l10n.trackReEnrichUndoCoverKept}',
+        _ => l10n.trackSaveFailed(context.friendlyError(result.error)),
+      },
+    );
   }
 
   Future<void> _syncDownloadHistoryMetadata({bool? hasLyrics}) async {

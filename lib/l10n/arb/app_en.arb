@@ -4383,6 +4383,66 @@
   "@trackReEnrichApplyChanges": {
     "description": "Confirmation button in the batch metadata review sheet"
   },
+  "trackReEnrichReviewSelected": "{selected} of {total} changes selected",
+  "@trackReEnrichReviewSelected": {
+    "description": "Summary above the changes of one song in the re-enrich review, where each change has its own switch",
+    "placeholders": {
+      "selected": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "trackReEnrichAlreadyMatches": "This result matches the song's current metadata, so there is nothing to change.",
+  "@trackReEnrichAlreadyMatches": {
+    "description": "Shown instead of an empty review when the picked re-enrich result would change nothing"
+  },
+  "trackReEnrichSmallerCover": "Smaller than the current cover",
+  "@trackReEnrichSmallerCover": {
+    "description": "Note under a proposed cover in the re-enrich review; the change starts switched off"
+  },
+  "trackReEnrichHasLyrics": "Has lyrics",
+  "@trackReEnrichHasLyrics": {
+    "description": "Current value of the lyrics row in the re-enrich review when the song already has lyrics"
+  },
+  "trackReEnrichUndo": "Undo re-enrich",
+  "@trackReEnrichUndo": {
+    "description": "Song metadata menu action that restores the metadata the song had before its last re-enrich"
+  },
+  "trackReEnrichUndoAction": "Undo",
+  "@trackReEnrichUndoAction": {
+    "description": "Action in the re-enrich result for one song that restores its previous metadata"
+  },
+  "trackReEnrichUndoAll": "Undo all",
+  "@trackReEnrichUndoAll": {
+    "description": "Action in the result of a re-enrich of several songs that restores the previous metadata of every song it changed"
+  },
+  "trackReEnrichUndoConfirmTitle": "Undo re-enrich?",
+  "@trackReEnrichUndoConfirmTitle": {
+    "description": "Title of the confirmation before restoring a song's metadata from before its last re-enrich"
+  },
+  "trackReEnrichUndoConfirmMessage": "The tags, cover and lyrics the last re-enrich changed go back to what the song had before. Edits made to them since are replaced.",
+  "@trackReEnrichUndoConfirmMessage": {
+    "description": "Message of the confirmation before undoing a re-enrich"
+  },
+  "trackReEnrichUndoProgress": "Restoring previous metadata...",
+  "@trackReEnrichUndoProgress": {
+    "description": "Progress title while undoing a re-enrich of several songs"
+  },
+  "trackReEnrichUndoDone": "Previous metadata restored",
+  "@trackReEnrichUndoDone": {
+    "description": "Result after undoing the re-enrich of one song"
+  },
+  "trackReEnrichUndoAllDone": "Restored {count} of {total} songs",
+  "@trackReEnrichUndoAllDone": {
+    "description": "Result after undoing the re-enrich of several songs",
+    "placeholders": {
+      "count": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "trackReEnrichUndoCoverKept": "The cover re-enrich added stays, because a cover cannot be removed from a song that had none.",
+  "@trackReEnrichUndoCoverKept": {
+    "description": "Added to the undo result when re-enrich gave a song its first cover, which undo cannot remove"
+  },
   "reEnrichBestMatches": "Best matches",
   "@reEnrichBestMatches": {
     "description": "Header above the online results that fit the song, in the re-enrich result picker"
