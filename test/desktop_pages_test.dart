@@ -133,7 +133,11 @@ void main() {
         ),
     ];
     for (var length = 0; length <= items.length; length++) {
-      final active = activeDesktopDownloads(items.sublist(0, length));
+      // The ring must count exactly the rows the popover lists.
+      final lookup = DownloadQueueLookup.fromItems(items.sublist(0, length));
+      final active = [
+        for (final id in lookup.activeItemIds) lookup.byItemId[id]!,
+      ];
       var total = 0.0;
       for (final item in active) {
         total += item.status == DownloadStatus.finalizing

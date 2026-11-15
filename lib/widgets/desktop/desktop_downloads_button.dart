@@ -11,15 +11,6 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 
-/// Downloads that are waiting, running or finalizing, in queue order.
-List<DownloadItem> activeDesktopDownloads(List<DownloadItem> items) => [
-  for (final item in items)
-    if (item.status == DownloadStatus.queued ||
-        item.status == DownloadStatus.downloading ||
-        item.status == DownloadStatus.finalizing)
-      item,
-];
-
 /// How many of [items] are active and their overall progress: waiting items
 /// count as not started. One pass, so a progress sample allocates nothing.
 ({int count, double progress}) desktopDownloadsSummary(
@@ -66,6 +57,8 @@ class _DesktopDownloadsButtonState
 
   void _showAll() {
     _menu.close();
+    // Mornye lists downloads on their own sidebar page; Library would
+    // reopen whichever page it showed last, such as Songs.
     if (!ShellNavigationService.requestLibraryLink('downloads')) {
       ShellNavigationService.requestTab(ShellTab.library);
     }
