@@ -625,7 +625,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
           );
           // A DAC level that falls from one song to the next shows here:
           // what the DAC read when opened against what the app set last.
-          if (response?['volumeTrace'] case final Map trace
+          if (response?['volumeTrace'] case final Map<Object?, Object?> trace
               when volume is Map) {
             _log.i(
               'DAC volume: connected at ${trace['connectedDb']} dB, '
