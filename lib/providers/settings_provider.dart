@@ -644,6 +644,14 @@ class SettingsNotifier extends Notifier<AppSettings> {
     ),
   );
 
+  void setConfirmLoudVolume(bool enabled) =>
+      _commit(state.copyWith(confirmLoudVolume: enabled));
+
+  void setLoudVolumeLevel(int percent) {
+    if (!loudVolumeLevels.contains(percent)) return;
+    _commit(state.copyWith(loudVolumeLevel: percent));
+  }
+
   void setPauseOnMute(bool enabled) =>
       _commit(state.copyWith(pauseOnMute: enabled));
 

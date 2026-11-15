@@ -414,6 +414,21 @@ class SettingsSearchCatalog {
           ],
         ),
         SettingsSearchEntry(
+          icon: Icons.volume_up_outlined,
+          title: l10n.confirmLoudVolume,
+          subtitle: l10n.confirmLoudVolumeDescription,
+          keywords: const [
+            'volume',
+            'limit',
+            'limiter',
+            'loud',
+            'hearing',
+            'ears',
+            'safe',
+            'warning',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.fullscreen,
           title: l10n.playerCoverStyle,
           subtitle: l10n.playerCoverStyleFullScreenDescription,

@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
-import 'package:mornye/models/settings.dart' show headphoneResumeModes;
+import 'package:mornye/models/settings.dart'
+    show headphoneResumeModes, loudVolumeLevels;
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/alsa_output_devices.dart';
@@ -246,6 +247,22 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
               ),
               if (settings.playbackNormalization)
                 PlaybackNormalizationSettings(enabled: !settings.usbBitPerfect),
+              SettingsSwitchItem(
+                icon: Icons.volume_up_outlined,
+                title: context.l10n.confirmLoudVolume,
+                subtitle: context.l10n.confirmLoudVolumeDescription,
+                value: settings.confirmLoudVolume,
+                onChanged: (value) => ref
+                    .read(settingsProvider.notifier)
+                    .setConfirmLoudVolume(value),
+              ),
+              if (settings.confirmLoudVolume)
+                _LoudVolumeLevelChoice(
+                  level: settings.loudVolumeLevel,
+                  onChanged: ref
+                      .read(settingsProvider.notifier)
+                      .setLoudVolumeLevel,
+                ),
               if (!isDesktopPlatform) ...[
                 SettingsSwitchItem(
                   icon: Icons.vibration,
@@ -767,6 +784,50 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
           const NavBarSliverSpacer(),
+        ],
+      ),
+    );
+  }
+}
+
+/// The level, one of [loudVolumeLevels], above which the volume bar asks
+/// first; shown under the Confirm loud volume switch.
+class _LoudVolumeLevelChoice extends StatelessWidget {
+  const _LoudVolumeLevelChoice({required this.level, required this.onChanged});
+
+  final int level;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = context.l10n.confirmLoudVolumeLevel;
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: context.tokens.rowPaddingH,
+        vertical: context.tokens.rowPaddingVCompact,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.bodyLarge),
+          const SizedBox(height: 12),
+          if (context.isMornye)
+            MornyeSegmentedControl(
+              labels: [for (final level in loudVolumeLevels) '$level%'],
+              selectedIndex: loudVolumeLevels.indexOf(level),
+              onChanged: (index) => onChanged(loudVolumeLevels[index]),
+              samplesBackdrop: false,
+            )
+          else
+            SettingsSegmentedChoice<int>(
+              selected: level,
+              onChanged: onChanged,
+              semanticLabel: title,
+              options: [
+                for (final level in loudVolumeLevels)
+                  SettingsSegmentOption(value: level, label: '$level%'),
+              ],
+            ),
         ],
       ),
     );

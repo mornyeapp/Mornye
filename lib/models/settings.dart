@@ -20,6 +20,12 @@ double playbackNormalizationPreampFromJson(Object? value) =>
 String playbackNormalizationModeFromJson(Object? value) =>
     value == 'album' ? 'album' : 'track';
 
+/// Volume levels, in percent, above which the volume bar can ask first.
+const loudVolumeLevels = [60, 70, 80, 90];
+
+int loudVolumeLevelFromJson(Object? value) =>
+    value is int && loudVolumeLevels.contains(value) ? value : 80;
+
 /// When connecting headphones resumes playback: never, only a recent pause
 /// caused by headphones or Bluetooth going away, or on every connection
 /// (which also pauses on disconnect).
@@ -154,6 +160,10 @@ class AppSettings {
   final double playbackNormalizationPreamp;
   @JsonKey(fromJson: playbackNormalizationModeFromJson)
   final String playbackNormalizationMode; // 'track' or 'album'
+  // Ask before the app's volume bar goes above [loudVolumeLevel] percent.
+  final bool confirmLoudVolume;
+  @JsonKey(fromJson: loudVolumeLevelFromJson)
+  final int loudVolumeLevel; // One of [loudVolumeLevels].
   final bool pauseOnMute;
   // One of [headphoneResumeModes].
   @JsonKey(readValue: readHeadphoneResume, fromJson: headphoneResumeFromJson)
@@ -485,6 +495,8 @@ class AppSettings {
     this.playbackNormalization = false,
     this.playbackNormalizationPreamp = 0,
     this.playbackNormalizationMode = 'track',
+    this.confirmLoudVolume = false,
+    this.loudVolumeLevel = 80,
     this.pauseOnMute = true,
     this.headphoneResume = 'off',
     this.gaplessPlayback = true,
@@ -674,6 +686,8 @@ class AppSettings {
     bool? playbackNormalization,
     double? playbackNormalizationPreamp,
     String? playbackNormalizationMode,
+    bool? confirmLoudVolume,
+    int? loudVolumeLevel,
     bool? pauseOnMute,
     String? headphoneResume,
     bool? gaplessPlayback,
@@ -838,6 +852,8 @@ class AppSettings {
           playbackNormalizationPreamp ?? this.playbackNormalizationPreamp,
       playbackNormalizationMode:
           playbackNormalizationMode ?? this.playbackNormalizationMode,
+      confirmLoudVolume: confirmLoudVolume ?? this.confirmLoudVolume,
+      loudVolumeLevel: loudVolumeLevel ?? this.loudVolumeLevel,
       pauseOnMute: pauseOnMute ?? this.pauseOnMute,
       headphoneResume: headphoneResume ?? this.headphoneResume,
       gaplessPlayback: gaplessPlayback ?? this.gaplessPlayback,

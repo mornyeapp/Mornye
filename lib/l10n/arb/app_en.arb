@@ -4101,6 +4101,36 @@
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
   },
+  "confirmLoudVolume": "Confirm loud volume",
+  "@confirmLoudVolume": {
+    "description": "Switch title: the app's volume bar asks before going above a chosen level"
+  },
+  "confirmLoudVolumeDescription": "Ask before the volume bar goes above the level you choose. Volume buttons are not affected.",
+  "@confirmLoudVolumeDescription": {
+    "description": "Subtitle of the Confirm loud volume switch; hardware volume buttons are never limited"
+  },
+  "confirmLoudVolumeLevel": "Ask above",
+  "@confirmLoudVolumeLevel": {
+    "description": "Label over the choice of volume level (60, 70, 80 or 90 percent) above which the volume bar asks first"
+  },
+  "confirmLoudVolumeTitle": "Turn the volume up?",
+  "@confirmLoudVolumeTitle": {
+    "description": "Title of the dialog shown when the volume bar is moved above the chosen level"
+  },
+  "confirmLoudVolumeMessage": "Volume above {level} may hurt your hearing. Do you want to continue?",
+  "@confirmLoudVolumeMessage": {
+    "description": "Message of the loud volume dialog",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "80%"
+      }
+    }
+  },
+  "confirmLoudVolumeContinue": "Continue",
+  "@confirmLoudVolumeContinue": {
+    "description": "Dialog action that lets the volume go above the chosen level"
+  },
   "cacheAudioAnalysis": "Audio analysis cache",
   "@cacheAudioAnalysis": {
     "description": "Cache item title for saved audio analysis results"

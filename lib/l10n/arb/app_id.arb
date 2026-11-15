@@ -3656,6 +3656,36 @@
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
   },
+  "confirmLoudVolume": "Konfirmasi volume keras",
+  "@confirmLoudVolume": {
+    "description": "Switch title: the app's volume bar asks before going above a chosen level"
+  },
+  "confirmLoudVolumeDescription": "Tanya dulu sebelum bilah volume melewati batas yang Anda pilih. Tombol volume tidak terpengaruh.",
+  "@confirmLoudVolumeDescription": {
+    "description": "Subtitle of the Confirm loud volume switch; hardware volume buttons are never limited"
+  },
+  "confirmLoudVolumeLevel": "Tanya di atas",
+  "@confirmLoudVolumeLevel": {
+    "description": "Label over the choice of volume level (60, 70, 80 or 90 percent) above which the volume bar asks first"
+  },
+  "confirmLoudVolumeTitle": "Naikkan volume?",
+  "@confirmLoudVolumeTitle": {
+    "description": "Title of the dialog shown when the volume bar is moved above the chosen level"
+  },
+  "confirmLoudVolumeMessage": "Volume di atas {level} dapat membahayakan pendengaran Anda. Lanjutkan?",
+  "@confirmLoudVolumeMessage": {
+    "description": "Message of the loud volume dialog",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "80%"
+      }
+    }
+  },
+  "confirmLoudVolumeContinue": "Lanjutkan",
+  "@confirmLoudVolumeContinue": {
+    "description": "Dialog action that lets the volume go above the chosen level"
+  },
   "cacheAudioAnalysis": "Cache analisis audio",
   "@cacheAudioAnalysis": {
     "description": "Cache item title for saved audio analysis results"

@@ -37,6 +37,10 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   playbackNormalizationMode: json['playbackNormalizationMode'] == null
       ? 'track'
       : playbackNormalizationModeFromJson(json['playbackNormalizationMode']),
+  confirmLoudVolume: json['confirmLoudVolume'] as bool? ?? false,
+  loudVolumeLevel: json['loudVolumeLevel'] == null
+      ? 80
+      : loudVolumeLevelFromJson(json['loudVolumeLevel']),
   pauseOnMute: json['pauseOnMute'] as bool? ?? true,
   headphoneResume: readHeadphoneResume(json, 'headphoneResume') == null
       ? 'off'
@@ -262,6 +266,8 @@ Map<String, dynamic> _$AppSettingsToJson(
   'playbackNormalization': instance.playbackNormalization,
   'playbackNormalizationPreamp': instance.playbackNormalizationPreamp,
   'playbackNormalizationMode': instance.playbackNormalizationMode,
+  'confirmLoudVolume': instance.confirmLoudVolume,
+  'loudVolumeLevel': instance.loudVolumeLevel,
   'pauseOnMute': instance.pauseOnMute,
   'headphoneResume': instance.headphoneResume,
   'gaplessPlayback': instance.gaplessPlayback,
