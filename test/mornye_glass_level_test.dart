@@ -9,6 +9,7 @@ import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/app_switch.dart';
 import 'package:mornye/widgets/extension_repo_card.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
@@ -525,6 +526,55 @@ void main() {
     };
     expect(keys, hasLength(6));
     expect(keyOf('back'), isNot(keyOf('front')));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a lens under an interface scale measures the window', (
+    tester,
+  ) async {
+    MornyeGlass.debugShaderFilterSupport = true;
+    addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
+    tester.view.devicePixelRatio = 2;
+    tester.view.physicalSize = const Size(800, 1600);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    MediaQueryData? content;
+
+    Future<void> pumpAt(double scale) => tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          mornyeGlassLevelProvider.overrideWithValue(MornyeGlassLevel.liquid),
+        ],
+        child: MaterialApp(
+          theme: MornyeTheme.build(Brightness.dark),
+          builder: (context, child) =>
+              AdaptiveUiScaler(userScale: scale, child: child!),
+          home: Scaffold(
+            body: MornyeGlass.navigation(
+              blurEnabled: true,
+              child: Builder(
+                builder: (context) {
+                  content = MediaQuery.of(context);
+                  return const SizedBox(width: 80, height: 40);
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    for (final scale in [0.8, 1.0, 1.3]) {
+      await pumpAt(scale);
+      // The lens turns its place in the window into pixels with these two.
+      final lens = MediaQuery.of(tester.element(find.byType(LiquidGlassLens)));
+      expect(lens.size.width, closeTo(400, 0.001), reason: '$scale');
+      expect(lens.size.height, closeTo(800, 0.001), reason: '$scale');
+      expect(lens.devicePixelRatio, closeTo(2, 0.001), reason: '$scale');
+      // What sits on the glass still lays out in the scaled viewport.
+      expect(content!.size.width, closeTo(400 / scale, 0.001));
+      expect(content!.devicePixelRatio, closeTo(2 * scale, 0.001));
+    }
     expect(tester.takeException(), isNull);
   });
 }

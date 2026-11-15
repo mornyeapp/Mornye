@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_easy/liquid_glass_easy.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/adaptive_layout.dart';
 
 /// A bounded package lens without a captured-screen view or a touch ticker.
 class MornyeLiquidBackdrop extends StatelessWidget {
@@ -47,7 +48,13 @@ class MornyeLiquidBackdrop extends StatelessWidget {
         5 /
         70;
     final index = 1 / math.sqrt(1 - math.pow(edgeBend.clamp(0, 0.95), 2));
-    return LiquidGlassLens(
+    // The lens places its backdrop sample in window pixels, from the window's
+    // size and pixel ratio. Under an interface scale the app's own viewport
+    // reports scaled ones, which drew the glass that fraction of the way
+    // towards the window's corner, away from its own box.
+    final uiScale = AdaptiveUiScale.of(context);
+    final viewport = uiScale == 1 ? null : MediaQuery.of(context);
+    final lens = LiquidGlassLens(
       style: LiquidGlassStyle(
         shape: LiquidGlassShape(
           cornerStyle: smoothCorners
@@ -77,7 +84,17 @@ class MornyeLiquidBackdrop extends StatelessWidget {
         // Version 5 expresses the widest colour split in logical pixels.
         dispersion: 1.32 * clarity * effect,
       ),
-      child: child,
+      child: viewport == null
+          ? child
+          : MediaQuery(data: viewport, child: child),
+    );
+    if (viewport == null) return lens;
+    return MediaQuery(
+      data: viewport.copyWith(
+        size: viewport.size * uiScale,
+        devicePixelRatio: viewport.devicePixelRatio / uiScale,
+      ),
+      child: lens,
     );
   }
 }
