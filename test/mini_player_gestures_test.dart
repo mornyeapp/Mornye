@@ -252,10 +252,10 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    if (!configuration.mornye) {
+    {
       for (final dx in [-100.0, 100.0]) {
-        testWidgets('Material: paused swipe $dx closes the player and a new '
-            'song shows it again', (tester) async {
+        testWidgets('${configuration.name}: paused swipe $dx closes the '
+            'player and a new song shows it again', (tester) async {
           final mediaItems = StreamController<MediaItem?>();
           addTearDown(mediaItems.close);
           final controller = await pumpPlayer(
@@ -285,9 +285,8 @@ void main() {
         });
       }
 
-      testWidgets('Material: loading swipes leave the player open', (
-        tester,
-      ) async {
+      testWidgets('${configuration.name}: loading swipes leave the player '
+          'open', (tester) async {
         final controller = await pumpPlayer(tester, loading: true);
         for (final dx in [-100.0, 100.0]) {
           await tester.timedDrag(
@@ -302,9 +301,8 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
-      testWidgets('Material: paused remote swipes keep track navigation', (
-        tester,
-      ) async {
+      testWidgets('${configuration.name}: paused remote swipes keep track '
+          'navigation', (tester) async {
         final controller = await pumpPlayer(tester, remote: _RemotePlayback());
         for (final dx in [-100.0, 100.0]) {
           await tester.timedDrag(
@@ -318,24 +316,6 @@ void main() {
         expect(find.text('Song'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
-    } else {
-      testWidgets(
-        '${configuration.name}: paused swipes keep track navigation',
-        (tester) async {
-          final controller = await pumpPlayer(tester);
-          for (final dx in [-100.0, 100.0]) {
-            await tester.timedDrag(
-              find.text('Song'),
-              Offset(dx, 0),
-              const Duration(milliseconds: 600),
-            );
-            await tester.pumpAndSettle();
-          }
-          expect(controller.calls, ['next', 'previous']);
-          expect(find.text('Song'), findsOneWidget);
-          expect(tester.takeException(), isNull);
-        },
-      );
     }
 
     for (final reducedMotion in [false, true]) {
@@ -514,7 +494,7 @@ void main() {
         frequency: 120,
       );
       await tester.pumpAndSettle();
-      expect(controller.calls, [configuration.mornye ? 'next' : 'dismiss']);
+      expect(controller.calls, ['dismiss']);
     });
 
     testWidgets('${configuration.name}: Home carousel and playback buttons '

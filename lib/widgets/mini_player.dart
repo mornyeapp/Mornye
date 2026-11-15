@@ -209,8 +209,7 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     }
     final direction = velocity.abs() >= 550 ? velocity : travel;
     final controller = ref.read(musicPlayerControllerProvider);
-    if (!context.isMornye &&
-        !ref.read(playbackPlayingProvider) &&
+    if (!ref.read(playbackPlayingProvider) &&
         ref.read(activeRemotePlaybackProvider) == null) {
       if (!ref.read(playbackLoadingProvider)) unawaited(controller.dismiss());
       return;
@@ -455,7 +454,7 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
       ),
     );
     // Swiping up opens the full player. Sideways swipes dismiss a paused
-    // local Material player; otherwise they change tracks. The title lines
+    // local player; otherwise they change tracks. The title lines
     // follow the finger and return to rest on release.
     // Desktop has no touch gestures: a click opens the player instead.
     final swipeable = isDesktopPlatform
