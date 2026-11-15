@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -52,23 +53,42 @@ class DesktopBackendConfig {
 
   /// Directories from path_provider. The FFmpeg tool locations default to
   /// those [DesktopFFmpegTools] resolves, so Rust and Dart run one binary.
+  ///
+  /// Windows fails the Documents lookup when that known folder points at a
+  /// folder that no longer exists, such as a removed OneDrive folder. The
+  /// backend does not depend on it, so application support stands in.
   static Future<DesktopBackendConfig> resolve({
     String? ffmpegPath,
     String? ffprobePath,
     Future<DesktopFFmpegTools> Function()? locateTools,
+    @visibleForTesting
+    Future<Directory> Function() supportDirectory =
+        getApplicationSupportDirectory,
+    @visibleForTesting
+    Future<Directory> Function() documentsDirectory =
+        getApplicationDocumentsDirectory,
+    @visibleForTesting
+    Future<Directory> Function() temporaryDirectory = getTemporaryDirectory,
   }) async {
     final directories = await Future.wait([
-      getApplicationSupportDirectory(),
-      getApplicationDocumentsDirectory(),
-      getTemporaryDirectory(),
+      supportDirectory(),
+      temporaryDirectory(),
     ]);
+    final appSupportDir = directories[0].path;
+    String documentsDir;
+    try {
+      documentsDir = (await documentsDirectory()).path;
+    } on Object catch (error) {
+      debugPrint('Documents folder unavailable, using app support: $error');
+      documentsDir = appSupportDir;
+    }
     final tools = ffmpegPath != null && ffprobePath != null
         ? null
         : await (locateTools ?? () => DesktopFFmpegTools.shared)();
     return DesktopBackendConfig(
-      appSupportDir: directories[0].path,
-      documentsDir: directories[1].path,
-      tempDir: directories[2].path,
+      appSupportDir: appSupportDir,
+      documentsDir: documentsDir,
+      tempDir: directories[1].path,
       ffmpegPath: ffmpegPath ?? tools?.ffmpegPath,
       ffprobePath: ffprobePath ?? tools?.ffprobePath,
     );
@@ -214,7 +234,20 @@ class RustFfiBackend extends BackendChannel {
   /// Log records the library pushes (callback kind 13).
   Stream<Object?> get logRecords => _logRecords.stream;
 
-  Future<NativeBackendTransport> _ensureReady() => _ready ??= _start();
+  Future<NativeBackendTransport> _ensureReady() {
+    final ready = _ready ??= _start();
+    // A failed start is not kept for the whole session: the next call
+    // starts again, for example once a missing folder is reachable.
+    unawaited(
+      ready.then<void>(
+        (_) {},
+        onError: (Object _) {
+          if (identical(_ready, ready)) _ready = null;
+        },
+      ),
+    );
+    return ready;
+  }
 
   Future<NativeBackendTransport> _start() async {
     final NativeBackendTransport transport;

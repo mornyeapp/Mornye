@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -370,6 +371,40 @@ void main() {
       missing.downloadProgressEvents().first,
       throwsA(isA<PlatformException>()),
     );
+  });
+
+  test('starts again after a failed start', () async {
+    var attempts = 0;
+    final retrying = RustFfiBackend(
+      openTransport: () => transport,
+      loadConfig: () async {
+        if (++attempts == 1) throw StateError('folder unavailable');
+        return _config;
+      },
+    );
+    transport.responder = (call) =>
+        transport.sendJson(call.id, NativeMessageKind.result, 'ok');
+    await expectLater(
+      retrying.invokeMethod<String>('first'),
+      throwsA(isA<StateError>()),
+    );
+    expect(await retrying.invokeMethod<String>('second'), 'ok');
+    expect(attempts, 2);
+    expect(transport.configs, hasLength(1));
+  });
+
+  test('config falls back to app support without a Documents folder', () async {
+    final config = await DesktopBackendConfig.resolve(
+      ffmpegPath: '/bin/ffmpeg',
+      ffprobePath: '/bin/ffprobe',
+      supportDirectory: () async => Directory('/support'),
+      documentsDirectory: () async =>
+          throw const FileSystemException('Unable to get documents directory'),
+      temporaryDirectory: () async => Directory('/tmp'),
+    );
+    expect(config.appSupportDir, '/support');
+    expect(config.documentsDir, '/support');
+    expect(config.tempDir, '/tmp');
   });
 
   group('library location', () {
