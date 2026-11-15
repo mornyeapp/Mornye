@@ -14,6 +14,7 @@ import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/screens/lyrics_share_screen.dart';
@@ -23,6 +24,7 @@ import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
+import 'package:mornye/utils/synced_lyrics_scroll.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -1213,10 +1215,38 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         mediaItem: mediaItem,
         lyrics: _trackMetadata.lyrics,
         initial: line,
+        position: line == null ? _lyricsDrawnPosition() : null,
+        offset: Duration(milliseconds: ref.read(themeProvider).lyricsOffsetMs),
       );
     } finally {
       _sharingLyrics = false;
     }
+  }
+
+  /// The position synced lyrics are drawn for, as [SyncedLyricsView] reads
+  /// it: the scrub preview, else the audio position plus the display lead
+  /// while playing. Null while Mornye shows no line yet (loading, or not
+  /// started), so sharing then opens with nothing selected.
+  Duration? _lyricsDrawnPosition() {
+    final preview = _seekPreview.value;
+    if (preview != null) return preview;
+    final state = ref.read(playbackStateProvider).value;
+    if (state == null) return null;
+    final loading =
+        state.processingState == AudioProcessingState.loading ||
+        state.processingState == AudioProcessingState.buffering;
+    if (context.isMornye &&
+        (loading || (!state.playing && state.position <= Duration.zero))) {
+      return null;
+    }
+    if (!state.playing ||
+        loading ||
+        !state.speed.isFinite ||
+        state.speed <= 0) {
+      return state.position;
+    }
+    final lead = lyricsDisplayLead(View.maybeOf(context)?.display.refreshRate);
+    return state.position + lead * state.speed;
   }
 
   /// Completes once a load already in flight (started elsewhere) finishes.

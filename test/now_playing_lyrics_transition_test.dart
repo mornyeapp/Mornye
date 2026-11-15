@@ -4592,6 +4592,77 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final mornye in [false, true]) {
+    final style = mornye ? 'Mornye' : 'Material';
+    testWidgets('$style Share lyrics selects the line being sung', (
+      tester,
+    ) async {
+      await pumpNowPlaying(
+        tester,
+        theme: mornye ? MornyeTheme.build(Brightness.dark) : null,
+        size: const Size(393, 852),
+        playback: PlaybackState(
+          processingState: AudioProcessingState.ready,
+          updatePosition: const Duration(milliseconds: 4500),
+        ),
+      );
+      mediaItems.add(item('many'));
+      await settlePlayer(tester);
+
+      await tester.tap(
+        findAppIcon(
+          mornye ? CupertinoIcons.ellipsis : Icons.more_vert,
+        ).hitTestable(),
+      );
+      await settlePlayer(tester);
+      await tester.tap(find.text('Share lyrics'));
+      await settlePlayer(tester);
+
+      final screen = tester.widget<LyricsShareScreen>(
+        find.byType(LyricsShareScreen),
+      );
+      expect(screen.initialSelection, {2});
+      // The card already quotes it, so Share is one tap away.
+      expect(
+        find.descendant(
+          of: find.byType(LyricsShareCard),
+          matching: find.text('Third line'),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Share lyrics with plain lyrics selects nothing', (tester) async {
+    metadataOverrides = {'lyrics': 'Plain verse\nAnother verse'};
+    await pumpNowPlaying(
+      tester,
+      size: const Size(393, 852),
+      playback: PlaybackState(
+        processingState: AudioProcessingState.ready,
+        updatePosition: const Duration(milliseconds: 4500),
+      ),
+    );
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+
+    await tester.tap(findAppIcon(Icons.more_vert).hitTestable());
+    await settlePlayer(tester);
+    await tester.tap(find.text('Share lyrics'));
+    await settlePlayer(tester);
+
+    final screen = tester.widget<LyricsShareScreen>(
+      find.byType(LyricsShareScreen),
+    );
+    expect(screen.lines.map((line) => line.text), [
+      'Plain verse',
+      'Another verse',
+    ]);
+    expect(screen.initialSelection, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a track change cancels a pending lyrics share', (tester) async {
     await pumpNowPlaying(tester);
     mediaItems.add(item('first'));

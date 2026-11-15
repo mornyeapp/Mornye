@@ -9,6 +9,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
+import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/widget_capture.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
@@ -40,16 +41,50 @@ List<LyricsShareLine> lyricsShareLines(ParsedLyrics lyrics) {
   ];
 }
 
+/// The row in [lyricsShareLines] of the line the player highlights at
+/// [position], the position it draws synced lyrics for (display lead
+/// included), with the listener's timing [offset]. Lines go through the
+/// player's own timeline, so an instrumental gap after a line ends selects
+/// nothing, and a backing vocal selects the line it backs. -1 for plain
+/// lyrics, before the first line and during a gap.
+int lyricsShareRowAt(
+  ParsedLyrics lyrics,
+  Duration position, {
+  Duration offset = Duration.zero,
+}) {
+  if (!lyrics.synced || lyrics.lines.isEmpty) return -1;
+  final timeline = lyricsWithDisplayEnds(
+    lyricsTimelineWithGaps(lyricsShiftedBy(lyrics.lines, offset)),
+  );
+  var active = LyricsParser.activeIndex(timeline, position);
+  if (active < 0) return -1;
+  if (timeline[active].isBackground) {
+    active = LyricDisplayLayout(timeline).leadForLine[active];
+  }
+  if (timeline[active].text.trim().isEmpty) return -1;
+  var row = 0;
+  for (var i = 0; i < active; i++) {
+    if (timeline[i].text.trim().isNotEmpty) row++;
+  }
+  return row;
+}
+
 /// Opens the lyric card editor. [initial] preselects the line the user
-/// long-pressed in the player.
+/// long-pressed in the player. Without it, [position] (see
+/// [lyricsShareRowAt]) preselects the line being sung, so sharing it takes
+/// one tap.
 Future<void> openLyricsShare(
   BuildContext context, {
   required MediaItem mediaItem,
   required ParsedLyrics lyrics,
   LyricLine? initial,
+  Duration? position,
+  Duration offset = Duration.zero,
 }) {
   final lines = lyricsShareLines(lyrics);
-  var selected = -1;
+  var selected = initial == null && position != null
+      ? lyricsShareRowAt(lyrics, position, offset: offset)
+      : -1;
   if (initial != null) {
     var row = 0;
     for (final line in lyrics.lines) {
@@ -96,18 +131,44 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
   final _cardKey = GlobalKey();
   final _shareButtonKey = GlobalKey();
   late final Set<int> _selected = {...widget.initialSelection};
-  late final ScrollController _list = ScrollController(
-    initialScrollOffset: widget.initialSelection.isEmpty
-        ? 0
-        : (widget.initialSelection.first - 2).clamp(0, 1 << 20) * 58.0,
-  );
+  final _initialRow = GlobalKey();
+
+  /// Made at the list's first layout, which gives the viewport height the
+  /// preselected line is centered in.
+  ScrollController? _list;
   LyricsCardBackground _background = LyricsCardBackground.artwork;
   bool _sharing = false;
 
+  /// A one-line row: 56dp tall with a 2dp gap below.
+  static const _rowExtent = 58.0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialSelection.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Lines that wrap make the estimate short; the built row corrects it.
+        final row = _initialRow.currentContext;
+        if (!mounted || row == null) return;
+        Scrollable.ensureVisible(row, alignment: 0.5);
+      });
+    }
+  }
+
   @override
   void dispose() {
-    _list.dispose();
+    _list?.dispose();
     super.dispose();
+  }
+
+  /// Centers the preselected line in a [viewport] tall list, estimating
+  /// rows at one line each so it opens there without a visible jump.
+  double _initialOffset(double viewport) {
+    if (widget.initialSelection.isEmpty || !viewport.isFinite) return 0;
+    final row = widget.initialSelection.first;
+    final content = widget.lines.length * _rowExtent - 2;
+    final centered = (row + 0.5) * _rowExtent - viewport / 2;
+    return centered.clamp(0, (content - viewport).clamp(0, double.infinity));
   }
 
   void _toggle(int index) {
@@ -260,16 +321,23 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
             ),
             Expanded(
               flex: 4,
-              child: ListView.builder(
-                controller: _list,
-                padding: EdgeInsets.symmetric(horizontal: tokens.gapMd),
-                itemCount: widget.lines.length,
-                itemBuilder: (context, index) => _LineChoice(
-                  line: widget.lines[index],
-                  selected: _selected.contains(index),
-                  first: index == 0,
-                  last: index == widget.lines.length - 1,
-                  onTap: () => _toggle(index),
+              child: LayoutBuilder(
+                builder: (context, constraints) => ListView.builder(
+                  controller: _list ??= ScrollController(
+                    initialScrollOffset: _initialOffset(constraints.maxHeight),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: tokens.gapMd),
+                  itemCount: widget.lines.length,
+                  itemBuilder: (context, index) => _LineChoice(
+                    key: index == widget.initialSelection.firstOrNull
+                        ? _initialRow
+                        : null,
+                    line: widget.lines[index],
+                    selected: _selected.contains(index),
+                    first: index == 0,
+                    last: index == widget.lines.length - 1,
+                    onTap: () => _toggle(index),
+                  ),
                 ),
               ),
             ),
@@ -465,6 +533,7 @@ class _SelectionCount extends StatelessWidget {
 
 class _LineChoice extends StatelessWidget {
   const _LineChoice({
+    super.key,
     required this.line,
     required this.selected,
     required this.first,
