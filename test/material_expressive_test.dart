@@ -1,13 +1,12 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
-import 'package:material_ui/material_ui.dart' as material_ui;
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/material_expressive.dart';
@@ -25,6 +24,7 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/tooltip_finder.dart';
 
 Widget _host(
   Widget child, {
@@ -36,7 +36,7 @@ Widget _host(
   child: MaterialApp(
     theme: theme ?? AppTheme.light(),
     locale: locale,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(context).copyWith(
@@ -63,7 +63,7 @@ void main() {
         isAmoled: true,
         useSystemFont: systemFont,
       );
-      late material_ui.ThemeData adapted;
+      late ThemeData adapted;
       late M3EThemeData expressive;
       late ThemeData host;
       late String adaptedCancel;
@@ -73,10 +73,10 @@ void main() {
           MaterialExpressiveScope(
             child: Builder(
               builder: (context) {
-                adapted = material_ui.Theme.of(context);
+                adapted = Theme.of(context);
                 expressive = M3ETheme.of(context);
                 host = Theme.of(context);
-                adaptedCancel = material_ui.MaterialLocalizations.of(
+                adaptedCancel = MaterialLocalizations.of(
                   context,
                 ).cancelButtonLabel;
                 hostCancel = MaterialLocalizations.of(
@@ -420,7 +420,7 @@ void main() {
     expect(find.byType(M3EIconButton), findsNothing);
     expect(find.byType(M3ESwitch), findsNothing);
     await tester.tap(find.text('Play'));
-    await tester.tap(find.byTooltip('Next'));
+    await tester.tap(findByTooltip('Next'));
     await tester.tap(find.byType(Switch));
     expect(calls, 3);
   });
@@ -537,7 +537,7 @@ void main() {
     expect(restingDownload, closeTo(360 - 2 * 48 - 2 * 12, 1));
 
     final gesture = await tester.startGesture(
-      tester.getCenter(find.byTooltip('Love')),
+      tester.getCenter(findByTooltip('Love')),
     );
     // Stay under the long-press delay so the release still taps.
     await tester.pump();

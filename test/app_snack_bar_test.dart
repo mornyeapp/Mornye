@@ -1,6 +1,6 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +11,8 @@ import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/view_queue_snackbar_action.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   for (final brightness in Brightness.values) {
@@ -173,7 +175,7 @@ void main() {
       showAddedToQueueSnackBar(messageContext, 'Track');
       await tester.pumpAndSettle();
       expect(find.text('View Queue'), findsOneWidget);
-      expect(find.byTooltip('Close'), findsOneWidget);
+      expect(findByTooltip('Close'), findsOneWidget);
       expect(
         find.byType(MornyeGlassPanel),
         mornye ? findsOneWidget : findsNothing,
@@ -184,7 +186,7 @@ void main() {
 
       showAddedToQueueSnackBar(messageContext, 'Another track');
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Close'));
+      await tester.tap(findByTooltip('Close'));
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
       expect(tester.takeException(), isNull);

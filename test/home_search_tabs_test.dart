@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
@@ -26,6 +26,8 @@ import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/lazy_tab_view.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   for (final desktop in [false, true]) {
@@ -76,7 +78,7 @@ void main() {
               .value,
           closeTo(23 / 180, 0.001),
         );
-        await tester.tap(find.byTooltip('Play'));
+        await tester.tap(findByTooltip('Play'));
         await tester.pumpAndSettle();
         expect(controller.resumes, 1);
         expect(tester.takeException(), isNull);
@@ -638,7 +640,7 @@ void main() {
       );
       expect(find.text('Found artist'), findsOneWidget);
       expect(search._requests, 1);
-      await tester.tap(find.byTooltip('Clear'));
+      await tester.tap(findByTooltip('Clear'));
       await tester.pumpAndSettle();
       expect(find.text('Found artist'), findsNothing);
       expect(find.text('Recently visited artist'), findsOneWidget);

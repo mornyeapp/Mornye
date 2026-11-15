@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:material_ui/material_ui.dart' as material_ui;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/screens/main_shell.dart';
@@ -17,7 +15,7 @@ import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/link_source_presence.dart';
 import 'package:mornye/services/link/sync/link_sync_runner.dart';
 import 'package:mornye/theme/dynamic_color_wrapper.dart';
-import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/l10n/supported_locales.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/android_tv.dart';
@@ -299,13 +297,7 @@ class MornyeApp extends ConsumerWidget {
               supportedLocales,
             );
           },
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            material_ui.GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
+          localizationsDelegates: appLocalizationsDelegates,
           // ARB files below the translation threshold remain bundled so
           // translators can test them, but production users should only be
           // offered locales selected by the completion checker.

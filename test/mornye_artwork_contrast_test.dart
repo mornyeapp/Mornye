@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/widgets/mornye_artwork_contrast.dart';
 
@@ -160,8 +160,10 @@ void main() {
     );
     Future<void> sample() async {
       await tester.pump(const Duration(milliseconds: 334));
+      // The test engine can take over 100 ms of real time to rasterize the
+      // readback of a scene that draws the decoded cover.
       await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 30)),
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
       );
     }
 

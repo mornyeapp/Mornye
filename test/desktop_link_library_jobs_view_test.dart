@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
@@ -10,6 +10,8 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/desktop/desktop_link_library_jobs_view.dart';
 import 'package:mornye/widgets/link/link_library_actions.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Host extends LinkDesktopHost {
   _Host(this.jobs);
@@ -120,7 +122,7 @@ void main() {
         expect(find.text('Renamed song'), findsOneWidget);
         expect(find.textContaining('Missing song:'), findsOneWidget);
         expect(find.textContaining('From iPhone'), findsOneWidget);
-        await tester.tap(find.byTooltip('Stop after the current song'));
+        await tester.tap(findByTooltip('Stop after the current song'));
         expect(host.cancelled, ['phone-b:convert']);
         expect(tester.takeException(), isNull);
       },

@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +24,8 @@ import 'package:mornye/services/music_player_service.dart'
     show MusicPlayerHandler;
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_action_button.dart';
+
+import 'support/tooltip_finder.dart';
 
 /// Scrolls [finder] into view. The page header shrinks while scrolling, so
 /// the first pass stops short; a second one, with the header collapsed,
@@ -144,7 +146,7 @@ void main() {
         const NetworkEntry('Initial.flac', 'Initial.flac'),
       ]);
       await tester.pumpAndSettle();
-      final refresh = find.byTooltip('Refresh');
+      final refresh = findByTooltip('Refresh');
       // Two taps before the disabled state is painted can overlap requests.
       await tester.tap(refresh);
       await tester.tap(refresh);
@@ -186,7 +188,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Add connection'));
+    await tester.tap(findByTooltip('Add connection'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('Name')), 'NAS');
     await tester.enterText(
@@ -229,7 +231,7 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
-          await tester.tap(find.byTooltip('Add connection'));
+          await tester.tap(findByTooltip('Add connection'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('HTTP(S)').hitTestable());
           await tester.pumpAndSettle();
@@ -320,7 +322,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Add connection'));
+        await tester.tap(findByTooltip('Add connection'));
         await tester.pumpAndSettle();
         // The connected button group also lays out an offstage copy of each
         // label to measure it; tap the visible one.
@@ -399,7 +401,7 @@ void main() {
         expect(find.text('Song.flac'), findsOneWidget);
         expect(service.paths, ['', 'Album/']);
         service.fail = true;
-        await tester.tap(find.byTooltip('Refresh').last);
+        await tester.tap(findByTooltip('Refresh').last);
         await tester.pumpAndSettle();
         expect(
           find.textContaining('Could not access the network source.'),
@@ -463,7 +465,7 @@ void main() {
         find.text('Uploaded 2, already there 1, failed 0'),
         findsOneWidget,
       );
-      await tester.tap(find.byTooltip('Clear'));
+      await tester.tap(findByTooltip('Clear'));
       await tester.pumpAndSettle();
       expect(find.text('Last upload'), findsNothing);
       expect(tester.takeException(), isNull);
@@ -509,7 +511,7 @@ void main() {
       expect(find.text('Mornye Link · 192.168.1.20'), findsOneWidget);
       expect(find.text('Subsonic · nas.test'), findsOneWidget);
       // Link manages the computer, so only the NAS can be edited here.
-      expect(find.byTooltip('Edit connection'), findsOneWidget);
+      expect(findByTooltip('Edit connection'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
     testWidgets(
@@ -533,7 +535,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Add connection'));
+        await tester.tap(findByTooltip('Add connection'));
         await tester.pumpAndSettle();
         expect(
           find.byType(CupertinoTextFormFieldRow),

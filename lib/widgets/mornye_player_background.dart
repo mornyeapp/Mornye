@@ -1,6 +1,6 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
 

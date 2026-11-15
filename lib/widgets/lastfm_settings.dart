@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/lastfm/lastfm_service.dart';
 import 'package:mornye/widgets/scrobble_settings.dart';

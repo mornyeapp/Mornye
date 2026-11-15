@@ -1,5 +1,5 @@
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +10,8 @@ import 'package:mornye/screens/artist_screen.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   tearDown(() => debugDesktopPlatformOverride = null);
@@ -71,15 +73,15 @@ void main() {
     await mouse.moveTo(tester.getCenter(first));
     await tester.pump();
 
-    final forward = find.byTooltip('Scroll forward');
+    final forward = findByTooltip('Scroll forward');
     expect(forward, findsOneWidget);
-    expect(find.byTooltip('Scroll back'), findsNothing);
+    expect(findByTooltip('Scroll back'), findsNothing);
     await tester.tap(forward);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     // A page moves the first single past the list's cache extent.
     expect(first, findsNothing);
-    expect(find.byTooltip('Scroll back'), findsOneWidget);
+    expect(findByTooltip('Scroll back'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));

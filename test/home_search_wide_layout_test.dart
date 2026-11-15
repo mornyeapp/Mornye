@@ -1,5 +1,5 @@
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart'
     show M3EButton;
@@ -10,6 +10,7 @@ import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
 
 import 'support/search_results_fixture.dart';
+import 'support/tooltip_finder.dart';
 
 // Tall enough for every section of the All view.
 const _desktop = Size(1280, 1800);
@@ -116,7 +117,7 @@ void main() {
         ],
       );
       expect(find.text('Albums'), findsNothing);
-      await tester.tap(find.byTooltip('Filters'));
+      await tester.tap(findByTooltip('Filters'));
       await tester.pumpAndSettle();
       expect(find.text('All'), findsOneWidget);
       expect(find.text('All entries'), findsNothing);
@@ -125,7 +126,7 @@ void main() {
       expect(results.requestedFilters.last, 'album');
 
       // The previous search has no results, but other filters remain usable.
-      await tester.tap(find.byTooltip('Filters'));
+      await tester.tap(findByTooltip('Filters'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Spoken audio'));
       await tester.pumpAndSettle();

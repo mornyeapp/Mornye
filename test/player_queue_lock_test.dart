@@ -1,5 +1,5 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -11,6 +11,8 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_player_queue.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
 import 'package:mornye/widgets/player_queue_sheet.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Player extends MusicPlayerController {
   final removed = <String>[];
@@ -104,10 +106,10 @@ void main() {
       final (player, container) = await _pump(tester, mornye: mornye);
       expect(find.byType(ReorderableDragStartListener), findsWidgets);
 
-      await tester.tap(find.byTooltip('Lock queue'));
+      await tester.tap(findByTooltip('Lock queue'));
       await tester.pumpAndSettle();
       expect(container.read(settingsProvider).queueLocked, isTrue);
-      expect(find.byTooltip('Unlock queue'), findsOneWidget);
+      expect(findByTooltip('Unlock queue'), findsOneWidget);
       expect(find.byType(ReorderableDragStartListener), findsNothing);
       for (final row in tester.widgetList<PlayerQueueDismissible>(
         find.byType(PlayerQueueDismissible),
@@ -120,7 +122,7 @@ void main() {
       await tester.tap(find.text('Last'));
       expect(player.jumpedTo, 2);
 
-      await tester.tap(find.byTooltip('Unlock queue'));
+      await tester.tap(findByTooltip('Unlock queue'));
       await tester.pumpAndSettle();
       expect(container.read(settingsProvider).queueLocked, isFalse);
       expect(find.byType(ReorderableDragStartListener), findsWidgets);
@@ -132,7 +134,7 @@ void main() {
 
   testWidgets('a saved lock applies when the queue opens', (tester) async {
     await _pump(tester, mornye: false, locked: true);
-    expect(find.byTooltip('Unlock queue'), findsOneWidget);
+    expect(findByTooltip('Unlock queue'), findsOneWidget);
     expect(find.byType(ReorderableDragStartListener), findsNothing);
   });
 

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Overlays a gradient on the trailing edge of a scrollable while more
 /// content remains beyond it, signalling that the view can scroll.

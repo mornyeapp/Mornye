@@ -1,5 +1,5 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +11,8 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/mornye_player_details_sheet.dart';
 import 'package:mornye/widgets/player_details_sheet.dart';
+
+import 'support/tooltip_finder.dart';
 
 const _item = MediaItem(
   id: 'song',
@@ -88,7 +90,7 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byTooltip('Close'));
+    await tester.tap(findByTooltip('Close'));
     await tester.pumpAndSettle();
     expect(find.text('Details'), findsNothing);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));

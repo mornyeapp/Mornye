@@ -1,5 +1,5 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
@@ -10,6 +10,8 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
 import 'package:mornye/widgets/player_compact_bar.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Player extends MusicPlayerController {
   final calls = <String>[];
@@ -93,11 +95,11 @@ void main() {
     // Normal speed and pitch show no label.
     expect(find.byKey(_tempoBadge), findsNothing);
     final l10n = AppLocalizations.of(tester.element(find.text('Song')));
-    await tester.tap(find.byTooltip(l10n.nowPlayingPreviousTrack));
-    await tester.tap(find.byTooltip(l10n.actionPause));
-    await tester.tap(find.byTooltip(l10n.nowPlayingNextTrack));
+    await tester.tap(findByTooltip(l10n.nowPlayingPreviousTrack));
+    await tester.tap(findByTooltip(l10n.actionPause));
+    await tester.tap(findByTooltip(l10n.nowPlayingNextTrack));
     expect(player.calls, ['previous', 'pause', 'next']);
-    await tester.tap(find.byTooltip(l10n.nowPlayingUpNext));
+    await tester.tap(findByTooltip(l10n.nowPlayingUpNext));
     expect(queueOpened, 1);
     expect(tester.takeException(), isNull);
   });

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +20,8 @@ import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/update_dialog.dart';
+
+import 'support/tooltip_finder.dart';
 
 Widget _app(ThemeData theme, Widget home) => ProviderScope(
   child: MaterialApp(
@@ -647,7 +649,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Service notice'), findsOneWidget);
       expect(dismissals, 0);
-      await tester.tap(find.byTooltip('Close'));
+      await tester.tap(findByTooltip('Close'));
       await tester.pumpAndSettle();
       expect(find.text('Service notice'), findsNothing);
       expect(dismissals, 1);

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -575,6 +575,17 @@ void main() {
       (tester) async {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(_route, (call) async => null);
+        // The song has no .lrc file. An unanswered platform call never
+        // completes under fake time and would keep the tags loading.
+        const backend = MethodChannel('com.zarz.mornye/backend');
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(backend, (call) async => null);
+        addTearDown(
+          () => TestDefaultBinaryMessengerBinding
+              .instance
+              .defaultBinaryMessenger
+              .setMockMethodCallHandler(backend, null),
+        );
         final tags = Completer<Map<String, dynamic>>();
         var reads = 0;
         final metadata = PlayerMetadataController(

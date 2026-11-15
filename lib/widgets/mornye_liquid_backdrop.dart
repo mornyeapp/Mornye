@@ -1,9 +1,10 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:liquid_glass_easy/liquid_glass_easy.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/widgets/legacy_theme_brightness.dart';
 
 /// A bounded package lens without a captured-screen view or a touch ticker.
 class MornyeLiquidBackdrop extends StatelessWidget {
@@ -54,39 +55,41 @@ class MornyeLiquidBackdrop extends StatelessWidget {
     // towards the window's corner, away from its own box.
     final uiScale = AdaptiveUiScale.of(context);
     final viewport = uiScale == 1 ? null : MediaQuery.of(context);
-    final lens = LiquidGlassLens(
-      style: LiquidGlassStyle(
-        shape: LiquidGlassShape(
-          cornerStyle: smoothCorners
-              ? LiquidGlassCornerStyle.squircle
-              : LiquidGlassCornerStyle.roundedRectangle,
-          clipQuality: smoothCorners
-              ? LiquidGlassClipQuality.exact
-              : LiquidGlassClipQuality.roundedRectangle,
-          cornerRadius: borderRadius.topLeft.x,
+    final lens = LegacyThemeBrightness(
+      child: LiquidGlassLens(
+        style: LiquidGlassStyle(
+          shape: LiquidGlassShape(
+            cornerStyle: smoothCorners
+                ? LiquidGlassCornerStyle.squircle
+                : LiquidGlassCornerStyle.roundedRectangle,
+            clipQuality: smoothCorners
+                ? LiquidGlassClipQuality.exact
+                : LiquidGlassClipQuality.roundedRectangle,
+            cornerRadius: borderRadius.topLeft.x,
+          ),
+          specular: LiquidGlassLight.specular(
+            thickness: outlines ? 0.75 * 5.4 : 0,
+            angle: 0,
+            spread: 0.2,
+            intensity: outlines
+                ? (dark ? 0.25 : 0.12) * effect * highlightIntensity
+                : 0,
+            color: dark ? Colors.white : const Color(0x88ffffff),
+          ),
+          glow: LiquidGlassLight.glow(
+            thickness: outlines ? 0.75 * 29.4 : 0,
+            intensity: outlines ? 0.05 * highlightIntensity : 0,
+          ),
+          blur: blurSigma,
+          refractionIndex: index,
+          refractionWidth: refractionWidth,
+          // Version 5 expresses the widest colour split in logical pixels.
+          dispersion: 1.32 * clarity * effect,
         ),
-        specular: LiquidGlassLight.specular(
-          thickness: outlines ? 0.75 * 5.4 : 0,
-          angle: 0,
-          spread: 0.2,
-          intensity: outlines
-              ? (dark ? 0.25 : 0.12) * effect * highlightIntensity
-              : 0,
-          color: dark ? Colors.white : const Color(0x88ffffff),
-        ),
-        glow: LiquidGlassLight.glow(
-          thickness: outlines ? 0.75 * 29.4 : 0,
-          intensity: outlines ? 0.05 * highlightIntensity : 0,
-        ),
-        blur: blurSigma,
-        refractionIndex: index,
-        refractionWidth: refractionWidth,
-        // Version 5 expresses the widest colour split in logical pixels.
-        dispersion: 1.32 * clarity * effect,
+        child: viewport == null
+            ? child
+            : MediaQuery(data: viewport, child: child),
       ),
-      child: viewport == null
-          ? child
-          : MediaQuery(data: viewport, child: child),
     );
     if (viewport == null) return lens;
     return MediaQuery(

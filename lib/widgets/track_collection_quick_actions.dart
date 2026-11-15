@@ -1,6 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';

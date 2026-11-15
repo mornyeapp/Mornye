@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Owns the long press for both selection and playlist dragging. The card
 /// inside must not register a competing onLongPress gesture.

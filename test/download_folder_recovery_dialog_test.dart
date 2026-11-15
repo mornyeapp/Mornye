@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -14,6 +14,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 class _History extends DownloadHistoryNotifier {
   @override
@@ -118,7 +119,7 @@ void main() {
               theme: mornye
                   ? MornyeTheme.build(Brightness.dark)
                   : AppTheme.dark(),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              localizationsDelegates: appLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: const Scaffold(body: QueueTab(librarySection: 'downloads')),
             ),
@@ -166,7 +167,7 @@ void main() {
         expect(dialog, findsNothing);
         expect(queue.retried, failure.reselect ? isEmpty : [item.id]);
         if (failure.reselect) {
-          await tester.tap(find.byTooltip(l10n.downloadFolderReselect));
+          await tester.tap(findByTooltip(l10n.downloadFolderReselect));
           await tester.pumpAndSettle();
           expect(reselect, findsOneWidget);
           expect(queue.retried, isEmpty);

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +13,8 @@ import 'package:mornye/widgets/lyric_blur.dart';
 import 'package:mornye/widgets/lyrics_size_setting.dart';
 import 'package:mornye/widgets/lyrics_text_scale.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -52,7 +54,7 @@ void main() {
     slider.onChangeEnd!(1.3);
     await tester.pumpAndSettle();
     expect(loadBootstrapThemeSettings(prefs).lyricsTextScale, 1.3);
-    await tester.tap(find.byTooltip('Reset'));
+    await tester.tap(findByTooltip('Reset'));
     await tester.pumpAndSettle();
     expect(loadBootstrapThemeSettings(prefs).lyricsTextScale, 1);
   });
@@ -93,7 +95,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('125%'), findsOneWidget);
     expect(loadBootstrapThemeSettings(prefs).lyricsBlur, 1.25);
-    await tester.tap(find.byTooltip('Reset'));
+    await tester.tap(findByTooltip('Reset'));
     await tester.pumpAndSettle();
     expect(loadBootstrapThemeSettings(prefs).lyricsBlur, 1);
   });
@@ -135,7 +137,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('0.5 s earlier'), findsOneWidget);
     expect(loadBootstrapThemeSettings(prefs).lyricsOffsetMs, -500);
-    await tester.tap(find.byTooltip('Reset'));
+    await tester.tap(findByTooltip('Reset'));
     await tester.pumpAndSettle();
     expect(loadBootstrapThemeSettings(prefs).lyricsOffsetMs, 0);
   });

@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart'
     show ClipRectLayer, PictureLayer, RenderRepaintBoundary, ShaderMaskLayer;
 import 'package:flutter_test/flutter_test.dart';

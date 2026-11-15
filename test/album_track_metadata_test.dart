@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +16,8 @@ import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/disc_separator_chip.dart';
 import 'package:mornye/widgets/track_list_tile.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -422,7 +424,7 @@ void main() {
     expect(albumTrack.audioQuality, '16-bit');
     expect(find.text('Lossless'), findsOneWidget);
     expect(find.text('Dolby Atmos'), findsNothing);
-    expect(find.byTooltip('Dolby Atmos'), findsOneWidget);
+    expect(findByTooltip('Dolby Atmos'), findsOneWidget);
     expect(find.byType(AudioQualityBadge), findsNothing);
     expect(find.byType(DolbyAtmosBadge), findsNothing);
     expect(find.byType(ExplicitBadge), findsOneWidget);

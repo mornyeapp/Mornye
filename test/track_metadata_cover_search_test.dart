@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -99,10 +99,18 @@ void main() {
       };
       messenger.setMockMethodCallHandler(channel, (call) async {
         switch (call.method) {
-          case 'searchTracksWithMetadataProviders':
-          case 'searchTracksWithMetadataProvider':
-            expect((call.arguments as Map)['query'], '$title $artist');
-            return jsonEncode([candidate]);
+          case 'reEnrichFile':
+            // Auto-fill searches the way a re-enrich preview does.
+            final request =
+                jsonDecode((call.arguments as Map)['request_json'] as String)
+                    as Map;
+            expect(request['preview_only'], isTrue);
+            expect(request['track_name'], title);
+            expect(request['artist_name'], artist);
+            return jsonEncode({
+              'candidates': [candidate],
+              'auto_match': 'strong',
+            });
           case 'getProviderMetadata':
             final args = call.arguments as Map;
             expect(args['provider_id'], 'example-provider');

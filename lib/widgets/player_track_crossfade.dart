@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_motion.dart';
 
 /// Timing for a track change the app started (a skip button, a headset key,

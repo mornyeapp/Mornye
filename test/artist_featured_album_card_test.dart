@@ -1,11 +1,13 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/providers/track_provider.dart';
 import 'package:mornye/widgets/artist_featured_album_card.dart';
+
+import 'support/tooltip_finder.dart';
 
 const _album = ArtistAlbum(
   id: 'album-1',
@@ -154,7 +156,7 @@ void main() {
     var opened = 0;
     await _pump(tester, onDownload: () => downloaded++, onTap: () => opened++);
 
-    await tester.tap(find.byTooltip('Download'));
+    await tester.tap(findByTooltip('Download'));
     await tester.pumpAndSettle();
     expect((downloaded, opened), (1, 0));
 

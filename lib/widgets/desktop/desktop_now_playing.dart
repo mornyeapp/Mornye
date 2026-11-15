@@ -3,8 +3,9 @@ import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart'
+    show CupertinoButton, CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart' show pushPage;
 import 'package:mornye/controllers/player_metadata_controller.dart';

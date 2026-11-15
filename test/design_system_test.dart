@@ -5,7 +5,7 @@ import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
@@ -27,6 +27,7 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/tooltip_finder.dart';
 
 /// Every Dart source file under `lib/`, used by the source-level contracts
 /// below. Those contracts exist because the duplication they guard against was
@@ -342,7 +343,7 @@ void main() {
       await tester.pump();
       expect(changes, ['Album']);
       expect(submitted, 'Album');
-      await tester.tap(find.byTooltip('Clear search'));
+      await tester.tap(findByTooltip('Clear search'));
       await tester.pump();
       expect(controller.text, isEmpty);
       expect(cleared, isTrue);

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -26,6 +26,7 @@ import 'package:mornye/widgets/library_search_results.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/tooltip_finder.dart';
 
 class _PlaybackRecorder extends PlaybackController {
   final paths = <String>[];
@@ -248,7 +249,7 @@ void main() {
           expect(player.paths, isEmpty);
           tester.state<NavigatorState>(find.byType(Navigator).first).pop();
           await tester.pumpAndSettle();
-          await tester.tap(find.byTooltip('Play'));
+          await tester.tap(findByTooltip('Play'));
           await tester.pumpAndSettle();
           expect(player.paths, [path]);
           // Without a Library list to continue into, the song plays alone.
@@ -353,7 +354,7 @@ void main() {
         // Typing searched only; no list was read for playback yet.
         expect(lists, isEmpty);
 
-        await tester.tap(find.byTooltip('Play').first);
+        await tester.tap(findByTooltip('Play').first);
         await tester.pumpAndSettle();
         expect(lists, [filtered]);
         expect(player.queues.last, [
@@ -364,7 +365,7 @@ void main() {
         expect(player.starts.last, 1);
         expect(player.paths.last, '/music/b.mp3');
 
-        await tester.tap(find.byTooltip('Play').last);
+        await tester.tap(findByTooltip('Play').last);
         await tester.pumpAndSettle();
         // Hidden by the filters, the song plays within every song instead.
         expect(lists.skip(1), [filtered, whole]);
@@ -551,7 +552,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.byTooltip('Play'), findsNWidgets(2));
+        expect(findByTooltip('Play'), findsNWidgets(2));
 
         await tester.longPress(find.text('Song a'));
         await tester.pumpAndSettle();
@@ -560,7 +561,7 @@ void main() {
         expect(find.text('Convert 1 track'), findsOneWidget);
         expect(find.text('Delete 1 track'), findsOneWidget);
         // Selecting hides row actions and keeps taps on the selection.
-        expect(find.byTooltip('Play'), findsNothing);
+        expect(findByTooltip('Play'), findsNothing);
         await tester.tap(find.text('Song b'));
         await tester.pumpAndSettle();
         expect(find.text('2 selected'), findsOneWidget);
@@ -578,7 +579,7 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(find.textContaining('selected'), findsNothing);
-        expect(find.byTooltip('Play'), findsNWidgets(2));
+        expect(findByTooltip('Play'), findsNWidgets(2));
 
         await tester.longPress(find.text('Song a'));
         await tester.pumpAndSettle();
@@ -648,12 +649,12 @@ void main() {
       await tester.pumpAndSettle();
       // Rows until the shared view setting picks covers.
       expect(find.byType(TrackCard), findsWidgets);
-      expect(find.byTooltip('Grid'), findsOneWidget);
+      expect(findByTooltip('Grid'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Grid'));
+      await tester.tap(findByTooltip('Grid'));
       await tester.pumpAndSettle();
       expect(find.byType(TrackCard), findsNothing);
-      expect(find.byTooltip('List'), findsOneWidget);
+      expect(findByTooltip('List'), findsOneWidget);
       // The overview: one shelf per kind, songs as covers the albums' size.
       expect(find.byType(SliverGrid), findsNothing);
       final song = find.byKey(const ValueKey('songs:local:0'));
@@ -691,7 +692,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(SliverGrid), findsNothing);
       expect(find.byType(TrackCard), findsWidgets);
-      expect(find.byTooltip('List'), findsNothing);
+      expect(findByTooltip('List'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -730,9 +731,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Grid'));
+    await tester.tap(findByTooltip('Grid'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('List'), findsOneWidget);
+    expect(findByTooltip('List'), findsOneWidget);
     final searched = requests.length;
 
     // A pane narrowing past the breakpoint, as when the lyrics panel opens

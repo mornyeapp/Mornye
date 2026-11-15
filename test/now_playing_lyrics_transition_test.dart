@@ -4,9 +4,9 @@ import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:clock/clock.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart'
     show RenderParagraph, RenderRepaintBoundary, debugOnProfilePaint;
 import 'package:flutter/services.dart';
@@ -67,6 +67,7 @@ import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/tooltip_finder.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -3445,7 +3446,7 @@ void main() {
         await settlePlayer(tester);
         expect(find.byType(PageView), findsNothing);
         final slider = find.byType(PlaybackSeekSlider);
-        final play = find.byTooltip('Play');
+        final play = findByTooltip('Play');
         final toggle = find.byKey(const ValueKey('material-lyrics-toggle'));
         final sliderState = tester.state(slider);
         final sliderBounds = tester.getRect(slider);

@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +13,8 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/hires_check_card.dart';
+
+import 'support/tooltip_finder.dart';
 
 const _limitedResult = <String, dynamic>{
   'supported': true,
@@ -146,7 +148,7 @@ void main() {
         expect(rowValue.right, closeTo(354, 1));
         expect(tester.takeException(), isNull);
         await captureCard(tester, '$name-result');
-        await tester.tap(find.byTooltip('Re-analyze'));
+        await tester.tap(findByTooltip('Re-analyze'));
         await tester.pumpAndSettle();
         expect(calls, 2);
       });

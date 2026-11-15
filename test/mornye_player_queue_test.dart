@@ -1,6 +1,6 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -9,6 +9,8 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_player_queue.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Player extends MusicPlayerController {
   int? jumpedTo;
@@ -75,19 +77,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Previous'), findsNothing);
       expect(find.text('Current'), findsNothing);
-      await tester.tap(find.byTooltip('Autoplay off'));
+      await tester.tap(findByTooltip('Autoplay off'));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('Autoplay on'), findsOneWidget);
+      expect(findByTooltip('Autoplay on'), findsOneWidget);
       expect(find.text('Autoplay from your Library'), findsOneWidget);
-      await tester.tap(find.byTooltip('Autoplay on'));
+      await tester.tap(findByTooltip('Autoplay on'));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('Autoplay off'), findsOneWidget);
-      await tester.tap(find.byTooltip('AutoMix off'));
+      expect(findByTooltip('Autoplay off'), findsOneWidget);
+      await tester.tap(findByTooltip('AutoMix off'));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('AutoMix on'), findsOneWidget);
-      await tester.tap(find.byTooltip('AutoMix on'));
+      expect(findByTooltip('AutoMix on'), findsOneWidget);
+      await tester.tap(findByTooltip('AutoMix on'));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('AutoMix off'), findsOneWidget);
+      expect(findByTooltip('AutoMix off'), findsOneWidget);
       await tester.tap(find.text('Last'));
       expect(player.jumpedTo, 3);
       final firstHandle = find.byType(ReorderableDragStartListener).first;

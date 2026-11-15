@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/utils/string_utils.dart';
 
 /// Rolls only the changed digits, keeping the timeline labels steady in width.

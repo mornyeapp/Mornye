@@ -1,6 +1,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,6 +32,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/tooltip_finder.dart';
 
 class _Settings extends SettingsNotifier {
   _Settings(this.viewMode, {this.filterMode = 'all'});
@@ -295,7 +296,7 @@ void main() {
           playback: playback,
         );
         final l10n = AppLocalizations.of(tester.element(find.byType(QueueTab)));
-        final button = find.byTooltip(
+        final button = findByTooltip(
           l10n.a11yPlayTrackByArtist('Alpha', 'Artist'),
         );
         expect(button.hitTestable(), findsOneWidget);

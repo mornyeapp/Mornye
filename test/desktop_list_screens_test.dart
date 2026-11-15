@@ -1,7 +1,7 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +20,8 @@ import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Player extends MusicPlayerController {
   @override
@@ -178,7 +180,7 @@ void main() {
       final close = tester.getRect(
         find.descendant(
           of: find.byType(SelectionBottomBar),
-          matching: find.byTooltip(
+          matching: findByTooltip(
             const DefaultMaterialLocalizations().closeButtonTooltip,
           ),
         ),
@@ -197,7 +199,7 @@ void main() {
       // No hero: the back control sits at the top of the pane and the
       // details start beside the artwork, at the list's left edge.
       expect(find.byType(FlexibleSpaceBar), findsNothing);
-      final back = find.byTooltip(
+      final back = findByTooltip(
         const DefaultMaterialLocalizations().backButtonTooltip,
       );
       expect(back, findsOneWidget);
@@ -249,7 +251,7 @@ void main() {
         );
         final rowPlay = find.descendant(
           of: row,
-          matching: find.byTooltip('Play'),
+          matching: findByTooltip('Play'),
         );
         await tester.tap(rowPlay);
         await tester.pumpAndSettle();

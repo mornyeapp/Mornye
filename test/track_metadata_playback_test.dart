@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +17,8 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Settings extends SettingsNotifier {
   @override
@@ -125,7 +127,7 @@ void main() {
             );
             await tester.pumpAndSettle();
             if (menu) {
-              await tester.tap(find.byTooltip('Show menu'));
+              await tester.tap(findByTooltip('Show menu'));
               await tester.pumpAndSettle();
               await tester.tap(
                 find.descendant(

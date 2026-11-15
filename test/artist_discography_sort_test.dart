@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -225,6 +225,8 @@ void main() {
           backend: (call) async {
             if (call.method != 'getProviderMetadata') return null;
             final args = call.arguments as Map<Object?, Object?>;
+            // Mornye's newest album card also reads that album's note.
+            if (args['resource_type'] != 'artist') return null;
             final id = args['resource_id'] as String;
             calls.add(id);
             final albums = id == artistId

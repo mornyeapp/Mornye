@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -12,6 +12,8 @@ import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/network_upload_actions.dart';
+
+import 'support/tooltip_finder.dart';
 
 UnifiedLibraryItem song(String path) => UnifiedLibraryItem.fromLocalLibrary(
   LocalLibraryItem(
@@ -86,7 +88,7 @@ void main() {
         mornye: mornye,
       );
       expect(find.text(label), findsOneWidget);
-      expect(find.byTooltip(label), findsOneWidget);
+      expect(findByTooltip(label), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
@@ -104,7 +106,7 @@ void main() {
         upload: upload,
       );
       // While one runs, the action shows its progress.
-      await tester.tap(find.byTooltip(label));
+      await tester.tap(findByTooltip(label));
       await settle(tester);
       expect(find.text('Second song'), findsOneWidget);
       expect(find.text('1 / 3'), findsOneWidget);
@@ -166,13 +168,13 @@ void main() {
       writable: [nas],
     );
     expect(find.text(label), findsNothing);
-    expect(find.byTooltip(label), findsNothing);
+    expect(findByTooltip(label), findsNothing);
   });
 
   testWidgets('no writable connection hides the upload', (tester) async {
     await pump(tester, items: [song('/music/a.flac')], writable: const []);
     expect(find.text(label), findsNothing);
-    expect(find.byTooltip(label), findsNothing);
+    expect(findByTooltip(label), findsNothing);
   });
 
   for (final mornye in [false, true]) {

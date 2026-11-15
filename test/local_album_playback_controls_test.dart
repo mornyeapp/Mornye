@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart' show MediaItem;
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,6 +17,7 @@ import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/album_track_tile.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/tooltip_finder.dart';
 
 class _Playing extends Notifier<bool> {
   @override
@@ -176,7 +177,7 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.descendant(of: row(1), matching: find.byTooltip('Play')),
+          find.descendant(of: row(1), matching: findByTooltip('Play')),
           findsOneWidget,
         );
 
@@ -186,7 +187,7 @@ void main() {
         expect(player._toggles, [true, false]);
         expect(playback._started, ['1']);
         expect(
-          find.descendant(of: row(1), matching: find.byTooltip('Pause')),
+          find.descendant(of: row(1), matching: findByTooltip('Pause')),
           findsOneWidget,
         );
 

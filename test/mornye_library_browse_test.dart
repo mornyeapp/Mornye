@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -16,6 +16,8 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/library_search_results.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Settings extends SettingsNotifier {
   _Settings([this.initial = const AppSettings(localLibraryEnabled: false)]);
@@ -88,7 +90,7 @@ void main() {
         final l10n = AppLocalizations.of(
           tester.element(find.byType(MornyeLibraryScreen)),
         );
-        await tester.tap(find.byTooltip(l10n.searchSortTitle));
+        await tester.tap(findByTooltip(l10n.searchSortTitle));
         await tester.pumpAndSettle();
         await tester.tap(
           find.text(
@@ -162,27 +164,27 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Filters'));
+      await tester.tap(findByTooltip('Filters'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Incomplete albums'));
       await tester.pumpAndSettle();
       expect(requests.last.completeness, incompleteAlbumFilter);
       expect(find.text('8/12'), findsOneWidget);
-      expect(find.byTooltip('8/12 tracks · 4 missing'), findsOneWidget);
-      await tester.tap(find.byTooltip('Search your library'));
+      expect(findByTooltip('8/12 tracks · 4 missing'), findsOneWidget);
+      await tester.tap(findByTooltip('Search your library'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'My album');
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
       expect(requests.last.search, 'My album');
       expect(requests.last.completeness, incompleteAlbumFilter);
-      await tester.tap(find.byTooltip('Filters'));
+      await tester.tap(findByTooltip('Filters'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Album completeness unknown'));
       await tester.pumpAndSettle();
       expect(requests.last.completeness, unknownAlbumCompletenessFilter);
       expect(find.text('?'), findsOneWidget);
-      await tester.tap(find.byTooltip('Filters'));
+      await tester.tap(findByTooltip('Filters'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('All'));
       await tester.pumpAndSettle();
@@ -261,14 +263,14 @@ void main() {
       await tester.tap(find.text('Playlists'));
       expect(opened, ['downloads', 'all', 'playlists']);
 
-      await tester.tap(find.byTooltip('Search your library'));
+      await tester.tap(findByTooltip('Search your library'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'green lilac');
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
       expect(searches, hasLength(4));
       expect(find.byType(TextField), findsOneWidget);
-      await tester.tap(find.byTooltip('Clear'));
+      await tester.tap(findByTooltip('Clear'));
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
 
@@ -335,7 +337,7 @@ void main() {
     );
     scroll.controller!.jumpTo(0);
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Search your library'));
+    await tester.tap(findByTooltip('Search your library'));
     await tester.pumpAndSettle();
     expect(tester.testTextInput.isVisible, isTrue);
     // The field scrolls with the page over its plain background.
@@ -387,7 +389,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Search your library'));
+    await tester.tap(findByTooltip('Search your library'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'green lilac');
     await tester.pump(const Duration(milliseconds: 350));

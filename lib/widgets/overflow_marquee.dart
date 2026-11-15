@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Reveals overflowing content without making the mini player's text draggable.
 class OverflowMarquee extends StatefulWidget {

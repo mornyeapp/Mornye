@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A small tonal tag marking a feature that is still in beta.
 class BetaBadge extends StatelessWidget {

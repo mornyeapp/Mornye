@@ -1,5 +1,5 @@
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +25,7 @@ import 'package:mornye/widgets/track_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 class _Playback extends PlaybackController {
   final queues = <List<String>>[];
@@ -138,7 +139,7 @@ void main() {
     await tester.tap(
       find.descendant(
         of: find.widgetWithText(TrackCard, 'Song a2'),
-        matching: find.byTooltip('Play'),
+        matching: findByTooltip('Play'),
       ),
     );
     await tester.pumpAndSettle();
@@ -348,7 +349,7 @@ void main() {
     // An opened folder takes the album pages' header.
     expect(find.text('$_root/Artist A/Album A'), findsOneWidget);
     expect(find.text('3 tracks'), findsOneWidget);
-    expect(find.byTooltip('Add to playlist'), findsOneWidget);
+    expect(findByTooltip('Add to playlist'), findsOneWidget);
     expect(find.text('Songs'), findsNothing);
     await tester.tap(find.text('Play'));
     await tester.pumpAndSettle();

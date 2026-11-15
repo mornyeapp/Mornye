@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +9,8 @@ import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/audio_analysis_widget.dart';
 import 'package:mornye/widgets/hires_check_card.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -63,7 +65,7 @@ void main() {
         );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
-        await tester.tap(find.byTooltip('Show menu'));
+        await tester.tap(findByTooltip('Show menu'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 500));
         if (protocol == NetworkProtocol.http ||

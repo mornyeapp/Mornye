@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -9,6 +9,8 @@ import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   tearDown(() => debugDesktopPlatformOverride = null);
@@ -84,19 +86,19 @@ void main() {
       );
       expect(bounds.right, 900 - (desktop ? 8 : 12));
       // Level with the round back button.
-      final back = tester.getRect(find.byTooltip('Back'));
+      final back = tester.getRect(findByTooltip('Back'));
       expect(bounds.center.dy, back.center.dy);
       expect(bounds.height, 44);
       if (desktop) expect(back.left, 8);
-      final share = tester.getRect(find.byTooltip('Share'));
+      final share = tester.getRect(findByTooltip('Share'));
       final more = tester.getRect(
-        find.byTooltip(
+        findByTooltip(
           MaterialLocalizations.of(tester.element(capsule)).showMenuTooltip,
         ),
       );
       expect(share.right, lessThanOrEqualTo(more.left));
 
-      await tester.tap(find.byTooltip('Share'));
+      await tester.tap(findByTooltip('Share'));
       await tester.pumpAndSettle();
       expect(log, ['share']);
 

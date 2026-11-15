@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';

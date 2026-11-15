@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +15,8 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Controller implements MusicPlayerController {
   _Controller({this.onDismiss});
@@ -266,7 +268,7 @@ void main() {
           mediaItems.add(const MediaItem(id: 'song', title: 'Song'));
           await tester.pumpAndSettle();
 
-          expect(find.byTooltip('Dismiss'), findsNothing);
+          expect(findByTooltip('Dismiss'), findsNothing);
           await tester.timedDrag(
             find.text('Song'),
             Offset(dx, 0),
@@ -507,11 +509,11 @@ void main() {
       expect(carousel.offset, greaterThan(0));
       expect(controller.calls, isEmpty);
 
-      await tester.tap(find.byTooltip('Play'));
+      await tester.tap(findByTooltip('Play'));
       await tester.pumpAndSettle();
       expect(controller.calls, ['play']);
       if (!configuration.compact) {
-        await tester.tap(find.byTooltip('Next track'));
+        await tester.tap(findByTooltip('Next track'));
         await tester.pumpAndSettle();
         expect(controller.calls, ['play', 'next']);
       }

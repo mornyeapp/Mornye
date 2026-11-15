@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,6 +58,14 @@ void main() {
                 : {'method': 'native'};
           });
           addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+          // App storage never answers under fake time, so the undo state is
+          // not saved, as when the storage is unavailable.
+          const storage = MethodChannel('plugins.flutter.io/path_provider');
+          messenger.setMockMethodCallHandler(
+            storage,
+            (call) async => throw PlatformException(code: 'unavailable'),
+          );
+          addTearDown(() => messenger.setMockMethodCallHandler(storage, null));
           const search = Scaffold(
             body: CustomScrollView(
               slivers: [

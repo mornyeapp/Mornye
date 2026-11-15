@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,6 +30,7 @@ import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/tooltip_finder.dart';
 
 final _tracks = [
   for (final name in ['First', 'Unavailable', 'Selected', 'Last'])
@@ -267,7 +268,7 @@ Widget _selectionApp({
   ],
   child: MaterialApp(
     theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.light(),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: const SelectionOverlayHost(
       child: LibraryTracksFolderScreen(
@@ -641,7 +642,7 @@ void main() {
             theme: mornye
                 ? MornyeTheme.build(Brightness.dark)
                 : AppTheme.light(),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const LibraryTracksFolderScreen(
               mode: LibraryTracksFolderMode.playlist,
@@ -700,7 +701,7 @@ void main() {
             theme: mornye
                 ? MornyeTheme.build(Brightness.dark)
                 : AppTheme.light(),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const LibraryTracksFolderScreen(
               mode: LibraryTracksFolderMode.wishlist,
@@ -767,7 +768,7 @@ void main() {
                 theme: mornye
                     ? MornyeTheme.build(Brightness.dark)
                     : AppTheme.light(),
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                localizationsDelegates: appLocalizationsDelegates,
                 supportedLocales: AppLocalizations.supportedLocales,
                 home: LibraryTracksFolderScreen(
                   mode: mode,
@@ -838,7 +839,7 @@ void main() {
             theme: mornye
                 ? MornyeTheme.build(Brightness.dark)
                 : AppTheme.light(),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const LibraryTracksFolderScreen(
               mode: LibraryTracksFolderMode.playlist,
@@ -895,7 +896,7 @@ void main() {
             theme: mornye
                 ? MornyeTheme.build(Brightness.dark)
                 : AppTheme.light(),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const LibraryTracksFolderScreen(
               mode: LibraryTracksFolderMode.playlist,
@@ -946,7 +947,7 @@ void main() {
             theme: mornye
                 ? MornyeTheme.build(Brightness.dark)
                 : AppTheme.light(),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const LibraryTracksFolderScreen(
               mode: LibraryTracksFolderMode.playlist,
@@ -960,7 +961,7 @@ void main() {
       final width = tester.view.physicalSize.width;
       // Back sits at the reading start, the right edge in Arabic.
       expect(
-        tester.getCenter(find.byTooltip('رجوع').first).dx,
+        tester.getCenter(findByTooltip('رجوع').first).dx,
         greaterThan(width / 2),
       );
       // Download All, Play and Shuffle run from the right, and only Play

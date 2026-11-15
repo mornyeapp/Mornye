@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
@@ -15,6 +15,8 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/widgets/lyrics_editor_sheet.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Player implements MusicPlayerController {
   final seeks = <Duration>[];
@@ -211,7 +213,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('lyrics-editor-set-time')));
       await tester.tap(find.text('00:01.00'));
-      await tester.tap(find.byTooltip('Play'));
+      await tester.tap(findByTooltip('Play'));
       await tester.pump();
       expect(find.text('00:01.00'), findsOneWidget);
       expect(find.text('01:30.00'), findsNothing);
@@ -307,7 +309,7 @@ void main() {
     expect(saved, isEmpty);
     await tester.enterText(find.byType(TextField), 'Edited line');
     await tester.pump();
-    await tester.tap(find.byTooltip('Close'));
+    await tester.tap(findByTooltip('Close'));
     await tester.pumpAndSettle();
     expect(find.text('Discard Changes?'), findsOneWidget);
     await tester.tap(find.text('Discard'));
@@ -344,7 +346,7 @@ void main() {
   ) async {
     await open(tester, '[00:01.00]One\n[00:02.00]Two', desktop: true);
     expect(find.byKey(const ValueKey('app-sheet-dialog')), findsOneWidget);
-    await tester.tap(find.byTooltip('Line actions').first);
+    await tester.tap(findByTooltip('Line actions').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete line'));
     await tester.pumpAndSettle();

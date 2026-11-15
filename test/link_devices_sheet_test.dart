@@ -1,6 +1,6 @@
 import 'package:audio_service/audio_service.dart' show MediaItem;
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
@@ -20,6 +20,7 @@ import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 import 'support/link_fakes.dart';
+import 'support/tooltip_finder.dart';
 
 class _LocalItem extends LocalMediaItemNotifier {
   _LocalItem(this.item);
@@ -307,7 +308,7 @@ void main() {
         await tester.pumpWidget(
           host(theme: theme, child: const LinkDevicesButton()),
         );
-        expect(find.byTooltip('Devices'), findsNothing);
+        expect(findByTooltip('Devices'), findsNothing);
 
         await tester.pumpWidget(
           host(
@@ -316,8 +317,8 @@ void main() {
             child: const LinkDevicesButton(),
           ),
         );
-        expect(find.byTooltip('Devices'), findsOneWidget);
-        await tester.tap(find.byTooltip('Devices'));
+        expect(findByTooltip('Devices'), findsOneWidget);
+        await tester.tap(findByTooltip('Devices'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 500));
         expect(find.byType(LinkDevicesSheet), findsOneWidget);

@@ -3,7 +3,7 @@ import 'dart:collection';
 import 'dart:ui' show BoxHeightStyle, ImageFilter;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/foundation.dart' show ValueListenable, listEquals;
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter/rendering.dart'

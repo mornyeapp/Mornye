@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
@@ -258,6 +258,9 @@ void main() {
               child: const Text('Open'),
             ),
           ),
+          // Reduced motion keeps the MenuAnchor menu; otherwise right-click
+          // opens the M3E popup, whose rows and panel are not Material fills.
+          reduceMotion: true,
         ),
       );
       await tester.tap(find.text('Open'));

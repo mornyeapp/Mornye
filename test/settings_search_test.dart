@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -15,6 +15,8 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/settings_group.dart';
+
+import 'support/page_back.dart';
 
 void main() {
   setUp(() {
@@ -199,7 +201,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(AboutPage), findsOneWidget);
 
-      await tester.pageBack();
+      await pageBack(tester);
       await tester.pumpAndSettle();
 
       final restoredField = tester.widget<TextField>(find.byType(TextField));

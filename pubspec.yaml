@@ -60,7 +60,8 @@ dependencies:
 
   # Material Expressive 3 / Dynamic Color
   dynamic_color: ^2.1.0
-  material_ui: ^1.10.0
+  material_ui: ^1.11.0
+  cupertino_ui: ^1.1.6
   material_3_expressive: ^1.2.0
   material_color_utilities: 0.13.0
 

@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -37,6 +37,7 @@ import 'package:mornye/widgets/mornye_bottom_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 class _FakeController implements MusicPlayerController {
   final calls = <String>[];
@@ -276,7 +277,7 @@ void main() {
       );
       items.add(_track);
       await tester.pumpAndSettle();
-      expect(find.byTooltip('Dismiss'), findsOneWidget);
+      expect(findByTooltip('Dismiss'), findsOneWidget);
       desktopInspectorPanel.value = DesktopInspectorPanel.upNext;
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('desktop-player-dismiss')));
@@ -533,7 +534,7 @@ void main() {
                 expect(rect.top, greaterThanOrEqualTo(bar.top));
                 expect(rect.bottom, lessThanOrEqualTo(bar.bottom));
               }
-              await tester.tap(find.byTooltip('Next track (Ctrl+Right)'));
+              await tester.tap(findByTooltip('Next track (Ctrl+Right)'));
               expect(controller.calls, ['next']);
               if (!playing) {
                 await tester.tap(
@@ -721,14 +722,14 @@ void main() {
     ) async {
       await pumpShell(tester, mornye: false, width: 1400);
 
-      expect(find.byTooltip('Next track (Ctrl+Right)'), findsOneWidget);
-      expect(find.byTooltip('Previous track (Ctrl+Left)'), findsOneWidget);
-      expect(find.byTooltip('Play (Space)'), findsOneWidget);
-      expect(find.byTooltip('Lyrics (Ctrl+Shift+L)'), findsOneWidget);
-      expect(find.byTooltip('Up next (Ctrl+Shift+U)'), findsOneWidget);
+      expect(findByTooltip('Next track (Ctrl+Right)'), findsOneWidget);
+      expect(findByTooltip('Previous track (Ctrl+Left)'), findsOneWidget);
+      expect(findByTooltip('Play (Space)'), findsOneWidget);
+      expect(findByTooltip('Lyrics (Ctrl+Shift+L)'), findsOneWidget);
+      expect(findByTooltip('Up next (Ctrl+Shift+U)'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Next track (Ctrl+Right)'));
-      await tester.tap(find.byTooltip('Play (Space)'));
+      await tester.tap(findByTooltip('Next track (Ctrl+Right)'));
+      await tester.tap(findByTooltip('Play (Space)'));
       expect(controller.calls, ['next', 'play']);
     });
 
@@ -739,7 +740,7 @@ void main() {
 
       expect(find.byType(DesktopPlayerBar), findsOneWidget);
       expect(find.text('Not playing'), findsOneWidget);
-      await tester.tap(find.byTooltip('Next track (Ctrl+Right)'));
+      await tester.tap(findByTooltip('Next track (Ctrl+Right)'));
       expect(controller.calls, isEmpty);
     });
 
@@ -795,12 +796,12 @@ void main() {
       // The menu button sits over the destination icons.
       expect(
         tester.getCenter(menuIcon(Icons.menu)).dx,
-        closeTo(tester.getCenter(find.byTooltip('library')).dx, 0.5),
+        closeTo(tester.getCenter(findByTooltip('library')).dx, 0.5),
       );
       // No labels under the icons: tooltips and semantics name them, and
       // the whole 56dp square around an icon takes the click.
       expect(find.text('library'), findsNothing);
-      expect(find.byTooltip('library'), findsOneWidget);
+      expect(findByTooltip('library'), findsOneWidget);
       final semantics = tester.ensureSemantics();
       await tester.pump();
       expect(
@@ -811,7 +812,7 @@ void main() {
         'library\n2',
       );
       semantics.dispose();
-      final library = tester.getRect(find.byTooltip('library'));
+      final library = tester.getRect(findByTooltip('library'));
       expect(library.size, const Size(56, 56));
       await tester.tapAt(library.topLeft + const Offset(4, 4));
       expect(selections, [ShellTab.library]);
@@ -1119,7 +1120,7 @@ void main() {
 
       expect(find.bySemanticsLabel('Not playing'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('desktop-player-shuffle')));
-      await tester.tap(find.byTooltip('Next track (Ctrl+Right)'));
+      await tester.tap(findByTooltip('Next track (Ctrl+Right)'));
       expect(controller.calls, isEmpty);
     });
 
@@ -1128,8 +1129,8 @@ void main() {
     ) async {
       await pumpShell(tester, mornye: true, width: 1400);
 
-      expect(find.byTooltip('library (Ctrl+2)'), findsOneWidget);
-      expect(find.byTooltip('settings (Ctrl+5)'), findsOneWidget);
+      expect(findByTooltip('library (Ctrl+2)'), findsOneWidget);
+      expect(findByTooltip('settings (Ctrl+5)'), findsOneWidget);
       await tester.tap(find.text('library'));
       await tester.tap(find.byKey(const ValueKey('desktop-sidebar-settings')));
       expect(selections, [ShellTab.library, ShellTab.settings]);
@@ -1257,7 +1258,7 @@ void main() {
       expect(find.text('Playlists'), findsOneWidget);
       expect(find.text('library'), findsNothing);
       // The first Library page stands for Library and takes its shortcut.
-      expect(find.byTooltip('Recently Added (Ctrl+2)'), findsOneWidget);
+      expect(findByTooltip('Recently Added (Ctrl+2)'), findsOneWidget);
       await tester.tap(find.text('Albums'));
       await tester.tap(find.text('All Playlists'));
       await tester.tap(find.text('Road trip'));

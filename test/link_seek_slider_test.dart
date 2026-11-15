@@ -1,5 +1,5 @@
 import 'package:audio_service/audio_service.dart' show PlaybackState;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/link/desktop/link_phone_playback.dart';

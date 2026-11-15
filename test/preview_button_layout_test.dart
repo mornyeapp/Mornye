@@ -1,5 +1,5 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
@@ -62,9 +62,12 @@ void main() {
   }
 
   void expectCenteredHitbox(WidgetTester tester, IconData iconData) {
-    final button = find.byWidgetPredicate(
-      (widget) => widget is IconButton || widget is M3EIconButton,
-    );
+    // M3EIconButton builds an IconButton inside; measure the outer button.
+    final button = find
+        .byWidgetPredicate(
+          (widget) => widget is IconButton || widget is M3EIconButton,
+        )
+        .first;
     final icon = findAppIcon(iconData);
     final hitbox = tester.getRect(button);
 

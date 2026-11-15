@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -234,8 +234,6 @@ void main() {
         home: MornyePlayerBackground(artUri: artUri),
       ),
     );
-    final dominant = HSLColor.fromColor(source!);
-    final muted = dominant.withSaturation(dominant.saturation.clamp(0.0, 0.34));
     final decoration =
         tester
                 .widget<DecoratedBox>(
@@ -249,12 +247,17 @@ void main() {
                 .decoration
             as BoxDecoration;
     final gradient = decoration.gradient! as LinearGradient;
+    // The first frame already uses the cover's colour, not the gray of a
+    // cover still being read.
     expect(
       gradient.colors.first.toARGB32(),
-      muted
-          .withLightness(0.28 + dominant.lightness * 0.24)
-          .toColor()
-          .toARGB32(),
+      mornyePlayerGradient(source, fullBleed: false).colors.first.toARGB32(),
+    );
+    expect(
+      gradient.colors.first.toARGB32(),
+      isNot(
+        mornyePlayerGradient(null, fullBleed: false).colors.first.toARGB32(),
+      ),
     );
     await tester.pumpWidget(const SizedBox.shrink());
   });

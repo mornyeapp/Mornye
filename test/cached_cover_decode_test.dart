@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:flutter_test/flutter_test.dart';

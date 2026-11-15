@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Mornye TrackInfoView's vertically stacked label and value.
 class MornyeMetadataRow extends StatelessWidget {

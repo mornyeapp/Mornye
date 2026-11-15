@@ -1,6 +1,6 @@
 import 'dart:ui' show PointerDeviceKind;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -20,6 +20,7 @@ import 'package:mornye/widgets/expressive_button.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 final _entries = [
   for (final id in ['a', 'b', 'c'])
@@ -279,7 +280,7 @@ void main() {
   testWidgets('discard keeps the original order', (tester) async {
     final collections = await open(tester);
     await moveFirstToLast(tester);
-    await tester.tap(find.byTooltip('Close').first);
+    await tester.tap(findByTooltip('Close').first);
     await tester.pumpAndSettle();
     expect(find.text('Discard Changes?'), findsOneWidget);
     await tester.tap(find.text('Discard'));

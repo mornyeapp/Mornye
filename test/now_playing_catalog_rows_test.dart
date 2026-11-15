@@ -1,5 +1,5 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +24,7 @@ import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/track_list_tile.dart';
 
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 /// The playing track, a different track, and a track another provider lists
 /// under the same catalog id.
@@ -354,8 +355,8 @@ void main() {
         await _pumpFor(tester);
         _expectOnlyCurrentMarked(tester);
         // The current row's button pauses rather than restarting.
-        expect(find.byTooltip('Pause'), findsOneWidget);
-        expect(find.byTooltip('Play'), findsNWidgets(2));
+        expect(findByTooltip('Pause'), findsOneWidget);
+        expect(findByTooltip('Play'), findsNWidgets(2));
         expect(tester.takeException(), isNull);
       });
     }

@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';

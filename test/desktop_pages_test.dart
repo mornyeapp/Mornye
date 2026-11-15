@@ -1,5 +1,5 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -31,6 +31,8 @@ import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/desktop/desktop_shortcuts.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart'
     show desktopWindowFullScreen;
+
+import 'support/tooltip_finder.dart';
 
 class _Queue extends DownloadQueueNotifier {
   _Queue(this._items);
@@ -566,7 +568,7 @@ void main() {
       expect(find.text('Done song'), findsNothing);
       expect(find.textContaining('40%'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Cancel download').first);
+      await tester.tap(findByTooltip('Cancel download').first);
       expect(queue.cancelled, ['a']);
 
       await tester.tap(

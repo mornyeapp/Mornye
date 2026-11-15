@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -6,6 +6,8 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   for (final mornye in [false, true]) {
@@ -185,7 +187,7 @@ void main() {
     ) async {
       var closed = 0;
       await showPanel(tester, () => closed++);
-      await tester.tap(find.byTooltip('Close'));
+      await tester.tap(findByTooltip('Close'));
       await tester.pumpAndSettle();
       expect(closed, 1);
     });
@@ -309,7 +311,7 @@ void main() {
       await tester.tap(find.byType(AppSheetHandle));
       await tester.pumpAndSettle();
       expect(find.text('1 selected').hitTestable(), findsOneWidget);
-      expect(find.byTooltip('Close').hitTestable(), findsOneWidget);
+      expect(findByTooltip('Close').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
       expect(closed, 0);
     });

@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -137,6 +137,8 @@ void main() {
   });
 
   Future<void> open(WidgetTester tester, {required bool mornye}) async {
+    // The backdrop settles its blur only in a resumed app.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     tester.view.physicalSize = _size;
     tester.view.devicePixelRatio = _pixelRatio;
     addTearDown(tester.view.reset);
@@ -516,6 +518,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(blur.debugImage, isNotNull);
     expect(tester.takeException(), isNull);
+    // The cover color's sample read gives up after five seconds.
+    await tester.pump(const Duration(seconds: 6));
   });
 
   for (final (choice, fileName, width, height) in [

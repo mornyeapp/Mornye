@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/unified_library_item.dart';
@@ -92,13 +92,16 @@ void main() {
           ? MornyeTheme.build(Brightness.dark)
           : ThemeData(colorSchemeSeed: Colors.teal);
       await _pump(tester, _item(server), theme: theme);
+      // The nearest box is the badge; Mornye's page transition adds its own.
       final decoration =
           tester
                   .widget<DecoratedBox>(
-                    find.ancestor(
-                      of: find.byType(AppIcon),
-                      matching: find.byType(DecoratedBox),
-                    ),
+                    find
+                        .ancestor(
+                          of: find.byType(AppIcon),
+                          matching: find.byType(DecoratedBox),
+                        )
+                        .first,
                   )
                   .decoration
               as BoxDecoration;

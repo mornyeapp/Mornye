@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -97,7 +97,20 @@ void main() {
       ),
     );
     expect(find.byType(M3EIconButton), findsOneWidget);
-    expect(find.byType(IconButton), findsNothing);
+    // M3EIconButton builds its own IconButton; no other may be built.
+    expect(
+      find.byType(IconButton),
+      findsExactly(
+        tester
+            .widgetList(
+              find.descendant(
+                of: find.byType(M3EIconButton),
+                matching: find.byType(IconButton),
+              ),
+            )
+            .length,
+      ),
+    );
     expect(_drawnIcon(tester).icon, Symbols.close_rounded);
     await tester.tap(find.byType(M3EIconButton));
     await tester.pumpAndSettle();

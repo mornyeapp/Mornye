@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/services/metadata_autofill_service.dart';
 import 'package:mornye/services/metadata_cover_resources.dart';
 import 'package:mornye/utils/isrc_utils.dart';

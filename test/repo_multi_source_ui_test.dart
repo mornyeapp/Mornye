@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +9,8 @@ import 'package:mornye/screens/repo/repositories_screen.dart';
 import 'package:mornye/screens/repo_tab.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+
+import 'support/tooltip_finder.dart';
 
 const _first = 'https://example.com/registry.json';
 const _second =
@@ -141,7 +143,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: find.byKey(const ValueKey('repository-$_second')),
-          matching: find.byTooltip('Remove repository'),
+          matching: findByTooltip('Remove repository'),
         ),
       );
       await _settle(tester);

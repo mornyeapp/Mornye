@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -52,9 +52,13 @@ void main() {
 
   /// The tonal pill around [value], if Material drew one.
   ShapeDecoration? pill(WidgetTester tester, String value) {
+    // Mornye's page transition draws its edge shadow in a DecoratedBox too.
     final boxes = find.ancestor(
       of: find.text(value),
-      matching: find.byType(DecoratedBox),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is DecoratedBox && widget.decoration is ShapeDecoration,
+      ),
     );
     if (boxes.evaluate().isEmpty) return null;
     return tester.widget<DecoratedBox>(boxes.first).decoration

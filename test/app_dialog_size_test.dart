@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +8,8 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+
+import 'support/tooltip_finder.dart';
 
 const _dialogKey = ValueKey('app-sheet-dialog');
 
@@ -128,7 +130,7 @@ void main() {
       expect(find.text('Row 0').hitTestable(), findsNothing);
       expect(tester.takeException(), isNull);
 
-      await tester.tap(find.byTooltip('Close'));
+      await tester.tap(findByTooltip('Close'));
       await tester.pumpAndSettle();
       expect(dialog, findsNothing);
     },
@@ -152,7 +154,7 @@ void main() {
           tester.widget<Dialog>(find.byKey(_dialogKey)).shape!
               as RoundedRectangleBorder;
       expect(shape.borderRadius, BorderRadius.circular(28));
-      expect(find.byTooltip('Close'), mornye ? findsNothing : findsOneWidget);
+      expect(findByTooltip('Close'), mornye ? findsNothing : findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     }
   });

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -31,6 +31,8 @@ import 'package:mornye/widgets/animated_library_sliver_grid.dart';
 import 'package:mornye/widgets/library_directory_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Settings extends SettingsNotifier {
   _Settings(this.initial);
@@ -794,7 +796,7 @@ void main() {
       }
       expect(find.text('Track b'), findsOneWidget);
       expect(lists, isEmpty);
-      await tester.tap(find.byTooltip(l10n.tooltipPlay).hitTestable());
+      await tester.tap(findByTooltip(l10n.tooltipPlay).hitTestable());
       for (var i = 0; i < 10; i++) {
         await tester.pump(const Duration(milliseconds: 50));
       }
@@ -837,9 +839,9 @@ void main() {
       );
       final l10n = l10nOf(tester);
       await tester.tap(
-        find
-            .byTooltip(l10n.a11yPlayTrackByArtist('Song 1', 'Artist'))
-            .hitTestable(),
+        findByTooltip(
+          l10n.a11yPlayTrackByArtist('Song 1', 'Artist'),
+        ).hitTestable(),
       );
       for (var i = 0; i < 10; i++) {
         await tester.pump(const Duration(milliseconds: 50));

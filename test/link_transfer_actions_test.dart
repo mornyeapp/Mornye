@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -21,6 +21,7 @@ import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/link/link_transfers_view.dart';
 
 import 'support/link_fakes.dart';
+import 'support/tooltip_finder.dart';
 
 /// Downloads that never finish, so a transfer stays running.
 class _StuckTransport implements LinkOfflineTransport {
@@ -153,20 +154,20 @@ void main() {
       ),
     );
     await settle(tester);
-    expect(find.byTooltip('Send to Studio PC'), findsNothing);
-    expect(find.byTooltip('Save to this phone'), findsNothing);
+    expect(findByTooltip('Send to Studio PC'), findsNothing);
+    expect(findByTooltip('Save to this phone'), findsNothing);
 
     client.setConnection(LinkConnectionState.connected);
     await settle(tester);
-    expect(find.byTooltip('Send to Studio PC'), findsOneWidget);
-    expect(find.byTooltip('Save to this phone'), findsOneWidget);
+    expect(findByTooltip('Send to Studio PC'), findsOneWidget);
+    expect(findByTooltip('Save to this phone'), findsOneWidget);
 
     await tester.pumpWidget(
       app(LinkTransferButtons(items: [_phoneSong('Mine')])),
     );
     await settle(tester);
-    expect(find.byTooltip('Send to Studio PC'), findsOneWidget);
-    expect(find.byTooltip('Save to this phone'), findsNothing);
+    expect(findByTooltip('Send to Studio PC'), findsOneWidget);
+    expect(findByTooltip('Save to this phone'), findsNothing);
   });
 
   testWidgets('save to this phone starts a transfer and offers to view it', (
@@ -176,7 +177,7 @@ void main() {
       app(LinkTransferButtons(items: [_desktopSong('l:7', 'Theirs')])),
     );
     await settle(tester);
-    await tester.tap(find.byTooltip('Save to this phone'));
+    await tester.tap(findByTooltip('Save to this phone'));
     await settle(tester);
 
     final transfers = containerOf(tester).read(linkTransfersProvider);

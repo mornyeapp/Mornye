@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -17,6 +17,8 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/desktop/detail_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/tooltip_finder.dart';
 
 /// Hands out cover schemes without decoding images: [cached] answers a peek
 /// at once, and any other cover waits until the test calls [complete].
@@ -174,7 +176,7 @@ void main() {
       );
       expect(title.style?.color, cover.onSurface);
 
-      final back = find.byTooltip(
+      final back = findByTooltip(
         const DefaultMaterialLocalizations().backButtonTooltip,
       );
       expect(_schemeAt(tester, back), theme.colorScheme);

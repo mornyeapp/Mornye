@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +16,7 @@ import 'package:mornye/widgets/link/link_transfers_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/link_desktop_fakes.dart';
+import 'support/tooltip_finder.dart';
 
 class _Settings extends SettingsNotifier {
   @override
@@ -378,7 +379,7 @@ void main() {
     expect(find.text('secret-key-1'), findsOneWidget);
     expect(find.text('mornye'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Copy Password or API key'));
+    await tester.tap(findByTooltip('Copy Password or API key'));
     await settle(tester);
     expect(copied, ['secret-key-1']);
     expect(find.text('Copied to clipboard'), findsOneWidget);

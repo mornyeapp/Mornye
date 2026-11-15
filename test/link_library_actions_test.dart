@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -29,6 +29,7 @@ import 'package:mornye/utils/audio_conversion_utils.dart';
 
 import 'support/link_fakes.dart';
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 class _Extensions extends ExtensionNotifier {
   @override
@@ -180,7 +181,7 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(find.byTooltip('Show menu'));
+      await tester.tap(findByTooltip('Show menu'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       for (final label in [
@@ -403,7 +404,7 @@ void main() {
     expect(find.text('2 of 2 songs · 1 failed'), findsOneWidget);
     expect(find.text('Broken: Conversion failed'), findsOneWidget);
     expect(find.text('Next Song · 1 of 3 songs'), findsOneWidget);
-    expect(find.byTooltip('Stop after the current song'), findsOneWidget);
+    expect(findByTooltip('Stop after the current song'), findsOneWidget);
     // Reading tags is a step of an edit, not a change of its own.
     expect(find.text('Show details'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());

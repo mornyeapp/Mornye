@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +19,8 @@ import 'package:mornye/widgets/desktop/library_drop_target.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/track_card.dart';
+
+import 'support/tooltip_finder.dart';
 
 Widget _app(Widget child, {bool mornye = false}) => ProviderScope(
   child: MaterialApp(
@@ -581,7 +583,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.widget<AnimatedOpacity>(opacity).opacity, 1);
 
-      await tester.tap(find.byTooltip('Play'));
+      await tester.tap(findByTooltip('Play'));
       expect(played, 1);
       await mouse.removePointer();
     });
@@ -589,7 +591,7 @@ void main() {
     testWidgets('phones show no hover button', (tester) async {
       debugDesktopPlatformOverride = false;
       await tester.pumpWidget(tile(() {}));
-      expect(find.byTooltip('Play'), findsNothing);
+      expect(findByTooltip('Play'), findsNothing);
     });
   });
 

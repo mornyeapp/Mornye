@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +11,8 @@ import 'package:mornye/screens/artist_concerts_screen.dart';
 import 'package:mornye/screens/concert_detail_screen.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/animation_utils.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -77,7 +79,7 @@ void main() {
         );
         expect(find.textContaining('21:00'), findsOneWidget);
         expect(find.text('Get Tickets'), findsNothing);
-        await tester.tap(find.byTooltip('Back').last);
+        await tester.tap(findByTooltip('Back').last);
         await tester.pumpAndSettle();
         expect(find.byType(ConcertDetailScreen), findsNothing);
       },
@@ -137,7 +139,7 @@ void main() {
       expect(find.text('Get Tickets'), findsOneWidget);
       expect(find.text('Example Set List'), findsOneWidget);
       expect(find.text('123 Example Street'), findsOneWidget);
-      await tester.tap(find.byTooltip('Add to Calendar'));
+      await tester.tap(findByTooltip('Add to Calendar'));
       await tester.pumpAndSettle();
       expect(
         calendarCalls.single.arguments,

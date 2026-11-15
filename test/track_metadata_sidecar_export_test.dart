@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart'
@@ -22,6 +22,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/tooltip_finder.dart';
 
 class _Extensions extends ExtensionNotifier {
   @override
@@ -219,7 +220,7 @@ void main() {
       ]) {
         await tester.tap(
           scenario.mornye
-              ? find.byTooltip('Show menu')
+              ? findByTooltip('Show menu')
               : findAppIcon(Icons.more_vert),
         );
         await tester.pumpAndSettle();

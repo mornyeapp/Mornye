@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -19,6 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/app_icon_finder.dart';
 import 'support/re_enrich_settings.dart';
+import 'support/tooltip_finder.dart';
 
 class _History extends DownloadHistoryNotifier {
   @override
@@ -114,11 +115,11 @@ void main() {
       expect(tester.widget<AlbumTrackTile>(row('Second')).isCurrent, isTrue);
       expect(tester.widget<AlbumTrackTile>(row('First')).isCurrent, isFalse);
       expect(
-        find.descendant(of: row('Second'), matching: find.byTooltip('Pause')),
+        find.descendant(of: row('Second'), matching: findByTooltip('Pause')),
         findsOneWidget,
       );
       expect(
-        find.descendant(of: row('First'), matching: find.byTooltip('Play')),
+        find.descendant(of: row('First'), matching: findByTooltip('Play')),
         findsOneWidget,
       );
       expect(

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Shared numbered, draggable row used by provider-priority reorder lists.
 class ReorderablePriorityItem extends StatelessWidget {

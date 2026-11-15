@@ -1,10 +1,9 @@
 import 'dart:async';
 
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart' as material_ui;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/models/theme_settings.dart';
 
@@ -16,10 +15,7 @@ final initialThemeSettingsProvider = Provider<ThemeSettings>(
 /// when it first builds.
 final initialDynamicColorsProvider = Provider<DynamicColors?>((ref) => null);
 
-typedef DynamicColorSchemes = ({
-  material_ui.ColorScheme light,
-  material_ui.ColorScheme dark,
-});
+typedef DynamicColorSchemes = ({ColorScheme light, ColorScheme dark});
 
 /// The system's colors: the Android 12+ wallpaper palette, else the desktop
 /// accent color. Asked once, in the same order as `DynamicColorBuilder`.
@@ -60,11 +56,11 @@ class DynamicColors {
       final accent = await DynamicColorPlugin.getAccentColor();
       if (accent != null) {
         return (
-          light: material_ui.ColorScheme.fromSeed(
+          light: ColorScheme.fromSeed(
             seedColor: accent,
             brightness: Brightness.light,
           ),
-          dark: material_ui.ColorScheme.fromSeed(
+          dark: ColorScheme.fromSeed(
             seedColor: accent,
             brightness: Brightness.dark,
           ),

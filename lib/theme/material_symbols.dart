@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter/material.dart' show Icons;
+import 'package:material_ui/material_ui.dart' show Icons;
 import 'package:material_symbols_icons/symbols.dart';
 
 /// Material Symbols Rounded counterpart of a legacy Material icon.

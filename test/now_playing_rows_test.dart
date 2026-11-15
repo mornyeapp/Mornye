@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +16,8 @@ import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
 import 'package:mornye/widgets/track_card.dart';
+
+import 'support/tooltip_finder.dart';
 
 /// Long enough for the effect and spatial springs to settle.
 const _settle = Duration(seconds: 1);
@@ -674,7 +676,7 @@ void main() {
       await _pumpFor(tester, _settle);
 
       expect(find.byType(NowPlayingIndicator), findsOneWidget);
-      expect(find.byTooltip('Pause'), findsOneWidget);
+      expect(findByTooltip('Pause'), findsOneWidget);
       final button = tester.widget<IconButton>(find.byType(IconButton));
       final scheme = _scheme(tester, find.text('Song'));
       expect(
@@ -688,7 +690,7 @@ void main() {
       await tester.pump();
 
       expect(find.byType(NowPlayingIndicator), findsNothing);
-      expect(find.byTooltip('Play'), findsOneWidget);
+      expect(findByTooltip('Play'), findsOneWidget);
     });
   });
 }
