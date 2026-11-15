@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/supported_locales.dart';
 import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/network_offline_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
@@ -46,19 +47,26 @@ class NetworkUploadNotifier extends Notifier<LinkOfflineProgress?> {
     String folder,
   ) async {
     if (_cancel != null) return null;
-    final songs = networkUploadSongs(items);
-    if (songs.isEmpty) return null;
+    final uploadable = networkUploadItems(items);
+    if (uploadable.isEmpty) return null;
     final cancel = LinkOfflineCancel();
     _cancel = cancel;
     final storage = ref.read(networkOfflineStorageProvider);
     final notices = NotificationService();
-    final l10n = appLocalizationsFor(ref.read(settingsProvider).locale);
-    state = LinkOfflineProgress(done: 0, total: songs.length, title: '');
+    final settings = ref.read(settingsProvider);
+    final queue = ref.read(downloadQueueProvider.notifier);
+    final l10n = appLocalizationsFor(settings.locale);
+    state = LinkOfflineProgress(done: 0, total: uploadable.length, title: '');
     var lastProgressAt = DateTime.fromMillisecondsSinceEpoch(0);
     try {
       await notices.beginBackgroundWork(
         'network_upload',
         title: l10n.networkUploading,
+      );
+      // The folders downloads get on this device, from the songs' tags.
+      final songs = await networkUploadSongs(
+        uploadable,
+        folderFor: (item) => queue.libraryFolderFor(item, settings),
       );
       final result =
           await NetworkLibraryUploader(

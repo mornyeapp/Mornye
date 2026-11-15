@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/library_database_models.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/network_library_upload.dart';
 import 'package:mornye/services/network_storage_service.dart';
@@ -14,6 +17,7 @@ UnifiedLibraryItem local(
   String artist = 'Artist',
   String album = 'Album',
   String? albumArtist,
+  String? releaseDate,
 }) => UnifiedLibraryItem.fromLocalLibrary(
   LocalLibraryItem(
     id: path,
@@ -22,6 +26,7 @@ UnifiedLibraryItem local(
     artistName: artist,
     albumName: album,
     albumArtist: albumArtist,
+    releaseDate: releaseDate,
     format: 'flac',
     scannedAt: DateTime(2026),
   ),
@@ -58,7 +63,7 @@ void main() {
         downloadedAt: DateTime(2026),
       ),
     );
-    final songs = networkUploadSongs([
+    final songs = networkUploadItems([
       local('/music/a.flac'),
       local('/music/a.flac'),
       local('content://media/tree/primary%3AMusic/document/b.flac'),
@@ -66,56 +71,141 @@ void main() {
       local('/music/album.cue#track02'),
       offline,
     ]);
-    expect(songs.map((song) => song.path), [
+    expect(songs.map((song) => song.filePath), [
       '/music/a.flac',
       'content://media/tree/primary%3AMusic/document/b.flac',
     ]);
   });
 
-  test('remote layout is Album Artist/Album/original file name', () {
-    final song = networkUploadSongs([
-      local(
-        '/music/Some/Where/01 Intro.flac',
-        artist: 'Guest',
-        albumArtist: 'Band',
-        album: 'First: Record',
-      ),
-    ]).single;
-    expect(song.relativeDir, 'Band/First Record');
-    expect(song.fileName, '01 Intro.flac');
+  test('each song goes into its folder under its original name', () async {
+    final songs = await networkUploadSongs([
+      local('/music/Some/Where/01 Intro.flac', album: 'One'),
+      local('/music/b.mp3', album: 'Two'),
+      local('/music/b.mp3', album: 'Two'),
+    ], folderFor: (item) async => 'Folder ${item.albumName}');
+    expect(
+      [for (final song in songs) '${song.relativeDir}|${song.fileName}'],
+      ['Folder One|01 Intro.flac', 'Folder Two|b.mp3'],
+    );
+  });
 
-    final noAlbum = networkUploadSongs([
-      local('/music/x.mp3', album: ' '),
-    ]).single;
-    expect(noAlbum.relativeDir, 'Artist');
+  group('upload folders follow Folder Organization', () {
+    final queue = DownloadQueueNotifier();
+    final song = local(
+      '/music/Some/Where/01 Intro.flac',
+      artist: 'Guest feat. Other',
+      albumArtist: 'Band',
+      album: 'First: Record',
+      releaseDate: '2024-03-01',
+    );
+    Future<String> folder(AppSettings settings, [UnifiedLibraryItem? item]) =>
+        queue.libraryFolderFor(item ?? song, settings);
+
+    test('the preset layouts match downloads', () async {
+      // The phone's own default keeps every song in the download folder.
+      expect(await folder(AppSettings()), '');
+      expect(
+        await folder(AppSettings(folderOrganization: 'album')),
+        'First Record',
+      );
+      expect(await folder(AppSettings(folderOrganization: 'artist')), 'Band');
+      expect(
+        await folder(AppSettings(folderOrganization: 'artist_album')),
+        'Band/First Record',
+      );
+      expect(
+        await folder(
+          AppSettings(
+            folderOrganization: 'artist_album',
+            useAlbumArtistForFolders: false,
+          ),
+        ),
+        'Guest feat. Other/First Record',
+      );
+      expect(
+        await folder(AppSettings(separateSingles: true)),
+        'Albums/Band/First Record',
+      );
+      expect(
+        await folder(
+          AppSettings(
+            separateSingles: true,
+            albumFolderStructure: 'artist_year_album',
+          ),
+        ),
+        'Albums/Band/[2024] First Record',
+      );
+    });
+
+    test('playlist folders keep the folder in the download folder', () async {
+      final settings = AppSettings(
+        folderOrganization: 'playlist',
+        downloadDirectory: '/music',
+      );
+      expect(
+        await folder(settings, local('/music/Road Trip/a.flac')),
+        'Road Trip',
+      );
+      expect(await folder(settings, local('/music/a.flac')), '');
+      expect(await folder(settings, local('/elsewhere/List/a.flac')), '');
+    });
+
+    test('a custom template expands from the tags', () async {
+      const backend = MethodChannel('com.zarz.mornye/backend');
+      final messenger =
+          TestWidgetsFlutterBinding.ensureInitialized().defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(backend, (call) async {
+        if (call.method != 'buildFilename') return null;
+        final args = call.arguments as Map;
+        final metadata = jsonDecode(args['metadata'] as String) as Map;
+        return (args['template'] as String).replaceAllMapped(
+          RegExp(r'\{([a-z_]+)\}'),
+          (match) => '${metadata[match[1]] ?? ''}',
+        );
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(backend, null));
+      expect(
+        await folder(
+          AppSettings(
+            folderOrganization: 'custom',
+            folderPathTemplate: '{album_artist}/{year} - {album}',
+          ),
+        ),
+        'Band/2024 - First Record',
+      );
+    });
   });
 
   test('content URIs keep their document or download file name', () {
-    final document = networkUploadSongs([
-      local('content://tree/document/primary%3AMusic%2FAlbum%2FTrack%3F.m4a'),
-    ]).single;
-    expect(document.fileName, 'Track.m4a');
-
-    final download = networkUploadSongs([
-      UnifiedLibraryItem.fromDownloadHistory(
-        DownloadHistoryItem(
-          id: 'download',
-          trackName: 'Title',
-          artistName: 'Artist',
-          albumName: 'Album',
-          filePath: 'content://tree/document/42',
-          safFileName: 'Title - Artist.flac',
-          service: 'provider',
-          downloadedAt: DateTime(2026),
+    expect(
+      networkUploadFileName(
+        local('content://tree/document/primary%3AMusic%2FAlbum%2FTrack%3F.m4a'),
+      ),
+      'Track.m4a',
+    );
+    expect(
+      networkUploadFileName(
+        UnifiedLibraryItem.fromDownloadHistory(
+          DownloadHistoryItem(
+            id: 'download',
+            trackName: 'Title',
+            artistName: 'Artist',
+            albumName: 'Album',
+            filePath: 'content://tree/document/42',
+            safFileName: 'Title - Artist.flac',
+            service: 'provider',
+            downloadedAt: DateTime(2026),
+          ),
         ),
       ),
-    ]).single;
-    expect(download.fileName, 'Title - Artist.flac');
-
-    final unnamed = networkUploadSongs([
-      local('content://tree/document/42', title: 'Title'),
-    ]).single;
-    expect(unnamed.fileName, 'Title - Artist.flac');
+      'Title - Artist.flac',
+    );
+    expect(
+      networkUploadFileName(
+        local('content://tree/document/42', title: 'Title'),
+      ),
+      'Title - Artist.flac',
+    );
   });
 
   test('only SMB and WebDAV folders of saved connections accept uploads', () {

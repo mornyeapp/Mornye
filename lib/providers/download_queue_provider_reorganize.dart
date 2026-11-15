@@ -64,13 +64,7 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
       // Fail fast with a clear error instead of once per track.
       FolderPathTemplate.segments(settings.folderPathTemplate);
     }
-    final keepsPlaylistFolders =
-        !settings.separateSingles &&
-        (settings.folderOrganization == 'playlist' ||
-            (settings.folderOrganization == 'custom' &&
-                _playlistFolderTokenPattern.hasMatch(
-                  settings.folderPathTemplate,
-                )));
+    final keepsPlaylistFolders = _keepsPlaylistFolders(settings);
     final dropsPlaylistFolders =
         !keepsPlaylistFolders && settings.createPlaylistFolder;
 
@@ -316,6 +310,66 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
     }
   }
 
+  /// The folder the Files settings give [item], a song already in the
+  /// Library, inside a download folder: where a download of it would go,
+  /// from its tags. Uploads to network storage lay out their copies with it.
+  /// Rules that name the source playlist, which the Library does not keep,
+  /// give the song the folder it has inside the download folder, else none.
+  ///
+  /// Throws [FormatException] when the custom folder template is invalid.
+  Future<String> libraryFolderFor(
+    UnifiedLibraryItem item,
+    AppSettings settings,
+  ) async {
+    final history = item.historyItem;
+    final local = item.localItem;
+    if (_keepsPlaylistFolders(settings)) {
+      final safMode = _isSafMode(settings);
+      final directory = settings.downloadDirectory.isNotEmpty
+          ? settings.downloadDirectory
+          : state.outputDir;
+      final root = safMode
+          ? settings.downloadTreeUri
+          : directory.isEmpty
+          ? ''
+          : p.normalize(plainWindowsPath(directory));
+      final location = history != null
+          ? _storedLocation(history, root: root, safMode: safMode)
+          : _libraryLocation(item.filePath, root: root, safMode: safMode);
+      return location?.relativeDir ?? '';
+    }
+    final facts = history != null
+        ? _TrackFacts(
+            _trackFromHistory(history),
+            service: history.service,
+            quality: history.quality ?? '',
+          )
+        : _TrackFacts(
+            local != null
+                ? _trackFromLibrary(local)
+                : Track(
+                    id: item.id,
+                    name: item.trackName,
+                    artistName: item.artistName,
+                    albumName: item.albumName,
+                    duration: 0,
+                  ),
+          );
+    return normalizeRelativeLibraryDir(
+      await _ruleFolderFor(facts.track, facts, settings),
+    );
+  }
+
+  /// Whether the folder rules name the source playlist, which neither
+  /// history nor the Local Library keeps.
+  bool _keepsPlaylistFolders(AppSettings settings) =>
+      !settings.separateSingles &&
+      (settings.folderOrganization == 'playlist' ||
+          (settings.folderOrganization == 'custom' &&
+              _playlistFolderTokenPattern.hasMatch(
+                settings.folderPathTemplate,
+              )));
+
   bool _sameStoredName(String a, String b, {required bool ignoreCase}) =>
       ignoreCase ? a.toLowerCase() == b.toLowerCase() : a == b;
 
@@ -502,29 +556,7 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
     if (keepCurrentFolder) {
       relativeDir = current.relativeDir;
     } else {
-      final customFolderPath =
-          !settings.separateSingles && settings.folderOrganization == 'custom'
-          ? await FolderPathTemplate.expand(settings.folderPathTemplate, {
-              ..._filenameMetadataForTrack(
-                track,
-                provider: service,
-                providerTrackId: providerTrackId,
-                quality: quality,
-              ),
-              'artist': _folderArtistForTrack(track, settings),
-              'album_artist':
-                  normalizeOptionalString(track.albumArtist) ??
-                  track.artistName,
-              'playlist': '',
-            })
-          : null;
-      // No playlistName: the source playlist is not recorded, so no
-      // playlist folder prefix is added.
-      final raw = _buildRelativeOutputDir(
-        track,
-        settings,
-        customFolderPath: customFolderPath,
-      );
+      final raw = await _ruleFolderFor(track, facts, settings);
       relativeDir = normalizeRelativeLibraryDir(
         safMode ? _sanitizeSafRelativeDir(raw) : raw,
       );
@@ -558,6 +590,39 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
         ? await _buildSafFileName(baseName, extension)
         : '${await PlatformBridge.sanitizeFilename(baseName)}$extension';
     return _RuleTarget(relativeDir, fileName);
+  }
+
+  /// The folder the rules give [track] inside the download folder, as a
+  /// download names it. No playlist: the source playlist is not recorded,
+  /// so no playlist folder prefix is added.
+  Future<String> _ruleFolderFor(
+    Track track,
+    _TrackFacts facts,
+    AppSettings settings,
+  ) async {
+    final service = facts.service;
+    final customFolderPath =
+        !settings.separateSingles && settings.folderOrganization == 'custom'
+        ? await FolderPathTemplate.expand(settings.folderPathTemplate, {
+            ..._filenameMetadataForTrack(
+              track,
+              provider: service,
+              providerTrackId: service.isEmpty
+                  ? ''
+                  : _knownProviderTrackId(track, service),
+              quality: facts.quality,
+            ),
+            'artist': _folderArtistForTrack(track, settings),
+            'album_artist':
+                normalizeOptionalString(track.albumArtist) ?? track.artistName,
+            'playlist': '',
+          })
+        : null;
+    return _buildRelativeOutputDir(
+      track,
+      settings,
+      customFolderPath: customFolderPath,
+    );
   }
 
   String _storedExtension(String fileName) {

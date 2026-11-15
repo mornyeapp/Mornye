@@ -55,39 +55,38 @@ class NetworkUploadSong {
   final String path;
   final String title;
 
-  /// `Album Artist/Album`, as Save offline and the default download layout
-  /// name folders.
+  /// The folders under the chosen folder, as the download folder settings
+  /// arrange a download of the song; empty for the chosen folder itself.
   final String relativeDir;
   final String fileName;
 }
 
-/// The uploadable songs of [items], once each by file.
-List<NetworkUploadSong> networkUploadSongs(Iterable<UnifiedLibraryItem> items) {
+/// The songs of [items] stored on this device, once each by file.
+List<UnifiedLibraryItem> networkUploadItems(
+  Iterable<UnifiedLibraryItem> items,
+) {
   final paths = <String>{};
   return [
     for (final item in items)
-      if (canUploadLibraryItem(item) && paths.add(item.filePath))
-        NetworkUploadSong(
-          path: item.filePath,
-          title: item.trackName,
-          relativeDir: networkUploadRelativeDir(item),
-          fileName: networkUploadFileName(item),
-        ),
+      if (canUploadLibraryItem(item) && paths.add(item.filePath)) item,
   ];
 }
 
-String networkUploadRelativeDir(UnifiedLibraryItem item) {
-  final albumArtist =
-      item.localItem?.albumArtist ?? item.historyItem?.albumArtist;
-  final artist = albumArtist?.trim().isNotEmpty ?? false
-      ? albumArtist!
-      : item.artistName;
-  final album = item.albumName.trim();
-  return [
-    FolderPathTemplate.sanitizeComponent(artist),
-    if (album.isNotEmpty) FolderPathTemplate.sanitizeComponent(album),
-  ].join('/');
-}
+/// The uploadable songs of [items], once each by file, each in the folder
+/// [folderFor] gives it: where the download folder settings put a download
+/// of it, so the copies are laid out like the songs on this device.
+Future<List<NetworkUploadSong>> networkUploadSongs(
+  Iterable<UnifiedLibraryItem> items, {
+  required Future<String> Function(UnifiedLibraryItem item) folderFor,
+}) async => [
+  for (final item in networkUploadItems(items))
+    NetworkUploadSong(
+      path: item.filePath,
+      title: item.trackName,
+      relativeDir: await folderFor(item),
+      fileName: networkUploadFileName(item),
+    ),
+];
 
 /// The file's own name, so the copy matches the original. A content URI's
 /// name comes from its download record or its document id, else the default

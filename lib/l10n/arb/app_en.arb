@@ -146,9 +146,9 @@
   "@networkUploadHere": {
     "description": "Action in the network folder browser that picks the current folder as the upload destination"
   },
-  "networkUploadDescription": "Songs go into Artist/Album folders here. Files already on the server are never replaced.",
+  "networkUploadDescription": "Songs go into folders here the way Folder Organization arranges your downloads. Files already on the server are never replaced.",
   "@networkUploadDescription": {
-    "description": "Help below the upload destination action describing the folder layout and that existing server files are kept"
+    "description": "Help below the upload destination action describing the folder layout and that existing server files are kept. Folder Organization is the name of the download folder settings section"
   },
   "networkUploadResult": "Uploaded {saved}, already there {skipped}, failed {failed}",
   "@networkUploadResult": {

@@ -129,7 +129,10 @@ that still cannot play is named in a notice and skipped.
 
 Songs already in the local Library can be uploaded to a writable SMB or WebDAV
 connection from the track menu, the Library selection and album headers. Files
-land in `<folder>/<Album Artist>/<Album>/` and never replace a remote file.
+land under the chosen folder in the folders **Settings → Files → Folder
+Organization** gives a download of the song, from its tags, and never replace
+a remote file. Rules that name the source playlist keep the folder the song has
+inside the download folder, since the Library does not record the playlist.
 
 ## Validation
 
