@@ -17,6 +17,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/synced_lyrics_scroll.dart';
+import 'package:mornye/utils/text_direction.dart';
 import 'package:mornye/widgets/lyric_line_scroller.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 
@@ -356,11 +357,38 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
       );
     } else if (text == line.text.trim() && line.hasWordTiming) {
       // A long line slides to keep the sung words in view.
-      child = ClipRect(
+      child = Directionality(
         key: ValueKey('word-${line.time.inMilliseconds}'),
+        textDirection: strongTextDirection(text) ?? Directionality.of(context),
+        child: ClipRect(
+          child: LyricLineScroller(
+            text: line.words.map((word) => word.text).join(),
+            words: line.words,
+            style: style,
+            start: line.time,
+            end: line.end,
+            nextStart: nextStart,
+            position: position,
+            advancing: advancing,
+            speed: speed,
+            child: WordTimedLyricLine(
+              line: line,
+              initialPosition: position,
+              seekPreview: widget.seekPreview,
+              style: style,
+              maxLines: 1,
+            ),
+          ),
+        ),
+      );
+    } else {
+      // The line reads, and a long one slides, in its own direction: a
+      // right-to-left line starts at its right edge and moves rightwards.
+      child = Directionality(
+        key: ValueKey('line-${line.time.inMilliseconds}-$text'),
+        textDirection: strongTextDirection(text) ?? Directionality.of(context),
         child: LyricLineScroller(
-          text: line.words.map((word) => word.text).join(),
-          words: line.words,
+          text: text,
           style: style,
           start: line.time,
           end: line.end,
@@ -368,32 +396,13 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
           position: position,
           advancing: advancing,
           speed: speed,
-          child: WordTimedLyricLine(
-            line: line,
-            initialPosition: position,
-            seekPreview: widget.seekPreview,
-            style: style,
+          child: Text(
+            text,
             maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.ellipsis,
+            style: style,
           ),
-        ),
-      );
-    } else {
-      child = LyricLineScroller(
-        key: ValueKey('line-${line.time.inMilliseconds}-$text'),
-        text: text,
-        style: style,
-        start: line.time,
-        end: line.end,
-        nextStart: nextStart,
-        position: position,
-        advancing: advancing,
-        speed: speed,
-        child: Text(
-          text,
-          maxLines: 1,
-          softWrap: false,
-          overflow: TextOverflow.ellipsis,
-          style: style,
         ),
       );
     }

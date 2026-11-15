@@ -15,7 +15,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_draft.dart';
 import 'package:mornye/utils/string_utils.dart';
-import 'package:mornye/widgets/aligned_lyric_pronunciation.dart';
+import 'package:mornye/utils/text_direction.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -97,6 +97,8 @@ class LyricsEditorSheet extends ConsumerStatefulWidget {
 class _EditorLine {
   _EditorLine(this.base) : time = base.time {
     text.text = base.text;
+    direction.value = strongTextDirection(base.text);
+    text.addListener(_updateDirection);
   }
 
   final LyricsDraftLine base;
@@ -105,11 +107,19 @@ class _EditorLine {
   final key = GlobalKey();
   Duration? time;
 
+  /// The line's own direction, by its first letter; null follows the
+  /// editor's. It changes only when that letter's script does, so typing
+  /// does not rebuild the field.
+  final direction = ValueNotifier<TextDirection?>(null);
+
+  void _updateDirection() => direction.value = strongTextDirection(text.text);
+
   LyricsDraftLine get draft =>
       base.copyWith(time: time, clearTime: time == null, text: text.text);
 
   void dispose() {
     text.dispose();
+    direction.dispose();
     focus.dispose();
   }
 }
@@ -728,15 +738,12 @@ class _LyricsEditorRow extends StatelessWidget {
                 timeChip,
                 const SizedBox(width: 4),
                 Expanded(
-                  child: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: line.text,
-                    builder: (context, value, _) => TextField(
+                  child: ValueListenableBuilder<TextDirection?>(
+                    valueListenable: line.direction,
+                    builder: (context, direction, _) => TextField(
                       controller: line.text,
                       focusNode: line.focus,
-                      textDirection: lyricTextDirection(
-                        value.text,
-                        Directionality.of(context),
-                      ),
+                      textDirection: direction,
                       minLines: 1,
                       maxLines: null,
                       // The field grows with its text, so it never needs to

@@ -17,6 +17,7 @@ import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/string_utils.dart';
+import 'package:mornye/utils/text_direction.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';

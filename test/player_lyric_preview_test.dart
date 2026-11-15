@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -308,6 +309,76 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final mornye in [true, false]) {
+    testWidgets('slides a long right-to-left line towards its end on the '
+        'left (mornye: $mornye)', (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      // Invented: "the blue door at the end of the old garden opens onto a
+      // long road between the trees".
+      const long =
+          'الباب الأزرق في آخر الحديقة القديمة يفتح على طريق طويل بين '
+          'الأشجار';
+      final lyrics = LyricsParser.parse('''
+[00:00.00]Short line
+[00:05.00]$long
+[00:15.00]
+''');
+      final view = await pumpPreview(
+        tester,
+        metadata: await _metadata(lyrics),
+        mornye: mornye,
+      );
+      double offset() => tester
+          .widget<Transform>(
+            find.descendant(
+              of: find.byType(LyricLineScroller),
+              matching: find.byType(Transform),
+            ),
+          )
+          .transform
+          .getTranslation()
+          .x;
+      Rect line() => tester.getRect(
+        find.ancestor(
+          of: find.text(long),
+          matching: find.byType(LyricLineScroller),
+        ),
+      );
+      Rect text() => tester.getRect(find.text(long));
+
+      view.playback.add(_at(const Duration(seconds: 5)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(
+        tester.renderObject<RenderParagraph>(find.text(long)).textDirection,
+        TextDirection.rtl,
+      );
+      // The line starts at its beginning, on the right.
+      expect(offset(), 0);
+      expect(text().right, moreOrLessEquals(line().right, epsilon: 0.5));
+      expect(text().left, lessThan(line().left));
+
+      // Its first words sung, it moves right to bring the next ones in.
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(seconds: 2));
+      final sliding = offset();
+      expect(sliding, greaterThan(0));
+
+      // Near its end the line's last words, on its left, are in view.
+      view.playback.add(
+        _at(const Duration(milliseconds: 14500), playing: false),
+      );
+      await tester.pumpAndSettle();
+      expect(offset(), greaterThan(sliding));
+      expect(text().left, moreOrLessEquals(line().left, epsilon: 0.5));
+      // The row around it keeps the app's direction.
+      expect(tester.getCenter(find.byType(Icon)).dx, greaterThan(line().right));
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('keeps sliding forward when playback reports a later time late', (
     tester,

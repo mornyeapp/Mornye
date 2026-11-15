@@ -8,6 +8,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
+import 'package:mornye/utils/text_direction.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
@@ -16,6 +17,10 @@ import 'package:mornye/widgets/lyrics_editor_sheet.dart';
 import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/lyrics_text_scale.dart';
+
+/// The directions of plain lyrics' lines, worked out once for each lyrics.
+final _plainLyricDirections =
+    Expando<({List<TextDirection?> text, List<TextDirection?> lines})>();
 
 class PlayerLyricsSection extends ConsumerWidget {
   const PlayerLyricsSection({
@@ -251,8 +256,35 @@ class PlayerLyricsSection extends ConsumerWidget {
           shown(line.romanization, visibility.$1) != null ||
           shown(line.translation, visibility.$2) != null,
     );
+    final ambientDirection = Directionality.of(context);
+    final directions = _plainLyricDirections[lyrics] ??= (
+      text: lyricLineDirections(lyrics.plainText.split('\n')),
+      lines: lyricLineDirections(lyrics.lines.map((line) => line.text)),
+    );
     if (!hasSupplements) {
-      return Text(lyrics.plainText, style: style, textAlign: TextAlign.center);
+      // Each line reads in its own direction. One text has one, so lyrics
+      // mixing both directions get a text a line, laid out the same.
+      final first = directions.text.firstOrNull;
+      if (directions.text.every((direction) => direction == first)) {
+        return Text(
+          lyrics.plainText,
+          textDirection: first ?? ambientDirection,
+          style: style,
+          textAlign: TextAlign.center,
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (index, line) in lyrics.plainText.split('\n').indexed)
+            Text(
+              line,
+              textDirection: directions.text[index] ?? ambientDirection,
+              style: style,
+              textAlign: TextAlign.center,
+            ),
+        ],
+      );
     }
     final supplementStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(
       height: 1.4,
@@ -261,13 +293,18 @@ class PlayerLyricsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final line in lyrics.lines)
+        for (final (index, line) in lyrics.lines.indexed)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(line.text, style: style, textAlign: TextAlign.center),
+                Text(
+                  line.text,
+                  textDirection: directions.lines[index] ?? ambientDirection,
+                  style: style,
+                  textAlign: TextAlign.center,
+                ),
                 for (final supplement in [
                   shown(line.romanization, visibility.$1),
                   shown(line.translation, visibility.$2),
@@ -275,6 +312,10 @@ class PlayerLyricsSection extends ConsumerWidget {
                   if (supplement != null)
                     Text(
                       supplement,
+                      textDirection:
+                          strongTextDirection(supplement) ??
+                          directions.lines[index] ??
+                          ambientDirection,
                       style: supplementStyle,
                       textAlign: TextAlign.center,
                     ),

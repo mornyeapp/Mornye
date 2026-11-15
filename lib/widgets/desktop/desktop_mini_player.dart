@@ -435,9 +435,10 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
                       else
                         Text(
                           lines[current].text,
-                          textDirection: lyricTextDirection(
+                          // Each line reads, and aligns, in its own
+                          // direction.
+                          textDirection: strongTextDirection(
                             lines[current].text,
-                            Directionality.of(context),
                           ),
                           style: textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w700,
@@ -449,10 +450,7 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
                     if (next >= 0)
                       Text(
                         lines[next].text,
-                        textDirection: lyricTextDirection(
-                          lines[next].text,
-                          Directionality.of(context),
-                        ),
+                        textDirection: strongTextDirection(lines[next].text),
                         style: textTheme.bodyLarge?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),

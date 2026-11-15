@@ -23,9 +23,8 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/synced_lyrics_scroll.dart';
+import 'package:mornye/utils/text_direction.dart';
 import 'package:mornye/widgets/aligned_lyric_pronunciation.dart';
-export 'package:mornye/widgets/aligned_lyric_pronunciation.dart'
-    show isRtlLyricText, lyricTextDirection;
 import 'package:mornye/widgets/lyric_blur.dart';
 import 'package:mornye/widgets/lyric_supplement_transition.dart';
 import 'package:mornye/widgets/lyric_scroll_motion.dart';
@@ -207,6 +206,10 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
         _ => false,
       };
   static const double _estimatedLyricExtent = 64;
+
+  /// Each line's own direction, worked out once for these lyrics; null
+  /// follows the app's.
+  List<TextDirection?> _lineDirections = const [];
   _LyricExtentSnapshot? _lineExtents;
   List<(double, double, double)> _lineMeasurements = [];
   List<LyricPronunciationLayout?> _pronunciationLayouts = [];
@@ -406,6 +409,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     _lines = lyricsWithDisplayEnds(
       lyricsTimelineWithGaps(lyricsShiftedBy(widget.lyrics.lines, _offset)),
     );
+    _lineDirections = lyricLineDirections(_lines.map((line) => line.text));
     _timeline = LyricTimelineIndex(_lines);
     _rowReveal.stop();
     _revealFrom = _revealTo = [
@@ -734,6 +738,8 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
         _measurementRevision++;
         return;
       }
+      final lineDirection = _lineDirections[index] ?? direction;
+      painter.textDirection = lineDirection;
       painter.text = TextSpan(
         text: line.text,
         style: _primaryLyricStyle(context, background: line.isBackground),
@@ -748,6 +754,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
         context,
         line,
       )) {
+        painter.textDirection = strongTextDirection(text) ?? lineDirection;
         painter.text = TextSpan(text: text, style: style);
         painter.layout(maxWidth: width);
         if (translation) {
@@ -763,7 +770,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
             pronunciationStyle: style,
             maxWidth: width,
             textScaler: scaler,
-            textDirection: direction,
+            textDirection: lineDirection,
             locale: locale,
           );
           if (aligned != null) {
@@ -1193,6 +1200,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
             _rowInputs = rowInputs;
             _rowsRevision++;
           }
+          final ambientDirection = Directionality.of(context);
           final list = _lyricList(
             revision: _rowsRevision,
             controller: _scroll,
@@ -1214,6 +1222,9 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
               final line = lines[index];
               final leadIndex = _displayLayout.leadForLine[index];
               final textAlign = _lyricTextAlign(context, lines[leadIndex]);
+              // Each line reads in its own direction: a Latin line in an
+              // Arabic song stays left to right, and the reverse.
+              final lineDirection = _lineDirections[index] ?? ambientDirection;
               // A row about to open is built now: no later frame of its
               // reveal rebuilds it.
               if (rowVisibility[index] == 0 &&
@@ -1235,6 +1246,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 return _revealRow(
                   index,
                   textAlign,
+                  lineDirection,
                   Padding(
                     padding: EdgeInsets.symmetric(
                       vertical: context.tokens.lyricsLinePaddingV,
@@ -1296,6 +1308,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                   line,
                   content,
                   color,
+                  direction: lineDirection,
                   visibility: visibility,
                   pronunciationLayout: mornye
                       ? _pronunciationLayouts[index]
@@ -1366,6 +1379,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
               return _revealRow(
                 index,
                 textAlign,
+                lineDirection,
                 Padding(
                   padding: _linePadding(index),
                   child: TvTapTarget(
@@ -1391,7 +1405,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                           (textAlign == TextAlign.end
                                   ? AlignmentDirectional.centerEnd
                                   : AlignmentDirectional.centerStart)
-                              .resolve(Directionality.of(context)),
+                              .resolve(lineDirection),
                       duration: motion,
                       curve: Curves.easeOutCubic,
                       child: AnimatedOpacity(
@@ -1419,7 +1433,13 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     );
   }
 
-  Widget _revealRow(int index, TextAlign align, Widget child) {
+  /// [child] and its reveal, laid out in [direction], the line's own.
+  Widget _revealRow(
+    int index,
+    TextAlign align,
+    TextDirection direction,
+    Widget child,
+  ) {
     final AlignmentGeometry alignment = align == TextAlign.end
         ? AlignmentDirectional.topEnd
         : align == TextAlign.center
@@ -1436,31 +1456,34 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     );
     return KeyedSubtree(
       key: _lineKeys[index],
-      child: !_lines[index].isBackground && _lines[index].text.isNotEmpty
-          ? child
-          // Only these rows open and close. They follow the reveal clock
-          // themselves, so the other rows are not rebuilt on its frames.
-          : ListenableBuilder(
-              listenable: _rowReveal,
-              child: fullHeight,
-              builder: (context, fullHeight) {
-                final visibility = _rowVisibility[index];
-                return IgnorePointer(
-                  ignoring: visibility < 1,
-                  child: _lines[index].isBackground
-                      ? LyricBackingTransition(
-                          visibility: visibility,
-                          alignment: alignment,
-                          child: fullHeight!,
-                        )
-                      : LyricSupplementTransition(
-                          visibility: visibility,
-                          alignment: alignment,
-                          child: fullHeight!,
-                        ),
-                );
-              },
-            ),
+      child: Directionality(
+        textDirection: direction,
+        child: !_lines[index].isBackground && _lines[index].text.isNotEmpty
+            ? child
+            // Only these rows open and close. They follow the reveal clock
+            // themselves, so the other rows are not rebuilt on its frames.
+            : ListenableBuilder(
+                listenable: _rowReveal,
+                child: fullHeight,
+                builder: (context, fullHeight) {
+                  final visibility = _rowVisibility[index];
+                  return IgnorePointer(
+                    ignoring: visibility < 1,
+                    child: _lines[index].isBackground
+                        ? LyricBackingTransition(
+                            visibility: visibility,
+                            alignment: alignment,
+                            child: fullHeight!,
+                          )
+                        : LyricSupplementTransition(
+                            visibility: visibility,
+                            alignment: alignment,
+                            child: fullHeight!,
+                          ),
+                  );
+                },
+              ),
+      ),
     );
   }
 

@@ -62,6 +62,10 @@ TextAlign _lyricTextAlign(BuildContext context, LyricLine line) {
   return voice.index.isEven ? TextAlign.start : TextAlign.end;
 }
 
+/// [textAlign] of a line in [lineDirection], for a translation or
+/// pronunciation under it that reads in [supplementDirection]: it stays on
+/// the line's side, so an English translation sits under the right edge of
+/// an Arabic line.
 TextAlign _supplementTextAlign(
   TextAlign textAlign,
   TextDirection lineDirection,
@@ -77,11 +81,31 @@ TextAlign _supplementTextAlign(
   };
 }
 
+/// A translation or pronunciation [text] in its own direction, on the side
+/// of a line in [lineDirection].
+Widget _supplementText(
+  String text,
+  TextDirection lineDirection,
+  TextAlign textAlign,
+  TextStyle style,
+) {
+  final direction = strongTextDirection(text) ?? lineDirection;
+  return Text(
+    text,
+    textDirection: direction,
+    textAlign: _supplementTextAlign(textAlign, lineDirection, direction),
+    style: style,
+  );
+}
+
+/// [primary] with the line's pronunciation and translation under it.
+/// [direction] is the line's own, which the caller lays the row out in.
 Widget _withLyricSupplements(
   BuildContext context,
   LyricLine line,
   Widget primary,
   Color color, {
+  required TextDirection direction,
   required Offset visibility,
   required LyricPronunciationLayout? pronunciationLayout,
   required TextAlign textAlign,
@@ -89,13 +113,11 @@ Widget _withLyricSupplements(
   Widget Function(String, List<LyricWord>, TextStyle)? timedSupplementText,
 }) {
   if (line.romanization == null && line.translation == null) return primary;
-  final ambientDirection = Directionality.of(context);
-  final lineDirection = lyricTextDirection(line.text, ambientDirection);
-  final AlignmentGeometry alignment = (switch (textAlign) {
+  final AlignmentGeometry alignment = switch (textAlign) {
     TextAlign.end => AlignmentDirectional.topEnd,
     TextAlign.center => Alignment.topCenter,
     _ => AlignmentDirectional.topStart,
-  }).resolve(lineDirection);
+  };
   final supplements = _lyricSupplements(context, line).toList();
   Widget withSupplements(Widget primary, {bool aligned = false}) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -111,15 +133,11 @@ Widget _withLyricSupplements(
               padding: const EdgeInsets.only(top: 6),
               child: words.isNotEmpty && timedSupplementText != null
                   ? timedSupplementText(text, words, style)
-                  : Text(
+                  : _supplementText(
                       text,
-                      textDirection: lyricTextDirection(text, ambientDirection),
-                      textAlign: _supplementTextAlign(
-                        textAlign,
-                        lineDirection,
-                        lyricTextDirection(text, ambientDirection),
-                      ),
-                      style: style.copyWith(
+                      direction,
+                      textAlign,
+                      style.copyWith(
                         color: color.withValues(alpha: color.a * 0.8),
                       ),
                     ),

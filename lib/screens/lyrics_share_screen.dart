@@ -10,8 +10,8 @@ import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
+import 'package:mornye/utils/text_direction.dart';
 import 'package:mornye/utils/widget_capture.dart';
-import 'package:mornye/widgets/aligned_lyric_pronunciation.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_shape.dart';
@@ -621,10 +621,7 @@ class _LineChoice extends StatelessWidget {
                         Expanded(
                           child: Text(
                             line.text,
-                            textDirection: lyricTextDirection(
-                              line.text,
-                              Directionality.of(context),
-                            ),
+                            textDirection: strongTextDirection(line.text),
                             style:
                                 (line.background
                                         ? theme.textTheme.bodyMedium
@@ -692,10 +689,14 @@ class LyricsShareCard extends StatelessWidget {
     final secondary = foreground.withValues(alpha: 0.7);
     final fontSize = fontSizeFor(lines);
     final scheme = Theme.of(context).colorScheme;
-    final ambientDirection = Directionality.of(context);
-    final cardDirection = lines.any((line) => isRtlLyricText(line.text))
-        ? TextDirection.rtl
-        : ambientDirection;
+    // A card shrunk to fit keeps the side its first line reads from. Each
+    // line reads in its own direction.
+    final cardDirection =
+        lines
+            .map((line) => strongTextDirection(line.text))
+            .nonNulls
+            .firstOrNull ??
+        Directionality.of(context);
     return MediaQuery.withNoTextScaling(
       child: SizedBox.fromSize(
         size: lyricsShareCardSize,
@@ -797,10 +798,11 @@ class LyricsShareCard extends StatelessWidget {
                                             ),
                                             child: Text(
                                               line.text,
-                                              textDirection: lyricTextDirection(
-                                                line.text,
-                                                ambientDirection,
-                                              ),
+                                              textDirection:
+                                                  strongTextDirection(
+                                                    line.text,
+                                                  ) ??
+                                                  cardDirection,
                                               style: TextStyle(
                                                 color: line.background
                                                     ? secondary

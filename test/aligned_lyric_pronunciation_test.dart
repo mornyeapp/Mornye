@@ -91,10 +91,6 @@ void main() {
   });
 
   test('does not split right-to-left lyrics into left-to-right word boxes', () {
-    expect(isRtlLyricText('قطة صغيرة على الشباك'), isTrue);
-    expect(isRtlLyricText('qitta saghira ala ashubbak'), isFalse);
-    expect(lyricTextDirection('قطة صغيرة على الشباك'), TextDirection.rtl);
-    expect(lyricTextDirection('qitta saghira ala ashubbak'), TextDirection.ltr);
     expect(
       _layout(
         LyricLine(

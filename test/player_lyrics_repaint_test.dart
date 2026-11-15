@@ -959,9 +959,16 @@ void main() {
       expect(_segmentBoxes(tester), isNot(equals(boxes)));
       await matchesFreshLayout();
 
+      // A Latin line reads left to right in a right-to-left app too, so its
+      // geometry stays.
+      boxes = _segmentBoxes(tester);
+      direction = TextDirection.rtl;
+      await pump();
+      expect(_segmentBoxes(tester), same(boxes));
+      await matchesFreshLayout();
+
       for (final change in <VoidCallback>[
         () => width = 180,
-        () => direction = TextDirection.rtl,
         () => scale = 1.4,
         () => fontSize = 32,
         () => locale = const Locale('en', 'US'),

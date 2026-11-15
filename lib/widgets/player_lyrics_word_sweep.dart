@@ -18,18 +18,22 @@ class WordTimedLyricLine extends StatelessWidget {
   final TextStyle style;
   final int? maxLines;
 
+  /// The line reads and sweeps in its own direction.
   @override
-  Widget build(BuildContext context) => _WordHighlightedLyricLine(
-    line: line,
-    colorScheme: Theme.of(context).colorScheme,
-    animate: true,
-    initialPosition: initialPosition,
-    seekPreview: seekPreview,
-    supplementVisibility: Offset.zero,
-    pronunciationLayout: null,
-    textAlign: TextAlign.start,
-    textStyle: style,
-    maxLines: maxLines,
+  Widget build(BuildContext context) => Directionality(
+    textDirection: strongTextDirection(line.text) ?? Directionality.of(context),
+    child: _WordHighlightedLyricLine(
+      line: line,
+      colorScheme: Theme.of(context).colorScheme,
+      animate: true,
+      initialPosition: initialPosition,
+      seekPreview: seekPreview,
+      supplementVisibility: Offset.zero,
+      pronunciationLayout: null,
+      textAlign: TextAlign.start,
+      textStyle: style,
+      maxLines: maxLines,
+    ),
   );
 }
 
@@ -356,11 +360,8 @@ class _WordHighlightedLyricLineState
 
   @override
   Widget build(BuildContext context) {
-    final ambientDirection = Directionality.of(context);
-    final lineDirection = lyricTextDirection(
-      widget.line.text,
-      ambientDirection,
-    );
+    // The line's own direction, which its row is laid out in.
+    final lineDirection = Directionality.of(context);
     final style =
         widget.textStyle ??
         _primaryLyricStyle(context, background: widget.line.isBackground);
@@ -368,7 +369,6 @@ class _WordHighlightedLyricLineState
         ? _buildTimedText(widget.line.text, widget.line.words, style)
         : Text(
             widget.line.text,
-            textDirection: lineDirection,
             textAlign: widget.textAlign,
             style: style.copyWith(color: widget.colorScheme.onSurface),
             maxLines: widget.maxLines,
@@ -381,18 +381,23 @@ class _WordHighlightedLyricLineState
       widget.line,
       primary,
       widget.colorScheme.onSurface,
+      direction: lineDirection,
       timedText: _buildTimedText,
-      timedSupplementText: (text, words, style) => _buildTimedText(
-        text,
-        words,
-        style,
-        lift: false,
-        textAlign: _supplementTextAlign(
-          widget.textAlign,
-          lineDirection,
-          lyricTextDirection(text, ambientDirection),
-        ),
-      ),
+      timedSupplementText: (text, words, style) {
+        final direction = strongTextDirection(text) ?? lineDirection;
+        return _buildTimedText(
+          text,
+          words,
+          style,
+          lift: false,
+          textDirection: direction,
+          textAlign: _supplementTextAlign(
+            widget.textAlign,
+            lineDirection,
+            direction,
+          ),
+        );
+      },
       visibility: widget.supplementVisibility,
       pronunciationLayout: widget.pronunciationLayout,
       textAlign: widget.textAlign,
@@ -404,6 +409,7 @@ class _WordHighlightedLyricLineState
     List<LyricWord> words,
     TextStyle style, {
     bool lift = true,
+    TextDirection? textDirection,
     TextAlign? textAlign,
   }) {
     final highlightedColor = widget.colorScheme.onSurface;
@@ -421,6 +427,7 @@ class _WordHighlightedLyricLineState
       currentPosition: _currentPosition,
       repaint: _animationClock,
       style: style,
+      textDirection: textDirection,
       textAlign: textAlign ?? widget.textAlign,
       pendingColor: pendingColor,
       highlightedColor: highlightedColor,
@@ -447,6 +454,10 @@ class _SweepingTimedLyricText extends StatefulWidget {
   final Duration Function() currentPosition;
   final Listenable repaint;
   final TextStyle style;
+
+  /// The text's direction when it differs from its row's: a translation
+  /// under a line in another script.
+  final TextDirection? textDirection;
   final TextAlign textAlign;
   final Color pendingColor;
   final Color highlightedColor;
@@ -464,6 +475,7 @@ class _SweepingTimedLyricText extends StatefulWidget {
     required this.currentPosition,
     required this.repaint,
     required this.style,
+    this.textDirection,
     required this.textAlign,
     required this.pendingColor,
     required this.highlightedColor,
@@ -567,6 +579,12 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
 
     final segmentBoxes = <List<Rect>>[];
     final segmentDirections = <List<TextDirection>>[];
+    // Each run sweeps in the direction it is laid out in: a Latin word or a
+    // number in an Arabic line reads left to right, an Arabic word in a
+    // Latin line right to left. A word split into several runs on one row
+    // (a font change) takes them in its own reading order, else in the
+    // line's.
+    final lineRightToLeft = _cachedDirection == TextDirection.rtl;
     var segmentOffset = 0;
     for (final segment in widget.segments) {
       final segmentEnd = segmentOffset + segment.length;
@@ -578,21 +596,19 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
             boxHeightStyle: BoxHeightStyle.max,
           )
           .toList();
-      final segmentRtl = isRtlLyricText(segment);
+      final direction = textBoxes.firstOrNull?.direction;
+      final rightToLeft = textBoxes.every((box) => box.direction == direction)
+          ? direction == TextDirection.rtl
+          : lineRightToLeft;
       textBoxes.sort((a, b) {
         final row = a.top.compareTo(b.top);
         if (row != 0) return row;
-        final rtl =
-            segmentRtl ||
-            a.direction == TextDirection.rtl ||
-            b.direction == TextDirection.rtl;
-        return rtl ? b.left.compareTo(a.left) : a.left.compareTo(b.left);
+        return rightToLeft
+            ? b.left.compareTo(a.left)
+            : a.left.compareTo(b.left);
       });
       segmentBoxes.add([for (final box in textBoxes) box.toRect()]);
-      segmentDirections.add([
-        for (final box in textBoxes)
-          segmentRtl ? TextDirection.rtl : box.direction,
-      ]);
+      segmentDirections.add([for (final box in textBoxes) box.direction]);
       segmentOffset = segmentEnd;
     }
     // Snapshot contents: callers can rebuild equal lists or mutate boundaries
@@ -614,10 +630,10 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
 
   @override
   Widget build(BuildContext context) {
-    final text = widget.segments.join();
-    final textDirection = lyricTextDirection(text, Directionality.of(context));
+    final textDirection = widget.textDirection ?? Directionality.of(context);
     final textScaler = MediaQuery.textScalerOf(context);
     final locale = Localizations.maybeLocaleOf(context);
+    final text = widget.segments.join();
     _ensurePainters(text, textDirection, textScaler, locale);
 
     return LayoutBuilder(
