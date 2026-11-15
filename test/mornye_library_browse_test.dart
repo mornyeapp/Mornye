@@ -14,6 +14,7 @@ import 'package:mornye/services/album_completeness.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_search_field.dart';
+import 'package:mornye/widgets/library_search_results.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _Settings extends SettingsNotifier {
@@ -351,6 +352,62 @@ void main() {
     expect(requests.last.search, 'My album');
     expect(requests.last.limit, 40);
     expect(offsets.last, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a song from the Library search plays on in the Songs sort', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(
+            () => _Settings(
+              const AppSettings(
+                localLibraryEnabled: true,
+                historySortMode: 'oldest',
+              ),
+            ),
+          ),
+          downloadHistoryProvider.overrideWith(_History.new),
+          libraryBrowsePageLoaderProvider.overrideWithValue(
+            (page) async => const LibraryBrowsePage([]),
+          ),
+          librarySearchProvider.overrideWith((ref, request) async => []),
+        ],
+        child: MaterialApp(
+          theme: MornyeTheme.build(Brightness.light),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: MornyeLibraryScreen(onOpenSection: (_) {})),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Search your library'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'green lilac');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    // The overview has no filters of its own; the Songs page's last only
+    // while that page is open.
+    expect(
+      tester
+          .widget<LibrarySearchResults>(find.byType(LibrarySearchResults))
+          .songList,
+      (
+        filterMode: 'all',
+        sortMode: 'oldest',
+        source: null,
+        quality: null,
+        format: null,
+        metadata: null,
+        includeLocal: true,
+      ),
+    );
     expect(tester.takeException(), isNull);
   });
 }

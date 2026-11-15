@@ -30,21 +30,57 @@ extension _QueueTabNavigation on _QueueTabState {
     }
   }
 
+  /// The Library list [filterMode] shows, in [sortMode] and the active
+  /// filters, without the search text: the list a song played while
+  /// searching continues into.
+  LibrarySongListRequest _songListFor(String filterMode, String sortMode) => (
+    filterMode: filterMode,
+    sortMode: sortMode,
+    source: _filterSource,
+    quality: _filterQuality,
+    format: _filterFormat,
+    metadata: _filterMetadata,
+    includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+  );
+
+  /// The Songs list a song played from the Library search continues into,
+  /// in the order the Songs page shows.
+  LibrarySongListRequest _searchSongList() =>
+      _songListFor('all', ref.read(settingsProvider).historySortMode);
+
   /// Plays [item] and queues the rest of the merged library (downloaded + local
   /// in display order) so playback continues to the next track. Honors player
-  /// mode and shuffle.
+  /// mode and shuffle. While a search narrows the list, the song plays on
+  /// into the whole list around it, as the same tap without the search does.
   Future<void> _playLibraryItem(
     UnifiedLibraryItem item,
     List<UnifiedLibraryItem> libraryItems,
   ) async {
-    final playableItems = libraryItems
+    var played = item;
+    var listed = libraryItems;
+    if (_searchQuery.isNotEmpty) {
+      final mode =
+          widget.librarySection ?? ref.read(settingsProvider).historyFilterMode;
+      // A list that cannot be read leaves the matches to play.
+      final placed = await placeInLibrarySongList(
+        ref,
+        item,
+        _songListFor(mode == 'singles' ? 'singles' : 'all', _sortMode),
+      ).catchError((Object _) => null);
+      if (!mounted) return;
+      if (placed != null) {
+        played = placed.item;
+        listed = placed.songs;
+      }
+    }
+    final playableItems = listed
         .where(
           (u) => u.filePath.trim().isNotEmpty && !isCueVirtualPath(u.filePath),
         )
         .toList();
     if (playableItems.isEmpty) return;
 
-    var start = playableItems.indexWhere((u) => u.id == item.id);
+    var start = playableItems.indexWhere((u) => u.id == played.id);
     if (start < 0) start = 0;
 
     try {

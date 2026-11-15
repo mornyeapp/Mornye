@@ -49,6 +49,7 @@ import 'package:material_3_expressive/material_3_expressive.dart'
         M3EButtonStyle;
 import 'package:mornye/providers/library_browse_provider.dart';
 import 'package:mornye/providers/library_counts_provider.dart';
+import 'package:mornye/providers/library_search_provider.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/widgets/app_shape.dart';
 import 'package:mornye/widgets/library_fast_scroller.dart';
@@ -974,6 +975,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                       slivers: [
                         LibrarySearchResults(
                           query: _searchQuery,
+                          songList: _searchSongList(),
                           onOpenArtist: (artist) => pushPage<void>(
                             context,
                             (_) => Scaffold(

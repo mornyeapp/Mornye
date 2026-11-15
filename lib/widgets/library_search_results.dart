@@ -18,9 +18,11 @@ import 'package:mornye/services/batch_track_actions.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
+import 'package:mornye/services/playable_media.dart' show PlayableMedia;
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
@@ -46,10 +48,15 @@ class LibrarySearchResults extends ConsumerStatefulWidget {
     required this.query,
     required this.onOpenArtist,
     this.shelves = false,
+    this.songList,
   });
 
   final String query;
   final ValueChanged<String> onOpenArtist;
+
+  /// The Library list a played song continues into, from the song on, as a
+  /// tap in that list plays. Without it a song plays on its own.
+  final LibrarySongListRequest? songList;
 
   /// Groups the overview into artists, albums and
   /// playlists in rows of artwork that scroll sideways, songs as rows, and
@@ -351,16 +358,7 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
             );
             return;
           }
-          final media = item.localItem != null
-              ? playableFromLocal(item.localItem!)
-              : playableFromHistory(item.historyItem!);
-          await ref
-              .read(playbackProvider.notifier)
-              .playMediaQueue(
-                [media],
-                startIndex: 0,
-                externalPath: media.source,
-              );
+          await _play(item);
         case LibrarySearchKind.artists:
           widget.onOpenArtist(hit.title);
         case LibrarySearchKind.playlists:
@@ -402,6 +400,42 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
         SnackBar(content: Text(context.l10n.snackbarCannotOpenFile('$error'))),
       );
     }
+  }
+
+  /// Plays [item] within [LibrarySearchResults.songList] when the Library
+  /// places it there, so playback runs on into the songs after it.
+  Future<void> _play(UnifiedLibraryItem item) async {
+    PlayableMedia media(UnifiedLibraryItem song) => song.localItem != null
+        ? playableFromLocal(song.localItem!)
+        : playableFromHistory(song.historyItem!);
+    final songList = widget.songList;
+    // A list that cannot be read leaves the song to play on its own.
+    final placed = songList == null
+        ? null
+        : await placeInLibrarySongList(
+            ref,
+            item,
+            songList,
+          ).catchError((Object _) => null);
+    if (!mounted) return;
+    final songs = placed == null
+        ? [item]
+        : placed.songs
+              .where(
+                (song) =>
+                    identical(song, placed.item) ||
+                    (song.filePath.trim().isNotEmpty &&
+                        !isCueVirtualPath(song.filePath)),
+              )
+              .toList(growable: false);
+    final start = placed == null ? 0 : songs.indexOf(placed.item);
+    await ref
+        .read(playbackProvider.notifier)
+        .playMediaQueue(
+          songs.map(media),
+          startIndex: start,
+          externalPath: media(item).source,
+        );
   }
 
   Widget _row(LibrarySearchHit hit) {

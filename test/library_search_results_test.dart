@@ -29,6 +29,8 @@ import 'support/app_icon_finder.dart';
 
 class _PlaybackRecorder extends PlaybackController {
   final paths = <String>[];
+  final queues = <List<String>>[];
+  final starts = <int>[];
 
   @override
   Future<void> playMediaQueue(
@@ -37,6 +39,8 @@ class _PlaybackRecorder extends PlaybackController {
     required String externalPath,
   }) async {
     paths.add(externalPath);
+    queues.add([for (final media in queue) media.source]);
+    starts.add(startIndex);
   }
 }
 
@@ -247,11 +251,135 @@ void main() {
           await tester.tap(find.byTooltip('Play'));
           await tester.pumpAndSettle();
           expect(player.paths, [path]);
+          // Without a Library list to continue into, the song plays alone.
+          expect(player.queues, [
+            [path],
+          ]);
           expect(find.byType(TrackMetadataScreen), findsNothing);
           expect(tester.takeException(), isNull);
         },
       );
     }
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets(
+      'a played song continues into its Library list from the song ($mornye)',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        FlutterSecureStorage.setMockInitialValues({});
+        UnifiedLibraryItem local(String id) =>
+            UnifiedLibraryItem.fromLocalLibrary(
+              LocalLibraryItem(
+                id: id,
+                trackName: 'Song $id',
+                artistName: 'Artist',
+                albumName: 'Album',
+                filePath: '/music/$id.mp3',
+                scannedAt: DateTime(2026),
+              ),
+            );
+        const LibrarySongListRequest filtered = (
+          filterMode: 'all',
+          sortMode: 'oldest',
+          source: null,
+          quality: 'hires',
+          format: null,
+          metadata: null,
+          includeLocal: true,
+        );
+        const LibrarySongListRequest whole = (
+          filterMode: 'all',
+          sortMode: 'oldest',
+          source: null,
+          quality: null,
+          format: null,
+          metadata: null,
+          includeLocal: true,
+        );
+        final lists = <LibrarySongListRequest>[];
+        final player = _PlaybackRecorder();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              playbackProvider.overrideWith(() => player),
+              librarySearchProvider.overrideWith(
+                (ref, request) async => request.kind == LibrarySearchKind.songs
+                    ? [
+                        // The second song is one the Hi-Res filter hides.
+                        for (final id in ['b', 'x'])
+                          LibrarySearchHit(
+                            kind: LibrarySearchKind.songs,
+                            id: id,
+                            title: 'Song $id',
+                            source: 'local',
+                          ),
+                      ]
+                    : [],
+              ),
+              librarySearchTrackProvider.overrideWith(
+                (ref, key) async => local(key.id),
+              ),
+              librarySongListProvider.overrideWith((ref, request) async {
+                lists.add(request);
+                return [
+                  for (final id
+                      in request == filtered
+                          ? ['a', 'b', 'c']
+                          : ['w', 'x', 'a', 'b', 'c'])
+                    local(id),
+                ];
+              }),
+            ],
+            child: MaterialApp(
+              theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: CustomScrollView(
+                  slivers: [
+                    LibrarySearchResults(
+                      query: 'Song',
+                      songList: filtered,
+                      onOpenArtist: (_) {},
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        // Typing searched only; no list was read for playback yet.
+        expect(lists, isEmpty);
+
+        await tester.tap(find.byTooltip('Play').first);
+        await tester.pumpAndSettle();
+        expect(lists, [filtered]);
+        expect(player.queues.last, [
+          '/music/a.mp3',
+          '/music/b.mp3',
+          '/music/c.mp3',
+        ]);
+        expect(player.starts.last, 1);
+        expect(player.paths.last, '/music/b.mp3');
+
+        await tester.tap(find.byTooltip('Play').last);
+        await tester.pumpAndSettle();
+        // Hidden by the filters, the song plays within every song instead.
+        expect(lists.skip(1), [filtered, whole]);
+        expect(player.queues.last, [
+          '/music/w.mp3',
+          '/music/x.mp3',
+          '/music/a.mp3',
+          '/music/b.mp3',
+          '/music/c.mp3',
+        ]);
+        expect(player.starts.last, 1);
+        expect(player.paths.last, '/music/x.mp3');
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final mornye in [false, true]) {

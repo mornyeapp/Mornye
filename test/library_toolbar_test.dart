@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:material_3_expressive/material_3_expressive.dart'
@@ -10,13 +11,18 @@ import 'package:mornye/models/download_item.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
+import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/providers/library_search_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/library_tracks_folder_screen.dart';
 import 'package:mornye/screens/queue_tab.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/library_search.dart';
+import 'package:mornye/services/playable_media.dart' show PlayableMedia;
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -86,6 +92,21 @@ class _Collections extends LibraryCollectionsNotifier {
 class _Queue extends DownloadQueueNotifier {
   @override
   DownloadQueueState build() => DownloadQueueState();
+}
+
+class _Playback extends PlaybackController {
+  final queues = <List<String>>[];
+  final starts = <int>[];
+
+  @override
+  Future<void> playMediaQueue(
+    Iterable<PlayableMedia> queue, {
+    required int startIndex,
+    required String externalPath,
+  }) async {
+    queues.add([for (final media in queue) media.source]);
+    starts.add(startIndex);
+  }
 }
 
 void main() {
@@ -163,6 +184,7 @@ void main() {
     List<UserPlaylistCollection> playlists = const [],
     bool withQueueItem = true,
     String? librarySection,
+    List<Override> overrides = const [],
   }) async {
     final preferences = await SharedPreferences.getInstance();
     debugDesktopPlatformOverride = desktop;
@@ -204,6 +226,7 @@ void main() {
           ),
           downloadQueueProvider.overrideWith(_Queue.new),
           downloadQueueLookupProvider.overrideWithValue(queue),
+          ...overrides,
         ],
         child: MaterialApp(
           theme: mornye
@@ -699,6 +722,137 @@ void main() {
     await tester.pump();
     expect(pagerPhysics(), isA<ClampingScrollPhysics>());
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets('a searched song plays on into the Songs list in its sort '
+        'and filters (Mornye: $mornye)', (tester) async {
+      UnifiedLibraryItem song(String id) => UnifiedLibraryItem.fromLocalLibrary(
+        LocalLibraryItem(
+          id: id,
+          trackName: 'Track $id',
+          artistName: 'Artist',
+          albumName: 'Album',
+          filePath: '/music/$id.flac',
+          scannedAt: DateTime(2026),
+        ),
+      );
+      final lists = <LibrarySongListRequest>[];
+      final player = _Playback();
+      await pumpLibrary(
+        tester,
+        mornye: mornye,
+        overrides: [
+          playbackProvider.overrideWith(() => player),
+          librarySearchProvider.overrideWith(
+            (ref, request) async => request.kind == LibrarySearchKind.songs
+                ? [
+                    const LibrarySearchHit(
+                      kind: LibrarySearchKind.songs,
+                      id: 'b',
+                      title: 'Track b',
+                      source: 'local',
+                    ),
+                  ]
+                : [],
+          ),
+          librarySearchTrackProvider.overrideWith(
+            (ref, key) async => song(key.id),
+          ),
+          librarySongListProvider.overrideWith((ref, request) async {
+            lists.add(request);
+            return [
+              for (final id in ['a', 'b', 'c']) song(id),
+            ];
+          }),
+        ],
+      );
+      final l10n = l10nOf(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(QueueTab)),
+      );
+      container.read(settingsProvider.notifier).setHistorySortMode('oldest');
+      await tester.tap(find.text(l10n.libraryFilterTitle).hitTestable());
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.tap(find.text(l10n.libraryFilterQualityHiRes));
+      await tester.ensureVisible(find.text(l10n.libraryFilterApply));
+      await tester.tap(find.text(l10n.libraryFilterApply));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(AppSearchField),
+          matching: find.byType(EditableText),
+        ),
+        'Track',
+      );
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(find.text('Track b'), findsOneWidget);
+      expect(lists, isEmpty);
+      await tester.tap(find.byTooltip(l10n.tooltipPlay).hitTestable());
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      expect(lists, [
+        (
+          filterMode: 'all',
+          sortMode: 'oldest',
+          source: null,
+          quality: 'hires',
+          format: null,
+          metadata: null,
+          includeLocal: container.read(settingsProvider).localLibraryEnabled,
+        ),
+      ]);
+      expect(player.queues, [
+        ['/music/a.flac', '/music/b.flac', '/music/c.flac'],
+      ]);
+      expect(player.starts, [1]);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets('an unsearched song plays on into the loaded Songs list '
+        '(Mornye: $mornye)', (tester) async {
+      final lists = <LibrarySongListRequest>[];
+      final player = _Playback();
+      await pumpLibrary(
+        tester,
+        mornye: mornye,
+        dates: [DateTime(2026, 1, 12), DateTime(2026, 1, 11), DateTime(2026)],
+        overrides: [
+          playbackProvider.overrideWith(() => player),
+          librarySongListProvider.overrideWith((ref, request) async {
+            lists.add(request);
+            return const [];
+          }),
+        ],
+      );
+      final l10n = l10nOf(tester);
+      await tester.tap(
+        find
+            .byTooltip(l10n.a11yPlayTrackByArtist('Song 1', 'Artist'))
+            .hitTestable(),
+      );
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      expect(lists, isEmpty);
+      expect(player.queues, [
+        ['/music/song-0.flac', '/music/song-1.flac', '/music/song-2.flac'],
+      ]);
+      expect(player.starts, [1]);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('Mornye keeps its filter button', (tester) async {
     await pumpLibrary(tester, mornye: true);

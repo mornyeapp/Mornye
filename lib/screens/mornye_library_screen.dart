@@ -432,6 +432,21 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
           if (searchingLibrary)
             LibrarySearchResults(
               query: _query,
+              // A played song continues into the Songs list in its saved
+              // sort; the Songs page's filters last only while it is open.
+              songList: (
+                filterMode: 'all',
+                sortMode: ref.watch(
+                  settingsProvider.select((s) => s.historySortMode),
+                ),
+                source: null,
+                quality: null,
+                format: null,
+                metadata: null,
+                includeLocal: ref.watch(
+                  settingsProvider.select((s) => s.localLibraryEnabled),
+                ),
+              ),
               onOpenArtist: (artist) =>
                   _openPage(MornyeLibraryPage.albums, artist: artist),
             ),
