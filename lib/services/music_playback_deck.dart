@@ -623,6 +623,18 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
             '${codec == null ? '' : ', $codec'}'
             '${_preparedStatus.lossy ? ' (lossy source)' : ''}',
           );
+          // A DAC level that falls from one song to the next shows here:
+          // what the DAC read when opened against what the app set last.
+          if (response?['volumeTrace'] case final Map trace
+              when volume is Map) {
+            _log.i(
+              'DAC volume: connected at ${trace['connectedDb']} dB, '
+              'remembered ${trace['rememberedDb']} dB, '
+              'released ${trace['sinceReleaseMs']} ms ago, '
+              'playing at ${volume['currentDb']} dB '
+              '(${volume['minDb']} to ${volume['maxDb']} dB)',
+            );
+          }
           usbAudioStatus.value = _volumeBlocked
               ? const UsbAudioStatus(reason: 'volume_unavailable')
               : const UsbAudioStatus(reason: 'ready');

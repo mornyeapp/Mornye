@@ -178,6 +178,24 @@ internal object UsbDirectFormats {
         output.flip()
         return output
     }
+
+    /** A new track reopens the DAC within this long of closing the last one. */
+    const val TRACK_CHANGE_WINDOW_MS = 10_000L
+
+    /**
+     * The level to give a DAC that was playing at [remembered] dB and read
+     * [limit] dB when it was opened, [sinceReleaseMs] after this app let go
+     * of it (null if it never held it).
+     *
+     * A DAC is never made louder than it connects. Between two tracks the app
+     * lets go of the DAC for a moment, though, and the system's own USB audio
+     * driver takes it back and may set its volume; a lower level read then is
+     * not the listener's, and following it made every track quieter than the
+     * last. So across a track change the level that was playing stands.
+     */
+    fun restoredVolumeDb(remembered: Double, limit: Double, sinceReleaseMs: Long?): Double =
+        if (sinceReleaseMs != null && sinceReleaseMs in 0..TRACK_CHANGE_WINDOW_MS) remembered
+        else minOf(remembered, limit)
 }
 
 /**

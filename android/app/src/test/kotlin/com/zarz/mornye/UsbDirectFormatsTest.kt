@@ -198,4 +198,17 @@ class UsbDirectFormatsTest {
         assertNull(UsbDirectFormats.alacBitDepth(ByteArray(10)))
         assertNull(UsbDirectFormats.alacBitDepth(cookie.copyOf().also { it[4] = 1 }))
     }
+
+    @Test
+    fun keepsThePlayingLevelAcrossATrackChangeOnly() {
+        // The system lowered the DAC while the app let go of it between tracks.
+        assertEquals(-18.0, UsbDirectFormats.restoredVolumeDb(-18.0, -52.0, 40), 0.0)
+        assertEquals(-18.0, UsbDirectFormats.restoredVolumeDb(-18.0, -52.0, UsbDirectFormats.TRACK_CHANGE_WINDOW_MS), 0.0)
+        // A DAC opened later, or never held before, is not made louder than it connects.
+        assertEquals(-52.0, UsbDirectFormats.restoredVolumeDb(-18.0, -52.0, UsbDirectFormats.TRACK_CHANGE_WINDOW_MS + 1), 0.0)
+        assertEquals(-52.0, UsbDirectFormats.restoredVolumeDb(-18.0, -52.0, null), 0.0)
+        assertEquals(-52.0, UsbDirectFormats.restoredVolumeDb(-18.0, -52.0, -5), 0.0)
+        // A DAC that connects louder still gets the remembered level.
+        assertEquals(-18.0, UsbDirectFormats.restoredVolumeDb(-18.0, 0.0, null), 0.0)
+    }
 }

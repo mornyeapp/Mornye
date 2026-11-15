@@ -52,7 +52,10 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
     private var pausedPositionUs = 0L
     private var needsSeek = false
     private var allowFixedVolume = false
+    // The level each DAC last played at once the user set one, and when the
+    // app last let go of that DAC: a reopen right after is a track change.
     private val deviceVolumes = mutableMapOf<Int, Double>()
+    private val deviceReleases = mutableMapOf<Int, Long>()
     // DACs whose access prompt the user declined this session, so later
     // tracks do not prompt again. Touched on the main thread only.
     private val declinedDevices = mutableSetOf<String>()
@@ -69,6 +72,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 declinedDevices.remove(device.declineKey())
                 worker.post {
                     deviceVolumes.remove(device.deviceId)
+                    deviceReleases.remove(device.deviceId)
                     if (device.deviceId == deviceId) fail("USB disconnected")
                 }
             } else if (intent.action == permissionAction) {
@@ -295,9 +299,20 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 val audio = opened ?: throw requireNotNull(refused)
                 output = audio
                 format = audio.format()
-                if (audio.volume().available) {
-                    deviceVolumes[request.device.deviceId]?.let {
-                        audio.setVolume(minOf(it, audio.volume().restoreLimitDb))
+                // What the DAC read when it was opened, for the log: a level
+                // that falls between tracks was set by something else.
+                val connected = audio.volume()
+                val volumeTrace = mutableMapOf<String, Any>("connectedDb" to connected.restoreLimitDb)
+                if (connected.available) {
+                    val id = request.device.deviceId
+                    val since = deviceReleases[id]?.let { android.os.SystemClock.elapsedRealtime() - it }
+                    since?.let { volumeTrace["sinceReleaseMs"] = it }
+                    deviceVolumes[id]?.let {
+                        volumeTrace["rememberedDb"] = it
+                        // What it plays at is what the next track keeps.
+                        deviceVolumes[id] = audio.setVolume(
+                            UsbDirectFormats.restoredVolumeDb(it, connected.restoreLimitDb, since),
+                        ).currentDb
                     }
                 }
                 if (request.revision != revision) { closeSource(); request.done(mapOf("reason" to "cancelled"), null); return@post }
@@ -318,7 +333,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                     "codec" to source.codec, "lossy" to source.lossy,
                     "duration" to durationUs / 1000,
                     "transport" to f.encoding, "carrierRate" to f.sampleRate.toLong(), "driver" to "usb_direct",
-                    "volume" to volumeMap(audio.volume()),
+                    "volume" to volumeMap(audio.volume()), "volumeTrace" to volumeTrace,
                     "volumeBlocked" to (!audio.volume().available && !allowFixedVolume)), null)
             } catch (error: Exception) {
                 closeSource()
@@ -461,6 +476,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
         runCatching { pause() }
         output?.shutdown()
         output?.destroy()
+        if (output != null) deviceId?.let { deviceReleases[it] = android.os.SystemClock.elapsedRealtime() }
         output = null
         connection?.close()
         connection = null
