@@ -28,7 +28,11 @@ const List<String> losslessDitherOptions = [
 
 const List<String> losslessResamplerOptions = ['swr', 'soxr'];
 
-const int soxrVhqPrecisionBits = 28;
+// The most SoXR offers: its highest precision (33 bits, above the 28 of its
+// Very High Quality preset), a passband without ripple and exact handling of
+// rate pairs that are not a simple ratio. Slower, for a conversion that runs
+// once per file.
+const int soxrPrecisionBits = 33;
 const double soxrPassbandEndRatio = 0.95;
 
 class LosslessConversionProcessing {
@@ -85,8 +89,9 @@ List<String> losslessResamplerFilterOptions(
   return [
     'resampler=$resampler',
     if (resampler == 'soxr') ...[
-      'precision=$soxrVhqPrecisionBits',
+      'precision=$soxrPrecisionBits',
       'cutoff=$soxrPassbandEndRatio',
+      'cheby=1',
     ],
   ];
 }

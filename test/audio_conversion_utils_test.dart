@@ -114,14 +114,15 @@ void main() {
       expect(swrHighPass.hasDither, isTrue);
     });
 
-    test('uses VHQ and a 95 percent passband only for SoXR', () {
+    test('uses the highest SoXR settings only for SoXR', () {
       const soxr = LosslessConversionProcessing(resampler: 'soxr');
       const swr = LosslessConversionProcessing(resampler: 'swr');
 
       expect(losslessResamplerFilterOptions(soxr), [
         'resampler=soxr',
-        'precision=28',
+        'precision=33',
         'cutoff=0.95',
+        'cheby=1',
       ]);
       expect(losslessResamplerFilterOptions(swr), ['resampler=swr']);
     });
