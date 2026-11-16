@@ -12,7 +12,6 @@ import java.io.IOException
  * opened file holds an image.
  */
 internal object CoverProviderFiles {
-    /** An allowed cover folder and the endings of its cover file names. */
     class Folder(val directory: File, private val suffixes: List<String>) {
         /**
          * Every path the system gives [directory]: as named, and without

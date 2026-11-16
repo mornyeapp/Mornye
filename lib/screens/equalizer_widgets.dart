@@ -116,7 +116,6 @@ class _ActionRow extends StatelessWidget {
   }
 }
 
-/// Status, master switch and the estimated response of the whole chain.
 class _EqualizerOverview extends ConsumerWidget {
   const _EqualizerOverview({this.onEnabledChanged});
 
@@ -236,7 +235,6 @@ class _EqualizerOverview extends ConsumerWidget {
   }
 }
 
-/// Quick-apply chips for every preset, plus save, reset and overflow actions.
 class _PresetBar extends ConsumerWidget {
   const _PresetBar({
     required this.busy,
@@ -349,7 +347,6 @@ class _PresetBar extends ConsumerWidget {
   }
 }
 
-/// Band count picker and one vertical gain fader per band.
 class _BandEditor extends ConsumerWidget {
   const _BandEditor();
 

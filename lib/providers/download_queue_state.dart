@@ -285,7 +285,6 @@ class DownloadQueueState {
       ? lookup._queuedPositions.indices.map((index) => items[index])
       : items.where((item) => item.status == DownloadStatus.queued);
 
-  /// Replaces items and updates their lookup from this same queue snapshot.
   DownloadQueueState withItemReplacements(Map<int, DownloadItem> replacements) {
     if (replacements.isEmpty) return this;
     final nextItems = ChunkedList<DownloadItem>.from(

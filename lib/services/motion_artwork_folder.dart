@@ -11,7 +11,6 @@ import 'package:mornye/services/saf_siblings.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 
-/// The name an album's animated cover has in the album's folder.
 const motionArtworkFileName = 'cover.mp4';
 const _maxBytes = 64 << 20;
 

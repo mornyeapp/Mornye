@@ -214,7 +214,6 @@ class RustFfiBackend extends BackendChannel {
 
   static RustFfiBackend? _shared;
 
-  /// The process-wide desktop backend.
   static RustFfiBackend get shared => _shared ??= RustFfiBackend();
 
   @visibleForTesting

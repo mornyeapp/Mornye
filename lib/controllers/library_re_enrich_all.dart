@@ -53,7 +53,6 @@ Future<List<UnifiedLibraryItem>> loadReEnrichableLibraryItems({
   return items;
 }
 
-/// Whether Re-enrich can write to the file at [path] from this device.
 bool isReEnrichableLibraryPath(String path) {
   final trimmed = path.trim();
   return trimmed.isNotEmpty && !trimmed.startsWith('network://');

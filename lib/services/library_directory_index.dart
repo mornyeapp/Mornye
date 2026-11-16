@@ -2,7 +2,6 @@ import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/saf_display_path.dart';
 import 'package:mornye/utils/windows_path_identity.dart';
 
-/// One Library song as the folder index reads it: its record and file.
 class LibraryDirectoryEntry {
   const LibraryDirectoryEntry({
     required this.source,
@@ -259,7 +258,6 @@ int compareNaturally(String a, String b) {
   return rest != 0 ? rest : a.compareTo(b);
 }
 
-/// A song in a [LibraryDirectory].
 class LibraryDirectoryTrack {
   const LibraryDirectoryTrack({
     required this.source,
@@ -278,11 +276,9 @@ class LibraryDirectoryTrack {
   final int? discNumber;
   final int? trackNumber;
 
-  /// The [UnifiedLibraryItem] id of the song.
   String get itemId => source == 'local' ? 'local_$id' : 'dl_$id';
 }
 
-/// A folder of the Library and what it holds.
 class LibraryDirectory {
   LibraryDirectory._(this.key, this.name, this.path);
 
@@ -317,7 +313,6 @@ class LibraryDirectory {
   }
 }
 
-/// The Library's songs arranged by the folders their files are in.
 class LibraryDirectoryIndex {
   LibraryDirectoryIndex._(this.root, this._byKey);
 

@@ -41,6 +41,5 @@ abstract class BackendChannel {
   Stream<dynamic> libraryScanProgressEvents();
 }
 
-/// The backend of the running platform.
 BackendChannel get backendChannel =>
     isDesktopPlatform ? RustFfiBackend.shared : MethodChannelBackend.shared;

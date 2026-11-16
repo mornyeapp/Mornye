@@ -44,7 +44,6 @@ class AudioCompareException implements Exception {
       'AudioCompareException($failure${fileName == null ? '' : ', $fileName'})';
 }
 
-/// What the summary shows about one file.
 class AudioCompareFileInfo {
   const AudioCompareFileInfo({
     required this.name,

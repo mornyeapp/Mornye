@@ -478,7 +478,6 @@ extension _QueueTabNavigation on _QueueTabState {
     );
   }
 
-  /// Icon fallback for playlists with no cover.
   /// When [size] is null the container expands to fill its parent (grid view)
   /// and uses a fixed icon size.
   Widget _playlistIconFallback(ColorScheme colorScheme, [double? size]) {
@@ -497,7 +496,6 @@ extension _QueueTabNavigation on _QueueTabState {
     );
   }
 
-  /// Handle a track being dropped onto a playlist.
   /// When selection mode is active and the dragged item is among the selected,
   /// all selected tracks are added to the playlist.
   Future<void> _onTrackDroppedOnPlaylist(

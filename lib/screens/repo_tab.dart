@@ -295,7 +295,6 @@ class _RepoTabState extends ConsumerState<RepoTab> {
 
   static const double _desktopGridGap = 12;
 
-  /// Desktop extensions as a grid of tiles that fills the pane.
   Widget _desktopExtensionGrid(
     List<RepoExtension> extensions, {
     required int columns,

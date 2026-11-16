@@ -25,7 +25,6 @@ class LibraryTracksFolderData {
       entry.track,
   ];
 
-  /// Whether each track's lookup key is in [existingKeys].
   List<bool> inHistory(Set<String> existingKeys) {
     if (!setEquals(existingKeys, _inHistoryKeys)) {
       _inHistoryKeys = Set.of(existingKeys);

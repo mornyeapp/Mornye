@@ -101,7 +101,6 @@ class AlbumArtworkRecord {
       );
 }
 
-/// A Library album with what it already has.
 class LibraryArtworkAlbum {
   const LibraryArtworkAlbum({
     required this.album,
@@ -221,7 +220,6 @@ class LibraryAlbumArtworkStore {
   // Tags read from file names fall back to these; nothing can match them.
   static const _unknown = {'', 'unknown', 'unknown album', 'unknown artist'};
 
-  /// The `album_key` of the Library song at [filePath].
   Future<String?> albumKeyOf(String filePath) async {
     final db = await _open();
     final rows = await db.query(
@@ -348,12 +346,10 @@ class LibraryAlbumArtworkStore {
   }
 }
 
-/// How a lookup for one album ended.
 sealed class ArtworkLookup {
   const ArtworkLookup();
 }
 
-/// A provider album matched.
 class ArtworkFound extends ArtworkLookup {
   const ArtworkFound(this.candidate, {this.coverUrl, this.motionUrl});
 
@@ -384,7 +380,6 @@ class AlbumArtworkLookup {
   /// Metadata provider IDs in the user's priority order.
   final List<String> providers;
 
-  /// Album search results from one provider.
   final Future<List<Map<String, dynamic>>> Function(
     String providerId,
     String query,
@@ -436,7 +431,6 @@ class AlbumArtworkLookup {
   }
 }
 
-/// What a run found.
 class AlbumArtworkSummary {
   const AlbumArtworkSummary({
     this.albums = 0,
@@ -455,7 +449,6 @@ class AlbumArtworkSummary {
   /// Albums no provider could be asked about.
   final int failed;
 
-  /// Songs whose cover changed.
   final int songs;
   final bool cancelled;
 }
@@ -483,10 +476,8 @@ class AlbumArtworkJob {
   /// Saves the cover at a URL to a path, at most library cover size.
   final Future<bool> Function(String url, String path) downloadCover;
 
-  /// Whether an animated cover is saved for the album already.
   final Future<bool> Function(LibraryArtworkAlbum album) hasMotion;
 
-  /// Saves the animated cover at a URL for the album.
   final Future<bool> Function(LibraryArtworkAlbum album, String url) saveMotion;
   final DateTime Function() _now;
   final int concurrency;

@@ -27,7 +27,6 @@ class LyricsDraftLine {
   /// When the line is sung, or null while it has no time yet.
   final Duration? time;
 
-  /// The words shown in the player.
   final String text;
 
   /// The singer prefix, such as `v2:`, written before the text.

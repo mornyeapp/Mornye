@@ -61,7 +61,6 @@ double? _estimateEffectiveSpectralCutoffFileInIsolate(
   );
 }
 
-/// What the analysers read from an ffprobe result.
 class AudioAnalysisMediaInfo {
   final int fileSize;
   final String codecName;

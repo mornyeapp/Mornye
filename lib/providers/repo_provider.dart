@@ -300,7 +300,6 @@ RepoCatalogMerge mergeRepoCatalog({
   );
 }
 
-/// What adding a repository did.
 enum RepoAddStatus { added, duplicate, failed }
 
 class RepoAddResult {

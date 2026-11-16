@@ -123,7 +123,6 @@ double audioCompareRelativeDb(double residual, double reference) {
   return db.clamp(audioCompareFloorDb, audioCompareCeilingDb).toDouble();
 }
 
-/// Which channel the timeline shows.
 enum AudioCompareChannel { combined, left, right }
 
 /// Levels of one timeline window, as mean squares per channel.
@@ -199,7 +198,6 @@ double audioCompareOverallDb(
 
 // Alignment
 
-/// The best lag of one correlation search.
 class AudioCompareLagMatch {
   const AudioCompareLagMatch(this.lag, this.correlation);
 
@@ -437,7 +435,6 @@ int audioCompareLoudestStart(Float32List samples, int length, int step) {
   return best;
 }
 
-/// The average of [channels] interleaved channels.
 Float32List audioCompareMixToMono(Float32List interleaved, int channels) {
   if (channels <= 1) return interleaved;
   final frames = interleaved.length ~/ channels;
@@ -483,7 +480,6 @@ class AudioCompareCoarseInput {
   final int otherStart;
 }
 
-/// Result of the wide search.
 class AudioCompareCoarseMatch {
   const AudioCompareCoarseMatch({
     required this.candidates,
@@ -595,7 +591,6 @@ AudioCompareCoarseMatch audioCompareCoarseAlign(AudioCompareCoarseInput input) {
   );
 }
 
-/// One place in the other file where the full-rate step looks.
 class AudioCompareFineCandidate {
   const AudioCompareFineCandidate({
     required this.other,
@@ -633,7 +628,6 @@ class AudioCompareFineInput {
   final int radius;
 }
 
-/// Offset, gain and excerpt residual from the full-rate refinement.
 class AudioCompareFineMatch {
   const AudioCompareFineMatch({
     required this.lag,
@@ -832,7 +826,6 @@ List<AudioCompareWindow> audioCompareMeasureWindows({
 
 // Summary
 
-/// How large the whole-song difference is.
 enum AudioCompareLevel {
   identical,
   nearlyIdentical,
@@ -841,7 +834,6 @@ enum AudioCompareLevel {
   large,
 }
 
-/// Where in the spectrum the differences sit.
 enum AudioCompareBand { none, high, low, broadband }
 
 /// Why the null test is probably not meaningful.
@@ -934,7 +926,6 @@ double audioCompareMedianDb(
   return values[values.length ~/ 2];
 }
 
-/// The notices that make a null test not meaningful.
 Set<AudioCompareNotice> audioCompareNoticesFor({
   required double correlation,
   required double overallDb,

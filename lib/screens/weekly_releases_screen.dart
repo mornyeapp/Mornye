@@ -16,7 +16,6 @@ import 'package:mornye/widgets/settings_group.dart';
 class WeeklyReleasesScreen extends ConsumerStatefulWidget {
   const WeeklyReleasesScreen({super.key, this.days = 7});
 
-  /// The period selected on opening.
   final int days;
 
   @override

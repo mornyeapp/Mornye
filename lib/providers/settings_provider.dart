@@ -700,7 +700,6 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setPlaybackPitch(double semitones) =>
       _commit(state.copyWith(playbackPitch: playbackPitchFromJson(semitones)));
 
-  /// Normal speed, the pitch kept and the original key.
   void resetPlaybackTempo() => _commit(
     state.copyWith(playbackSpeed: 1, playbackKeepPitch: true, playbackPitch: 0),
   );

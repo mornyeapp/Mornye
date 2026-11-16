@@ -303,7 +303,6 @@ class MetadataAutofillService {
   static bool lyricsOnly(Set<String> fields) =>
       fields.length == 1 && fields.contains('lyrics');
 
-  /// The enabled extensions that provide lyrics, by name.
   List<Extension> lyricsProviders(ExtensionState state) =>
       [
         for (final extension in state.extensions)

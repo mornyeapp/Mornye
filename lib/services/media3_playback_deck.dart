@@ -75,11 +75,9 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   /// False once the native player turned out to be missing from this build.
   static bool _missing = false;
 
-  /// Overrides [isAvailable] in tests.
   @visibleForTesting
   static bool? debugAvailableOverride;
 
-  /// Forgets that the native player was missing, for tests.
   @visibleForTesting
   static void debugResetAvailability() => _missing = false;
 

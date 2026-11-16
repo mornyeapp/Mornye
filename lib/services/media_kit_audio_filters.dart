@@ -161,7 +161,6 @@ class MpvAudioFilterChain {
     );
   }
 
-  /// This chain followed by the filters [tempo] needs.
   MpvAudioFilterChain withTempo(MpvTempo tempo) => MpvAudioFilterChain(
     [...filters, ...tempo.filters],
     volumeGainDb: volumeGainDb,

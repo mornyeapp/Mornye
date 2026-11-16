@@ -45,7 +45,6 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/profile_avatar.dart';
 import 'package:mornye/widgets/no_scrollbars.dart';
 
-/// One entry on the Settings tab.
 class _Destination {
   const _Destination({
     required this.icon,

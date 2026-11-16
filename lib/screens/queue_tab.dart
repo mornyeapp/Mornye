@@ -469,7 +469,6 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     if (mounted) _searchFocusNode.requestFocus();
   }
 
-  /// The pinned header's Search action, shown while the field is hidden.
   Widget _buildSearchAction() => ValueListenableBuilder<bool>(
     valueListenable: _searchFieldHidden,
     builder: (context, hidden, _) {

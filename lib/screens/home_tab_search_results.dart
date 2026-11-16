@@ -1012,7 +1012,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     }
   }
 
-  /// Selects the filter chip [id] and searches again with it.
   void _selectSearchFilter(String id) {
     ref.read(trackProvider.notifier).setSearchFilter(id);
     _triggerSearchWithFilter(id);

@@ -30,7 +30,6 @@ class RecognizedSong {
   final String? label;
   final String? isrc;
 
-  /// The song's page on the service's website.
   final String? webUrl;
   final DateTime recognizedAt;
 

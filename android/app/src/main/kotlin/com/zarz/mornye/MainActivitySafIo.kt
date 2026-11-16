@@ -37,9 +37,6 @@ internal fun isMediaStoreUri(uri: Uri): Boolean {
                authority.contains("media")
     }
 
-    /**
-     * Resolve extension from a MediaStore URI by querying DISPLAY_NAME or MIME_TYPE.
-     */
 internal fun Context.resolveMediaStoreExt(uri: Uri, fallbackExt: String?): String {
         try {
             contentResolver.query(uri, arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
@@ -463,7 +460,6 @@ internal fun Context.writeSafSidecarFromPath(
 internal fun Context.writeSafSidecarLrc(audioUri: Uri, lrcContent: String): Boolean =
     writeSafSidecar(audioUri, lrcContent, "lrc")
 
-/** The sidecar name for [audioUri]: its base name with [extension]. */
 private fun Context.safSidecarName(audioUri: Uri, extension: String): String? {
     val audioName = try {
         DocumentFile.fromSingleUri(this, audioUri)?.name

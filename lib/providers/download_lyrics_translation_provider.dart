@@ -305,6 +305,5 @@ class DownloadLyricsWrite {
   /// The lyrics with the translation laid over them.
   final ParsedLyrics shown;
 
-  /// The song already had a `.mlrc` file.
   final bool hasMlrc;
 }

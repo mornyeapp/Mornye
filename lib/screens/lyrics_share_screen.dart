@@ -501,7 +501,6 @@ class _BackgroundPicker extends StatelessWidget {
   }
 }
 
-/// How many lines are quoted, against the card's limit.
 class _SelectionCount extends StatelessWidget {
   const _SelectionCount({required this.count});
 

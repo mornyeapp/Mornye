@@ -13,7 +13,6 @@ final _log = AppLogger('ExtensionAutoUpdate');
 /// foreground checks again. The native registry cache absorbs closer calls.
 const extensionUpdateCheckInterval = Duration(hours: 6);
 
-/// The store version an automatic update would install for [extension].
 String extensionUpdateTarget(RepoExtension extension) =>
     '${extension.id}@${extension.version}';
 

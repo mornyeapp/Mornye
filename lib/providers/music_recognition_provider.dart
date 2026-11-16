@@ -319,7 +319,6 @@ class MusicRecognitionController extends Notifier<MusicRecognitionState> {
     state = const MusicRecognitionState();
   }
 
-  /// Shows a song from the history.
   void show(RecognizedSong song) {
     if (state.isBusy) return;
     state = MusicRecognitionState(phase: RecognitionPhase.result, song: song);

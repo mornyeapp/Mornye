@@ -12,7 +12,6 @@ import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_switch.dart';
 import 'package:mornye/widgets/app_text_field.dart';
 
-/// The message for a pairing failure.
 String linkPairingErrorMessage(AppLocalizations l10n, LinkPairingError error) =>
     switch (error) {
       LinkPairingError.badPin => l10n.linkErrorBadPin,

@@ -82,7 +82,6 @@ class ListeningRewindRange {
   final DateTime previousStart;
   final DateTime previousEnd;
 
-  /// The last day inside the window.
   DateTime get lastDay => DateTime(end.year, end.month, end.day - 1);
 }
 
@@ -158,8 +157,6 @@ class ListeningRewind {
   /// Songs replayed fewer times than this in one day are not highlighted.
   static const minimumReplays = 3;
 
-  /// Builds the highlights from the window's [summary].
-  ///
   /// [newArtistNames] holds artists first heard inside the window; pass null
   /// when nothing was recorded before it, since every artist would be "new".
   factory ListeningRewind.compute({

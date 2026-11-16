@@ -21,7 +21,6 @@ final _log = AppLogger('SongLeftovers');
 /// Android document.
 typedef SongFolderEntry = ({String name, String id, bool folder});
 
-/// Lists and deletes in the folders holding songs.
 abstract interface class SongFolderStore {
   /// The entries of [folder], or null when it cannot be listed.
   Future<List<SongFolderEntry>?> list(String folder);
@@ -104,10 +103,8 @@ class _SongPlace {
 
   final SongFolderStore store;
 
-  /// The song's file name.
   final String name;
 
-  /// The folder holding the song.
   final String folder;
 
   /// The folders the song may leave empty, nearest first: inside the

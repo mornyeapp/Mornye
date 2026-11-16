@@ -44,11 +44,8 @@ final _tagRow = RegExp(
   caseSensitive: false,
 );
 
-/// The `.mlrc` path next to the audio file at [path].
 String mlrcPathFor(String path) => sidecarPathFor(path, mlrcExtension);
 
-/// The path of the sidecar with [extension] next to the audio file at
-/// [path].
 String sidecarPathFor(String path, String extension) {
   final audioExtension = p.extension(path);
   final base = audioExtension.isEmpty
@@ -264,7 +261,6 @@ class LyricsSidecarStore {
   bool _isDocument(String source) =>
       isContentUri(source) && !isCueVirtualPath(source) && !isDesktopPlatform;
 
-  /// Whether [source] can have this sidecar.
   bool canWrite(String source) =>
       _localPath(source) != null || _isDocument(source);
 
@@ -291,7 +287,6 @@ class LyricsSidecarStore {
     return null;
   }
 
-  /// Saves [content] as the sidecar next to [source].
   Future<void> write(String source, String content) async {
     final path = _localPath(source);
     if (path != null) {

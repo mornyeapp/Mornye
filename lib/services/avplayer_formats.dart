@@ -166,7 +166,6 @@ class AvPlayerCopies {
 
   bool ownsPath(String path) => _cache.ownsPath(path);
 
-  /// Whether a copy was made for the song [source].
   bool has(String source) => _cache.cachedPath(source) != null;
 
   /// A FLAC copy of [input] for the song [source], or null when FFmpeg

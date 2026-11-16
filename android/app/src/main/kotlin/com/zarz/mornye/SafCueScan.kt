@@ -124,7 +124,6 @@ internal fun MainActivity.resolveCueAudioSibling(
         return null
     }
 
-/** Resolves the audio document named by a CUE sheet copied to [tempCuePath]. */
 internal fun MainActivity.resolveCueSheetAudio(
     tempCuePath: String,
     parentDir: DocumentFile,

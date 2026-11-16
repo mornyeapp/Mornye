@@ -37,7 +37,6 @@ class LibraryQueueStore {
     this.shadowSnapshot = false,
   });
 
-  /// The Library row is not shadowed by a downloaded History file.
   String _notShadowedByHistory(String alias) =>
       sqlite.libraryNotShadowedSql(alias, snapshot: shadowSnapshot);
 

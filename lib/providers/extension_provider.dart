@@ -28,7 +28,6 @@ final extensionSettingsProvider = FutureProvider.autoDispose
       return PlatformBridge.getExtensionSettings(extensionId);
     });
 
-/// Result of restoring extensions from a backup.
 class ExtensionNotifier extends Notifier<ExtensionState> {
   static const _extensionHealthDefaultCacheTtl = Duration(minutes: 10);
   static const _extensionHealthMinimumCacheTtl = Duration(minutes: 1);

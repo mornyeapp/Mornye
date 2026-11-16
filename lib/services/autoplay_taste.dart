@@ -855,7 +855,6 @@ class AutoplayTaste {
     return AutoplayTasteSignal(vectors);
   }
 
-  /// Forgets every logged play and the model learned from them.
   Future<void> reset() async {
     _generation++;
     _pending.clear();

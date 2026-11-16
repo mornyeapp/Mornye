@@ -71,7 +71,6 @@ final lyricsTranslationSongLanguagesProvider =
       (ref) => LyricsTranslationSongLanguages(),
     );
 
-/// The Chinese reading data of offline romanization.
 final pinyinDataLoaderProvider = Provider<PinyinDataLoader>(
   (ref) => PinyinDataLoader(),
 );
@@ -112,7 +111,6 @@ String lyricsAiModelFor(AppSettings settings) {
   return LyricsAiProvider.fromId(settings.lyricsAiProvider).defaultModel ?? '';
 }
 
-/// The provider settings with [apiKey] filled in.
 LyricsAiConfig lyricsAiConfigFor(AppSettings settings, {String apiKey = ''}) =>
     LyricsAiConfig(
       provider: LyricsAiProvider.fromId(settings.lyricsAiProvider),
@@ -139,7 +137,6 @@ LyricsTranslationLanguage lyricsTranslationTargetFor(AppSettings settings) =>
           PlatformDispatcher.instance.locale,
     );
 
-/// A running translation.
 class LyricsTranslationJob {
   const LyricsTranslationJob({
     required this.id,
@@ -164,7 +161,6 @@ class LyricsTranslationState {
   final LyricsTranslationJob? job;
 }
 
-/// How a translation request ended.
 class LyricsTranslationOutcome {
   const LyricsTranslationOutcome.success({
     this.missing = 0,
@@ -192,7 +188,6 @@ class LyricsTranslationOutcome {
 
   final LyricsAiErrorKind? error;
 
-  /// Lines the model left untranslated.
   final int missing;
 
   /// The model returned every line as it was: the lyrics are already in
@@ -200,7 +195,6 @@ class LyricsTranslationOutcome {
   final bool unchanged;
   final bool cancelled;
 
-  /// Another translation was already running.
   final bool busy;
 }
 
@@ -334,7 +328,6 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     return shown || _alreadyIn(source, target);
   }
 
-  /// What the settings alone give for [lyrics].
   LyricsTranslationLanguage settingsTargetFor(ParsedLyrics lyrics) =>
       _settingsTargetOf(
         LyricsTranslationSource.cached(lyrics),
@@ -722,7 +715,6 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     }
   }
 
-  /// The provider's model ids.
   Future<List<String>> listModels(LyricsAiConfig config) async {
     final client = ref.read(lyricsAiHttpClientProvider)();
     try {

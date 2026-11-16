@@ -21,7 +21,6 @@ import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/lyrics_options_button.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
-/// Provider, key, model and behavior of AI lyrics translation.
 class LyricsAiTranslationPage extends ConsumerStatefulWidget {
   const LyricsAiTranslationPage({super.key});
 

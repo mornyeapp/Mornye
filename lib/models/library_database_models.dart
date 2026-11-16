@@ -5,7 +5,6 @@ import 'package:mornye/utils/audio_format_utils.dart';
 const libraryAudioMetadataScanVersion = 4;
 const libraryLyricsMetadataScanVersion = 3;
 
-/// The path columns of one visible Library row.
 typedef LibraryFilePathRow = ({String id, String sourceId, String filePath});
 
 int libraryIncrementalSnapshotModTime({

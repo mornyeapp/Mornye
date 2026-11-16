@@ -114,7 +114,6 @@ class AudioMetadataMapper {
     return fields;
   }
 
-  /// Normalizes arbitrary tag spellings to standard Vorbis comment names.
   static Map<String, String> normalizeToVorbisComments(
     Map<String, String> metadata,
   ) {

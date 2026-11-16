@@ -708,7 +708,6 @@ class LibraryCollectionsDatabase {
     ];
   }
 
-  /// A playlist's songs in playlist order.
   Future<List<Track>> loadPlaylistTracks(
     String playlistId, {
     int limit = 500,

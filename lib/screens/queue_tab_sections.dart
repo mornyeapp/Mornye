@@ -108,7 +108,6 @@ extension _QueueTabSections on _QueueTabState {
     return null;
   }
 
-  /// Splits [items] into runs that share a section label.
   List<_LibrarySection> _trackSections(
     BuildContext context,
     List<UnifiedLibraryItem> items,
@@ -324,7 +323,6 @@ extension _QueueTabSections on _QueueTabState {
     );
   }
 
-  /// Switches song pages between the list and the cover grid.
   Widget _buildViewModeButton(BuildContext context, String viewMode) {
     final grid = viewMode == 'grid';
     return AppIconButton(

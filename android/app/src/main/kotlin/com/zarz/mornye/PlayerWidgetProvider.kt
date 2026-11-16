@@ -182,7 +182,6 @@ class PlayerWidgetProvider : AppWidgetProvider() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 ))
             }
-            // Expressive shape morph: a pill while paused, a rounder square while playing.
             views.setImageViewResource(R.id.player_widget_play_shape, if (playing) R.drawable.widget_shape_squircle else R.drawable.widget_shape_pill)
             bind(R.id.player_widget_play, R.id.player_widget_play_shape, R.id.player_widget_play_icon,
                 if (playing) R.drawable.ic_widget_pause else R.drawable.ic_widget_play, colors.primary, colors.onPrimary, "toggle")
@@ -199,7 +198,6 @@ class PlayerWidgetProvider : AppWidgetProvider() {
 
         fun seed(state: JSONObject) = state.optLong("background", 0xff292433).toInt()
 
-        /** Material 3 colour roles for one widget instance. */
         class Palette(
             val container: Int,
             val onContainer: Int,

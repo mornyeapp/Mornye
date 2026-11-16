@@ -24,7 +24,6 @@ double _homeMixCoverSizeOf(BuildContext context) =>
 
 double _homeShelfRadiusOf(BuildContext context) => context.isMornye ? 10 : 20;
 
-/// Whether Home uses compact Mornye desktop typography.
 bool _homeCompactText(BuildContext context) =>
     context.isMornye && isDesktopPlatform;
 
@@ -1663,7 +1662,6 @@ class _HomeShortcuts extends ConsumerWidget {
     );
   }
 
-  /// The label, icon and action of [shortcut].
   ({String label, IconData icon, VoidCallback onTap}) _entry(
     BuildContext context,
     WidgetRef ref,

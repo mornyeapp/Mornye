@@ -25,7 +25,6 @@ import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:mornye/widgets/player_queue_sheet.dart';
 import 'package:mornye/widgets/no_scrollbars.dart';
 
-/// A panel of the desktop trailing inspector.
 enum DesktopInspectorPanel { lyrics, upNext }
 
 /// Width of the trailing inspector.
@@ -503,7 +502,6 @@ class _InspectorLyricsState extends ConsumerState<_InspectorLyrics> {
   );
 }
 
-/// The Material Up Next list in a desktop panel.
 class DesktopMaterialQueue extends StatefulWidget {
   const DesktopMaterialQueue({super.key, required this.colorScheme});
 

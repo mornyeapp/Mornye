@@ -176,8 +176,6 @@ final playbackLoadingProvider = Provider<bool>((ref) {
   );
 });
 
-/// Whether a list row is the current track, and if so whether it plays or
-/// loads.
 typedef MediaPlaybackUi = ({bool isCurrent, bool isPlaying, bool isLoading});
 
 const MediaPlaybackUi _notCurrent = (

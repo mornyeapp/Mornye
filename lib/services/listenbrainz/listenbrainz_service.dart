@@ -29,7 +29,6 @@ class ListenBrainzService extends Scrobbler<ListenBrainzAccount> {
   @override
   bool get configured => true;
 
-  /// The server of the signed-in account.
   String? get server => session?.server;
 
   /// Checks [token] with [server] (empty for ListenBrainz itself) and signs

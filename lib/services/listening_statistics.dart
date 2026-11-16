@@ -361,7 +361,6 @@ class ListeningStatisticsStore {
     latestFirst: latestFirst,
   );
 
-  /// Runs a read-only aggregate against the statistics database.
   Future<Map<String, int>> loadAlbumPlays(String album) async =>
       readAlbumPlays(await _open(), album);
 

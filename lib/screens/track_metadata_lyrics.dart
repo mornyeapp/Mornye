@@ -702,7 +702,6 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
     }
   }
 
-  /// [fileName] in the NAS folder of the current network song.
   String _networkSidecarSource(String fileName) {
     final uri = Uri.parse(cleanFilePath);
     final folder = uri.pathSegments.take(uri.pathSegments.length - 1);
@@ -1237,7 +1236,6 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
     format: _storedAudioFormat,
   );
 
-  /// Shows what a re-enrich or its undo wrote to the file at [sourcePath].
   Future<void> _reloadAfterReEnrichWrite(
     String sourcePath, {
     bool? hasLyrics,

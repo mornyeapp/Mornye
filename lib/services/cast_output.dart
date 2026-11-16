@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
-/// A Cast receiver on the network, listed where the app draws the picker.
 @immutable
 class CastDevice {
   const CastDevice({required this.id, required this.name, this.model = ''});

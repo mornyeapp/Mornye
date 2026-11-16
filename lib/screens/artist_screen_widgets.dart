@@ -1,10 +1,8 @@
 // ignore_for_file: invalid_use_of_protected_member
 part of 'artist_screen.dart';
 
-/// Side margin of the artist page's desktop sections.
 const double _mornyeSectionInset = 24;
 
-/// Space between the columns of the artist page's desktop highlights.
 const double _mornyeHighlightGap = 16;
 
 /// Width of a highlight column: two fit the pane, and the right margin shows
@@ -14,7 +12,6 @@ double _mornyeHighlightColumn(double paneWidth) => math.max(
   260,
 );
 
-/// Settles a sideways scroll on the nearest column of [extent].
 class _ColumnSnapPhysics extends ScrollPhysics {
   const _ColumnSnapPhysics({required this.extent, super.parent});
 
@@ -778,7 +775,6 @@ extension _ArtistScreenSections on _ArtistScreenState {
     );
   }
 
-  /// The newest release, cover first with its details beside it.
   Widget _buildMornyeLatestRelease(
     BuildContext context,
     ArtistAlbum album,

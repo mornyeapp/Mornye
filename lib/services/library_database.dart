@@ -524,7 +524,6 @@ class LibraryDatabase {
     includeLocal: includeLocal,
   );
 
-  /// Paths and durations of every downloaded and scanned song.
   Future<List<Map<String, Object?>>> getSongFiles() =>
       _queueRead((store) => store.songFiles(), includeLocal: true);
 

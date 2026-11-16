@@ -40,7 +40,6 @@ internal class SafFolderCovers(
         }
     }
 
-    /** Gives [row] the thumbnail of [image] unless it has artwork already. */
     fun fill(row: JSONObject, image: SafChildEntry?) {
         if (image == null || row.optString("coverPath", "").isNotEmpty()) return
         thumbnails.computeIfAbsent("${image.doc.uri}|${image.lastModified}") {

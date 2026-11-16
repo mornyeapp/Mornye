@@ -1,6 +1,5 @@
 part of 'download_settings_page.dart';
 
-/// Searchable region list.
 class _RegionPickerSheet extends StatefulWidget {
   const _RegionPickerSheet({
     required this.regions,

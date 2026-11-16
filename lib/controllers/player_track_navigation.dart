@@ -10,7 +10,6 @@ import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('PlayerTrackNavigation');
 
-/// Opens the artist of the song playing as [mediaItem].
 Future<void> openPlayingArtist(
   BuildContext context,
   WidgetRef ref,
@@ -26,7 +25,6 @@ Future<void> openPlayingArtist(
   );
 }
 
-/// Opens the album of the song playing as [mediaItem] from [source].
 Future<void> openPlayingAlbum(
   BuildContext context,
   WidgetRef ref, {

@@ -21,7 +21,6 @@ const libraryMixMaxCount = 10;
 /// The most genre mixes, leaving room for the other kinds.
 const _maxGenreMixes = 5;
 
-/// The most decade mixes.
 const _maxDecadeMixes = 2;
 
 /// Songs added within this many days make the New Additions mix.
@@ -210,7 +209,6 @@ class LibraryMixHints {
     this.albums = const [],
   });
 
-  /// Loved songs.
   final List<({String artist, String title})> loved;
 
   /// Autoplay's learning log while learning is on: songs as normalized

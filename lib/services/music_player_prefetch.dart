@@ -83,7 +83,6 @@ class _MusicPrefetch {
     }
   }
 
-  /// The whole copy of the network song [media], or null.
   Future<String?> lookup(PlayableMedia media) async {
     final cache = _cache;
     if (cache == null) return null;

@@ -14,7 +14,6 @@ import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('MediaKitDeck');
 
-/// An error-level line from libmpv's log.
 typedef MpvLogError = ({String prefix, String text});
 
 /// The libmpv operations [MediaKitPlaybackDeck] uses. [MediaKitEngine] is the
@@ -53,7 +52,6 @@ abstract interface class MpvPlaylistEngine implements MpvEngine {
   Future<void> clearNext();
 }
 
-/// One libmpv instance through media_kit.
 class MediaKitEngine implements MpvEngine, MpvPlaylistEngine {
   MediaKitEngine()
     : _player = NativePlayer(
@@ -213,7 +211,6 @@ class MediaKitEngine implements MpvEngine, MpvPlaylistEngine {
   }
 }
 
-/// A source libmpv could not open.
 class MediaKitSourceException implements Exception {
   const MediaKitSourceException(this.message);
   final String message;
@@ -273,7 +270,6 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
 
   static bool? _available;
 
-  /// Overrides [isAvailable] in tests.
   @visibleForTesting
   static bool? debugAvailableOverride;
 
@@ -323,7 +319,6 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   /// The output property as last set; null before the first set.
   ({String name, String value})? _output;
 
-  /// Whether [_output] is the exclusive one.
   bool _exclusive = false;
   int? _sampleRate;
 
@@ -342,7 +337,6 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   double _speed = 1;
   bool _pitchCorrection = true;
 
-  /// True while libmpv refused the filters of a semitone shift.
   bool _pitchFailed = false;
 
   /// Optional filters this process's libmpv lacks, found by probing once.
@@ -360,7 +354,6 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   Timer? _equalizerTimer;
   Future<void> _equalizerWrite = Future.value();
 
-  /// Reads an mpv property of this deck's player, for integration tests.
   @visibleForTesting
   Future<String> debugProperty(String name) => _engine.getProperty(name);
 

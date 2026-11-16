@@ -181,7 +181,6 @@ class Media3GaplessTest {
         return File(files, name).apply { writeBytes(buffer.array()) }
     }
 
-    /** Plays [first] then [second] gaplessly and returns the measurement. */
     private fun handoff(label: String, first: File, second: File, queueAtMs: Long = -1): Pair<Measurement, Long> {
         call("create")
         val measurement = Measurement()

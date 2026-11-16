@@ -288,7 +288,6 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     );
   }
 
-  /// Desktop windows keep the tour in one centered column.
   Widget _desktopColumn(Widget child) => isDesktopPlatform
       ? Center(
           child: ConstrainedBox(

@@ -49,7 +49,6 @@ class LibraryTrackConversionResult {
 
   const LibraryTrackConversionResult.success() : this._();
 
-  /// Pipeline stage that was running when the conversion failed.
   final String? failureStage;
   final Object? error;
   final StackTrace? stackTrace;

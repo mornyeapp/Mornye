@@ -783,7 +783,6 @@ class _ExploreSectionPage extends StatelessWidget {
   static bool _isFeatured(ExploreItem item) =>
       item.featuredCoverUrl?.isNotEmpty == true;
 
-  /// Columns of at least [minWidth], at most [maxCount].
   static int _columns(double width, double minWidth, int maxCount) =>
       ((width + _gap) / (minWidth + _gap)).floor().clamp(1, maxCount);
 

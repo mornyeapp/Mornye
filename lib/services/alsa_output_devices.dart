@@ -8,7 +8,6 @@ class AlsaOutputDevice {
   /// The mpv device name, `alsa/hw:CARD=<card>,DEV=<device>`.
   final String id;
 
-  /// The card and device names, as the system lists them.
   final String label;
 }
 

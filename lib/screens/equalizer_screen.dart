@@ -484,7 +484,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   }
 }
 
-/// The preset whose curve and tone match the current settings.
 EqualizerPreset? _matchingPreset(EqualizerState state) {
   bool same(double left, double right) =>
       left == right && (left != 0 || left.isNegative == right.isNegative);

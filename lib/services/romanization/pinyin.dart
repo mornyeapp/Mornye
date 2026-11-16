@@ -16,7 +16,6 @@ class PinyinData {
     this._longestPhrase,
   );
 
-  /// Parses the gzipped data file.
   factory PinyinData.decode(List<int> gzipped) =>
       PinyinData.parse(utf8.decode(gzip.decode(gzipped)));
 

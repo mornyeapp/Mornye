@@ -39,7 +39,6 @@ extension _DownloadQueueReplayGain on DownloadQueueNotifier {
     }
   }
 
-  /// Store a track's ReplayGain scan result for later album gain computation.
   void _storeTrackReplayGainForAlbum(
     Track track,
     String filePath,

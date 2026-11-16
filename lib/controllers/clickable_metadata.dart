@@ -519,7 +519,6 @@ class DetailPage {
 
   static final _routes = Expando<DetailPage>('detail page');
 
-  /// Records that the route around [context] shows [page].
   static void mark(BuildContext context, DetailPage page) {
     final route = ModalRoute.of(context);
     if (route != null) _routes[route] = page;
@@ -579,7 +578,6 @@ void pushViaPreferredNavigator(
   push(activeTabNavigator);
 }
 
-/// Pushes a [MaterialPageRoute] built by [builder] onto the nearest navigator.
 Future<T?> pushPage<T>(BuildContext context, WidgetBuilder builder) =>
     Navigator.push(context, MaterialPageRoute<T>(builder: builder));
 

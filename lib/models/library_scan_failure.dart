@@ -54,7 +54,6 @@ class LibraryScanFailures {
   final int count;
   final List<LibraryScanFailure> files;
 
-  /// From a finished scan's progress report.
   factory LibraryScanFailures.fromProgress(Map<String, dynamic> progress) =>
       LibraryScanFailures(
         count: (progress['error_count'] as num?)?.toInt() ?? 0,

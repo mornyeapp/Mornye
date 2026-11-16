@@ -14,7 +14,6 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
         lower.endsWith('.ogg');
   }
 
-  /// Whether the current file is a CUE sheet (or CUE-referenced)
   bool get _isCueFile {
     if (isCueVirtualPath(rawFilePath)) return true;
     final lower = cleanFilePath.toLowerCase();

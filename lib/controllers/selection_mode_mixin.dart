@@ -20,7 +20,6 @@ mixin SelectionModeMixin<T extends StatefulWidget> on State<T> {
   /// stays hidden until the menu and its chosen action have run.
   bool contextMenuSelection = false;
 
-  /// Whether the screen shows its selection bar.
   bool get showsSelectionBar => isSelectionMode && !contextMenuSelection;
 
   /// Where a desktop Shift-click range starts: the item clicked last without

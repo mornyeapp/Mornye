@@ -168,7 +168,6 @@ class NowPlayingRoute extends PageRoute<void> {
     );
   }
 
-  /// The open morph's surface: the mini player's bounds grown to the screen.
   Rect _openRect(Size size, double value) => Rect.lerp(
     _openFrom!.surface,
     Offset.zero & size,
@@ -243,7 +242,6 @@ class NowPlayingRoute extends PageRoute<void> {
         (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
   }
 
-  /// Starts the shrink into the mini player from where the page is now.
   bool _captureDismiss() {
     final context = subtreeContext;
     if (context == null ||

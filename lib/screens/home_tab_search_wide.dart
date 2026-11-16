@@ -644,7 +644,6 @@ class _SearchSongCoverCell extends ConsumerWidget {
 
   final Track track;
 
-  /// The side of the cover.
   final double extent;
   final bool isInHistory;
   final bool showLocalLibraryIndicator;
@@ -813,7 +812,6 @@ class _SearchCoverCell extends StatelessWidget {
 
   final Track item;
 
-  /// The side of the cover.
   final double extent;
   final VoidCallback onTap;
   final VoidCallback onSaveCover;

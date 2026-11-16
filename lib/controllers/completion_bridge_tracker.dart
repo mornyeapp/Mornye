@@ -13,7 +13,6 @@ class CompletionBridgeTracker {
   /// Bridged queue items by queue item id.
   final Map<String, DownloadItem> items = {};
 
-  /// When each bridged item completed.
   final Map<String, DateTime> addedAt = {};
 
   /// Bridged items whose cover precache has already been scheduled.

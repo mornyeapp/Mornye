@@ -21,7 +21,6 @@ final _log = AppLogger('PlayerMetadata');
 typedef OnlineLyricsFetcher = Future<String> Function(MediaItem item);
 typedef OnlineLyricsSaver = Future<void> Function(String source, String lyrics);
 
-/// Where [PlayerMetadataController.saveShownLyrics] wrote.
 enum LyricsSaveTarget {
   /// Tags in the song's own LRC lyrics, or in its `.lrc` file when those are
   /// the lyrics shown.
@@ -172,7 +171,6 @@ class PlayerMetadataController extends ChangeNotifier {
   bool get loading => _loading;
   bool get searchingOnline => _searchingOnline;
 
-  /// The last online search for this track found nothing.
   bool get onlineSearchMissed => _onlineSearchMissed;
   bool get onlineLyricsSaveFailed => _onlineLyricsSaveFailed;
 
@@ -244,7 +242,6 @@ class PlayerMetadataController extends ChangeNotifier {
     );
   }
 
-  /// The shown lyrics are the `.lrc` file's, not the song's own.
   bool get _lyricsInLrcFile =>
       _lrcFileLyrics != null && _lyricsRaw == _lrcFileLyrics;
 

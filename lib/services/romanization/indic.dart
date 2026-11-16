@@ -32,7 +32,6 @@ class _Script {
   /// Independent vowels; an empty value is a bare vowel carrier.
   final Map<int, String> vowels;
 
-  /// Vowel signs.
   final Map<int, String> signs;
   final int virama;
   final Set<int> nasals;

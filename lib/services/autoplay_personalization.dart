@@ -30,7 +30,6 @@ class AutoplayLearningTrack {
   final Duration? duration;
 }
 
-/// What a learning observation came from.
 enum AutoplayFeedbackKind {
   /// Played on, through at least half of the song.
   listened,
@@ -41,10 +40,8 @@ enum AutoplayFeedbackKind {
   /// Played again on purpose and kept playing.
   replayed,
 
-  /// Added to the loved songs.
   loved,
 
-  /// Added to a playlist.
   playlisted,
 }
 

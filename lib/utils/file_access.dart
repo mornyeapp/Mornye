@@ -170,7 +170,6 @@ Future<String> validateOrFixIosPath(
   return musicDir.path;
 }
 
-/// Detailed result for iOS path validation
 class IosPathValidationResult {
   final bool isValid;
   final String? errorReason;
@@ -286,7 +285,6 @@ final _cueTrackSuffix = RegExp(r'#track\d+$');
 const cueVirtualTrackRequiresSplitMessage =
     'This CUE track is virtual. Use Split into Tracks first.';
 
-/// Whether the path is a CUE virtual path (contains #trackNN suffix).
 bool isCueVirtualPath(String? path) {
   return path != null && _cueTrackSuffix.hasMatch(path);
 }
