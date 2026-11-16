@@ -47,6 +47,12 @@ class SubsonicFixture {
   List<int>? audio;
   List<int>? cover;
 
+  /// Emulate a server-selected transcode, independent of catalogue format.
+  String? streamContentType;
+  bool chunkedStream = false;
+  List<int> Function(int seconds)? audioAtOffset;
+  List<Map<String, dynamic>> extensions = [];
+
   /// The OpenSubsonic `type` of every response (`mornye` for a desktop).
   String? type;
 
@@ -149,15 +155,28 @@ class SubsonicFixture {
               method == 'getCoverArt') &&
           !mediaError) {
         final isAudio = method != 'getCoverArt';
+        final transcode = method == 'stream' && chunkedStream;
         response.headers.contentType = ContentType.parse(
-          isAudio ? song['contentType'] as String : 'image/png',
+          method == 'stream' && streamContentType != null
+              ? streamContentType!
+              : isAudio
+              ? song['contentType'] as String
+              : 'image/png',
         );
         if (!isAudio && coverEtag != null) {
           response.headers.set('etag', coverEtag!);
         }
-        final range = request.headers.value('range');
+        final range = transcode ? null : request.headers.value('range');
         response.statusCode = range == null ? 200 : 206;
-        final media = (isAudio ? audio : cover) ?? [0, 1, 2, 3];
+        final offset =
+            int.tryParse(request.uri.queryParameters['timeOffset'] ?? '0') ?? 0;
+        final media =
+            (method == 'stream' && audioAtOffset != null
+                ? audioAtOffset!(offset)
+                : isAudio
+                ? audio
+                : cover) ??
+            [0, 1, 2, 3];
         final part = networkByteRange(range, media.length);
         if (range != null) {
           response.headers.set(
@@ -165,14 +184,15 @@ class SubsonicFixture {
             'bytes ${part.start}-${part.end}/${media.length}',
           );
         }
-        response.headers.set('accept-ranges', 'bytes');
+        response.headers.set('accept-ranges', transcode ? 'none' : 'bytes');
         final bytes = media.sublist(part.start, part.end + 1);
-        response.contentLength = bytes.length;
+        if (!transcode) response.contentLength = bytes.length;
         response.add(bytes);
       } else {
         final query = request.uri.queryParameters;
         final songs = library;
         final payload = switch (method) {
+          'getOpenSubsonicExtensions' => {'openSubsonicExtensions': extensions},
           'getAlbumList2' when songs != null => {
             'albumList2': {
               'album': [

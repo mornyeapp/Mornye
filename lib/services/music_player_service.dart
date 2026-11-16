@@ -29,6 +29,7 @@ import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/music_playback_deck.dart';
+import 'package:mornye/services/subsonic_playback_deck.dart';
 import 'package:mornye/services/network_playback_cache.dart';
 import 'package:mornye/services/network_storage_service.dart'
     show subsonicSongIdFromPath;
@@ -1129,7 +1130,9 @@ class MusicPlayerHandler extends BaseAudioHandler
   );
 
   Future<void> refreshOutputStatus() async {
-    final player = _player;
+    final player = _player is SubsonicPlaybackDeck
+        ? (_player as SubsonicPlaybackDeck).inner
+        : _player;
     if (player is AudioplayersPlaybackDeck) await player.refreshNativeStatus();
   }
 

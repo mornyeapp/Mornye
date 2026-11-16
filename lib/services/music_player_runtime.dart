@@ -36,6 +36,7 @@ import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/network_metadata_service.dart';
 import 'package:mornye/services/network_playback_cache.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/services/subsonic_playback_deck.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_notification.dart';
@@ -202,6 +203,13 @@ class PlaybackDependencies {
   // back to audioplayers, which has no equalizer there. macOS plays through
   // AVPlayer and moves to libmpv for exclusive output (hog mode).
   static PlaybackDeck _createDeck(String playerId) {
+    return SubsonicPlaybackDeck(
+      inner: _createEngineDeck(playerId),
+      lookup: NetworkStorageService.instance.subsonicPlayback,
+    );
+  }
+
+  static PlaybackDeck _createEngineDeck(String playerId) {
     if (playbackEngine == PlaybackEngine.mediaKit &&
         MediaKitPlaybackDeck.isAvailable) {
       return MediaKitPlaybackDeck(playerId: playerId);

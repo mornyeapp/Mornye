@@ -347,6 +347,137 @@ void main() {
     },
   );
 
+  for (final chunked in [false, true]) {
+    test(
+      'server-selected Opus stream is forwarded (chunked=$chunked)',
+      () async {
+        server.streamContentType = 'audio/ogg';
+        server.chunkedStream = chunked;
+        server.audio = [79, 103, 103, 83, 1, 2, 3, 4];
+        final song = SubsonicSong(server.song);
+        final source = NetworkStorageService.source('fixture', song.path);
+        final url = Uri.parse(await storage.resolve(source));
+        final http = HttpClient();
+        addTearDown(() => http.close(force: true));
+        final request = await http.getUrl(url);
+        request.headers.set('range', 'bytes=0-');
+        final response = await request.close();
+        expect(response.statusCode, chunked ? 200 : 206);
+        expect(response.headers.contentType!.mimeType, 'audio/ogg');
+        expect(
+          response.headers.value('accept-ranges'),
+          chunked ? 'none' : 'bytes',
+        );
+        expect(response.contentLength, chunked ? -1 : server.audio!.length);
+        expect(await response.expand((chunk) => chunk).toList(), server.audio);
+        final parameters = server.requests.last.queryParameters;
+        expect(parameters['c'], 'Mornye');
+        expect(parameters['id'], server.song['id']);
+        expect(parameters, isNot(contains('format')));
+        expect(parameters, isNot(contains('maxBitRate')));
+      },
+    );
+  }
+
+  test(
+    'transcodeOffset discovery and seek preserve server player settings',
+    () async {
+      server.extensions = [
+        {
+          'name': 'transcodeOffset',
+          'versions': [1],
+        },
+      ];
+      server.chunkedStream = true;
+      server.streamContentType = 'audio/ogg';
+      final source = NetworkStorageService.source(
+        'fixture',
+        SubsonicSong(server.song).path,
+      );
+      final url = await storage.resolve(source);
+      final stream = (await storage.subsonicPlayback(url))!;
+      expect(stream.duration, const Duration(seconds: 243));
+      final http = HttpClient();
+      addTearDown(() => http.close(force: true));
+      final first = await (await http.getUrl(Uri.parse(url))).close();
+      await first.drain<void>();
+      expect(stream.requiresOffset(url), isTrue);
+      for (final second in [90, 15, 0]) {
+        final seek = await http.getUrl(
+          Uri.parse(stream.at(Duration(seconds: second))),
+        );
+        seek.headers.set('range', 'bytes=100-');
+        final response = await seek.close();
+        expect(response.statusCode, 200);
+        expect(response.headers.contentType!.mimeType, 'audio/ogg');
+        await response.drain<void>();
+        expect(server.requests.last.queryParameters['timeOffset'], '$second');
+        expect(server.requests.last.queryParameters['c'], 'Mornye');
+        expect(server.requests.last.queryParameters, isNot(contains('format')));
+        expect(
+          server.requests.last.queryParameters,
+          isNot(contains('maxBitRate')),
+        );
+        expect(server.ranges.last, 'bytes=100-');
+      }
+      server.chunkedStream = false;
+      final cached = await http.getUrl(
+        Uri.parse(stream.at(const Duration(seconds: 30))),
+      );
+      cached.headers.set('range', 'bytes=1-2');
+      final cachedResponse = await cached.close();
+      expect(cachedResponse.statusCode, 206);
+      expect(cachedResponse.headers.value('content-range'), 'bytes 1-2/4');
+      expect(await cachedResponse.expand((chunk) => chunk).toList(), [1, 2]);
+    },
+  );
+
+  test(
+    'offset discovery leaves unsupported and unrelated sources alone',
+    () async {
+      final source = NetworkStorageService.source(
+        'fixture',
+        SubsonicSong(server.song).path,
+      );
+      final url = await storage.resolve(source);
+      expect(await storage.subsonicPlayback(url), isNull);
+      server.extensions = [
+        {
+          'name': 'transcodeOffset',
+          'versions': [2],
+        },
+      ];
+      expect(await storage.subsonicPlayback(url), isNull);
+      server.errorCode = 0;
+      server.failMethod = 'getOpenSubsonicExtensions';
+      expect(await storage.subsonicPlayback(url), isNull);
+      final count = server.requests.length;
+      expect(
+        await storage.subsonicPlayback('https://example.com/song.flac'),
+        isNull,
+      );
+      expect(server.requests, hasLength(count));
+    },
+  );
+
+  test('invalid time offsets do not reach the upstream server', () async {
+    final source = NetworkStorageService.source(
+      'fixture',
+      SubsonicSong(server.song).path,
+    );
+    final url = await storage.resolve(source);
+    final http = HttpClient();
+    addTearDown(() => http.close(force: true));
+    for (final invalid in ['-1', 'NaN', '1.5', 'bad']) {
+      final response = await (await http.getUrl(
+        Uri.parse(url).replace(queryParameters: {'timeOffset': invalid}),
+      )).close();
+      expect(response.statusCode, 400);
+      await response.drain<void>();
+    }
+    expect(server.requests, isEmpty);
+  });
+
   test(
     'stream and artwork use fresh authentication, support range and restore',
     () async {
@@ -373,7 +504,11 @@ void main() {
       expect(response.statusCode, 206);
       expect(response.headers.value('content-range'), 'bytes 1-2/4');
       expect(await response.expand((chunk) => chunk).toList(), [1, 2]);
-      expect(server.requests.last.queryParameters['format'], 'raw');
+      expect(server.requests.last.queryParameters, isNot(contains('format')));
+      expect(
+        server.requests.last.queryParameters,
+        isNot(contains('maxBitRate')),
+      );
       expect(server.requests.last.queryParameters['id'], server.song['id']);
       final head = await (await http.openUrl('HEAD', Uri.parse(url))).close();
       await head.drain<void>();

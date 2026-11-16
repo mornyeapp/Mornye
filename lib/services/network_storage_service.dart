@@ -382,6 +382,7 @@ class NetworkStorageService {
   Future<HttpServer>? _server;
   Future<void> _mutation = Future.value();
   final _routes = <String, ({String id, String path})>{};
+  final _streamRanges = <String, bool>{};
   final _readClients =
       <
         ({
@@ -445,7 +446,14 @@ class NetworkStorageService {
     final next = [...await connections()]..removeWhere((c) => c.id == id);
     await _write(jsonEncode(next.map((c) => c.toJson()).toList()));
     _connections = List.unmodifiable(next);
+    final retired = _routes.entries
+        .where((entry) => entry.value.id == id)
+        .map((entry) => '/${entry.key}')
+        .toSet();
     _routes.removeWhere((_, route) => route.id == id);
+    _streamRanges.removeWhere(
+      (url, _) => retired.contains(Uri.parse(url).path),
+    );
     _closeReadClients(id, force: true);
     await connectionRemovals.publish(id);
   });
@@ -686,7 +694,9 @@ class NetworkStorageService {
         ? '${newId()}.$suffix'
         : newId();
     while (_routes.length >= 256) {
-      _routes.remove(_routes.keys.first);
+      final retired = _routes.keys.first;
+      _routes.remove(retired);
+      _streamRanges.removeWhere((url, _) => Uri.parse(url).path == '/$retired');
     }
     _routes[token] = (id: host, path: path);
     return 'http://127.0.0.1:${server.port}/$token';
@@ -1340,9 +1350,10 @@ class NetworkStorageService {
     String path, {
     String method = 'GET',
     String? range,
+    int? timeOffset,
   }) async {
     final target = c.protocol == NetworkProtocol.subsonic
-        ? _subsonicMediaTarget(c, path)
+        ? _subsonicMediaTarget(c, path, timeOffset: timeOffset)
         : networkTarget(c, path);
     if (c.protocol == NetworkProtocol.smb) {
       final smb = await _smb(c, target, shared: true);
@@ -1448,12 +1459,36 @@ class NetworkStorageService {
       }
       final c = await connection(route.id);
       final range = request.headers.value(HttpHeaders.rangeHeader);
+      final requestedOffset = request.uri.queryParameters['timeOffset'];
+      final offset = requestedOffset == null
+          ? null
+          : int.tryParse(requestedOffset);
+      if (requestedOffset != null && (offset == null || offset < 0)) {
+        request.response.statusCode = HttpStatus.badRequest;
+        return;
+      }
       read = await _openRead(
         c,
         route.path,
         method: request.method,
         range: range,
+        timeOffset: offset,
       );
+      if (route.path.startsWith('subsonic/song/') &&
+          read.status >= 200 &&
+          read.status < 300) {
+        final url =
+            'http://127.0.0.1:${request.connectionInfo!.localPort}${request.uri}';
+        // One entry per route is enough: a restarted transcode also needs
+        // time-based seeking, even if a later segment becomes cached.
+        final base = Uri.parse(url).replace(query: null).toString();
+        _streamRanges[base] =
+            read.status == HttpStatus.partialContent ||
+            int.tryParse(read.headers[HttpHeaders.contentLengthHeader] ?? '') !=
+                null ||
+            read.headers[HttpHeaders.acceptRangesHeader]?.toLowerCase() ==
+                'bytes';
+      }
       request.response.statusCode = read.status >= 300 && read.status < 400
           ? HttpStatus.badGateway
           : read.status;
@@ -1586,6 +1621,7 @@ class NetworkStorageService {
     final server = _server;
     _server = null;
     _routes.clear();
+    _streamRanges.clear();
     for (final client in _readClients.values) {
       client.close(force: true);
     }

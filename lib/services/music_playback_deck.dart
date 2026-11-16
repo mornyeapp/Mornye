@@ -274,6 +274,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   final _completions = StreamController<void>.broadcast();
   final _subscriptions = <StreamSubscription<dynamic>>[];
   AsyncError? _ordinaryError;
+  bool _ordinaryNetwork = false;
   StreamSubscription<dynamic>? _nativeSubscription;
   StreamSubscription<Duration>? _positionSubscription;
   Duration _positionInterval = const Duration(milliseconds: 200);
@@ -283,6 +284,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   bool _direct = false;
   bool _preparing = false;
   Completer<void>? _ordinaryPreparation;
+  Completer<void>? _ordinarySeek;
   bool _disposed = false;
   int _token = 0;
   Duration? _duration;
@@ -300,6 +302,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   bool get needsSourceReload => _direct && _routeLost;
   @override
   Future<void> cancelPreparation() async {
+    _cancelOrdinarySeek();
     if (_preparing) await stop();
     final preparation = _ordinaryPreparation;
     if (preparation == null) return;
@@ -337,7 +340,9 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
 
   @override
   Future<void> configureOutput() async {
-    await _ordinary.setReleaseMode(ReleaseMode.stop);
+    await _ordinary.setReleaseMode(
+      _ordinaryNetwork ? ReleaseMode.release : ReleaseMode.stop,
+    );
     // audioplayers has no audio context outside Android and iOS.
     if (Platform.isAndroid || Platform.isIOS) {
       await _ordinary.setAudioContext(_musicAudioContext);
@@ -367,7 +372,12 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
 
   @override
   Future<void> setNetworkSource(String url, {bool arriving = false}) async {
+    // STOP mode rewinds a file, but Android stops and prepares an unknown-
+    // duration live stream again. Retire HTTP sources instead of reopening
+    // the previous transcode while changing tracks or seeking.
+    await _ordinary.setReleaseMode(ReleaseMode.release);
     await stop();
+    _ordinaryNetwork = true;
     _source = null;
     _routeLost = false;
     _nativeStarted = false;
@@ -391,6 +401,8 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     bool dapExclusive = false,
   }) async {
     await stop();
+    _ordinaryNetwork = false;
+    await _ordinary.setReleaseMode(ReleaseMode.stop);
     final source = DeviceFileSource(path);
     _source = source;
     _routeLost = false;
@@ -657,7 +669,18 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
 
   @override
   Future<void> seek(Duration position) async {
-    if (!_direct) return _ordinary.seek(position);
+    if (!_direct) {
+      _cancelOrdinarySeek();
+      final abandoned = _ordinarySeek = Completer<void>();
+      try {
+        // Android may never report seek completion for a live transcode.
+        // Pause/Next must not queue behind audioplayers' 30-second timeout.
+        await Future.any([_ordinary.seek(position), abandoned.future]);
+      } finally {
+        if (identical(_ordinarySeek, abandoned)) _ordinarySeek = null;
+      }
+      return;
+    }
     final token = _token;
     await _channel.invokeMethod<void>('seek', {
       'position': position.inMilliseconds,
@@ -701,6 +724,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
 
   @override
   Future<void> stop() async {
+    _cancelOrdinarySeek();
     _timer?.cancel();
     if (_direct || _preparing) {
       _token = ++_nextToken;
@@ -713,6 +737,12 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
       usbAudioStatus.value = const UsbAudioStatus();
     }
     await _ordinary.stop();
+  }
+
+  void _cancelOrdinarySeek() {
+    final pending = _ordinarySeek;
+    _ordinarySeek = null;
+    if (pending != null && !pending.isCompleted) pending.complete();
   }
 
   @override
