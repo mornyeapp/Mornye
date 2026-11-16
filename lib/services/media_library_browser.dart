@@ -363,10 +363,15 @@ class MediaLibraryBrowser {
           key: row['album_key'] as String?,
           name: row['album_name'] as String? ?? '',
           artist: row['artist_name'] as String? ?? '',
-          cover: row['cover_url'] as String?,
+          cover: _rowCover(row),
         ),
     ];
   }
+
+  /// The cover of an album or artist row: the cover file of scanned songs,
+  /// else the web cover of downloaded ones.
+  static String? _rowCover(Map<String, dynamic> row) =>
+      row['cover_path'] as String? ?? row['cover_url'] as String?;
 
   Future<List<MediaItem>> _artistItems() async {
     final rows = await library.getQueueArtistPage(
@@ -375,10 +380,7 @@ class MediaLibraryBrowser {
     return [
       for (final row in rows)
         if ((row['artist_name'] as String? ?? '').isNotEmpty)
-          _artistItem(
-            row['artist_name'] as String,
-            cover: row['cover_url'] as String?,
-          ),
+          _artistItem(row['artist_name'] as String, cover: _rowCover(row)),
     ];
   }
 

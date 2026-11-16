@@ -460,12 +460,17 @@ void main() {
         reason: 'only a path the system reported is the same folder',
       );
     });
+    // As the Library query answers: a scanned album's cover file under
+    // cover_path, a downloaded album's web cover under cover_url.
     Map<String, dynamic> album(String name, String? cover) => {
       'queue_source': 'local',
       'album_key': name,
       'album_name': name,
       'artist_name': 'Artist',
-      'cover_url': cover,
+      if (cover != null && cover.startsWith('http'))
+        'cover_url': cover
+      else
+        'cover_path': cover,
     };
     Map<String, String?> art(List<MediaItem> items) => {
       for (final item in items) item.title: item.artUri?.toString(),
@@ -497,7 +502,7 @@ void main() {
           {
             'artist_key': 'artist',
             'artist_name': 'Artist',
-            'cover_url': '$library/artist.jpg',
+            'cover_path': '$library/artist.jpg',
           },
         ],
       );
