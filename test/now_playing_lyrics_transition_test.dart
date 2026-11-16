@@ -1291,12 +1291,12 @@ void main() {
     );
     MornyeControlsDim dim() => tester.widget(find.byType(MornyeControlsDim));
     expect(contrast.enabled, isTrue);
-    expect(dim().visible, isFalse);
+    expect(dim().strength, 0);
     const color = Colors.white;
-    for (final light in [true, false]) {
-      contrast.onDimChanged(light);
+    for (final strength in [1.0, 0.35, 0.0]) {
+      contrast.onDim(strength);
       await tester.pump();
-      expect(dim().visible, light);
+      expect(dim().strength, strength);
       expect(
         tester.widget<MornyePlayerBackground>(
           find.byType(MornyePlayerBackground),
@@ -1324,6 +1324,48 @@ void main() {
         color,
       );
     }
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a cover read before opens with its layer', (tester) async {
+    // The sample's own result is driven below instead.
+    MornyeArtworkContrast.debugReadback = (_, _) =>
+        Completer<ui.Image>().future;
+    addTearDown(() => MornyeArtworkContrast.debugReadback = null);
+    final song = item(
+      'first',
+    ).copyWith(artUri: Uri.parse('file:///covers/remembered-dim.jpg'));
+    Future<void> open() async {
+      await pumpNowPlaying(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        size: const Size(393, 852),
+      );
+      mediaItems.add(song);
+      await settlePlayer(tester);
+      ProviderScope.containerOf(
+        tester.element(find.byType(NowPlayingScreen)),
+      ).read(settingsProvider.notifier).setPlayerCoverStyle('fullscreen');
+      await settlePlayer(tester);
+    }
+
+    MornyeControlsDim dim() => tester.widget(find.byType(MornyeControlsDim));
+    void read(double strength) => tester
+        .widget<MornyeArtworkContrast>(find.byType(MornyeArtworkContrast))
+        .onDim(strength);
+
+    await open();
+    expect(dim().strength, 0);
+    read(0.6);
+    await tester.pump();
+    expect(dim().strength, 0.6);
+
+    await tester.pumpWidget(const SizedBox());
+    await open();
+    expect(dim().strength, 0.6);
+
+    // Leaves nothing behind for the cover.
+    read(0);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -4101,7 +4143,7 @@ void main() {
           tester.widget(find.byType(MornyePlayerBackground));
       MornyeControlsDim dim() => tester.widget(find.byType(MornyeControlsDim));
       expect(background().artwork, isNotNull);
-      expect(dim().visible, isTrue);
+      expect(dim().strength, 1);
 
       // The gradient and its fade must not fall back to the still cover's
       // layout for the frames the lookup takes, and then return.
@@ -4109,10 +4151,10 @@ void main() {
       for (var frame = 0; frame < 10; frame++) {
         await tester.pump(const Duration(milliseconds: 16));
         expect(background().artwork, isNotNull, reason: 'frame $frame');
-        expect(dim().visible, isTrue, reason: 'frame $frame');
+        expect(dim().strength, 1, reason: 'frame $frame');
       }
       await settlePlayer(tester);
-      expect(dim().visible, isTrue);
+      expect(dim().strength, 1);
       expect(tester.takeException(), isNull);
     },
   );

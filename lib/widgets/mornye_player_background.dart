@@ -150,21 +150,25 @@ class MornyePlayerBackground extends StatelessWidget {
   }
 }
 
+/// How dark [MornyeControlsDim] is at full strength.
+const mornyeControlsDimAlpha = 0.4;
+
 /// Keeps the player's white labels readable from the artwork's fade down: a
 /// soft dark layer over [MornyePlayerBackground] with the same artwork
-/// geometry. Moving artwork always has it; a still cover has it when the
-/// contrast sample finds a label background too light for white. It stays
-/// outside that sample, so turning it on does not change what is read.
+/// geometry. Moving artwork has all of it; a still cover has as much as the
+/// contrast sample asks for, none while white already reads on it. It stays
+/// outside that sample, so it does not change what is read.
 class MornyeControlsDim extends StatelessWidget {
   const MornyeControlsDim({
     super.key,
-    required this.visible,
+    required this.strength,
     this.squareArtwork = true,
     this.artworkAspectRatio,
     this.fadeStart = 0.58,
   });
 
-  final bool visible;
+  /// From 0 (no layer) to 1 (all of it).
+  final double strength;
   final bool squareArtwork;
   final double? artworkAspectRatio;
   final double fadeStart;
@@ -181,7 +185,7 @@ class MornyeControlsDim extends StatelessWidget {
     final end = ((start + artworkHeight / size.height) / 2).clamp(start, 1.0);
     return IgnorePointer(
       child: AnimatedOpacity(
-        opacity: visible ? 1 : 0,
+        opacity: strength.clamp(0.0, 1.0),
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
             : const Duration(milliseconds: 380),
@@ -195,7 +199,7 @@ class MornyeControlsDim extends StatelessWidget {
               colors: [
                 Colors.black.withValues(alpha: 0),
                 // 4.5:1 for white over a white frame mid-fade.
-                Colors.black.withValues(alpha: 0.4),
+                Colors.black.withValues(alpha: mornyeControlsDimAlpha),
               ],
             ),
           ),

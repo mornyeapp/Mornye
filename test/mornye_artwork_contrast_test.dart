@@ -1,10 +1,18 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/widgets/mornye_artwork_contrast.dart';
+import 'package:mornye/widgets/mornye_player_background.dart';
+
+/// Records in [reports] when the readings turn the dark layer on or off.
+ValueChanged<double> changes(List<bool> reports) => (strength) {
+  final on = strength > 0;
+  if (on != (reports.isNotEmpty && reports.last)) reports.add(on);
+};
 
 void main() {
   for (final interruption in ['none', 'disabled', 'background', 'hidden']) {
@@ -41,7 +49,7 @@ void main() {
                       key: capture,
                       enabled: enabled,
                       targets: {'header': target},
-                      onDimChanged: reports.add,
+                      onDim: changes(reports),
                       child: ColoredBox(color: color),
                     ),
                     Positioned(
@@ -136,7 +144,7 @@ void main() {
               key: capture,
               enabled: true,
               targets: {'header': target},
-              onDimChanged: reports.add,
+              onDim: changes(reports),
               child: RepaintBoundary(
                 child: ColoredBox(
                   color: Colors.black,
@@ -224,12 +232,33 @@ void main() {
     }
   });
 
-  testWidgets('any region too light for white labels turns the layer on', (
+  test('the layer is only as strong as white labels need', () {
+    expect(mornyeDimStrength(0), 0);
+    expect(mornyeDimStrength(mornyeLabelBackgroundLuminance), 0);
+    expect(mornyeDimStrength(1), 1);
+    var previous = 0.0;
+    for (var luminance = 0.0; luminance <= 1; luminance += 0.01) {
+      final strength = mornyeDimStrength(luminance);
+      expect(strength, greaterThanOrEqualTo(previous));
+      previous = strength;
+      if (strength == 0 || strength == 1) continue;
+      // Dimmed, the background is about as light as the limit: no darker
+      // than a step of the layer below it.
+      final scale = 1 - strength * mornyeControlsDimAlpha;
+      expect(
+        luminance * math.pow(scale, 2.2),
+        closeTo(mornyeLabelBackgroundLuminance, 0.03),
+        reason: 'luminance $luminance',
+      );
+    }
+  });
+
+  testWidgets('the lightest region sets how strong the layer is', (
     tester,
   ) async {
     final header = GlobalKey();
     final controls = GlobalKey();
-    final reports = <bool>[];
+    final reports = <double>[];
     Widget app(Color top, Color bottom) => MaterialApp(
       home: Stack(
         fit: StackFit.expand,
@@ -237,7 +266,7 @@ void main() {
           MornyeArtworkContrast(
             enabled: true,
             targets: {'header': header, 'controls': controls},
-            onDimChanged: reports.add,
+            onDim: reports.add,
             child: Column(
               children: [
                 Expanded(
@@ -278,52 +307,43 @@ void main() {
 
     await tester.pumpWidget(app(Colors.white, Colors.black));
     await sample();
-    expect(reports, [true]);
+    expect(reports.last, 1);
     // A light region anywhere keeps the one layer on.
     await tester.pumpWidget(app(Colors.black, Colors.white));
     await sample();
-    expect(reports, [true]);
+    expect(reports.last, 1);
     await tester.pumpWidget(app(Colors.black, Colors.black));
     await sample();
-    expect(reports, [true, false]);
+    expect(reports.last, 0);
+    final readings = reports.length;
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pumpWidget(app(Colors.white, Colors.black));
     await sample();
-    expect(reports, [true, false]);
+    expect(reports, hasLength(readings));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
     await sample();
-    expect(reports, [true, false, true]);
+    expect(reports, hasLength(greaterThan(readings)));
+    expect(reports.last, 1);
 
-    // A muted pink frame gives white text under 4.5:1, so it is dimmed too
-    // rather than given black labels.
-    const pastel = Color(0xffa08398);
-    expect(1.05 / (pastel.computeLuminance() + 0.05), lessThan(4.5));
-    await tester.pumpWidget(app(pastel, pastel));
+    // A mid-tone cover stays as bright as it is: white reads on it, though
+    // under 4.5:1.
+    const teal = Color(0xff4f8f96);
+    expect(1.05 / (teal.computeLuminance() + 0.05), inExclusiveRange(3.5, 4.5));
+    await tester.pumpWidget(app(teal, teal));
     await sample();
-    expect(reports, [true, false, true]);
+    expect(reports.last, 0);
 
-    // A gray between the two thresholds keeps whichever state it finds.
-    const dark = Color(0xff606060);
-    const between = Color(0xff727272);
-    const light = Color(0xff808080);
-    expect(between.computeLuminance(), inExclusiveRange(0.16, 0.18));
-    reports.clear();
-    await tester.pumpWidget(app(dark, dark));
+    // A light cover is dimmed as far as it needs, not all the way, rather
+    // than given black labels.
+    const silver = Color(0xffc0c0c0);
+    await tester.pumpWidget(app(silver, Colors.black));
     await sample();
-    expect(reports, [false]);
-    await tester.pumpWidget(app(between, dark));
-    await sample();
-    expect(reports, [false]);
-    await tester.pumpWidget(app(light, dark));
-    await sample();
-    expect(reports, [false, true]);
-    await tester.pumpWidget(app(between, dark));
-    await sample();
-    expect(reports, [false, true]);
-    await tester.pumpWidget(app(dark, dark));
-    await sample();
-    expect(reports, [false, true, false]);
+    expect(reports.last, inExclusiveRange(0.5, 0.9));
+    expect(
+      reports.last,
+      closeTo(mornyeDimStrength(silver.computeLuminance()), 0.051),
+    );
     await tester.pumpWidget(const SizedBox());
   });
 }

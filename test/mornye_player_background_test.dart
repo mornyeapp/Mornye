@@ -339,7 +339,7 @@ void main() {
       fit: StackFit.expand,
       children: [
         const MornyePlayerBackground(artUri: null, artwork: bright),
-        MornyeControlsDim(visible: dim),
+        MornyeControlsDim(strength: dim ? 1 : 0),
       ],
     );
     await tester.pumpWidget(

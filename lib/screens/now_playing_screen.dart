@@ -186,7 +186,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   final _expandedArtworkKey = GlobalKey();
   final _compactArtworkKey = GlobalKey();
   final _motionArtworkKey = GlobalKey();
-  final _artworkDim = ValueNotifier(false);
+  final _artworkDim = ValueNotifier(0.0);
+
+  /// The still cover [_artworkDim] belongs to, and what was read for the
+  /// covers shown before: a cover seen again starts with its layer, so the
+  /// player does not open bright and darken once the first reading lands.
+  String? _artworkDimCover;
+  static final _coverDim = <String, double>{};
   final _seekPreview = PlaybackSeekPreview();
   NowPlayingRoute? _artworkRoute;
 
@@ -469,9 +475,16 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         ? bottomInset.clamp(0.0, _homeIndicatorBelowRow)
         : null;
     // Labels stay white. Moving artwork is always dimmed behind them; a still
-    // cover is sampled to decide.
+    // cover is sampled to decide by how much.
     final samplesArtwork = fullBleed && motionArtwork == null;
-    if (!samplesArtwork) _artworkDim.value = false;
+    final dimCover = samplesArtwork ? mediaItem.artUri?.toString() : null;
+    if (!samplesArtwork) {
+      _artworkDim.value = 0;
+    } else if (dimCover != _artworkDimCover) {
+      // An unread cover keeps the layer it follows until its reading.
+      _artworkDim.value = _coverDim[dimCover] ?? _artworkDim.value;
+    }
+    _artworkDimCover = dimCover;
     Widget artwork() => MornyePlayerArtwork(
       mediaItem: mediaItem,
       videoUrl: motionArtwork?.source,
@@ -916,9 +929,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 'controls': _artworkControlsKey,
                 'volume': _artworkVolumeKey,
               },
-              onDimChanged: (dim) {
+              onDim: (dim) {
                 if (!mounted) return;
                 _artworkDim.value = dim;
+                final cover = _artworkDimCover;
+                if (cover == null) return;
+                if (_coverDim.length >= 64 && !_coverDim.containsKey(cover)) {
+                  _coverDim.remove(_coverDim.keys.first);
+                }
+                _coverDim[cover] = dim;
               },
               child: MornyePlayerBackground(
                 artUri: mediaItem.artUri,
@@ -936,10 +955,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     : null,
               ),
             ),
-            ValueListenableBuilder<bool>(
+            ValueListenableBuilder<double>(
               valueListenable: _artworkDim,
               builder: (context, dim, _) => MornyeControlsDim(
-                visible: showsFullArtwork && (motionArtwork != null || dim),
+                strength: !showsFullArtwork
+                    ? 0
+                    : motionArtwork != null
+                    ? 1
+                    : dim,
                 squareArtwork: squareArtwork,
                 artworkAspectRatio: artworkRatio,
                 fadeStart: fadeStart,
