@@ -411,6 +411,48 @@ void main() {
       expect(hashes['auto'], hashes['triangular']);
       expect(hashes['auto'], isNot(hashes['none']));
     });
+
+    test('every $resampler quality level converts, each its own way', () async {
+      if (!haveTools()) return;
+      if (resampler == 'soxr' && !haveSoxr) {
+        markTestSkipped('Requires FFmpeg built with libsoxr');
+        return;
+      }
+      final input = await source(24, 96000);
+      final hashes = <String, String>{};
+      for (final quality in [
+        null,
+        ...losslessResamplerQualityOptionsFor(resampler),
+      ]) {
+        final output = await FFmpegConversion.convertAudioFormat(
+          inputPath: input,
+          targetFormat: 'flac',
+          bitrate: '',
+          metadata: const {},
+          sourceBitDepth: 24,
+          losslessQuality: const LosslessConversionQuality(
+            maxSampleRate: 44100,
+          ),
+          losslessProcessing: LosslessConversionProcessing(
+            dither: 'none',
+            resampler: resampler,
+            resamplerQuality: quality,
+          ),
+          deleteOriginal: false,
+        );
+        expect(output, isNotNull, reason: '$quality');
+        hashes['$quality'] = await pcmHash(output!, 24);
+      }
+      // No choice is the resampler's default level; the levels all differ.
+      expect(
+        hashes['null'],
+        hashes[defaultLosslessResamplerQuality(resampler)],
+      );
+      expect(
+        hashes.values.toSet(),
+        hasLength(losslessResamplerQualityOptionsFor(resampler).length),
+      );
+    });
   }
 
   test('auto conversion writes ALAC M4A and then keeps it', () async {

@@ -196,6 +196,9 @@ class LinkLibraryExecutor {
           losslessProcessing: LosslessConversionProcessing(
             dither: options['dither'] as String? ?? 'none',
             resampler: options['resampler'] as String? ?? 'swr',
+            // Absent from a phone that predates the choice: the resampler's
+            // default level.
+            resamplerQuality: options['resamplerQuality'] as String?,
             highPass: options['ditherHighPass'] == true,
           ),
           keepOriginal: options['keepOriginal'] != false,

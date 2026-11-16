@@ -163,6 +163,7 @@ Future<void> runLinkLibraryAction(
                 'maxSampleRate': quality.maxSampleRate,
                 'dither': processing.dither,
                 'resampler': processing.resampler,
+                'resamplerQuality': processing.resamplerQuality,
                 'ditherHighPass': processing.highPass,
               }),
         ),

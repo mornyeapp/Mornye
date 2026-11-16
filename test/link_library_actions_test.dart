@@ -128,6 +128,7 @@ void main() {
               const LosslessConversionProcessing(
                 dither: 'triangular',
                 resampler: 'soxr',
+                resamplerQuality: 'very_high',
               ),
               true,
             );
@@ -145,6 +146,7 @@ void main() {
           'maxSampleRate': 44100,
           'dither': 'triangular',
           'resampler': 'soxr',
+          'resamplerQuality': 'very_high',
           'ditherHighPass': false,
         });
         expect(accepted, 1);

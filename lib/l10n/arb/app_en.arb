@@ -8802,6 +8802,64 @@
   "@trackConvertResamplerSoxr": {
     "description": "Lossless conversion SoX resampler option"
   },
+  "trackConvertResamplerQuality": "Quality",
+  "@trackConvertResamplerQuality": {
+    "description": "Title of the resampler quality slider in the convert sheet"
+  },
+  "trackConvertResamplerQualityFast": "Fast",
+  "@trackConvertResamplerQualityFast": {
+    "description": "Lowest resampler quality level"
+  },
+  "trackConvertResamplerQualityMedium": "Medium",
+  "@trackConvertResamplerQualityMedium": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityHigh": "High",
+  "@trackConvertResamplerQualityHigh": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityVeryHigh": "Very high",
+  "@trackConvertResamplerQualityVeryHigh": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityBest": "Best",
+  "@trackConvertResamplerQualityBest": {
+    "description": "Highest resampler quality level"
+  },
+  "trackConvertResamplerQualityDescription": "Higher levels resample more accurately and take longer.",
+  "@trackConvertResamplerQualityDescription": {
+    "description": "Explains the resampler quality slider"
+  },
+  "trackConvertResamplerSwrDetail": "{taps}-tap filter",
+  "@trackConvertResamplerSwrDetail": {
+    "description": "What the chosen SWR quality level uses: the length of its filter",
+    "placeholders": {
+      "taps": {
+        "type": "int"
+      }
+    }
+  },
+  "trackConvertResamplerSoxrDetail": "{bits}-bit precision",
+  "@trackConvertResamplerSoxrDetail": {
+    "description": "What the chosen SoXR quality level uses: its calculation precision",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      }
+    }
+  },
+  "trackConvertResamplerSoxrPresetDetail": "{bits}-bit precision, SoX {preset}",
+  "@trackConvertResamplerSoxrPresetDetail": {
+    "description": "What the chosen SoXR quality level uses, with the SoX name of that preset (HQ or VHQ)",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      },
+      "preset": {
+        "type": "String"
+      }
+    }
+  },
   "updateSeeReleaseNotes": "See release notes for details.",
   "@updateSeeReleaseNotes": {
     "description": "Fallback changelog text when release notes cannot be parsed"

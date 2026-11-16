@@ -126,6 +126,75 @@ void main() {
       ]);
       expect(losslessResamplerFilterOptions(swr), ['resampler=swr']);
     });
+
+    test('each resampler offers its own quality levels', () {
+      List<String> options(String resampler, String? quality) =>
+          losslessResamplerFilterOptions(
+            LosslessConversionProcessing(
+              resampler: resampler,
+              resamplerQuality: quality,
+            ),
+          );
+
+      expect(losslessResamplerQualityOptionsFor('swr'), [
+        'fast',
+        'medium',
+        'high',
+        'very_high',
+        'best',
+      ]);
+      expect(options('swr', 'fast'), ['resampler=swr', 'filter_size=16']);
+      // Medium is the library's own filter, as before the choice existed.
+      expect(options('swr', 'medium'), ['resampler=swr']);
+      expect(options('swr', null), ['resampler=swr']);
+      expect(options('swr', 'high'), ['resampler=swr', 'filter_size=64']);
+      expect(options('swr', 'very_high'), [
+        'resampler=swr',
+        'filter_size=128',
+        'kaiser_beta=12',
+      ]);
+      expect(options('swr', 'best'), [
+        'resampler=swr',
+        'filter_size=256',
+        'kaiser_beta=16',
+      ]);
+
+      expect(losslessResamplerQualityOptionsFor('soxr'), [
+        'medium',
+        'high',
+        'very_high',
+        'best',
+      ]);
+      expect(options('soxr', 'medium'), ['resampler=soxr', 'precision=16']);
+      // SoX's High Quality and Very High Quality recipes.
+      expect(options('soxr', 'high'), ['resampler=soxr', 'precision=20']);
+      expect(options('soxr', 'very_high'), ['resampler=soxr', 'precision=28']);
+      expect(options('soxr', 'best'), options('soxr', null));
+    });
+
+    test('an unknown quality level falls back to the default', () {
+      const soxrFast = LosslessConversionProcessing(
+        resampler: 'soxr',
+        resamplerQuality: 'fast',
+      );
+      expect(soxrFast.normalizedResamplerQuality, 'best');
+      expect(soxrFast.hasDefaultResamplerQuality, isTrue);
+      const other = LosslessConversionProcessing(resamplerQuality: 'other');
+      expect(other.normalizedResamplerQuality, 'medium');
+      const high = LosslessConversionProcessing(
+        dither: 'auto',
+        resamplerQuality: ' High ',
+      );
+      expect(high.normalizedResamplerQuality, 'high');
+      expect(high.hasDefaultResamplerQuality, isFalse);
+      // Resolving Smart dither keeps the level.
+      expect(
+        high
+            .resolveDither(sourceBitDepth: 24, targetBitDepth: 16)
+            .normalizedResamplerQuality,
+        'high',
+      );
+    });
   });
 
   group('kept conversion output identity', () {

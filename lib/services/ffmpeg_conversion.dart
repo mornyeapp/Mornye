@@ -443,7 +443,8 @@ abstract final class FFmpegConversion {
       '${targetBitDepth != null ? ' $targetBitDepth-bit' : ''}'
       '${targetSampleRate != null ? ' @ ${targetSampleRate}Hz' : ''}'
       '${processing.hasDither ? ' dither=${processing.normalizedDither}' : ''}'
-      '${processing.normalizedResampler != 'swr' ? ' resampler=${processing.normalizedResampler}' : ''}',
+      '${processing.normalizedResampler != 'swr' ? ' resampler=${processing.normalizedResampler}' : ''}'
+      '${processing.hasDefaultResamplerQuality ? '' : ' quality=${processing.normalizedResamplerQuality}'}',
     );
     final result = await FFmpegExecution.arguments(arguments);
     if (!result.success) {
@@ -529,7 +530,8 @@ abstract final class FFmpegConversion {
       '${container.toUpperCase()} (${use24 ? 24 : 16}-bit'
       '${targetSampleRate != null ? ', ${targetSampleRate}Hz' : ''}'
       '${processing.hasDither ? ', dither=${processing.normalizedDither}' : ''}'
-      '${processing.normalizedResampler != 'swr' ? ', resampler=${processing.normalizedResampler}' : ''})',
+      '${processing.normalizedResampler != 'swr' ? ', resampler=${processing.normalizedResampler}' : ''}'
+      '${processing.hasDefaultResamplerQuality ? '' : ', quality=${processing.normalizedResamplerQuality}'})',
     );
     final result = await FFmpegExecution.arguments(arguments);
     if (!result.success) {

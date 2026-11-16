@@ -7676,6 +7676,64 @@
   "@trackConvertResamplerSoxr": {
     "description": "Lossless conversion SoX resampler option"
   },
+  "trackConvertResamplerQuality": "Kualitas",
+  "@trackConvertResamplerQuality": {
+    "description": "Title of the resampler quality slider in the convert sheet"
+  },
+  "trackConvertResamplerQualityFast": "Cepat",
+  "@trackConvertResamplerQualityFast": {
+    "description": "Lowest resampler quality level"
+  },
+  "trackConvertResamplerQualityMedium": "Sedang",
+  "@trackConvertResamplerQualityMedium": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityHigh": "Tinggi",
+  "@trackConvertResamplerQualityHigh": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityVeryHigh": "Sangat tinggi",
+  "@trackConvertResamplerQualityVeryHigh": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityBest": "Terbaik",
+  "@trackConvertResamplerQualityBest": {
+    "description": "Highest resampler quality level"
+  },
+  "trackConvertResamplerQualityDescription": "Tingkat yang lebih tinggi lebih akurat, tetapi konversinya lebih lama.",
+  "@trackConvertResamplerQualityDescription": {
+    "description": "Explains the resampler quality slider"
+  },
+  "trackConvertResamplerSwrDetail": "Filter {taps} tap",
+  "@trackConvertResamplerSwrDetail": {
+    "description": "What the chosen SWR quality level uses: the length of its filter",
+    "placeholders": {
+      "taps": {
+        "type": "int"
+      }
+    }
+  },
+  "trackConvertResamplerSoxrDetail": "Presisi {bits} bit",
+  "@trackConvertResamplerSoxrDetail": {
+    "description": "What the chosen SoXR quality level uses: its calculation precision",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      }
+    }
+  },
+  "trackConvertResamplerSoxrPresetDetail": "Presisi {bits} bit, SoX {preset}",
+  "@trackConvertResamplerSoxrPresetDetail": {
+    "description": "What the chosen SoXR quality level uses, with the SoX name of that preset (HQ or VHQ)",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      },
+      "preset": {
+        "type": "String"
+      }
+    }
+  },
   "updateSeeReleaseNotes": "Lihat catatan yang baru untuk detail.",
   "@updateSeeReleaseNotes": {
     "description": "Fallback changelog text when release notes cannot be parsed"
