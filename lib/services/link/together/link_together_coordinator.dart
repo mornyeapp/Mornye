@@ -185,6 +185,7 @@ class LinkTogetherCoordinator {
 
   LinkTogetherReport? _report;
   bool _reportFresh = false;
+  int? _checkLoggedAtMs;
   LinkTogetherReport? _lastPhone;
   LinkTogetherReport? _lastLeader;
   Timer? _poll;
@@ -445,12 +446,19 @@ class LinkTogetherCoordinator {
     final reported = phoneLeads ? desktop.positionMs : phoneAt;
     final rate = (phoneLeads ? raw : phone).rate;
     final nudging = aligner.nudging(now);
-    _log.d(
-      'Link: together, check: $who at ${reported}ms, expected '
-      '${reported - error}ms, drift ${error}ms, rate '
-      '${rate?.toStringAsFixed(2) ?? '?'}, nudge ${nudging ? 'on' : 'off'}'
-      '${aligner.settling(now) ? ', settling' : ''}',
-    );
+    final settling = aligner.settling(now);
+    // Every check would push all else out of the log within minutes.
+    final loggedAt = _checkLoggedAtMs;
+    if (loggedAt == null ||
+        now - loggedAt >= (nudging || settling ? 1000 : 5000)) {
+      _checkLoggedAtMs = now;
+      _log.d(
+        'Link: together, check: $who at ${reported}ms, expected '
+        '${reported - error}ms, drift ${error}ms, rate '
+        '${rate?.toStringAsFixed(2) ?? '?'}, nudge ${nudging ? 'on' : 'off'}'
+        '${settling ? ', settling' : ''}',
+      );
+    }
     final step = aligner.sample(error, now, canNudge: canNudge);
     final landing = aligner.takeLanding();
     if (landing != null) {
