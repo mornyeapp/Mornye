@@ -33,6 +33,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
@@ -386,6 +387,12 @@ class DownloadService : Service() {
     // cannot interrupt the blocking native call it may be sitting in, and
     // the shared pause/cancel flags get reset for the new run.
     @Volatile private var nativeWorkerGeneration = 0L
+    // True from a native queue start until the service stops. Workers count
+    // themselves busy while they run an item; a paused queue with no busy
+    // worker drops the wake lock and every waiter suspends on the signal.
+    @Volatile private var nativeWorkerRunActive = false
+    private val nativeWorkerBusyCount = AtomicInteger(0)
+    private val nativeWorkerSignal = NativeWorkerSignal()
 
     override fun onCreate() {
         super.onCreate()
@@ -467,6 +474,7 @@ class DownloadService : Service() {
                     nativeWorkerPaused = true
                 }
                 cancelActiveNativeItemForPause()
+                onNativeWorkerStateChanged()
                 writeNativeWorkerSnapshotAsync(
                     isRunning = nativeWorkerJob?.isActive == true,
                     isPaused = true,
@@ -480,6 +488,7 @@ class DownloadService : Service() {
                     nativeWorkerResumePending = nativeWorkerPausePendingIds.isNotEmpty()
                     nativeWorkerPaused = nativeWorkerResumePending
                 }
+                onNativeWorkerStateChanged()
                 val stillPaused = isNativeWorkerPaused()
                 writeNativeWorkerSnapshotAsync(
                     isRunning = nativeWorkerJob?.isActive == true,
@@ -516,6 +525,7 @@ class DownloadService : Service() {
                 }
                 NativeDownloadFinalizer.cancelActiveWork()
                 nativeWorkerJob?.cancel(CancellationException("Native queue cancelled"))
+                onNativeWorkerStateChanged()
                 writeNativeWorkerSnapshotAsync(
                     isRunning = false,
                     isPaused = false,
@@ -666,7 +676,7 @@ class DownloadService : Service() {
 
         isRunning = true
         lastNotificationSignature = null
-        ensureWakeLock()
+        refreshNativeWorkerWakeLock()
         pushWidgetState(0, 0)
     }
 
@@ -723,6 +733,8 @@ class DownloadService : Service() {
         nativeWorkerNetworkPaused = false
         nativeWorkerVerificationPaused = false
         nativeWorkerCancelRequested = false
+        nativeWorkerRunActive = true
+        nativeWorkerSignal.notifyChanged()
         unregisterNativeWorkerNetworkCallback()
         val workerSettings = try {
             JSONObject(settingsJson)
@@ -1052,7 +1064,7 @@ class DownloadService : Service() {
     }
 
     private fun finishNativePauseCancellation(itemId: String, generation: Long) {
-        synchronized(nativeWorkerItems) {
+        val resumed = synchronized(nativeWorkerItems) {
             if (generation != nativeWorkerGeneration) return
             nativeWorkerPausePendingIds.remove(itemId)
             // Resume may arrive before the blocking download unwinds. Keep the
@@ -1060,8 +1072,12 @@ class DownloadService : Service() {
             if (nativeWorkerResumePending && nativeWorkerPausePendingIds.isEmpty()) {
                 nativeWorkerResumePending = false
                 nativeWorkerPaused = false
+                true
+            } else {
+                false
             }
         }
+        if (resumed) onNativeWorkerStateChanged()
     }
 
     private suspend fun processConcurrentNativeRequest(
@@ -1074,11 +1090,12 @@ class DownloadService : Service() {
         rateLimitAttempts: ConcurrentHashMap<String, Int>,
     ) {
         while (!nativeWorkerCancelRequested && generation == nativeWorkerGeneration) {
-            while (isNativeWorkerPaused() &&
-                !nativeWorkerCancelRequested &&
-                generation == nativeWorkerGeneration
-            ) {
-                delay(500)
+            nativeWorkerSignal.awaitUntil {
+                !NativeWorkerPolicy.shouldWorkerWait(
+                    paused = isNativeWorkerPaused(),
+                    cancelRequested = nativeWorkerCancelRequested,
+                    currentGeneration = generation == nativeWorkerGeneration,
+                )
             }
             if (nativeWorkerCancelRequested || generation != nativeWorkerGeneration) return
 
@@ -1086,7 +1103,9 @@ class DownloadService : Service() {
             var retryCurrentRequest = false
             var directoryScope: AutoCloseable? = null
             var failureStage = "preparing output directory"
+            nativeWorkerBusyCount.incrementAndGet()
             try {
+                onNativeWorkerStateChanged()
                 directoryScope = coreBackend.openDownloadDirectoryForRequest(request.requestJson)
                 // Acquire the provider permit first. If several requests from
                 // one provider are queued, they must not occupy every global
@@ -1340,14 +1359,19 @@ class DownloadService : Service() {
                     includeItems = true,
                 )
             } finally {
-                directoryScope?.close()
-                finishNativePauseCancellation(request.itemId, generation)
-                if (progressInitialized) {
-                    updateNativeWorkerItemProgress(request.itemId)
-                    try {
-                        coreBackend.clearItemProgress(request.itemId)
-                    } catch (_: Exception) {
+                try {
+                    directoryScope?.close()
+                    finishNativePauseCancellation(request.itemId, generation)
+                    if (progressInitialized) {
+                        updateNativeWorkerItemProgress(request.itemId)
+                        try {
+                            coreBackend.clearItemProgress(request.itemId)
+                        } catch (_: Exception) {
+                        }
                     }
+                } finally {
+                    nativeWorkerBusyCount.decrementAndGet()
+                    onNativeWorkerStateChanged()
                 }
             }
 
@@ -1459,6 +1483,40 @@ class DownloadService : Service() {
         wakeLock.release()
     }
 
+    /** Holds the wake lock only while queue work can run; renews it when held. */
+    @Synchronized
+    internal fun refreshNativeWorkerWakeLock() {
+        if (!isRunning) return
+        val hold = NativeWorkerPolicy.shouldHoldWakeLock(
+            nativeRunActive = nativeWorkerRunActive,
+            paused = isNativeWorkerPaused(),
+            cancelRequested = nativeWorkerCancelRequested,
+            busyWorkers = nativeWorkerBusyCount.get(),
+            pollingForWifi = nativeWorkerNetworkPaused &&
+                nativeWorkerNetworkFallbackJob?.isActive == true,
+        )
+        if (hold) ensureWakeLock() else releaseWakeLock()
+    }
+
+    /**
+     * Call after every write to the pause, cancel, generation or busy state:
+     * wakes suspended workers and the progress coordinator, then applies the
+     * wake lock policy before the caller returns.
+     */
+    internal fun onNativeWorkerStateChanged() {
+        nativeWorkerSignal.notifyChanged()
+        refreshNativeWorkerWakeLock()
+    }
+
+    internal suspend fun awaitNativeWorkerProgressNeeded(generation: Long) {
+        nativeWorkerSignal.awaitUntil {
+            NativeWorkerPolicy.shouldPollProgress(
+                paused = isNativeWorkerPaused(),
+                busyWorkers = nativeWorkerBusyCount.get(),
+            ) || !isNativeWorkerProgressActive(generation)
+        }
+    }
+
     @Synchronized
     private fun stopForegroundService(cancelNativeWorker: Boolean = true) {
         cancelScheduledNativeWorkerItemsSnapshot()
@@ -1487,6 +1545,7 @@ class DownloadService : Service() {
         nativeWorkerDownloadNetworkMode = "any"
         nativeWorkerNetworkPaused = false
         nativeWorkerJob = null
+        nativeWorkerRunActive = false
         isRunning = false
         lastNotificationSignature = null
         widgetSignature = ""
@@ -1496,6 +1555,7 @@ class DownloadService : Service() {
             android.util.Log.w("DownloadService", "Widget clear failed: ${e.message}")
         }
         releaseWakeLock()
+        nativeWorkerSignal.notifyChanged()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -1517,9 +1577,9 @@ class DownloadService : Service() {
     @Synchronized
     internal fun updateNotification(progress: Long, total: Long) {
         if (!isRunning) return
-        // Keep the foreground-service wake lock alive even when the visible
-        // notification is unchanged and therefore deduplicated below.
-        ensureWakeLock()
+        // Apply the wake lock policy even when the visible notification is
+        // unchanged and therefore deduplicated below.
+        refreshNativeWorkerWakeLock()
 
         val visibleProgress = when {
             total <= 0L -> "indeterminate"
@@ -1543,10 +1603,6 @@ class DownloadService : Service() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(NOTIFICATION_ID, notification)
         pushWidgetState(progress, total)
-    }
-
-    internal fun maintainNativeWorkerWakeLock() {
-        if (isRunning) ensureWakeLock()
     }
 
     private fun pushWidgetState(progress: Long, total: Long) {

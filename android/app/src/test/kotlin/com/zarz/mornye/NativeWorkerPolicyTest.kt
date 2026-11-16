@@ -1,9 +1,16 @@
 package com.zarz.mornye
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class NativeWorkerPolicyTest {
     @Test
@@ -178,6 +185,130 @@ class NativeWorkerPolicyTest {
         assertEquals("completed", NativeWorkerPolicy.statusAfterWorkerStop("completed"))
         assertEquals("failed", NativeWorkerPolicy.statusAfterWorkerStop("failed"))
         assertEquals("skipped", NativeWorkerPolicy.statusAfterWorkerStop("skipped"))
+    }
+
+    @Test
+    fun pausedQueueWithNoBusyWorkerReleasesWakeLock() {
+        assertFalse(
+            NativeWorkerPolicy.shouldHoldWakeLock(
+                nativeRunActive = true,
+                paused = true,
+                cancelRequested = false,
+                busyWorkers = 0,
+                pollingForWifi = false,
+            ),
+        )
+    }
+
+    @Test
+    fun wakeLockStaysWhileWorkCanRun() {
+        fun hold(
+            nativeRunActive: Boolean = true,
+            paused: Boolean = true,
+            cancelRequested: Boolean = false,
+            busyWorkers: Int = 0,
+            pollingForWifi: Boolean = false,
+        ) = NativeWorkerPolicy.shouldHoldWakeLock(
+            nativeRunActive = nativeRunActive,
+            paused = paused,
+            cancelRequested = cancelRequested,
+            busyWorkers = busyWorkers,
+            pollingForWifi = pollingForWifi,
+        )
+
+        assertTrue(hold(paused = false))
+        assertTrue(hold(busyWorkers = 1))
+        assertTrue(hold(cancelRequested = true))
+        assertTrue(hold(pollingForWifi = true))
+        assertTrue(hold(nativeRunActive = false))
+    }
+
+    @Test
+    fun workersWaitOnlyWhilePausedInTheirOwnRun() {
+        assertTrue(
+            NativeWorkerPolicy.shouldWorkerWait(
+                paused = true,
+                cancelRequested = false,
+                currentGeneration = true,
+            ),
+        )
+        assertFalse(
+            NativeWorkerPolicy.shouldWorkerWait(
+                paused = false,
+                cancelRequested = false,
+                currentGeneration = true,
+            ),
+        )
+        assertFalse(
+            NativeWorkerPolicy.shouldWorkerWait(
+                paused = true,
+                cancelRequested = true,
+                currentGeneration = true,
+            ),
+        )
+        assertFalse(
+            NativeWorkerPolicy.shouldWorkerWait(
+                paused = true,
+                cancelRequested = false,
+                currentGeneration = false,
+            ),
+        )
+    }
+
+    @Test
+    fun progressPollingStopsOnceAPausedQueueIsIdle() {
+        assertFalse(NativeWorkerPolicy.shouldPollProgress(paused = true, busyWorkers = 0))
+        assertTrue(NativeWorkerPolicy.shouldPollProgress(paused = true, busyWorkers = 2))
+        assertTrue(NativeWorkerPolicy.shouldPollProgress(paused = false, busyWorkers = 0))
+    }
+
+    @Test
+    fun pausedWaitDoesNotPollUntilSignalled() = runBlocking {
+        val signal = NativeWorkerSignal()
+        val paused = AtomicBoolean(true)
+        val checks = AtomicInteger(0)
+        val waiter = launch(Dispatchers.Default) {
+            signal.awaitUntil {
+                checks.incrementAndGet()
+                !paused.get()
+            }
+        }
+
+        delay(1_600)
+        assertTrue(waiter.isActive)
+        assertTrue("checked ${checks.get()} times while paused", checks.get() <= 2)
+
+        paused.set(false)
+        signal.notifyChanged()
+        withTimeout(1_000) { waiter.join() }
+    }
+
+    @Test
+    fun signalNeverLosesAWakeupRacingTheWaiter() = runBlocking {
+        repeat(500) {
+            val signal = NativeWorkerSignal()
+            val paused = AtomicBoolean(true)
+            val waiter = launch(Dispatchers.Default) {
+                signal.awaitUntil { !paused.get() }
+            }
+            launch(Dispatchers.Default) {
+                paused.set(false)
+                signal.notifyChanged()
+            }
+            withTimeout(2_000) { waiter.join() }
+        }
+    }
+
+    @Test
+    fun cancelledWaiterStopsWithoutASignal() = runBlocking {
+        val signal = NativeWorkerSignal()
+        val waiter = launch(Dispatchers.Default) {
+            signal.awaitUntil { false }
+        }
+        delay(50)
+        waiter.cancel()
+        withTimeout(1_000) { waiter.join() }
+        assertTrue(waiter.isCancelled)
     }
 
     @Test

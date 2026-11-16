@@ -115,6 +115,7 @@ internal fun DownloadService.refreshNativeWorkerNetworkPause() {
     if (shouldPause == nativeWorkerNetworkPaused) return
 
     nativeWorkerNetworkPaused = shouldPause
+    onNativeWorkerStateChanged()
     if (nativeWorkerJob?.isActive != true) return
 
     if (shouldPause) {

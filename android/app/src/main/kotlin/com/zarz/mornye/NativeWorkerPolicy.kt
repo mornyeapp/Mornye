@@ -1,5 +1,9 @@
 package com.zarz.mornye
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+
 internal object NativeWorkerPolicy {
     const val MAX_RATE_LIMIT_RETRIES = 1
     private const val DEFAULT_RATE_LIMIT_DELAY_SECONDS = 30
@@ -79,5 +83,51 @@ internal object NativeWorkerPolicy {
     fun statusAfterWorkerStop(status: String): String = when (status) {
         "preparing", "downloading", "finalizing" -> "queued"
         else -> status
+    }
+
+    /**
+     * A paused or waiting native queue releases the wake lock once no worker
+     * is still running an item. Polling for Wi-Fi (no network callback) and
+     * the legacy progress-only mode keep it, as both need the CPU to advance.
+     */
+    fun shouldHoldWakeLock(
+        nativeRunActive: Boolean,
+        paused: Boolean,
+        cancelRequested: Boolean,
+        busyWorkers: Int,
+        pollingForWifi: Boolean,
+    ): Boolean = !nativeRunActive ||
+        !paused ||
+        cancelRequested ||
+        busyWorkers > 0 ||
+        pollingForWifi
+
+    fun shouldWorkerWait(
+        paused: Boolean,
+        cancelRequested: Boolean,
+        currentGeneration: Boolean,
+    ): Boolean = paused && !cancelRequested && currentGeneration
+
+    fun shouldPollProgress(
+        paused: Boolean,
+        busyWorkers: Int,
+    ): Boolean = !paused || busyWorkers > 0
+}
+
+/**
+ * Wakes coroutines suspended on native queue state. Every write that can end
+ * a wait (pause, resume, cancel, generation, network, busy workers) must call
+ * [notifyChanged] after it, so waiters need no timer.
+ */
+internal class NativeWorkerSignal {
+    private val version = MutableStateFlow(0L)
+
+    fun notifyChanged() {
+        version.update { it + 1 }
+    }
+
+    suspend fun awaitUntil(condition: () -> Boolean) {
+        if (condition()) return
+        version.first { condition() }
     }
 }

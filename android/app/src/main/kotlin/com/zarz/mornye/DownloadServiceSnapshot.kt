@@ -238,7 +238,9 @@ internal fun DownloadService.startNativeWorkerProgressCoordinator(generation: Lo
     val job = serviceScope.launch {
         val lastSignatures = mutableMapOf<String, String?>()
         while (isActive && isNativeWorkerProgressActive(generation)) {
-            maintainNativeWorkerWakeLock()
+            refreshNativeWorkerWakeLock()
+            awaitNativeWorkerProgressNeeded(generation)
+            if (!isNativeWorkerProgressActive(generation)) break
             val changedItemIds = pollNativeWorkerProgress(generation, connection)
             val snapshotItemIds = mutableListOf<String>()
             for (itemId in changedItemIds) {
