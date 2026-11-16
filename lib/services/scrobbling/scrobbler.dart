@@ -226,30 +226,41 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
       unknownTitle: _unknownTitle(),
       unknownArtist: _unknownArtist(),
     );
-    // Counting only matters while a song plays; an idle phone is not woken
-    // every second.
-    if (_active && _listening.playing) {
-      _ticker ??= Timer.periodic(
-        const Duration(seconds: 1),
-        (_) => _listening.tick(),
-      );
-    } else {
-      _ticker?.cancel();
-      _ticker = null;
-    }
+    _scheduleTick();
+  }
+
+  /// Wakes once, when the playing song can count, instead of every second.
+  void _scheduleTick() {
+    _ticker?.cancel();
+    final wait = _active ? _listening.untilScrobble : null;
+    _ticker = wait == null
+        ? null
+        : Timer(wait, () {
+            _listening.tick();
+            _scheduleTick();
+          });
   }
 
   void _configure() {
-    _ticker?.cancel();
     _retry?.cancel();
-    _ticker = null;
     _retry = null;
     _updateListening();
-    if (!_active) return;
-    _retry = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => unawaited(flush()),
-    );
+    _scheduleRetry();
+  }
+
+  /// Retries every 30 s while listens of this account wait; an empty queue
+  /// keeps no timer.
+  void _scheduleRetry() {
+    final username = _session?.username;
+    if (_active && _queue.any((entry) => entry.username == username)) {
+      _retry ??= Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => unawaited(flush()),
+      );
+    } else {
+      _retry?.cancel();
+      _retry = null;
+    }
   }
 
   /// Saves a session the service just granted and turns scrobbling on.
@@ -384,6 +395,7 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
     final oldest = _now().subtract(const Duration(days: 14));
     _queue.removeWhere((entry) => entry.started.isBefore(oldest));
     if (_queue.length > 2000) _queue.removeRange(0, _queue.length - 2000);
+    _scheduleRetry();
     await _saveSafely();
     unawaited(flush());
   }
@@ -392,7 +404,10 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
     if (!_initialized || !_active || !_durable || _queue.isEmpty) {
       return Future.value();
     }
-    return _flushing ??= _flush().whenComplete(() => _flushing = null);
+    return _flushing ??= _flush().whenComplete(() {
+      _flushing = null;
+      _scheduleRetry();
+    });
   }
 
   Future<void> _flush() async {

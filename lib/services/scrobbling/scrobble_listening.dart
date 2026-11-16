@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:audio_service/audio_service.dart';
 
 /// What every scrobbling service is told about a song. The saved form keeps
@@ -160,22 +162,36 @@ class ScrobbleListening {
     _submitIfEligible();
   }
 
-  void _submitIfEligible() {
-    final track = _track;
-    final duration = track?.duration;
-    if (_submitted ||
-        track == null ||
-        _started == null ||
-        duration == null ||
-        duration <= const Duration(seconds: 30)) {
-      return;
+  /// How far [elapsed] must advance after the last update or tick before
+  /// this listen counts, or null while nothing would count it.
+  Duration? get untilScrobble {
+    final threshold = _threshold;
+    if (!_playing || _submitted || _started == null || threshold == null) {
+      return null;
     }
-    final threshold = Duration(
+    final remaining = (threshold - _listened).inMicroseconds / _speed;
+    return Duration(microseconds: max(0, remaining.ceil()));
+  }
+
+  Duration? get _threshold {
+    final duration = _track?.duration;
+    if (duration == null || duration <= const Duration(seconds: 30)) {
+      return null;
+    }
+    return Duration(
       microseconds: (duration.inMicroseconds ~/ 2).clamp(
         0,
         const Duration(minutes: 4).inMicroseconds,
       ),
     );
+  }
+
+  void _submitIfEligible() {
+    final track = _track;
+    final threshold = _threshold;
+    if (_submitted || track == null || _started == null || threshold == null) {
+      return;
+    }
     if (_listened >= threshold) {
       _submitted = true;
       onScrobble(track, _started!);
