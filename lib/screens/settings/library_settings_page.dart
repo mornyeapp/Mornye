@@ -465,6 +465,8 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
         return context.l10n.historyFilterSingles;
       case 'artists':
         return context.l10n.searchArtists;
+      case 'genres':
+        return context.l10n.libraryGenres;
       case 'playlists':
         return context.l10n.searchPlaylists;
       case 'folders':
@@ -486,6 +488,7 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
             ('albums', Icons.album),
             ('singles', Icons.audiotrack),
             ('artists', Icons.person),
+            ('genres', Icons.category_outlined),
             ('playlists', Icons.queue_music),
             ('folders', Icons.folder_outlined),
           ])

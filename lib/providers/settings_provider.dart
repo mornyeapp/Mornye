@@ -121,6 +121,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
     'albums',
     'singles',
     'artists',
+    'genres',
     'playlists',
     'folders',
   };
