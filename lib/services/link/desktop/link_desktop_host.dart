@@ -18,6 +18,7 @@ import 'package:mornye/services/link/desktop/link_library_executor.dart';
 import 'package:mornye/services/link/desktop/link_library_jobs_host.dart';
 import 'package:mornye/services/link/desktop/link_desktop_transfers.dart';
 import 'package:mornye/services/link/desktop/link_downloads.dart';
+import 'package:mornye/services/link/desktop/link_host_files.dart';
 import 'package:mornye/services/link/desktop/link_phone_catalogs.dart';
 import 'package:mornye/services/link/client/link_client_controller.dart';
 import 'package:mornye/services/link/desktop/link_phone_host_lifetime.dart';
@@ -620,6 +621,10 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     }
     // After the stop, so an export finishing meanwhile fetches nothing.
     _webCovers?.stop();
+    // The server that borrowed them is gone.
+    if (_phone && ref.mounted) {
+      unawaited(ref.read(linkHostFilesProvider).closeAll());
+    }
     _index = null;
     _lastSentState = null;
     _localPlaying = false;
@@ -680,6 +685,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       router
         ..unregister(LinkOps.downloads)
         ..unregister(LinkOps.open);
+      ref.read(linkHostFilesProvider).register(router);
     } else {
       _registerLibraryJobs(router);
     }
@@ -863,7 +869,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     _unsubscribeSourceDeletion = SourceDeletionEvents.instance.subscribe((
       source,
     ) async {
-      if (linkLocalFilePath(source) != null) _scheduleExport(urgent: true);
+      if (linkSharedSongPath(source) != null) _scheduleExport(urgent: true);
     });
     // A phone host downloads nothing for other phones, so it sends no
     // download updates either.

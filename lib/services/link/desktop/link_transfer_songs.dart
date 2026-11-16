@@ -62,9 +62,9 @@ LinkPhoneSongPath? linkPhoneSongPath(String path) {
 
 /// The catalog id the export gives [item] (`d:` and the history id for a
 /// download, `l:` and the library id for a scanned song), or null for a
-/// song whose file is not on this computer, such as a phone's.
+/// song whose file is not on this device, such as a phone's.
 String? linkDesktopSongIdOf(UnifiedLibraryItem item) {
-  if (linkLocalFilePath(item.filePath) == null) return null;
+  if (linkSharedSongPath(item.filePath) == null) return null;
   final history = item.historyItem;
   if (history != null) return linkDownloadSongId(history.id);
   final local = item.localItem;
@@ -99,7 +99,7 @@ LinkOutgoingSong linkOutgoingSongOf(
 }) {
   final history = item.historyItem;
   final local = item.localItem;
-  final path = linkLocalFilePath(item.filePath) ?? item.filePath;
+  final path = linkSharedSongPath(item.filePath) ?? item.filePath;
   final seconds = history?.duration ?? local?.duration;
   return (
     song: LinkTransferSong(
@@ -139,10 +139,14 @@ Future<List<LinkOutgoingSong>> linkOutgoingSongs(
       continue;
     }
     var size = 0;
-    try {
-      size = await File(linkLocalFilePath(item.filePath)!).length();
-    } on FileSystemException {
-      // The phone learns the size when it downloads the file.
+    // A storage access document is not opened here either.
+    final local = linkLocalFilePath(item.filePath);
+    if (local != null) {
+      try {
+        size = await File(local).length();
+      } on FileSystemException {
+        // The phone learns the size when it downloads the file.
+      }
     }
     songs.add(linkOutgoingSongOf(item, songId: songId, size: size));
   }

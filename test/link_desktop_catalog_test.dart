@@ -78,14 +78,17 @@ void main() {
     local('empty', null),
   ];
 
-  test('maps readable local files and omits the rest', () {
+  List<Map<String, dynamic>> decode(LinkCatalogPage page) =>
+      const LineSplitter()
+          .convert(utf8.decode(page.bytes))
+          .map((line) => jsonDecode(line) as Map<String, dynamic>)
+          .toList();
+
+  test('maps readable local files and documents and omits the rest', () {
     final page = mapLinkCatalogRows(rows());
-    expect(page.songs.map((song) => song.id), ['l:1', 'd:h9']);
-    final lines = const LineSplitter()
-        .convert(utf8.decode(page.bytes))
-        .map((line) => jsonDecode(line) as Map<String, dynamic>)
-        .toList();
-    expect(lines, hasLength(2));
+    expect(page.songs.map((song) => song.id), ['l:1', 'd:h9', 'l:content']);
+    final lines = decode(page);
+    expect(lines, hasLength(3));
 
     final first = lines.first;
     expect(first.keys.toList(), [
@@ -144,9 +147,9 @@ void main() {
     );
     expect(first['explicit'], isFalse);
     // The desktop player keeps the web cover the catalog drops.
-    expect(page.covers, [cover, 'https://example.com/cover.jpg']);
+    expect(page.covers, [cover, 'https://example.com/cover.jpg', null]);
 
-    final second = lines.last;
+    final second = lines[1];
     expect(second['path'], download);
     expect(second['size'], 32, reason: 'falls back to the file size');
     expect(second['suffix'], 'mp3');
@@ -160,6 +163,60 @@ void main() {
         url: 'https://example.com/cover.jpg',
       ),
     ]);
+
+    final document = lines.last;
+    expect(document['path'], 'content://media/external/audio/7');
+    expect(document['title'], 'Track content');
+    expect(document['size'], isNull, reason: 'the row knows no size');
+    expect(document['suffix'], isNull);
+  });
+
+  test('shares storage access documents from their rows alone', () {
+    const uri =
+        'content://com.android.externalstorage.documents/tree/primary%3AMusic'
+        '/document/primary%3AMusic%2FBand%2FCaf%C3%A9.flac';
+    const saved = 'content://com.example.documents/document/42';
+    final page = mapLinkCatalogRows([
+      local('saf', uri, {
+        'trackName': null,
+        'fileSize': 4096,
+        'duration': 200,
+        'bitDepth': 24,
+        'coverPath': cover,
+      }),
+      {
+        'source': 'downloaded',
+        'item': {
+          'id': 'h1',
+          'trackName': 'Saved',
+          'artistName': 'Someone',
+          'filePath': saved,
+          'safFileName': 'Saved.m4a',
+          'coverUrl': 'https://example.com/saved.jpg',
+          'format': 'MP3',
+        },
+      },
+      // Network storage and a Link device's songs stay out.
+      local('nas', 'network://nas-1/Music/a.flac'),
+      local('link', 'network://link-phone-1/f1.flac'),
+    ]);
+    expect(page.songs.map((song) => song.id), ['l:saf', 'd:h1']);
+    expect(page.songs.first.path, uri);
+    final lines = decode(page);
+    expect(lines.first['path'], uri);
+    expect(lines.first['title'], 'Café', reason: 'named by its document');
+    expect(lines.first['size'], 4096);
+    expect(lines.first['suffix'], 'flac');
+    expect(lines.first['durationMs'], 200000);
+    expect(lines.first['bitDepth'], 24);
+    expect(lines.first['coverPath'], cover);
+    expect(lines.last['path'], saved);
+    expect(lines.last['suffix'], 'm4a', reason: 'from its saved name');
+    expect(lines.last['size'], isNull);
+    expect(lines.last['webCoverPath'], isNull);
+    // Telling whether a document embeds a picture would mean reading it.
+    expect(page.webCoverSongs, isEmpty);
+    expect(page.covers, [cover, 'https://example.com/saved.jpg']);
   });
 
   group('web covers', () {
@@ -399,25 +456,30 @@ void main() {
     expect(queries[1].cursor, const QueueLibraryDbCursor([3]));
     expect(queries.every((query) => query.includeLocal), isTrue);
     expect(queries.every((query) => query.excludeNetwork), isTrue);
-    expect(export.count, 2);
+    expect(export.count, 3);
     expect(export.path, endsWith('catalog.ndjson'));
     expect(File('${export.path}.part').existsSync(), isFalse);
 
     final lines = File(export.path).readAsLinesSync();
-    expect(lines, hasLength(3));
+    expect(lines, hasLength(4));
     expect(jsonDecode(lines.first), {
       'catalogVersion': 1,
       'generatedMs': 1700000000000,
-      'count': 2,
+      'count': 3,
     });
     expect((jsonDecode(lines[1]) as Map)['id'], 'l:1');
     expect((jsonDecode(lines[2]) as Map)['id'], 'd:h9');
+    expect((jsonDecode(lines[3]) as Map)['id'], 'l:content');
 
     expect(export.index.serverId, 'srv');
-    expect(export.index.length, 2);
+    expect(export.index.length, 3);
     expect(export.index.coverFor('l:1'), cover);
     expect(export.index.coverFor('d:h9'), 'https://example.com/cover.jpg');
     expect(export.index.songIdForPath(download), 'd:h9');
+    expect(
+      export.index.songIdForPath('content://media/external/audio/7'),
+      'l:content',
+    );
   });
 
   test('an empty Library still writes a valid header', () async {
@@ -441,5 +503,11 @@ void main() {
     expect(linkLocalFilePath('content://a/b'), isNull);
     expect(linkLocalFilePath('relative/path.flac'), isNull);
     expect(linkLocalFilePath(null), isNull);
+    expect(linkSharedSongPath(' content://a/b '), 'content://a/b');
+    expect(linkSharedSongPath('EXISTS:content://a/b'), 'content://a/b');
+    expect(linkSharedSongPath('EXISTS:$song'), song);
+    expect(linkSharedSongPath('network://nas/a.flac'), isNull);
+    expect(linkSharedSongPath('relative/path.flac'), isNull);
+    expect(linkSharedSongPath(null), isNull);
   });
 }

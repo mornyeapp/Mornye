@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/link/client/link_client_controller.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
+import 'package:mornye/services/link/desktop/link_host_files.dart';
 import 'package:mornye/services/link/desktop/link_phone_host_lifetime.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
@@ -99,10 +100,14 @@ void main() {
   group('phone host', () {
     late FakeLinkBackend backend;
     late ProviderContainer container;
+    late List<String> lent;
+    late List<String> returned;
 
     setUp(() {
       debugDesktopPlatformOverride = false;
       backend = FakeLinkBackend()..catalogSongs = 1;
+      lent = [];
+      returned = [];
     });
 
     tearDown(() {
@@ -142,6 +147,15 @@ void main() {
           )),
           playbackPlayingProvider.overrideWith(
             (ref) => ref.watch(_playingProvider),
+          ),
+          linkHostFilesProvider.overrideWithValue(
+            LinkHostFiles(
+              open: (uri) async {
+                lent.add(uri);
+                return (path: '/proc/self/fd/9', token: 'token-${lent.length}');
+              },
+              close: (token) async => returned.add(token),
+            ),
           ),
         ],
       );
@@ -212,12 +226,25 @@ void main() {
       for (final op in [LinkOps.downloads, LinkOps.open, LinkOps.libraryJobs]) {
         expect(router.handles(op), isFalse, reason: op);
       }
+      // The server borrows storage access songs through the app.
+      const document = 'content://com.example.documents/document/a%3ASong.flac';
+      final opened = await router.dispatch(
+        const LinkRequest(
+          requestId: '1',
+          op: linkHostFileOpenOp,
+          deviceId: '',
+          args: {'uri': document, 'lease': '1'},
+        ),
+      );
+      expect(opened, {'path': '/proc/self/fd/9'});
+      expect(lent, [document]);
 
       await host().setEnabled(false);
       await flush(tester);
       expect(hostState().phase, LinkHostPhase.stopped);
       expect(backend.calls, contains('stop'));
       expect(prefs.getBool(linkPhoneHostEnabledKey), isFalse);
+      expect(returned, ['token-1'], reason: 'its server is gone');
       await shutdown(tester);
     });
 

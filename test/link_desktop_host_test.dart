@@ -7,6 +7,7 @@ import 'package:mornye/models/download_item.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/link/desktop/link_desktop_backend.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
+import 'package:mornye/services/link/desktop/link_host_files.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
@@ -122,6 +123,8 @@ void main() {
     for (final op in [LinkOps.state, LinkOps.handoffPlay, LinkOps.resolve]) {
       expect(router.handles(op), isTrue, reason: op);
     }
+    // A computer's songs are plain files; the server opens them itself.
+    expect(router.handles(linkHostFileOpenOp), isFalse);
     await shutdown(tester);
     expect(backend.calls.last, 'stop');
   });
