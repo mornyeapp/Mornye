@@ -231,6 +231,30 @@ void main() {
     });
   });
 
+  test('a nudge at the rate in force only moves its end', () {
+    fakeAsync((async) {
+      final (:deck, :follower, now: _) = setUp(async);
+      deck.playNow();
+      follower.nudge(1.02, 1000);
+      async.elapse(const Duration(milliseconds: 800));
+      // Longer, at the same rate: no change on the way, which some engines
+      // pay for with lost time.
+      follower.nudge(1.02, 1000);
+      async.elapse(const Duration(milliseconds: 900));
+      expect(deck.rates, [1.02]);
+      async.elapse(const Duration(milliseconds: 101));
+      expect(deck.rates, [1.02, 1]);
+
+      // From one nudge rate to the other directly, and 1 ends it.
+      follower.nudge(1.02, 1000);
+      follower.nudge(0.98, 1000);
+      follower.nudge(1, 0);
+      expect(deck.rates, [1.02, 1, 1.02, 0.98, 1]);
+      async.elapse(const Duration(seconds: 2));
+      expect(deck.rates, [1.02, 1, 1.02, 0.98, 1]);
+    });
+  });
+
   test('a session that ends while it waits starts the player at once', () {
     fakeAsync((async) {
       final (:deck, :follower, :now) = setUp(async);

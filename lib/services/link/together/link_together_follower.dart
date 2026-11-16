@@ -49,6 +49,7 @@ class LinkTogetherFollower {
   bool _startPending = false;
   int _lastActionMs = 0;
   Timer? _nudgeTimer;
+  double _nudgeFactor = 1;
 
   /// A cue is being carried out.
   bool get busy => _busy > 0;
@@ -172,11 +173,17 @@ class LinkTogetherFollower {
   }
 
   /// Plays at [factor] times the normal rate for [durationMs], then normal
-  /// again; 1 stops a nudge under way.
+  /// again; 1 stops a nudge under way. A nudge already at [factor] only
+  /// moves its end: some engines lose a little of the song on every rate
+  /// change.
   void nudge(double factor, int durationMs) {
-    _stopNudge();
-    if (factor == 1 || durationMs <= 0 || !_deck.canNudge) return;
-    _deck.setRate(factor);
+    if (factor == 1 || durationMs <= 0 || !_deck.canNudge) {
+      _stopNudge();
+      return;
+    }
+    _nudgeTimer?.cancel();
+    if (_nudgeTimer == null || _nudgeFactor != factor) _deck.setRate(factor);
+    _nudgeFactor = factor;
     _nudgeTimer = Timer(Duration(milliseconds: durationMs), _stopNudge);
   }
 
@@ -184,6 +191,7 @@ class LinkTogetherFollower {
     final nudging = _nudgeTimer != null;
     _nudgeTimer?.cancel();
     _nudgeTimer = null;
+    _nudgeFactor = 1;
     if (nudging) _deck.setRate(1);
   }
 
