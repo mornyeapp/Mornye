@@ -936,6 +936,19 @@ class LibraryDatabase {
     }
 
     await sqlite.transactionWithBusyRetry(db, (txn) async {
+      // A song opened from a list does not carry its folder. Filed under
+      // the default one, the converted file would stay hidden wherever that
+      // folder is gone, so it joins the folder its original is stored in.
+      final stored = await txn.query(
+        'library',
+        columns: ['source_id'],
+        where: 'id = ? OR file_path = ?',
+        whereArgs: [item.id, item.filePath],
+        limit: 1,
+      );
+      if (stored.isNotEmpty) {
+        updated['sourceId'] = stored.first['source_id'];
+      }
       if (!keepOriginal) {
         await txn.delete(
           'library_path_keys',
