@@ -6423,9 +6423,9 @@
   "@hiResReportShare": {
     "description": "Button that shares the Hi-Res authenticity report as text"
   },
-  "hiResBatchAction": "Check authenticity",
+  "hiResBatchAction": "Authenticity",
   "@hiResBatchAction": {
-    "description": "Menu action that runs the Hi-Res authenticity check on an album or on several selected songs"
+    "description": "Menu action that runs the Hi-Res authenticity check on an album or on several selected songs. Keep it to one or two short words: it shares a row with actions such as Play next"
   },
   "hiResBatchProgress": "Reading song {current} of {total}",
   "@hiResBatchProgress": {

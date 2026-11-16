@@ -5932,7 +5932,7 @@
   "@hiResReportShare": {
     "description": "Button that shares the Hi-Res authenticity report as text"
   },
-  "hiResBatchAction": "Periksa keaslian",
+  "hiResBatchAction": "Cek keaslian",
   "@hiResBatchAction": {
     "description": "Menu action that runs the Hi-Res authenticity check on an album or on several selected songs"
   },
