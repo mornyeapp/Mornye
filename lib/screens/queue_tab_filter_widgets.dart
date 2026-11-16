@@ -339,11 +339,22 @@ extension _QueueTabFilterWidgets on _QueueTabState {
       );
     }
 
+    // Songs, not Singles, lead with Shuffle while the tools show.
+    final showShuffle = filterMode == 'all' && !_isSelectionMode;
+    void shuffleSongs() => _shuffleLibrarySongs(
+      allFilteredUnifiedItems,
+      complete: allFilteredUnifiedItems.length >= totalTrackCount,
+    );
+
     Widget trackCountHeader() => SliverToBoxAdapter(
       child: _countHeaderRow(
         context,
         context.l10n.queueTrackCount(totalTrackCount),
         [
+          if (showShuffle && !context.isMornye) ...[
+            _buildLibraryShuffleButton(context, onPressed: shuffleSongs),
+            SizedBox(width: context.tokens.gapSm),
+          ],
           if (rootLibrary && !_isSelectionMode)
             ..._buildLibraryTools(context, viewMode: historyViewMode)
           else if (!_isSelectionMode)
@@ -381,6 +392,11 @@ extension _QueueTabFilterWidgets on _QueueTabState {
             child: ListeningRewindBanner(
               margin: EdgeInsets.fromLTRB(edge, 8, edge, 4),
             ),
+          ),
+
+        if (totalTrackCount > 0 && showShuffle && context.isMornye)
+          SliverToBoxAdapter(
+            child: _buildLibraryShuffleButton(context, onPressed: shuffleSongs),
           ),
 
         if (totalTrackCount > 0 && filterMode == 'all') trackCountHeader(),

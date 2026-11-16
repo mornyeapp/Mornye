@@ -96,6 +96,45 @@ extension _QueueTabNavigation on _QueueTabState {
     }
   }
 
+  /// Plays the songs the Songs page lists, in its sort and filters, from a
+  /// random one with shuffle on, as folder and album pages do. A list the
+  /// page has not [complete]ly loaded is read whole first; an external
+  /// player opens one file and needs no list.
+  Future<void> _shuffleLibrarySongs(
+    List<UnifiedLibraryItem> loaded, {
+    required bool complete,
+  }) async {
+    var songs = loaded;
+    if (!complete &&
+        _searchQuery.isEmpty &&
+        ref.read(settingsProvider).playerMode == 'internal') {
+      // A list that cannot be read leaves the loaded songs to play.
+      songs = await ref
+          .read(librarySongListProvider(_songListFor('all', _sortMode)).future)
+          .catchError((Object _) => loaded);
+      if (!mounted) return;
+    }
+    final playable = songs
+        .where(
+          (u) => u.filePath.trim().isNotEmpty && !isCueVirtualPath(u.filePath),
+        )
+        .toList(growable: false);
+    if (playable.isEmpty) return;
+    final start = Random().nextInt(playable.length);
+    try {
+      await ref.read(musicPlayerControllerProvider).setShuffle(true);
+      await ref
+          .read(playbackProvider.notifier)
+          .playMediaQueue(
+            playable.map(_toPlayableMedia),
+            startIndex: start,
+            externalPath: playable[start].filePath,
+          );
+    } catch (e) {
+      if (mounted) showCannotOpenFileSnackBar(context, e);
+    }
+  }
+
   PlayableMedia _toPlayableMedia(UnifiedLibraryItem item) {
     final history = item.historyItem;
     if (history != null) return playableFromHistory(history);

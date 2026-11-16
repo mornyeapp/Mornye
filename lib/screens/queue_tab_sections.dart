@@ -280,6 +280,40 @@ extension _QueueTabSections on _QueueTabState {
     ];
   }
 
+  /// The Songs page's one emphasized action: a filled round Shuffle before
+  /// the tools in Material, at the tools' height. Mornye uses the gray
+  /// Shuffle capsule of its collection headers, across the page on phones.
+  Widget _buildLibraryShuffleButton(
+    BuildContext context, {
+    required VoidCallback onPressed,
+  }) {
+    final l10n = context.l10n;
+    if (context.isMornye) {
+      final button = HeaderFilledButton(
+        icon: Icons.shuffle,
+        label: l10n.actionShuffle,
+        tonal: true,
+        onPressed: onPressed,
+      );
+      final edge = 16 + wideListInset(context);
+      return Padding(
+        padding: EdgeInsets.fromLTRB(edge, 8, edge, 0),
+        child: isDesktopPlatform
+            ? Align(alignment: AlignmentDirectional.centerStart, child: button)
+            : SizedBox(width: double.infinity, child: button),
+      );
+    }
+    final colors = Theme.of(context).colorScheme;
+    return ExpressiveIconButton(
+      tooltip: l10n.actionShuffle,
+      onPressed: onPressed,
+      icon: const AppIcon(Icons.shuffle),
+      size: isDesktopPlatform ? 40 : 44,
+      backgroundColor: colors.primary,
+      foregroundColor: colors.onPrimary,
+    );
+  }
+
   /// Switches song pages between the list and the cover grid.
   Widget _buildViewModeButton(BuildContext context, String viewMode) {
     final grid = viewMode == 'grid';
