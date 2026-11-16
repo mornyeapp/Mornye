@@ -127,6 +127,31 @@ class Media3ContractTest {
     }
 
     @Test
+    fun onlySongsThatCanHoldMoreThanSixteenBitsDecodeAsFloat() {
+        fun sixteen(mime: String?, bits: Int?, skipSilence: Boolean = false) =
+            Media3Decoding.sixteenBit(mime, bits, skipSilence)
+
+        // Lossy codecs, whose vendor decoders are the ones other players use.
+        for (mime in listOf("audio/mpeg", "audio/mp4a-latm", "audio/opus", "audio/vorbis", "AUDIO/MPEG")) {
+            assertTrue(mime, sixteen(mime, null))
+        }
+        // A lossless file follows its stated depth.
+        assertTrue(sixteen("audio/flac", 16))
+        assertTrue(sixteen("audio/alac", 16))
+        assertEquals(false, sixteen("audio/flac", 24))
+        assertEquals(false, sixteen("audio/alac", 32))
+        // Without a stated depth it may be high resolution: float stays.
+        assertEquals(false, sixteen("audio/flac", null))
+        assertEquals(false, sixteen(null, null))
+        // Skip silence needs 16-bit whatever the song.
+        assertTrue(sixteen("audio/flac", 24, skipSilence = true))
+
+        assertEquals("float", Media3Decoding.encodingName(32, float = true))
+        assertEquals("24-bit", Media3Decoding.encodingName(24, float = false))
+        assertEquals("unknown", Media3Decoding.encodingName(null, float = false))
+    }
+
+    @Test
     fun spatialAudioMapsToTheSpatializationBehavior() {
         val on = media3AudioAttributes(true)
         val off = media3AudioAttributes(false)

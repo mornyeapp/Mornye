@@ -320,6 +320,9 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
         _duration = null;
         if (playbackOutputVolume.value != next.output) _outputVolumeChanged();
         next.onStarted();
+      case 'trace':
+        // The decoder and output the phone used; no path or title.
+        _log.i('Engine: ${event['message']}');
       case 'completed':
         _next = null;
         _setState(PlaybackDeckState.completed);

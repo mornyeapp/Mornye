@@ -23,6 +23,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.RenderersFactory
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.audio.AudioRendererEventListener
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
@@ -46,36 +47,43 @@ import io.flutter.plugin.common.MethodChannel
  * and pitch for every format instead, the same time-stretch MediaPlayer
  * uses for `setPlaybackParams`. The `DynamicsProcessing` equalizer is an
  * effect on the session in the platform mixer and works with either PCM
- * format, since offload stays disabled. Skip silence trades this for 16-bit
- * decoding while it is on (see [Media3AudioRenderer]).
+ * format, since offload stays disabled. Only songs that can hold more than
+ * 16 bits are decoded as float, and none while skip silence is on (see
+ * [Media3AudioRenderer]).
  *
  * Buffer size: see [MAX_BUFFERED_SPEED].
  */
-internal fun media3AudioRenderers(context: Context, decode16Bit: () -> Boolean) =
+internal fun media3AudioRenderers(context: Context, skipSilence: () -> Boolean) =
     RenderersFactory { handler, _, audioListener, _, _ ->
         val sink = DefaultAudioSink.Builder(context)
             .setEnableFloatOutput(true)
             .setEnableAudioOutputPlaybackParameters(true)
             .setAudioTrackBufferSizeProvider(cappedSpeedBufferSize)
             .build()
-        arrayOf(Media3AudioRenderer(context, handler, audioListener, sink, decode16Bit))
+        arrayOf(Media3AudioRenderer(context, handler, audioListener, sink, skipSilence))
     }
 
 /**
+ * media3 asks every decoder for float PCM once the sink takes float, the
+ * phone vendor's MP3 and AAC decoders included. This renderer asks for
+ * 16-bit PCM instead wherever float holds nothing more (see
+ * [Media3Decoding]): lossy songs and files of 16 bits or fewer.
+ *
  * Skip silence: `DefaultAudioSink` skips silence in its audio processor
- * chain, which it bypasses for float PCM (see [media3AudioRenderers]), and
- * media3 asks every decoder for float PCM once the sink takes float. So
- * while [decode16Bit] holds, decoders are asked for 16-bit PCM instead,
- * which the chain and its silence detection process. A decoder already
- * running keeps its encoding; the mode applies from the next decoder start
- * (the next source, or a queued item whose decoder cannot be reused).
+ * chain, which it bypasses for float PCM (see [media3AudioRenderers]). So
+ * while [skipSilence] holds, every decoder is asked for 16-bit PCM, which
+ * the chain and its silence detection process.
+ *
+ * A decoder already running keeps its encoding; the mode applies from the
+ * next decoder start (the next source, or a queued item whose decoder cannot
+ * be reused, as when a 24-bit song follows a 16-bit one).
  */
 private class Media3AudioRenderer(
     context: Context,
     handler: Handler?,
     listener: AudioRendererEventListener?,
     sink: AudioSink,
-    private val decode16Bit: () -> Boolean,
+    private val skipSilence: () -> Boolean,
 ) : MediaCodecAudioRenderer(context, MediaCodecSelector.DEFAULT, handler, listener, sink) {
     /** The mode the running decoder was configured with; playback thread only. */
     private var decoding16Bit: Boolean? = null
@@ -87,7 +95,7 @@ private class Media3AudioRenderer(
         codecOperatingRate: Float,
     ): MediaFormat {
         val mediaFormat = super.getMediaFormat(format, codecMimeType, codecMaxInputSize, codecOperatingRate)
-        val sixteen = decode16Bit()
+        val sixteen = decodes16Bit(format)
         if (sixteen && Build.VERSION.SDK_INT >= 24) {
             mediaFormat.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
         }
@@ -102,7 +110,7 @@ private class Media3AudioRenderer(
         isInitialization: Boolean,
     ): DecoderReuseEvaluation {
         val running = decoding16Bit
-        if (running != null && running != decode16Bit()) {
+        if (running != null && running != decodes16Bit(newFormat)) {
             return DecoderReuseEvaluation(
                 codecInfo.name,
                 oldFormat,
@@ -113,6 +121,18 @@ private class Media3AudioRenderer(
         }
         return super.canReuseCodec(codecInfo, oldFormat, newFormat, isInitialization)
     }
+
+    private fun decodes16Bit(format: Format): Boolean =
+        Media3Decoding.sixteenBit(format.sampleMimeType, pcmBits(format.pcmEncoding), skipSilence())
+}
+
+/** The bit depth of a media3 PCM encoding, null when it names none. */
+private fun pcmBits(encoding: Int): Int? = when (encoding) {
+    C.ENCODING_PCM_8BIT -> 8
+    C.ENCODING_PCM_16BIT, C.ENCODING_PCM_16BIT_BIG_ENDIAN -> 16
+    C.ENCODING_PCM_24BIT, C.ENCODING_PCM_24BIT_BIG_ENDIAN -> 24
+    C.ENCODING_PCM_32BIT, C.ENCODING_PCM_32BIT_BIG_ENDIAN, C.ENCODING_PCM_FLOAT -> 32
+    else -> null
 }
 
 /**
@@ -221,6 +241,70 @@ internal class Media3Player(
         if (generated != AudioManager.ERROR) exo.audioSessionId = generated
         sessionId = exo.audioSessionId
         exo.addListener(this)
+        exo.addAnalyticsListener(OutputTrace())
+    }
+
+    /**
+     * What the phone's decoder and audio output did with a song, for the
+     * app's log: the decoder that ran, the output opened for it, and the
+     * first times that output ran dry. Noise or stutter that only one brand
+     * of phone has shows here. Never a path or a title.
+     */
+    private inner class OutputTrace : AnalyticsListener {
+        private var underruns = 0
+
+        override fun onAudioInputFormatChanged(
+            eventTime: AnalyticsListener.EventTime,
+            format: Format,
+            decoderReuseEvaluation: DecoderReuseEvaluation?,
+        ) {
+            val encoding = format.pcmEncoding
+            trace(
+                "source ${format.sampleMimeType} " +
+                    "${Media3Decoding.encodingName(pcmBits(encoding), encoding == C.ENCODING_PCM_FLOAT)} " +
+                    "${format.sampleRate} Hz ${format.channelCount} ch",
+            )
+        }
+
+        override fun onAudioDecoderInitialized(
+            eventTime: AnalyticsListener.EventTime,
+            decoderName: String,
+            initializedTimestampMs: Long,
+            initializationDurationMs: Long,
+        ) = trace("decoder $decoderName")
+
+        override fun onAudioTrackInitialized(
+            eventTime: AnalyticsListener.EventTime,
+            audioTrackConfig: AudioSink.AudioTrackConfig,
+        ) {
+            underruns = 0
+            val encoding = audioTrackConfig.encoding
+            trace(
+                "output ${Media3Decoding.encodingName(pcmBits(encoding), encoding == C.ENCODING_PCM_FLOAT)} " +
+                    "${audioTrackConfig.sampleRate} Hz, buffer ${audioTrackConfig.bufferSize} bytes",
+            )
+        }
+
+        override fun onAudioUnderrun(
+            eventTime: AnalyticsListener.EventTime,
+            bufferSize: Int,
+            bufferSizeMs: Long,
+            elapsedSinceLastFeedMs: Long,
+        ) {
+            if (++underruns > UNDERRUNS_TRACED) return
+            trace("output ran dry: buffer $bufferSizeMs ms, $elapsedSinceLastFeedMs ms since the last write")
+        }
+
+        override fun onAudioSinkError(eventTime: AnalyticsListener.EventTime, audioSinkError: Exception) =
+            trace("output error ${audioSinkError.javaClass.simpleName}")
+
+        override fun onAudioCodecError(eventTime: AnalyticsListener.EventTime, audioCodecError: Exception) =
+            trace("decoder error ${audioCodecError.javaClass.simpleName}")
+
+        private fun trace(message: String) {
+            Log.i(TAG, message)
+            if (!released) emit(mapOf("event" to "trace", "message" to message))
+        }
     }
 
     fun handle(call: MethodCall, result: MethodChannel.Result) {
@@ -563,5 +647,8 @@ internal class Media3Player(
 
     private companion object {
         const val TAG = "Media3"
+
+        /** Dry runs logged for one output; a broken one would flood the log. */
+        const val UNDERRUNS_TRACED = 5
     }
 }

@@ -65,6 +65,47 @@ internal object Media3Errors {
     )
 }
 
+/**
+ * Which sample format a decoder is asked for. Float keeps the bits of a
+ * high resolution file past 16; nothing else gains from it, and asking is
+ * the one thing here that other players on the phone do not do, so a
+ * vendor's decoder that handles the request badly would only show in this
+ * engine. Songs that cannot hold more than 16 bits are therefore decoded as
+ * every other player decodes them.
+ */
+internal object Media3Decoding {
+    /** Codecs whose decoders have 16-bit samples to give at most. */
+    private val lossy = setOf(
+        "audio/mpeg",
+        "audio/mpeg-l1",
+        "audio/mpeg-l2",
+        "audio/mp4a-latm",
+        "audio/opus",
+        "audio/vorbis",
+        "audio/ac3",
+        "audio/eac3",
+        "audio/eac3-joc",
+        "audio/ac4",
+        "audio/3gpp",
+        "audio/amr-wb",
+    )
+
+    /**
+     * Whether to ask for 16-bit PCM. [bits] is the depth the file states,
+     * null when it states none: a lossless file of unknown depth keeps
+     * float. [skipSilence] needs 16-bit for every song.
+     */
+    fun sixteenBit(mime: String?, bits: Int?, skipSilence: Boolean): Boolean =
+        skipSilence || (bits?.let { it <= 16 } ?: (mime?.lowercase() in lossy))
+
+    /** A PCM encoding in words, for the log. */
+    fun encodingName(bits: Int?, float: Boolean): String = when {
+        float -> "float"
+        bits != null -> "$bits-bit"
+        else -> "unknown"
+    }
+}
+
 internal object Media3Transport {
     const val PLAYING = "playing"
     const val PAUSED = "paused"
