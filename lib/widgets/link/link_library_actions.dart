@@ -97,6 +97,8 @@ Future<void> runLinkLibraryAction(
   final name = linkDesktopName(client);
   // A phone host changes no files for other phones; it says so in `features`.
   if (!client.server.supports(LinkHostFeatures.libraryJobs)) {
+    // No other selection would work, and its sheet would cover the message.
+    onAccepted?.call();
     notify(context.l10n.linkFileChangesUnavailable(name));
     return;
   }

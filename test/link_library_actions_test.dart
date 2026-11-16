@@ -316,6 +316,7 @@ void main() {
     // file actions never run on them.
     expect(hasLinkLibrarySongs(container, [item]), isTrue);
 
+    var selectionEnded = 0;
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -327,9 +328,13 @@ void main() {
             body: Builder(
               builder: (context) => TextButton(
                 onPressed: () => unawaited(
-                  runLinkLibraryAction(context, container, [
-                    item,
-                  ], LinkLibraryAction.delete),
+                  runLinkLibraryAction(
+                    context,
+                    container,
+                    [item],
+                    LinkLibraryAction.delete,
+                    onAccepted: () => selectionEnded++,
+                  ),
                 ),
                 child: const Text('Remote delete'),
               ),
@@ -345,6 +350,8 @@ void main() {
       find.text('Songs on Studio PC cannot be changed from this phone.'),
       findsOneWidget,
     );
+    // The selection sheet would cover the message.
+    expect(selectionEnded, 1);
     expect(client.posts, isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
   });
