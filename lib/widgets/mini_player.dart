@@ -122,9 +122,18 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     if (context.isMornye) return body;
     // Material takes the track's artwork scheme, like the full player.
     final artUri = ref.watch(
-      currentMediaItemProvider.select((item) => item.value?.artUri),
+      currentMediaItemProvider.select((item) => item.value?.artUri?.toString()),
     );
-    return PlayerArtworkTheme(artUri: artUri?.toString(), child: body);
+    // The phone shell already moves the whole bar to this cover; a second
+    // scope would only lerp the same scheme again on every frame.
+    final enclosing = context
+        .findAncestorWidgetOfExactType<PlayerArtworkTheme>();
+    if (enclosing != null &&
+        !enclosing.fadesSurfaceOnly &&
+        enclosing.artUri == artUri) {
+      return body;
+    }
+    return PlayerArtworkTheme(artUri: artUri, child: body);
   }
 }
 

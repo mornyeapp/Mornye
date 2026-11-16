@@ -334,10 +334,14 @@ void main() {
     );
     final cover = _seeded(Colors.teal);
 
-    Widget app(Widget home, {required bool mornye}) => ProviderScope(
+    Widget app(
+      Widget home, {
+      required bool mornye,
+      Stream<MediaItem?>? items,
+    }) => ProviderScope(
       overrides: [
         currentMediaItemProvider.overrideWithBuild(
-          (ref, notifier) => Stream.value(track),
+          (ref, notifier) => items ?? Stream.value(track),
         ),
         playbackStateProvider.overrideWith(
           (ref) => Stream.value(PlaybackState()),
@@ -413,6 +417,123 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(Theme.of(tester.element(find.text('Song'))).colorScheme, cover);
+    });
+
+    testWidgets('the Material mini player uses the shell scope for its cover', (
+      tester,
+    ) async {
+      palette.cached[_coverA] = cover;
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            bottomNavigationBar: PlayerArtworkTheme(
+              artUri: track.artUri.toString(),
+              child: const MiniPlayer(),
+            ),
+          ),
+          mornye: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(PlayerArtworkTheme), findsOneWidget);
+      expect(palette.requests, [_coverA]);
+      expect(Theme.of(tester.element(find.text('Song'))).colorScheme, cover);
+    });
+
+    for (final (name, outer) in [
+      (
+        'another cover',
+        const PlayerArtworkTheme(artUri: _coverB, child: MiniPlayer()),
+      ),
+      (
+        'a surface-only scope',
+        PlayerArtworkTheme(
+          artUri: Uri.file(_coverA).toString(),
+          fadesSurfaceOnly: true,
+          child: const MiniPlayer(),
+        ),
+      ),
+    ]) {
+      testWidgets('the Material mini player keeps its own scope under $name', (
+        tester,
+      ) async {
+        palette.cached[_coverA] = cover;
+        palette.cached[_coverB] = _seeded(Colors.purple);
+        await tester.pumpWidget(
+          app(Scaffold(bottomNavigationBar: outer), mornye: false),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(PlayerArtworkTheme), findsNWidgets(2));
+        expect(Theme.of(tester.element(find.text('Song'))).colorScheme, cover);
+      });
+    }
+
+    testWidgets('under the shell scope the mini player moves with the bar '
+        'on every frame of a skip', (tester) async {
+      final items = StreamController<MediaItem?>.broadcast();
+      addTearDown(items.close);
+      final red = _seeded(Colors.red);
+      palette.cached[_coverA] = cover;
+      palette.cached[_coverB] = red;
+      const probe = Key('bar');
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            bottomNavigationBar: Consumer(
+              builder: (context, ref, child) => PlayerArtworkTheme(
+                artUri: ref.watch(
+                  currentMediaItemProvider.select(
+                    (item) => item.value?.artUri?.toString(),
+                  ),
+                ),
+                child: child!,
+              ),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  MiniPlayer(),
+                  SizedBox(key: probe, height: 1),
+                ],
+              ),
+            ),
+          ),
+          mornye: false,
+          items: items.stream,
+        ),
+      );
+      items.add(track);
+      await tester.pumpAndSettle();
+      expect(find.byType(PlayerArtworkTheme), findsOneWidget);
+
+      ColorScheme bar() =>
+          Theme.of(tester.element(find.byKey(probe))).colorScheme;
+      ColorScheme mini() => Theme.of(
+        tester.element(
+          find
+              .descendant(
+                of: find.byType(MiniPlayer),
+                matching: find.byType(InkWell),
+              )
+              .first,
+        ),
+      ).colorScheme;
+      expect(mini(), cover);
+
+      for (final (next, target) in [
+        (track.copyWith(id: 'b', artUri: Uri.file(_coverB)), red),
+        (MediaItem(id: 'none', title: 'Plain'), AppTheme.light().colorScheme),
+      ]) {
+        items.add(next);
+        await tester.pump();
+        var moving = 0;
+        for (var i = 0; i < 40; i++) {
+          await tester.pump(const Duration(milliseconds: 8));
+          if (bar() != target) moving++;
+          expect(mini(), bar());
+        }
+        expect(moving, greaterThan(2));
+        expect(mini(), target);
+      }
     });
 
     testWidgets('the Material full player takes the cover scheme', (
