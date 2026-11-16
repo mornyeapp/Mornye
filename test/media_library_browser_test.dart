@@ -424,6 +424,42 @@ void main() {
       host: 'app.covers',
       pathSegments: [folder, name],
     ).toString();
+
+    test('a cover stored under the folder\'s other path gets its URI', () {
+      // Android gives the app's files as /data/user/0/<package>, a link to
+      // /data/data/<package>, and scanned covers are stored under the
+      // latter.
+      const linked = BrowserCoverProvider(
+        authority: 'app.covers',
+        folders: {'library_covers': '/data/user/0/app/files/library_covers'},
+        aliases: {
+          'library_covers': ['/data/data/app/files/library_covers'],
+        },
+      );
+      for (final path in [
+        '/data/data/app/files/library_covers/cover_1.jpg',
+        'file:///data/data/app/files/library_covers/cover_1.jpg',
+        '/data/user/0/app/files/library_covers/cover_1.jpg',
+      ]) {
+        expect(
+          linked.uriFor(path).toString(),
+          cover('library_covers', 'cover_1.jpg'),
+          reason: path,
+        );
+      }
+      expect(
+        linked.uriFor('/data/data/app/files/playlist_covers/list.jpg'),
+        isNull,
+      );
+      expect(
+        const BrowserCoverProvider(
+          authority: 'app.covers',
+          folders: {'library_covers': '/data/user/0/app/files/library_covers'},
+        ).uriFor('/data/data/app/files/library_covers/cover_1.jpg'),
+        isNull,
+        reason: 'only a path the system reported is the same folder',
+      );
+    });
     Map<String, dynamic> album(String name, String? cover) => {
       'queue_source': 'local',
       'album_key': name,

@@ -140,6 +140,26 @@ class CoverProviderFilesTest {
         )
     }
 
+    /**
+     * Android gives the app's files as `/data/user/0/<package>`, a link to
+     * `/data/data/<package>`, and scanned covers are stored under the latter.
+     */
+    @Test
+    fun locatesCoversUnderEitherPathOfALinkedFolder() {
+        val link = File(app.parentFile, "${app.name}-link")
+        Files.createSymbolicLink(link.toPath(), app.toPath())
+        try {
+            val linked = CoverProviderFiles.folders(File(link, "files"), File(link, "cache"))
+            val expected = "library_covers" to "cover_0123.jpg"
+
+            assertEquals(expected, CoverProviderFiles.locate(linked, "$app/files/library_covers/cover_0123.jpg"))
+            assertEquals(expected, CoverProviderFiles.locate(linked, "$link/files/library_covers/cover_0123.jpg"))
+            assertNull(CoverProviderFiles.locate(linked, "$app/files/playlist_covers/list.jpg"))
+        } finally {
+            link.delete()
+        }
+    }
+
     @Test
     fun locatesCoverPathsAsDartNamesThem() {
         val files = File(app, "files").path

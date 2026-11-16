@@ -118,11 +118,20 @@ class CoverContentProvider : ContentProvider() {
         private fun coverFolders(context: Context) =
             CoverProviderFiles.folders(context.filesDir, context.cacheDir)
 
-        /** The authority and folder paths Dart builds cover URIs from. */
-        fun describe(context: Context): Map<String, Any> = mapOf(
-            "authority" to authority(context),
-            "folders" to coverFolders(context).mapValues { it.value.directory.path },
-        )
+        /**
+         * The authority and folder paths Dart builds cover URIs from, with
+         * the other paths the system gives each folder.
+         */
+        fun describe(context: Context): Map<String, Any> {
+            val folders = coverFolders(context)
+            return mapOf(
+                "authority" to authority(context),
+                "folders" to folders.mapValues { it.value.directory.path },
+                "aliases" to folders.mapValues { (_, folder) ->
+                    folder.spellings.map { it.path }.filter { it != folder.directory.path }
+                },
+            )
+        }
 
         /**
          * Maps a queue item's artwork to the provider URI a car can load,
