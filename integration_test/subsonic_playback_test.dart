@@ -98,7 +98,11 @@ void main() {
       expect(
         server.requests
             .where((uri) => uri.path.contains('/stream.'))
-            .every((uri) => uri.queryParameters['format'] == 'raw'),
+            .every(
+              (uri) =>
+                  !uri.queryParameters.containsKey('format') &&
+                  !uri.queryParameters.containsKey('maxBitRate'),
+            ),
         isTrue,
       );
       expect(server.authorizations, everyElement(isNull));

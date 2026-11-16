@@ -347,6 +347,38 @@ void main() {
     },
   );
 
+  for (final chunked in [false, true]) {
+    test(
+      'server-selected Opus stream is forwarded (chunked=$chunked)',
+      () async {
+        server.streamContentType = 'audio/ogg';
+        server.chunkedStream = chunked;
+        server.audio = [79, 103, 103, 83, 1, 2, 3, 4];
+        final song = SubsonicSong(server.song);
+        final source = NetworkStorageService.source('fixture', song.path);
+        final url = Uri.parse(await storage.resolve(source));
+        final http = HttpClient();
+        addTearDown(() => http.close(force: true));
+        final request = await http.getUrl(url);
+        request.headers.set('range', 'bytes=0-');
+        final response = await request.close();
+        expect(response.statusCode, chunked ? 200 : 206);
+        expect(response.headers.contentType!.mimeType, 'audio/ogg');
+        expect(
+          response.headers.value('accept-ranges'),
+          chunked ? 'none' : 'bytes',
+        );
+        expect(response.contentLength, chunked ? -1 : server.audio!.length);
+        expect(await response.expand((chunk) => chunk).toList(), server.audio);
+        final parameters = server.requests.last.queryParameters;
+        expect(parameters['c'], 'Mornye');
+        expect(parameters['id'], server.song['id']);
+        expect(parameters, isNot(contains('format')));
+        expect(parameters, isNot(contains('maxBitRate')));
+      },
+    );
+  }
+
   test(
     'stream and artwork use fresh authentication, support range and restore',
     () async {
@@ -373,7 +405,11 @@ void main() {
       expect(response.statusCode, 206);
       expect(response.headers.value('content-range'), 'bytes 1-2/4');
       expect(await response.expand((chunk) => chunk).toList(), [1, 2]);
-      expect(server.requests.last.queryParameters['format'], 'raw');
+      expect(server.requests.last.queryParameters, isNot(contains('format')));
+      expect(
+        server.requests.last.queryParameters,
+        isNot(contains('maxBitRate')),
+      );
       expect(server.requests.last.queryParameters['id'], server.song['id']);
       final head = await (await http.openUrl('HEAD', Uri.parse(url))).close();
       await head.drain<void>();

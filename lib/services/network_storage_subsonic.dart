@@ -97,10 +97,9 @@ Uri _subsonicMediaTarget(NetworkConnection connection, String path) {
   final encoded = segments.last.split('.').first;
   final id = _decodeSubsonicId(encoded);
   return switch (segments[1]) {
-    'song' => _subsonicTarget(connection, 'stream', {
-      'id': id,
-      'format': 'raw',
-    }),
+    // Let the server apply the player's transcoding preferences. Requesting
+    // format=raw explicitly overrides those preferences in Navidrome.
+    'song' => _subsonicTarget(connection, 'stream', {'id': id}),
     'cover' => _subsonicTarget(connection, 'getCoverArt', {'id': id}),
     _ => throw const FormatException('Invalid Subsonic media path'),
   };
