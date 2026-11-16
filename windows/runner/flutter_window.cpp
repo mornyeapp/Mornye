@@ -22,6 +22,11 @@ constexpr int kMinimumClientHeight = 600;
 // Gap, in logical pixels, between a new mini player and the screen corner.
 constexpr int kMiniPlayerScreenInset = 16;
 
+// Frames asked for after the window first shows, and the time between them.
+constexpr UINT_PTR kStartupRedrawTimer = 0x4D52;
+constexpr UINT kStartupRedrawIntervalMs = 250;
+constexpr int kStartupRedraws = 8;
+
 // Reads a number from the call arguments, or |fallback| when it is missing.
 double NumberArgument(const flutter::EncodableValue* arguments,
                       const char* key, double fallback) {
@@ -153,6 +158,13 @@ bool FlutterWindow::OnCreate() {
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
+    // The engine calls this once it has drawn the first frame, also when
+    // that frame could not reach the window (surface not ready, or a size
+    // change in between). An idle app draws nothing more, so the window
+    // would stay blank: ask for a few more frames while it is visible.
+    startup_redraws_left_ = kStartupRedraws;
+    SetTimer(GetHandle(), kStartupRedrawTimer, kStartupRedrawIntervalMs,
+             nullptr);
   });
 
   // Flutter can complete the first frame before the "show window" callback is
@@ -199,6 +211,11 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_TIMER && wparam == kStartupRedrawTimer) {
+    if (flutter_controller_) flutter_controller_->ForceRedraw();
+    if (--startup_redraws_left_ <= 0) KillTimer(hwnd, kStartupRedrawTimer);
+    return 0;
+  }
   if (taskbar_controls_ && taskbar_controls_->HandleMessage(message, wparam)) {
     return 0;
   }

@@ -64,6 +64,9 @@ class FlutterWindow : public Win32Window {
   flutter::EncodableList pending_audio_;
   bool audio_ready_ = false;
 
+  // Frames still to ask for after the window first showed.
+  int startup_redraws_left_ = 0;
+
   // Whether the window shows the mini player, and what it restores.
   bool mini_player_ = false;
   WINDOWPLACEMENT mini_player_restore_placement_ = {};
