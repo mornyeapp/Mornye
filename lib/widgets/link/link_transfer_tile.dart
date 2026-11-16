@@ -538,7 +538,6 @@ class _LinkTransferSliverState extends State<LinkTransferSliver>
     if (widget.expanded == oldWidget.expanded) return;
     final tokens = context.tokens;
     final reduced = MediaQuery.disableAnimationsOf(context);
-    // Exits are shorter than entrances.
     final motion = widget.expanded
         ? AppMotion.spatial(
             context,

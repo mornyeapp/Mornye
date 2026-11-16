@@ -105,7 +105,6 @@ void main() {
         mornye: mornye,
         upload: upload,
       );
-      // While one runs, the action shows its progress.
       await tester.tap(findByTooltip(label));
       await settle(tester);
       expect(find.text('Second song'), findsOneWidget);
@@ -122,7 +121,6 @@ void main() {
       await settle(tester);
       expect(find.text('Second song'), findsOneWidget);
 
-      // The sheet closes by itself when the upload ends.
       upload.finish();
       await settle(tester);
       expect(find.text('Second song'), findsNothing);

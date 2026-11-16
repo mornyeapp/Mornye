@@ -841,7 +841,6 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
         final playback = ref.watch(
           mediaItemPlaybackUiProvider(_playbackKey(item)),
         );
-        // The current song pauses and resumes in place.
         final VoidCallback play = playback.isCurrent
             ? () => ref
                   .read(musicPlayerControllerProvider)

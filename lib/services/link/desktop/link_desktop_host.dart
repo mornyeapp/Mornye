@@ -480,7 +480,6 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       catalogSongs: null,
       followedPhone: null,
     );
-    // Nothing is connected any more.
     unawaited(refreshDevices());
   }
 

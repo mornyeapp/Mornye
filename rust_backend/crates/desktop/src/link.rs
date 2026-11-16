@@ -380,7 +380,6 @@ mod tests {
         let request_id = calls.lock().unwrap()[0].1["requestId"].clone();
         drop(pending);
         assert!(link.host.waiting.lock().unwrap().is_empty());
-        // A late reply is ignored.
         assert_eq!(
             link.reply(&args(json!({"requestId": request_id, "result": {}})))
                 .unwrap(),

@@ -94,7 +94,6 @@ extension _HomeTabSearchWideUI on _HomeTabState {
     // provider does not supply a relevance ranking across different types.
     final topResults = overview && context.isMornye;
 
-    // Songs are covers too, as the other kinds are.
     void addSongs() {
       final isInHistory = _watchSearchHistory(resultsRef, songs);
       final songFilter = overview ? filterFor('track') : null;

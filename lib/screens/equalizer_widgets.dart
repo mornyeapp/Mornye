@@ -551,7 +551,6 @@ class _BandFader extends StatelessWidget {
     String semantics(double v) => '${v.toStringAsFixed(1)} dB';
     return Column(
       children: [
-        // Tapping the gain returns the band to 0 dB.
         Tooltip(
           message: '$resetLabel $hz Hz',
           child: SizedBox(

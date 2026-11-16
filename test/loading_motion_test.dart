@@ -55,7 +55,6 @@ void main() {
       expect(_sliverOpacity(tester), 1);
 
       await tester.pumpWidget(_page(loading: false));
-      // The first frame without the skeleton already shows the content.
       final first = _sliverOpacity(tester);
       expect(first, greaterThan(0));
       expect(first, lessThan(1));
@@ -68,7 +67,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       expect(_sliverOpacity(tester), 1);
 
-      // A rebuild with new data never replays it.
       await tester.pumpWidget(_page(loading: false, build: 1));
       expect(_sliverOpacity(tester), 1);
       expect(find.text('loaded 1'), findsOneWidget);

@@ -282,7 +282,6 @@ async fn cover_art_without_any_picture_is_404_and_remembered() {
     set_mtime(modified);
     assert_eq!(json_cover(&fixture, "s").await.status, 404, "remembered");
 
-    // A changed file is read again.
     set_mtime(modified + std::time::Duration::from_secs(5));
     let found = json_cover(&fixture, "s").await;
     assert_eq!(found.status, 200);

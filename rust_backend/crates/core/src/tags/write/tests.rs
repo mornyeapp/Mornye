@@ -285,11 +285,9 @@ fn flac_tag_edits_split_combined_numbers_and_keep_totals() {
         ["TOTALTRACKS=9", "TRACKNUMBER=4", "TRACKTOTAL=9"]
     );
 
-    // Clearing the total removes every total field.
     let output = edit(&separate, &[("track_total", "")]);
     assert_eq!(flac_comment_list(&output), ["TRACKNUMBER=2"]);
 
-    // Clearing the number clears its total too, as before.
     let output = edit(&separate, &[("disc_number", "3"), ("track_number", "")]);
     assert_eq!(flac_comment_list(&output), ["DISCNUMBER=3"]);
 }

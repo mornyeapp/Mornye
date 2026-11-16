@@ -429,7 +429,6 @@ class LinkHandoff {
     final run = files?.begin();
     final (:queue, :phoneFiles) = await _refs(items);
 
-    // Songs the desktop lacks that the phone can send.
     final pending = await _missing(queue, phoneFiles, current: current);
     ({LinkUploadStart? start, Future<void> whole})? upload;
     if (pending.remove(current)) {

@@ -197,7 +197,6 @@ double audioCompareOverallDb(
       .toDouble();
 }
 
-// ---------------------------------------------------------------------------
 // Alignment
 
 /// The best lag of one correlation search.
@@ -729,7 +728,6 @@ AudioCompareFineMatch audioCompareFineAlign(AudioCompareFineInput input) {
   );
 }
 
-// ---------------------------------------------------------------------------
 // Reference residual measurement
 
 /// A second-order high-pass (RBJ cookbook, Q = 1/sqrt(2)), the filter FFmpeg
@@ -832,7 +830,6 @@ List<AudioCompareWindow> audioCompareMeasureWindows({
   return windows;
 }
 
-// ---------------------------------------------------------------------------
 // Summary
 
 /// How large the whole-song difference is.

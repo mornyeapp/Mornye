@@ -425,9 +425,7 @@ class LibraryReorganizer {
     return _Recorded.complete;
   }
 
-  // ---------------------------------------------------------------------------
   // Local storage
-  // ---------------------------------------------------------------------------
 
   Future<_Outcome> _moveLocal(
     String root,
@@ -555,9 +553,7 @@ class LibraryReorganizer {
     }
   }
 
-  // ---------------------------------------------------------------------------
   // Storage Access Framework (Android)
-  // ---------------------------------------------------------------------------
 
   Future<_Outcome> _moveSaf(
     String treeUri,

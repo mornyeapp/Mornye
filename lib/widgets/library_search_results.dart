@@ -461,7 +461,6 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
     final swipe = song
         ? resolvedLibraryItemQueueSwipe(ref, () => _resolve(hit))
         : null;
-    // The current track pauses and resumes in place.
     VoidCallback play(MediaPlaybackUi? playback) => playback?.isCurrent ?? false
         ? () => ref
               .read(musicPlayerControllerProvider)

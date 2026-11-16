@@ -680,7 +680,6 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
               }),
         );
       }
-      // Backgrounded: release idle native runtimes and connections.
       unawaited(PlatformBridge.releaseNativeMemory());
     }
   }
