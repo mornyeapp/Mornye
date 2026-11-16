@@ -17,6 +17,7 @@ import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/mornye_library_screen.dart';
 import 'package:mornye/screens/queue_tab.dart';
+import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/playable_media.dart';
@@ -24,9 +25,11 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
@@ -139,6 +142,17 @@ Future<void> _settle(WidgetTester tester) async {
   }
 }
 
+/// Opening the details reads the song's file first, which needs real time
+/// between the frames.
+Future<void> _settleDetails(WidgetTester tester) async {
+  for (var i = 0; i < 20; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
 Future<void> _rightClick(WidgetTester tester, Finder finder) async {
   final gesture = await tester.startGesture(
     tester.getCenter(finder),
@@ -191,6 +205,8 @@ void main() {
     });
     addTearDown(() => messenger.setMockMethodCallHandler(sqlite, null));
   });
+  // Clicks of one test must not complete a double click of the last one.
+  setUp(DesktopDoubleClick.reset);
   tearDown(() => debugDesktopPlatformOverride = null);
 
   Future<void> pumpLibrary(
@@ -206,6 +222,7 @@ void main() {
     MediaItem? currentItem,
     bool playing = false,
     bool loading = false,
+    bool? tapPlays,
   }) async {
     debugDesktopPlatformOverride = desktop;
     tester.view.physicalSize = desktop
@@ -249,6 +266,8 @@ void main() {
           ),
           playbackPlayingProvider.overrideWith((ref) => playing),
           playbackLoadingProvider.overrideWith((ref) => loading),
+          if (tapPlays != null)
+            librarySongTapPlaysProvider.overrideWithValue(tapPlays),
         ],
         child: MaterialApp(
           theme: mornye
@@ -263,6 +282,11 @@ void main() {
         ),
       ),
     );
+    // The app's player bar keeps the current item loaded, which Mornye rows
+    // do not watch themselves.
+    ProviderScope.containerOf(
+      tester.element(find.byType(QueueTab)),
+    ).listen(currentMediaItemProvider, (_, _) {});
     await _settle(tester);
   }
 
@@ -294,6 +318,7 @@ void main() {
           desktop: true,
           mornye: mornye,
           playback: playback,
+          tapPlays: false,
         );
         final l10n = AppLocalizations.of(tester.element(find.byType(QueueTab)));
         final button = findByTooltip(
@@ -339,6 +364,7 @@ void main() {
             artist: 'Artist',
           ),
           playing: playing,
+          tapPlays: false,
         );
         final icon = findAppIcon(
           playing
@@ -369,6 +395,7 @@ void main() {
           artist: 'Artist',
         ),
         loading: true,
+        tapPlays: false,
       );
       final l10n = AppLocalizations.of(tester.element(find.byType(QueueTab)));
       final button = find.byWidgetPredicate(
@@ -379,6 +406,131 @@ void main() {
       expect(tester.widget<AppIconButton>(button).onPressed, isNull);
       expect(player.toggles, isEmpty);
       expect(tester.takeException(), isNull);
+    });
+
+    // By default a click plays as the Play button does, and the button
+    // opens the details instead.
+    testWidgets('a click plays the full queue; the info button opens the '
+        'details (mornye: $mornye)', (tester) async {
+      final playback = _Playback();
+      await pumpLibrary(
+        tester,
+        desktop: true,
+        mornye: mornye,
+        playback: playback,
+      );
+      final l10n = AppLocalizations.of(tester.element(find.byType(QueueTab)));
+      expect(
+        findByTooltip(l10n.a11yPlayTrackByArtist('Alpha', 'Artist')),
+        findsNothing,
+      );
+      expect(findByTooltip('Show details'), findsNWidgets(2));
+
+      await tester.tap(find.text('Alpha'));
+      await _settle(tester);
+      expect(playback.started, ['/music/Alpha.flac']);
+      expect(playback._queue.map((item) => item.source), [
+        '/music/Bravo.flac',
+        '/music/Alpha.flac',
+      ]);
+      expect(playback._startIndex, 1);
+      expect(find.byType(TrackMetadataScreen), findsNothing);
+      expect(find.byType(LibraryTrackSelectionBar), findsNothing);
+
+      // Material extracts the embedded cover before the details open, which
+      // this host test cannot do, so only Mornye follows the route.
+      if (!mornye) return;
+      await tester.tap(findByTooltip('Show details').first);
+      await _settleDetails(tester);
+      expect(find.byType(TrackMetadataScreen), findsOneWidget);
+      expect(playback.started, ['/music/Alpha.flac']);
+    });
+
+    testWidgets('with the details setting a click opens the details '
+        '(mornye: $mornye)', (tester) async {
+      final playback = _Playback();
+      await pumpLibrary(
+        tester,
+        desktop: true,
+        mornye: mornye,
+        playback: playback,
+        tapPlays: false,
+      );
+      expect(findByTooltip('Show details'), findsNothing);
+      await tester.tap(find.text('Alpha'));
+      await _settleDetails(tester);
+      // See above: Material stops at the cover extraction.
+      if (mornye) expect(find.byType(TrackMetadataScreen), findsOneWidget);
+      expect(playback.started, isEmpty);
+    });
+
+    for (final playing in [false, true]) {
+      testWidgets('a click on the current song toggles playback in place '
+          '(mornye: $mornye, playing: $playing)', (tester) async {
+        final playback = _Playback();
+        final player = _Player();
+        await pumpLibrary(
+          tester,
+          desktop: true,
+          mornye: mornye,
+          playback: playback,
+          player: player,
+          currentItem: const MediaItem(
+            id: '/music/Alpha.flac',
+            title: 'Alpha',
+            artist: 'Artist',
+          ),
+          playing: playing,
+        );
+        await tester.tap(find.text('Alpha'));
+        await _settle(tester);
+        expect(player.toggles, [playing]);
+        expect(playback.started, isEmpty);
+        expect(find.byType(TrackMetadataScreen), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('a click on the current song does nothing while it loads '
+        '(mornye: $mornye)', (tester) async {
+      final playback = _Playback();
+      final player = _Player();
+      await pumpLibrary(
+        tester,
+        desktop: true,
+        mornye: mornye,
+        playback: playback,
+        player: player,
+        currentItem: const MediaItem(
+          id: '/music/Alpha.flac',
+          title: 'Alpha',
+          artist: 'Artist',
+        ),
+        loading: true,
+      );
+      await tester.tap(find.text('Alpha'));
+      await _settle(tester);
+      expect(player.toggles, isEmpty);
+      expect(playback.started, isEmpty);
+      expect(find.byType(TrackMetadataScreen), findsNothing);
+    });
+
+    testWidgets('a Shift-click still selects instead of playing '
+        '(mornye: $mornye)', (tester) async {
+      final playback = _Playback();
+      await pumpLibrary(
+        tester,
+        desktop: true,
+        mornye: mornye,
+        playback: playback,
+      );
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.tap(find.text('Alpha'));
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await _settle(tester);
+      expect(find.byType(LibraryTrackSelectionBar), findsOneWidget);
+      expect(playback.started, isEmpty);
+      expect(find.byType(TrackMetadataScreen), findsNothing);
     });
 
     testWidgets('a right-click menu leaves the selection toolbar closed '
@@ -437,6 +589,109 @@ void main() {
     expect(find.byType(SliverTrackTable), findsNothing);
     expect(find.byType(TrackCard), findsNWidgets(2));
     expect(find.text('January 2026'), findsOneWidget);
+  });
+
+  for (final mornye in [false, true]) {
+    for (final tapPlays in [true, false]) {
+      testWidgets('a phone Songs row ${tapPlays ? 'plays' : 'opens details'} '
+          'on a tap (mornye: $mornye)', (tester) async {
+        final playback = _Playback();
+        await pumpLibrary(
+          tester,
+          desktop: false,
+          mornye: mornye,
+          playback: playback,
+          // Null keeps the default setting.
+          tapPlays: tapPlays ? null : false,
+        );
+        final l10n = AppLocalizations.of(tester.element(find.byType(QueueTab)));
+        final row = find.widgetWithText(TrackCard, 'Alpha');
+        expect(
+          find.descendant(of: row, matching: findByTooltip('Show details')),
+          tapPlays ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: row,
+            matching: findByTooltip(
+              l10n.a11yPlayTrackByArtist('Alpha', 'Artist'),
+            ),
+          ),
+          tapPlays ? findsNothing : findsOneWidget,
+        );
+
+        await tester.tap(find.text('Alpha'));
+        await _settleDetails(tester);
+        if (tapPlays) {
+          expect(playback.started, ['/music/Alpha.flac']);
+          expect(playback._queue.map((item) => item.source), [
+            '/music/Bravo.flac',
+            '/music/Alpha.flac',
+          ]);
+          expect(find.byType(TrackMetadataScreen), findsNothing);
+        } else {
+          expect(playback.started, isEmpty);
+          // Material extracts the embedded cover first; see the desktop test.
+          if (mornye) {
+            expect(find.byType(TrackMetadataScreen), findsOneWidget);
+          }
+        }
+      });
+    }
+
+    testWidgets('a phone Songs row keeps toggling selection on a tap '
+        '(mornye: $mornye)', (tester) async {
+      final playback = _Playback();
+      await pumpLibrary(
+        tester,
+        desktop: false,
+        mornye: mornye,
+        playback: playback,
+      );
+      await tester.longPress(find.text('Alpha'));
+      await _settle(tester);
+      expect(find.byType(LibraryTrackSelectionBar), findsOneWidget);
+      await tester.tap(find.text('Bravo'));
+      await _settle(tester);
+      expect(
+        tester
+            .widget<TrackCard>(find.widgetWithText(TrackCard, 'Bravo'))
+            .isSelected,
+        isTrue,
+      );
+      expect(playback.started, isEmpty);
+      expect(find.byType(TrackMetadataScreen), findsNothing);
+    });
+  }
+
+  testWidgets('a phone Songs row whose file is missing keeps opening its '
+      'details', (tester) async {
+    final playback = _Playback();
+    // Mornye, which opens the details without extracting a cover first.
+    await pumpLibrary(tester, desktop: false, mornye: true, playback: playback);
+    // The test songs have no files; the Library confirms the miss after its
+    // retries.
+    for (var i = 0; i < 14; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    final row = find.widgetWithText(TrackCard, 'Alpha');
+    final l10n = AppLocalizations.of(tester.element(find.byType(QueueTab)));
+    expect(
+      find.descendant(
+        of: row,
+        matching: findByTooltip(l10n.queueDownloadedFileMissing),
+      ),
+      findsOneWidget,
+    );
+    expect(findByTooltip('Show details'), findsNothing);
+
+    await tester.tap(find.text('Alpha'));
+    await _settleDetails(tester);
+    expect(playback.started, isEmpty);
+    expect(find.byType(TrackMetadataScreen), findsOneWidget);
   });
 
   for (final desktop in [false, true]) {

@@ -8,11 +8,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/library_search_provider.dart';
 import 'package:mornye/providers/library_lyrics_search_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_search.dart';
@@ -26,6 +28,7 @@ import 'package:mornye/widgets/library_search_results.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/fixed_settings.dart';
 import 'support/tooltip_finder.dart';
 
 class _PlaybackRecorder extends PlaybackController {
@@ -162,9 +165,15 @@ void main() {
   }
 
   for (final mornye in [false, true]) {
-    for (final local in [false, true]) {
+    for (final (local, tapPlays) in [
+      (false, false),
+      (true, false),
+      (false, true),
+      (true, true),
+    ]) {
       testWidgets(
-        'search opens metadata; only Play starts audio ($mornye/$local)',
+        'search opens metadata on a tap or its info button and plays on the '
+        'other ($mornye/$local/tapPlays: $tapPlays)',
         (tester) async {
           SharedPreferences.setMockInitialValues({});
           FlutterSecureStorage.setMockInitialValues({});
@@ -214,6 +223,15 @@ void main() {
             ProviderScope(
               overrides: [
                 playbackProvider.overrideWith(() => player),
+                settingsProvider.overrideWith(
+                  () => FixedSettingsNotifier(
+                    AppSettings(
+                      librarySongTap: tapPlays
+                          ? AppSettings.librarySongTapPlay
+                          : AppSettings.librarySongTapDetails,
+                    ),
+                  ),
+                ),
                 librarySearchProvider.overrideWith(
                   (ref, request) async =>
                       request.kind == LibrarySearchKind.songs
@@ -256,7 +274,12 @@ void main() {
             tester.widget<TrackCard>(find.byType(TrackCard)).style,
             mornye ? TrackCardStyle.flat : TrackCardStyle.filled,
           );
-          await tester.tap(find.text('Song'));
+          final song = find.text('Song');
+          final info = findByTooltip('Show details');
+          final play = findByTooltip('Play');
+          expect(info, tapPlays ? findsOneWidget : findsNothing);
+          expect(play, tapPlays ? findsNothing : findsOneWidget);
+          await tester.tap(tapPlays ? info : song);
           await tester.pumpAndSettle();
           final details = tester.widget<TrackMetadataScreen>(
             find.byType(TrackMetadataScreen),
@@ -266,7 +289,7 @@ void main() {
           expect(player.paths, isEmpty);
           tester.state<NavigatorState>(find.byType(Navigator).first).pop();
           await tester.pumpAndSettle();
-          await tester.tap(findByTooltip('Play'));
+          await tester.tap(tapPlays ? song : play);
           await tester.pumpAndSettle();
           expect(player.paths, [path]);
           // Without a Library list to continue into, the song plays alone.
@@ -371,7 +394,8 @@ void main() {
         // Typing searched only; no list was read for playback yet.
         expect(lists, isEmpty);
 
-        await tester.tap(findByTooltip('Play').first);
+        // A tap on a song plays it as its Play button did.
+        await tester.tap(find.text('Song b'));
         await tester.pumpAndSettle();
         expect(lists, [filtered]);
         expect(player.queues.last, [
@@ -382,7 +406,7 @@ void main() {
         expect(player.starts.last, 1);
         expect(player.paths.last, '/music/b.mp3');
 
-        await tester.tap(findByTooltip('Play').last);
+        await tester.tap(find.text('Song x'));
         await tester.pumpAndSettle();
         // Hidden by the filters, the song plays within every song instead.
         expect(lists.skip(1), [filtered, whole]);
@@ -569,7 +593,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(findByTooltip('Play'), findsNWidgets(2));
+        expect(findByTooltip('Show details'), findsNWidgets(2));
 
         await tester.longPress(find.text('Song a'));
         await tester.pumpAndSettle();
@@ -578,7 +602,7 @@ void main() {
         expect(find.text('Convert 1 track'), findsOneWidget);
         expect(find.text('Delete 1 track'), findsOneWidget);
         // Selecting hides row actions and keeps taps on the selection.
-        expect(findByTooltip('Play'), findsNothing);
+        expect(findByTooltip('Show details'), findsNothing);
         await tester.tap(find.text('Song b'));
         await tester.pumpAndSettle();
         expect(find.text('2 selected'), findsOneWidget);
@@ -596,7 +620,7 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(find.textContaining('selected'), findsNothing);
-        expect(findByTooltip('Play'), findsNWidgets(2));
+        expect(findByTooltip('Show details'), findsNWidgets(2));
 
         await tester.longPress(find.text('Song a'));
         await tester.pumpAndSettle();

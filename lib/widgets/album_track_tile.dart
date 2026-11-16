@@ -1,18 +1,21 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 /// Album-style track row: track number, title/subtitle, and a trailing play
-/// button that's hidden once selection mode is active.
+/// button that's hidden once selection mode is active. The Library song tap
+/// setting can swap the tap and the button (see [songRowTap]).
 ///
 /// A thin arrangement over [TrackCard]; the container, selection tick, padding
 /// and typography all come from there.
-class AlbumTrackTile extends StatelessWidget {
+class AlbumTrackTile extends ConsumerWidget {
   const AlbumTrackTile({
     super.key,
     required this.trackNumber,
@@ -49,7 +52,7 @@ class AlbumTrackTile extends StatelessWidget {
   final QueueSwipeActions? queueSwipe;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return TrackCard(
       style: TrackCardStyle.flat,
       queueSwipe: queueSwipe,
@@ -57,7 +60,9 @@ class AlbumTrackTile extends StatelessWidget {
       isSelected: isSelected,
       isCurrent: isCurrent,
       isPlaying: isPlaying,
-      onTap: isSelectionMode ? onToggleSelection : onOpen,
+      onTap: isSelectionMode
+          ? onToggleSelection
+          : songRowTap(ref, openDetails: onOpen, play: onPlay),
       onLongPress: isSelectionMode ? null : onEnterSelectionMode,
       leading: SizedBox(
         width: 24,
@@ -70,7 +75,10 @@ class AlbumTrackTile extends StatelessWidget {
       ),
       title: trackName,
       subtitle: subtitle,
-      trailing: AlbumTrackPlayButton(isPlaying: isPlaying, onPlay: onPlay),
+      trailing: SongRowButton(
+        playButton: AlbumTrackPlayButton(isPlaying: isPlaying, onPlay: onPlay),
+        onOpenDetails: onOpen,
+      ),
     );
   }
 }

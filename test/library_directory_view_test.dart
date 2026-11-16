@@ -134,14 +134,15 @@ void main() {
     expect(find.text('$_root/Artist A/Album A'), findsOneWidget);
     expect(find.text('3 tracks'), findsOneWidget);
 
-    // A song's play button queues the folder's songs from it; the CUE
-    // track needs splitting first, so it stays out of the queue.
-    await tester.tap(
-      find.descendant(
-        of: find.widgetWithText(TrackCard, 'Song a2'),
-        matching: findByTooltip('Play'),
-      ),
+    // A tap on a song queues the folder's songs from it, and its button
+    // opens the details instead; the CUE track needs splitting first, so it
+    // stays out of the queue.
+    final song = find.widgetWithText(TrackCard, 'Song a2');
+    expect(
+      find.descendant(of: song, matching: findByTooltip('Show details')),
+      findsOneWidget,
     );
+    await tester.tap(song);
     await tester.pumpAndSettle();
     expect(playback.queues.single, [_paths['a1'], _paths['a2']]);
     expect(playback.starts.single, 1);

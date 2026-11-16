@@ -86,7 +86,11 @@ extension _QueueTabItemWidgets on _QueueTabState {
         },
         child: TrackCard(
           onTap: isCompleted
-              ? () => _navigateToMetadataScreen(item)
+              ? songRowTap(
+                  ref,
+                  openDetails: () => _navigateToMetadataScreen(item),
+                  play: () => _playCompletedDownload(item),
+                )
               : item.status == DownloadStatus.failed ||
                     item.status == DownloadStatus.skipped
               ? () => _showDownloadErrorDialog(context, item)
@@ -468,6 +472,28 @@ extension _QueueTabItemWidgets on _QueueTabState {
     );
   }
 
+  void _openCompletedDownload(DownloadItem item) => _openFile(
+    item.filePath!,
+    title: item.track.name,
+    artist: item.track.artistName,
+    album: item.track.albumName,
+    coverUrl: item.track.coverUrl ?? '',
+  );
+
+  /// A tap on a completed download that does what its play button does; a
+  /// download whose file is missing has none and opens its details.
+  void _playCompletedDownload(DownloadItem item) {
+    final path = item.filePath;
+    if (path == null || !_fileExistsListenable(path).value) {
+      _navigateToMetadataScreen(item);
+      return;
+    }
+    _LibraryPlaybackButton.run(ref, (
+      id: '',
+      path: _cleanFilePath(path),
+    ), () => _openCompletedDownload(item));
+  }
+
   Widget _buildActionButtons(
     BuildContext context,
     DownloadItem item,
@@ -546,19 +572,19 @@ extension _QueueTabItemWidgets on _QueueTabState {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (fileExists)
-                  _LibraryPlaybackButton(
-                    playbackKey: (id: '', path: _cleanFilePath(item.filePath!)),
-                    playTooltip: context.l10n.a11yPlayTrackByArtist(
-                      item.track.name,
-                      item.track.artistName,
+                  SongRowButton(
+                    playButton: _LibraryPlaybackButton(
+                      playbackKey: (
+                        id: '',
+                        path: _cleanFilePath(item.filePath!),
+                      ),
+                      playTooltip: context.l10n.a11yPlayTrackByArtist(
+                        item.track.name,
+                        item.track.artistName,
+                      ),
+                      onPlay: () => _openCompletedDownload(item),
                     ),
-                    onPlay: () => _openFile(
-                      item.filePath!,
-                      title: item.track.name,
-                      artist: item.track.artistName,
-                      album: item.track.albumName,
-                      coverUrl: item.track.coverUrl ?? '',
-                    ),
+                    onOpenDetails: () => _navigateToMetadataScreen(item),
                   )
                 else
                   Semantics(
@@ -881,8 +907,8 @@ extension _QueueTabItemWidgets on _QueueTabState {
     );
   }
 
-  /// A desktop click on a library song opens its details, as a tap does on
-  /// a phone; modifier clicks select.
+  /// A desktop click on a library song runs [open], what a tap does on a
+  /// phone; modifier clicks select.
   void _desktopLibraryItemClick(
     UnifiedLibraryItem item,
     List<UnifiedLibraryItem> libraryItems,
@@ -912,6 +938,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
       filterMode,
       items,
       Theme.of(context).colorScheme,
+      openAction,
     );
     final byId = table.byId;
     final sort = switch (_sortMode) {
@@ -948,10 +975,21 @@ extension _QueueTabItemWidgets on _QueueTabState {
             ],
             selectedIds: _selectedIds,
             onSelect: _applyDesktopClick,
-            // A click opens the song's details, as a tap does on a phone.
+            // A click does what a tap does on a phone: by the Library song
+            // tap setting, plays as the row's button does or opens the
+            // details.
             onActivate: (id) {
               final item = byId[id];
-              if (item != null) openAction(item)();
+              if (item == null) return;
+              songRowTap(
+                ref,
+                openDetails: openAction(item),
+                play: () => _LibraryPlaybackButton.run(
+                  ref,
+                  _libraryPlaybackKey(item),
+                  () => _playLibraryItem(item, items),
+                ),
+              )();
             },
             onContextMenu: (id, position) {
               final item = byId[id];
@@ -1000,6 +1038,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
     String filterMode,
     List<UnifiedLibraryItem> items,
     ColorScheme colorScheme,
+    VoidCallback Function(UnifiedLibraryItem item) openAction,
   ) {
     final qualityMode = _libraryQualityLabelMode;
     final cached = _songTableByMode[filterMode];
@@ -1007,7 +1046,9 @@ extension _QueueTabItemWidgets on _QueueTabState {
         cached != null &&
         cached.qualityMode == qualityMode &&
         cached.colorScheme == colorScheme;
-    if (reusable && identical(cached.items, items)) return cached;
+    if (reusable && identical(cached.items, items)) {
+      return cached..openAction = openAction;
+    }
     final previous = reusable ? cached.rowByItem : null;
     final rows = <TrackTableRow>[];
     final rowByItem = Map<UnifiedLibraryItem, TrackTableRow>.identity();
@@ -1028,18 +1069,24 @@ extension _QueueTabItemWidgets on _QueueTabState {
             },
             leading: _buildUnifiedCoverImage(item, colorScheme, 32),
             titleTrailing: Builder(
-              builder: (context) => _LibraryPlaybackButton(
-                playbackKey: _libraryPlaybackKey(item),
-                playTooltip: context.l10n.a11yPlayTrackByArtist(
-                  item.trackName,
-                  item.artistName,
+              builder: (context) => SongRowButton(
+                playButton: _LibraryPlaybackButton(
+                  playbackKey: _libraryPlaybackKey(item),
+                  playTooltip: context.l10n.a11yPlayTrackByArtist(
+                    item.trackName,
+                    item.artistName,
+                  ),
+                  // Cached rows must use the current page and sort order.
+                  onPlay: () => _playLibraryItem(
+                    item,
+                    _songTableByMode[filterMode]?.items ?? items,
+                  ),
+                  inline: true,
                 ),
-                // Cached rows must use the current page and sort order.
-                onPlay: () => _playLibraryItem(
-                  item,
-                  _songTableByMode[filterMode]?.items ?? items,
-                ),
-                inline: true,
+                onOpenDetails: () =>
+                    (_songTableByMode[filterMode]?.openAction ?? openAction)(
+                      item,
+                    )(),
               ),
             ),
             playback: mediaItemPlaybackUiProvider(_libraryPlaybackKey(item)),
@@ -1055,6 +1102,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
       rows: rows,
       rowByItem: rowByItem,
       byId: byId,
+      openAction: openAction,
     );
   }
 
@@ -1175,17 +1223,29 @@ extension _QueueTabItemWidgets on _QueueTabState {
         );
       },
     );
+    void play() => _playLibraryItem(item, libraryItems);
+    // A song whose file is missing has no play action and keeps opening.
+    final tap = songRowTap(
+      ref,
+      openDetails: open,
+      play: () => fileExistsListenable.value
+          ? _LibraryPlaybackButton.run(ref, playbackKey, play)
+          : open(),
+    );
     final trailing = ValueListenableBuilder<bool>(
       valueListenable: fileExistsListenable,
       builder: (context, fileExists, child) {
         if (fileExists) {
-          return _LibraryPlaybackButton(
-            playbackKey: playbackKey,
-            playTooltip: context.l10n.a11yPlayTrackByArtist(
-              item.trackName,
-              item.artistName,
+          return SongRowButton(
+            playButton: _LibraryPlaybackButton(
+              playbackKey: playbackKey,
+              playTooltip: context.l10n.a11yPlayTrackByArtist(
+                item.trackName,
+                item.artistName,
+              ),
+              onPlay: play,
             ),
-            onPlay: () => _playLibraryItem(item, libraryItems),
+            onOpenDetails: open,
           );
         }
         return Tooltip(
@@ -1206,10 +1266,10 @@ extension _QueueTabItemWidgets on _QueueTabState {
       isPlaying: playing,
       leadingArtwork: true,
       onTap: isDesktopPlatform
-          ? () => _desktopLibraryItemClick(item, libraryItems, open)
+          ? () => _desktopLibraryItemClick(item, libraryItems, tap)
           : _isSelectionMode
           ? () => _toggleSelection(item.id)
-          : open,
+          : tap,
       onContextMenu: (position) => _showLibraryItemMenu(
         context,
         item,
@@ -1273,6 +1333,16 @@ extension _QueueTabItemWidgets on _QueueTabState {
       localNavigationItems: localNavigationItems,
       localNavigationIndex: localNavigationIndex,
     );
+    final playbackKey = _libraryPlaybackKey(item);
+    void play() => _playLibraryItem(item, libraryItems);
+    // A song whose file is missing has no play action and keeps opening.
+    final tap = songRowTap(
+      ref,
+      openDetails: open,
+      play: () => fileExistsListenable.value
+          ? _LibraryPlaybackButton.run(ref, playbackKey, play)
+          : open(),
+    );
 
     return TrackGridCard(
       isSelected: _isSelectionMode && isSelected,
@@ -1281,10 +1351,10 @@ extension _QueueTabItemWidgets on _QueueTabState {
         item.artistName,
       ),
       onTap: isDesktopPlatform
-          ? () => _desktopLibraryItemClick(item, libraryItems, open)
+          ? () => _desktopLibraryItemClick(item, libraryItems, tap)
           : _isSelectionMode
           ? () => _toggleSelection(item.id)
-          : open,
+          : tap,
       onContextMenu: (position) => _showLibraryItemMenu(
         context,
         item,
@@ -1339,14 +1409,18 @@ extension _QueueTabItemWidgets on _QueueTabState {
               valueListenable: fileExistsListenable,
               builder: (context, fileExists, child) {
                 if (fileExists) {
-                  return _LibraryPlaybackButton(
-                    playbackKey: _libraryPlaybackKey(item),
-                    playTooltip: context.l10n.a11yPlayTrackByArtist(
-                      item.trackName,
-                      item.artistName,
+                  return SongRowButton(
+                    playButton: _LibraryPlaybackButton(
+                      playbackKey: playbackKey,
+                      playTooltip: context.l10n.a11yPlayTrackByArtist(
+                        item.trackName,
+                        item.artistName,
+                      ),
+                      onPlay: play,
+                      grid: true,
                     ),
-                    onPlay: () => _playLibraryItem(item, libraryItems),
-                    grid: true,
+                    onOpenDetails: open,
+                    size: SongRowButtonSize.grid,
                   );
                 }
                 return Tooltip(
@@ -1418,22 +1492,42 @@ class _LibraryPlaybackButton extends ConsumerWidget {
   final bool grid;
   final bool inline;
 
+  /// What the button does for [playback]: nothing while its song loads,
+  /// pause or resume for the current song, and [onPlay] for any other.
+  static VoidCallback? action(
+    WidgetRef ref,
+    MediaPlaybackUi playback,
+    VoidCallback onPlay,
+  ) => playback.isLoading
+      ? null
+      : () {
+          if (playback.isCurrent) {
+            ref
+                .read(musicPlayerControllerProvider)
+                .togglePlayPause(playback.isPlaying);
+          } else {
+            onPlay();
+          }
+        };
+
+  /// Runs [action] for the song's playback state at the time of the call, as
+  /// a row tap that does what the button does.
+  static void run(
+    WidgetRef ref,
+    PlaybackRowKey playbackKey,
+    VoidCallback onPlay,
+  ) => action(
+    ref,
+    ref.read(mediaItemPlaybackUiProvider(playbackKey)),
+    onPlay,
+  )?.call();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playback = ref.watch(mediaItemPlaybackUiProvider(playbackKey));
     final icon = playback.isPlaying ? Icons.pause : Icons.play_arrow;
     final tooltip = playback.isPlaying ? context.l10n.actionPause : playTooltip;
-    final onPressed = playback.isLoading
-        ? null
-        : () {
-            if (playback.isCurrent) {
-              ref
-                  .read(musicPlayerControllerProvider)
-                  .togglePlayPause(playback.isPlaying);
-            } else {
-              onPlay();
-            }
-          };
+    final onPressed = action(ref, playback, onPlay);
 
     if (grid) {
       return TrackGridPlayButton(
@@ -1498,13 +1592,14 @@ class _LibraryPlaybackButton extends ConsumerWidget {
 /// The desktop Songs table rows of one song list, with the inputs they were
 /// built from.
 class _LibrarySongTableRows {
-  const _LibrarySongTableRows({
+  _LibrarySongTableRows({
     required this.items,
     required this.qualityMode,
     required this.colorScheme,
     required this.rows,
     required this.rowByItem,
     required this.byId,
+    required this.openAction,
   });
 
   final List<UnifiedLibraryItem> items;
@@ -1513,4 +1608,8 @@ class _LibrarySongTableRows {
   final List<TrackTableRow> rows;
   final Map<UnifiedLibraryItem, TrackTableRow> rowByItem;
   final Map<String, UnifiedLibraryItem> byId;
+
+  /// Opens a song's details with the latest build's navigation lists, for
+  /// the details buttons of rows kept from an earlier build.
+  VoidCallback Function(UnifiedLibraryItem item) openAction;
 }

@@ -105,6 +105,7 @@ import 'package:mornye/widgets/animated_library_sliver_grid.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/smoothed_progress.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/two_finger_pinch_listener.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';

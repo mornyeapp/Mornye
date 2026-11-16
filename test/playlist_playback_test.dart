@@ -23,6 +23,7 @@ import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/widgets/destructive_selection_button.dart';
@@ -809,64 +810,77 @@ void main() {
   }
 
   for (final mornye in [false, true]) {
-    testWidgets('playlist row queues its neighbors (Mornye: $mornye)', (
-      tester,
-    ) async {
-      final player = _Player();
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            settingsProvider.overrideWith(_Settings.new),
-            musicPlayerControllerProvider.overrideWithValue(player),
-            playbackProvider.overrideWith(_Playback.new),
-            libraryCollectionsProvider.overrideWith(_Collections.new),
-            localLibraryProvider.overrideWith(_Library.new),
-            downloadHistoryProvider.overrideWith(_History.new),
-            downloadHistoryVisibleBatchExistsProvider.overrideWith(
-              (ref, request) => {
-                for (final track in request.tracks)
-                  if (track.spotifyId != 'Unavailable') track.lookupKey,
-              },
-            ),
-            localLibraryCoverProvider.overrideWith(
-              (ref, request) async => null,
-            ),
-            localLibraryFirstCoverProvider.overrideWith(
-              (ref, request) async => null,
-            ),
-          ],
-          child: MaterialApp(
-            theme: mornye
-                ? MornyeTheme.build(Brightness.dark)
-                : AppTheme.light(),
-            localizationsDelegates: appLocalizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: const LibraryTracksFolderScreen(
-              mode: LibraryTracksFolderMode.playlist,
-              playlistId: 'playlist',
+    for (final tapPlays in [false, true]) {
+      testWidgets('playlist row queues its neighbors from '
+          '${tapPlays ? 'a tap' : 'its Play button'} (Mornye: $mornye)', (
+        tester,
+      ) async {
+        final player = _Player();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              settingsProvider.overrideWith(_Settings.new),
+              librarySongTapPlaysProvider.overrideWithValue(tapPlays),
+              musicPlayerControllerProvider.overrideWithValue(player),
+              playbackProvider.overrideWith(_Playback.new),
+              libraryCollectionsProvider.overrideWith(_Collections.new),
+              localLibraryProvider.overrideWith(_Library.new),
+              downloadHistoryProvider.overrideWith(_History.new),
+              downloadHistoryVisibleBatchExistsProvider.overrideWith(
+                (ref, request) => {
+                  for (final track in request.tracks)
+                    if (track.spotifyId != 'Unavailable') track.lookupKey,
+                },
+              ),
+              localLibraryCoverProvider.overrideWith(
+                (ref, request) async => null,
+              ),
+              localLibraryFirstCoverProvider.overrideWith(
+                (ref, request) async => null,
+              ),
+            ],
+            child: MaterialApp(
+              theme: mornye
+                  ? MornyeTheme.build(Brightness.dark)
+                  : AppTheme.light(),
+              localizationsDelegates: appLocalizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const LibraryTracksFolderScreen(
+                mode: LibraryTracksFolderMode.playlist,
+                playlistId: 'playlist',
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final row = find.ancestor(
-        of: find.text('Selected'),
-        matching: find.byType(TrackCard),
-      );
-      await tester.scrollUntilVisible(row, 200);
-      await tester.tap(
-        find.descendant(of: row, matching: findAppIcon(Icons.play_arrow)),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
+        final row = find.ancestor(
+          of: find.text('Selected'),
+          matching: find.byType(TrackCard),
+        );
+        await tester.scrollUntilVisible(row, 200);
+        expect(
+          find.descendant(of: row, matching: findByTooltip('Show details')),
+          tapPlays ? findsOneWidget : findsNothing,
+        );
+        await tester.tap(
+          tapPlays
+              ? find.text('Selected')
+              : find.descendant(
+                  of: row,
+                  matching: findAppIcon(Icons.play_arrow),
+                ),
+        );
+        await tester.pumpAndSettle();
 
-      expect(player.queue.map((item) => item.title), [
-        'First',
-        'Selected',
-        'Last',
-      ]);
-      expect(player.index, 1);
-      expect(tester.takeException(), isNull);
-    });
+        expect(player.queue.map((item) => item.title), [
+          'First',
+          'Selected',
+          'Last',
+        ]);
+        expect(player.index, 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
 
     testWidgets('playlist header shuffles every song (Mornye: $mornye)', (
       tester,

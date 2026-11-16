@@ -15,6 +15,7 @@ import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/tooltip_finder.dart';
@@ -43,8 +44,11 @@ Widget _app(
   String? artUri,
   bool playing = true,
   bool reduceMotion = false,
+  bool? tapPlays,
 }) => ProviderScope(
   overrides: [
+    if (tapPlays != null)
+      librarySongTapPlaysProvider.overrideWithValue(tapPlays),
     currentMediaItemProvider.overrideWithBuild(
       (ref, notifier) => Stream.value(
         currentId == null
@@ -672,7 +676,7 @@ void main() {
     );
 
     testWidgets('marks the current track and offers pause', (tester) async {
-      await tester.pumpWidget(_app(tile(current: true)));
+      await tester.pumpWidget(_app(tile(current: true), tapPlays: false));
       await _pumpFor(tester, _settle);
 
       expect(find.byType(NowPlayingIndicator), findsOneWidget);
@@ -686,11 +690,22 @@ void main() {
     });
 
     testWidgets('other tracks show no glyph', (tester) async {
-      await tester.pumpWidget(_app(tile(current: false)));
+      await tester.pumpWidget(_app(tile(current: false), tapPlays: false));
       await tester.pump();
 
       expect(find.byType(NowPlayingIndicator), findsNothing);
       expect(findByTooltip('Play'), findsOneWidget);
+    });
+
+    testWidgets('a tap that plays keeps the current track marked', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_app(tile(current: true)));
+      await _pumpFor(tester, _settle);
+
+      expect(find.byType(NowPlayingIndicator), findsOneWidget);
+      expect(findByTooltip('Show details'), findsOneWidget);
+      expect(findByTooltip('Pause'), findsNothing);
     });
   });
 }

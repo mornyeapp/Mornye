@@ -14,6 +14,7 @@ import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/expressive_button_group.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
@@ -1362,8 +1363,9 @@ class _CollectionTrackTile extends ConsumerWidget {
         : ref.watch(catalogTrackPlaybackUiProvider(catalogTrackKey(track)));
     final isCurrent = playback?.isCurrent ?? false;
     final isPlaying = playback?.isPlaying ?? false;
+    final hasFile = isInHistory || isInLocalLibrary;
     // Songs with a file queue as the selection bar queues them.
-    final queueSwipe = isInHistory || isInLocalLibrary
+    final queueSwipe = hasFile
         ? mediaQueueSwipe(
             ref,
             () => resolveCollectionTrackFiles(
@@ -1372,6 +1374,11 @@ class _CollectionTrackTile extends ConsumerWidget {
             ),
           )
         : null;
+    final VoidCallback play = isCurrent
+        ? () =>
+              ref.read(musicPlayerControllerProvider).togglePlayPause(isPlaying)
+        : () => _playFromHere(context, ref);
+    void openDetails() => _navigateToMetadata(context, ref);
 
     return TrackCard(
       style: TrackCardStyle.flat,
@@ -1414,19 +1421,15 @@ class _CollectionTrackTile extends ConsumerWidget {
       ),
       // The button reads its colours inside the row, which follow the fill
       // of the current track.
-      trailing: isInHistory || isInLocalLibrary
+      trailing: hasFile
           ? Builder(
               builder: (context) {
                 final colorScheme = Theme.of(context).colorScheme;
-                return AppIconButton(
+                final playButton = AppIconButton(
                   tooltip: isPlaying
                       ? context.l10n.actionPause
                       : context.l10n.tooltipPlay,
-                  onPressed: isCurrent
-                      ? () => ref
-                            .read(musicPlayerControllerProvider)
-                            .togglePlayPause(isPlaying)
-                      : () => _playFromHere(context, ref),
+                  onPressed: play,
                   icon: Icon(
                     isPlaying ? Icons.pause : Icons.play_arrow,
                     color: colorScheme.primary,
@@ -1438,19 +1441,23 @@ class _CollectionTrackTile extends ConsumerWidget {
                     ),
                   ),
                 );
+                // A wishlist tap downloads, so its button stays Play.
+                return mode == LibraryTracksFolderMode.wishlist
+                    ? playButton
+                    : SongRowButton(
+                        playButton: playButton,
+                        onOpenDetails: openDetails,
+                      );
               },
             )
           : null,
       onTap: isSelectionMode
           ? onTap
-          : () {
-              if (mode == LibraryTracksFolderMode.wishlist) {
-                _downloadTrack(context, ref);
-                return;
-              }
-
-              _navigateToMetadata(context, ref);
-            },
+          : mode == LibraryTracksFolderMode.wishlist
+          ? () => _downloadTrack(context, ref)
+          : hasFile
+          ? songRowTap(ref, openDetails: openDetails, play: play)
+          : openDetails,
       onLongPress: isSelectionMode ? onTap : onLongPress,
     );
   }

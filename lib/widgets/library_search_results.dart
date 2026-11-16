@@ -34,6 +34,7 @@ import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/sliver_layout_info_builder.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
@@ -460,6 +461,12 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
     final swipe = song
         ? resolvedLibraryItemQueueSwipe(ref, () => _resolve(hit))
         : null;
+    // The current track pauses and resumes in place.
+    VoidCallback play(MediaPlaybackUi? playback) => playback?.isCurrent ?? false
+        ? () => ref
+              .read(musicPlayerControllerProvider)
+              .togglePlayPause(playback!.isPlaying)
+        : () => _open(hit, play: true);
     Widget card({MediaPlaybackUi? playback}) => TrackCard(
       key: playback == null ? key : null,
       style: hit.kind == LibrarySearchKind.songs && !context.isMornye
@@ -482,21 +489,19 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
       isPlaying: playback?.isPlaying ?? false,
       leadingArtwork: song,
       trailing: song
-          ? AppIconButton(
-              tooltip: playback?.isPlaying ?? false
-                  ? context.l10n.actionPause
-                  : context.l10n.tooltipPlay,
-              icon: Icon(
-                playback?.isPlaying ?? false
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
+          ? SongRowButton(
+              playButton: AppIconButton(
+                tooltip: playback?.isPlaying ?? false
+                    ? context.l10n.actionPause
+                    : context.l10n.tooltipPlay,
+                icon: Icon(
+                  playback?.isPlaying ?? false
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
+                ),
+                onPressed: play(playback),
               ),
-              // The current track pauses and resumes in place.
-              onPressed: playback?.isCurrent ?? false
-                  ? () => ref
-                        .read(musicPlayerControllerProvider)
-                        .togglePlayPause(playback!.isPlaying)
-                  : () => _open(hit, play: true),
+              onOpenDetails: () => _open(hit),
             )
           : const Icon(Icons.chevron_right),
       // Long-press selects songs for the Library batch actions; while
@@ -504,7 +509,13 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
       isSelectionMode: song && _selecting,
       isSelected: song && _selected.containsKey(_itemId(hit)),
       onTap: !_selecting
-          ? () => _open(hit)
+          ? song
+                ? songRowTap(
+                    ref,
+                    openDetails: () => _open(hit),
+                    play: play(playback),
+                  )
+                : () => _open(hit)
           : song
           ? () => _toggleSelection(hit)
           : null,

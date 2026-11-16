@@ -36,7 +36,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'support/page_back.dart';
-import 'support/tooltip_finder.dart';
 
 class _Settings extends SettingsNotifier {
   _Settings(this.initial);
@@ -902,7 +901,8 @@ void main() {
       }
       expect(find.text('Track b'), findsOneWidget);
       expect(lists, isEmpty);
-      await tester.tap(findByTooltip(l10n.tooltipPlay).hitTestable());
+      // A tap on the song plays it, as its Play button did.
+      await tester.tap(find.text('Track b').hitTestable());
       for (var i = 0; i < 10; i++) {
         await tester.pump(const Duration(milliseconds: 50));
       }
@@ -943,12 +943,8 @@ void main() {
           }),
         ],
       );
-      final l10n = l10nOf(tester);
-      await tester.tap(
-        findByTooltip(
-          l10n.a11yPlayTrackByArtist('Song 1', 'Artist'),
-        ).hitTestable(),
-      );
+      // A tap on the song plays it, as its Play button did.
+      await tester.tap(find.text('Song 1').hitTestable());
       for (var i = 0; i < 10; i++) {
         await tester.pump(const Duration(milliseconds: 50));
       }

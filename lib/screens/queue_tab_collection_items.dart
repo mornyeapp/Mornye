@@ -161,38 +161,63 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     final artistName = historyItem?.artistName ?? track.artistName;
     final albumName = historyItem?.albumName ?? track.albumName;
     final coverUrl = historyItem?.coverUrl ?? track.coverUrl ?? '';
-    void onTap() => historyItem != null
+    void openDetails() => historyItem != null
         ? _navigateToHistoryMetadataScreen(
             historyItem,
             navigationItems: navigationItems,
             navigationIndex: navigationIndex,
           )
         : _navigateToMetadataScreen(item);
-    final playback = playablePath == null
+    void play(String path) => _openFile(
+      path,
+      title: trackName,
+      artist: artistName,
+      album: albumName,
+      coverUrl: coverUrl,
+    );
+    final playable = playablePath == null
+        ? null
+        : _completionBridgePlayableProbe.listenable(
+            historyFilePath: historyItem?.filePath,
+            completedItemFilePath: item.filePath,
+          );
+    // Plays only once the file is known to play; until then a tap opens.
+    final onTap = songRowTap(
+      ref,
+      openDetails: openDetails,
+      play: () {
+        final result = playable?.value;
+        final resolvedPath = result?.path;
+        if (result?.status != CompletionBridgePlayableStatus.playable ||
+            resolvedPath == null) {
+          return openDetails();
+        }
+        _LibraryPlaybackButton.run(ref, (
+          id: '',
+          path: _cleanFilePath(resolvedPath),
+        ), () => play(resolvedPath));
+      },
+    );
+    final playback = playable == null
         ? null
         : ValueListenableBuilder<CompletionBridgePlayableResult>(
-            valueListenable: _completionBridgePlayableProbe.listenable(
-              historyFilePath: historyItem?.filePath,
-              completedItemFilePath: item.filePath,
-            ),
+            valueListenable: playable,
             builder: (context, result, child) {
               final resolvedPath = result.path;
               if (result.status == CompletionBridgePlayableStatus.playable &&
                   resolvedPath != null) {
-                return _LibraryPlaybackButton(
-                  playbackKey: (id: '', path: _cleanFilePath(resolvedPath)),
-                  playTooltip: context.l10n.a11yPlayTrackByArtist(
-                    trackName,
-                    artistName,
+                return SongRowButton(
+                  playButton: _LibraryPlaybackButton(
+                    playbackKey: (id: '', path: _cleanFilePath(resolvedPath)),
+                    playTooltip: context.l10n.a11yPlayTrackByArtist(
+                      trackName,
+                      artistName,
+                    ),
+                    onPlay: () => play(resolvedPath),
+                    grid: grid,
                   ),
-                  onPlay: () => _openFile(
-                    resolvedPath,
-                    title: trackName,
-                    artist: artistName,
-                    album: albumName,
-                    coverUrl: coverUrl,
-                  ),
-                  grid: grid,
+                  onOpenDetails: openDetails,
+                  size: grid ? SongRowButtonSize.grid : SongRowButtonSize.list,
                 );
               }
               if (result.status == CompletionBridgePlayableStatus.checking) {

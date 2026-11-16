@@ -20,6 +20,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/library_search_results.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/track_list_tile.dart';
 
@@ -350,7 +351,15 @@ void main() {
       ) async {
         debugDesktopPlatformOverride = desktop;
         await tester.pumpWidget(
-          _app(results(), current: current, overrides: searchOverrides),
+          _app(
+            results(),
+            current: current,
+            overrides: [
+              ...searchOverrides,
+              // The rows keep their Play buttons while a tap opens details.
+              librarySongTapPlaysProvider.overrideWithValue(false),
+            ],
+          ),
         );
         await _pumpFor(tester);
         _expectOnlyCurrentMarked(tester);

@@ -49,6 +49,7 @@ import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/sliver_layout_info_builder.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 /// One Library folder: its path and counts, Play and Shuffle over every
@@ -840,6 +841,13 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
         final playback = ref.watch(
           mediaItemPlaybackUiProvider(_playbackKey(item)),
         );
+        // The current song pauses and resumes in place.
+        final VoidCallback play = playback.isCurrent
+            ? () => ref
+                  .read(musicPlayerControllerProvider)
+                  .togglePlayPause(playback.isPlaying)
+            : () => _play(items, start: item);
+        void openDetails() => _openDetails(item);
         return TrackCard(
           style: context.isMornye ? TrackCardStyle.flat : TrackCardStyle.filled,
           leading: _SongArtwork(item: item, size: context.tokens.coverList),
@@ -852,27 +860,25 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
           ),
           isCurrent: playback.isCurrent,
           isPlaying: playback.isPlaying,
-          trailing: AppIconButton(
-            tooltip: playback.isPlaying
-                ? context.l10n.actionPause
-                : context.l10n.tooltipPlay,
-            icon: Icon(
-              playback.isPlaying
-                  ? Icons.pause_rounded
-                  : Icons.play_arrow_rounded,
+          trailing: SongRowButton(
+            playButton: AppIconButton(
+              tooltip: playback.isPlaying
+                  ? context.l10n.actionPause
+                  : context.l10n.tooltipPlay,
+              icon: Icon(
+                playback.isPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
+              ),
+              onPressed: play,
             ),
-            // The current song pauses and resumes in place.
-            onPressed: playback.isCurrent
-                ? () => ref
-                      .read(musicPlayerControllerProvider)
-                      .togglePlayPause(playback.isPlaying)
-                : () => _play(items, start: item),
+            onOpenDetails: openDetails,
           ),
           isSelectionMode: isSelectionMode,
           isSelected: selectedIds.contains(item.id),
           onTap: isSelectionMode
               ? () => toggleSelection(item.id)
-              : () => _openDetails(item),
+              : songRowTap(ref, openDetails: openDetails, play: play),
           onLongPress: isSelectionMode
               ? () => toggleSelection(item.id)
               : () => enterSelectionMode(item.id),
