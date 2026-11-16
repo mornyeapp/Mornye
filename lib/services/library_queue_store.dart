@@ -268,6 +268,7 @@ class LibraryQueueStore {
     if (sqlite.normalizeLookupText(request.searchQuery).isNotEmpty ||
         request.excludeNetwork ||
         request.albumArtist != null ||
+        request.genre != null ||
         request.quality != null ||
         request.format != null ||
         request.metadata != null) {
@@ -354,6 +355,41 @@ class LibraryQueueStore {
         request.offset,
       ],
     );
+  }
+
+  /// Genres across downloaded and scanned music, one row for each spelling
+  /// of a genre with its song count and a cover, without loading songs into
+  /// Dart. Genres compare trimmed and case-folded, as the genre sort does.
+  /// Songs without a genre and scanned paths already represented by
+  /// downloads are left out. Within a genre the most common spelling comes
+  /// first.
+  Future<List<Map<String, Object?>>> genreSpellings({
+    required bool includeLocal,
+  }) {
+    final parts = <String>[
+      '''
+        SELECT sort_genre AS genre_key, TRIM(genre) AS genre_name,
+          cover_url, NULL AS cover_path, file_path AS sample_file_path
+        FROM history_db.history
+        WHERE sort_genre != ''
+      ''',
+      if (includeLocal)
+        '''
+          SELECT l.sort_genre AS genre_key, TRIM(l.genre) AS genre_name,
+            NULL AS cover_url, l.cover_path, l.file_path AS sample_file_path
+          FROM ${LibrarySchema.visibleView} l
+          WHERE l.sort_genre != '' AND ${_notShadowedByHistory('l')}
+        ''',
+    ];
+    return _db.rawQuery('''
+      SELECT genre_key, genre_name, COUNT(*) AS track_count,
+        MAX(NULLIF(cover_url, '')) AS cover_url,
+        MAX(NULLIF(cover_path, '')) AS cover_path,
+        MAX(sample_file_path) AS sample_file_path
+      FROM (${parts.join(' UNION ALL ')})
+      GROUP BY genre_key, genre_name
+      ORDER BY genre_key, track_count DESC, genre_name
+    ''');
   }
 
   String _escapeLikePattern(String value) {
@@ -595,6 +631,7 @@ class LibraryQueueStore {
         sqlite.normalizeLookupText(request.searchQuery).isEmpty &&
         !request.excludeNetwork &&
         request.albumArtist == null &&
+        request.genre == null &&
         request.quality == null &&
         request.format == null &&
         request.metadata == null;
@@ -807,6 +844,10 @@ class LibraryQueueStore {
       where.add('h.sort_album_artist = ?');
       args.add(sqlite.normalizeLookupText(request.albumArtist));
     }
+    if (request.genre != null) {
+      where.add('h.sort_genre = ?');
+      args.add(sqlite.normalizeLookupText(request.genre));
+    }
     final query = sqlite.normalizeLookupText(request.searchQuery);
     if (query.isNotEmpty) {
       final ftsQuery = sqlite.ftsPhraseSearchQuery(query);
@@ -868,6 +909,10 @@ class LibraryQueueStore {
     if (request.albumArtist != null) {
       where.add('l.album_artist_norm = ?');
       args.add(sqlite.normalizeLookupText(request.albumArtist));
+    }
+    if (request.genre != null) {
+      where.add('l.sort_genre = ?');
+      args.add(sqlite.normalizeLookupText(request.genre));
     }
     final query = sqlite.normalizeLookupText(request.searchQuery);
     if (query.isNotEmpty) {

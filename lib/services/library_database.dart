@@ -562,6 +562,15 @@ class LibraryDatabase {
     includeLocal: request.includeLocal,
   );
 
+  /// Each spelling of each genre across downloaded and scanned music, with
+  /// its song count and a cover; see [LibraryQueueStore.genreSpellings].
+  Future<List<Map<String, Object?>>> getGenreSpellings({
+    required bool includeLocal,
+  }) => _queueRead(
+    (store) => store.genreSpellings(includeLocal: includeLocal),
+    includeLocal: includeLocal,
+  );
+
   Future<List<Map<String, dynamic>>> getQueueLocalAlbumTracks(
     String albumName,
     String artistName,

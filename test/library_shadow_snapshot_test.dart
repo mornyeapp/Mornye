@@ -220,6 +220,11 @@ final _requests = <String, QueueLibraryDbQuery>{
               sortMode: sort,
               albumArtist: 'Artist 1',
             ),
+            'genre': (source, sort) => QueueLibraryDbQuery(
+              source: source,
+              sortMode: sort,
+              genre: 'pop',
+            ),
             'hires': (source, sort) => QueueLibraryDbQuery(
               source: source,
               sortMode: sort,
@@ -274,6 +279,7 @@ Future<Map<String, Object?>> _reads(
       filterMode: query.filterMode,
       searchQuery: query.searchQuery,
       albumArtist: query.albumArtist,
+      genre: query.genre,
       quality: query.quality,
       format: query.format,
       metadata: query.metadata,
@@ -287,6 +293,7 @@ Future<Map<String, Object?>> _reads(
   }
   reads['folders'] = await store.directoryEntries(includeLocal: true);
   reads['files'] = await store.songFiles();
+  reads['genres'] = await store.genreSpellings(includeLocal: true);
   reads['mixes'] = [
     for (final source in ['downloaded', 'local'])
       ...await store.mixSongs(source: source, limit: 1000),
@@ -358,6 +365,11 @@ Future<void> _expectCurrent(String step) async {
     await library.getDirectoryEntries(includeLocal: true),
     await rowCheck.directoryEntries(includeLocal: true),
     reason: '$step folders',
+  );
+  expect(
+    await library.getGenreSpellings(includeLocal: true),
+    await rowCheck.genreSpellings(includeLocal: true),
+    reason: '$step genres',
   );
   expect(
     await library.getSongFiles(),

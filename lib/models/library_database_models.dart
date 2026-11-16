@@ -314,6 +314,9 @@ class IsrcDuplicateGroup {
 class QueueLibraryDbQuery {
   final bool includeSingleTrackAlbums;
   final String? albumArtist;
+
+  /// Songs whose genre tag, trimmed and case-folded, is this genre.
+  final String? genre;
   final int limit;
   final int offset;
   final String filterMode;
@@ -330,6 +333,7 @@ class QueueLibraryDbQuery {
   const QueueLibraryDbQuery({
     this.includeSingleTrackAlbums = false,
     this.albumArtist,
+    this.genre,
     this.limit = 100,
     this.offset = 0,
     this.filterMode = 'all',
