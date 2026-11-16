@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/services/saf_siblings.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/lyrics_draft.dart';
@@ -280,7 +281,12 @@ class LyricsSidecarStore {
       return utf8.decode(await file.readAsBytes(), allowMalformed: true);
     }
     if (_isDocument(source)) {
-      return PlatformBridge.readSafSidecar(source, extension);
+      if (!SafSiblings.extensions.contains(extension)) {
+        return PlatformBridge.readSafSidecar(source, extension);
+      }
+      final sidecar = await SafSiblings.instance.sidecar(source, extension);
+      if (sidecar == null || sidecar.size > _maxSidecarBytes) return null;
+      return PlatformBridge.readSafText(sidecar.uri, _maxSidecarBytes);
     }
     return null;
   }
@@ -301,7 +307,17 @@ class LyricsSidecarStore {
       return;
     }
     if (_isDocument(source)) {
-      if (!await PlatformBridge.writeSafSidecar(source, content, extension)) {
+      final bool written;
+      try {
+        written = await PlatformBridge.writeSafSidecar(
+          source,
+          content,
+          extension,
+        );
+      } finally {
+        SafSiblings.instance.forget(source);
+      }
+      if (!written) {
         throw StateError('The .$extension file could not be written');
       }
       return;

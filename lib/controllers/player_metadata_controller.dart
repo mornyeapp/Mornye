@@ -7,6 +7,7 @@ import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_metadata.dart';
 import 'package:mornye/services/player_lyrics_persistence.dart';
+import 'package:mornye/services/saf_siblings.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/logger.dart';
@@ -93,6 +94,8 @@ class PlayerMetadataController extends ChangeNotifier {
           _savingLyricsSources.contains(changed)) {
         return;
       }
+      // A tag change can come with new sidecars beside the song.
+      SafSiblings.instance.forget(changed);
       final item = _item;
       // Read again what was read before: a copy is probed on every load, an
       // unresolved document only when something asked for its tags.

@@ -426,14 +426,28 @@ internal suspend fun MainActivity.handleFindSafSibling(call: MethodCall, result:
     val safUri = call.argument<String>("saf_uri") ?: ""
     val name = call.argument<String>("name") ?: ""
     val sibling = withContext(Dispatchers.IO) {
-        // A plain file name: never a path into another folder.
-        if (name.isBlank() || name.contains('/') || name.startsWith('.')) {
-            null
-        } else {
-            findSafSibling(Uri.parse(safUri), name)
-        }
+        if (isPlainSiblingName(name)) findSafSibling(Uri.parse(safUri), name) else null
     }
     result.success(sibling)
+}
+
+internal suspend fun MainActivity.handleFindSafSiblings(call: MethodCall, result: MethodChannel.Result) {
+    val safUri = call.argument<String>("saf_uri") ?: ""
+    val extensions = call.argument<List<String>>("extensions").orEmpty()
+    val names = call.argument<List<String>>("names").orEmpty()
+    val siblings = withContext(Dispatchers.IO) {
+        findSafSiblings(Uri.parse(safUri), extensions, names)
+    }
+    result.success(siblings)
+}
+
+internal suspend fun MainActivity.handleReadSafText(call: MethodCall, result: MethodChannel.Result) {
+    val uri = Uri.parse(call.argument<String>("uri") ?: "")
+    val maxBytes = call.argument<Int>("max_bytes") ?: 0
+    val content = withContext(Dispatchers.IO) {
+        if (uri.scheme == "content" && maxBytes > 0) readSafText(uri, maxBytes) else null
+    }
+    result.success(content)
 }
 
 internal suspend fun MainActivity.handleSafSongFolders(call: MethodCall, result: MethodChannel.Result) {

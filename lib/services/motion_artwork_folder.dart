@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:mornye/services/motion_artwork_store.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/services/saf_siblings.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 
@@ -34,7 +35,7 @@ class MotionArtworkFolder {
     Future<bool> Function(String target, File file)? upload,
     bool? documents,
   }) : _directory = directory ?? MotionArtworkStore.defaultDirectory,
-       _sibling = sibling ?? PlatformBridge.findSafSibling,
+       _sibling = sibling ?? _findSibling,
        _copyDocument = copyDocument ?? PlatformBridge.copyContentUriToTemp,
        _createDocument = createDocument ?? _createSafDocument,
        _upload = upload ?? _uploadToNetwork,
@@ -244,6 +245,14 @@ class MotionArtworkFolder {
     final real = isCueVirtualPath(path) ? stripCueTrackSuffix(path) : path;
     return p.isAbsolute(real) ? real : null;
   }
+
+  /// The song's folder is listed once for this and the song's lyrics.
+  static Future<MotionArtworkDocument?> _findSibling(
+    String song,
+    String name,
+  ) => SafSiblings.names.contains(name)
+      ? SafSiblings.instance.file(song, name)
+      : PlatformBridge.findSafSibling(song, name);
 
   static Future<bool> _createSafDocument(
     String treeUri,

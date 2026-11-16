@@ -9,6 +9,7 @@ import android.system.Os
 import android.system.OsConstants
 import androidx.documentfile.provider.DocumentFile
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -545,6 +546,78 @@ internal fun Context.findSafSibling(audioUri: Uri, name: String): Map<String, An
         )
     } catch (e: Exception) {
         android.util.Log.w("Mornye", "Sibling lookup failed: ${e.message}")
+        null
+    }
+}
+
+/**
+ * The sidecars with [extensions] and the files named [names] in the folder
+ * of a SAF audio document, found in one listing of that folder, each as its
+ * uri, size and modification time: "sidecars" by extension and "files" by
+ * name, leaving out those the folder does not have. Null when the folder
+ * cannot be read.
+ */
+internal fun Context.findSafSiblings(
+    audioUri: Uri,
+    extensions: List<String>,
+    names: List<String>,
+): Map<String, Any>? {
+    return try {
+        val parent = safParentDir(audioUri) ?: return null
+        val audioName = if (extensions.isEmpty()) {
+            null
+        } else {
+            try {
+                DocumentFile.fromSingleUri(this, audioUri)?.name
+            } catch (_: Exception) {
+                null
+            }
+        }
+        val wanted = safSiblingWanted(audioName, extensions, names)
+        val children = findSafChildren(this, parent, wanted.names)
+        val entries = mutableMapOf<String, Map<String, Any>?>()
+        fun entry(name: String): Map<String, Any>? = entries.getOrPut(name) {
+            children[name]?.takeIf { it.isFile }?.let {
+                mapOf(
+                    "uri" to it.uri.toString(),
+                    "size" to it.length(),
+                    "modified" to it.lastModified(),
+                )
+            }
+        }
+        mapOf(
+            "sidecars" to buildMap {
+                for ((extension, name) in wanted.sidecars) entry(name)?.let { put(extension, it) }
+            },
+            "files" to buildMap {
+                for (name in wanted.files) entry(name)?.let { put(name, it) }
+            },
+        )
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Sibling lookup failed: ${e.message}")
+        null
+    }
+}
+
+/**
+ * The text of a sidecar document found by [findSafSiblings], or null when it
+ * cannot be read or exceeds [maxBytes].
+ */
+internal fun Context.readSafText(uri: Uri, maxBytes: Int = 8 * 1024 * 1024): String? {
+    return try {
+        contentResolver.openInputStream(uri)?.use { input ->
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                if (output.size() + read > maxBytes) return null
+                output.write(buffer, 0, read)
+            }
+            output.toByteArray().toString(Charsets.UTF_8)
+        }
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Sidecar read failed: ${e.message}")
         null
     }
 }

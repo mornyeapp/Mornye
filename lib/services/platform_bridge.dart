@@ -1719,6 +1719,49 @@ class PlatformBridge {
     return (uri: uri, size: size, modified: modified);
   }
 
+  /// The sidecars with [extensions] and the files named [names] in the
+  /// folder of the SAF document [safUri], found in one listing of that
+  /// folder: sidecars by extension and files by name, leaving out those the
+  /// folder does not have. Null when the folder cannot be read.
+  static Future<
+    ({
+      Map<String, ({String uri, int size, int modified})> sidecars,
+      Map<String, ({String uri, int size, int modified})> files,
+    })?
+  >
+  findSafSiblings(
+    String safUri, {
+    required List<String> extensions,
+    required List<String> names,
+  }) async {
+    final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'findSafSiblings',
+      {'saf_uri': safUri, 'extensions': extensions, 'names': names},
+    );
+    if (result == null) return null;
+    Map<String, ({String uri, int size, int modified})> entries(Object? map) =>
+        {
+          if (map is Map)
+            for (final MapEntry(:key, :value) in map.entries)
+              if (key is String && value is Map)
+                if (value case {
+                  'uri': final String uri,
+                  'size': final int size,
+                  'modified': final int modified,
+                })
+                  key: (uri: uri, size: size, modified: modified),
+        };
+    return (
+      sidecars: entries(result['sidecars']),
+      files: entries(result['files']),
+    );
+  }
+
+  /// The text of the SAF document [uri], or null when it cannot be read or
+  /// is larger than [maxBytes].
+  static Future<String?> readSafText(String uri, int maxBytes) =>
+      _invokeAs<String?>('readSafText', {'uri': uri, 'max_bytes': maxBytes});
+
   /// The file name of the SAF document [safUri] and the folders holding it,
   /// nearest first, each with whether it is the granted tree's own folder,
   /// or null when the provider cannot tell. Ask before deleting the
