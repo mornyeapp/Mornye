@@ -74,7 +74,19 @@ impl DeviceRecord {
 pub(crate) struct Store {
     dir: PathBuf,
     server: Mutex<ServerFile>,
-    devices: Mutex<Vec<DeviceRecord>>,
+    devices: Mutex<Devices>,
+    /// Held across every `devices.json` write, so writes never overlap or
+    /// land out of order. Taken before `devices`.
+    saving: Mutex<()>,
+    #[cfg(test)]
+    writes: std::sync::atomic::AtomicUsize,
+}
+
+/// The paired devices as authentication sees them.
+struct Devices {
+    records: Vec<DeviceRecord>,
+    /// A `lastSeenMs` in `records` is not yet in `devices.json`.
+    unsaved: bool,
 }
 
 impl Store {
@@ -98,7 +110,13 @@ impl Store {
         Ok(Self {
             dir: dir.to_owned(),
             server: Mutex::new(server),
-            devices: Mutex::new(devices),
+            devices: Mutex::new(Devices {
+                records: devices,
+                unsaved: false,
+            }),
+            saving: Mutex::new(()),
+            #[cfg(test)]
+            writes: std::sync::atomic::AtomicUsize::new(0),
         })
     }
 
@@ -132,7 +150,7 @@ impl Store {
     }
 
     pub(crate) fn devices(&self) -> Vec<DeviceRecord> {
-        self.devices.lock().expect("link devices").clone()
+        self.devices.lock().expect("link devices").records.clone()
     }
 
     /// The device whose key satisfies `matches`. Every key is checked so the
@@ -140,7 +158,7 @@ impl Store {
     pub(crate) fn find(&self, matches: impl Fn(&str) -> bool) -> Option<DeviceRecord> {
         let devices = self.devices.lock().expect("link devices");
         let mut found = None;
-        for record in devices.iter() {
+        for record in devices.records.iter() {
             if matches(&record.api_key) && found.is_none() {
                 found = Some(record.clone());
             }
@@ -166,23 +184,28 @@ impl Store {
             paired_ms: now,
             last_seen_ms: seen.then_some(now),
         };
+        let _saving = self.saving.lock().expect("link devices file");
         let mut devices = self.devices.lock().expect("link devices");
         let mut updated: Vec<DeviceRecord> = devices
+            .records
             .iter()
             .filter(|existing| existing.device_id != device_id)
             .cloned()
             .collect();
         updated.push(record.clone());
-        save_devices(&self.dir, &updated)?;
-        *devices = updated;
+        self.save(&updated)?;
+        devices.records = updated;
+        devices.unsaved = false;
         Ok(record)
     }
 
     /// Removes `device_id`. Returns whether it existed.
     pub(crate) fn remove(&self, device_id: &str) -> Result<bool, String> {
+        let _saving = self.saving.lock().expect("link devices file");
         let mut devices = self.devices.lock().expect("link devices");
-        let before = devices.len();
+        let before = devices.records.len();
         let updated: Vec<DeviceRecord> = devices
+            .records
             .iter()
             .filter(|record| record.device_id != device_id)
             .cloned()
@@ -190,33 +213,74 @@ impl Store {
         if updated.len() == before {
             return Ok(false);
         }
-        save_devices(&self.dir, &updated)?;
-        *devices = updated;
+        self.save(&updated)?;
+        devices.records = updated;
+        devices.unsaved = false;
         Ok(true)
     }
 
     /// Records that `device_id` was just seen. Persisted at most once a
-    /// minute per device; a failed write is retried on a later touch.
+    /// minute per device, without holding the lock authentication takes; a
+    /// failed write is retried on a later touch.
     pub(crate) fn touch(&self, device_id: &str) {
         let now = now_ms();
-        let mut devices = self.devices.lock().expect("link devices");
-        let Some(index) = devices
-            .iter()
-            .position(|record| record.device_id == device_id)
-        else {
-            return;
-        };
-        if devices[index]
-            .last_seen_ms
-            .is_some_and(|seen| now - seen < TOUCH_INTERVAL_MS)
         {
-            return;
+            let mut guard = self.devices.lock().expect("link devices");
+            let devices = &mut *guard;
+            let Some(record) = devices
+                .records
+                .iter_mut()
+                .find(|record| record.device_id == device_id)
+            else {
+                return;
+            };
+            if record
+                .last_seen_ms
+                .is_some_and(|seen| now - seen < TOUCH_INTERVAL_MS)
+            {
+                if !devices.unsaved {
+                    return;
+                }
+            } else {
+                record.last_seen_ms = Some(now);
+                devices.unsaved = true;
+            }
         }
-        let mut updated = devices.clone();
-        updated[index].last_seen_ms = Some(now);
-        if save_devices(&self.dir, &updated).is_ok() {
-            *devices = updated;
+        blocking(|| self.save_seen());
+    }
+
+    /// Writes `devices.json` when a `lastSeenMs` is not in it yet.
+    fn save_seen(&self) {
+        let _saving = self.saving.lock().expect("link devices file");
+        let records = {
+            let mut devices = self.devices.lock().expect("link devices");
+            if !devices.unsaved {
+                return;
+            }
+            devices.unsaved = false;
+            devices.records.clone()
+        };
+        if self.save(&records).is_err() {
+            self.devices.lock().expect("link devices").unsaved = true;
         }
+    }
+
+    fn save(&self, records: &[DeviceRecord]) -> Result<(), String> {
+        #[cfg(test)]
+        self.writes
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        save_devices(&self.dir, records)
+    }
+}
+
+/// Runs `work` here, handing the other tasks of a multi-thread runtime
+/// worker to another thread first.
+fn blocking<T>(work: impl FnOnce() -> T) -> T {
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
+            tokio::task::block_in_place(work)
+        }
+        _ => work(),
     }
 }
 
@@ -402,6 +466,107 @@ mod tests {
         let store = Store::open(dir.path()).unwrap();
         assert!(store.devices().is_empty());
         assert!(dir.path().join("devices.json.bad").exists());
+    }
+
+    fn writes(store: &Store) -> usize {
+        store.writes.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Waits until `done` holds, at most 5 s.
+    fn wait_for(done: impl Fn() -> bool) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !done() {
+            assert!(std::time::Instant::now() < deadline, "timed out");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
+    #[test]
+    fn a_touch_writes_without_holding_up_authentication_and_coalesces() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = std::sync::Arc::new(Store::open(dir.path()).unwrap());
+        let a = store.upsert("a", "A", "android", false).unwrap();
+        store.upsert("b", "B", "subsonic", false).unwrap();
+        let before = writes(&store);
+
+        // A write in progress holds the writer lock.
+        let writing = store.saving.lock().unwrap();
+        let touches: Vec<_> = ["a", "b", "a", "b"]
+            .into_iter()
+            .map(|device| {
+                let store = std::sync::Arc::clone(&store);
+                std::thread::spawn(move || store.touch(device))
+            })
+            .collect();
+        let (found, answered) = std::sync::mpsc::channel();
+        let finder = std::sync::Arc::clone(&store);
+        std::thread::spawn(move || {
+            wait_for(|| {
+                finder
+                    .devices()
+                    .iter()
+                    .all(|record| record.last_seen_ms.is_some())
+            });
+            let _ = found.send(finder.find(|key| key == a.api_key).map(|r| r.device_id));
+        });
+        assert_eq!(
+            answered
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("authentication waited for the write"),
+            Some("a".to_owned())
+        );
+        drop(writing);
+        for touch in touches {
+            touch.join().unwrap();
+        }
+        assert_eq!(writes(&store) - before, 1, "both devices in one write");
+        assert!(
+            stored_devices(dir.path())
+                .unwrap()
+                .iter()
+                .all(|record| record.last_seen_ms.is_some())
+        );
+
+        for _ in 0..10 {
+            store.touch("a");
+            store.touch("b");
+        }
+        assert_eq!(writes(&store) - before, 1, "once a minute per device");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_touch_write_is_retried_and_never_brings_back_a_revoked_device() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(dir.path()).unwrap();
+        store.upsert("a", "A", "android", false).unwrap();
+        store.upsert("b", "B", "android", false).unwrap();
+        let mode = |mode| {
+            std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(mode)).unwrap()
+        };
+        mode(0o500);
+        store.touch("a");
+        mode(0o700);
+        if stored_devices(dir.path()).unwrap()[0]
+            .last_seen_ms
+            .is_some()
+        {
+            return; // The folder stayed writable (running as root).
+        }
+        store.touch("a");
+        let stored = stored_devices(dir.path()).unwrap();
+        assert!(stored[0].last_seen_ms.is_some(), "retried");
+
+        assert!(store.remove("b").unwrap());
+        store.touch("b");
+        store.touch("a");
+        let left: Vec<String> = stored_devices(dir.path())
+            .unwrap()
+            .into_iter()
+            .map(|record| record.device_id)
+            .collect();
+        assert_eq!(left, vec!["a".to_owned()]);
     }
 
     #[test]
