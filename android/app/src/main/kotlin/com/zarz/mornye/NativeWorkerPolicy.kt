@@ -87,8 +87,9 @@ internal object NativeWorkerPolicy {
 
     /**
      * A paused or waiting native queue releases the wake lock once no worker
-     * is still running an item. Polling for Wi-Fi (no network callback) and
-     * the legacy progress-only mode keep it, as both need the CPU to advance.
+     * is still running an item or finishing the run. Polling for Wi-Fi (no
+     * network callback), a queue still being prepared by Flutter and the
+     * legacy progress-only mode keep it, as all need the CPU to advance.
      */
     fun shouldHoldWakeLock(
         nativeRunActive: Boolean,
@@ -96,11 +97,24 @@ internal object NativeWorkerPolicy {
         cancelRequested: Boolean,
         busyWorkers: Int,
         pollingForWifi: Boolean,
+        preparingQueue: Boolean,
     ): Boolean = !nativeRunActive ||
         !paused ||
         cancelRequested ||
         busyWorkers > 0 ||
-        pollingForWifi
+        pollingForWifi ||
+        preparingQueue
+
+    /**
+     * Wi-Fi came back while the queue stays paused by another flag. In Wi-Fi
+     * only mode Flutter pauses the queue itself when Wi-Fi drops, so its
+     * resume has to travel through Flutter and startService first.
+     * Verification still blocks the queue after that resume, so no grace.
+     */
+    fun shouldHoldWifiReturnGrace(
+        userPaused: Boolean,
+        verificationPaused: Boolean,
+    ): Boolean = userPaused && !verificationPaused
 
     fun shouldWorkerWait(
         paused: Boolean,

@@ -196,6 +196,7 @@ class NativeWorkerPolicyTest {
                 cancelRequested = false,
                 busyWorkers = 0,
                 pollingForWifi = false,
+                preparingQueue = false,
             ),
         )
     }
@@ -208,19 +209,44 @@ class NativeWorkerPolicyTest {
             cancelRequested: Boolean = false,
             busyWorkers: Int = 0,
             pollingForWifi: Boolean = false,
+            preparingQueue: Boolean = false,
         ) = NativeWorkerPolicy.shouldHoldWakeLock(
             nativeRunActive = nativeRunActive,
             paused = paused,
             cancelRequested = cancelRequested,
             busyWorkers = busyWorkers,
             pollingForWifi = pollingForWifi,
+            preparingQueue = preparingQueue,
         )
 
         assertTrue(hold(paused = false))
         assertTrue(hold(busyWorkers = 1))
         assertTrue(hold(cancelRequested = true))
         assertTrue(hold(pollingForWifi = true))
+        assertTrue(hold(preparingQueue = true))
         assertTrue(hold(nativeRunActive = false))
+    }
+
+    @Test
+    fun wifiReturnGraceOnlyWhileAnotherPauseAwaitsResume() {
+        assertTrue(
+            NativeWorkerPolicy.shouldHoldWifiReturnGrace(
+                userPaused = true,
+                verificationPaused = false,
+            ),
+        )
+        assertFalse(
+            NativeWorkerPolicy.shouldHoldWifiReturnGrace(
+                userPaused = false,
+                verificationPaused = false,
+            ),
+        )
+        assertFalse(
+            NativeWorkerPolicy.shouldHoldWifiReturnGrace(
+                userPaused = true,
+                verificationPaused = true,
+            ),
+        )
     }
 
     @Test
