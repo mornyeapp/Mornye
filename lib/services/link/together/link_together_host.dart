@@ -101,7 +101,10 @@ class LinkTogetherHost {
     _lastSent = null;
     _changes = _deck.changes.listen((_) => _onChange());
     _onStarted?.call(request.deviceId);
-    _log.i('Link: together started, this computer ${role.name}s');
+    _log.i(
+      'Link: together started, this computer '
+      '${role == LinkTogetherRole.leader ? 'leads' : 'follows'}',
+    );
     return report().toJson();
   }
 
