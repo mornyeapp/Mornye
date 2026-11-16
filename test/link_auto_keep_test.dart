@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/link/features/link_auto_keep.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_phone_receiver.dart';
@@ -447,4 +448,52 @@ void main() {
       expect(container.read(linkKeptCollectionsProvider).value, isEmpty);
     });
   });
+
+  test('a song this phone already has from elsewhere is not copied', () async {
+    final songs = await _desktopSongs([
+      _track('1'),
+      _track('2'),
+      _track('3'),
+      _track('4'),
+    ], linkTestServer);
+    final history = _History({
+      // A copy saved from another device, or a download of the same song.
+      'Song 1': '/music/Artist/Song 1.flac',
+      // Its file is gone.
+      'Song 2': '/music/Artist/Song 2.flac',
+      // Only on network storage.
+      'Song 3': 'network://nas/Artist/Song 3.flac',
+    });
+
+    final missing = await linkSongsNotOnThisPhone(
+      songs,
+      history: history,
+      exists: (path) async => !path.contains('Song 2'),
+    );
+
+    expect([for (final song in missing) song.songId], ['2', '3', '4']);
+    expect(history.asked, ['Song 1', 'Song 2', 'Song 3', 'Song 4']);
+  });
+}
+
+/// A download history that holds a file for some song titles.
+class _History extends Fake implements HistoryDatabase {
+  _History(this.files);
+
+  final Map<String, String> files;
+  final asked = <String>[];
+
+  @override
+  Future<List<Map<String, dynamic>?>> findExistingTracks(
+    List<HistoryLookupRequest> requests,
+  ) async => [
+    for (final request in requests)
+      () {
+        asked.add(request.trackName);
+        final path = files[request.trackName];
+        return path == null
+            ? null
+            : <String, dynamic>{'id': request.trackName, 'filePath': path};
+      }(),
+  ];
 }

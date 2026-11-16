@@ -6,11 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/link/features/link_library_lookup.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('LinkAutoKeep');
@@ -267,14 +269,46 @@ final linkKeepDesktopSongsProvider =
       )
     >(
       (ref) =>
-          (tracks, server) async => linkOfflineSongs([
-            for (final item in await linkLibraryItemsFor(
-              tracks,
-              includeLocal: ref.read(settingsProvider).localLibraryEnabled,
-            ))
-              ?item.localItem,
-          ], server),
+          (tracks, server) async => linkSongsNotOnThisPhone(
+            linkOfflineSongs([
+              for (final item in await linkLibraryItemsFor(
+                tracks,
+                includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+              ))
+                ?item.localItem,
+            ], server),
+          ),
     );
+
+/// The [songs] this phone has no file of. A download of the same song, or a
+/// copy saved from another paired device, already keeps it here: without
+/// this, a second device sharing the same songs had every one copied again.
+Future<List<LinkOfflineSong>> linkSongsNotOnThisPhone(
+  List<LinkOfflineSong> songs, {
+  HistoryDatabase? history,
+  Future<bool> Function(String path) exists = fileExists,
+}) async {
+  if (songs.isEmpty) return songs;
+  final copies = await (history ?? HistoryDatabase.instance)
+      .findExistingTracks([
+        for (final song in songs)
+          HistoryLookupRequest(
+            spotifyId: '',
+            isrc: song.item.isrc,
+            trackName: song.item.trackName,
+            artistName: song.item.artistName,
+          ),
+      ]);
+  final missing = <LinkOfflineSong>[];
+  for (var i = 0; i < songs.length; i++) {
+    final path = copies[i]?['filePath'] as String? ?? '';
+    // A copy on network storage is not on this phone.
+    final here =
+        path.isNotEmpty && !path.startsWith('network://') && await exists(path);
+    if (!here) missing.add(songs[i]);
+  }
+  return missing;
+}
 
 /// Keeps the kept collections on this phone, for the app's lifetime on
 /// phones ([linkPhoneFeaturesProvider] keeps it alive). Transfers come
