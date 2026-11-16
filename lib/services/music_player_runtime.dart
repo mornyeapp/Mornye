@@ -436,7 +436,21 @@ class MusicPlayerRuntime {
     playbackExclusiveOutput.value = exclusive;
   }
 
-  void configure(AppSettings settings) {
+  /// The settings [configure] was given last, before [_override].
+  AppSettings? _requested;
+  AppSettings Function(AppSettings settings)? _override;
+
+  /// Plays with [override] applied to every settings snapshot until it is
+  /// cleared with null, without saving anything: a crash or restart forgets
+  /// it. Mornye Link Play together switches off what cannot stay in step.
+  void overrideSettings(AppSettings Function(AppSettings settings)? override) {
+    _override = override;
+    configure(_requested ?? _settings);
+  }
+
+  void configure(AppSettings requested) {
+    _requested = requested;
+    final settings = _override?.call(requested) ?? requested;
     final previous = _settings;
     _settings = settings;
     _configureExclusiveOutput(settings);

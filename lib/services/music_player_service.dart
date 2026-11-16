@@ -1567,11 +1567,15 @@ class MusicPlayerHandler extends BaseAudioHandler
         _media[_index].source == media.source;
   }
 
+  /// Replaces the queue and starts [initialIndex] at [initialPosition]; with
+  /// [startPaused] the song loads there without a sound, as for a device
+  /// that must start at an agreed instant.
   Future<void> setQueueAndPlay(
     List<PlayableMedia> items, {
     int initialIndex = 0,
     Duration initialPosition = Duration.zero,
     bool? shuffle,
+    bool startPaused = false,
   }) async {
     if (items.isEmpty) return;
     _autoplay.reset();
@@ -1591,8 +1595,24 @@ class MusicPlayerHandler extends BaseAudioHandler
     _markSessionQueueChanged();
     _playHistory.clear();
     queue.add(List<MediaItem>.unmodifiable(_queueItems));
-    await _playIndex(_index, startPosition: initialPosition);
+    await _playIndex(
+      _index,
+      startPosition: initialPosition,
+      startPaused: startPaused,
+    );
   }
+
+  /// Loads queue entry [index] at [position] without starting it, so a
+  /// following play starts it at once (Mornye Link Play together).
+  Future<void> prepareQueueItem(
+    int index, {
+    Duration position = Duration.zero,
+  }) => _playIndex(
+    index,
+    recordHistory: false,
+    startPaused: true,
+    startPosition: position,
+  );
 
   Future<void> enqueue(PlayableMedia item, {bool playNext = false}) async {
     if (_media.isEmpty || _index < 0) {
