@@ -102,6 +102,7 @@ class AudioNative {
   final clocks = <String, Stopwatch>{};
   final rates = <String, double>{};
   final ignoredSeeks = <String>{};
+  final withheldSeekCompletions = <String>{};
   final missingPositions = <String>{};
   final positionReplies = <String, Completer<int?>>{};
   final nextPlayers = <String, String>{};
@@ -181,7 +182,9 @@ class AudioNative {
               positions[id] = args['position']! as int;
               clocks[id]?.reset();
             }
-            unawaited(event(id, 'audio.onSeekComplete'));
+            if (!withheldSeekCompletions.contains(id)) {
+              unawaited(event(id, 'audio.onSeekComplete'));
+            }
           case 'setNextPlayer':
             final next = args['nextPlayerId'] as String?;
             if (next == null) {
