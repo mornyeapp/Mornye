@@ -23,6 +23,9 @@ final equalizerProvider = NotifierProvider<EqualizerController, EqualizerState>(
 
 class EqualizerController extends Notifier<EqualizerState> {
   static const storageKey = 'playback_equalizer_v1';
+
+  /// The most custom presets kept, as [savePreset] enforces.
+  static const maxPresets = 100;
   int _revision = 0;
   bool _disposed = false;
   EqualizerState? _pending;
@@ -85,7 +88,21 @@ class EqualizerController extends Notifier<EqualizerState> {
     }
   }
 
+  /// Completes once the saved settings were read (or failed to read).
+  Future<void> ensureLoaded() => _loading;
+
   void update(EqualizerSettings settings) => _commit(settings, state.presets);
+
+  /// Replaces the custom presets with [presets] (Mornye Link sound sync).
+  /// The curve playing now stays as it is.
+  void replacePresets(List<EqualizerPreset> presets) {
+    final names = {for (final preset in presets) preset.name};
+    for (final preset in state.presets) {
+      if (!names.contains(preset.name)) _deletedPresets.add(preset.name);
+    }
+    _deletedPresets.removeAll(names);
+    _commit(state.settings, presets.take(maxPresets).toList());
+  }
 
   void applyPreset(EqualizerPreset preset) =>
       update(state.settings.withToneOf(preset.settings));

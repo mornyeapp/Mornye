@@ -28,6 +28,8 @@ import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_lyrics_translations.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/link_transfers.dart';
+import 'package:mornye/services/link/sync/link_sound_sync_handlers.dart';
+import 'package:mornye/services/link/sync/link_sound_sync_protocol.dart';
 import 'package:mornye/services/link/sync/link_sync_handlers.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/services/network_storage_service.dart';
@@ -553,6 +555,14 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       if (!ref.mounted || !state.running || state.clients.isEmpty) return;
       unawaited(_send({'type': LinkMessageTypes.collectionsChanged}));
     });
+    registerLinkSoundSyncHandlers(
+      router,
+      ref,
+      notifyPhones: () {
+        if (!ref.mounted || !state.running || state.clients.isEmpty) return;
+        unawaited(_send({'type': LinkSoundSyncMessages.preferencesChanged}));
+      },
+    );
   }
 
   /// The name [deviceId] gave when it paired, else its id.
