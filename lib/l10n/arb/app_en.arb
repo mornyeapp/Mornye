@@ -8528,6 +8528,18 @@
   "@linkSaveToPhoneCancelled": {
     "description": "Mornye Link: the listener cancelled saving desktop songs to the phone"
   },
+  "linkKeepOnPhone": "Keep on this phone",
+  "@linkKeepOnPhone": {
+    "description": "Mornye Link: playlist or Loved menu action; while the paired computer is connected, the collection's songs that live on the computer are saved to this phone by themselves"
+  },
+  "linkKeepOnPhoneStop": "Stop keeping on this phone",
+  "@linkKeepOnPhoneStop": {
+    "description": "Mornye Link: playlist or Loved menu action that ends Keep on this phone; songs already saved stay"
+  },
+  "linkKeptOnPhone": "Kept on this phone",
+  "@linkKeptOnPhone": {
+    "description": "Mornye Link: short label in a playlist's or Loved's header while it is kept on this phone"
+  },
   "linkTransferPhoneReceiving": "{count, plural, =1{Saving {title} from {name}} other{Saving {count} songs from {name}}}",
   "@linkTransferPhoneReceiving": {
     "description": "Mornye Link: snackbar and notification when the phone starts copying songs from the paired computer into its download folder; title is the song's title when there is one song",

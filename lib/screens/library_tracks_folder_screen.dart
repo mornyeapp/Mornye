@@ -54,6 +54,7 @@ import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/widgets/destructive_selection_button.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
+import 'package:mornye/widgets/link/link_keep_actions.dart';
 import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/collection_suggestions_section.dart';
@@ -1099,7 +1100,8 @@ class _LibraryTracksFolderScreenState
         return squarePlaceholder();
       },
       meta: entries.isNotEmpty
-          ? HeaderMetaRow(
+          ? LinkKeptMetaRow(
+              collection: _keptCollection(playlist),
               items: [
                 HeaderMetaItem(
                   context.l10n.tracksCount(entries.length),
@@ -1241,6 +1243,19 @@ class _LibraryTracksFolderScreenState
     );
   }
 
+  /// The Mornye Link kept collection id of this page: Loved or the playlist.
+  String? _keptCollection(UserPlaylistCollection? playlist) {
+    switch (widget.mode) {
+      case LibraryTracksFolderMode.loved:
+        return linkKeptLoved;
+      case LibraryTracksFolderMode.playlist:
+        final id = widget.playlistId ?? playlist?.id;
+        return id == null || id.isEmpty ? null : linkKeptPlaylist(id);
+      case LibraryTracksFolderMode.wishlist:
+        return null;
+    }
+  }
+
   /// The actions behind the header's More button, built when it opens.
   List<List<ContextMenuAction>> _moreMenuGroups(
     String title,
@@ -1262,6 +1277,8 @@ class _LibraryTracksFolderScreenState
           ),
         ],
         if (isPlaylistMode) ?linkTrackTransferAction(context, ref, tracks),
+        if (_keptCollection(playlist) case final collection?)
+          ?linkKeepAction(context, ref, collection),
       ],
       if (linkTransfers) desktopLinkTransferTrackActions(context, ref, tracks),
       [
