@@ -16,10 +16,26 @@ class _Settings extends SettingsNotifier {
   AppSettings build() => const AppSettings();
 }
 
-final _queue = [
+final _defaultQueue = [
   for (var i = 0; i < 40; i++)
     MediaItem(id: 'song$i', title: 'Song $i', artist: 'Artist'),
 ];
+
+/// A queue entry that counts the rows built for it: only a real row reads
+/// the title.
+class _CountedItem extends MediaItem {
+  const _CountedItem(this.index, this.builds)
+    : super(id: 'song$index', title: 'Song $index', artist: 'Artist');
+
+  final int index;
+  final Set<int> builds;
+
+  @override
+  String get title {
+    builds.add(index);
+    return super.title;
+  }
+}
 
 /// Shows the Material queue for a player on [playing]; [sheet] opens it the
 /// way Now Playing does, otherwise it fills the page like the desktop panel.
@@ -27,7 +43,9 @@ Future<(ScrollController, StreamController<MediaItem?>)> _pump(
   WidgetTester tester, {
   required int playing,
   bool sheet = false,
+  List<MediaItem>? queue,
 }) async {
+  final songs = queue ?? _defaultQueue;
   final current = StreamController<MediaItem?>();
   addTearDown(current.close);
   final scroll = ScrollController();
@@ -39,14 +57,14 @@ Future<(ScrollController, StreamController<MediaItem?>)> _pump(
       currentMediaItemProvider.overrideWithBuild(
         (ref, notifier) => current.stream,
       ),
-      playQueueProvider.overrideWith((ref) => Stream.value(_queue)),
+      playQueueProvider.overrideWith((ref) => Stream.value(songs)),
       playbackStateProvider.overrideWith(
         (ref) => Stream.value(PlaybackState(queueIndex: playing)),
       ),
     ],
   );
   addTearDown(container.dispose);
-  current.add(_queue[playing]);
+  current.add(songs[playing]);
   final theme = AppTheme.light();
   await tester.pumpWidget(
     UncontrolledProviderScope(
@@ -103,7 +121,7 @@ void main() {
     final (scroll, current) = await _pump(tester, playing: 20);
     final opened = scroll.offset;
 
-    current.add(_queue[30]);
+    current.add(_defaultQueue[30]);
     await tester.pumpAndSettle();
     expect(scroll.offset, opened);
 
@@ -127,6 +145,39 @@ void main() {
     final (scroll, _) = await _pump(tester, playing: 39);
     expect(scroll.offset, scroll.position.maxScrollExtent);
     expect(_row(39), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a long queue opens far down without building the songs '
+      'before the playing one', (tester) async {
+    final builds = <int>{};
+    final queue = [for (var i = 0; i < 3000; i++) _CountedItem(i, builds)];
+    final (scroll, _) = await _pump(tester, playing: 2500, queue: queue);
+
+    final rowHeight = tester.getSize(_row(2500)).height;
+    expect(scroll.offset, moreOrLessEquals(2499 * rowHeight));
+    expect(
+      tester.getTopLeft(_row(2499)).dy,
+      moreOrLessEquals(_listTop(tester)),
+    );
+    // Only the first screen, measured before the jump, and the screen the
+    // jump lands on.
+    expect(builds.length, lessThan(80));
+    expect(builds.where((index) => index > 40 && index < 2400), isEmpty);
+
+    // No empty box stays behind: the rows kept above the viewport are real,
+    // and so are the songs before them once the user scrolls back.
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is SizedBox && widget.key is ObjectKey,
+        skipOffstage: false,
+      ),
+      findsNothing,
+    );
+    scroll.jumpTo(scroll.offset - 6 * rowHeight);
+    await tester.pumpAndSettle();
+    expect(_row(2494), findsOneWidget);
+    expect(_row(2496), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

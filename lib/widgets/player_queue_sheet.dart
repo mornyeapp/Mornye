@@ -72,6 +72,12 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
   GlobalKey? _firstRowKey = GlobalKey();
   bool _openScheduled = false;
 
+  /// While the list jumps to the playing song, the rows before this index
+  /// are empty boxes [_passedRowHeight] tall: a list without fixed row
+  /// heights builds every row it passes, and none of these reach the screen.
+  int _passedRows = 0;
+  double _passedRowHeight = 0;
+
   /// Opens the list at the playing song, with the song before it still in
   /// view, once and without motion, so a later song change never moves it.
   void _openAtPlayingSong() {
@@ -88,7 +94,17 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
           0.0,
           position.maxScrollExtent,
         );
-        if (offset > position.pixels) scroll.jumpTo(offset);
+        if (offset > position.pixels) {
+          // One row of margin above the first one the jump shows.
+          _passedRows = (offset / rowHeight).floor() - 1;
+          _passedRowHeight = rowHeight;
+          scroll.jumpTo(offset);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _passedRows = 0;
+            // Rows kept just above the viewport become real ones.
+            if (mounted) setState(() {});
+          });
+        }
       }
       setState(() => _firstRowKey = null);
     });
@@ -224,6 +240,12 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
               },
               itemBuilder: (context, i) {
                 final item = queue[i];
+                if (i < _passedRows) {
+                  return SizedBox(
+                    key: ObjectKey(item),
+                    height: _passedRowHeight,
+                  );
+                }
                 final isCurrent = current?.id == item.id;
                 return PlayerQueueDismissible(
                   key: ObjectKey(item),
