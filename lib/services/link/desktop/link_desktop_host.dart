@@ -31,6 +31,8 @@ import 'package:mornye/services/link/link_transfers.dart';
 import 'package:mornye/services/link/sync/link_sound_sync_handlers.dart';
 import 'package:mornye/services/link/sync/link_sound_sync_protocol.dart';
 import 'package:mornye/services/link/sync/link_sync_handlers.dart';
+import 'package:mornye/services/link/together/link_together_deck.dart';
+import 'package:mornye/services/link/together/link_together_host.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playable_media.dart';
@@ -205,6 +207,10 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   LinkWebCovers? _webCovers;
   StreamSubscription<void>? _webCoversAdded;
   DesktopLinkCatalogIndex? _index;
+
+  /// Play together with one phone: while it runs, both players play and
+  /// the "one player at a time" rules leave that phone alone.
+  LinkTogetherHost? _together;
 
   /// Phone sources to scan again after the next export, which knows the
   /// songs transfers saved from them.
@@ -472,6 +478,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     ref.read(linkCatalogIndexProvider.notifier).set(null);
     _phoneSources?.keepConnected(const {});
     _transfers?.keepConnected(const {});
+    _together?.keepConnected(const {});
     state = state.copyWith(
       phase: LinkHostPhase.stopped,
       server: null,
@@ -550,6 +557,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     _libraryJobs!.register(router);
     _phoneCatalogs?.register(router);
     _transfers?.register(router);
+    (_together ??= _createTogether()).register(router);
     registerLinkSyncHandlers(router, ref);
     ref.read(linkCollectionsChangedHookProvider.notifier).set(() {
       if (!ref.mounted || !state.running || state.clients.isEmpty) return;
@@ -564,6 +572,19 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       },
     );
   }
+
+  LinkTogetherHost _createTogether() => LinkTogetherHost(
+    deck: LinkRuntimeTogetherDeck(
+      runtime: ref.read(musicPlayerRuntimeProvider),
+      refFor: (item) =>
+          linkTrackRef(LinkPlayerItem.fromMediaItem(item), index: _index),
+    ),
+    send: (message, deviceId) => _send(message, deviceId: deviceId),
+    // Both play now: this computer shows its own player.
+    onStarted: (_) {
+      if (ref.mounted) stopFollowingPhone();
+    },
+  );
 
   /// The name [deviceId] gave when it paired, else its id.
   String deviceName(String deviceId) => _deviceName(deviceId);
@@ -796,11 +817,13 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       phoneStates: {...state.phoneStates, event.deviceId: phoneState},
     );
     // A phone starting to play takes over the player screens, as the
-    // desktop starting does on the phone, unless the desktop plays.
+    // desktop starting does on the phone, unless the desktop plays or the
+    // two play together.
     if (!_localPlaying &&
         _plays(phoneState) &&
         !_plays(was) &&
-        state.followedPhone != event.deviceId) {
+        state.followedPhone != event.deviceId &&
+        _together?.deviceId != event.deviceId) {
       state = state.copyWith(followedPhone: event.deviceId);
     }
   }
@@ -818,6 +841,8 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     if (playing == _localPlaying) return;
     _localPlaying = playing;
     _updateHeartbeat();
+    // Playing together, both players run and each pause is the session's.
+    if (_together?.active ?? false) return;
     if (playing) {
       if (state.followedPhone != null) {
         state = state.copyWith(followedPhone: null);
@@ -919,6 +944,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     );
     _phoneSources?.keepConnected(ids);
     _transfers?.keepConnected(ids);
+    _together?.keepConnected(ids);
     final updates = _downloadUpdates;
     updates?.keepConnected(clients);
     if (updates != null) unawaited(updates.publish(snapshotsOnly: true));
@@ -1264,6 +1290,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _dispose() {
+    _together?.dispose();
     _libraryJobs?.close();
     _cancelApp();
     _cancelBackend();
