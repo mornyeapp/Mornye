@@ -268,7 +268,7 @@ class LibraryQueueStore {
     if (sqlite.normalizeLookupText(request.searchQuery).isNotEmpty ||
         request.excludeNetwork ||
         request.albumArtist != null ||
-        request.genre != null ||
+        request.genreTags != null ||
         request.quality != null ||
         request.format != null ||
         request.metadata != null) {
@@ -357,11 +357,12 @@ class LibraryQueueStore {
     );
   }
 
-  /// Genres across downloaded and scanned music, one row for each spelling
-  /// of a genre with its song count and a cover, without loading songs into
-  /// Dart. Genres compare trimmed and case-folded, as the genre sort does.
+  /// Genre tags across downloaded and scanned music, one row for each
+  /// spelling of a tag with its song count and a cover, without loading
+  /// songs into Dart. Tags compare trimmed and case-folded, as the genre
+  /// sort does, and a tag listing several genres is still one tag here.
   /// Songs without a genre and scanned paths already represented by
-  /// downloads are left out. Within a genre the most common spelling comes
+  /// downloads are left out. Within a tag the most common spelling comes
   /// first.
   Future<List<Map<String, Object?>>> genreSpellings({
     required bool includeLocal,
@@ -631,7 +632,7 @@ class LibraryQueueStore {
         sqlite.normalizeLookupText(request.searchQuery).isEmpty &&
         !request.excludeNetwork &&
         request.albumArtist == null &&
-        request.genre == null &&
+        request.genreTags == null &&
         request.quality == null &&
         request.format == null &&
         request.metadata == null;
@@ -844,9 +845,11 @@ class LibraryQueueStore {
       where.add('h.sort_album_artist = ?');
       args.add(sqlite.normalizeLookupText(request.albumArtist));
     }
-    if (request.genre != null) {
-      where.add('h.sort_genre = ?');
-      args.add(sqlite.normalizeLookupText(request.genre));
+    if (request.genreTags case final tags?) {
+      where.add(
+        'h.sort_genre IN (${List.filled(tags.length, '?').join(', ')})',
+      );
+      args.addAll(tags.map(sqlite.normalizeLookupText));
     }
     final query = sqlite.normalizeLookupText(request.searchQuery);
     if (query.isNotEmpty) {
@@ -910,9 +913,11 @@ class LibraryQueueStore {
       where.add('l.album_artist_norm = ?');
       args.add(sqlite.normalizeLookupText(request.albumArtist));
     }
-    if (request.genre != null) {
-      where.add('l.sort_genre = ?');
-      args.add(sqlite.normalizeLookupText(request.genre));
+    if (request.genreTags case final tags?) {
+      where.add(
+        'l.sort_genre IN (${List.filled(tags.length, '?').join(', ')})',
+      );
+      args.addAll(tags.map(sqlite.normalizeLookupText));
     }
     final query = sqlite.normalizeLookupText(request.searchQuery);
     if (query.isNotEmpty) {

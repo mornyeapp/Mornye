@@ -223,7 +223,7 @@ final _requests = <String, QueueLibraryDbQuery>{
             'genre': (source, sort) => QueueLibraryDbQuery(
               source: source,
               sortMode: sort,
-              genre: 'pop',
+              genreTags: const ['pop'],
             ),
             'hires': (source, sort) => QueueLibraryDbQuery(
               source: source,
@@ -279,7 +279,7 @@ Future<Map<String, Object?>> _reads(
       filterMode: query.filterMode,
       searchQuery: query.searchQuery,
       albumArtist: query.albumArtist,
-      genre: query.genre,
+      genreTags: query.genreTags,
       quality: query.quality,
       format: query.format,
       metadata: query.metadata,
