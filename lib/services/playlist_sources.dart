@@ -249,18 +249,6 @@ List<LibraryFolder> _groupFolders(
   ({List<LibraryFilePathRow> rows, Map<String, String> sourceNames}) request,
 ) => groupLibraryFolderTree(request.rows, sourceNames: request.sourceNames);
 
-/// The tracks of [folder] in [sortFolderItems] order.
-Future<List<Track>> libraryFolderTracks(
-  LibraryFolder folder,
-  LibraryDatabase library,
-) async {
-  final rows = await library.getByIds(folder.ids);
-  final items = sortFolderItems([
-    for (final row in rows) LocalLibraryItem.fromJson(row),
-  ]);
-  return [for (final item in items) _localTrack(item)];
-}
-
 /// Every Library track inside [root] and all of its subfolders, however
 /// deep. Only files already in the Library are found.
 Future<LibraryFolder> libraryFolderTree(

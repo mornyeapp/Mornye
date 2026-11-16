@@ -763,7 +763,7 @@ class _HighPass {
 /// Measures the residual windows directly from decoded samples, as the
 /// FFmpeg pass does for whole songs: `reference - gain * other`, with the
 /// other file shifted by [offsetFrames] and silent outside its length.
-/// Used on excerpts and as the reference implementation in tests.
+/// Only tests call it, as the reference the FFmpeg pass is checked against.
 List<AudioCompareWindow> audioCompareMeasureWindows({
   required Float32List reference,
   required Float32List other,
