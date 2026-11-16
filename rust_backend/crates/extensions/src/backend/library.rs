@@ -1,6 +1,8 @@
 //! Backend operations for local library files: audio metadata reads and CUE sheet parsing and scanning.
 
 use super::Backend;
+use super::cover::FolderArtwork;
+use crate::files::SyncBatch;
 use cap_std::fs::OpenOptions;
 use chrono::{SecondsFormat, Utc};
 use mornye_core::cue::{self, CueSheet};
@@ -10,6 +12,7 @@ use mornye_core::tags::{
 };
 use serde_json::{Value, json};
 use std::cell::RefCell;
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
@@ -22,6 +25,7 @@ struct FolderImage {
     path: String,
     size: u64,
     modified: i64,
+    artwork: FolderArtwork,
 }
 
 impl FolderImage {
@@ -93,7 +97,7 @@ impl Backend {
         cache_key: &str,
         scan_time: &str,
         mod_time: i64,
-        covers: Option<&crate::files::SyncBatch>,
+        covers: Option<&SyncBatch>,
         folder_image: Option<&FolderImage>,
         check: &dyn Fn() -> Result<(), String>,
     ) -> Result<Value, String> {
@@ -155,6 +159,7 @@ impl Backend {
                     &image.path,
                     &directory,
                     &image.cache_key(song),
+                    &image.artwork,
                     covers,
                     check,
                 )
@@ -202,11 +207,14 @@ impl Backend {
         cue::parse(&mut file, &check)
     }
 
+    /// `walked` holds files a scan's walk just found and validated; those
+    /// need no probe.
     fn resolve_cue_audio(
         &self,
         path: &str,
         name: &str,
         audio_directory: &str,
+        walked: Option<&BTreeSet<&str>>,
         check: &dyn Fn() -> Result<(), String>,
     ) -> Result<String, String> {
         let base = Path::new(path).parent().unwrap_or(Path::new("."));
@@ -220,6 +228,9 @@ impl Backend {
             check()?;
             let candidate = crate::files::clean(&directory.join(name.trim_start_matches('/')));
             let candidate = candidate.to_string_lossy();
+            if walked.is_some_and(|walked| walked.contains(candidate.as_ref())) {
+                return Ok(Some(candidate.into_owned()));
+            }
             let input = files.resolve_legacy(&candidate)?;
             input.native_display()?;
             Ok(input.metadata().is_ok().then(|| candidate.into_owned()))
@@ -287,7 +298,7 @@ impl Backend {
             .parse_cue_file(path, &check)
             .map_err(|error| format!("failed to parse cue file: {error}"))?;
         let audio = self
-            .resolve_cue_audio(path, &sheet.file_name, audio_directory, &check)
+            .resolve_cue_audio(path, &sheet.file_name, audio_directory, None, &check)
             .map_err(|error| {
                 error.replace(
                     "audio file not found for cue:",
@@ -339,7 +350,8 @@ impl Backend {
             })
         };
         let sheet = self.parse_cue_file(path, &check)?;
-        let audio = self.resolve_cue_audio(path, &sheet.file_name, audio_directory, &check)?;
+        let audio =
+            self.resolve_cue_audio(path, &sheet.file_name, audio_directory, None, &check)?;
         self.scan_cue_sheet(
             path,
             &sheet,
@@ -348,6 +360,7 @@ impl Backend {
             mod_time,
             cache_key,
             scan_time,
+            None,
             None,
             &check,
         )
@@ -399,6 +412,7 @@ impl Backend {
         mod_time: i64,
         cache_key: &str,
         scan_time: &str,
+        covers: Option<&SyncBatch>,
         folder_image: Option<&FolderImage>,
         check: &dyn Fn() -> Result<(), String>,
     ) -> Result<Value, String> {
@@ -435,7 +449,7 @@ impl Backend {
         let cover = if directory.is_empty() {
             String::new()
         } else {
-            self.save_cover_to_cache_with_hint_and_key(audio, "", &directory, cache_key, check)
+            self.save_cover_to_cache_batched(audio, "", &directory, cache_key, covers, check)
                 .ok()
                 .filter(|cover| !cover.is_empty())
                 .or_else(|| {
@@ -449,7 +463,8 @@ impl Backend {
                         &image.path,
                         &directory,
                         &image.cache_key(song),
-                        None,
+                        &image.artwork,
+                        covers,
                         check,
                     )
                     .ok()
