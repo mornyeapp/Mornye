@@ -35,6 +35,7 @@
   "linkFileSavingCover": "Menyimpan cover art...",
   "linkFileJobsUnsupported": "Perbarui Mornye di komputer agar file musiknya bisa dikelola dari HP ini.",
   "linkFileSelectionOneDevice": "Pilih lagu dari satu komputer yang terhubung (maksimal 100 lagu).",
+  "linkFileChangesUnavailable": "Lagu di {name} tidak dapat diubah dari ponsel ini.",
   "linkFileCancelHint": "Hentikan setelah lagu yang sedang diproses",
   "linkFileJobCancelled": "Dihentikan",
   "linkFileJobQueued": "Dalam antrean",

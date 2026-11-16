@@ -63,6 +63,15 @@
   },
   "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
   "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
+  "linkFileChangesUnavailable": "Songs on {name} cannot be changed from this phone.",
+  "@linkFileChangesUnavailable": {
+    "description": "Snackbar when a file action (edit tags, convert, delete) is chosen for songs of a linked device that changes no files for others, such as another phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "linkFileJobProgress": "{finished} of {total} {total, plural, =1{song} other{songs}}",
   "@linkFileJobProgress": {
     "placeholders": {

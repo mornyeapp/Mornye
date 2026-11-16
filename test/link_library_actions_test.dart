@@ -296,6 +296,59 @@ void main() {
     );
   }
 
+  testWidgets('a host that changes no files says so and is asked nothing', (
+    tester,
+  ) async {
+    final client = FakeLinkClient(
+      server: linkTestServer.copyWith(
+        platform: 'android',
+        features: const <String>[],
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [linkPhoneClientProvider.overrideWithValue(client)],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await client.close();
+    });
+    // Its songs still count as the linked device's, so this phone's own
+    // file actions never run on them.
+    expect(hasLinkLibrarySongs(container, [item]), isTrue);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => unawaited(
+                  runLinkLibraryAction(context, container, [
+                    item,
+                  ], LinkLibraryAction.delete),
+                ),
+                child: const Text('Remote delete'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Remote delete'));
+    await tester.pump();
+
+    expect(
+      find.text('Songs on Studio PC cannot be changed from this phone.'),
+      findsOneWidget,
+    );
+    expect(client.posts, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('mixed-device batch never sends an operation', (tester) async {
     final client = FakeLinkClient();
     final container = ProviderContainer(

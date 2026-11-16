@@ -55,13 +55,15 @@ IconData linkLibraryActionIcon(LinkLibraryAction action) => switch (action) {
   LinkLibraryAction.saveLyrics => Icons.lyrics_outlined,
 };
 
+/// Whether [items] hold songs of the linked device, whose files only that
+/// device can change: [runLinkLibraryAction] takes them, also for a host
+/// that changes no files, so they never reach this phone's own file actions.
 bool hasLinkLibrarySongs(
   ProviderContainer container,
   List<UnifiedLibraryItem> items,
 ) {
   final client = container.read(linkPhoneClientProvider);
   return client != null &&
-      client.server.supports(LinkHostFeatures.libraryJobs) &&
       items.any(
         (item) => linkDesktopSongId(item.filePath, client.server) != null,
       );
@@ -92,11 +94,16 @@ Future<void> runLinkLibraryAction(
     }
   }
 
+  final name = linkDesktopName(client);
+  // A phone host changes no files for other phones; it says so in `features`.
+  if (!client.server.supports(LinkHostFeatures.libraryJobs)) {
+    notify(context.l10n.linkFileChangesUnavailable(name));
+    return;
+  }
   if (items.length > 100 || ids.contains(null)) {
     notify(context.l10n.linkFileSelectionOneDevice);
     return;
   }
-  final name = linkDesktopName(client);
   final controller = container.read(linkLibraryJobsProvider.notifier);
   final songIds = ids.cast<String>();
   final options = <String, dynamic>{};
