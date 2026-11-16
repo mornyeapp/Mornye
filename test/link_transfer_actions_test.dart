@@ -20,6 +20,7 @@ import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/link/link_transfers_view.dart';
 
+import 'support/app_icon_finder.dart';
 import 'support/link_fakes.dart';
 import 'support/tooltip_finder.dart';
 
@@ -168,6 +169,32 @@ void main() {
     await settle(tester);
     expect(findByTooltip('Send to Studio PC'), findsOneWidget);
     expect(findByTooltip('Save to this phone'), findsNothing);
+  });
+
+  testWidgets('sending to another phone is not drawn as a computer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(LinkTransferButtons(items: [_phoneSong('Mine')])),
+    );
+    await settle(tester);
+    expect(findAppIcon(Icons.computer), findsOneWidget);
+    expect(findAppIcon(Icons.send_to_mobile), findsNothing);
+
+    client = FakeLinkClient(
+      server: linkTestServer.copyWith(platform: 'android'),
+    );
+    await tester.pumpWidget(
+      app(
+        LinkTransferButtons(
+          key: const ValueKey('phone-host'),
+          items: [_phoneSong('Mine')],
+        ),
+      ),
+    );
+    await settle(tester);
+    expect(findAppIcon(Icons.send_to_mobile), findsOneWidget);
+    expect(findAppIcon(Icons.computer), findsNothing);
   });
 
   testWidgets('save to this phone starts a transfer and offers to view it', (

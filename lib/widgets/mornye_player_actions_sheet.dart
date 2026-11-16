@@ -55,6 +55,7 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
     this.tempoSubtitle,
     this.volumeShown = true,
     this.sendToDesktop,
+    this.sendToPhoneHost = false,
     this.saveToPhone = false,
   });
 
@@ -69,6 +70,9 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
 
   /// The paired desktop's name while this phone's song can go there.
   final String? sendToDesktop;
+
+  /// Whether that paired device is another phone rather than a computer.
+  final bool sendToPhoneHost;
 
   /// Whether the song is the paired desktop's, which can be saved here.
   final bool saveToPhone;
@@ -144,7 +148,9 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
                 context,
                 'linkSend',
                 context.l10n.linkSendToDesktop(name),
-                CupertinoIcons.desktopcomputer,
+                sendToPhoneHost
+                    ? CupertinoIcons.device_phone_portrait
+                    : CupertinoIcons.desktopcomputer,
               ),
             if (saveToPhone)
               _action(

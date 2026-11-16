@@ -365,6 +365,12 @@ List<UnifiedLibraryItem> linkPhoneSongItemsOf(
     if (isLinkPhoneSongItem(item)) item,
 ];
 
+/// The icon of sending a song to the paired device: a computer, or a phone
+/// with an arrow when the host is another phone, which keeps it apart from
+/// "Save to this phone" beside it.
+IconData linkSendToHostIcon(LinkClientApi client) =>
+    client.server.isPhone ? Icons.send_to_mobile : Icons.computer;
+
 /// The app bar actions of a Library album: "Send to (desktop)" when [items]
 /// hold this phone's own songs and "Save to this phone" when they hold the
 /// paired desktop's, while that desktop is connected. Empty otherwise.
@@ -389,7 +395,7 @@ class LinkTransferButtons extends ConsumerWidget {
       children: [
         if (phoneSongs.isNotEmpty)
           HeaderCircleButton(
-            icon: Icons.computer,
+            icon: linkSendToHostIcon(client),
             tooltip: context.l10n.linkSendToDesktop(linkDesktopName(client)),
             onPressed: () => linkSendSongsToDesktop(context, ref, phoneSongs),
           ),
@@ -445,7 +451,7 @@ Future<void> _showTrackTransferSheet(
       mainAxisSize: MainAxisSize.min,
       children: [
         AppSheetOption(
-          leading: const AppIcon.adaptive(Icons.computer),
+          leading: AppIcon.adaptive(linkSendToHostIcon(client)),
           title: Text(sheetContext.l10n.linkSendToDesktop(name)),
           onTap: () async {
             Navigator.pop(sheetContext);
@@ -496,7 +502,7 @@ List<Widget> linkTransferSelectionActions(
   return [
     if (phoneSongs.isNotEmpty)
       SelectionActionButton(
-        icon: Icons.computer,
+        icon: linkSendToHostIcon(client),
         label: context.l10n.linkSendToDesktop(linkDesktopName(client)),
         colorScheme: colors,
         onPressed: () {

@@ -85,7 +85,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         ),
       if (phoneSongs.isNotEmpty && linkClient != null)
         _MetadataOption(
-          icon: Icons.computer,
+          icon: linkSendToHostIcon(linkClient),
           label: l10n.linkSendToDesktop(linkDesktopName(linkClient)),
           onTap: () => linkSendSongsToDesktop(screenContext, ref, phoneSongs),
         ),

@@ -1418,6 +1418,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               tempoSubtitle: tempoSubtitle,
               volumeShown: volumeShown,
               sendToDesktop: sendToDesktop,
+              sendToPhoneHost: linkClient?.server.isPhone ?? false,
               saveToPhone: saveToPhone,
             ),
           )
@@ -1449,9 +1450,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     title: sheetContext.l10n.lyricsShareTitle,
                     onTap: () => Navigator.of(sheetContext).pop('shareLyrics'),
                   ),
-                  if (sendToDesktop != null)
+                  if (sendToDesktop != null && linkClient != null)
                     SettingsItem(
-                      icon: Icons.computer,
+                      icon: linkSendToHostIcon(linkClient),
                       title: sheetContext.l10n.linkSendToDesktop(sendToDesktop),
                       onTap: () => Navigator.of(sheetContext).pop('linkSend'),
                     ),
