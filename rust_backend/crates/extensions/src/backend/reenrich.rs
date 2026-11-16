@@ -1,7 +1,9 @@
 //! Backend re-enrichment of an existing audio file with fresh metadata, cover art, and lyrics.
 
 use super::{Backend, LyricsRequest};
+use crate::manager::ManagerError;
 use cap_std::fs::OpenOptions;
+use mornye_core::cancellation::RequestLease;
 use mornye_core::lyrics::{file, lrc};
 use mornye_core::metadata::TrackMetadata;
 use mornye_core::metadata::reenrich::{self, Candidate, Match, Request, text};
@@ -10,7 +12,7 @@ use mornye_providers::deezer::MetadataLookup;
 use mornye_providers::resolver::{Check, availability};
 use serde_json::{Value, json};
 use std::io::Write;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 mod tests;
@@ -326,6 +328,9 @@ impl Backend {
                 break;
             }
             let tracks = self.metadata_provider_work_result(check, |lease| {
+                if !stops && order.len() > 1 {
+                    return self.search_providers_at_once(query, &order, lease);
+                }
                 self.manager.search_each_metadata_provider_with_lease(
                     query,
                     REENRICH_SEARCH_LIMIT,
@@ -374,6 +379,68 @@ impl Backend {
             return Err(error);
         }
         Ok((request.rank(found), catalog))
+    }
+
+    /// Asks every provider at once when none may stop the search early. Each
+    /// provider has its own engine, so the wait is the slowest provider, not
+    /// their sum; the result is the serial search's, in provider order.
+    fn search_providers_at_once(
+        &self,
+        query: &str,
+        order: &[String],
+        lease: Arc<RequestLease>,
+    ) -> Result<Vec<Value>, ManagerError> {
+        std::thread::scope(|scope| {
+            let workers = order
+                .iter()
+                .map(|id| {
+                    let lease = lease.clone();
+                    std::thread::Builder::new()
+                        .name("reenrich-search".into())
+                        .spawn_scoped(scope, move || {
+                            self.manager.search_each_metadata_provider_with_lease(
+                                query,
+                                REENRICH_SEARCH_LIMIT,
+                                std::slice::from_ref(id),
+                                "",
+                                30_000,
+                                Some(lease),
+                                |_| false,
+                            )
+                        })
+                })
+                .collect::<Vec<_>>();
+            let mut tracks = Vec::new();
+            let mut verification = None;
+            let mut failure = None;
+            for worker in workers {
+                let result = worker
+                    .map_err(|error| ManagerError(error.to_string()))
+                    .and_then(|worker| {
+                        worker
+                            .join()
+                            .map_err(|_| ManagerError("metadata search panicked".into()))?
+                    });
+                match result {
+                    Ok(found) => tracks.extend(found),
+                    // A provider without results that needs verification
+                    // reports it only when no provider found anything.
+                    Err(error) if error.0.starts_with("verification_required") => {
+                        verification.get_or_insert(error);
+                    }
+                    Err(error) => {
+                        failure.get_or_insert(error);
+                    }
+                }
+            }
+            if let Some(error) = failure {
+                return Err(error);
+            }
+            match verification {
+                Some(error) if tracks.is_empty() => Err(error),
+                _ => Ok(tracks),
+            }
+        })
     }
 
     /// Applies the one winning track; motion artwork must share its release.

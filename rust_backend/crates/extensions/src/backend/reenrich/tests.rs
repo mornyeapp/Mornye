@@ -386,6 +386,33 @@ fn an_automatic_run_stops_at_the_first_confident_provider() {
 }
 
 #[test]
+fn a_picker_asks_its_providers_at_once_and_keeps_their_order() {
+    let slow = |id: &str, year: u32| {
+        format!(
+            r#"() => {{ const end = Date.now() + 500; while (Date.now() < end) {{}}
+            return [{{id: "{id}", name: "Signal", artists: "Lead Artist", album_name: "Album",
+            duration_ms: 201000, release_date: "{year}-01-01"}}]; }}"#
+        )
+    };
+    let (a, b, c) = (
+        slow("from-a", 2001),
+        slow("from-b", 2002),
+        slow("from-c", 2003),
+    );
+    let fixture = providers(&[("provider-a", &a), ("provider-b", &b), ("provider-c", &c)]);
+    let started = std::time::Instant::now();
+    let response = fixture
+        .reenrich(song(json!({"include_candidates":true})))
+        .unwrap();
+    let elapsed = started.elapsed();
+    let candidates = response["candidates"].as_array().unwrap();
+    let ids: Vec<_> = candidates.iter().map(|track| text(track, "id")).collect();
+    assert_eq!(ids, ["from-a", "from-b", "from-c"]);
+    // Three 500 ms providers took at least 1.5 s one after another.
+    assert!(elapsed < Duration::from_millis(1200), "{elapsed:?}");
+}
+
+#[test]
 fn a_batch_lists_candidates_but_keeps_the_early_stop() {
     let reissue = r#"() => [{id: "reissue", name: "Signal", artists: "Lead Artist",
         album_name: "Album", duration_ms: 201000}]"#;
@@ -541,4 +568,24 @@ fn a_picker_reports_a_needed_verification_when_no_provider_answered() {
     let response = fixture.reenrich(song(json!({}))).unwrap();
     assert_eq!(response["auto_match"], "none");
     assert_eq!(response["enriched_metadata"]["album_name"], "Album");
+}
+
+#[test]
+fn a_picker_asking_providers_at_once_reports_verification_as_one_after_another() {
+    let blocked = r#"() => { throw new Error("verification_required: sign in again"); }"#;
+    let fixture = providers(&[("provider-v", blocked), ("provider-w", blocked)]);
+    let error = fixture
+        .reenrich(song(json!({"include_candidates":true})))
+        .unwrap_err();
+    assert!(
+        error.starts_with("verification_required: extension 'provider-v' needs verification"),
+        "{error}"
+    );
+    let fixture = providers(&[("provider-v", blocked), ("provider-b", RIGHT_SONG)]);
+    let response = fixture
+        .reenrich(song(json!({"include_candidates":true})))
+        .unwrap();
+    let candidates = response["candidates"].as_array().unwrap();
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(candidates[0]["provider_id"], "provider-b");
 }
