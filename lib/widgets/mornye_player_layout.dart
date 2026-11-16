@@ -523,7 +523,7 @@ class MornyePlayerLayout extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          OverflowMarquee(
+                          _PlayingMarquee(
                             resetKey: (mediaItem.id, mediaItem.title),
                             child: PlayerMetadataTitle(
                               mediaItem: mediaItem,
@@ -537,7 +537,7 @@ class MornyePlayerLayout extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          OverflowMarquee(
+                          _PlayingMarquee(
                             resetKey: (mediaItem.id, mediaItem.artist),
                             child: Text(
                               mediaItem.artist ?? '',
@@ -655,6 +655,21 @@ class MornyePlayerLayout extends ConsumerWidget {
         ),
       ),
     ),
+    child: child,
+  );
+}
+
+/// Rests at the start while paused; only this marquee rebuilds on play/pause.
+class _PlayingMarquee extends ConsumerWidget {
+  const _PlayingMarquee({required this.resetKey, required this.child});
+
+  final Object resetKey;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => OverflowMarquee(
+    resetKey: resetKey,
+    playing: ref.watch(playbackPlayingProvider),
     child: child,
   );
 }

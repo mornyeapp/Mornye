@@ -61,6 +61,7 @@ import 'package:mornye/widgets/mornye_landscape_player.dart';
 import 'package:mornye/widgets/material_player_layout.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
 import 'package:mornye/widgets/mornye_player_layout.dart';
+import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_lyric_preview.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
@@ -3223,6 +3224,53 @@ void main() {
       expect(tester.getRect(find.byType(PlayerVolumeControl)), volume);
     },
   );
+
+  for (final landscape in [false, true]) {
+    testWidgets(
+      'Mornye title marquee rests while paused (landscape: $landscape)',
+      (tester) async {
+        const longTitle =
+            'I Do Not Want to Talk About It (A Long Album Version)';
+        final playbackEvents = StreamController<PlaybackState>.broadcast();
+        addTearDown(playbackEvents.close);
+        await pumpNowPlaying(
+          tester,
+          theme: MornyeTheme.build(Brightness.dark),
+          size: landscape ? const Size(852, 393) : const Size(393, 852),
+          playbackEvents: playbackEvents.stream,
+        );
+        mediaItems.add(item('first').copyWith(title: longTitle));
+        playbackEvents.add(PlaybackState(playing: false));
+        await settlePlayer(tester);
+        final marquee = find
+            .descendant(
+              of: find
+                  .ancestor(
+                    of: find.text(longTitle),
+                    matching: find.byType(OverflowMarquee),
+                  )
+                  .first,
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        double offset() =>
+            tester.state<ScrollableState>(marquee).position.pixels;
+
+        for (var second = 0; second < 8; second++) {
+          await tester.pump(const Duration(seconds: 1));
+          expect(offset(), 0);
+        }
+        playbackEvents.add(PlaybackState(playing: true));
+        await tester.pump();
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(offset(), greaterThan(0));
+        await tester.pumpWidget(const SizedBox());
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'Mornye panel switch moves built panels without rebuilding them',
