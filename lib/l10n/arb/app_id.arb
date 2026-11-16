@@ -414,6 +414,14 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
+  "homeNothingYetTitle": "Belum ada apa-apa",
+  "@homeNothingYetTitle": {
+    "description": "Title on the Mornye Home when the Library is empty and nothing was played"
+  },
+  "homeNothingYetMessage": "Lagu yang Anda tambahkan ke Koleksi atau putar akan muncul di sini.",
+  "@homeNothingYetMessage": {
+    "description": "Message under homeNothingYetTitle"
+  },
   "homeRecent": "Terbaru",
   "@homeRecent": {
     "description": "Section header for recent searches"

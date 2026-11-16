@@ -469,6 +469,27 @@ class _HomeSections extends ConsumerWidget {
         ),
     ];
 
+    // The Material Home always has its Shortcuts. The Mornye Home has only
+    // shelves, so an empty Library with nothing played would leave the page
+    // blank: say so once the Library shelves have answered.
+    if (mornye && sections.isEmpty) {
+      final librarySettled = ref.watch(
+        homeRecentlyAddedProvider.select((s) => s.hasValue || s.hasError),
+      );
+      if (librarySettled && !recentlyPlayedLoading) {
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.sizeOf(context).height * 0.5,
+          ),
+          child: EmptyState(
+            icon: Icons.music_note,
+            title: l10n.homeNothingYetTitle,
+            message: l10n.homeNothingYetMessage,
+          ),
+        );
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 24),
       child: Column(

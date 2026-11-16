@@ -618,6 +618,14 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
+  "homeNothingYetTitle": "Nothing here yet",
+  "@homeNothingYetTitle": {
+    "description": "Title on the Mornye Home when the Library is empty and nothing was played"
+  },
+  "homeNothingYetMessage": "Songs you add to your Library or play show up here.",
+  "@homeNothingYetMessage": {
+    "description": "Message under homeNothingYetTitle"
+  },
   "homeRecent": "Recent",
   "@homeRecent": {
     "description": "Section header for recent searches"
