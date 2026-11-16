@@ -9033,6 +9033,8 @@
   "linkShareSongsSubtitle": "Lagu di ponsel ini muncul di Library komputer dan bisa diputar di sana selama ponsel ini terhubung",
   "linkFollowDesktopTitle": "Ikuti pemutaran komputer",
   "linkFollowDesktopSubtitle": "Saat komputer mulai memutar, ponsel ini menampilkan dan mengendalikannya",
+  "linkSyncSoundTitle": "Sinkronkan pengaturan suara",
+  "linkSyncSoundSubtitle": "Preset equalizer, tingkat normalisasi kenyaringan, dan transisi mix tetap sama di ponsel ini dan komputer",
   "linkNearbySection": "Di jaringan ini",
   "linkSearching": "Mencari komputer...",
   "linkNoneFoundTitle": "Tidak ada komputer ditemukan",

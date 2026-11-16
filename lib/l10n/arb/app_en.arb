@@ -10780,6 +10780,14 @@
   "@linkHideDisconnectedSubtitle": {
     "description": "Subtitle of the Hide songs while disconnected switch"
   },
+  "linkSyncSoundTitle": "Sync sound settings",
+  "@linkSyncSoundTitle": {
+    "description": "Mornye Link phone switch: the user's saved sound settings travel between this phone and the paired computer"
+  },
+  "linkSyncSoundSubtitle": "Equalizer presets, volume normalization level and mix transitions stay the same on this phone and the computer",
+  "@linkSyncSoundSubtitle": {
+    "description": "Subtitle of the Sync sound settings switch; names what is synced"
+  },
   "linkNearbySection": "On this network",
   "@linkNearbySection": {
     "description": "Section header for computers running Mornye found on the local network"

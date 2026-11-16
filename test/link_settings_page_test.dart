@@ -287,6 +287,9 @@ void main() {
 
           final add = find.text(_l10n.linkAddManually);
           await tester.scrollUntilVisible(add, 300);
+          // A 300 px step can stop with the button just past the edge.
+          await tester.ensureVisible(add);
+          await tester.pump();
           await tester.tap(add);
           await _settle(tester);
           await tester.enterText(

@@ -10,6 +10,7 @@ import 'package:mornye/services/link/client/link_client_pairing.dart';
 import 'package:mornye/services/link/client/link_client_session.dart';
 import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/sync/link_sound_sync_runner.dart';
 import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
@@ -303,6 +304,7 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
     final hideDisconnected = ref.watch(
       settingsProvider.select((s) => s.linkHideDisconnectedSongs),
     );
+    final soundSync = ref.watch(linkSoundSyncOptionProvider);
     final unpaired = state.unpaired;
     final searching = state.discovery == LinkDiscoveryStatus.searching;
     final theme = Theme.of(context);
@@ -364,6 +366,17 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
                   value: options.shareSongs,
                   onChanged: options.loaded
                       ? optionsNotifier.setShareSongs
+                      : null,
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.equalizer,
+                  title: l10n.linkSyncSoundTitle,
+                  subtitle: l10n.linkSyncSoundSubtitle,
+                  value: soundSync.enabled,
+                  onChanged: soundSync.loaded
+                      ? ref
+                            .read(linkSoundSyncOptionProvider.notifier)
+                            .setEnabled
                       : null,
                 ),
                 SettingsSwitchItem(
