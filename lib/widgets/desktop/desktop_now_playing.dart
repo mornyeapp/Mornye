@@ -103,9 +103,11 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
     final mediaItem = ref.watch(currentMediaItemProvider).value;
     if (context.isMornye) return _buildPlayer(context, mediaItem);
     // Material takes the track's artwork scheme. Providers are read above,
-    // so the scoped builder reads none.
+    // so the scoped builder reads none. The scheme swaps in one step and
+    // only the page background moves, as on the phone player.
     return PlayerArtworkTheme(
       artUri: mediaItem?.artUri?.toString(),
+      fadesSurfaceOnly: true,
       child: Builder(builder: (context) => _buildPlayer(context, mediaItem)),
     );
   }
@@ -132,7 +134,7 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
                 showArtwork: false,
               )
             else
-              ColoredBox(color: colorScheme.surface),
+              PlayerArtworkSurface(surface: colorScheme.surface),
             ValueListenableBuilder<DesktopInspectorPanel?>(
               valueListenable: desktopInspectorPanel,
               builder: (context, panel, _) => mediaItem == null
