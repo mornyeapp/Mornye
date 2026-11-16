@@ -8,6 +8,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_languages.dart';
@@ -23,6 +24,7 @@ import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/lyrics_editor_sheet.dart';
 import 'package:mornye/widgets/lyrics_options_activity.dart';
+import 'package:mornye/widgets/lyrics_size_setting.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
 
@@ -85,9 +87,9 @@ Future<String?> showLyricsLanguagePicker(
   ),
 );
 
-/// The player's lyrics language menu: pronunciation and translation
-/// toggles, plus AI translation once a provider is set up. Hidden when it
-/// would offer nothing.
+/// The player's lyrics menu: pronunciation and translation toggles, AI
+/// translation once a provider is set up, and the timing of synced lyrics.
+/// Hidden when it would offer nothing.
 class LyricsOptionsButton extends ConsumerStatefulWidget {
   const LyricsOptionsButton({
     super.key,
@@ -237,11 +239,15 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
         metadata.canSaveTranslations &&
         !translating &&
         lyricsTranslationUnsaved(original, lyrics);
+    // Synced lyrics can always be timed, for this song or every song.
+    final timing = original.synced;
     if (canSaveTranslation &&
         ref.read(settingsProvider).lyricsTranslationAutoSave) {
       _scheduleAutoSave(lyrics);
     }
-    if (!pronunciation && !translation && !canTranslate && !translating) {
+    final language =
+        pronunciation || translation || canTranslate || translating;
+    if (!language && !timing) {
       return canEdit ? _editButton(context) : null;
     }
     final colorScheme = widget.colorScheme;
@@ -249,10 +255,14 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     final percent = ((job?.progress ?? 0) * 100).round();
     return Builder(
       builder: (buttonContext) => AppIconButton.filledTonal(
-        key: const ValueKey('lyrics-language-options'),
+        // Without language choices the menu holds timing (and editing), so
+        // a language glyph would mislead.
+        key: ValueKey(language ? 'lyrics-language-options' : 'lyrics-options'),
         tooltip: translating
             ? context.l10n.nowPlayingTranslatingLyrics(percent)
-            : context.l10n.nowPlayingLyricsLanguageOptions,
+            : language
+            ? context.l10n.nowPlayingLyricsLanguageOptions
+            : context.l10n.lyricsOffsetOptions,
         icon: translating
             ? SizedBox.square(
                 dimension: 20,
@@ -264,7 +274,9 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
                   wavy: false,
                 ),
               )
-            : const AppIcon(Icons.translate_rounded),
+            : language
+            ? const AppIcon(Icons.translate_rounded)
+            : const AppIcon.adaptive(Icons.tune_rounded),
         style: IconButton.styleFrom(
           foregroundColor: foreground,
           backgroundColor: colorScheme.onSurface.withValues(
@@ -280,6 +292,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           translating: translating,
           canSaveTranslation: canSaveTranslation,
           canEdit: canEdit,
+          timing: timing,
         ),
       ),
     );
@@ -328,6 +341,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     required bool translating,
     required bool canSaveTranslation,
     required bool canEdit,
+    required bool timing,
   }) async {
     final settings = ref.read(settingsProvider);
     final l10n = context.l10n;
@@ -379,6 +393,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
       ],
       if (canSaveTranslation)
         ('saveTranslation', l10n.nowPlayingSaveTranslation, Icons.save_alt),
+      if (timing) ('timing', l10n.lyricsOffset, Icons.timer_outlined),
       if (canEdit) ('edit', l10n.lyricsEditTitle, Icons.edit_note),
     ];
     _setOpen(true);
@@ -455,9 +470,25 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           unawaited(_saveTranslation());
       }
     } finally {
-      // The language sheet and the editor keep controls visible until they
-      // close.
-      if (action != 'translateInto' && action != 'edit') _setOpen(false);
+      // The language sheet, the timing sheet and the editor keep controls
+      // visible until they close.
+      if (action != 'translateInto' && action != 'edit' && action != 'timing') {
+        _setOpen(false);
+      }
+    }
+    if (action == 'timing') {
+      try {
+        final item = widget.metadata.item;
+        if (mounted) {
+          await showLyricsTimingSheet(
+            context,
+            songKey: songLyricsOffsetKeyOf(item),
+            songTitle: item?.title,
+          );
+        }
+      } finally {
+        _setOpen(false);
+      }
     }
     if (action == 'edit') {
       try {

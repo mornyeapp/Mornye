@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/models/theme_settings.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
@@ -322,10 +323,16 @@ Stream<bool> _inBackground() {
   return states.stream.distinct();
 }
 
-Future<Duration> _storedLyricsOffset() async {
+/// The stored app-wide offset plus [item]'s own, as the player times it.
+Future<Duration> _storedLyricsOffset(MediaItemMessage item) async {
   final prefs = await SharedPreferences.getInstance();
   return Duration(
-    milliseconds: normalizeLyricsOffsetMs(prefs.getInt(kLyricsOffsetKey)),
+    milliseconds:
+        normalizeLyricsOffsetMs(prefs.getInt(kLyricsOffsetKey)) +
+        storedSongLyricsOffsetMs(
+          prefs,
+          songLyricsOffsetKey(item.title, item.artist),
+        ),
   );
 }
 
@@ -343,7 +350,7 @@ class LockScreenLyrics extends AudioServicePlatform {
     this.platform, {
     Stream<bool> Function()? lockScreen,
     PlayerMetadataController Function()? metadata,
-    Future<Duration> Function()? lyricsOffset,
+    Future<Duration> Function(MediaItemMessage item)? lyricsOffset,
     this.restatePosition = false,
     DateTime Function()? now,
   }) : _lockScreen = lockScreen ?? lockScreenShowing,
@@ -365,7 +372,9 @@ class LockScreenLyrics extends AudioServicePlatform {
 
   final Stream<bool> Function() _lockScreen;
   final PlayerMetadataController Function() _createMetadata;
-  final Future<Duration> Function() _lyricsOffset;
+
+  /// The lyrics timing of an item: app-wide plus the song's own.
+  final Future<Duration> Function(MediaItemMessage item) _lyricsOffset;
   final DateTime Function() _now;
 
   bool _enabled = false;
@@ -419,19 +428,22 @@ class LockScreenLyrics extends AudioServicePlatform {
   void _setShowing(bool showing) {
     if (showing == _showing) return;
     _showing = showing;
-    if (showing) {
-      _load();
-      // The timing setting can only change while the screen is unlocked.
-      unawaited(
-        _lyricsOffset().then((offset) {
-          if (offset == _offset) return;
-          _offset = offset;
-          _timelineLyrics = null;
-          _lyricsChanged();
-        }, onError: (Object error) => _log.w('No lyrics offset: $error')),
-      );
-    }
+    if (showing) _load();
     _update();
+  }
+
+  /// Reads the timing of [item]'s lyrics, each time the lock screen shows
+  /// and for each song, since every song may have its own.
+  void _loadOffset(MediaItemMessage item) {
+    unawaited(
+      _lyricsOffset(item).then((offset) {
+        if (!_active || _item?.mediaItem.id != item.id) return;
+        if (offset == _offset) return;
+        _offset = offset;
+        _timelineLyrics = null;
+        _lyricsChanged();
+      }, onError: (Object error) => _log.w('No lyrics offset: $error')),
+    );
   }
 
   /// Reads the current item's lyrics. A controller already reading the
@@ -439,6 +451,7 @@ class LockScreenLyrics extends AudioServicePlatform {
   void _load() {
     final item = _item?.mediaItem;
     if (!_active || item == null) return;
+    _loadOffset(item);
     final metadata = _metadata ??= _createMetadata()
       ..addListener(_lyricsChanged);
     _loadedId = item.id;

@@ -14,7 +14,7 @@ import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
-import 'package:mornye/providers/theme_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/screens/lyrics_share_screen.dart';
@@ -1246,7 +1246,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         lyrics: _trackMetadata.lyrics,
         initial: line,
         position: line == null ? _lyricsDrawnPosition() : null,
-        offset: Duration(milliseconds: ref.read(themeProvider).lyricsOffsetMs),
+        offset: Duration(
+          milliseconds: ref.read(
+            lyricsOffsetMsForSongProvider(songLyricsOffsetKeyOf(mediaItem)),
+          ),
+        ),
       );
     } finally {
       _sharingLyrics = false;

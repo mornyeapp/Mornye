@@ -11,6 +11,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -205,9 +206,12 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
     final showTranslation = ref.watch(
       settingsProvider.select((settings) => settings.playerShowTranslation),
     );
-    final offsetMs = ref.watch(
+    final appOffsetMs = ref.watch(
       themeProvider.select((theme) => theme.lyricsOffsetMs),
     );
+    // The song is only known inside the builder below, which follows the
+    // metadata; a change of any song's offset is rare.
+    final songOffsets = ref.watch(songLyricsOffsetsProvider);
     ref.watch(lyricsTranslationProvider.select((state) => state.results));
     ref.watch(
       settingsProvider.select(
@@ -240,6 +244,9 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
           _heldTrack = null;
           _heldLyrics = null;
         }
+        final offsetMs =
+            appOffsetMs +
+            (songOffsets[songLyricsOffsetKeyOf(metadata.item)]?.offsetMs ?? 0);
         final lines = lyrics == null
             ? const <LyricLine>[]
             : _timelineFor(translation.shown(lyrics), offsetMs);

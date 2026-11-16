@@ -5,6 +5,7 @@ import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
@@ -193,6 +194,7 @@ class PlayerLyricsSection extends ConsumerWidget {
             showPronunciation: visibility.$1,
             showTranslation: visibility.$2,
             onLongPressLine: onShareLyrics,
+            songKey: songLyricsOffsetKeyOf(metadata.item),
           ),
           if (options != null)
             PositionedDirectional(

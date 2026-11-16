@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:audio_service_platform_interface/audio_service_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
+import 'package:mornye/models/theme_settings.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/services/lock_screen_lyrics.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Duration _seconds(num seconds) =>
     Duration(microseconds: (seconds * Duration.microsecondsPerSecond).round());
@@ -71,10 +75,13 @@ SetStateRequest _state(DateTime at, {bool playing = true, num position = 0}) =>
 
 /// A session over [os] with lyrics for [_lyrics], at the test's fake time.
 class _Harness {
-  _Harness(this.tester, {this.restatePosition = false});
+  _Harness(this.tester, {this.restatePosition = false, this.storedOffsets});
 
   final WidgetTester tester;
   final bool restatePosition;
+
+  /// True reads the offsets the app stores; otherwise lyrics are in sync.
+  final bool? storedOffsets;
   final os = _Os();
   final _lockScreen = StreamController<bool>.broadcast(sync: true);
 
@@ -85,7 +92,7 @@ class _Harness {
       readMetadata: (path) async => {'lyrics': _lyrics[path] ?? ''},
       parseLyrics: (raw) async => LyricsParser.parse(raw),
     ),
-    lyricsOffset: () async => Duration.zero,
+    lyricsOffset: storedOffsets == true ? null : (_) async => Duration.zero,
     restatePosition: restatePosition,
     now: () => now,
   );
@@ -306,6 +313,34 @@ void main() {
       expect(h.os.titles.last, 'Another song');
       await h.close();
       expect(h.os.titles.last, 'Other');
+    });
+
+    testWidgets('times each song with the app-wide and its own offset', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        kLyricsOffsetKey: 500,
+        kSongLyricsOffsetsKey: jsonEncode({
+          songLyricsOffsetKey('Song', 'Artist'): [500, 1],
+        }),
+      });
+      final h = _Harness(tester, storedOffsets: true)..session.enabled = true;
+      await h.play('a', 'Song');
+      await h.lock(true);
+      // The first line at 1 s shows at 2 s: 0.5 s app-wide, 0.5 s its own.
+      await h.elapse(1.5);
+      expect(h.os.titles.last, 'Song');
+      await h.elapse(0.6);
+      expect(h.os.titles.last, 'First line');
+
+      // Another song has only the app-wide offset: its line at 2 s shows at
+      // 2.5 s.
+      await h.play('b', 'Other');
+      await h.elapse(2.2);
+      expect(h.os.titles.last, 'Other');
+      await h.elapse(0.4);
+      expect(h.os.titles.last, 'Another song');
+      await h.close();
     });
 
     testWidgets('reads a song played straight from a picked folder', (

@@ -1056,6 +1056,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('lyrics-language-options')), findsNothing);
+    // Synced lyrics still offer their timing.
+    expect(find.byKey(const ValueKey('lyrics-options')), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

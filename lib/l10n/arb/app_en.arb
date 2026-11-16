@@ -10213,6 +10213,18 @@
       }
     }
   },
+  "lyricsOffsetThisSong": "This song",
+  "@lyricsOffsetThisSong": {
+    "description": "Player lyrics timing sheet: slider label for the timing offset of the playing song only"
+  },
+  "lyricsOffsetAllSongs": "All songs",
+  "@lyricsOffsetAllSongs": {
+    "description": "Player lyrics timing sheet: slider label for the app-wide timing offset, used for every song on this device"
+  },
+  "lyricsOffsetOptions": "Lyrics options",
+  "@lyricsOffsetOptions": {
+    "description": "Tooltip for the player lyrics menu button when it offers lyrics timing (and editing) but no language options"
+  },
   "appCrashTitle": "The app previously crashed",
   "appAnrTitle": "The app previously stopped responding",
   "@appAnrTitle": {

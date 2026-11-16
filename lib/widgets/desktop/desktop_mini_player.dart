@@ -296,7 +296,8 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
   int _shiftedOffsetMs = 0;
   List<LyricLine> _shifted = const [];
 
-  /// [lines] with the lyrics timing setting applied, kept while neither
+  /// [lines] with the lyrics timing (app-wide plus the song's) applied, kept
+  /// while neither
   /// changes so word-timed lines keep their sweep across rebuilds.
   List<LyricLine> _withOffset(List<LyricLine> lines, int offsetMs) {
     if (!identical(lines, _shiftedSource) || offsetMs != _shiftedOffsetMs) {
@@ -399,7 +400,11 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
         builder: (context, ref, _) {
           final lines = _withOffset(
             lyrics.lines,
-            ref.watch(themeProvider.select((theme) => theme.lyricsOffsetMs)),
+            ref.watch(
+              lyricsOffsetMsForSongProvider(
+                songLyricsOffsetKeyOf(metadata.item),
+              ),
+            ),
           );
           final current = _followPlayback(ref, lines);
           final next = _leadLineAfter(lines, current);

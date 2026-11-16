@@ -8788,6 +8788,9 @@
   "lyricsOffsetNone": "Sinkron",
   "lyricsOffsetLater": "{seconds} dtk lebih lambat",
   "lyricsOffsetEarlier": "{seconds} dtk lebih cepat",
+  "lyricsOffsetThisSong": "Lagu ini",
+  "lyricsOffsetAllSongs": "Semua lagu",
+  "lyricsOffsetOptions": "Opsi lirik",
   "appCrashTitle": "Aplikasi sebelumnya mengalami crash",
   "appAnrTitle": "Aplikasi sebelumnya berhenti merespons",
   "@appAnrTitle": {

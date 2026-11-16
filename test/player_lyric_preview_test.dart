@@ -12,6 +12,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
@@ -225,6 +226,39 @@ void main() {
     await view.container
         .read(themeProvider.notifier)
         .setLyricsOffsetMs(1000, persist: false);
+    await tester.pumpAndSettle();
+    expect(find.text('First example line'), findsNothing);
+    expect(find.text('•••'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('adds the song\'s own timing to the app-wide one', (
+    tester,
+  ) async {
+    final view = await pumpPreview(tester, metadata: await _metadata());
+    view.playback.add(_at(const Duration(milliseconds: 5800), playing: false));
+    await tester.pumpAndSettle();
+    expect(find.text('First example line'), findsOneWidget);
+
+    // Another song's offset changes nothing here.
+    final songs = view.container.read(songLyricsOffsetsProvider.notifier);
+    await songs.setOffsetMs(
+      songLyricsOffsetKey('Other Song', 'Example Artist'),
+      2000,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('First example line'), findsOneWidget);
+
+    // 0.5 s app-wide and 0.5 s for this song: at 5.8 s the first line, now
+    // at 6 s, has not begun. The key ignores case and spaces.
+    await view.container
+        .read(themeProvider.notifier)
+        .setLyricsOffsetMs(500, persist: false);
+    await songs.setOffsetMs(
+      songLyricsOffsetKey(' example song ', 'EXAMPLE ARTIST'),
+      500,
+      persist: false,
+    );
     await tester.pumpAndSettle();
     expect(find.text('First example line'), findsNothing);
     expect(find.text('•••'), findsOneWidget);

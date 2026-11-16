@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
@@ -192,6 +193,73 @@ void main() {
     await tester.pumpAndSettle();
     expect(scaleOf('First line'), 1.0);
     expect(scaleOf('Second line'), 0.96);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a song\'s own timing adds to the app-wide one at once', (
+    tester,
+  ) async {
+    final preview = ValueNotifier<Duration?>(const Duration(seconds: 3));
+    addTearDown(preview.dispose);
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final theme = MornyeTheme.build(Brightness.dark);
+    final song = songLyricsOffsetKey('Example Song', 'Example Artist');
+    final other = songLyricsOffsetKey('Other Song', 'Example Artist');
+    Widget view(String songKey) => UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: theme,
+        home: Scaffold(
+          body: SyncedLyricsView(
+            lyrics: const ParsedLyrics(
+              synced: true,
+              wordSynced: false,
+              plainText: '',
+              lines: [
+                LyricLine(time: Duration.zero, text: 'First line'),
+                LyricLine(time: Duration(seconds: 2), text: 'Second line'),
+              ],
+            ),
+            seekPreview: preview,
+            colorScheme: theme.colorScheme,
+            isActive: true,
+            showPronunciation: false,
+            showTranslation: false,
+            songKey: songKey,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpWidget(view(song));
+    await tester.pumpAndSettle();
+    double scaleOf(String text) => tester
+        .widget<AnimatedScale>(
+          find
+              .ancestor(
+                of: find.text(text),
+                matching: find.byType(AnimatedScale),
+              )
+              .first,
+        )
+        .scale;
+    expect(scaleOf('Second line'), 1.0);
+
+    // 1 s app-wide and 1 s for the song: at 3 s the second line, now at
+    // 4 s, has not begun.
+    await container.read(themeProvider.notifier).setLyricsOffsetMs(1000);
+    await container
+        .read(songLyricsOffsetsProvider.notifier)
+        .setOffsetMs(song, 1000, persist: false);
+    await tester.pumpAndSettle();
+    expect(scaleOf('First line'), 1.0);
+    expect(scaleOf('Second line'), 0.96);
+
+    // Another song without its own offset keeps only the app-wide one.
+    await tester.pumpWidget(view(other));
+    await tester.pumpAndSettle();
+    expect(scaleOf('Second line'), 1.0);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

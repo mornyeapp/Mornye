@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -108,6 +109,10 @@ class SyncedLyricsView extends ConsumerStatefulWidget {
   /// Long-pressing a sung line starts sharing it.
   final ValueChanged<LyricLine>? onLongPressLine;
 
+  /// The song's [songLyricsOffsetKey], whose own timing offset is added to
+  /// the app-wide one. Empty for none.
+  final String songKey;
+
   const SyncedLyricsView({
     super.key,
     required this.lyrics,
@@ -119,6 +124,7 @@ class SyncedLyricsView extends ConsumerStatefulWidget {
     required this.showTranslation,
     this.animateWords = true,
     this.onLongPressLine,
+    this.songKey = '',
   });
 
   @override
@@ -133,7 +139,8 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   ProviderSubscription<bool>? _loadingSubscription;
   ProviderSubscription<int>? _offsetSubscription;
 
-  /// The listener's lyrics timing setting, already applied to [_lines].
+  /// The listener's lyrics timing, app-wide plus the song's own, already
+  /// applied to [_lines].
   Duration _offset = Duration.zero;
   Timer? _lineBoundaryTimer;
   Timer? _userScrollIdleTimer;
@@ -326,19 +333,30 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _offsetSubscription = ref.listenManual<int>(
-      themeProvider.select((theme) => theme.lyricsOffsetMs),
-      (previous, next) {
-        setState(() {
-          _offset = Duration(milliseconds: next);
-          _resetLineKeys();
-        });
-        _syncPositionSubscription(resetUserScroll: false);
-      },
-    );
-    _offset = Duration(milliseconds: _offsetSubscription!.read());
+    _listenOffset();
     _resetLineKeys();
     widget.seekPreview.addListener(_previewChanged);
+  }
+
+  /// Follows the offset of [SyncedLyricsView.songKey]; a change re-times the
+  /// lines at once.
+  void _listenOffset() {
+    _offsetSubscription?.close();
+    _offsetSubscription = ref.listenManual<int>(
+      lyricsOffsetMsForSongProvider(widget.songKey),
+      (previous, next) => _setOffset(next),
+    );
+    _offset = Duration(milliseconds: _offsetSubscription!.read());
+  }
+
+  void _setOffset(int offsetMs) {
+    final offset = Duration(milliseconds: offsetMs);
+    if (offset == _offset) return;
+    setState(() {
+      _offset = offset;
+      _resetLineKeys();
+    });
+    _syncPositionSubscription(resetUserScroll: false);
   }
 
   @override
@@ -388,7 +406,13 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       oldWidget.seekPreview.removeListener(_previewChanged);
       widget.seekPreview.addListener(_previewChanged);
     }
-    if (oldWidget.lyrics != widget.lyrics) {
+    var offsetChanged = false;
+    if (oldWidget.songKey != widget.songKey) {
+      final before = _offset;
+      _listenOffset();
+      offsetChanged = _offset != before;
+    }
+    if (oldWidget.lyrics != widget.lyrics || offsetChanged) {
       _resetLineKeys();
     }
     if (oldWidget.showPronunciation != widget.showPronunciation ||
@@ -402,7 +426,8 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       });
     }
     if (oldWidget.isActive != widget.isActive ||
-        oldWidget.lyrics != widget.lyrics) {
+        oldWidget.lyrics != widget.lyrics ||
+        offsetChanged) {
       _syncPositionSubscription();
     }
   }
