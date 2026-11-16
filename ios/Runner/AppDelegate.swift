@@ -31,6 +31,7 @@ import UniformTypeIdentifiers
     private var musicHaptics: MusicHapticsBridge?
     private var audioOutput: AudioOutputBridge?
     private var castOutput: CastOutputPlugin?
+    private var linkHost: LinkHostPlugin?
     private let coreBackend: CoreBackend = createCoreBackend()
     private var pendingSessionGrantEvents: [[String: Any]] = []
 
@@ -179,6 +180,7 @@ import UniformTypeIdentifiers
         musicHaptics = MusicHapticsBridge(messenger: messenger)
         audioOutput = AudioOutputBridge(messenger: messenger) { [weak self] in self?.activeWindow }
         castOutput = CastOutputPlugin(messenger: messenger)
+        linkHost = LinkHostPlugin(messenger: messenger)
     }
 
     /// The window of the foreground scene. Under the UIScene lifecycle the

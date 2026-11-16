@@ -20,6 +20,7 @@ internal object SharedEngineChannels {
     fun configure(context: Context, engine: FlutterEngine) {
         engine.plugins.add(LocalNetworkPlugin())
         engine.plugins.add(CastOutputPlugin())
+        engine.plugins.add(LinkHostPlugin())
         engine.plugins.add(UsbBitPerfectPlugin())
         engine.plugins.add(Media3PlayerPlugin())
         engine.plugins.add(MusicHapticsPlugin())
