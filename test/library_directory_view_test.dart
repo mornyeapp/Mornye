@@ -88,8 +88,11 @@ Future<_Playback> _pump(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        // These tests play songs with a tap on the row.
         settingsProvider.overrideWith(
-          () => FixedSettingsNotifier(const AppSettings()),
+          () => FixedSettingsNotifier(
+            const AppSettings(librarySongTap: AppSettings.librarySongTapPlay),
+          ),
         ),
         libraryDirectoryIndexProvider.overrideWith(
           (ref) async => index ?? _index(),
@@ -361,8 +364,11 @@ void main() {
   test('Folders is a default Library view', () {
     final container = ProviderContainer(
       overrides: [
+        // These tests play songs with a tap on the row.
         settingsProvider.overrideWith(
-          () => FixedSettingsNotifier(const AppSettings()),
+          () => FixedSettingsNotifier(
+            const AppSettings(librarySongTap: AppSettings.librarySongTapPlay),
+          ),
         ),
       ],
     );

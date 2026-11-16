@@ -1048,9 +1048,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setLibrarySongTap(String mode) => _commit(
     state.copyWith(
-      librarySongTap: mode == AppSettings.librarySongTapDetails
-          ? AppSettings.librarySongTapDetails
-          : AppSettings.librarySongTapPlay,
+      librarySongTap: mode == AppSettings.librarySongTapPlay
+          ? AppSettings.librarySongTapPlay
+          : AppSettings.librarySongTapDetails,
     ),
   );
 

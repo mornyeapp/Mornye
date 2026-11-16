@@ -47,8 +47,8 @@ Widget _app(
   bool? tapPlays,
 }) => ProviderScope(
   overrides: [
-    if (tapPlays != null)
-      librarySongTapPlaysProvider.overrideWithValue(tapPlays),
+    // Without a choice these tests play songs with a tap on the row.
+    librarySongTapPlaysProvider.overrideWithValue(tapPlays ?? true),
     currentMediaItemProvider.overrideWithBuild(
       (ref, notifier) => Stream.value(
         currentId == null

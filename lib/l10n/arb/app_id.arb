@@ -7704,7 +7704,7 @@
   "@librarySongTap": {
     "description": "Library setting choosing whether a tap on a song row plays it or opens its details"
   },
-  "librarySongTapPlayDescription": "Ketuk untuk memutar lagu. Tombol info membuka detailnya.",
+  "librarySongTapPlayDescription": "Ketuk untuk memutar lagu. Tombol di sampingnya membuka detailnya.",
   "@librarySongTapPlayDescription": {
     "description": "Description of the tapping a song setting while a tap plays"
   },

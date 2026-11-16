@@ -25,6 +25,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/library_search_results.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/app_icon_finder.dart';
@@ -343,6 +344,7 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
+              librarySongTapPlaysProvider.overrideWithValue(true),
               playbackProvider.overrideWith(() => player),
               librarySearchProvider.overrideWith(
                 (ref, request) async => request.kind == LibrarySearchKind.songs
@@ -553,6 +555,7 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
+              librarySongTapPlaysProvider.overrideWithValue(true),
               playbackProvider.overrideWith(() => player),
               librarySearchProvider.overrideWith(
                 (ref, request) async => switch (request.kind) {

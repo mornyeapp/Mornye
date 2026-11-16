@@ -646,13 +646,19 @@ class TrackGridPlayButton extends StatelessWidget {
     required this.tooltip,
     required this.onPressed,
     this.icon = Icons.play_arrow,
+    this.compact = false,
   });
 
   static const double visualDiameter = 36;
+  static const double compactDiameter = 28;
 
   final String tooltip;
   final VoidCallback? onPressed;
   final IconData icon;
+
+  /// A smaller circle, for a lesser action such as opening the details. The
+  /// touch target stays the same.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -669,14 +675,18 @@ class TrackGridPlayButton extends StatelessWidget {
         padding: EdgeInsets.zero,
       ),
       icon: Container(
-        width: visualDiameter,
-        height: visualDiameter,
+        width: compact ? compactDiameter : visualDiameter,
+        height: compact ? compactDiameter : visualDiameter,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: colorScheme.primary,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: 18, color: colorScheme.onPrimary),
+        child: Icon(
+          icon,
+          size: compact ? 16 : 18,
+          color: colorScheme.onPrimary,
+        ),
       ),
     );
   }

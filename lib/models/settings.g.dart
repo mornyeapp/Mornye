@@ -135,7 +135,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       AppSettings.libraryQualityLabelBitDepthOnly,
   swipeToQueue: json['swipeToQueue'] as bool? ?? true,
   librarySongTap:
-      json['librarySongTap'] as String? ?? AppSettings.librarySongTapPlay,
+      json['librarySongTap'] as String? ?? AppSettings.librarySongTapDetails,
   askQualityBeforeDownload: json['askQualityBeforeDownload'] as bool? ?? true,
   enableLogging: json['enableLogging'] as bool? ?? false,
   useExtensionProviders: json['useExtensionProviders'] as bool? ?? true,

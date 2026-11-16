@@ -304,8 +304,8 @@ class AppSettings {
   final bool swipeToQueue;
 
   /// What a tap on a Library song row with a play button does:
-  /// [librarySongTapPlay] plays it and the button opens its details,
-  /// [librarySongTapDetails] opens its details and the button plays.
+  /// [librarySongTapDetails], the default, opens its details and the button
+  /// plays; [librarySongTapPlay] plays it and the button opens its details.
   final String librarySongTap;
   final bool askQualityBeforeDownload;
   final bool enableLogging;
@@ -565,7 +565,7 @@ class AppSettings {
     this.defaultLibraryView = 'last',
     this.libraryQualityLabelMode = AppSettings.libraryQualityLabelBitDepthOnly,
     this.swipeToQueue = true,
-    this.librarySongTap = AppSettings.librarySongTapPlay,
+    this.librarySongTap = AppSettings.librarySongTapDetails,
     this.askQualityBeforeDownload = true,
     this.enableLogging = false,
     this.useExtensionProviders = true,

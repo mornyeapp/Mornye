@@ -12,12 +12,12 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 /// Whether a tap on a Library song row plays the song, with the row's
-/// button opening its details, rather than the reverse
-/// ([AppSettings.librarySongTap]).
+/// button opening its details, rather than the reverse, which is the
+/// default ([AppSettings.librarySongTap]).
 final librarySongTapPlaysProvider = Provider<bool>(
   (ref) => ref.watch(
     settingsProvider.select(
-      (s) => s.librarySongTap != AppSettings.librarySongTapDetails,
+      (s) => s.librarySongTap == AppSettings.librarySongTapPlay,
     ),
   ),
 );
@@ -76,11 +76,15 @@ class SongRowButton extends ConsumerWidget {
       return playButton;
     }
     final tooltip = context.l10n.desktopMenuShowDetails;
+    // A page of text, not the circled "i": beside a row's circled error
+    // sign the two read as the same warning.
+    const glyph = Icons.article_outlined;
     if (size == SongRowButtonSize.grid) {
       return TrackGridPlayButton(
         tooltip: tooltip,
         onPressed: onOpenDetails,
-        icon: context.adaptiveIcon(Icons.info_outline),
+        icon: context.adaptiveIcon(glyph),
+        compact: true,
       );
     }
     final colorScheme = Theme.of(context).colorScheme;
@@ -89,8 +93,10 @@ class SongRowButton extends ConsumerWidget {
       tooltip: tooltip,
       onPressed: onOpenDetails,
       icon: AppIcon.adaptive(
-        Icons.info_outline,
-        size: dense ? 18 : null,
+        glyph,
+        // Smaller than the play glyph it replaces: details are the lesser
+        // action of the row.
+        size: dense ? 16 : 20,
         color: context.isMornye
             ? colorScheme.primary
             : colorScheme.onSurfaceVariant,

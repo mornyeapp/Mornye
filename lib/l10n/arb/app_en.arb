@@ -8830,7 +8830,7 @@
   "@librarySongTap": {
     "description": "Library setting choosing whether a tap on a song row plays it or opens its details"
   },
-  "librarySongTapPlayDescription": "A tap plays the song. The info button opens its details.",
+  "librarySongTapPlayDescription": "A tap plays the song. The button beside it opens its details.",
   "@librarySongTapPlayDescription": {
     "description": "Description of the tapping a song setting while a tap plays"
   },

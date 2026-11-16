@@ -1039,13 +1039,14 @@ class _LibrarySongTapChoice extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final title = l10n.librarySongTap;
-    final details = mode == AppSettings.librarySongTapDetails;
+    final details = mode != AppSettings.librarySongTapPlay;
     final selected = details
         ? AppSettings.librarySongTapDetails
         : AppSettings.librarySongTapPlay;
+    // The default comes first.
     final labels = {
-      AppSettings.librarySongTapPlay: l10n.tooltipPlay,
       AppSettings.librarySongTapDetails: l10n.nowPlayingDetails,
+      AppSettings.librarySongTapPlay: l10n.tooltipPlay,
     };
     final choice = context.isMornye
         ? MornyeSegmentedControl(

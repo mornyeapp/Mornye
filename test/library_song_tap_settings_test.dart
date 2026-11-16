@@ -20,7 +20,7 @@ import 'package:mornye/widgets/song_row_tap.dart';
 
 const _title = 'Tapping a song';
 const _playDescription =
-    'A tap plays the song. The info button opens its details.';
+    'A tap plays the song. The button beside it opens its details.';
 const _detailsDescription =
     "A tap opens the song's details. The play button plays it.";
 
@@ -81,7 +81,7 @@ void main() {
   tearDown(() => debugDesktopPlatformOverride = null);
 
   for (final mornye in [false, true]) {
-    testWidgets('a two-way choice that plays by default ($mornye)', (
+    testWidgets('a two-way choice that opens details by default ($mornye)', (
       tester,
     ) async {
       final container = await _pumpPage(tester, mornye: mornye);
@@ -91,18 +91,12 @@ void main() {
             : find.byType(SettingsSegmentedChoice<String>),
         findsOneWidget,
       );
-      expect(find.text(_playDescription), findsOneWidget);
-
-      await tester.tap(_option('Details'));
-      await tester.pumpAndSettle();
-      expect(
-        container.read(settingsProvider).librarySongTap,
-        AppSettings.librarySongTapDetails,
-      );
       expect(find.text(_detailsDescription), findsOneWidget);
-      final prefs = await SharedPreferences.getInstance();
-      final saved = jsonDecode(prefs.getString('app_settings')!) as Map;
-      expect(saved['librarySongTap'], AppSettings.librarySongTapDetails);
+      // The default comes first.
+      expect(
+        tester.getTopLeft(_option('Details')).dx,
+        lessThan(tester.getTopLeft(_option('Play')).dx),
+      );
 
       await tester.tap(_option('Play'));
       await tester.pumpAndSettle();
@@ -111,6 +105,17 @@ void main() {
         AppSettings.librarySongTapPlay,
       );
       expect(find.text(_playDescription), findsOneWidget);
+      final prefs = await SharedPreferences.getInstance();
+      final saved = jsonDecode(prefs.getString('app_settings')!) as Map;
+      expect(saved['librarySongTap'], AppSettings.librarySongTapPlay);
+
+      await tester.tap(_option('Details'));
+      await tester.pumpAndSettle();
+      expect(
+        container.read(settingsProvider).librarySongTap,
+        AppSettings.librarySongTapDetails,
+      );
+      expect(find.text(_detailsDescription), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
@@ -125,14 +130,14 @@ void main() {
     (
       'a new backup',
       const AppSettings(
-        librarySongTap: AppSettings.librarySongTapDetails,
+        librarySongTap: AppSettings.librarySongTapPlay,
       ).toJson(),
-      AppSettings.librarySongTapDetails,
+      AppSettings.librarySongTapPlay,
     ),
     (
       'a backup from before the choice',
       <String, dynamic>{'swipeToQueue': false},
-      AppSettings.librarySongTapPlay,
+      AppSettings.librarySongTapDetails,
     ),
   ]) {
     testWidgets('restoring $name keeps the choice', (tester) async {
@@ -152,7 +157,7 @@ void main() {
     });
   }
 
-  testWidgets('an unknown value plays on a tap', (tester) async {
+  testWidgets('an unknown value opens details on a tap', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final container = ProviderContainer(
       overrides: [
@@ -162,15 +167,15 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    expect(container.read(librarySongTapPlaysProvider), isTrue);
+    expect(container.read(librarySongTapPlaysProvider), isFalse);
     container
         .read(settingsProvider.notifier)
-        .setLibrarySongTap(AppSettings.librarySongTapDetails);
-    expect(container.read(librarySongTapPlaysProvider), isFalse);
+        .setLibrarySongTap(AppSettings.librarySongTapPlay);
+    expect(container.read(librarySongTapPlaysProvider), isTrue);
     container.read(settingsProvider.notifier).setLibrarySongTap('other');
     expect(
       container.read(settingsProvider).librarySongTap,
-      AppSettings.librarySongTapPlay,
+      AppSettings.librarySongTapDetails,
     );
   });
 
@@ -218,7 +223,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          initialSettingsProvider.overrideWithValue(const AppSettings()),
+          initialSettingsProvider.overrideWithValue(
+            const AppSettings(librarySongTap: AppSettings.librarySongTapPlay),
+          ),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),

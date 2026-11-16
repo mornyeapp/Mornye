@@ -107,23 +107,26 @@ void main() {
     expect(off.copyWith(locale: 'id').swipeToQueue, isFalse);
   });
 
-  test('A Library song tap plays by default and remembers details', () {
-    expect(const AppSettings().librarySongTap, AppSettings.librarySongTapPlay);
-    // Settings saved before the choice existed play on a tap.
+  test('A Library song tap opens details by default and remembers play', () {
+    expect(
+      const AppSettings().librarySongTap,
+      AppSettings.librarySongTapDetails,
+    );
+    // Settings saved before the choice existed keep opening the details.
     expect(
       AppSettings.fromJson({'swipeToQueue': true}).librarySongTap,
+      AppSettings.librarySongTapDetails,
+    );
+    final play = const AppSettings().copyWith(
+      librarySongTap: AppSettings.librarySongTapPlay,
+    );
+    expect(
+      AppSettings.fromJson(play.toJson()).librarySongTap,
       AppSettings.librarySongTapPlay,
     );
-    final details = const AppSettings().copyWith(
-      librarySongTap: AppSettings.librarySongTapDetails,
-    );
     expect(
-      AppSettings.fromJson(details.toJson()).librarySongTap,
-      AppSettings.librarySongTapDetails,
-    );
-    expect(
-      details.copyWith(locale: 'id').librarySongTap,
-      AppSettings.librarySongTapDetails,
+      play.copyWith(locale: 'id').librarySongTap,
+      AppSettings.librarySongTapPlay,
     );
   });
 
