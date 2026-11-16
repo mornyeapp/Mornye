@@ -105,6 +105,7 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
                   HiResCheckCard(
                     filePath: _filePath,
                     formatHint: _storedAudioFormat,
+                    name: '$artistName - $trackName',
                   ),
                 ],
               ],

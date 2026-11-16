@@ -5,6 +5,7 @@ import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/desktop_link_transfer_actions.dart';
+import 'package:mornye/widgets/hires_batch_check_sheet.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/services/network_offline_saver.dart';
 import 'package:mornye/widgets/network_offline_actions.dart';
@@ -126,6 +127,15 @@ List<List<ContextMenuAction>> libraryTrackMenuGroups(
           icon: Icons.swap_horiz,
           label: l10n.selectionConvertCount(count),
           onSelected: onConvert,
+        ),
+      if (count > 1 && hiResCheckableItems(items).isNotEmpty)
+        ContextMenuAction(
+          icon: Icons.verified_outlined,
+          label: l10n.hiResBatchAction,
+          onSelected: () {
+            onDone?.call();
+            showHiResBatchCheckSheet(root, items);
+          },
         ),
     ],
     [

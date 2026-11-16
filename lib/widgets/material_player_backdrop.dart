@@ -52,7 +52,7 @@ class MaterialPlayerBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final blurredCover = PlayerCoverBlur(
+    final blurredCover = _BlurredCover(
       artUri: mediaItem.artUri?.toString(),
       colorScheme: colorScheme,
     );
@@ -270,40 +270,21 @@ class _RenderFadeBand extends RenderProxyBox {
 /// blur the whole screen again on every frame. The surface under it and the
 /// tint over it stay live layers, so the artwork scheme moving to the next
 /// track's colours never draws the blur again. A new cover's blur fades in
-/// over the previous one with the track change.
-/// A cover blurred beyond detail, filling its box. The blur is drawn once
-/// per cover and size, then shown as a plain image, and a new cover fades
-/// in over the previous one. While a window resize goes on, the previous
-/// blur stretches over the box until the size settles.
-class PlayerCoverBlur extends StatefulWidget {
-  const PlayerCoverBlur({
-    super.key,
-    required this.artUri,
-    required this.colorScheme,
-    this.reveal,
-    this.sigma = 48,
-  });
+/// over the previous one with the track change. While a window resize goes
+/// on, the previous blur stretches over the box until the size settles.
+class _BlurredCover extends StatefulWidget {
+  const _BlurredCover({required this.artUri, required this.colorScheme});
 
   final String? artUri;
   final ColorScheme colorScheme;
 
-  /// The blur radius in logical pixels. The default keeps the cover's
-  /// larger shapes; a few times that leaves only its colours.
-  final double sigma;
-
-  /// Without it the blur sits between two layers of the surface colour and
-  /// is blurred live while the cover decodes. With it, only the blur is
-  /// drawn, transparent down to `top` and opaque from `bottom` (logical
-  /// pixels from the top of the box), so it can lie over a sharp cover that
-  /// ends there, and nothing shows until the cover has decoded.
-  final ({double top, double bottom})? reveal;
-
   @override
-  State<PlayerCoverBlur> createState() => _PlayerCoverBlurState();
+  State<_BlurredCover> createState() => _BlurredCoverState();
 }
 
-class _PlayerCoverBlurState extends State<PlayerCoverBlur>
+class _BlurredCoverState extends State<_BlurredCover>
     with SingleTickerProviderStateMixin {
+  static const _sigma = 48.0;
   static const _artWidth = PlayerArtwork.miniCacheWidth;
 
   late final _listener = ImageStreamListener(
@@ -340,7 +321,7 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
   }
 
   @override
-  void didUpdateWidget(PlayerCoverBlur oldWidget) {
+  void didUpdateWidget(_BlurredCover oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.artUri != widget.artUri) _resolve();
   }
@@ -402,32 +383,19 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
   /// leaves without visible detail. The live filter blurs in logical pixels
   /// under the device pixel ratio; this canvas has no transform, so sigma
   /// takes the same dpr / 4 scale and still spans 48 dp once drawn back.
-  static ui.Image _render(
-    ui.Image art,
-    Size size,
-    double dpr,
-    ({double top, double bottom})? reveal,
-    double logicalSigma,
-  ) {
+  static ui.Image _render(ui.Image art, Size size, double dpr) {
     final scale = dpr / 4;
     final width = math.max(1, (size.width * scale).ceil());
     final height = math.max(1, (size.height * scale).ceil());
     final rect = Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble());
-    final sigma = logicalSigma * scale;
+    final sigma = _sigma * scale;
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    if (reveal != null) canvas.saveLayer(rect, Paint());
-    canvas.saveLayer(
-      rect,
-      Paint()
-        ..imageFilter = ui.ImageFilter.blur(
-          sigmaX: sigma,
-          sigmaY: sigma,
-          // Alone over a sharp cover the blur has to stay opaque up to its
-          // edges; between the surface layers it fades into them instead.
-          tileMode: reveal == null ? null : TileMode.clamp,
-        ),
-    );
+    final canvas = Canvas(recorder)
+      ..saveLayer(
+        rect,
+        Paint()
+          ..imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+      );
     paintImage(
       canvas: canvas,
       rect: rect,
@@ -436,21 +404,6 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
       filterQuality: FilterQuality.low,
     );
     canvas.restore();
-    if (reveal != null) {
-      // Baked into the image, so showing it costs no mask per frame.
-      canvas
-        ..drawRect(
-          rect,
-          Paint()
-            ..blendMode = BlendMode.dstIn
-            ..shader = ui.Gradient.linear(
-              Offset(0, reveal.top * scale),
-              Offset(0, math.max(reveal.bottom, reveal.top + 1) * scale),
-              const [Color(0x00ffffff), Color(0xffffffff)],
-            ),
-        )
-        ..restore();
-    }
     final picture = recorder.endRecording();
     try {
       return picture.toImageSync(width, height);
@@ -460,10 +413,9 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
   }
 
   /// Whether the blur drawn for [drawn] can stand in for [size] while a
-  /// window resize goes on: the box keeps about its shape, and no revealed
-  /// edge is baked in at a fixed position.
-  static bool _stretches(Size drawn, Size size, Object? reveal) {
-    if (reveal != null || drawn.isEmpty || size.isEmpty) return false;
+  /// window resize goes on: the box keeps about its shape.
+  static bool _stretches(Size drawn, Size size) {
+    if (drawn.isEmpty || size.isEmpty) return false;
     final change = size.aspectRatio / drawn.aspectRatio;
     return change > 0.8 && change < 1.25;
   }
@@ -483,16 +435,11 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
     _motion = playerTrackChangeMotion(context);
     final surface = widget.colorScheme.surface;
     final art = _art?.image;
-    final reveal = widget.reveal;
     final Widget blurred;
     if (art == null) {
-      if (reveal != null) return const SizedBox.shrink();
       // Blur live while the cover decodes and for the placeholder.
       blurred = ImageFiltered(
-        imageFilter: ui.ImageFilter.blur(
-          sigmaX: widget.sigma,
-          sigmaY: widget.sigma,
-        ),
+        imageFilter: ui.ImageFilter.blur(sigmaX: _sigma, sigmaY: _sigma),
         child: PlayerArtwork(
           artUri: widget.artUri,
           colorScheme: widget.colorScheme,
@@ -504,15 +451,14 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
       blurred = LayoutBuilder(
         builder: (context, constraints) {
           final size = constraints.biggest;
-          final sigma = widget.sigma;
-          final inputs = (art, dpr, reveal, sigma);
+          final inputs = (art, dpr);
           final drawn = _blurSize;
           if (inputs != _blurInputs ||
               drawn == null ||
-              !_stretches(drawn, size, reveal)) {
+              !_stretches(drawn, size)) {
             _resizeSettle?.cancel();
             _blur?.dispose();
-            _blur = _render(art, size, dpr, reveal, sigma);
+            _blur = _render(art, size, dpr);
             _blurInputs = inputs;
             _blurSize = size;
           } else {
@@ -536,7 +482,6 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
         },
       );
     }
-    if (reveal != null) return blurred;
     return Stack(
       fit: StackFit.expand,
       children: [

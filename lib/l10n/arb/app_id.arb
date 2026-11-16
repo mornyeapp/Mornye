@@ -5568,17 +5568,9 @@
   "@hiResCheckTitle": {
     "description": "Title of the fake Hi-Res check card"
   },
-  "hiResCheckSummary": "Periksa spektrum dan bit depth aktif untuk mendeteksi tanda upsampling atau padding.",
-  "@hiResCheckSummary": {
-    "description": "Introductory text for the sampled Hi-Res analysis"
-  },
   "hiResCheckLimitedBandwidth": "Bandwidth terbatas",
   "@hiResCheckLimitedBandwidth": {
     "description": "Neutral finding: a limited spectrum alone does not prove upsampling"
-  },
-  "hiResCheckNoEvidence": "Tidak terdeteksi upsampling atau padding",
-  "@hiResCheckNoEvidence": {
-    "description": "No evidence was detected; this does not certify the master"
   },
   "hiResCheckEstimatedCutoff": "Cutoff terestimasi",
   "@hiResCheckEstimatedCutoff": {
@@ -5591,15 +5583,6 @@
   "hiResCheckBandwidthExplanation": "Cutoff rendah juga dapat berasal dari mastering. Bukan selalu hasil upsampling.",
   "@hiResCheckBandwidthExplanation": {
     "description": "Explains why the limited-bandwidth finding is neutral"
-  },
-  "hiResCheckSampledExplanation": "Hasil analisis dari {seconds} detik audio. Jangan gunakan hasil sebagai bukti keaslian.",
-  "@hiResCheckSampledExplanation": {
-    "description": "Limits of the sampled Hi-Res analysis; seconds is a formatted duration",
-    "placeholders": {
-      "seconds": {
-        "type": "String"
-      }
-    }
   },
   "hiResCheckImagingEvidence": "Ada spektrum band yang saling berbalik yang mungkin ini hasil upsampling.",
   "@hiResCheckImagingEvidence": {
@@ -5627,17 +5610,9 @@
   "@hiResCheckRun": {
     "description": "Button that starts the Hi-Res authenticity check"
   },
-  "hiResCheckChecking": "Memeriksa keaslian Hi-Res...",
-  "@hiResCheckChecking": {
-    "description": "Loading text while the Hi-Res check runs"
-  },
   "hiResCheckVerdictFake": "Sepertinya Hi-Res palsu",
   "@hiResCheckVerdictFake": {
     "description": "Verdict: the file claims Hi-Res but does not measure as it"
-  },
-  "hiResCheckVerdictStandard": "Kualitas biasa, tidak ada yang aneh",
-  "@hiResCheckVerdictStandard": {
-    "description": "Verdict: neither sample rate nor bit depth claims Hi-Res"
   },
   "hiResCheckVerdictInconclusive": "Tidak yakin: bagian teranalisis terlalu diam atau pendek",
   "@hiResCheckVerdictInconclusive": {
@@ -5665,6 +5640,358 @@
       },
       "effective": {
         "type": "int"
+      }
+    }
+  },
+  "hiResReportSummary": "Membaca seluruh file lalu memeriksa keutuhan, bit depth asli, rentang frekuensi, dan jejak kompresi lossy.",
+  "@hiResReportSummary": {
+    "description": "What the Hi-Res authenticity inspection does, shown before it runs"
+  },
+  "hiResReportChecking": "Membaca seluruh file. Lagu yang panjang butuh waktu sedikit lebih lama.",
+  "@hiResReportChecking": {
+    "description": "Loading text while the whole-file inspection runs"
+  },
+  "hiResReportGradeCorrupt": "File rusak",
+  "@hiResReportGradeCorrupt": {
+    "description": "Inspection outcome: the audio fails its checksum or cannot be decoded in full"
+  },
+  "hiResReportGradeCorruptBody": "Audio di file ini tidak sama dengan yang ditulis saat file dibuat. Ambil salinan baru.",
+  "@hiResReportGradeCorruptBody": {
+    "description": "Explains the damaged-file outcome"
+  },
+  "hiResReportGradeLossy": "Dibuat dari file lossy",
+  "@hiResReportGradeLossy": {
+    "description": "Inspection outcome: a lossless file whose audio went through a lossy codec"
+  },
+  "hiResReportGradeLossyBody": "Audio ini membawa pola frame kompresi {codec}. Audio ini pernah lossy sebelum disimpan sebagai lossless, dan detail yang hilang tidak kembali.",
+  "@hiResReportGradeLossyBody": {
+    "description": "Explains the lossy-source outcome; codec is a format name such as AAC",
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportGradeUpscaledBody": "File ini mengaku punya resolusi lebih tinggi daripada audionya.",
+  "@hiResReportGradeUpscaledBody": {
+    "description": "Explains the fake Hi-Res outcome"
+  },
+  "hiResReportGradeSuspect": "Ada tanda sumber berkualitas lebih rendah",
+  "@hiResReportGradeSuspect": {
+    "description": "Inspection outcome: evidence of a lossy or lower-resolution source that falls short of proof"
+  },
+  "hiResReportGradeSuspectBody": "Sebagian bukti mengarah ke sumber lossy atau beresolusi lebih rendah, tetapi belum cukup untuk memastikannya.",
+  "@hiResReportGradeSuspectBody": {
+    "description": "Explains the suspect outcome"
+  },
+  "hiResReportGradeClean": "Tidak ada masalah",
+  "@hiResReportGradeClean": {
+    "description": "Inspection outcome: nothing was flagged"
+  },
+  "hiResReportGradeCleanBody": "Tidak ada tanda kerusakan, upscaling, atau kompresi lossy pada audio ini.",
+  "@hiResReportGradeCleanBody": {
+    "description": "Explains the clean outcome"
+  },
+  "hiResReportIntegrity": "Keutuhan",
+  "@hiResReportIntegrity": {
+    "description": "Report section: whether the file's audio is intact"
+  },
+  "hiResReportIntegrityVerified": "Audio cocok dengan checksum yang tersimpan di file.",
+  "@hiResReportIntegrityVerified": {
+    "description": "Integrity finding: checksum verified"
+  },
+  "hiResReportIntegrityUnverified": "File ini tidak menyimpan checksum untuk dibandingkan. Seluruh audio terbaca tanpa galat.",
+  "@hiResReportIntegrityUnverified": {
+    "description": "Integrity finding: no checksum available, decoding succeeded"
+  },
+  "hiResReportIntegrityMismatch": "Audio yang terbaca tidak cocok dengan checksum yang tersimpan di file.",
+  "@hiResReportIntegrityMismatch": {
+    "description": "Integrity finding: checksum mismatch"
+  },
+  "hiResReportIntegrityLength": "File ini berisi {decoded} dari {declared} yang tertulis.",
+  "@hiResReportIntegrityLength": {
+    "description": "Integrity finding: the audio is shorter or longer than declared; both are formatted durations",
+    "placeholders": {
+      "decoded": {
+        "type": "String"
+      },
+      "declared": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportIntegrityDecodeError": "Pembacaan berhenti di {position}. File terpotong atau rusak.",
+  "@hiResReportIntegrityDecodeError": {
+    "description": "Integrity finding: a decode error; position is a formatted time",
+    "placeholders": {
+      "position": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportChecksum": "Checksum (MD5)",
+  "@hiResReportChecksum": {
+    "description": "Label of the audio checksum row"
+  },
+  "hiResReportBitDepth": "Bit depth",
+  "@hiResReportBitDepth": {
+    "description": "Report section: the real resolution of the samples"
+  },
+  "hiResReportBitDepthFull": "Seluruh {bits} bit berisi audio.",
+  "@hiResReportBitDepthFull": {
+    "description": "Bit depth finding: the declared depth is real",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportBitDepthCoarse": "Semua bit terpakai, tetapi jarak antarsampel yang pelan seperti audio {bits}-bit. Kemungkinan file ini diperbesar dari resolusi yang lebih rendah.",
+  "@hiResReportBitDepthCoarse": {
+    "description": "Bit depth finding: the samples lie further apart than the declared depth allows; bits is a formatted number",
+    "placeholders": {
+      "bits": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportBitDepthNear16": "Sampel berada di kisi 16-bit dengan noise halus di atasnya: sumber 16-bit yang disimpan sebagai {declared}-bit.",
+  "@hiResReportBitDepthNear16": {
+    "description": "Bit depth finding: 16-bit audio with dither in a wider word",
+    "placeholders": {
+      "declared": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportBitDepthFloat": "Audio floating-point tidak punya bit depth tetap untuk diperiksa.",
+  "@hiResReportBitDepthFloat": {
+    "description": "Bit depth finding for floating-point files"
+  },
+  "hiResReportBitDepthUnmeasured": "Sampel pelan terlalu sedikit untuk mengukur resolusi aslinya.",
+  "@hiResReportBitDepthUnmeasured": {
+    "description": "Bit depth finding when the resolution could not be measured"
+  },
+  "hiResReportMeasuredResolution": "Resolusi terukur",
+  "@hiResReportMeasuredResolution": {
+    "description": "Label of the measured bit resolution row"
+  },
+  "hiResReportBitsValue": "{bits} bit",
+  "@hiResReportBitsValue": {
+    "description": "A bit count; bits is a formatted number",
+    "placeholders": {
+      "bits": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportFrequency": "Rentang frekuensi",
+  "@hiResReportFrequency": {
+    "description": "Report section: how far up the audio reaches"
+  },
+  "hiResReportLowpass": "Low-pass",
+  "@hiResReportLowpass": {
+    "description": "Label of the low-pass filter row"
+  },
+  "hiResReportLowpassValue": "{frequency}, turun {drop} dB",
+  "@hiResReportLowpassValue": {
+    "description": "Where the spectrum is cut and by how much",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      },
+      "drop": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassNone": "Tidak ada potongan tajam yang menonjol di spektrum.",
+  "@hiResReportLowpassNone": {
+    "description": "Frequency finding: no low-pass filter"
+  },
+  "hiResReportLowpassFormat": "Terpotong di {frequency}, tepat di bawah batas sample rate ini: filter bawaan formatnya.",
+  "@hiResReportLowpassFormat": {
+    "description": "Frequency finding: the normal anti-alias filter",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassSourceRate": "Terpotong di {frequency}, batas rekaman 44,1 atau 48 kHz. Sample rate yang lebih tinggi ini tidak berisi musik di atasnya.",
+  "@hiResReportLowpassSourceRate": {
+    "description": "Frequency finding: a Hi-Res file with the bandwidth of a lower sample rate",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassHigh": "Terpotong di {frequency}. Filter mastering bisa menghasilkan ini, begitu juga MP3 320 kbps dan Opus.",
+  "@hiResReportLowpassHigh": {
+    "description": "Frequency finding: a cut that is not evidence by itself",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassMedium": "Terpotong di {frequency}, tempat encoder lossy sekitar 192 kbps memotong. Master berkualitas penuh jarang berhenti serendah ini.",
+  "@hiResReportLowpassMedium": {
+    "description": "Frequency finding: a cut typical of mid-bitrate lossy encoders",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassLow": "Terpotong di {frequency}, tempat encoder lossy sekitar 128 kbps memotong.",
+  "@hiResReportLowpassLow": {
+    "description": "Frequency finding: a cut typical of low-bitrate lossy encoders",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLossy": "Kompresi lossy",
+  "@hiResReportLossy": {
+    "description": "Report section: traces of a lossy codec in the audio"
+  },
+  "hiResReportLossyFound": "Ditemukan pola frame {codec}: satu blok setiap {samples} sampel, seirama di sepanjang file. Audio yang tidak pernah dikompresi tidak memilikinya.",
+  "@hiResReportLossyFound": {
+    "description": "Lossy finding: a codec frame grid was detected; codec is a format name",
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      },
+      "samples": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportLossySuspectedPattern": "Terlihat pola frame MP3 yang samar, terlalu lemah untuk dipastikan.",
+  "@hiResReportLossySuspectedPattern": {
+    "description": "Lossy finding: weak evidence of an MP3 frame grid"
+  },
+  "hiResReportLossySuspectedLowpass": "Pola frame tidak ditemukan, tetapi low-pass di atas berada di tempat encoder lossy biasa memotong.",
+  "@hiResReportLossySuspectedLowpass": {
+    "description": "Lossy finding: only the low-pass points to a lossy source"
+  },
+  "hiResReportLossyNotFound": "Tidak ditemukan pola frame AAC, Vorbis, atau MP3. Opus tidak meninggalkan pola, dan resampling setelah decoding menghapus pola lainnya, jadi hasil ini tidak menyingkirkan sumber lossy.",
+  "@hiResReportLossyNotFound": {
+    "description": "Lossy finding: nothing detected, with the limits of the test"
+  },
+  "hiResReportLossyHighRate": "Tidak diperiksa. Di atas 48 kHz sumber lossy pasti sudah di-resample, sehingga pola framenya tersamar.",
+  "@hiResReportLossyHighRate": {
+    "description": "Lossy finding: the test does not apply to high sample rates"
+  },
+  "hiResReportLossyTooShort": "Tidak diperiksa: audionya terlalu sedikit untuk diukur.",
+  "@hiResReportLossyTooShort": {
+    "description": "Lossy finding: the file is too short or too quiet for the test"
+  },
+  "hiResReportPatternStrength": "Kekuatan pola",
+  "@hiResReportPatternStrength": {
+    "description": "Label of the codec frame pattern score row"
+  },
+  "hiResReportPatternStrengthValue": "{score} (terdeteksi mulai {threshold})",
+  "@hiResReportPatternStrengthValue": {
+    "description": "The frame pattern score next to the score that counts as found",
+    "placeholders": {
+      "score": {
+        "type": "String"
+      },
+      "threshold": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportSpectrum": "Spektrum rata-rata",
+  "@hiResReportSpectrum": {
+    "description": "Caption of the spectrum chart"
+  },
+  "hiResReportSpectrumSemantics": "Spektrum rata-rata, berisi hingga {frequency}",
+  "@hiResReportSpectrumSemantics": {
+    "description": "Screen reader description of the spectrum chart",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportWholeFile": "Seluruh {duration} audio dibaca. Tidak ada analisis yang bisa menjamin master aslinya.",
+  "@hiResReportWholeFile": {
+    "description": "Scope and limits of the inspection; duration is a formatted time",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportShare": "Bagikan laporan",
+  "@hiResReportShare": {
+    "description": "Button that shares the Hi-Res authenticity report as text"
+  },
+  "hiResBatchAction": "Periksa keaslian",
+  "@hiResBatchAction": {
+    "description": "Menu action that runs the Hi-Res authenticity check on an album or on several selected songs"
+  },
+  "hiResBatchProgress": "Membaca lagu {current} dari {total}",
+  "@hiResBatchProgress": {
+    "description": "Progress of the authenticity check of several songs",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchWaiting": "Menunggu",
+  "@hiResBatchWaiting": {
+    "description": "Status of a song the authenticity check has not reached yet"
+  },
+  "hiResBatchReading": "Membaca seluruh file",
+  "@hiResBatchReading": {
+    "description": "Status of the song the authenticity check is reading now"
+  },
+  "hiResBatchSummary": "{flagged, plural, =0{Tidak ada masalah di {total} lagu.} other{{flagged} dari {total} lagu perlu dilihat.}}",
+  "@hiResBatchSummary": {
+    "description": "Result of the authenticity check of several songs: how many showed a warning or a problem",
+    "placeholders": {
+      "flagged": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchFailed": "{count, plural, other{{count} lagu tidak bisa dibaca.}}",
+  "@hiResBatchFailed": {
+    "description": "How many songs the authenticity check could not read",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchSkipped": "{count, plural, other{{count} lagu berformat lain dilewati.}} Hanya FLAC dan WAV yang bisa diperiksa.",
+  "@hiResBatchSkipped": {
+    "description": "How many songs were not checked because of their format",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchMixedFormats": "Lagu-lagu ini tidak berformat sama: {formats}. Album dari satu master biasanya sama.",
+  "@hiResBatchMixedFormats": {
+    "description": "Note that the checked songs differ in bit depth or sample rate; formats is a list such as 24-bit/96kHz (8), 16-bit/44.1kHz (4)",
+    "placeholders": {
+      "formats": {
+        "type": "String"
       }
     }
   },

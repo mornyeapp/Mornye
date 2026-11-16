@@ -60,7 +60,6 @@ import 'package:mornye/widgets/mornye_player_actions_sheet.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/mornye_player_artwork.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
-import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/services/motion_artwork_store.dart';
 
 export 'package:mornye/routes/now_playing_route.dart';
@@ -926,7 +925,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 squareArtwork: squareArtwork,
                 artworkAspectRatio: artworkRatio,
                 fadeStart: fadeStart,
-                coverBlur: ref.watch(mornyeBlurEnabledProvider),
                 artwork: showsFullArtwork
                     ? PlayerTransitionArtwork(
                         artworkKey: _motionArtworkKey,
