@@ -1043,10 +1043,12 @@ class _LibrarySongTapChoice extends StatelessWidget {
     final selected = details
         ? AppSettings.librarySongTapDetails
         : AppSettings.librarySongTapPlay;
-    // The default comes first.
+    // The default comes first. Each names what the tap does: a bare
+    // "Details" or "Play" read as the button on the row, which holds the
+    // other action.
     final labels = {
-      AppSettings.librarySongTapDetails: l10n.nowPlayingDetails,
-      AppSettings.librarySongTapPlay: l10n.tooltipPlay,
+      AppSettings.librarySongTapDetails: l10n.librarySongTapOpenDetails,
+      AppSettings.librarySongTapPlay: l10n.librarySongTapPlaySong,
     };
     final choice = context.isMornye
         ? MornyeSegmentedControl(

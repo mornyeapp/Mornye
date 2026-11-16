@@ -94,11 +94,11 @@ void main() {
       expect(find.text(_detailsDescription), findsOneWidget);
       // The default comes first.
       expect(
-        tester.getTopLeft(_option('Details')).dx,
-        lessThan(tester.getTopLeft(_option('Play')).dx),
+        tester.getTopLeft(_option('Open details')).dx,
+        lessThan(tester.getTopLeft(_option('Play song')).dx),
       );
 
-      await tester.tap(_option('Play'));
+      await tester.tap(_option('Play song'));
       await tester.pumpAndSettle();
       expect(
         container.read(settingsProvider).librarySongTap,
@@ -109,7 +109,7 @@ void main() {
       final saved = jsonDecode(prefs.getString('app_settings')!) as Map;
       expect(saved['librarySongTap'], AppSettings.librarySongTapPlay);
 
-      await tester.tap(_option('Details'));
+      await tester.tap(_option('Open details'));
       await tester.pumpAndSettle();
       expect(
         container.read(settingsProvider).librarySongTap,

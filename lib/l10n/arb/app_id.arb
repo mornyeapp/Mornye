@@ -7762,6 +7762,14 @@
   "@librarySongTap": {
     "description": "Library setting choosing whether a tap on a song row plays it or opens its details"
   },
+  "librarySongTapOpenDetails": "Buka detail",
+  "@librarySongTapOpenDetails": {
+    "description": "Choice of the tapping a song setting: a tap on the song opens its details. Name the action of the tap, not the button on the row. Keep it short: it shares one segmented control with the other choice"
+  },
+  "librarySongTapPlaySong": "Putar lagu",
+  "@librarySongTapPlaySong": {
+    "description": "Choice of the tapping a song setting: a tap on the song plays it. Name the action of the tap, not the button on the row. Keep it short: it shares one segmented control with the other choice"
+  },
   "librarySongTapPlayDescription": "Ketuk untuk memutar lagu. Tombol di sampingnya membuka detailnya.",
   "@librarySongTapPlayDescription": {
     "description": "Description of the tapping a song setting while a tap plays"
