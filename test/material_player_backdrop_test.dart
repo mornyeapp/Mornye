@@ -440,6 +440,40 @@ void main() {
     expect(landscape.debugDisposed, isTrue);
   });
 
+  testWidgets('a window resize stretches the blur and draws it once settled', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_backdrop());
+    await _waitForCover(tester, _cached);
+    final first = _blur(tester);
+    expect((first.width, first.height), (200, 150));
+
+    // Every frame of a live resize keeps the blur drawn for the first size.
+    for (var frame = 1; frame <= 10; frame++) {
+      tester.view.physicalSize = Size(800 + frame * 16, 600 + frame * 8);
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(first.debugDisposed, isFalse, reason: 'frame $frame');
+      expect(identical(_blur(tester), first), isTrue, reason: 'frame $frame');
+    }
+    expect(tester.getSize(_cached), const Size(960, 680));
+
+    // Once the size settles, the blur is drawn for it.
+    await tester.pump(const Duration(milliseconds: 200));
+    final settled = _blur(tester);
+    expect(settled, isNot(same(first)));
+    expect((settled.width, settled.height), (240, 170));
+    expect(first.debugDisposed, isTrue);
+    await tester.pump(const Duration(seconds: 1));
+    expect(_blur(tester), same(settled));
+
+    await tester.pumpWidget(const SizedBox());
+    expect(settled.debugDisposed, isTrue);
+  });
+
   for (final dpr in [1.0, 3.0]) {
     testWidgets('cached blur matches the live blur at ${dpr}x', (tester) async {
       tester.view.physicalSize = Size(160 * dpr, 320 * dpr);

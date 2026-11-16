@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -272,7 +273,8 @@ class _RenderFadeBand extends RenderProxyBox {
 /// over the previous one with the track change.
 /// A cover blurred beyond detail, filling its box. The blur is drawn once
 /// per cover and size, then shown as a plain image, and a new cover fades
-/// in over the previous one.
+/// in over the previous one. While a window resize goes on, the previous
+/// blur stretches over the box until the size settles.
 class PlayerCoverBlur extends StatefulWidget {
   const PlayerCoverBlur({
     super.key,
@@ -312,6 +314,14 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
   ImageInfo? _art;
   ui.Image? _blur;
   Object? _blurInputs;
+
+  /// The size [_blur] was drawn for. Null draws it again at the next layout.
+  Size? _blurSize;
+
+  /// Draws [_blur] again once a resize has settled; until then the previous
+  /// blur is stretched over the box.
+  Timer? _resizeSettle;
+  static const _resizeSettleDelay = Duration(milliseconds: 150);
 
   /// The previous cover's blur, kept under the new one while it fades in.
   ui.Image? _outgoing;
@@ -380,6 +390,7 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
   @override
   void dispose() {
     _stream?.removeListener(_listener);
+    _resizeSettle?.cancel();
     _fade.dispose();
     _art?.dispose();
     _blur?.dispose();
@@ -448,6 +459,19 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
     }
   }
 
+  /// Whether the blur drawn for [drawn] can stand in for [size] while a
+  /// window resize goes on: the box keeps about its shape, and no revealed
+  /// edge is baked in at a fixed position.
+  static bool _stretches(Size drawn, Size size, Object? reveal) {
+    if (reveal != null || drawn.isEmpty || size.isEmpty) return false;
+    final change = size.aspectRatio / drawn.aspectRatio;
+    return change > 0.8 && change < 1.25;
+  }
+
+  void _settleResize() {
+    if (mounted) setState(() => _blurSize = null);
+  }
+
   static Widget _image(ui.Image? image) => RawImage(
     image: image,
     fit: BoxFit.fill,
@@ -479,12 +503,23 @@ class _PlayerCoverBlurState extends State<PlayerCoverBlur>
       final dpr = MediaQuery.devicePixelRatioOf(context);
       blurred = LayoutBuilder(
         builder: (context, constraints) {
+          final size = constraints.biggest;
           final sigma = widget.sigma;
-          final inputs = (art, constraints.biggest, dpr, reveal, sigma);
-          if (inputs != _blurInputs) {
+          final inputs = (art, dpr, reveal, sigma);
+          final drawn = _blurSize;
+          if (inputs != _blurInputs ||
+              drawn == null ||
+              !_stretches(drawn, size, reveal)) {
+            _resizeSettle?.cancel();
             _blur?.dispose();
-            _blur = _render(art, constraints.biggest, dpr, reveal, sigma);
+            _blur = _render(art, size, dpr, reveal, sigma);
             _blurInputs = inputs;
+            _blurSize = size;
+          } else {
+            _resizeSettle?.cancel();
+            if (size != drawn) {
+              _resizeSettle = Timer(_resizeSettleDelay, _settleResize);
+            }
           }
           final outgoing = _outgoing;
           if (outgoing == null) return _image(_blur);
