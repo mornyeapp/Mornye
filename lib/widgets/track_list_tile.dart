@@ -5,7 +5,6 @@ import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
-import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/local_playback.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
@@ -52,11 +51,9 @@ class TrackListTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    // Material rows mark the current track; Mornye rows show no
-    // current-track state.
-    final playback = context.isMornye
-        ? null
-        : ref.watch(catalogTrackPlaybackUiProvider(catalogTrackKey(track)));
+    final playback = ref.watch(
+      catalogTrackPlaybackUiProvider(catalogTrackKey(track)),
+    );
 
     final isQueued = ref.watch(
       downloadQueueLookupProvider.select(
@@ -85,8 +82,8 @@ class TrackListTile extends ConsumerWidget {
       style: TrackCardStyle.flat,
       isSelectionMode: isSelectionMode,
       isSelected: isSelected,
-      isCurrent: playback?.isCurrent ?? false,
-      isPlaying: playback?.isPlaying ?? false,
+      isCurrent: playback.isCurrent,
+      isPlaying: playback.isPlaying,
       leadingArtwork: leadingArtwork,
       leading: leading,
       title: track.name,

@@ -152,7 +152,8 @@ class TrackCard extends StatelessWidget {
   /// The row is the player's current track. The Material style fills it with
   /// `primaryContainer` of the track's artwork scheme ([PlayerArtworkTheme]),
   /// rounds its ends into a pill and shows a [NowPlayingIndicator] before
-  /// [trailing]. Mornye ignores it.
+  /// [trailing]. Mornye keeps the row plain and shows the title in its
+  /// accent.
   final bool isCurrent;
 
   /// The current track is playing, so the indicator moves.
@@ -352,7 +353,11 @@ class TrackCard extends StatelessWidget {
                           fontWeight: current
                               ? FontWeight.w700
                               : FontWeight.w500,
-                          color: contentColor,
+                          // The accent as status: Mornye's only sign of
+                          // the current track.
+                          color: isCurrent && !material
+                              ? colorScheme.primary
+                              : contentColor,
                         ),
                       ),
                       if (subtitle != null) ...[

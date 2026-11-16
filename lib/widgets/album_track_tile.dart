@@ -30,6 +30,7 @@ class AlbumTrackTile extends ConsumerWidget {
     this.isCurrent = false,
     this.isPlaying = false,
     this.queueSwipe,
+    this.filePath,
   });
 
   final int? trackNumber;
@@ -51,6 +52,9 @@ class AlbumTrackTile extends ConsumerWidget {
   /// See [TrackCard.queueSwipe].
   final QueueSwipeActions? queueSwipe;
 
+  /// The track's file. A CUE virtual track's tap opens it ([songRowTap]).
+  final String? filePath;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return TrackCard(
@@ -62,7 +66,7 @@ class AlbumTrackTile extends ConsumerWidget {
       isPlaying: isPlaying,
       onTap: isSelectionMode
           ? onToggleSelection
-          : songRowTap(ref, openDetails: onOpen, play: onPlay),
+          : songRowTap(ref, path: filePath, openDetails: onOpen, play: onPlay),
       onLongPress: isSelectionMode ? null : onEnterSelectionMode,
       leading: SizedBox(
         width: 24,
@@ -78,6 +82,7 @@ class AlbumTrackTile extends ConsumerWidget {
       trailing: SongRowButton(
         playButton: AlbumTrackPlayButton(isPlaying: isPlaying, onPlay: onPlay),
         onOpenDetails: onOpen,
+        path: filePath,
       ),
     );
   }

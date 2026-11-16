@@ -873,12 +873,18 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
               onPressed: play,
             ),
             onOpenDetails: openDetails,
+            path: item.filePath,
           ),
           isSelectionMode: isSelectionMode,
           isSelected: selectedIds.contains(item.id),
           onTap: isSelectionMode
               ? () => toggleSelection(item.id)
-              : songRowTap(ref, openDetails: openDetails, play: play),
+              : songRowTap(
+                  ref,
+                  path: item.filePath,
+                  openDetails: openDetails,
+                  play: play,
+                ),
           onLongPress: isSelectionMode
               ? () => toggleSelection(item.id)
               : () => enterSelectionMode(item.id),

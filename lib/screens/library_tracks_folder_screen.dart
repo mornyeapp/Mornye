@@ -18,7 +18,6 @@ import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
-import 'package:mornye/theme/mornye_theme.dart';
 import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
@@ -1356,13 +1355,11 @@ class _CollectionTrackTile extends ConsumerWidget {
     final heroTag = inMemoryHistoryItem != null
         ? 'cover_${inMemoryHistoryItem.id}'
         : null;
-    // Material rows mark the current track; Mornye rows show no
-    // current-track state.
-    final playback = context.isMornye
-        ? null
-        : ref.watch(catalogTrackPlaybackUiProvider(catalogTrackKey(track)));
-    final isCurrent = playback?.isCurrent ?? false;
-    final isPlaying = playback?.isPlaying ?? false;
+    final playback = ref.watch(
+      catalogTrackPlaybackUiProvider(catalogTrackKey(track)),
+    );
+    final isCurrent = playback.isCurrent;
+    final isPlaying = playback.isPlaying;
     final hasFile = isInHistory || isInLocalLibrary;
     // Songs with a file queue as the selection bar queues them.
     final queueSwipe = hasFile

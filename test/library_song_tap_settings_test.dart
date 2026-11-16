@@ -190,4 +190,58 @@ void main() {
       ], contains(_title));
     });
   }
+
+  testWidgets('a CUE virtual track opens its details on a tap and keeps its '
+      'play button', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final log = <String>[];
+    Widget row(String name, String path) => Consumer(
+      builder: (context, ref, _) => Row(
+        children: [
+          TextButton(
+            onPressed: songRowTap(
+              ref,
+              path: path,
+              openDetails: () => log.add('details $name'),
+              play: () => log.add('play $name'),
+            ),
+            child: Text('row $name'),
+          ),
+          SongRowButton(
+            path: path,
+            playButton: Text('play button $name'),
+            onOpenDetails: () {},
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(const AppSettings()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Column(
+              children: [
+                row('song', '/music/song.flac'),
+                row('cue', '/music/album.cue#track02'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('row song'));
+    await tester.tap(find.text('row cue'));
+    expect(log, ['play song', 'details cue']);
+    // The song's button opens the details; the CUE track's still plays.
+    expect(find.text('play button song'), findsNothing);
+    expect(find.text('play button cue'), findsOneWidget);
+  });
 }

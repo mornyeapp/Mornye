@@ -502,6 +502,7 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
                 onPressed: play(playback),
               ),
               onOpenDetails: () => _open(hit),
+              path: hit.samplePath,
             )
           : const Icon(Icons.chevron_right),
       // Long-press selects songs for the Library batch actions; while
@@ -512,6 +513,7 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
           ? song
                 ? songRowTap(
                     ref,
+                    path: hit.samplePath,
                     openDetails: () => _open(hit),
                     play: play(playback),
                   )
@@ -523,10 +525,9 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
       onContextMenu: (position) => _showHitMenu(hit, position),
       queueSwipe: swipe,
     );
-    if (!song || context.isMornye) return card();
-    // Material song rows follow the file they play, so a track change
-    // rebuilds only the rows involved. Mornye rows show no current-track
-    // state.
+    if (!song) return card();
+    // Song rows follow the file they play, so a track change rebuilds only
+    // the rows involved.
     return Consumer(
       key: key,
       builder: (context, ref, _) => card(

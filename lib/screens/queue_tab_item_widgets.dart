@@ -983,6 +983,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
               if (item == null) return;
               songRowTap(
                 ref,
+                path: item.filePath,
                 openDetails: openAction(item),
                 play: () => _LibraryPlaybackButton.run(
                   ref,
@@ -1087,6 +1088,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
                     (_songTableByMode[filterMode]?.openAction ?? openAction)(
                       item,
                     )(),
+                path: item.filePath,
               ),
             ),
             playback: mediaItemPlaybackUiProvider(_libraryPlaybackKey(item)),
@@ -1227,6 +1229,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
     // A song whose file is missing has no play action and keeps opening.
     final tap = songRowTap(
       ref,
+      path: item.filePath,
       openDetails: open,
       play: () => fileExistsListenable.value
           ? _LibraryPlaybackButton.run(ref, playbackKey, play)
@@ -1246,6 +1249,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
               onPlay: play,
             ),
             onOpenDetails: open,
+            path: item.filePath,
           );
         }
         return Tooltip(
@@ -1292,21 +1296,14 @@ extension _QueueTabItemWidgets on _QueueTabState {
     return Semantics(
       label: context.l10n.a11yTrackByArtist(item.trackName, item.artistName),
       selected: isSelected,
-      // Material rows follow their own file, so a track change rebuilds only
-      // the rows involved. Mornye rows show no current-track state.
-      child: context.isMornye
-          ? card()
-          : Consumer(
-              builder: (context, ref, _) {
-                final playback = ref.watch(
-                  mediaItemPlaybackUiProvider(playbackKey),
-                );
-                return card(
-                  current: playback.isCurrent,
-                  playing: playback.isPlaying,
-                );
-              },
-            ),
+      // Rows follow their own file, so a track change rebuilds only the rows
+      // involved.
+      child: Consumer(
+        builder: (context, ref, _) {
+          final playback = ref.watch(mediaItemPlaybackUiProvider(playbackKey));
+          return card(current: playback.isCurrent, playing: playback.isPlaying);
+        },
+      ),
     );
   }
 
@@ -1338,6 +1335,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
     // A song whose file is missing has no play action and keeps opening.
     final tap = songRowTap(
       ref,
+      path: item.filePath,
       openDetails: open,
       play: () => fileExistsListenable.value
           ? _LibraryPlaybackButton.run(ref, playbackKey, play)
@@ -1421,6 +1419,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
                     ),
                     onOpenDetails: open,
                     size: SongRowButtonSize.grid,
+                    path: item.filePath,
                   );
                 }
                 return Tooltip(

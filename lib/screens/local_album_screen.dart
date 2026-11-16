@@ -859,6 +859,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
         );
         final isPlaying = isCurrent && ref.watch(playbackPlayingProvider);
         return AlbumTrackTile(
+          filePath: track.filePath,
           isCurrent: isCurrent,
           isPlaying: isPlaying,
           trackNumber: track.trackNumber,

@@ -164,6 +164,19 @@ TrackCard _card(WidgetTester tester, String title) => tester.widget<TrackCard>(
   find.ancestor(of: find.text(title), matching: find.byType(TrackCard)),
 );
 
+/// Mornye marks the current row with its title's colour alone.
+void _expectOnlyCurrentAccented(WidgetTester tester) {
+  Color? titleColor(String title) =>
+      tester.widget<Text>(find.text(title)).style?.color;
+  final accent = Theme.of(
+    tester.element(find.text('Current song')),
+  ).colorScheme.primary;
+  expect(titleColor('Current song'), accent);
+  expect(titleColor('Other song'), isNot(accent));
+  expect(titleColor('Same id song'), isNot(accent));
+  expect(find.byType(NowPlayingIndicator), findsNothing);
+}
+
 void _expectOnlyCurrentMarked(WidgetTester tester) {
   expect(_card(tester, 'Current song').isCurrent, isTrue);
   expect(_card(tester, 'Other song').isCurrent, isFalse);
@@ -205,11 +218,12 @@ void main() {
       expect(find.byType(NowPlayingIndicator), findsNothing);
     });
 
-    testWidgets('Mornye rows show no current-track state', (tester) async {
+    testWidgets('Mornye rows show only the current title in the accent', (
+      tester,
+    ) async {
       await tester.pumpWidget(_app(list(), mornye: true));
       await _pumpFor(tester);
-      expect(_card(tester, 'Current song').isCurrent, isFalse);
-      expect(find.byType(NowPlayingIndicator), findsNothing);
+      _expectOnlyCurrentAccented(tester);
     });
   });
 
@@ -370,7 +384,9 @@ void main() {
       });
     }
 
-    testWidgets('Mornye rows show no current-track state', (tester) async {
+    testWidgets('Mornye rows show only the current title in the accent', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _app(
           results(),
@@ -380,7 +396,7 @@ void main() {
         ),
       );
       await _pumpFor(tester);
-      expect(find.byType(NowPlayingIndicator), findsNothing);
+      _expectOnlyCurrentAccented(tester);
     });
   });
 }

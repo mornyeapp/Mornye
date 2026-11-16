@@ -578,7 +578,9 @@ void main() {
       expect(find.byType(NowPlayingIndicator), findsOneWidget);
     });
 
-    testWidgets('Mornye ignores the current track', (tester) async {
+    testWidgets('Mornye shows the current track in its title colour alone', (
+      tester,
+    ) async {
       await tester.pumpWidget(_app(card(current: true), mornye: true));
       await tester.pump();
 
@@ -588,6 +590,12 @@ void main() {
       );
       expect(surface.color, Colors.transparent);
       expect(_textStyle(tester, 'Song')?.fontWeight, FontWeight.w500);
+      final accent = _scheme(tester, find.text('Song')).primary;
+      expect(_textStyle(tester, 'Song')?.color, accent);
+
+      await tester.pumpWidget(_app(card(), mornye: true));
+      await tester.pump();
+      expect(_textStyle(tester, 'Song')?.color, isNot(accent));
     });
 
     testWidgets('Mornye keeps its selection tint', (tester) async {
