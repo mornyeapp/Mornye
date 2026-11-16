@@ -588,6 +588,57 @@ void main() {
       await mouse.removePointer();
     });
 
+    testWidgets('builds the button on the first hover', (tester) async {
+      await tester.pumpWidget(tile(() {}));
+      expect(find.byType(IconButton), findsNothing);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(
+        location: tester.getCenter(find.byType(ColoredBox).last),
+      );
+      await tester.pump();
+      expect(find.byType(IconButton), findsOneWidget);
+
+      // It stays built so it fades out.
+      await mouse.moveTo(Offset.zero);
+      await tester.pump();
+      expect(find.byType(IconButton), findsOneWidget);
+      await tester.pumpAndSettle();
+      await mouse.removePointer();
+    });
+
+    testWidgets('Tab reaches the button before it is built', (tester) async {
+      var played = 0;
+      await tester.pumpWidget(tile(() => played++));
+      final opacity = find.descendant(
+        of: find.byType(DesktopHoverPlayButton),
+        matching: find.byType(AnimatedOpacity),
+      );
+      expect(find.byType(IconButton), findsNothing);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      expect(tester.widget<AnimatedOpacity>(opacity).opacity, 1);
+      final button = find.byType(IconButton);
+      expect(button, findsOneWidget);
+      expect(
+        Focus.of(
+          tester.element(
+            find.descendant(of: button, matching: find.byType(Icon)),
+          ),
+        ).hasPrimaryFocus,
+        isTrue,
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(played, 1);
+
+      FocusManager.instance.primaryFocus!.unfocus();
+      await tester.pumpAndSettle();
+      expect(tester.widget<AnimatedOpacity>(opacity).opacity, 0);
+    });
+
     testWidgets('phones show no hover button', (tester) async {
       debugDesktopPlatformOverride = false;
       await tester.pumpWidget(tile(() {}));

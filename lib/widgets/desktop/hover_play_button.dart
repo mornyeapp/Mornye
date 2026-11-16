@@ -73,8 +73,28 @@ class _DesktopCoverHoverState extends State<DesktopCoverHover> {
   bool _focused = false;
   bool _pressed = false;
 
+  /// The Play button is built once the pointer or focus first reaches it,
+  /// then stays so it can fade out. Until then a bare focus stop holds its
+  /// place in the Tab order.
+  bool _buttonBuilt = false;
+  final _buttonFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _buttonFocus.dispose();
+    super.dispose();
+  }
+
   void _setPressed(bool pressed) {
     if (_pressed != pressed) setState(() => _pressed = pressed);
+  }
+
+  void _buildButtonForFocus(bool focused) {
+    if (!focused || _buttonBuilt) return;
+    setState(() => _buttonBuilt = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _buttonFocus.requestFocus();
+    });
   }
 
   @override
@@ -134,7 +154,10 @@ class _DesktopCoverHoverState extends State<DesktopCoverHover> {
         opaque: false,
         cursor: SystemMouseCursors.click,
         hitTestBehavior: HitTestBehavior.translucent,
-        onEnter: (_) => setState(() => _hovered = true),
+        onEnter: (_) => setState(() {
+          _hovered = true;
+          _buttonBuilt = true;
+        }),
         onExit: (_) => setState(() {
           _hovered = false;
           _pressed = false;
@@ -191,35 +214,45 @@ class _DesktopCoverHoverState extends State<DesktopCoverHover> {
             child: Focus(
               canRequestFocus: false,
               onFocusChange: (focused) => setState(() => _focused = focused),
-              child: IconButton(
-                tooltip: widget.playTooltip,
-                onPressed: widget.onPlay,
-                padding: EdgeInsets.zero,
-                style: IconButton.styleFrom(
-                  fixedSize: const Size.square(DesktopCoverHover._target),
-                  minimumSize: const Size.square(DesktopCoverHover._target),
-                  shape: const CircleBorder(),
-                  backgroundColor: Colors.transparent,
-                ),
-                icon: Container(
-                  width: diameter,
-                  height: diameter,
-                  decoration: BoxDecoration(
-                    color: background,
-                    shape: BoxShape.circle,
-                    boxShadow: const [
-                      BoxShadow(blurRadius: 6, color: Color(0x33000000)),
-                    ],
-                  ),
-                  child: Icon(
-                    mornye
-                        ? mornyeIconFor(Icons.play_arrow)
-                        : Icons.play_arrow_rounded,
-                    size: mornye ? 16 : 22,
-                    color: foreground,
-                  ),
-                ),
-              ),
+              child: !_buttonBuilt
+                  ? Focus(
+                      onFocusChange: _buildButtonForFocus,
+                      child: const SizedBox.square(
+                        dimension: DesktopCoverHover._target,
+                      ),
+                    )
+                  : IconButton(
+                      focusNode: _buttonFocus,
+                      tooltip: widget.playTooltip,
+                      onPressed: widget.onPlay,
+                      padding: EdgeInsets.zero,
+                      style: IconButton.styleFrom(
+                        fixedSize: const Size.square(DesktopCoverHover._target),
+                        minimumSize: const Size.square(
+                          DesktopCoverHover._target,
+                        ),
+                        shape: const CircleBorder(),
+                        backgroundColor: Colors.transparent,
+                      ),
+                      icon: Container(
+                        width: diameter,
+                        height: diameter,
+                        decoration: BoxDecoration(
+                          color: background,
+                          shape: BoxShape.circle,
+                          boxShadow: const [
+                            BoxShadow(blurRadius: 6, color: Color(0x33000000)),
+                          ],
+                        ),
+                        child: Icon(
+                          mornye
+                              ? mornyeIconFor(Icons.play_arrow)
+                              : Icons.play_arrow_rounded,
+                          size: mornye ? 16 : 22,
+                          color: foreground,
+                        ),
+                      ),
+                    ),
             ),
           ),
         ),
