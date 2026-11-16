@@ -843,9 +843,18 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
     var loading = false;
     var failed = false;
     if (_lyricsSearch) {
-      final progress = ref.watch(libraryLyricsIndexProvider);
-      loading = !progress.hasError && progress.value?.complete != true;
-      failed = progress.hasError || (progress.value?.failed ?? 0) > 0;
+      // The checked count updates in its own Consumer, not the results.
+      final (indexFailed, complete, readFailed) = ref.watch(
+        libraryLyricsIndexProvider.select(
+          (progress) => (
+            progress.hasError,
+            progress.value?.complete == true,
+            (progress.value?.failed ?? 0) > 0,
+          ),
+        ),
+      );
+      loading = !indexFailed && !complete;
+      failed = indexFailed || readFailed;
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(
@@ -855,9 +864,15 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
               children: [
                 Text(context.l10n.libraryLyricsSearchDescription),
                 if (loading)
-                  Text(
-                    context.l10n.libraryLyricsIndexing(
-                      progress.value?.checked ?? 0,
+                  Consumer(
+                    builder: (context, ref, _) => Text(
+                      context.l10n.libraryLyricsIndexing(
+                        ref.watch(
+                          libraryLyricsIndexProvider.select(
+                            (progress) => progress.value?.checked ?? 0,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 if (failed) Text(context.l10n.libraryLyricsSearchIncomplete),

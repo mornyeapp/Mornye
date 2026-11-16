@@ -83,8 +83,11 @@ void main() {
                   ref.onDispose(() => stopped++);
                   return progress.stream;
                 }),
-                libraryLyricsSearchProvider.overrideWith((ref, request) async {
-                  queries.add(request.query);
+                libraryLyricsSearchProvider.overrideWithBuild((
+                  ref,
+                  notifier,
+                ) async {
+                  queries.add(notifier.request.query);
                   return [_hit(LibrarySearchKind.songs, 0, query: 'Matching')];
                 }),
               ],
@@ -126,6 +129,20 @@ void main() {
           expect(started, 1);
           expect(find.textContaining('8 songs checked'), findsOneWidget);
           expect(find.text('Matching songs 0'), findsOneWidget);
+          expect(find.byType(TrackCard), findsWidgets);
+          var rowBuilds = 0;
+          debugOnRebuildDirtyWidget = (element, _) {
+            if (element.widget is TrackCard) rowBuilds++;
+          };
+          addTearDown(() => debugOnRebuildDirtyWidget = null);
+          for (final checked in [16, 24, 32]) {
+            progress.add(LibraryLyricsIndexProgress(checked: checked));
+            await tester.pump();
+            await tester.pump();
+          }
+          debugOnRebuildDirtyWidget = null;
+          expect(find.textContaining('32 songs checked'), findsOneWidget);
+          expect(rowBuilds, 0);
           query.value = 'dancing';
           await tester.pump();
           await tester.pump();
