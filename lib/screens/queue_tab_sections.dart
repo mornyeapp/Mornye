@@ -231,12 +231,18 @@ extension _QueueTabSections on _QueueTabState {
   }
 
   /// Sort, filter and, given a [viewMode], the list/grid switch of a Library
-  /// page. Material 3 Expressive joins them in one connected button group
-  /// with the labels and tooltips of the separate buttons, which Mornye and
-  /// reduced motion keep.
-  List<Widget> _buildLibraryTools(BuildContext context, {String? viewMode}) {
+  /// page, led by Shuffle where [onShuffle] is given. Material 3 Expressive
+  /// joins them in one connected button group with the labels and tooltips
+  /// of the separate buttons, which Mornye and reduced motion keep.
+  List<Widget> _buildLibraryTools(
+    BuildContext context, {
+    String? viewMode,
+    VoidCallback? onShuffle,
+  }) {
     if (!materialExpressiveEnabled(context)) {
       return [
+        if (onShuffle != null)
+          _buildLibraryShuffleButton(context, onPressed: onShuffle),
         _buildSortButton(context),
         _buildFilterButton(context),
         if (viewMode != null) _buildViewModeButton(context, viewMode),
@@ -248,6 +254,12 @@ extension _QueueTabSections on _QueueTabState {
     return [
       ToolButtonGroup(
         tools: [
+          if (onShuffle != null)
+            ToolButton(
+              icon: const AppIcon(Icons.shuffle),
+              tooltip: l10n.actionShuffle,
+              onPressed: (_) => onShuffle(),
+            ),
           ToolButton(
             icon: const AppIcon(Icons.sort),
             label: _sortLabel(context, _sortMode),
@@ -280,9 +292,11 @@ extension _QueueTabSections on _QueueTabState {
     ];
   }
 
-  /// The Songs page's one emphasized action: a filled round Shuffle before
-  /// the tools in Material, at the tools' height. Mornye uses the gray
-  /// Shuffle capsule of its collection headers, across the page on phones.
+  /// Shuffle on the Songs page. Material shows it as one of the page's
+  /// tools: the first segment of their group ([_buildLibraryTools]), or
+  /// this plain icon button where the tools are separate buttons. Mornye
+  /// uses the gray Shuffle capsule of its collection headers, across the
+  /// page on phones.
   Widget _buildLibraryShuffleButton(
     BuildContext context, {
     required VoidCallback onPressed,
@@ -303,14 +317,10 @@ extension _QueueTabSections on _QueueTabState {
             : SizedBox(width: double.infinity, child: button),
       );
     }
-    final colors = Theme.of(context).colorScheme;
-    return ExpressiveIconButton(
+    return AppIconButton(
       tooltip: l10n.actionShuffle,
       onPressed: onPressed,
       icon: const AppIcon(Icons.shuffle),
-      size: isDesktopPlatform ? 40 : 44,
-      backgroundColor: colors.primary,
-      foregroundColor: colors.onPrimary,
     );
   }
 

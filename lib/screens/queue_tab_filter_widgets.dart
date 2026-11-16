@@ -339,7 +339,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
       );
     }
 
-    // Songs, not Singles, lead with Shuffle while the tools show.
+    // Songs, not Singles, offer Shuffle while the tools show.
     final showShuffle = filterMode == 'all' && !_isSelectionMode;
     void shuffleSongs() => _shuffleLibrarySongs(
       allFilteredUnifiedItems,
@@ -351,14 +351,19 @@ extension _QueueTabFilterWidgets on _QueueTabState {
         context,
         context.l10n.queueTrackCount(totalTrackCount),
         [
-          if (showShuffle && !context.isMornye) ...[
-            _buildLibraryShuffleButton(context, onPressed: shuffleSongs),
-            SizedBox(width: context.tokens.gapSm),
-          ],
+          // Material keeps Shuffle with the page's tools; Mornye shows its
+          // capsule above this row.
           if (rootLibrary && !_isSelectionMode)
-            ..._buildLibraryTools(context, viewMode: historyViewMode)
-          else if (!_isSelectionMode)
+            ..._buildLibraryTools(
+              context,
+              viewMode: historyViewMode,
+              onShuffle: showShuffle && !context.isMornye ? shuffleSongs : null,
+            )
+          else if (!_isSelectionMode) ...[
+            if (showShuffle && !context.isMornye)
+              _buildLibraryShuffleButton(context, onPressed: shuffleSongs),
             _buildFilterButton(context),
+          ],
           // The root Library creates playlists from the Playlists page.
           if (!rootLibrary &&
               !_isSelectionMode &&

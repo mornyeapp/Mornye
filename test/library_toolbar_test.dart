@@ -32,6 +32,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/animated_library_sliver_grid.dart';
 import 'package:mornye/widgets/library_directory_view.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -216,6 +217,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // These tests play songs with a tap on the row.
+          librarySongTapPlaysProvider.overrideWithValue(true),
           settingsProvider.overrideWith(
             () => _Settings(
               hasPersistedAppSettings(preferences)
@@ -362,15 +365,18 @@ void main() {
       expect(groups, findsOneWidget);
       final group = tester.widget<M3EButtonGroup>(groups);
       expect(group.type, M3EButtonGroupType.connected);
-      expect(group.actions, hasLength(3));
+      expect(group.actions, hasLength(4));
+      // Shuffle leads the Songs page's tools as one of them.
+      expect(group.actions[0].tooltip, l10n.actionShuffle);
+      expect(group.actions[0].label, isNull);
       // Sort keeps its label so the current order stays visible.
       expect(
-        (group.actions[0].label! as Text).data,
+        (group.actions[1].label! as Text).data,
         l10n.libraryFilterSortLatest,
       );
-      expect((group.actions[1].label! as Text).data, l10n.libraryFilterTitle);
-      expect(group.actions[2].tooltip, l10n.appearanceHistoryViewGrid);
-      expect(group.actions[2].label, isNull);
+      expect((group.actions[2].label! as Text).data, l10n.libraryFilterTitle);
+      expect(group.actions[3].tooltip, l10n.appearanceHistoryViewGrid);
+      expect(group.actions[3].label, isNull);
       expect(group.selectedIndex, isNull);
 
       // A compact visual that keeps the 48dp touch target.

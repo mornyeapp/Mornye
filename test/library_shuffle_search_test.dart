@@ -22,7 +22,10 @@ import 'package:mornye/services/playable_media.dart' show PlayableMedia;
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:material_3_expressive/material_3_expressive.dart'
+    show M3EButton;
 import 'package:mornye/widgets/app_search_field.dart';
+import 'package:mornye/widgets/tool_button_group.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -229,9 +232,13 @@ void main() {
 
   Finder shuffleButton(WidgetTester tester, {required bool mornye}) {
     final l10n = l10nOf(tester);
+    // Material's Shuffle is a segment of the tool group.
     return (mornye
             ? find.text(l10n.actionShuffle)
-            : findByTooltip(l10n.actionShuffle))
+            : find.byWidgetPredicate(
+                (widget) =>
+                    widget is M3EButton && widget.tooltip == l10n.actionShuffle,
+              ))
         .hitTestable();
   }
 
@@ -246,7 +253,7 @@ void main() {
     for (final mornye in [false, true]) {
       final views = mornye ? ['list'] : ['list', 'grid'];
       for (final viewMode in views) {
-        testWidgets('Songs leads with Shuffle (desktop: $desktop, '
+        testWidgets('Songs offers Shuffle (desktop: $desktop, '
             'Mornye: $mornye, view: $viewMode)', (tester) async {
           await pumpLibrary(
             tester,
@@ -257,8 +264,22 @@ void main() {
           final shuffle = shuffleButton(tester, mornye: mornye);
           expect(shuffle, findsOneWidget);
           if (!mornye) {
-            // A compact visual beside the tools, with the 48dp target.
-            expect(tester.getSize(shuffle).height, greaterThanOrEqualTo(48));
+            // The first of the page's tools, in their group and its colours,
+            // with the group's 48dp target.
+            final group = find.ancestor(
+              of: shuffle,
+              matching: find.byType(ToolButtonGroup),
+            );
+            expect(group, findsOneWidget);
+            expect(tester.getSize(group).height, greaterThanOrEqualTo(48));
+            final filter = find.descendant(
+              of: group,
+              matching: find.text(l10nOf(tester).libraryFilterTitle),
+            );
+            expect(
+              tester.getTopLeft(shuffle).dx,
+              lessThan(tester.getTopLeft(filter.first).dx),
+            );
           }
           expect(tester.takeException(), isNull);
         });
