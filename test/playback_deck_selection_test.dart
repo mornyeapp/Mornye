@@ -6,6 +6,7 @@ import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/playback_deck.dart';
+import 'package:mornye/services/subsonic_playback_deck.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
 import 'support/fake_mpv_engine.dart';
@@ -83,7 +84,9 @@ void main() {
           ..add(dependencies.createDeck('main'))
           ..add(dependencies.createPreviewDeck('preview'));
         expect(
-          created.reversed.take(2),
+          created.reversed
+              .take(2)
+              .map((deck) => deck is SubsonicPlaybackDeck ? deck.inner : deck),
           everyElement(isA<MediaKitPlaybackDeck>()),
         );
       }
@@ -91,13 +94,18 @@ void main() {
       // exclusive output.
       select(TargetPlatform.macOS, desktop: true);
       created.add(dependencies.createDeck('main'));
-      expect(created.last, isA<ExclusiveOutputDeck>());
+      expect(
+        (created.last as SubsonicPlaybackDeck).inner,
+        isA<ExclusiveOutputDeck>(),
+      );
       select(TargetPlatform.android, desktop: false);
       created
         ..add(dependencies.createDeck('main'))
         ..add(dependencies.createPreviewDeck('preview'));
       expect(
-        created.reversed.take(2),
+        created.reversed
+            .take(2)
+            .map((deck) => deck is SubsonicPlaybackDeck ? deck.inner : deck),
         everyElement(isA<AudioplayersPlaybackDeck>()),
       );
     } finally {
@@ -111,7 +119,10 @@ void main() {
     MediaKitPlaybackDeck.debugAvailableOverride = false;
     select(TargetPlatform.linux, desktop: true);
     final deck = const PlaybackDependencies().createDeck('main');
-    expect(deck, isA<AudioplayersPlaybackDeck>());
+    expect(
+      (deck as SubsonicPlaybackDeck).inner,
+      isA<AudioplayersPlaybackDeck>(),
+    );
     await deck.dispose();
   });
 }

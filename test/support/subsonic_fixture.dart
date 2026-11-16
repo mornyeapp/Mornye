@@ -50,6 +50,8 @@ class SubsonicFixture {
   /// Emulate a server-selected transcode, independent of catalogue format.
   String? streamContentType;
   bool chunkedStream = false;
+  List<int> Function(int seconds)? audioAtOffset;
+  List<Map<String, dynamic>> extensions = [];
 
   /// The OpenSubsonic `type` of every response (`mornye` for a desktop).
   String? type;
@@ -166,7 +168,15 @@ class SubsonicFixture {
         }
         final range = transcode ? null : request.headers.value('range');
         response.statusCode = range == null ? 200 : 206;
-        final media = (isAudio ? audio : cover) ?? [0, 1, 2, 3];
+        final offset =
+            int.tryParse(request.uri.queryParameters['timeOffset'] ?? '0') ?? 0;
+        final media =
+            (method == 'stream' && audioAtOffset != null
+                ? audioAtOffset!(offset)
+                : isAudio
+                ? audio
+                : cover) ??
+            [0, 1, 2, 3];
         final part = networkByteRange(range, media.length);
         if (range != null) {
           response.headers.set(
@@ -182,6 +192,7 @@ class SubsonicFixture {
         final query = request.uri.queryParameters;
         final songs = library;
         final payload = switch (method) {
+          'getOpenSubsonicExtensions' => {'openSubsonicExtensions': extensions},
           'getAlbumList2' when songs != null => {
             'albumList2': {
               'album': [

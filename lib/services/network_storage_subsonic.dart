@@ -89,7 +89,11 @@ Uri _subsonicTarget(
   );
 }
 
-Uri _subsonicMediaTarget(NetworkConnection connection, String path) {
+Uri _subsonicMediaTarget(
+  NetworkConnection connection,
+  String path, {
+  int? timeOffset,
+}) {
   final segments = networkPath(path).split('/');
   if (segments.length != 3 || segments.first != 'subsonic') {
     throw const FormatException('Invalid Subsonic media path');
@@ -99,10 +103,30 @@ Uri _subsonicMediaTarget(NetworkConnection connection, String path) {
   return switch (segments[1]) {
     // Let the server apply the player's transcoding preferences. Requesting
     // format=raw explicitly overrides those preferences in Navidrome.
-    'song' => _subsonicTarget(connection, 'stream', {'id': id}),
+    'song' => _subsonicTarget(connection, 'stream', {
+      'id': id,
+      if (timeOffset != null) 'timeOffset': '$timeOffset',
+    }),
     'cover' => _subsonicTarget(connection, 'getCoverArt', {'id': id}),
     _ => throw const FormatException('Invalid Subsonic media path'),
   };
+}
+
+/// A credential-free loopback stream whose server advertises transcodeOffset.
+class SubsonicPlaybackStream {
+  const SubsonicPlaybackStream({
+    required this.url,
+    required this.duration,
+    required this.requiresOffset,
+  });
+
+  final String url;
+  final Duration? duration;
+  final bool Function(String url) requiresOffset;
+
+  String at(Duration position) => Uri.parse(url)
+      .replace(queryParameters: {'timeOffset': '${position.inSeconds}'})
+      .toString();
 }
 
 Map<String, dynamic> _subsonicMap(Object? value) {
@@ -210,6 +234,48 @@ class SubsonicSong {
 }
 
 extension SubsonicStorage on NetworkStorageService {
+  /// Recognizes only this service's own loopback routes. API credentials
+  /// stay behind the proxy, including when playback restarts after a seek.
+  Future<SubsonicPlaybackStream?> subsonicPlayback(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        uri.scheme != 'http' ||
+        uri.host != '127.0.0.1' ||
+        _server == null ||
+        uri.port != (await _server!).port) {
+      return null;
+    }
+    final route = _routes[uri.path.replaceFirst('/', '')];
+    if (route == null || !route.path.startsWith('subsonic/song/')) return null;
+    final c = await connection(route.id);
+    if (c.protocol != NetworkProtocol.subsonic) return null;
+    final client = openSubsonic(c);
+    try {
+      final response = await client.request('getOpenSubsonicExtensions');
+      final supported = _subsonicList(response['openSubsonicExtensions']).any(
+        (extension) =>
+            extension['name'] == 'transcodeOffset' &&
+            extension['versions'] is List &&
+            (extension['versions'] as List).contains(1),
+      );
+      if (!supported) return null;
+      final song = await client.song(route.path);
+      final seconds = (song.data['duration'] as num?)?.toDouble();
+      return SubsonicPlaybackStream(
+        url: uri.replace(query: null).toString(),
+        duration: seconds != null && seconds.isFinite && seconds > 0
+            ? Duration(milliseconds: (seconds * 1000).round())
+            : null,
+        requiresOffset: (current) => _streamRanges[current] == false,
+      );
+    } catch (_) {
+      // Older servers may reject discovery. Ordinary playback still works.
+      return null;
+    } finally {
+      client.close();
+    }
+  }
+
   SubsonicClient openSubsonic(NetworkConnection connection) {
     connection.validate();
     if (connection.protocol != NetworkProtocol.subsonic) {
