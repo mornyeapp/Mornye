@@ -577,4 +577,57 @@ void main() {
     }
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('a lens under an interface scale keeps its build on a '
+      'keyboard inset change', (tester) async {
+    MornyeGlass.debugShaderFilterSupport = true;
+    addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
+    tester.view.devicePixelRatio = 2;
+    tester.view.physicalSize = const Size(800, 1600);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+    MediaQueryData? content;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          mornyeGlassLevelProvider.overrideWithValue(MornyeGlassLevel.liquid),
+        ],
+        child: MaterialApp(
+          theme: MornyeTheme.build(Brightness.dark),
+          builder: (context, child) =>
+              AdaptiveUiScaler(userScale: 0.9, child: child!),
+          home: Scaffold(
+            resizeToAvoidBottomInset: false,
+            body: MornyeGlass.navigation(
+              blurEnabled: true,
+              child: Builder(
+                builder: (context) {
+                  content = MediaQuery.of(context);
+                  return const SizedBox(width: 80, height: 40);
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final lens = tester.widget<LiquidGlassLens>(find.byType(LiquidGlassLens));
+    expect(content!.viewInsets.bottom, 0);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 600);
+    await tester.pump();
+
+    // A lens rebuild repaints its glass.
+    expect(
+      tester.widget<LiquidGlassLens>(find.byType(LiquidGlassLens)),
+      same(lens),
+    );
+    expect(content!.viewInsets.bottom, closeTo(300 / 0.9, 0.001));
+    final window = MediaQuery.of(tester.element(find.byType(LiquidGlassLens)));
+    expect(window.size.width, closeTo(400, 0.001));
+    expect(window.devicePixelRatio, closeTo(2, 0.001));
+    expect(tester.takeException(), isNull);
+  });
 }

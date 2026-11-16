@@ -54,7 +54,6 @@ class MornyeLiquidBackdrop extends StatelessWidget {
     // reports scaled ones, which drew the glass that fraction of the way
     // towards the window's corner, away from its own box.
     final uiScale = AdaptiveUiScale.of(context);
-    final viewport = uiScale == 1 ? null : MediaQuery.of(context);
     final lens = LegacyThemeBrightness(
       child: LiquidGlassLens(
         style: LiquidGlassStyle(
@@ -86,18 +85,60 @@ class MornyeLiquidBackdrop extends StatelessWidget {
           // Version 5 expresses the widest colour split in logical pixels.
           dispersion: 1.32 * clarity * effect,
         ),
-        child: viewport == null
-            ? child
-            : MediaQuery(data: viewport, child: child),
+        child: uiScale == 1 ? child : _AppViewport(child: child),
       ),
     );
-    if (viewport == null) return lens;
-    return MediaQuery(
-      data: viewport.copyWith(
-        size: viewport.size * uiScale,
-        devicePixelRatio: viewport.devicePixelRatio / uiScale,
+    if (uiScale == 1) return lens;
+    return _WindowViewport(scale: uiScale, child: lens);
+  }
+}
+
+/// Gives the lens the window's size and pixel ratio. Only this and
+/// [_AppViewport] follow every viewport change, such as a keyboard inset; the
+/// lens rebuilds when the two values it reads change.
+class _WindowViewport extends StatelessWidget {
+  const _WindowViewport({required this.scale, required this.child});
+
+  final double scale;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final viewport = MediaQuery.of(context);
+    return _InheritedAppViewport(
+      data: viewport,
+      child: MediaQuery(
+        data: viewport.copyWith(
+          size: viewport.size * scale,
+          devicePixelRatio: viewport.devicePixelRatio / scale,
+        ),
+        child: child,
       ),
-      child: lens,
     );
   }
+}
+
+class _InheritedAppViewport extends InheritedWidget {
+  const _InheritedAppViewport({required this.data, required super.child});
+
+  final MediaQueryData data;
+
+  @override
+  bool updateShouldNotify(_InheritedAppViewport oldWidget) =>
+      data != oldWidget.data;
+}
+
+/// Restores the app's scaled viewport for what sits on the glass.
+class _AppViewport extends StatelessWidget {
+  const _AppViewport({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => MediaQuery(
+    data: context
+        .dependOnInheritedWidgetOfExactType<_InheritedAppViewport>()!
+        .data,
+    child: child,
+  );
 }
