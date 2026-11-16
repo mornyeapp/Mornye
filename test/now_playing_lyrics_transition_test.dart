@@ -59,6 +59,7 @@ import 'package:mornye/widgets/mornye_player_layout.dart';
 import 'package:mornye/widgets/player_lyric_preview.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
+import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
@@ -3178,6 +3179,43 @@ void main() {
       await settlePlayer(tester, const Duration(milliseconds: 16));
       expect(find.byType(MornyePlayerQueue), findsNothing);
       expect(tester.getRect(find.byType(PlayerVolumeControl)), volume);
+    },
+  );
+
+  testWidgets(
+    'Mornye panel switch moves built panels without rebuilding them',
+    (tester) async {
+      await pumpNowPlaying(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        size: const Size(393, 852),
+      );
+      mediaItems.add(item('many'));
+      await settlePlayer(tester);
+
+      Future<Set<Widget>> switchFrames(IconData icon, Type panel) async {
+        await tester.tap(findAppIcon(icon));
+        final instances = <Widget>{};
+        for (var frame = 0; frame < 24; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          await completeLyrics(tester);
+          final found = find.byType(panel);
+          if (found.evaluate().isNotEmpty) instances.add(tester.widget(found));
+        }
+        await settlePlayer(tester);
+        return instances;
+      }
+
+      expect(
+        await switchFrames(CupertinoIcons.quote_bubble, PlayerLyricsSection),
+        hasLength(1),
+      );
+      expect(
+        await switchFrames(CupertinoIcons.list_bullet, MornyePlayerQueue),
+        hasLength(1),
+      );
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
     },
   );
 

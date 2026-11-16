@@ -127,6 +127,10 @@ class MornyePlayerLayout extends ConsumerWidget {
           compactCoverSize,
           double.infinity,
         );
+        // Made once per layout, so the panel switch moves the same panels on
+        // every frame instead of rebuilding their rows.
+        late final queuePanel = MornyePlayerQueue(colorScheme: colorScheme);
+        late final lyricsPanel = lyricsBuilder(false);
         Widget stage({
           bool artworkOnly = false,
           double progress = 0,
@@ -208,12 +212,10 @@ class MornyePlayerLayout extends ConsumerWidget {
                             ? KeyedSubtree(
                                 key: ValueKey(page),
                                 child: showQueue
-                                    ? MornyePlayerQueue(
-                                        colorScheme: colorScheme,
-                                      )
+                                    ? queuePanel
                                     : _mornyeLyricsViewport(
                                         context,
-                                        lyricsBuilder(false),
+                                        lyricsPanel,
                                         visibleHeight:
                                             stage.minHeight -
                                             (8 + compactHeaderHeight + 16),
