@@ -26,6 +26,8 @@ void main() {
     bool explicit = false,
     bool disableAnimations = false,
     bool tickersEnabled = true,
+    bool playing = true,
+    int? maxCycles,
     TextDirection direction = TextDirection.ltr,
     CustomPainter? foregroundPainter,
   }) async {
@@ -44,6 +46,8 @@ void main() {
                   width: width,
                   child: OverflowMarquee(
                     resetKey: title,
+                    playing: playing,
+                    maxCycles: maxCycles,
                     child: CustomPaint(
                       foregroundPainter: foregroundPainter,
                       child: ExplicitTrackTitle(
@@ -210,6 +214,111 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('pausing finishes the pass in flight and rests at the start', (
+    tester,
+  ) async {
+    await pumpTitle(tester);
+    await startScrolling(tester);
+    final scroll = controller(tester);
+    final start = scroll.offset;
+    expect(start, closeTo(28, 1));
+
+    await pumpTitle(tester, playing: false);
+    // The pass keeps moving forward instead of freezing with the text cut.
+    await tester.pump(const Duration(seconds: 1));
+    expect(scroll.offset, closeTo(start + 28, 1));
+    var previous = scroll.offset;
+    var rested = false;
+    for (var i = 0; i < 240 && !rested; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+      if (scroll.offset == 0) {
+        rested = true;
+      } else {
+        expect(scroll.offset, greaterThan(previous));
+        previous = scroll.offset;
+      }
+    }
+    expect(rested, isTrue);
+    await tester.pump(const Duration(seconds: 30));
+    expect(scroll.offset, 0);
+    expect(tester.binding.transientCallbackCount, 0);
+    expect(tester.binding.hasScheduledFrame, isFalse);
+
+    // Playing again waits the usual pause before the next pass.
+    await pumpTitle(tester);
+    await tester.pump(const Duration(milliseconds: 2500));
+    expect(scroll.offset, 0);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(seconds: 1));
+    expect(scroll.offset, closeTo(28, 1));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a paused title stays still until playback starts', (
+    tester,
+  ) async {
+    await pumpTitle(tester, playing: false);
+    final scroll = controller(tester);
+    expect(scroll.position.maxScrollExtent, greaterThan(0));
+    await tester.pump(const Duration(seconds: 20));
+    expect(scroll.offset, 0);
+    expect(tester.binding.transientCallbackCount, 0);
+
+    // A pause during the wait before the first pass cancels that pass.
+    await pumpTitle(tester);
+    await tester.pump(const Duration(seconds: 2));
+    await pumpTitle(tester, playing: false);
+    await tester.pump(const Duration(seconds: 20));
+    expect(scroll.offset, 0);
+    expect(tester.binding.transientCallbackCount, 0);
+
+    // Lifecycle changes while paused do not start it either.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 20));
+    expect(scroll.offset, 0);
+    expect(tester.binding.transientCallbackCount, 0);
+
+    await pumpTitle(tester);
+    await startScrolling(tester);
+    expect(scroll.offset, closeTo(28, 1));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a bounded marquee keeps its pass count across a pause', (
+    tester,
+  ) async {
+    Future<int> countPasses({bool pauseAfterPass = false}) async {
+      final scroll = controller(tester);
+      var passes = 0;
+      var moving = false;
+      for (var i = 0; i < 400; i++) {
+        await tester.pump(const Duration(milliseconds: 250));
+        if (scroll.offset > 0) {
+          moving = true;
+        } else if (moving) {
+          moving = false;
+          passes++;
+          if (pauseAfterPass) {
+            await pumpTitle(tester, maxCycles: 2, playing: false);
+          }
+        }
+      }
+      return passes;
+    }
+
+    await pumpTitle(tester, maxCycles: 2);
+    expect(await countPasses(pauseAfterPass: true), 1);
+    await pumpTitle(tester, maxCycles: 2);
+    expect(await countPasses(), 1);
+    final scroll = controller(tester);
+    expect(scroll.offset, 0);
+    expect(tester.binding.transientCallbackCount, 0);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('bounded marquee rests at the start after its passes', (
     tester,
   ) async {
@@ -347,6 +456,7 @@ void main() {
               ),
             ),
             playbackStateProvider.overrideWith((ref) => const Stream.empty()),
+            playbackPlayingProvider.overrideWithValue(true),
             deviceSupportsLiquidGlassProvider.overrideWithValue(liquid),
             lowEndDeviceProvider.overrideWithValue(false),
             backdropBlurEnabledProvider.overrideWithValue(false),
@@ -424,6 +534,7 @@ void main() {
                 playbackStateProvider.overrideWith(
                   (ref) => const Stream.empty(),
                 ),
+                playbackPlayingProvider.overrideWithValue(true),
                 lowEndDeviceProvider.overrideWithValue(true),
                 backdropBlurEnabledProvider.overrideWithValue(false),
               ],
@@ -466,6 +577,98 @@ void main() {
       );
     }
   }
+
+  testWidgets('Material mini player marquees rest while paused and loop '
+      'while playing', (tester) async {
+    final playing = ValueNotifier(true);
+    addTearDown(playing.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentMediaItemProvider.overrideWithBuild(
+            (ref, notifier) => Stream.value(
+              const MediaItem(
+                id: 'long-track',
+                title: 'A title that overflows',
+                artist: 'First artist and second',
+              ),
+            ),
+          ),
+          playbackStateProvider.overrideWith((ref) => const Stream.empty()),
+          playbackPlayingProvider.overrideWith((ref) {
+            void changed() => ref.invalidateSelf();
+            playing.addListener(changed);
+            ref.onDispose(() => playing.removeListener(changed));
+            return playing.value;
+          }),
+          lowEndDeviceProvider.overrideWithValue(true),
+          backdropBlurEnabledProvider.overrideWithValue(false),
+        ],
+        child: MaterialApp(
+          theme: ThemeData(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(
+            body: Center(child: SizedBox(width: 320, child: MiniPlayer())),
+          ),
+        ),
+      ),
+    );
+    for (var i = 0; i < 4; i++) {
+      await tester.pump();
+    }
+    final scrolls = tester
+        .widgetList<SingleChildScrollView>(
+          find.descendant(
+            of: find.byType(MiniPlayer),
+            matching: find.byType(SingleChildScrollView),
+          ),
+        )
+        .map((view) => view.controller!)
+        .toList();
+    expect(scrolls, hasLength(2));
+
+    // No cap while playing: a third pass starts like the first.
+    Future<List<int>> watchPasses(int steps) async {
+      final passes = [0, 0];
+      final moving = [false, false];
+      for (var i = 0; i < steps; i++) {
+        await tester.pump(const Duration(milliseconds: 250));
+        for (var j = 0; j < scrolls.length; j++) {
+          if (scrolls[j].offset > 0) {
+            moving[j] = true;
+          } else if (moving[j]) {
+            moving[j] = false;
+            passes[j]++;
+          }
+        }
+      }
+      return passes;
+    }
+
+    final playingPasses = await watchPasses(600);
+    expect(playingPasses[0], greaterThanOrEqualTo(3));
+    expect(playingPasses[1], greaterThanOrEqualTo(3));
+
+    playing.value = false;
+    await tester.pump();
+    final pausedPasses = await watchPasses(240);
+    // At most the pass that was in flight finishes.
+    expect(pausedPasses[0], lessThanOrEqualTo(1));
+    expect(pausedPasses[1], lessThanOrEqualTo(1));
+    for (final scroll in scrolls) {
+      expect(scroll.offset, 0);
+    }
+
+    playing.value = true;
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(seconds: 1));
+    for (final scroll in scrolls) {
+      expect(scroll.offset, closeTo(28, 1));
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }
 
 class _PaintCounter extends CustomPainter {

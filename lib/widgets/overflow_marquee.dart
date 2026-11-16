@@ -9,6 +9,7 @@ class OverflowMarquee extends StatefulWidget {
     required this.resetKey,
     required this.child,
     this.maxCycles,
+    this.playing = true,
   });
 
   final Object resetKey;
@@ -17,6 +18,10 @@ class OverflowMarquee extends StatefulWidget {
   /// Stops at the start after this many passes; null scrolls indefinitely.
   /// A new [resetKey], width or lifecycle resume starts a fresh count.
   final int? maxCycles;
+
+  /// False finishes the pass in flight and rests at the start until playback
+  /// resumes, which waits the usual pause and keeps the pass count.
+  final bool playing;
 
   @override
   State<OverflowMarquee> createState() => _OverflowMarqueeState();
@@ -35,6 +40,7 @@ class _OverflowMarqueeState extends State<OverflowMarquee>
   bool _motionEnabled = false;
   bool _appActive = true;
   bool _looping = false;
+  bool _passInFlight = false;
   double _loopDistance = 0;
   double? _viewport;
   double? _extent;
@@ -62,6 +68,14 @@ class _OverflowMarqueeState extends State<OverflowMarquee>
     if (widget.resetKey != oldWidget.resetKey ||
         widget.maxCycles != oldWidget.maxCycles) {
       _queueRestart();
+    } else if (widget.playing != oldWidget.playing) {
+      _pause?.cancel();
+      if (_looping &&
+          !_restartQueued &&
+          !_passInFlight &&
+          _canScroll(_generation)) {
+        _scheduleCycle(_generation);
+      }
     }
   }
 
@@ -75,6 +89,7 @@ class _OverflowMarqueeState extends State<OverflowMarquee>
     _pause?.cancel();
     _generation++;
     _cycles = 0;
+    _passInFlight = false;
     if (_restartQueued) return;
     _restartQueued = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -107,25 +122,27 @@ class _OverflowMarqueeState extends State<OverflowMarquee>
       _scroll.hasClients;
 
   void _scheduleCycle(int generation) {
+    final maxCycles = widget.maxCycles;
+    if (!widget.playing || (maxCycles != null && _cycles >= maxCycles)) return;
     _pause = Timer(const Duration(seconds: 3), () => _scrollCycle(generation));
   }
 
   Future<void> _scrollCycle(int generation) async {
     if (!_canScroll(generation)) return;
+    _passInFlight = true;
     await _scroll.animateTo(
       _loopDistance,
       duration: Duration(milliseconds: (_loopDistance / 28 * 1000).round()),
       curve: Curves.linear,
     );
-    if (_canScroll(generation)) {
-      // The next copy is now exactly where the first started, so resetting
-      // the offset changes neither the visible text nor its direction.
-      _scroll.jumpTo(0);
-      _cycles++;
-      final maxCycles = widget.maxCycles;
-      if (maxCycles != null && _cycles >= maxCycles) return;
-      _scheduleCycle(generation);
-    }
+    // A restart has already reset the offset and the flag.
+    if (!_canScroll(generation)) return;
+    _passInFlight = false;
+    // The next copy is now exactly where the first started, so resetting
+    // the offset changes neither the visible text nor its direction.
+    _scroll.jumpTo(0);
+    _cycles++;
+    _scheduleCycle(generation);
   }
 
   @override

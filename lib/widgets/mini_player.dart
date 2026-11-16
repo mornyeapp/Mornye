@@ -226,6 +226,7 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     MediaItem mediaItem, {
     required bool remote,
     required int? marqueeCycles,
+    required bool playing,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final mornye = context.isMornye;
@@ -236,6 +237,7 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
         OverflowMarquee(
           resetKey: (mediaItem.id, mediaItem.title),
           maxCycles: marqueeCycles,
+          playing: playing,
           child: ExplicitTrackTitle(
             title: mediaItem.title,
             explicit: parseExplicitFlag(mediaItem.extras?['explicit']) == true,
@@ -259,6 +261,7 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
           OverflowMarquee(
             resetKey: (mediaItem.id, mediaItem.artist),
             maxCycles: marqueeCycles,
+            playing: playing,
             child: Text(
               mediaItem.artist ?? '',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -382,6 +385,7 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                             mediaItem,
                             remote: remote,
                             marqueeCycles: marqueeCycles,
+                            playing: isPlaying,
                           ),
                         ),
                       ),
