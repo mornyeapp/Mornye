@@ -117,6 +117,7 @@ impl LyricsFetcher for InstalledLyricsFetcher {
                 })
                 .map_err(|error| LyricsError::Other(error.to_string()))?;
             let mut cancelled = None;
+            let mut heartbeat = Duration::from_millis(5);
             loop {
                 if let Err(message) = check() {
                     cancelled = Some(message);
@@ -124,11 +125,12 @@ impl LyricsFetcher for InstalledLyricsFetcher {
                     break;
                 }
                 if !matches!(
-                    completion.recv_timeout(Duration::from_millis(5)),
+                    completion.recv_timeout(heartbeat),
                     Err(mpsc::RecvTimeoutError::Timeout)
                 ) {
                     break;
                 }
+                heartbeat = (heartbeat * 2).min(Duration::from_millis(40));
             }
             let result = worker
                 .join()

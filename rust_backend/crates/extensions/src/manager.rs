@@ -1,6 +1,7 @@
 //! Installed packages and runtime lifecycle belong to one native owner.
 
 mod downloads;
+mod engine;
 mod info;
 mod install;
 mod lifecycle;
@@ -21,6 +22,7 @@ use crate::manifest::ExtensionManifest;
 use crate::package::{ExtensionPackage, is_package_path};
 use crate::runtime::{CompiledSource, LoadMode, lifecycle_result};
 use crate::{ExtensionError, ExtensionRuntime, RuntimeLimits};
+use engine::{EngineGuard, EngineLock};
 use mornye_core::cancellation::RequestLease;
 use mornye_core::fs::{DirBuilderPortableExt, OpenOptionsPortableExt};
 use serde_json::{Map, Value, json};
@@ -62,7 +64,7 @@ struct Installed {
     // Survives a retired VM so its reload skips the compile. Loads reuse it
     // only for identical source text; each install or upgrade has its own.
     compiled: Mutex<Option<Arc<CompiledSource>>>,
-    engine: Mutex<Engine>,
+    engine: EngineLock,
     // Pool maintenance must not wait for a primary VM running post-processing.
     // Code needing both locks takes engine before downloads.
     downloads: Mutex<downloads::Pool>,

@@ -7,7 +7,8 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
+use std::sync::atomic::Ordering;
+use std::time::{Duration, Instant};
 
 fn manager(directory: &Path) -> ExtensionManager {
     ExtensionManager::new(
@@ -405,6 +406,61 @@ fn upgrades_never_reuse_the_previous_compile() {
         "2"
     );
     assert_eq!(source_compiles(second), 1);
+    installed.shutdown();
+}
+
+#[test]
+fn busy_engine_waiters_wake_on_release_or_cancel_without_polling() {
+    let directory = tempfile::tempdir().unwrap();
+    let installed = manager(directory.path());
+    let archive = package(
+        directory.path(),
+        "example.busy",
+        "1",
+        "registerExtension({});",
+    );
+    installed.install(&archive).unwrap();
+    let entry = installed.get("example.busy").unwrap();
+    let registry = CancellationRegistry::new(CancellationDomain::ExtensionRequest);
+    for cancel in [false, true] {
+        let lease = Arc::new(registry.acquire("").unwrap());
+        let held = entry.engine.lock().unwrap();
+        let attempts = entry.engine.attempts.load(Ordering::Relaxed);
+        std::thread::scope(|scope| {
+            let waiter = scope.spawn(|| {
+                installed
+                    .download_engine(&entry, Some(&lease))
+                    .map(drop)
+                    .map(|()| Instant::now())
+                    .map_err(|failure| (failure.to_string(), Instant::now()))
+            });
+            std::thread::sleep(Duration::from_millis(300));
+            let signalled = Instant::now();
+            let result = if cancel {
+                lease.release();
+                let result = waiter.join().unwrap();
+                drop(held);
+                result
+            } else {
+                drop(held);
+                waiter.join().unwrap()
+            };
+            let woke = match result {
+                Ok(woke) => {
+                    assert!(!cancel);
+                    woke
+                }
+                Err((failure, woke)) => {
+                    assert!(cancel, "{failure}");
+                    woke
+                }
+            };
+            assert!(woke.duration_since(signalled) < Duration::from_millis(200));
+        });
+        // A 5 ms retry loop would try the lock about 60 times while held.
+        let tries = entry.engine.attempts.load(Ordering::Relaxed) - attempts;
+        assert!(tries <= 15, "{tries} lock attempts while waiting");
+    }
     installed.shutdown();
 }
 

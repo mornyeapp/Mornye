@@ -3,8 +3,6 @@
 use super::*;
 use mornye_core::matching::lowercase;
 use std::collections::BTreeSet;
-use std::sync::TryLockError;
-use std::time::Duration;
 
 #[derive(Default)]
 pub(super) struct Priorities {
@@ -245,21 +243,7 @@ impl ExtensionManager {
         if !entry.status.read().expect("extension status lock").enabled {
             return Err(error(format!("extension '{id}' is disabled")));
         }
-        let mut engine = loop {
-            self.check()?;
-            if let Some(lease) = &lease {
-                lease
-                    .check_active()
-                    .map_err(|failure| error(failure.to_string()))?;
-            }
-            match entry.engine.try_lock() {
-                Ok(engine) => break engine,
-                Err(TryLockError::WouldBlock) => std::thread::sleep(Duration::from_millis(5)),
-                Err(TryLockError::Poisoned(_)) => {
-                    return Err(error("extension engine lock poisoned"));
-                }
-            }
-        };
+        let mut engine = self.download_engine(&entry, lease.as_ref())?;
         if !self.current(&entry) || !entry.status.read().expect("extension status lock").enabled {
             return Err(error("extension is disabled or no longer installed"));
         }

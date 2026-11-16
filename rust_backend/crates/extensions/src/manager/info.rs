@@ -80,7 +80,7 @@ impl ExtensionManager {
                 error: String::new(),
             }),
             compiled: Mutex::default(),
-            engine: Mutex::default(),
+            engine: EngineLock::default(),
             downloads: Mutex::default(),
         });
         match settings {
