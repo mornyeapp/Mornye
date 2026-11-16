@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/rendering.dart' show RenderOpacity;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +17,9 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_now_playing.dart';
+import 'package:mornye/widgets/mornye_player_queue.dart';
+import 'package:mornye/widgets/player_artwork.dart';
+import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 
 /// Hands out cover schemes without decoding images.
@@ -175,4 +179,90 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets('${mornye ? 'Mornye' : 'Material'} panel motion and window '
+        'resize keep the column, lyrics and queue built', (tester) async {
+      palette.cached[_coverA] = ColorScheme.fromSeed(
+        seedColor: Colors.red,
+        brightness: Brightness.dark,
+      );
+      await pumpPage(
+        tester,
+        Stream.value(_track('a', _coverA)),
+        mornye: mornye,
+      );
+      final queueType = mornye ? MornyePlayerQueue : DesktopMaterialQueue;
+      final column = controls(tester);
+      final cover = find.byWidgetPredicate(
+        (widget) => widget is PlayerArtwork && widget.iconSize == 96,
+      );
+      double panelOpacity() => tester
+          .renderObject<RenderOpacity>(
+            find
+                .ancestor(
+                  of: find.byType(PlayerLyricsSection),
+                  matching: find.byType(Opacity),
+                )
+                .first,
+          )
+          .opacity;
+
+      desktopInspectorPanel.value = DesktopInspectorPanel.lyrics;
+      await tester.pump();
+      // Showing the lyrics builds them once.
+      final lyrics = tester.widget(find.byType(PlayerLyricsSection));
+      final opacities = <double>{};
+      for (var frame = 0; frame < 30; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        opacities.add(panelOpacity());
+        final coverSize = tester.getSize(cover);
+        expect(coverSize.width, coverSize.height);
+        expect(controls(tester), same(column), reason: 'open frame $frame');
+        expect(
+          tester.widget(find.byType(PlayerLyricsSection)),
+          same(lyrics),
+          reason: 'open frame $frame',
+        );
+      }
+      expect(opacities.where((value) => value > 0 && value < 1), isNotEmpty);
+      expect(panelOpacity(), 1);
+
+      // A live window resize.
+      for (var frame = 1; frame <= 10; frame++) {
+        tester.view.physicalSize = Size(1520 - frame * 12, 1000 - frame * 8);
+        await tester.pump();
+        expect(controls(tester), same(column), reason: 'resize frame $frame');
+        expect(
+          tester.widget(find.byType(PlayerLyricsSection)),
+          same(lyrics),
+          reason: 'resize frame $frame',
+        );
+      }
+
+      desktopInspectorPanel.value = DesktopInspectorPanel.upNext;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      desktopInspectorPanel.value = null;
+      await tester.pump();
+      final queue = tester.widget(find.byType(queueType));
+      var closing = 0;
+      for (var frame = 0; frame < 30; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        // The closed panel drops its queue once the motion ends.
+        if (find.byType(queueType).evaluate().isEmpty) break;
+        closing++;
+        expect(controls(tester), same(column), reason: 'close frame $frame');
+        expect(
+          tester.widget(find.byType(queueType)),
+          same(queue),
+          reason: 'close frame $frame',
+        );
+      }
+      expect(closing, greaterThan(5));
+      expect(find.byType(queueType), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 }

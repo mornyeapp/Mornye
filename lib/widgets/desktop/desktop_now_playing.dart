@@ -68,6 +68,11 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
   /// The panel on the trailing side, kept while it animates closed.
   DesktopInspectorPanel? _lastPanel;
 
+  /// The panel motion's value on its last frame, from 0 closed to 1 open.
+  double? _panelProgress;
+
+  _PlayerColumn? _column;
+
   @override
   void initState() {
     super.initState();
@@ -258,38 +263,80 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
     final motion = panel != null
         ? desktopInspectorMotion(context)
         : const AppMotionSpec(Duration(milliseconds: 260), Curves.easeInCubic);
+    final panels = _panels(
+      context,
+      colorScheme,
+      _panelProgress ?? (panel != null ? 1 : 0),
+    );
     return LayoutBuilder(
-      builder: (context, constraints) => TweenAnimationBuilder<double>(
-        tween: Tween(end: panel != null ? 1 : 0),
-        duration: reduce ? Duration.zero : motion.duration,
-        curve: motion.curve,
-        onEnd: () {
-          if (panel == null && mounted) setState(() => _lastPanel = null);
-        },
-        builder: (context, progress, _) =>
-            _sideLayout(context, constraints, mediaItem, colorScheme, progress),
-      ),
+      builder: (context, constraints) {
+        final player = _playerColumn(
+          mediaItem,
+          colorScheme,
+          // The cover decodes once at its largest size rather than on every
+          // frame of the resize.
+          _columnWidthFor(constraints, 520),
+        );
+        return TweenAnimationBuilder<double>(
+          tween: Tween(end: panel != null ? 1 : 0),
+          duration: reduce ? Duration.zero : motion.duration,
+          curve: motion.curve,
+          onEnd: () {
+            if (panel == null && mounted) setState(() => _lastPanel = null);
+          },
+          builder: (context, progress, panels) {
+            _panelProgress = progress;
+            return _sideLayout(context, constraints, player, panels!, progress);
+          },
+          child: panels,
+        );
+      },
+    );
+  }
+
+  /// The cover column's width under [limit], leaving room for the title and
+  /// transport below.
+  static double _columnWidthFor(BoxConstraints constraints, double limit) =>
+      math.max(240.0, math.min(limit, constraints.maxHeight - 340));
+
+  /// The same column while its inputs stay the same, so the panel motion and
+  /// a window resize do not build it again.
+  _PlayerColumn _playerColumn(
+    MediaItem mediaItem,
+    ColorScheme colorScheme,
+    double decodeSize,
+  ) {
+    final column = _column;
+    if (column != null &&
+        identical(column.mediaItem, mediaItem) &&
+        column.colorScheme == colorScheme &&
+        column.decodeSize == decodeSize) {
+      return column;
+    }
+    return _column = _PlayerColumn(
+      mediaItem: mediaItem,
+      metadata: _metadata,
+      seekPreview: _seekPreview,
+      colorScheme: colorScheme,
+      decodeSize: decodeSize,
     );
   }
 
   /// The cover column moves from the middle to the leading 5/11 of the
-  /// window as [progress] goes from 0 to 1, while the last panel fades in
-  /// on the trailing 6/11.
+  /// window as [progress] goes from 0 to 1, while [panels] fade in on the
+  /// trailing 6/11. Both are built once and only placed here.
   Widget _sideLayout(
     BuildContext context,
     BoxConstraints constraints,
-    MediaItem mediaItem,
-    ColorScheme colorScheme,
+    Widget player,
+    Widget panels,
     double progress,
   ) {
     final width = constraints.maxWidth;
     final size = progress.clamp(0.0, 1.0);
-    // The cover column leaves room for the title and transport below.
-    double columnWidthFor(double limit) =>
-        math.max(240.0, math.min(limit, constraints.maxHeight - 340));
     final columnWidth = lerpDouble(
-      columnWidthFor(520),
-      columnWidthFor(math.min(440.0, width * 0.34)),
+      _columnWidthFor(constraints, 520),
+      _columnWidthFor(constraints, math.min(440.0, width * 0.34)),
       size,
     )!;
     final leading = width * 5 / 11;
@@ -299,26 +346,6 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
     // and shimmer as they slide.
     final pixelRatio = MediaQuery.devicePixelRatioOf(context);
     final slide = ((1 - size) * 48 * pixelRatio).roundToDouble() / pixelRatio;
-    final player = SizedBox(
-      width: columnWidth,
-      child: _PlayerColumn(
-        mediaItem: mediaItem,
-        metadata: _metadata,
-        seekPreview: _seekPreview,
-        colorScheme: colorScheme,
-        artworkSize: columnWidth,
-        // The cover decodes once at its largest size rather than on every
-        // frame of the resize.
-        decodeSize: columnWidthFor(520),
-      ),
-    );
-    final panel = _lastPanel;
-    final showsLyrics = panel == DesktopInspectorPanel.lyrics;
-    // Panels cross-fade only when one replaces another; a panel that opens
-    // shows at once and fades with the panel side.
-    final switchDuration = MediaQuery.disableAnimationsOf(context) || size < 0.5
-        ? Duration.zero
-        : const Duration(milliseconds: 180);
     return Stack(
       children: [
         Positioned.directional(
@@ -327,7 +354,9 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
           top: 0,
           bottom: 0,
           width: columnWidth,
-          child: Center(child: player),
+          child: Center(
+            child: SizedBox(width: columnWidth, child: player),
+          ),
         ),
         PositionedDirectional(
           start: leading,
@@ -343,71 +372,78 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
                 opacity: size,
                 child: Transform.translate(
                   offset: Offset(slide * (rtl ? -1 : 1), 0),
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.fromSTEB(
-                      0,
-                      72,
-                      48,
-                      80,
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // Hidden lyrics follow line positions so they reopen
-                        // centered, without running word animations off screen.
-                        IgnorePointer(
-                          key: const ValueKey('desktop-now-playing-lyrics'),
-                          ignoring: !showsLyrics,
-                          child: ExcludeFocus(
-                            excluding: !showsLyrics,
-                            child: AnimatedOpacity(
-                              opacity: showsLyrics ? 1 : 0,
-                              duration: switchDuration,
-                              child: NoScrollbars(
-                                child: PlayerLyricsSection(
-                                  metadata: _metadata,
-                                  seekPreview: _seekPreview,
-                                  colorScheme: colorScheme,
-                                  isActive: true,
-                                  animateWords: showsLyrics,
-                                  options: LyricsOptionsButton(
-                                    metadata: _metadata,
-                                    colorScheme: colorScheme,
-                                    translationOwner: this,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        AnimatedSwitcher(
-                          duration: switchDuration,
-                          child: panel == DesktopInspectorPanel.upNext
-                              ? KeyedSubtree(
-                                  key: const ValueKey(
-                                    'desktop-now-playing-upNext',
-                                  ),
-                                  child: NoScrollbars(
-                                    child: context.isMornye
-                                        ? MornyePlayerQueue(
-                                            colorScheme: colorScheme,
-                                          )
-                                        : DesktopMaterialQueue(
-                                            colorScheme: colorScheme,
-                                          ),
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
-                    ),
-                  ),
+                  child: panels,
                 ),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  /// Lyrics and Up Next for the last panel, built while the panel motion
+  /// stands at [progress].
+  Widget _panels(
+    BuildContext context,
+    ColorScheme colorScheme,
+    double progress,
+  ) {
+    final panel = _lastPanel;
+    final showsLyrics = panel == DesktopInspectorPanel.lyrics;
+    // Panels cross-fade only when one replaces another; a panel that opens
+    // shows at once and fades with the panel side.
+    final switchDuration =
+        MediaQuery.disableAnimationsOf(context) || progress < 0.5
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(0, 72, 48, 80),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Hidden lyrics follow line positions so they reopen centered,
+          // without running word animations off screen.
+          IgnorePointer(
+            key: const ValueKey('desktop-now-playing-lyrics'),
+            ignoring: !showsLyrics,
+            child: ExcludeFocus(
+              excluding: !showsLyrics,
+              child: AnimatedOpacity(
+                opacity: showsLyrics ? 1 : 0,
+                duration: switchDuration,
+                child: NoScrollbars(
+                  child: PlayerLyricsSection(
+                    metadata: _metadata,
+                    seekPreview: _seekPreview,
+                    colorScheme: colorScheme,
+                    isActive: true,
+                    animateWords: showsLyrics,
+                    options: LyricsOptionsButton(
+                      metadata: _metadata,
+                      colorScheme: colorScheme,
+                      translationOwner: this,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          AnimatedSwitcher(
+            duration: switchDuration,
+            child: panel == DesktopInspectorPanel.upNext
+                ? KeyedSubtree(
+                    key: const ValueKey('desktop-now-playing-upNext'),
+                    child: NoScrollbars(
+                      child: context.isMornye
+                          ? MornyePlayerQueue(colorScheme: colorScheme)
+                          : DesktopMaterialQueue(colorScheme: colorScheme),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -418,7 +454,6 @@ class _PlayerColumn extends StatelessWidget {
     required this.metadata,
     required this.seekPreview,
     required this.colorScheme,
-    required this.artworkSize,
     required this.decodeSize,
   });
 
@@ -426,9 +461,8 @@ class _PlayerColumn extends StatelessWidget {
   final PlayerMetadataController metadata;
   final PlaybackSeekPreview seekPreview;
   final ColorScheme colorScheme;
-  final double artworkSize;
 
-  /// The width the cover is decoded at, at least [artworkSize].
+  /// The width the cover is decoded at, at least the column's width.
   final double decodeSize;
 
   @override
@@ -451,8 +485,9 @@ class _PlayerColumn extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox.square(
-          dimension: artworkSize,
+        // As wide as the column, which the panel motion resizes.
+        AspectRatio(
+          aspectRatio: 1,
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: corners,
