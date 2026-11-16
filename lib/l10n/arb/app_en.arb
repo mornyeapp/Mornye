@@ -8376,6 +8376,62 @@
       }
     }
   },
+  "linkPlayTogether": "Play together",
+  "@linkPlayTogether": {
+    "description": "Mornye Link Devices sheet: plays the same queue on this phone and the paired desktop at the same time"
+  },
+  "linkPlayTogetherSubtitle": "This phone and {name}",
+  "@linkPlayTogetherSubtitle": {
+    "description": "Mornye Link Devices sheet: under Play together, the two devices that play",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPlayTogetherTiming": "Phone timing",
+  "@linkPlayTogetherTiming": {
+    "description": "Mornye Link Devices sheet: slider that plays this phone earlier or later than the desktop while playing together"
+  },
+  "linkPlayTogetherTimingValue": "{value} ms",
+  "@linkPlayTogetherTimingValue": {
+    "description": "Mornye Link Devices sheet: the phone timing in milliseconds, signed",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPlayTogetherEarlier": "Earlier",
+  "@linkPlayTogetherEarlier": {
+    "description": "Mornye Link Devices sheet: start label of the phone timing slider"
+  },
+  "linkPlayTogetherLater": "Later",
+  "@linkPlayTogetherLater": {
+    "description": "Mornye Link Devices sheet: end label of the phone timing slider"
+  },
+  "linkPlayTogetherTimingHint": "Move it earlier if this phone sounds late, as with Bluetooth",
+  "@linkPlayTogetherTimingHint": {
+    "description": "Mornye Link Devices sheet: help under the phone timing slider"
+  },
+  "linkPlayTogetherFailed": "Could not play together with {name}",
+  "@linkPlayTogetherFailed": {
+    "description": "Mornye Link: Play together could not start",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPlayTogetherNeedsUpdate": "Update Mornye on {name} to play together",
+  "@linkPlayTogetherNeedsUpdate": {
+    "description": "Mornye Link: the paired desktop runs a version without Play together",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "linkDesktopDownloads": "Downloads on {name}",
   "@linkDesktopDownloads": {
     "description": "Mornye Link: heading of the paired desktop's download queue",

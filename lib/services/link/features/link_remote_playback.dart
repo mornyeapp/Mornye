@@ -17,6 +17,7 @@ import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_mirrored_playback.dart';
 import 'package:mornye/services/link/link_playback_details.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/link/together/link_together_controller.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/logger.dart';
@@ -44,8 +45,10 @@ class LinkPlaysOnDesktop extends Notifier<bool> {
       final now = desktopPlaying =
           desktop != null && desktop.playing && desktop.track != null;
       // The desktop starting to play takes over the player screens, as
-      // choosing it in Devices does, unless this phone plays meanwhile.
+      // choosing it in Devices does, unless this phone plays meanwhile or
+      // the two play together.
       if (was == true || !now || playing == true || state) return;
+      if (ref.read(linkPlayTogetherProvider).active) return;
       final options = ref.read(linkPhoneOptionsProvider);
       if (options.loaded && options.followDesktop) state = true;
     }
@@ -112,6 +115,8 @@ class LinkPlaysOnDesktop extends Notifier<bool> {
         .listen((playback) {
           final was = playing;
           playing = playback.playing;
+          // Playing together, both players run and Play together decides.
+          if (ref.read(linkPlayTogetherProvider).active) return;
           if (was == false && playback.playing) {
             if (state) state = false;
             // One player at a time: this phone starting pauses the desktop.

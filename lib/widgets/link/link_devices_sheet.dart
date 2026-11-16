@@ -10,6 +10,7 @@ import 'package:mornye/services/link/features/link_desktop_remote.dart';
 import 'package:mornye/services/link/features/link_downloads.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/together/link_together_controller.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -20,6 +21,7 @@ import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/link/link_library_actions.dart';
+import 'package:mornye/widgets/link/link_play_together.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 /// Opens the Devices sheet: where the music plays, this phone or the paired
@@ -84,10 +86,11 @@ class LinkDevicesButton extends ConsumerWidget {
   }
 }
 
-/// The body of the Devices sheet: picks where the music plays, this phone
-/// or the paired desktop, then lists the desktop's downloads. The device
-/// that plays is checked and does nothing when tapped again; the player
-/// screens show and drive whichever it is.
+/// The body of the Devices sheet: picks where the music plays, this phone,
+/// the paired desktop or both together, then lists the desktop's downloads.
+/// The choice that plays is checked and does nothing when tapped again; the
+/// player screens show and drive whichever device owns the queue. Choosing
+/// one device while both play together ends it there.
 class LinkDevicesSheet extends ConsumerWidget {
   const LinkDevicesSheet({super.key, this.scrollController});
 
@@ -108,6 +111,7 @@ class LinkDevicesSheet extends ConsumerWidget {
     final l10n = context.l10n;
     final name = linkDesktopName(client);
     final connected = remote.connection == LinkConnectionState.connected;
+    final together = ref.watch(linkPlayTogetherProvider);
     final check = AppIcon(
       Icons.check,
       color: Theme.of(context).colorScheme.primary,
@@ -140,6 +144,16 @@ class LinkDevicesSheet extends ConsumerWidget {
       }
     }
 
+    // Both already hold the queue: the other device just stops.
+    VoidCallback endTogether({required bool onPhone}) =>
+        () => choose(
+          (_) => unawaited(
+            ref.read(linkPlayTogetherProvider.notifier).stop(onPhone: onPhone),
+          ),
+        );
+    final phoneChosen = !onDesktop && !together.active;
+    final desktopChosen = onDesktop && !together.active;
+
     // A column, not a list view, so the sheet fits its few rows instead of
     // opening tall and mostly empty.
     return SingleChildScrollView(
@@ -155,9 +169,13 @@ class LinkDevicesSheet extends ConsumerWidget {
                 key: const ValueKey('link-device-phone'),
                 icon: Icons.phone_android,
                 title: l10n.linkThisPhone,
-                trailing: onDesktop ? null : check,
-                selected: !onDesktop,
-                onTap: onDesktop ? () => choose(playHere) : null,
+                trailing: phoneChosen ? check : null,
+                selected: phoneChosen,
+                onTap: together.active
+                    ? endTogether(onPhone: true)
+                    : onDesktop
+                    ? () => choose(playHere)
+                    : null,
               ),
               SettingsItem(
                 key: const ValueKey('link-device-desktop'),
@@ -170,15 +188,26 @@ class LinkDevicesSheet extends ConsumerWidget {
                   LinkConnectionState.disconnected =>
                     l10n.linkConnectionDisconnected,
                 },
-                trailing: onDesktop ? check : null,
-                selected: onDesktop,
-                onTap: !onDesktop && connected
-                    ? () => choose(playOnDesktop)
+                trailing: desktopChosen ? check : null,
+                selected: desktopChosen,
+                onTap: !connected || desktopChosen
+                    ? null
+                    : together.active
+                    ? endTogether(onPhone: false)
+                    : () => choose(playOnDesktop),
+              ),
+              linkPlayTogetherItem(
+                context,
+                together: together,
+                name: name,
+                check: check,
+                onTap: connected && (phoneHasTrack || desktopHasTrack)
+                    ? () => unawaited(linkStartPlayTogether(context, ref))
                     : null,
-                showDivider: false,
               ),
             ],
           ),
+          const LinkPlayTogetherTiming(),
           SettingsGroup(
             children: [
               SettingsItem(

@@ -12,10 +12,13 @@ import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/link/together/link_together_controller.dart';
 import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/app_slider.dart';
+import 'package:mornye/widgets/beta_badge.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
@@ -39,6 +42,44 @@ class _PlaysOnDesktop extends LinkPlaysOnDesktop {
   @override
   bool build() => initial;
 }
+
+/// Play together without the players: records what the sheet asks for.
+class _Together extends LinkPlayTogether {
+  _Together({
+    this.initial = const LinkTogetherState(),
+    this.outcome = LinkTogetherStart.started,
+  });
+
+  final LinkTogetherState initial;
+  final LinkTogetherStart outcome;
+  final calls = <String>[];
+
+  @override
+  LinkTogetherState build() => initial;
+
+  @override
+  Future<LinkTogetherStart> start() async {
+    calls.add('start');
+    if (outcome == LinkTogetherStart.started) {
+      state = state.copyWith(phase: LinkTogetherPhase.active);
+    }
+    return outcome;
+  }
+
+  @override
+  Future<void> stop({required bool onPhone}) async {
+    calls.add(onPhone ? 'stop on phone' : 'stop on desktop');
+    state = state.copyWith(phase: LinkTogetherPhase.idle);
+  }
+
+  @override
+  Future<void> setShift(int shiftMs) async {
+    calls.add('shift $shiftMs');
+    state = state.copyWith(shiftMs: shiftMs);
+  }
+}
+
+const _active = LinkTogetherState(phase: LinkTogetherPhase.active);
 
 /// The desktop as the player screens see it; only its name and the song
 /// on its way there are read.
@@ -96,6 +137,7 @@ void main() {
     bool onDesktop = false,
     RemotePlayback? remote,
     Widget? child,
+    _Together? together,
   }) {
     final player = FakePhonePlayer(
       LinkPhoneSnapshot(
@@ -114,6 +156,7 @@ void main() {
           () => _PlaysOnDesktop(onDesktop),
         ),
         activeRemotePlaybackProvider.overrideWithValue(remote),
+        linkPlayTogetherProvider.overrideWith(() => together ?? _Together()),
         linkHandoffProvider.overrideWithValue(
           client == null
               ? null
@@ -380,11 +423,210 @@ void main() {
         await open(tester);
 
         expect(find.text('This phone'), findsOneWidget);
-        // Two rows, not most of the screen.
+        // Three choices and a jobs row, not most of the screen.
         expect(
           tester.getSize(find.byType(LinkDevicesSheet)).height,
-          lessThan(300),
+          lessThan(400),
         );
+      });
+
+      testWidgets('offers Play together, marked Beta, next to the devices', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          host(theme: theme, client: desktop(), item: phoneItem),
+        );
+        await open(tester);
+
+        final together = row(tester, 'link-play-together');
+        expect(together.title, 'Play together');
+        expect(together.subtitle, 'This phone and Studio PC');
+        expect(together.selected, isFalse);
+        expect(together.onTap, isNotNull);
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('link-play-together')),
+            matching: find.byType(BetaBadge),
+          ),
+          findsOneWidget,
+        );
+        // The three choices share one group.
+        final group = tester.widget<SettingsGroup>(
+          find
+              .ancestor(
+                of: find.byKey(const ValueKey('link-play-together')),
+                matching: find.byType(SettingsGroup),
+              )
+              .first,
+        );
+        expect(group.children, hasLength(3));
+        expect(find.byType(AppSlider), findsNothing);
+      });
+
+      testWidgets('Play together needs a connection and a song', (
+        tester,
+      ) async {
+        final offline = desktop()
+          ..connectionState = LinkConnectionState.disconnected;
+        await tester.pumpWidget(
+          host(theme: theme, client: offline, item: phoneItem),
+        );
+        await open(tester);
+        expect(row(tester, 'link-play-together').onTap, isNull);
+
+        // Connected, but neither device has a song.
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpWidget(
+          host(theme: theme, client: desktop(desktopPlays: false)),
+        );
+        await open(tester);
+        expect(row(tester, 'link-play-together').onTap, isNull);
+      });
+
+      testWidgets('starting it keeps the sheet open and shows the timing', (
+        tester,
+      ) async {
+        final together = _Together();
+        await tester.pumpWidget(
+          host(
+            theme: theme,
+            client: desktop(),
+            item: phoneItem,
+            phonePlaying: true,
+            together: together,
+          ),
+        );
+        await open(tester);
+        await tester.tap(find.text('Play together'));
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+
+        expect(together.calls, ['start']);
+        expect(find.byType(LinkDevicesSheet), findsOneWidget);
+        expect(row(tester, 'link-play-together').selected, isTrue);
+        expect(row(tester, 'link-play-together').onTap, isNull);
+        // Neither device alone is checked; either one ends it there.
+        expect(row(tester, 'link-device-phone').selected, isFalse);
+        expect(row(tester, 'link-device-phone').onTap, isNotNull);
+        expect(row(tester, 'link-device-desktop').selected, isFalse);
+        expect(row(tester, 'link-device-desktop').onTap, isNotNull);
+        expect(find.text('Phone timing'), findsOneWidget);
+        expect(find.text('0 ms'), findsOneWidget);
+        expect(find.text('Earlier'), findsOneWidget);
+        expect(find.text('Later'), findsOneWidget);
+        expect(
+          tester.widget<AppSlider>(find.byType(AppSlider)).centered,
+          isTrue,
+        );
+      });
+
+      for (final (label, choice) in [
+        ('This phone', 'stop on phone'),
+        ('Studio PC', 'stop on desktop'),
+      ]) {
+        testWidgets('choosing $label while together ends it there', (
+          tester,
+        ) async {
+          final together = _Together(initial: _active);
+          final client = desktop();
+          await tester.pumpWidget(
+            host(
+              theme: theme,
+              client: client,
+              item: phoneItem,
+              phonePlaying: true,
+              together: together,
+            ),
+          );
+          await open(tester);
+          await tester.tap(find.text(label));
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 1));
+
+          expect(together.calls, [choice]);
+          expect(find.byType(LinkDevicesSheet), findsNothing);
+          // No handoff: both already hold the queue.
+          expect(
+            client.posts.where((post) => post.op == LinkOps.handoffPlay),
+            isEmpty,
+          );
+        });
+      }
+
+      testWidgets('the timing shows a signed value and saves on release', (
+        tester,
+      ) async {
+        final together = _Together(
+          initial: const LinkTogetherState(
+            phase: LinkTogetherPhase.active,
+            shiftMs: -120,
+          ),
+        );
+        await tester.pumpWidget(
+          host(
+            theme: theme,
+            client: desktop(),
+            item: phoneItem,
+            together: together,
+          ),
+        );
+        await open(tester);
+        // A real minus sign.
+        expect(find.text('−120 ms'), findsOneWidget);
+
+        await tester.drag(find.byType(AppSlider), const Offset(60, 0));
+        await tester.pump();
+        final saved = together.calls.single;
+        expect(saved, startsWith('shift '));
+        final value = int.parse(saved.substring('shift '.length));
+        expect(value, greaterThan(-120));
+        expect(value % 10, 0);
+      });
+
+      testWidgets('a start that fails closes the sheet and says why', (
+        tester,
+      ) async {
+        final together = _Together(outcome: LinkTogetherStart.needsUpdate);
+        await tester.pumpWidget(
+          host(
+            theme: theme,
+            client: desktop(),
+            item: phoneItem,
+            together: together,
+          ),
+        );
+        await open(tester);
+        await tester.tap(find.text('Play together'));
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+
+        expect(find.byType(LinkDevicesSheet), findsNothing);
+        expect(
+          find.text('Update Mornye on Studio PC to play together'),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('the timing closes when Play together ends', (tester) async {
+        final together = _Together(initial: _active);
+        await tester.pumpWidget(
+          host(
+            theme: theme,
+            client: desktop(),
+            item: phoneItem,
+            together: together,
+          ),
+        );
+        await open(tester);
+        expect(find.byType(AppSlider), findsOneWidget);
+
+        // As when the connection drops while the sheet is open.
+        await together.stop(onPhone: true);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        expect(find.byType(AppSlider), findsNothing);
+        expect(row(tester, 'link-device-phone').selected, isTrue);
+        expect(tester.takeException(), isNull);
       });
 
       testWidgets('the player says where the music plays', (tester) async {

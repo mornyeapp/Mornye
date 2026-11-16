@@ -336,6 +336,25 @@ class LinkHandoff {
     );
   }
 
+  /// Gives the desktop the phone's queue as [playOnDesktop] does, uploads
+  /// included, but loaded paused at the phone's position and with the phone
+  /// still playing: Play together then starts the desktop at an agreed
+  /// instant. Null when the phone plays nothing.
+  Future<LinkHandoffResult?> shareQueueWithDesktop({
+    void Function(int sent, int total)? onSending,
+  }) async {
+    final snapshot = player.snapshot;
+    if (snapshot.current == null) return null;
+    final window = linkQueueWindow(snapshot.queue.length, snapshot.index);
+    return _sendQueue(
+      snapshot.queue.sublist(window.start, window.end),
+      current: snapshot.index - window.start,
+      positionMs: () => player.snapshot.positionMs,
+      desktopPlays: false,
+      onSending: onSending,
+    );
+  }
+
   /// Starts [items] on the desktop from [index], as [playOnDesktop] sends
   /// the phone's queue: what the phone picks while the desktop plays in its
   /// place.
@@ -423,6 +442,7 @@ class LinkHandoff {
     required int Function() positionMs,
     LinkPlayerState? modes,
     bool movesPlayback = false,
+    bool desktopPlays = true,
     void Function(int sent, int total)? onSending,
   }) async {
     final files = this.files;
@@ -464,11 +484,12 @@ class LinkHandoff {
         queue: played,
         index: current - first,
         positionMs: positionMs(),
-        playing: true,
+        playing: desktopPlays,
         shuffle: modes?.shuffle ?? localModes.shuffle,
         repeat: modes?.repeat ?? localModes.repeat,
-        autoplay: modes?.autoplay ?? localModes.autoplay,
-        autoMix: modes?.autoMix ?? localModes.autoMix,
+        // A shared queue leaves the desktop's saved choices alone.
+        autoplay: desktopPlays ? modes?.autoplay ?? localModes.autoplay : null,
+        autoMix: desktopPlays ? modes?.autoMix ?? localModes.autoMix : null,
       ).toJson(),
       if (arriving != null)
         'arriving': [
@@ -482,7 +503,7 @@ class LinkHandoff {
       resolved: resolved is num ? resolved.toInt() : 0,
       missing: _indexes(reply, 'missing'),
     );
-    if (result.started) {
+    if (result.started && desktopPlays) {
       // Set before the pause, which can already bring up the desktop's
       // player. When the desktop lacks this song it starts a later one.
       if (movesPlayback && !result.missing.contains(current - first)) {
