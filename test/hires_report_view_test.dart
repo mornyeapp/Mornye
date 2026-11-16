@@ -68,9 +68,32 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('All 16 bits carry audio.'), findsOneWidget);
-    expect(find.textContaining('does not rule them out'), findsOneWidget);
+    expect(find.textContaining('does not rule out a lossy'), findsOneWidget);
     expect(find.text('3.4 (found from 12)'), findsOneWidget);
     expect(find.textContaining('Read all 3:05'), findsOneWidget);
+  });
+
+  testWidgets('a pattern is measured against the limit of its own kind', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _json(
+        grade: 'lossy',
+        lossy: {
+          'status': 'found',
+          'family': 'mp3',
+          'frame_samples': 576,
+          'score': 97.3,
+          'ratio': 16.8,
+          'found_score': 15.0,
+        },
+      ),
+    );
+
+    expect(find.textContaining('frame pattern of MP3:'), findsOneWidget);
+    expect(find.textContaining('one block every 576 samples'), findsOneWidget);
+    expect(find.text('97.3 (found from 15)'), findsOneWidget);
   });
 
   testWidgets('a codec frame pattern names the codec and the outcome', (

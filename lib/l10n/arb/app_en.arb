@@ -6361,7 +6361,7 @@
   "@hiResReportLossySuspectedLowpass": {
     "description": "Lossy finding: only the low-pass points to a lossy source"
   },
-  "hiResReportLossyNotFound": "No frame pattern of AAC, Vorbis or MP3 was found. MP3 at high bitrates and Opus can leave none, so this does not rule them out.",
+  "hiResReportLossyNotFound": "No frame pattern of AAC, Vorbis or MP3 was found. Opus leaves none, and resampling after decoding erases the others, so this does not rule out a lossy source.",
   "@hiResReportLossyNotFound": {
     "description": "Lossy finding: nothing detected, with the limits of the test"
   },

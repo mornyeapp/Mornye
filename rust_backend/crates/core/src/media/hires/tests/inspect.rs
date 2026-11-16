@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::media::hires::inspect::{
-    GRADE_CLEAN, GRADE_CORRUPT, GRADE_LOSSY, GRADE_SUSPECT, GRADE_UPSCALED,
+    GRADE_CLEAN, GRADE_CORRUPT, GRADE_LOSSY, GRADE_SUSPECT, GRADE_UPSCALED, once_layer3,
     through_lapped_transform,
 };
 use md5::{Digest, Md5};
@@ -155,5 +155,17 @@ fn audio_that_was_lossy_once_shows_the_codec_frame_grid() {
     assert_eq!(report.lossy.status, "found", "{:?}", report.lossy);
     assert_eq!(report.lossy.family, "aac");
     assert_eq!(report.lossy.frame_samples, 1_024);
+    assert_eq!(report.grade, GRADE_LOSSY);
+}
+
+#[test]
+fn audio_that_was_layer_3_once_shows_the_granule_grid() {
+    let dir = TempDir::new("inspect-layer3");
+    let samples = once_layer3(70, 12_345, 100);
+    let report = inspect(&flac(&dir, "once.flac", &samples, CD_SR, 16)).report;
+    assert_eq!(report.lossy.status, "found", "{:?}", report.lossy);
+    assert_eq!(report.lossy.family, "mp3");
+    assert_eq!(report.lossy.frame_samples, 576);
+    assert_eq!(report.lossy.found_score, 15.0);
     assert_eq!(report.grade, GRADE_LOSSY);
 }

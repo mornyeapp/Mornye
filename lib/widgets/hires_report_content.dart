@@ -34,10 +34,6 @@ class HiResReportContent {
     required this.footer,
   });
 
-  /// A frame pattern counts as found from this score; the Rust checker's
-  /// `GRID_SCORE`.
-  static const patternFoundScore = 12;
-
   factory HiResReportContent.of(
     AppLocalizations l10n,
     HiResCheckResult result,
@@ -312,7 +308,7 @@ class HiResReportContent {
             l10n.hiResReportPatternStrength,
             l10n.hiResReportPatternStrengthValue(
               _number(report.lossyScore),
-              '$patternFoundScore',
+              '${report.lossyFoundScore.round()}',
             ),
           ),
       ],

@@ -5878,7 +5878,7 @@
   "@hiResReportLossySuspectedLowpass": {
     "description": "Lossy finding: only the low-pass points to a lossy source"
   },
-  "hiResReportLossyNotFound": "Tidak ditemukan pola frame AAC, Vorbis, atau MP3. MP3 bitrate tinggi dan Opus bisa tidak meninggalkan pola, jadi hasil ini tidak menyingkirkan keduanya.",
+  "hiResReportLossyNotFound": "Tidak ditemukan pola frame AAC, Vorbis, atau MP3. Opus tidak meninggalkan pola, dan resampling setelah decoding menghapus pola lainnya, jadi hasil ini tidak menyingkirkan sumber lossy.",
   "@hiResReportLossyNotFound": {
     "description": "Lossy finding: nothing detected, with the limits of the test"
   },

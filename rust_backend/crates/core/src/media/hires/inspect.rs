@@ -12,8 +12,11 @@
 //! that: a lossy file at a high bitrate can leave no trace this can see.
 
 mod grid;
+mod layer3;
 #[cfg(test)]
 pub(super) use grid::testing::through_lapped_transform;
+#[cfg(test)]
+pub(super) use layer3::testing::once_layer3;
 
 use super::*;
 use md5::{Digest, Md5};
@@ -48,14 +51,18 @@ const MIN_LOW_BYTE_SAMPLES: u64 = 100_000;
 const NEAR_16BIT_SHARE: f64 = 0.9;
 const NEAR_16BIT_DISTANCE: usize = 8;
 
-/// Samples kept of each excerpt: the longest transform and half of it again,
-/// so every frame alignment fits.
-const EXCERPT: usize = 3_072;
+/// Samples kept of each excerpt: what the layer 3 scan reads, which is more
+/// than the long transform and half of it again, so every frame alignment
+/// of either fits.
+const EXCERPT: usize = layer3::EXCERPT;
+const _: () = assert!(EXCERPT >= LONG_TRANSFORM.size * 3 / 2);
 /// Excerpts start a whole number of frames apart for every transform looked
 /// for (1024 and 576 samples), so a grid falls on the same alignment in all
 /// of them and their evidence adds up.
 const EXCERPT_ALIGN: u64 = 9_216;
-/// Excerpts kept while reading, and how many of the louder ones are scanned.
+const _: () = assert!(EXCERPT_ALIGN.is_multiple_of(layer3::GRANULE as u64));
+/// Excerpts kept while reading, and how many of the louder ones the long
+/// transform is scanned in. The layer 3 scan picks its own.
 const EXCERPT_CANDIDATES: u64 = 40;
 const EXCERPTS_SCANNED: usize = 10;
 /// The frame grid is looked for where codecs spend the fewest bits.
@@ -64,25 +71,17 @@ const GRID_HIGH_HZ: f64 = 20_000.0;
 /// Codecs of these families work at the rate of the file they produce; a
 /// higher rate means the grid, if any, no longer falls on whole samples.
 const GRID_MAX_SAMPLE_RATE: u32 = 48_000;
-/// A grid counts as found from this peak (in robust deviations) that also
-/// stands this far above every other alignment; real music that was never
-/// lossy stays below 6 and 1.1.
+/// The grid of the long transform counts as found from this peak (in robust
+/// deviations) that also stands this far above every other alignment; real
+/// music that was never lossy stays below 6 and 1.1. Layer 3 has its own
+/// scan and its own limits, see [`layer3`].
 const GRID_SCORE: f64 = 12.0;
 const GRID_RATIO: f64 = 1.25;
-const GRID_HINT_SCORE: f64 = 9.0;
-const GRID_HINT_RATIO: f64 = 1.15;
 
 const LONG_TRANSFORM: grid::Transform = grid::Transform {
     size: 2_048,
     windows: &[grid::Window::Sine, grid::Window::Kbd, grid::Window::Vorbis],
     zero_db: -50.0,
-};
-/// The hybrid filterbank of MPEG layer 3, approximated by one sine-windowed
-/// transform over its 1152-sample granule pair.
-const GRANULE_TRANSFORM: grid::Transform = grid::Transform {
-    size: 1_152,
-    windows: &[grid::Window::Sine],
-    zero_db: -25.0,
 };
 
 /// A step in the spectrum counts as a low-pass from this drop, and as
@@ -166,6 +165,9 @@ pub struct Lossy {
     /// How far the best alignment stands out; see [`grid::GridPeak`].
     pub score: f64,
     pub ratio: f64,
+    /// The score from which a grid of the kind `score` was measured for
+    /// counts as found; 0 when nothing was measured.
+    pub found_score: f64,
 }
 
 /// The average spectrum, for drawing: `db[i]` is the loudest level, below
@@ -186,6 +188,8 @@ pub(super) struct ChannelDetail {
     /// Quiet samples per cell.
     cell_samples: Vec<u32>,
     low_bytes: [u64; 256],
+    /// The loudest sample of the channel.
+    loudest: f32,
     capture: Option<Capture>,
 }
 
@@ -212,6 +216,7 @@ impl ChannelDetail {
             seen: vec![0; 2 * LOW_LEVEL as usize / 64],
             cell_samples: vec![0; 2 * LOW_LEVEL as usize / CELL],
             low_bytes: [0; 256],
+            loudest: 0.0,
             capture: (capture && count > 0).then(|| Capture {
                 starts: (0..count).map(|i| i * stride).collect(),
                 next: 0,
@@ -235,6 +240,7 @@ impl ChannelDetail {
                 self.low_bytes[(view & 0xFF) as usize] += 1;
             }
         }
+        self.loudest = self.loudest.max(sample.abs());
         if let Some(capture) = &mut self.capture {
             if let Some(&start) = capture.starts.get(capture.next)
                 && capture.position >= start
@@ -594,8 +600,38 @@ fn curve(spec_db: &[f64], sample_rate: u32) -> Spectrum {
 }
 
 /// How far a peak stands out against what a grid must show: 1 is enough.
-fn strength(peak: &grid::GridPeak, score: f64, ratio: f64) -> f64 {
-    (peak.score / score).min((peak.ratio - 1.0) / (ratio - 1.0))
+fn strength((score, ratio): (f64, f64), (needed_score, needed_ratio): (f64, f64)) -> f64 {
+    (score / needed_score).min((ratio - 1.0) / (needed_ratio - 1.0))
+}
+
+/// A peak of one of the two scans, in the terms the report shows.
+struct Grid {
+    family: &'static str,
+    frame_samples: usize,
+    score: f64,
+    ratio: f64,
+    found_score: f64,
+    /// How far it stands out against what its scan asks for.
+    strength: f64,
+}
+
+/// The layer 3 scan, over every excerpt kept of the first two channels.
+fn granules(
+    details: &[Box<ChannelDetail>],
+    sample_rate: u32,
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<Option<layer3::Granules>, String> {
+    let Some(first) = details.first() else {
+        return Ok(None);
+    };
+    let left = first.excerpts();
+    let right = details.get(1).map(|second| second.excerpts());
+    let loudest = details
+        .iter()
+        .take(2)
+        .map(|detail| detail.loudest)
+        .fold(0.0, f32::max);
+    layer3::scan(&left, right.as_deref(), loudest, sample_rate, check)
 }
 
 fn lossy(
@@ -641,65 +677,83 @@ fn lossy(
     };
     let lsb = 2f64.powi(1 - bits.min(32) as i32);
 
-    // The clearest peak of each transform, over the signals.
-    let mut peaks: [Option<grid::GridPeak>; 2] = [None, None];
-    for (transform, best) in [&LONG_TRANSFORM, &GRANULE_TRANSFORM]
-        .into_iter()
-        .zip(&mut peaks)
-    {
-        // What rounding noise alone puts into one coefficient, four times over.
-        let noise = 4.0 * lsb / 12f64.sqrt() * (transform.size as f64 / 4.0).sqrt();
-        for signal in &signals {
-            let excerpts: Vec<&[f64]> = signal.iter().map(Vec::as_slice).collect();
-            let peak = grid::scan(transform, &excerpts, sample_rate, (low, high), noise, check)?;
-            if let Some(peak) = peak {
-                let clearer = best.as_ref().is_none_or(|other| {
-                    strength(&peak, GRID_SCORE, GRID_RATIO)
-                        > strength(other, GRID_SCORE, GRID_RATIO)
-                });
-                if clearer {
-                    *best = Some(peak);
-                }
-            }
+    // The clearest peak of the long transform, over the signals.
+    let needed = (GRID_SCORE, GRID_RATIO);
+    // What rounding noise alone puts into one coefficient, four times over.
+    let noise = 4.0 * lsb / 12f64.sqrt() * (LONG_TRANSFORM.size as f64 / 4.0).sqrt();
+    let mut long: Option<grid::GridPeak> = None;
+    for signal in &signals {
+        let excerpts: Vec<&[f64]> = signal.iter().map(Vec::as_slice).collect();
+        let band = (low, high);
+        let peak = grid::scan(&LONG_TRANSFORM, &excerpts, sample_rate, band, noise, check)?;
+        if let Some(peak) = peak
+            && long.as_ref().is_none_or(|other| {
+                strength((peak.score, peak.ratio), needed)
+                    > strength((other.score, other.ratio), needed)
+            })
+        {
+            long = Some(peak);
         }
     }
-    let [long, granule] = peaks;
-    if (long.is_some() || granule.is_some()) && !suspect_lowpass {
-        lossy.status = "not_found".into();
-    }
-    let found = |peak: &Option<grid::GridPeak>, score: f64, ratio: f64| {
-        peak.filter(|peak| strength(peak, score, ratio) >= 1.0)
-    };
-    // A weaker peak counts only for the granule transform: the long one is
-    // unmistakable where it applies, and faint in audio that was MP3.
-    let decided = if let Some(peak) = found(&long, GRID_SCORE, GRID_RATIO) {
-        let family = if peak.window == grid::Window::Vorbis {
+    let long = long.map(|peak| Grid {
+        family: if peak.window == grid::Window::Vorbis {
             "vorbis"
         } else {
             "aac"
-        };
-        Some((peak, "found", family, LONG_TRANSFORM.size))
-    } else if let Some(peak) = found(&granule, GRID_SCORE, GRID_RATIO) {
-        Some((peak, "found", "mp3", GRANULE_TRANSFORM.size))
-    } else {
-        found(&granule, GRID_HINT_SCORE, GRID_HINT_RATIO)
-            .map(|peak| (peak, "suspected", "mp3", GRANULE_TRANSFORM.size))
-    };
-    let shown = match decided {
-        Some((peak, status, family, size)) => {
-            lossy.status = status.into();
-            lossy.family = family.into();
-            lossy.frame_samples = (size / 2) as u32;
-            Some(peak)
+        },
+        frame_samples: LONG_TRANSFORM.size / 2,
+        score: peak.score,
+        ratio: peak.ratio,
+        found_score: GRID_SCORE,
+        strength: strength((peak.score, peak.ratio), needed),
+    });
+    let granules = granules(details, sample_rate, check)?;
+    let layer3_grid = granules.map(|peak| Grid {
+        family: "mp3",
+        frame_samples: layer3::GRANULE,
+        score: peak.score,
+        ratio: peak.ratio,
+        found_score: layer3::FOUND_SCORE,
+        strength: strength(
+            (peak.score, peak.ratio),
+            (layer3::FOUND_SCORE, layer3::FOUND_RATIO),
+        ),
+    });
+    if (long.is_some() || layer3_grid.is_some()) && !suspect_lowpass {
+        lossy.status = "not_found".into();
+    }
+
+    let clearer = |a: &&Grid, b: &&Grid| a.strength.total_cmp(&b.strength);
+    let grids = [&long, &layer3_grid];
+    let found = grids
+        .into_iter()
+        .flatten()
+        .filter(|grid| match grid.family {
+            "mp3" => granules.is_some_and(|peak| peak.verdict == layer3::Verdict::Found),
+            _ => grid.strength >= 1.0,
+        })
+        .max_by(clearer);
+    let suspected = layer3_grid
+        .as_ref()
+        .filter(|_| granules.is_some_and(|peak| peak.verdict == layer3::Verdict::Suspected));
+    let shown = if let Some(grid) = found.or(suspected) {
+        lossy.status = if found.is_some() {
+            "found"
+        } else {
+            "suspected"
         }
+        .into();
+        lossy.family = grid.family.into();
+        lossy.frame_samples = grid.frame_samples as u32;
+        Some(grid)
+    } else {
         // Nothing found: show how close the nearest miss came.
-        None => [long, granule].into_iter().flatten().max_by(|a, b| {
-            strength(a, GRID_SCORE, GRID_RATIO).total_cmp(&strength(b, GRID_SCORE, GRID_RATIO))
-        }),
+        grids.into_iter().flatten().max_by(clearer)
     };
-    if let Some(peak) = shown {
-        lossy.score = (peak.score * 10.0).round() / 10.0;
-        lossy.ratio = (peak.ratio * 1_000.0).round() / 1_000.0;
+    if let Some(grid) = shown {
+        lossy.score = (grid.score * 10.0).round() / 10.0;
+        lossy.ratio = (grid.ratio * 1_000.0).round() / 1_000.0;
+        lossy.found_score = grid.found_score;
     }
     Ok(lossy)
 }

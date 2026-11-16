@@ -359,7 +359,11 @@ fn hires_check_returns_the_whole_file_report() {
     // A WAV file stores no checksum of its audio.
     assert_eq!(report["integrity"]["status"], "unverified");
     assert!(report["grade"].is_string());
-    assert!(report["spectrum"]["db"].as_array().is_some_and(|db| db.len() > 1));
+    assert!(
+        report["spectrum"]["db"]
+            .as_array()
+            .is_some_and(|db| db.len() > 1)
+    );
 }
 
 fn wait_inbound(method: &str, timeout: Duration) -> Value {

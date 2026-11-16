@@ -50,6 +50,13 @@ class HiResReport {
   final double lossyScore;
   final double lossyRatio;
 
+  /// The score from which a pattern of the kind measured counts as found.
+  final double lossyFoundScore;
+
+  /// That score for AAC and Vorbis (the Rust checker's `GRID_SCORE`), which
+  /// a report without its own figure is read with.
+  static const double _longTransformFoundScore = 12;
+
   /// The average spectrum in dB below its peak, [spectrumStepHz] apart.
   final double spectrumStepHz;
   final List<double> spectrumDb;
@@ -71,6 +78,7 @@ class HiResReport {
     this.lossyFrameSamples = 0,
     this.lossyScore = 0,
     this.lossyRatio = 0,
+    this.lossyFoundScore = _longTransformFoundScore,
     this.spectrumStepHz = 0,
     this.spectrumDb = const [],
   });
@@ -100,6 +108,10 @@ class HiResReport {
       lossyFrameSamples: (lossy['frame_samples'] as num?)?.toInt() ?? 0,
       lossyScore: (lossy['score'] as num?)?.toDouble() ?? 0,
       lossyRatio: (lossy['ratio'] as num?)?.toDouble() ?? 0,
+      lossyFoundScore: switch ((lossy['found_score'] as num?)?.toDouble()) {
+        final score? when score > 0 => score,
+        _ => _longTransformFoundScore,
+      },
       spectrumStepHz: (spectrum['step_hz'] as num?)?.toDouble() ?? 0,
       spectrumDb: [
         for (final value in spectrum['db'] as List? ?? const [])
