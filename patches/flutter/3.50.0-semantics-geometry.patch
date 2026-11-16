@@ -1,7 +1,7 @@
 diff --git a/packages/flutter/lib/src/rendering/object.dart b/packages/flutter/lib/src/rendering/object.dart
 --- a/packages/flutter/lib/src/rendering/object.dart
 +++ b/packages/flutter/lib/src/rendering/object.dart
-@@ -1617,6 +1617,9 @@
+@@ -1622,6 +1622,9 @@
                if (!parentInSemanticsTree.geometryDirty) {
                  targets.add(parentInSemanticsTree);
                } else {
