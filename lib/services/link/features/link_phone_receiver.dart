@@ -23,6 +23,7 @@ class _Incoming {
     required this.saver,
     required this.songs,
     required this.transfer,
+    this.onFinished,
   }) : status = transfer.status;
 
   /// The desktop session its status goes to.
@@ -32,6 +33,9 @@ class _Incoming {
   final LinkOfflineSaver saver;
   final List<LinkOfflineSong> songs;
   final LinkTransfer transfer;
+
+  /// Learns the last status once the transfer stopped, however it stopped.
+  void Function(LinkTransferStatus status)? onFinished;
   final cancel = LinkOfflineCancel();
   final skipped = <int>[];
   final failed = <int>[];
@@ -44,6 +48,12 @@ class _Incoming {
   DateTime? reportedAt;
 
   String get id => status.transferId;
+
+  void finish() {
+    final onFinished = this.onFinished;
+    this.onFinished = null;
+    onFinished?.call(status);
+  }
 }
 
 /// Receives the paired desktop's songs on this phone (contract section
@@ -112,6 +122,9 @@ class LinkPhoneReceiver {
   void dispose() {
     _disposed = true;
     _running?.cancel.cancel();
+    for (final job in _waiting) {
+      job.finish();
+    }
     _waiting.clear();
     _unsubscribe();
     unawaited(_offers.close());
@@ -125,14 +138,18 @@ class LinkPhoneReceiver {
   }
 
   /// Queues "Save to this phone" for [songs] of the paired desktop. Null
-  /// when none is paired or there is nothing to save.
-  LinkTransfer? save(List<LinkOfflineSong> songs) {
+  /// when none is paired or there is nothing to save. [onFinished] learns
+  /// the last status once the transfer stopped (done, cancelled or failed).
+  LinkTransfer? save(
+    List<LinkOfflineSong> songs, {
+    void Function(LinkTransferStatus status)? onFinished,
+  }) {
     final client = _client;
     final saver = this.saver();
     if (_disposed || client == null || saver == null || songs.isEmpty) {
       return null;
     }
-    return _queue(client, saver, _newId(), songs);
+    return _queue(client, saver, _newId(), songs, onFinished: onFinished);
   }
 
   /// Stops [transferId]: a waiting transfer at once, the running one once
@@ -147,6 +164,7 @@ class LinkPhoneReceiver {
     _waiting.remove(job);
     _jobs.remove(transferId);
     _report(job, _status(job, LinkTransferState.cancelled));
+    job.finish();
   }
 
   void _handle(LinkClientApi client, Map<String, dynamic> message) {
@@ -197,8 +215,9 @@ class LinkPhoneReceiver {
     LinkClientApi client,
     LinkOfflineSaver saver,
     String id,
-    List<LinkOfflineSong> songs,
-  ) {
+    List<LinkOfflineSong> songs, {
+    void Function(LinkTransferStatus status)? onFinished,
+  }) {
     final transfer = LinkTransfer(
       direction: LinkTransferDirection.incoming,
       peerId: client.server.serverId,
@@ -226,6 +245,7 @@ class LinkPhoneReceiver {
       saver: saver,
       songs: songs,
       transfer: transfer,
+      onFinished: onFinished,
     );
     _jobs[id] = job;
     _waiting.add(job);
@@ -253,6 +273,7 @@ class LinkPhoneReceiver {
       } finally {
         _running = null;
         _jobs.remove(job.id);
+        job.finish();
       }
     }
   }

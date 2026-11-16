@@ -14,6 +14,7 @@ import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/notification_service.dart';
+import 'package:mornye/services/link/features/link_auto_keep.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_library_lookup.dart';
 import 'package:mornye/services/link/features/link_library_jobs_client.dart';
@@ -291,6 +292,7 @@ final linkPhoneFeaturesProvider = Provider<LinkPhoneSession?>((ref) {
   ref.listen(linkPhoneLibraryProvider, (_, _) {});
   ref.listen(linkPhoneReceiverProvider, (_, _) {});
   ref.listen(linkPhoneSenderProvider, (_, _) {});
+  ref.listen(linkAutoKeepProvider, (_, _) {});
   final client = ref.watch(linkPhoneClientProvider);
   final handoff = ref.watch(linkHandoffProvider);
   if (client == null || handoff == null) return null;

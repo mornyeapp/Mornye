@@ -237,6 +237,40 @@ void main() {
     expect(states(second.id), ['queued 0', 'running 0', 'done 1']);
   });
 
+  test('tells onFinished how each transfer stopped, once', () async {
+    final finished = <String, List<LinkTransferState>>{};
+    void Function(LinkTransferStatus) record(String name) =>
+        (status) => (finished[name] ??= []).add(status.state);
+    final gate = transport.gates['1'] = Completer<void>();
+    receiver.save(_songs(['1']), onFinished: record('first'));
+    final second = receiver.save(_songs(['2']), onFinished: record('second'))!;
+    receiver.save(_songs(['3']), onFinished: record('third'));
+    await until(() => transport.requested.isNotEmpty);
+
+    receiver.cancel(second.id);
+    expect(finished, {
+      'second': [LinkTransferState.cancelled],
+    });
+    gate.complete();
+    await until(() => finished.length == 3);
+    await receiver.idle;
+    expect(finished, {
+      'second': [LinkTransferState.cancelled],
+      'first': [LinkTransferState.done],
+      'third': [LinkTransferState.done],
+    });
+
+    // Waiting transfers still learn it when the receiver goes away.
+    transport.gates['4'] = Completer<void>();
+    receiver.save(_songs(['4']), onFinished: record('fourth'));
+    receiver.save(_songs(['5']), onFinished: record('fifth'));
+    await until(() => transport.requested.contains('4'));
+    receiver.dispose();
+    expect(finished['fifth'], [LinkTransferState.queued]);
+    await until(() => finished.containsKey('fourth'));
+    expect(finished['fourth'], [LinkTransferState.cancelled]);
+  });
+
   test('reports byte progress at most four times a second', () async {
     transport
       ..chunks = 10

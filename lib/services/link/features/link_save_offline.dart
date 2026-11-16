@@ -264,6 +264,9 @@ class LinkOfflineSaver {
   String historyId(String songId) =>
       '${idPrefix}_${sha256.convert(utf8.encode('$serverId/$songId'))}';
 
+  /// Whether this device already has [song], the check [save] skips by.
+  Future<bool> has(LinkOfflineSong song) => _has(song);
+
   Future<bool> _has(LinkOfflineSong song) async {
     final exists = this.exists;
     try {
