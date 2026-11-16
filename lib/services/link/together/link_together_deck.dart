@@ -100,6 +100,7 @@ class LinkRuntimeTogetherDeck implements LinkTogetherDeck {
       positionMs: state.position.inMilliseconds,
       durationMs: current?.duration?.inMilliseconds,
       repeat: _repeat(state.repeatMode),
+      rate: state.speed,
     );
   }
 

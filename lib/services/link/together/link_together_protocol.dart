@@ -60,6 +60,7 @@ class LinkTogetherReport {
     this.silent = false,
     this.busy = false,
     this.canNudge = false,
+    this.rate,
   });
 
   /// When it was read, on the device's clock.
@@ -92,10 +93,15 @@ class LinkTogetherReport {
   /// The device can change its playback rate a little to close a gap.
   final bool canNudge;
 
-  /// The position at [atMs] of the same clock, advanced while playing.
+  /// The rate its player moves at now (a nudge included), or null from a
+  /// device that does not say.
+  final double? rate;
+
+  /// The position at [atMs] of the same clock, advanced at [rate] while
+  /// playing.
   int positionAt(int atMs) {
     if (!playing) return positionMs;
-    final advanced = positionMs + (atMs - nowMs);
+    final advanced = positionMs + ((atMs - nowMs) * (rate ?? 1)).round();
     final duration = durationMs;
     if (advanced < 0) return 0;
     return duration != null && duration > 0 && advanced > duration
@@ -132,6 +138,7 @@ class LinkTogetherReport {
     silent: silent ?? this.silent,
     busy: busy ?? this.busy,
     canNudge: canNudge ?? this.canNudge,
+    rate: rate,
   );
 
   Map<String, dynamic> toJson() => {
@@ -147,6 +154,7 @@ class LinkTogetherReport {
     'silent': silent,
     'busy': busy,
     'canNudge': canNudge,
+    'rate': ?rate,
   };
 
   static LinkTogetherReport? fromJson(Object? json) {
@@ -154,6 +162,7 @@ class LinkTogetherReport {
     final nowMs = _int(json['nowMs']);
     if (nowMs == null || nowMs <= 0) return null;
     final session = json['session'];
+    final rate = json['rate'];
     return LinkTogetherReport(
       nowMs: nowMs,
       session: session is String && session.isNotEmpty ? session : null,
@@ -169,6 +178,9 @@ class LinkTogetherReport {
       silent: json['silent'] == true,
       busy: json['busy'] == true,
       canNudge: json['canNudge'] == true,
+      // A session plays at 1x with nudges of a few percent; a value far from
+      // that is not a rate to extrapolate with.
+      rate: rate is num && rate > 0.5 && rate < 2 ? rate.toDouble() : null,
     );
   }
 }

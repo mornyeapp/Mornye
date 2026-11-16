@@ -202,6 +202,41 @@ void main() {
     });
   });
 
+  test('a report carries the rate in force, which its position runs at', () {
+    fakeAsync((async) {
+      final (:deck, host: _, :router, sent: _, started: _) = setUp(async);
+      deck.playNow(position: 5000);
+      run(
+        async,
+        call(router, LinkTogetherOps.start, const {
+          'session': 's1',
+          'role': 'follower',
+        }),
+      );
+      run(
+        async,
+        call(router, LinkTogetherOps.align, const {
+          'session': 's1',
+          'nudge': {'factor': 1.02, 'durationMs': 5000},
+        }),
+      );
+      final report = LinkTogetherReport.fromJson(
+        run(async, call(router, LinkTogetherOps.time, const {})),
+      )!;
+      expect(report.rate, 1.02);
+      expect(report.positionAt(report.nowMs + 1000) - report.positionMs, 1020);
+
+      // A computer that does not say runs at 1, and a rate no nudge sets is
+      // not one.
+      final json = report.toJson()..remove('rate');
+      final unsaid = LinkTogetherReport.fromJson(json)!;
+      expect(unsaid.rate, isNull);
+      expect(unsaid.positionAt(unsaid.nowMs + 1000) - unsaid.positionMs, 1000);
+      expect(LinkTogetherReport.fromJson({...json, 'rate': 0})!.rate, isNull);
+      expect(LinkTogetherReport.fromJson({...json, 'rate': '2'})!.rate, isNull);
+    });
+  });
+
   test('stop pauses only when asked, and restores the player', () {
     fakeAsync((async) {
       final (:deck, :host, :router, sent: _, started: _) = setUp(async);
