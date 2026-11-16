@@ -6,7 +6,6 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/player_artwork.dart';
-import 'package:video_player/video_player.dart';
 
 class MornyePlayerArtwork extends ConsumerStatefulWidget {
   const MornyePlayerArtwork({
@@ -41,8 +40,7 @@ class MornyePlayerArtwork extends ConsumerStatefulWidget {
 }
 
 class _MornyePlayerArtworkState extends ConsumerState<MornyePlayerArtwork> {
-  String? _displayedSource;
-  VideoPlayerController? _displayedController;
+  final _shown = ShownArtworkVideo();
 
   @override
   Widget build(BuildContext context) {
@@ -63,50 +61,38 @@ class _MornyePlayerArtworkState extends ConsumerState<MornyePlayerArtwork> {
           );
     if (MediaQuery.disableAnimationsOf(context) ||
         !ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled))) {
-      _displayedSource = null;
-      _displayedController = null;
+      _shown.clear();
       return fallback;
     }
-    final videoUrl = widget.videoUrl;
-    final prepared = videoUrl == null
-        ? null
-        : ref.watch(playerArtworkVideoProvider(videoUrl));
-    if (prepared?.hasError == true) {
+    final failed = _shown.watch(
+      ref,
+      widget.videoUrl,
+      resolving: widget.resolvingVideo,
+    );
+    if (failed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) widget.onError?.call();
       });
     }
-    if (prepared?.value case final controller?) {
-      _displayedSource = videoUrl;
-      _displayedController = controller;
-    } else if (!widget.resolvingVideo &&
-        (videoUrl == null || prepared?.hasError == true)) {
-      _displayedSource = null;
-      _displayedController = null;
-    }
-    // Retain the outgoing decoder only while it is still displayed. Watching
-    // it before accepting the new frame keeps its heap alive until a later
-    // unrelated rebuild, even after the old banner has been removed.
-    if (_displayedSource != null && _displayedSource != videoUrl) {
-      ref.watch(playerArtworkVideoProvider(_displayedSource!));
-    }
+    final source = _shown.source;
+    final controller = _shown.controller;
     return Stack(
       fit: StackFit.expand,
       children: [
         fallback,
-        if (_displayedController != null)
+        if (source != null && controller != null)
           MotionHeaderBanner(
-            videoUrl: _displayedSource!,
+            videoUrl: source,
             fallback: const SizedBox.shrink(),
-            controller: _displayedController,
+            controller: controller,
             fadeDuration: Duration.zero,
             onAspectRatioChanged: (ratio) {
-              if (_displayedSource == widget.videoUrl) {
+              if (_shown.source == widget.videoUrl) {
                 widget.onAspectRatioChanged?.call(ratio);
               }
             },
             onError: () {
-              if (_displayedSource == widget.videoUrl) widget.onError?.call();
+              if (_shown.source == widget.videoUrl) widget.onError?.call();
             },
           ),
       ],

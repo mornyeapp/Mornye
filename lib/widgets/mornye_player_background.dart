@@ -33,7 +33,7 @@ LinearGradient mornyePlayerGradient(
 }
 
 /// Height of the full-bleed artwork on a screen of [size].
-double _artworkHeight(
+double mornyeArtworkHeight(
   Size size, {
   required bool squareArtwork,
   required double? aspectRatio,
@@ -85,7 +85,7 @@ class MornyePlayerBackground extends StatelessWidget {
             sourceColor,
             fullBleed: artwork != null,
           );
-          final artworkHeight = _artworkHeight(
+          final artworkHeight = mornyeArtworkHeight(
             MediaQuery.sizeOf(context),
             squareArtwork: squareArtwork,
             aspectRatio: artworkAspectRatio,
@@ -176,7 +176,7 @@ class MornyeControlsDim extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final artworkHeight = _artworkHeight(
+    final artworkHeight = mornyeArtworkHeight(
       size,
       squareArtwork: squareArtwork,
       aspectRatio: artworkAspectRatio,
