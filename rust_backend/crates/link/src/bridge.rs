@@ -8,7 +8,7 @@
 //! Call every method from a plain thread, not from inside an async task:
 //! starting and stopping the server builds and shuts down its own runtime.
 
-use crate::{Host, HostError, LinkConfig, LinkServer};
+use crate::{Host, HostError, LinkConfig, LinkServer, Tuning};
 use futures_util::future::BoxFuture;
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -173,8 +173,8 @@ impl AppBridge {
             .ok_or_else(|| BridgeError::Failure("Mornye Link is not running".to_owned()))
     }
 
-    /// `linkStart {"name", "port"?, "platform"?, "features"?}`. Restarts a
-    /// running server.
+    /// `linkStart {"name", "port"?, "platform"?, "features"?, "advertise"?}`.
+    /// Restarts a running server. `advertise: false` leaves mDNS to the app.
     pub fn start(&self, paths: &BridgePaths, args: &Value) -> Result<Started, BridgeError> {
         let port = match number(args, "port") {
             None => 0,
@@ -201,8 +201,19 @@ impl AppBridge {
         if let Some(previous) = slot.take() {
             stop(previous);
         }
+        // Phones advertise through the platform's own service discovery:
+        // iOS only lets entitled apps open raw multicast sockets, and
+        // Android drops multicast to apps that hold no multicast lock.
+        let tuning = Tuning {
+            advertise: args
+                .get("advertise")
+                .and_then(Value::as_bool)
+                .unwrap_or(true),
+            ..Tuning::default()
+        };
         let host: Arc<dyn Host> = self.host.clone();
-        let server = LinkServer::start(link_config, host).map_err(BridgeError::Failure)?;
+        let server =
+            LinkServer::start_with(link_config, host, tuning).map_err(BridgeError::Failure)?;
         let started = Started {
             summary: server.summary(),
             discovery_error: server.discovery_error().map(str::to_owned),
