@@ -37,20 +37,121 @@ void main() {
       expect(aligner.sample(50, 2000, canNudge: true), isA<LinkTogetherWait>());
     });
 
-    test('a nudge stops once in step or past the leader', () {
+    test('a nudge on course runs its planned length', () {
       final aligner = LinkTogetherAligner()
         ..sample(100, 0, canNudge: true)
         ..sample(100, 1000, canNudge: true);
-      expect(aligner.sample(60, 2000, canNudge: true), isA<LinkTogetherWait>());
-      final stop = aligner.sample(15, 3000, canNudge: true);
-      expect((stop as LinkTogetherNudge).factor, 1);
-      expect(aligner.nudging(3500), isFalse);
+      // Just after the rate change the report does not show it yet.
+      expect(aligner.settling(1500), isTrue);
+      expect(aligner.sample(0, 1500, canNudge: true), isA<LinkTogetherWait>());
+      // In step at 15 ms, but the plan ends at 0: no stop half way.
+      expect(aligner.sample(80, 2000, canNudge: true), isA<LinkTogetherWait>());
+      expect(aligner.sample(15, 5250, canNudge: true), isA<LinkTogetherWait>());
+      expect(aligner.nudging(5900), isTrue);
+      expect(aligner.nudging(6000), isFalse);
+    });
 
+    test('a nudge that would end out of step is replanned once', () {
+      // Entering the rate cost 30 ms: 2 % for 5 s would end 60 ms behind
+      // (leaving costs about as much), so the nudge ends 1 s after the check.
+      final aligner = LinkTogetherAligner()
+        ..sample(100, 0, canNudge: true)
+        ..sample(100, 1000, canNudge: true);
+      final shorter = aligner.sample(50, 2000, canNudge: true);
+      expect((shorter as LinkTogetherNudge).factor, closeTo(0.98, 1e-9));
+      expect(shorter.durationMs, 1000);
+      expect(aligner.sample(0, 2500, canNudge: true), isA<LinkTogetherWait>());
+      expect(aligner.sample(0, 3500, canNudge: true), isA<LinkTogetherWait>());
+      expect(aligner.takeLanding(), isNull);
+      expect(
+        aligner.sample(-10, 4000, canNudge: true),
+        isA<LinkTogetherWait>(),
+      );
+      final landing = aligner.takeLanding()!;
+      expect(landing.beforeMs, 100);
+      expect(landing.expectedMs, 0);
+      expect(landing.measuredMs, -10);
+      expect(landing.costMs, -70);
+      expect(landing.countedCostMs, -70);
+      expect(landing.holding, isFalse);
+      expect(aligner.takeLanding(), isNull);
+
+      // Already past the leader: the nudge ends at once.
       final overshoot = LinkTogetherAligner()
         ..sample(100, 0, canNudge: true)
         ..sample(100, 1000, canNudge: true);
-      final flipped = overshoot.sample(-25, 2000, canNudge: true);
-      expect((flipped as LinkTogetherNudge).factor, 1);
+      final stop = overshoot.sample(-30, 2000, canNudge: true);
+      expect((stop as LinkTogetherNudge).factor, 1);
+      expect(overshoot.nudging(2000), isFalse);
+    });
+
+    test('counts what rate changes cost and plans the next nudge with it', () {
+      // The real run: each nudge pair lost about 48 ms, so a 2.45 s nudge
+      // for -49 ms ended at -48 ms again, every 4 s.
+      final aligner = _withCost(-48);
+      expect(aligner.countedCostMs, -48);
+      final step = aligner.sample(-49, 8000, canNudge: true);
+      expect((step as LinkTogetherNudge).factor, closeTo(1.02, 1e-9));
+      expect(step.durationMs, 4850);
+      // Entering cost 26 ms, which the plan expected: no replanning.
+      expect(
+        aligner.sample(-55, 9000, canNudge: true),
+        isA<LinkTogetherWait>(),
+      );
+      expect(
+        aligner.sample(-1, 13850, canNudge: true),
+        isA<LinkTogetherWait>(),
+      );
+      final landing = aligner.takeLanding()!;
+      expect(landing.expectedMs, 0);
+      expect(landing.measuredMs, -1);
+      expect(landing.costMs, -49);
+      expect(aligner.holding, isFalse);
+    });
+
+    test('where rate changes cost more than 20 ms, a short nudge waits for '
+        'an error that stays out of step', () {
+      final aligner = _withCost(-45);
+      var now = 8000;
+      for (var i = 0; i < 6; i++) {
+        expect(
+          aligner.sample(17, now += 1000, canNudge: true),
+          isA<LinkTogetherWait>(),
+        );
+      }
+      LinkTogetherStep step = const LinkTogetherWait();
+      for (var i = 0; i < 5 && step is LinkTogetherWait; i++) {
+        step = aligner.sample(25, now += 1000, canNudge: true);
+      }
+      // Ahead, yet faster: slowing down would lose the changes' 45 ms too.
+      expect((step as LinkTogetherNudge).factor, closeTo(1.02, 1e-9));
+    });
+
+    test('holds when planned nudges keep missing, until 80 ms', () {
+      final aligner = _withCost(-48);
+      // Planned for -48 ms, the changes moved it +10 ms: a miss.
+      aligner.sample(-49, 8000, canNudge: true);
+      aligner.sample(58, 13850, canNudge: true);
+      expect(aligner.takeLanding()!.holding, isFalse);
+      final second = aligner.sample(58, 14850, canNudge: true);
+      expect((second as LinkTogetherNudge).factor, closeTo(0.98, 1e-9));
+      expect(second.durationMs, 1950);
+      // Then -60 ms: a second miss.
+      aligner.sample(-41, 17800, canNudge: true);
+      expect(aligner.takeLanding()!.holding, isTrue);
+      expect(aligner.holding, isTrue);
+      var now = 17800;
+      for (final error in [-41, -60, -79, -79, -50, -79, -20, -79]) {
+        expect(
+          aligner.sample(error, now += 1000, canNudge: true),
+          isA<LinkTogetherWait>(),
+        );
+      }
+      aligner.sample(-90, now += 1000, canNudge: true);
+      expect(
+        aligner.sample(-90, now += 1000, canNudge: true),
+        isA<LinkTogetherNudge>(),
+      );
     });
 
     test('a small error that stays is closed by a short nudge', () {
@@ -76,10 +177,10 @@ void main() {
       }
     });
 
-    test('nudges are capped at ten seconds', () {
-      final aligner = LinkTogetherAligner()..sample(240, 0, canNudge: true);
-      final step = aligner.sample(240, 1000, canNudge: true);
-      expect((step as LinkTogetherNudge).durationMs, 10000);
+    test('nudges are capped at fifteen seconds', () {
+      final aligner = _withCost(-100);
+      final step = aligner.sample(-245, 8000, canNudge: true);
+      expect((step as LinkTogetherNudge).durationMs, 15000);
     });
 
     test('rejoins beyond 250 ms on two samples, beyond 1.5 s at once', () {
@@ -175,32 +276,72 @@ void main() {
       );
     });
 
-    test('learns how late the follower sounds after a rejoin', () {
-      // The follower always sounds 60 ms after it is told to start.
-      final aligner = LinkTogetherAligner();
-      var now = 0;
-      for (var i = 0; i < 8; i++) {
-        aligner.rejoined(now);
-        now += 2000;
-        aligner.sample(aligner.leadMs - 60, now, canNudge: true);
-        now += 1000;
+    test('learns how late the follower sounds after a rejoin, in one step', () {
+      // The real run: lead 0 settled 221 ms behind, and the next cue's lead
+      // of 133 ms still settled 107 ms behind.
+      final aligner = LinkTogetherAligner()..rejoined(0);
+      expect(aligner.settling(1000), isTrue);
+      // Two settled samples that agree are trusted, the first alone is not.
+      expect(
+        aligner.sample(-230, 1500, canNudge: true),
+        isA<LinkTogetherWait>(),
+      );
+      expect(aligner.leadMs, 0);
+      aligner.sample(-226, 2500, canNudge: true);
+      expect(aligner.leadMs, 228);
+
+      // The next cue starts that early and settles in step; the lead stays.
+      aligner.rejoined(5000);
+      aligner
+        ..sample(-2, 6500, canNudge: true)
+        ..sample(3, 7500, canNudge: true);
+      expect(aligner.leadMs, inInclusiveRange(227, 228));
+
+      // Samples that do not agree yet are waited for.
+      final unsure = LinkTogetherAligner()..rejoined(0);
+      for (final (i, error) in [-30, 0, -28].indexed) {
+        unsure.sample(error, 1500 + i * 1000, canNudge: true);
+        expect(unsure.leadMs, 0);
       }
-      expect(aligner.leadMs, inInclusiveRange(58, 62));
+      unsure.sample(-26, 4500, canNudge: true);
+      expect(unsure.leadMs, 27);
+
+      // A nudge that starts first ends the learning with what came before.
+      final nudged = LinkTogetherAligner()..rejoined(0);
+      nudged.sample(-100, 1500, canNudge: true);
+      final step = nudged.sample(-200, 2500, canNudge: true);
+      expect(step, isA<LinkTogetherNudge>());
+      expect(nudged.leadMs, 150);
+    });
+
+    test('a lead stays within 600 ms, either way', () {
+      LinkTogetherAligner learn(int lead, int settled) {
+        final aligner = LinkTogetherAligner()
+          ..leadMs = lead
+          ..rejoined(0)
+          ..sample(settled, 1500, canNudge: true)
+          ..sample(settled, 2500, canNudge: true);
+        return aligner;
+      }
 
       // Ahead after a rejoin: the leader was the slower one to sound, so the
-      // follower starts late, by 400 ms at most either way.
-      final bounded = LinkTogetherAligner();
-      bounded.rejoined(0);
-      bounded.sample(200, 2000, canNudge: true);
-      expect(bounded.leadMs, -120);
-      bounded.leadMs = 390;
-      bounded.rejoined(3000);
-      bounded.sample(-200, 5000, canNudge: true);
-      expect(bounded.leadMs, 400);
-      bounded.leadMs = -390;
-      bounded.rejoined(6000);
-      bounded.sample(200, 8000, canNudge: true);
-      expect(bounded.leadMs, -400);
+      // follower starts late.
+      expect(learn(0, 200).leadMs, -200);
+      expect(learn(590, -200).leadMs, 600);
+      expect(learn(-590, 200).leadMs, -600);
+      // Far off is another problem (a wrong song or place), not a start.
+      expect(learn(0, 900).leadMs, 0);
     });
   });
+}
+
+/// An aligner whose one nudge so far, planned without a cost, ended
+/// [costMs] away from where the rate alone took it, read at 7 s.
+LinkTogetherAligner _withCost(int costMs) {
+  final aligner = LinkTogetherAligner()
+    ..sample(100, 0, canNudge: true)
+    ..sample(100, 1000, canNudge: true)
+    ..sample(costMs, 7000, canNudge: true);
+  aligner.takeLanding();
+  return aligner;
 }

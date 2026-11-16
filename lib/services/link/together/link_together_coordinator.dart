@@ -435,20 +435,52 @@ class LinkTogetherCoordinator {
     final at = desktop.nowMs;
     if (!_reportFresh || now - at > freshMs || at > now + 50) return;
     _reportFresh = false;
-    final phoneError = phone.positionAt(at) - (desktop.positionMs - _shiftMs());
+    final phoneAt = phone.positionAt(at);
+    final phoneError = phoneAt - (desktop.positionMs - _shiftMs());
     final error = phoneLeads ? -phoneError : phoneError;
     lastErrorMs = error;
     final canNudge = phoneLeads ? raw.canNudge : _phone.canNudge;
+    final who = phoneLeads ? 'computer' : 'phone';
+    // The follower's own report, where it should be, and what it was doing.
+    final reported = phoneLeads ? desktop.positionMs : phoneAt;
+    final rate = (phoneLeads ? raw : phone).rate;
+    final nudging = aligner.nudging(now);
+    _log.d(
+      'Link: together, check: $who at ${reported}ms, expected '
+      '${reported - error}ms, drift ${error}ms, rate '
+      '${rate?.toStringAsFixed(2) ?? '?'}, nudge ${nudging ? 'on' : 'off'}'
+      '${aligner.settling(now) ? ', settling' : ''}',
+    );
     final step = aligner.sample(error, now, canNudge: canNudge);
+    final landing = aligner.takeLanding();
+    if (landing != null) {
+      _log.i(
+        'Link: together, nudge ended: drift before ${landing.beforeMs}ms, '
+        'expected ${landing.expectedMs}ms, measured ${landing.measuredMs}ms '
+        '(the rate changes moved it ${landing.costMs}ms, now counted as '
+        '${landing.countedCostMs}ms)',
+      );
+      if (landing.holding) {
+        _log.i(
+          'Link: together, nudges do not land within ${aligner.inStepMs}ms '
+          'here, holding until the drift passes ${aligner.holdFromMs}ms',
+        );
+      }
+    }
     switch (step) {
       case LinkTogetherWait():
-        _log.d('Link: together, drift ${error}ms');
+        break;
       case LinkTogetherNudge(:final factor, :final durationMs):
-        _log.i(
-          'Link: together, drift ${error}ms, nudging the '
-          '${phoneLeads ? 'computer' : 'phone'} to $factor for '
-          '${durationMs}ms',
-        );
+        _log.i(switch ((factor == 1, nudging)) {
+          (true, _) => 'Link: together, drift ${error}ms, ending the nudge',
+          (false, true) =>
+            'Link: together, drift ${error}ms, the nudge goes on '
+                '${durationMs}ms more',
+          (false, false) =>
+            'Link: together, drift ${error}ms, nudging the $who to $factor '
+                'for ${durationMs}ms (rate changes counted as '
+                '${aligner.countedCostMs}ms)',
+        });
         if (phoneLeads) {
           await _desktop.nudge(factor, durationMs);
         } else {
