@@ -225,6 +225,7 @@ pub(crate) fn run_ffmpeg(
 ) -> Outcome {
     use std::io::Read;
     use std::process::{Command, Stdio};
+    use std::sync::mpsc::{self, RecvTimeoutError};
     use std::time::Duration;
 
     let Some(ffmpeg) = ffmpeg else {
@@ -261,12 +262,17 @@ pub(crate) fn run_ffmpeg(
             );
         }
     };
+    // Both pipes reach end of file when FFmpeg exits, which wakes the wait
+    // below instead of leaving it asleep until the next poll.
+    let (closed, pipe_closed) = mpsc::channel::<()>();
     let drain = |stream: Option<Box<dyn Read + Send>>| {
+        let closed = closed.clone();
         std::thread::spawn(move || {
             let mut text = Vec::new();
             if let Some(mut stream) = stream {
                 let _ = stream.read_to_end(&mut text);
             }
+            let _ = closed.send(());
             String::from_utf8_lossy(&text).into_owned()
         })
     };
@@ -282,6 +288,8 @@ pub(crate) fn run_ffmpeg(
             .take()
             .map(|s| Box::new(s) as Box<dyn Read + Send>),
     );
+    drop(closed);
+    let mut open_pipes = 2;
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break Ok(status),
@@ -290,7 +298,13 @@ pub(crate) fn run_ffmpeg(
                 let _ = child.wait();
                 break Err("cancelled".to_owned());
             }
-            Ok(None) => std::thread::sleep(Duration::from_millis(200)),
+            // The process is reaped shortly after its pipes close.
+            Ok(None) if open_pipes == 0 => std::thread::sleep(Duration::from_millis(5)),
+            Ok(None) => match pipe_closed.recv_timeout(Duration::from_millis(200)) {
+                Ok(()) => open_pipes -= 1,
+                Err(RecvTimeoutError::Disconnected) => open_pipes = 0,
+                Err(RecvTimeoutError::Timeout) => {}
+            },
             Err(error) => {
                 let _ = child.kill();
                 let _ = child.wait();
@@ -444,5 +458,32 @@ mod tests {
         assert!(success);
         assert!(output.contains("args:-i 0"), "{output}");
         assert!(!run("1").0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn returns_when_the_process_exits_instead_of_at_the_next_poll() {
+        let arguments = ["-c".to_owned(), "sleep 0.02".to_owned()];
+        let started = std::time::Instant::now();
+        for _ in 0..5 {
+            assert!(run_ffmpeg(Some(Path::new("/bin/sh")), &arguments, &|| false).0);
+        }
+        // A 200 ms poll took at least 1 s for five 20 ms commands.
+        let elapsed = started.elapsed();
+        assert!(
+            elapsed < std::time::Duration::from_millis(600),
+            "{elapsed:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancellation_still_stops_a_running_process() {
+        let arguments = ["-c".to_owned(), "exec sleep 5".to_owned()];
+        let started = std::time::Instant::now();
+        let cancelled = || started.elapsed() > std::time::Duration::from_millis(50);
+        let outcome = run_ffmpeg(Some(Path::new("/bin/sh")), &arguments, &cancelled);
+        assert_eq!(outcome, (false, "cancelled".into()));
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
     }
 }
