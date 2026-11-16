@@ -17,7 +17,7 @@ import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
-const _title = 'Play when headphones connect';
+const _title = 'Play when headphones or a car connect';
 
 Future<ProviderContainer> _pumpPage(
   WidgetTester tester, {
@@ -101,7 +101,7 @@ void main() {
       );
       expect(find.text(_title), findsOneWidget);
       expect(
-        find.text('Connecting headphones does not start playback.'),
+        find.text('Connecting headphones or a car does not start playback.'),
         findsOneWidget,
       );
       expect(find.text('Resume when headphones reconnect'), findsNothing);
@@ -131,10 +131,9 @@ void main() {
 
     testWidgets('Indonesian shows its own choices ($mornye)', (tester) async {
       await _pumpPage(tester, mornye: mornye, locale: 'id');
+      // By its title: the page holds other segmented controls above it.
       await tester.scrollUntilVisible(
-        mornye
-            ? find.byType(MornyeSegmentedControl)
-            : find.byType(SettingsSegmentedChoice<String>),
+        find.text('Putar saat earphone atau mobil terhubung'),
         200,
         scrollable: find.byType(Scrollable).first,
       );

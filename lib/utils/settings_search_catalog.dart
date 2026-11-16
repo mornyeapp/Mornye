@@ -485,6 +485,7 @@ class SettingsSearchCatalog {
             keywords: const [
               'earphone',
               'headphone',
+              'car',
               'bluetooth',
               'connect',
               'reconnect',

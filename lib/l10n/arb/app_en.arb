@@ -9792,31 +9792,31 @@
     }
   },
   "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
-  "playbackOnHeadphonesConnected": "Play when headphones connect",
-  "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
+  "playbackOnHeadphonesConnected": "Play when headphones or a car connect",
+  "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones, or a car over Bluetooth, connect. Disconnecting pauses playback. Built-in player only.",
   "@playbackOnHeadphonesConnectedDescription": {
-    "description": "Description of the Always choice of Play when headphones connect"
+    "description": "Description of the Always choice of Play when headphones or a car connect"
   },
-  "playbackResumeOnReconnectDescription": "If headphones or a Bluetooth device disconnect while music plays, playback resumes when one connects again within 30 minutes. Songs you paused stay paused. Built-in player only.",
+  "playbackResumeOnReconnectDescription": "If headphones, a car or another Bluetooth device disconnect while music plays, playback resumes when one connects again within 30 minutes. Songs you paused stay paused. Built-in player only.",
   "@playbackResumeOnReconnectDescription": {
-    "description": "Description of the After disconnect choice of Play when headphones connect"
+    "description": "Description of the After disconnect choice of Play when headphones or a car connect"
   },
   "playbackHeadphonesOff": "Off",
   "@playbackHeadphonesOff": {
-    "description": "Play when headphones connect choice: connecting headphones never starts playback. Keep it short; three choices share one row"
+    "description": "Play when headphones or a car connect choice: connecting headphones never starts playback. Keep it short; three choices share one row"
   },
   "playbackHeadphonesAfterDisconnect": "Reconnect",
   "@playbackHeadphonesAfterDisconnect": {
-    "description": "Play when headphones connect choice: resume only a recent pause caused by headphones disconnecting. Keep it short; three choices share one row"
+    "description": "Play when headphones or a car connect choice: resume only a recent pause caused by headphones disconnecting. Keep it short; three choices share one row"
   },
   "playbackHeadphonesAlways": "Always",
   "@playbackHeadphonesAlways": {
-    "description": "Play when headphones connect choice: resume on every connection and pause on disconnect. Keep it short; three choices share one row"
+    "description": "Play when headphones or a car connect choice: resume on every connection and pause on disconnect. Keep it short; three choices share one row"
   },
-  "playbackHeadphonesOffDescription": "Connecting headphones does not start playback.",
-  "playbackHeadphonesChoices": "Off, after a disconnect, or every time headphones connect.",
+  "playbackHeadphonesOffDescription": "Connecting headphones or a car does not start playback.",
+  "playbackHeadphonesChoices": "Off, after a disconnect, or every time headphones or a car connect.",
   "@playbackHeadphonesChoices": {
-    "description": "Settings search summary of the Play when headphones connect choices"
+    "description": "Settings search summary of the Play when headphones or a car connect choices"
   },
   "appearanceCustomFont": "Custom font",
   "appearanceCustomFontSubtitle": "Import a TTF or OTF file (up to 10 MB). Overrides the theme and system font.",

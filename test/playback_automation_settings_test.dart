@@ -46,7 +46,7 @@ void main() {
         ),
       );
       final muted = find.text('Pause when muted');
-      final connected = find.text('Play when headphones connect');
+      final connected = find.text('Play when headphones or a car connect');
       // The connected button group lays a label out more than once.
       final always = find.text('Always').first;
       await tester.scrollUntilVisible(
@@ -96,6 +96,12 @@ void main() {
       expect(
         catalog.playback.any(
           (entry) => entry.matches(SettingsSearchQuery('earphone')),
+        ),
+        isTrue,
+      );
+      expect(
+        catalog.playback.any(
+          (entry) => entry.matches(SettingsSearchQuery('car')),
         ),
         isTrue,
       );

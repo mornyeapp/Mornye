@@ -528,7 +528,7 @@ void main() {
       await transport.automation.dispose();
     });
 
-    test('with Play when headphones connect, a disconnect keeps the '
+    test('with Play when headphones or a car connect, a disconnect keeps the '
         'route-loss pause resumable', () async {
       final transport = _Transport();
       await transport.enable(mute: false, headphones: true, reconnect: true);
