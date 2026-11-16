@@ -155,6 +155,20 @@ from the upstream package are not vendored.
   views see the window (owner-approved). The app's queue-platform test covers
   mapping, mutations, pending sends, codec size and platform scope;
   `QueueItemIndexTest.java` covers native and legacy ID handling.
+- Dart: on Android, `_observeQueue` holds back a queue whose window has the
+  same start, length and entries as the last send except for the `artUri`
+  or `extras` of some entries (same id and other fields; `rating` by
+  identity) for `AudioService.androidQueueArtworkDelay` (3 s). The app swaps
+  in a downloaded song's embedded cover just after the song starts, and
+  re-sending up to 500 entries then landed in the song change. The playing
+  item still goes out at once through `setMediaItem`, so the notification,
+  lock screen and session show the new cover immediately; only the queue
+  row (Android Auto, system queue views) keeps the old cover until the held
+  send. Further artwork-only changes join it. Any other change, a window
+  move, or a held send's timer sends the newest window; a failed send
+  forgets the last window, so the next change goes out at once. In-app
+  listeners and other platforms are unaffected. The queue-platform test
+  covers it.
 
 Android 13+ still chooses the positions and built-in transport icons in System
 UI. We preserve real play/pause/previous/next semantics for headsets, lock screen

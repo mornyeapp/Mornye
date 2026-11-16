@@ -470,6 +470,121 @@ void main() {
     await pumpEventQueue();
   });
 
+  group('an artwork-only change', () {
+    const delay = Duration(milliseconds: 200);
+    final cover = Uri.file('/covers/embedded.jpg');
+
+    setUp(() => AudioService.androidQueueArtworkDelay = delay);
+    tearDown(
+      () => AudioService.androidQueueArtworkDelay = const Duration(seconds: 3),
+    );
+
+    Future<void> waitOut() => Future<void>.delayed(delay * 3);
+
+    test('reaches the queue after the track change, not during it', () async {
+      final songs = _songs(1000);
+      handler.playbackState.add(PlaybackState(queueIndex: 10));
+      handler.queue.add(songs);
+      await pumpEventQueue();
+      expect(platform.queues, hasLength(1));
+
+      final changed = [...songs];
+      changed[10] = changed[10].copyWith(artUri: cover);
+      handler.mediaItem.add(changed[10]);
+      handler.queue.add(changed);
+      await pumpEventQueue();
+      expect(platform.queues, hasLength(1));
+      expect(platform.items.single.artUri, cover);
+
+      await waitOut();
+      expect(platform.queues, hasLength(2));
+      expect(platform.queues.last, hasLength(500));
+      expect(platform.queues.last[10].artUri, cover);
+      expect(platform.queues.last[10].title, songs[10].title);
+      expect(platform.queues.last[10].extras, songs[10].extras);
+    });
+
+    test('joins later changes in one send', () async {
+      final songs = _songs(20);
+      handler.queue.add(songs);
+      await pumpEventQueue();
+      final changed = [...songs];
+      changed[0] = changed[0].copyWith(artUri: cover);
+      handler.queue.add([...changed]);
+      changed[1] = changed[1].copyWith(
+        extras: {...?changed[1].extras, 'resolvedSource': '/cache/song-1'},
+      );
+      handler.queue.add([...changed]);
+      await pumpEventQueue();
+      expect(platform.queues, hasLength(1));
+
+      await waitOut();
+      expect(platform.queues, hasLength(2));
+      expect(platform.queues.last[0].artUri, cover);
+      expect(
+        platform.queues.last[1].extras?['resolvedSource'],
+        '/cache/song-1',
+      );
+
+      changed[2] = changed[2].copyWith(artUri: cover);
+      handler.queue.add([...changed]);
+      final reordered = [changed[1], changed[0], ...changed.skip(2)];
+      handler.queue.add(reordered);
+      await pumpEventQueue();
+      expect(platform.queues, hasLength(3));
+      expect(platform.queues.last.take(3).map((item) => item.id), [
+        'song-1',
+        'song-0',
+        'song-2',
+      ]);
+      expect(platform.queues.last[2].artUri, cover);
+      await waitOut();
+      expect(platform.queues, hasLength(3));
+    });
+
+    test('other changes and window moves still go out at once', () async {
+      final songs = _songs(1000);
+      handler.queue.add(songs);
+      await pumpEventQueue();
+      final renamed = [...songs];
+      renamed[0] = renamed[0].copyWith(title: 'Tagged title', artUri: cover);
+      handler.queue.add(renamed);
+      await pumpEventQueue();
+      expect(platform.queues, hasLength(2));
+      expect(platform.queues.last[0].title, 'Tagged title');
+
+      final changed = [...renamed];
+      changed[460] = changed[460].copyWith(artUri: cover);
+      handler.queue.add(changed);
+      await pumpEventQueue();
+      expect(platform.queues, hasLength(2));
+      handler.playbackState.add(PlaybackState(queueIndex: 460));
+      await pumpEventQueue();
+      expect(platform.queues, hasLength(3));
+      expect(platform.queues.last.first.id, 'song-360');
+      expect(platform.queues.last[100].artUri, cover);
+      await waitOut();
+      expect(platform.queues, hasLength(3));
+    });
+
+    test('after a failed send goes out at once', () async {
+      platform.holdQueue = true;
+      final songs = _songs(5);
+      handler.queue.add(songs);
+      await pumpEventQueue();
+      platform.replyQueue(PlatformException(code: 'failed'));
+      await pumpEventQueue();
+      platform.holdQueue = false;
+      handler.queue.add([
+        songs.first.copyWith(artUri: cover),
+        ...songs.skip(1),
+      ]);
+      await pumpEventQueue();
+      expect(platform.queues, hasLength(2));
+      expect(platform.queues.last.first.artUri, cover);
+    });
+  });
+
   test('the newest queue keeps its place among item and state calls', () async {
     platform.holdQueue = true;
     handler.queue.add(_queue('q1'));
