@@ -31,6 +31,7 @@ import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/collection_track_files_provider.dart';
+import 'package:mornye/providers/collection_track_sort_provider.dart';
 import 'package:mornye/providers/deleted_library_files.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
@@ -46,6 +47,7 @@ import 'package:mornye/controllers/library_tracks_folder_data.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart';
 import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/widgets/collection_reorder_sliver.dart';
+import 'package:mornye/widgets/collection_track_sort_button.dart';
 import 'package:mornye/widgets/discard_changes_dialog.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
@@ -98,6 +100,34 @@ class _LibraryTracksFolderScreenState
   bool _confirmingDiscard = false;
   bool _trackActionInProgress = false;
 
+  /// The songs in their saved order, which Edit order and the M3U export
+  /// use whatever sort the page shows.
+  List<CollectionTrackEntry> _savedEntries = const [];
+  List<CollectionTrackEntry>? _sortedFrom;
+  CollectionTrackSort? _sortedBy;
+  List<CollectionTrackEntry> _sorted = const [];
+
+  String get _sortKey => switch (widget.mode) {
+    LibraryTracksFolderMode.wishlist => 'wishlist',
+    LibraryTracksFolderMode.loved => 'loved',
+    LibraryTracksFolderMode.playlist => playlistTrackSortKey(
+      widget.playlistId ?? '',
+    ),
+  };
+
+  /// [entries] in the page's sort, the same list until either changes.
+  List<CollectionTrackEntry> _sortedEntries(
+    List<CollectionTrackEntry> entries,
+    CollectionTrackSort sort,
+  ) {
+    if (!identical(entries, _sortedFrom) || sort != _sortedBy) {
+      _sortedFrom = entries;
+      _sortedBy = sort;
+      _sorted = sortCollectionEntries(entries, sort);
+    }
+    return _sorted;
+  }
+
   bool get _editingOrder => _orderDraft != null;
   bool get _orderChanged =>
       _orderDraft?.indexed.any(
@@ -141,6 +171,10 @@ class _LibraryTracksFolderScreenState
           ? await notifier.reorderPlaylistTracks(widget.playlistId!, keys)
           : await notifier.reorderSavedTracks(widget.mode, keys);
       if (!mounted) return;
+      // The page shows the order that was just saved.
+      ref
+          .read(collectionTrackSortsProvider.notifier)
+          .setSort(_sortKey, CollectionTrackSort.custom);
       setState(() => _orderDraft = null);
       showAppSnackBar(
         context,
@@ -357,7 +391,13 @@ class _LibraryTracksFolderScreenState
         break;
     }
 
-    entries = _orderDraft ?? entries;
+    _savedEntries = entries;
+    final sort = ref.watch(
+      collectionTrackSortsProvider.select(
+        (sorts) => sorts[_sortKey] ?? CollectionTrackSort.custom,
+      ),
+    );
+    entries = _orderDraft ?? _sortedEntries(entries, sort);
     _folderData.update(entries);
     pruneSelection(_folderData.keys);
 
@@ -1098,6 +1138,8 @@ class _LibraryTracksFolderScreenState
                 : _saveOrder,
             child: Text(context.l10n.dialogSave),
           ),
+        if (!_editingOrder && !isSelectionMode && entries.length > 1)
+          CollectionTrackSortButton(sortKey: _sortKey),
         // The desktop header adds its own from [moreMenu].
         if (moreMenu != null && !isDesktopPlatform)
           HeaderMoreButton(groups: moreMenu),
@@ -1216,7 +1258,7 @@ class _LibraryTracksFolderScreenState
           ContextMenuAction(
             icon: Icons.ios_share,
             label: context.l10n.collectionExportM3u,
-            onSelected: () => _exportAsM3u8(context, title, entries),
+            onSelected: () => _exportAsM3u8(context, title, _savedEntries),
           ),
         ],
         if (isPlaylistMode) ?linkTrackTransferAction(context, ref, tracks),
@@ -1227,7 +1269,7 @@ class _LibraryTracksFolderScreenState
           ContextMenuAction(
             icon: Icons.swap_vert,
             label: context.l10n.playlistEditOrder,
-            onSelected: () => _editOrder(entries),
+            onSelected: () => _editOrder(_savedEntries),
           ),
         if (isPlaylistMode) ...[
           ContextMenuAction(
