@@ -41,6 +41,7 @@ import 'package:mornye/widgets/library_playlist_drag_source.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/create_playlist_sheet.dart';
 import 'package:mornye/widgets/tool_button_group.dart';
+import 'package:flutter/rendering.dart' show RenderSliver;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
@@ -201,6 +202,14 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   bool _wasTabVisible = false;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final ScrollController _libraryScrollController = ScrollController();
+  final GlobalKey<NestedScrollViewState> _libraryScrollKey = GlobalKey();
+  final GlobalKey _searchFieldKey = GlobalKey();
+
+  /// The search field has scrolled under the pinned header, which then
+  /// offers a Search action that brings it back.
+  final ValueNotifier<bool> _searchFieldHidden = ValueNotifier(false);
+  bool _searchFieldCheckScheduled = false;
   String _searchQuery = '';
   Timer? _searchDebounce;
   final CompletionBridgeTracker _completionBridgeTracker =
@@ -307,6 +316,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     _completionBridgePlayableProbe = CompletionBridgePlayableProbeCache(
       onPlayable: _fileExistsCache.markExists,
     );
+    _libraryScrollController.addListener(_scheduleSearchFieldCheck);
   }
 
   void _initializePageController() {
@@ -375,6 +385,8 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     _filterPageController?.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _libraryScrollController.dispose();
+    _searchFieldHidden.dispose();
     _searchDebounce?.cancel();
     super.dispose();
   }
@@ -399,6 +411,78 @@ class _QueueTabState extends ConsumerState<QueueTab> {
       _resetLibraryPaging();
     });
   }
+
+  void _scheduleSearchFieldCheck() {
+    if (_searchFieldCheckScheduled) return;
+    _searchFieldCheckScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFieldCheckScheduled = false;
+      if (mounted) _searchFieldHidden.value = _isSearchFieldHidden();
+    });
+  }
+
+  /// Less than half of the search field shows below the pinned header,
+  /// which paints over the part of the field it overlaps.
+  bool _isSearchFieldHidden() {
+    final sliver = _searchFieldKey.currentContext?.findRenderObject();
+    if (sliver is! RenderSliver) return false;
+    final geometry = sliver.geometry;
+    if (geometry == null || geometry.scrollExtent <= 0) return false;
+    final shown = geometry.paintExtent - sliver.constraints.overlap;
+    return shown < geometry.scrollExtent / 2;
+  }
+
+  /// Brings the search field back from under the header and focuses it.
+  /// A scrolled list jumps to its start first, so only the header and the
+  /// field move.
+  Future<void> _revealSearchField() async {
+    final outer = _libraryScrollController;
+    if (outer.hasClients && outer.offset > 0) {
+      final inner = _libraryScrollKey.currentState?.innerController;
+      if (inner != null &&
+          inner.positions.any((position) => position.pixels > 0)) {
+        inner.jumpTo(0);
+      }
+      if (MediaQuery.disableAnimationsOf(context)) {
+        outer.jumpTo(0);
+      } else {
+        final motion = AppMotion.spatialSlow(
+          context,
+          const AppMotionSpec(Duration(milliseconds: 300), Curves.easeOutCubic),
+        );
+        await outer.animateTo(
+          0,
+          duration: motion.duration,
+          curve: motion.curve,
+        );
+      }
+    }
+    if (mounted) _searchFocusNode.requestFocus();
+  }
+
+  /// The pinned header's Search action, shown while the field is hidden.
+  Widget _buildSearchAction() => ValueListenableBuilder<bool>(
+    valueListenable: _searchFieldHidden,
+    builder: (context, hidden, _) {
+      final motion = AppMotion.effectsFast(
+        context,
+        const AppMotionSpec(Duration(milliseconds: 150), Curves.easeOut),
+      );
+      return AnimatedSwitcher(
+        duration: motion.duration,
+        switchInCurve: motion.curve,
+        switchOutCurve: motion.curve,
+        child: hidden
+            ? AppIconButton(
+                key: const ValueKey('library-search-action'),
+                icon: const AppIcon(Icons.search),
+                tooltip: context.l10n.mornyeSearch,
+                onPressed: _revealSearchField,
+              )
+            : const SizedBox.shrink(),
+      );
+    },
+  );
 
   void _resetLibraryPaging() => _pager.resetPaging();
 
@@ -846,6 +930,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
         hasAnyLibraryItems ||
         hasCollections ||
         hasActiveSearch;
+    final showSearchField = shouldShowLibraryControls || hasQueueItems;
     final listInset = wideListInset(context);
     if (!searchingLibrary) {
       _scheduleBlankLibraryRepair(
@@ -897,22 +982,29 @@ class _QueueTabState extends ConsumerState<QueueTab> {
               context,
             ).copyWith(overscroll: false),
             child: NestedScrollView(
+              key: _libraryScrollKey,
+              controller: _libraryScrollController,
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
                 if (widget.librarySection == null)
                   AppSliverHeader.tabRoot(
                     title: context.l10n.navLibrary,
                     alignToContent: true,
-                    actions: const [OpenAudioButton()],
+                    actions: [
+                      if (showSearchField) _buildSearchAction(),
+                      const OpenAudioButton(),
+                    ],
                   )
                 else
                   AppSliverHeader.page(
                     title: widget.librarySection == 'playlists'
                         ? context.l10n.searchPlaylists
                         : context.l10n.searchSongs,
+                    actions: [if (showSearchField) _buildSearchAction()],
                   ),
 
-                if (shouldShowLibraryControls || hasQueueItems)
+                if (showSearchField)
                   SliverToBoxAdapter(
+                    key: _searchFieldKey,
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(
                         16 + listInset,
