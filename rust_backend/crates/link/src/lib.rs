@@ -21,6 +21,7 @@ mod files;
 mod mdns;
 mod pairing;
 mod server;
+mod source;
 mod store;
 mod tls;
 mod ws;
@@ -105,6 +106,7 @@ impl LinkServer {
                 timeout: tuning.request_timeout,
             }),
             catalog: RwLock::new(Arc::new(Catalog::empty())),
+            leases: Default::default(),
         });
         let state = Arc::new(State {
             shared,

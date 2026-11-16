@@ -55,6 +55,7 @@ impl Fixture {
                 server_id: store.server_id(),
                 host: Arc::new(NoopHost),
                 catalog: RwLock::new(Arc::new(Catalog::empty())),
+                leases: Default::default(),
             }),
             store,
             pairing: Pairing::new(tuning.pairing_ttl, tuning.pair_interval),

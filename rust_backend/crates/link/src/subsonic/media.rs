@@ -4,6 +4,7 @@
 use super::objects::content_type;
 use super::{Failure, number, required};
 use crate::catalog::{Catalog, Song};
+use crate::source::{self, Lease, OpenError, Readable};
 use crate::types::{Body, HttpResponse, Shared, SubsonicRequest, full};
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt, TryStreamExt};
@@ -22,7 +23,7 @@ use std::process::Stdio;
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeekExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeekExt, ReadBuf};
 use tokio::process::{Child, ChildStdout, Command};
 use tokio_util::io::ReaderStream;
 
@@ -48,12 +49,15 @@ pub(super) async fn stream(
         number::<u32>(request, "maxBitRate"),
         number::<f64>(request, "timeOffset"),
     );
+    // ffmpeg opens the path itself, which it cannot do for a lent file.
     if let (Some(plan), Some(ffmpeg)) = (plan, &shared.config.ffmpeg_path)
+        && !source::needs_app(&song.path)
         && let Some(response) = transcode(ffmpeg, &song.path, &plan).await
     {
         return Ok(response);
     }
     file_response(
+        shared,
         &song.path,
         content_type(&song.suffix),
         &request.headers,
@@ -63,17 +67,15 @@ pub(super) async fn stream(
 }
 
 pub(super) async fn download(
+    shared: &Shared,
     catalog: &Catalog,
     request: &SubsonicRequest,
 ) -> Result<HttpResponse, Failure> {
     let song = song(catalog, request)?;
-    let name = song
-        .path
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_else(|| format!("{}.{}", song.title, song.suffix));
+    let name = source::file_name(&song.path, &song.title, &song.suffix);
     let disposition = format!("attachment; filename*=UTF-8''{}", percent_encode(&name));
     file_response(
+        shared,
         &song.path,
         content_type(&song.suffix),
         &request.headers,
@@ -89,20 +91,29 @@ fn song<'a>(catalog: &'a Catalog, request: &SubsonicRequest) -> Result<&'a Song,
         .ok_or_else(|| Failure::not_found("Song").with_status(404))
 }
 
-/// Serves `path` with `Range` support. A missing file answers error 70 with
-/// HTTP 404.
+/// Serves `path` ([`source::open`]) with `Range` support; a lent file's lease
+/// lasts as long as the body. A missing file answers error 70 with HTTP 404,
+/// one the app could not lend in time HTTP 503.
 pub(super) async fn file_response(
+    shared: &Shared,
     path: &Path,
     content_type: &str,
     headers: &HeaderMap,
     extra: Vec<(HeaderName, String)>,
 ) -> Result<HttpResponse, Failure> {
     let missing = || Failure::not_found("File").with_status(404);
-    let mut file = tokio::fs::File::open(path).await.map_err(|_| missing())?;
-    let metadata = file.metadata().await.map_err(|_| missing())?;
-    if !metadata.is_file() {
-        return Err(missing());
-    }
+    let Readable {
+        mut file,
+        metadata,
+        lease,
+    } = source::open(shared, path)
+        .await
+        .map_err(|error| match error {
+            OpenError::Missing => missing(),
+            OpenError::Busy => {
+                Failure::new(super::code::GENERIC, "Too many files are open").with_status(503)
+            }
+        })?;
     let len = metadata.len();
     let range = headers
         .get(RANGE)
@@ -118,7 +129,7 @@ pub(super) async fn file_response(
         ByteRange::Full => builder
             .status(200)
             .header(CONTENT_LENGTH, len)
-            .body(reader_body(file)),
+            .body(reader_body(file, lease)),
         ByteRange::Partial(start, end) => {
             file.seek(SeekFrom::Start(start))
                 .await
@@ -127,7 +138,7 @@ pub(super) async fn file_response(
                 .status(206)
                 .header(CONTENT_LENGTH, end - start + 1)
                 .header(CONTENT_RANGE, format!("bytes {start}-{end}/{len}"))
-                .body(reader_body(file.take(end - start + 1)))
+                .body(reader_body(file.take(end - start + 1), lease))
         }
         ByteRange::Unsatisfiable => builder
             .status(416)
@@ -137,10 +148,35 @@ pub(super) async fn file_response(
     response.map_err(|error| Failure::new(super::code::GENERIC, error.to_string()))
 }
 
-fn reader_body(reader: impl AsyncRead + Send + Sync + 'static) -> Body {
+fn reader_body(
+    reader: impl AsyncRead + Unpin + Send + Sync + 'static,
+    lease: Option<Lease>,
+) -> Body {
+    let reader = Leased {
+        reader,
+        _lease: lease,
+    };
     BodyExt::boxed(StreamBody::new(
         ReaderStream::with_capacity(reader, CHUNK).map_ok(Frame::data),
     ))
+}
+
+/// A body's reader and the lease keeping its file readable. The stream drops
+/// it at the end or after an error, and hyper drops the stream when the
+/// client goes away, so the lease ends with the response either way.
+struct Leased<R> {
+    reader: R,
+    _lease: Option<Lease>,
+}
+
+impl<R: AsyncRead + Unpin> AsyncRead for Leased<R> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.get_mut().reader).poll_read(cx, buf)
+    }
 }
 
 /// The answer to a `Range` header for a `len`-byte file.

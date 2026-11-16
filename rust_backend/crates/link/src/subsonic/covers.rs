@@ -9,6 +9,7 @@
 use super::media::file_response;
 use super::{Failure, number, required};
 use crate::catalog::{Catalog, cover_format, hex};
+use crate::source::{self, Readable};
 use crate::types::{HttpResponse, Shared, SubsonicRequest, full};
 use http::header::{CACHE_CONTROL, ETAG, IF_NONE_MATCH};
 use http::{HeaderMap, Response};
@@ -73,11 +74,12 @@ pub(super) async fn cover_art(
     let web: Vec<PathBuf> = source.web.into_iter().map(Path::to_owned).collect();
     let dir = shared.config.temp_dir.join(CACHE_DIR);
     let cache = dir.clone();
-    let image = tokio::task::spawn_blocking(move || find_image(&cache, &files, &candidates, &web))
-        .await
-        .ok()
-        .flatten()
-        .ok_or_else(not_found)?;
+    let image = if candidates.iter().any(|(audio, _)| source::needs_app(audio)) {
+        find_image_lent(shared, dir.clone(), files, candidates, web).await
+    } else {
+        blocking(move || find_image(&cache, &files, &candidates, &web)).await
+    }
+    .ok_or_else(not_found)?;
     let size = number::<i64>(request, "size")
         .filter(|size| *size > 0)
         .map(|size| u32::try_from(size.min(i64::from(MAX_EDGE))).unwrap_or(MAX_EDGE));
@@ -103,9 +105,22 @@ pub(super) async fn cover_art(
     {
         (target, content_type) = resized;
     }
-    file_response(&target, content_type, &request.headers, cache_headers)
-        .await
-        .map_err(|_| not_found())
+    file_response(
+        shared,
+        &target,
+        content_type,
+        &request.headers,
+        cache_headers,
+    )
+    .await
+    .map_err(|_| not_found())
+}
+
+/// `work` on the blocking pool.
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Option<T> + Send + 'static,
+) -> Option<T> {
+    tokio::task::spawn_blocking(work).await.ok().flatten()
 }
 
 /// The modification time in nanoseconds since the epoch, 0 when unknown.
@@ -139,24 +154,67 @@ fn find_image(
     candidates: &[(PathBuf, &'static str)],
     web: &[PathBuf],
 ) -> Option<Image> {
-    let on_disk = |path: &PathBuf| {
-        let metadata = fs::metadata(path).ok().filter(fs::Metadata::is_file)?;
-        Some(Image {
-            path: path.clone(),
-            len: metadata.len(),
-            content_type: sniff(path),
-            stamp: version_stamp(path, &metadata),
-        })
-    };
     files
         .iter()
-        .find_map(on_disk)
+        .find_map(|path| on_disk(path))
         .or_else(|| {
             candidates
                 .iter()
                 .find_map(|(audio, format)| extract_cached(dir, audio, format))
         })
-        .or_else(|| web.iter().find_map(on_disk))
+        .or_else(|| web.iter().find_map(|path| on_disk(path)))
+}
+
+/// [`find_image`] when an audio file is one the app lends: the same order,
+/// each lent file borrowed only while its picture is looked for. A lent
+/// file is borrowed even when its picture is cached, since its version
+/// stamp comes from the open file.
+async fn find_image_lent(
+    shared: &Shared,
+    dir: PathBuf,
+    files: Vec<PathBuf>,
+    candidates: Vec<(PathBuf, &'static str)>,
+    web: Vec<PathBuf>,
+) -> Option<Image> {
+    if let Some(image) = blocking(move || files.iter().find_map(|path| on_disk(path))).await {
+        return Some(image);
+    }
+    for (audio, format) in candidates {
+        let dir = dir.clone();
+        let image = if source::needs_app(&audio) {
+            let Ok(Readable {
+                file,
+                metadata,
+                lease,
+            }) = source::open(shared, &audio).await
+            else {
+                continue;
+            };
+            let file = file.into_std().await;
+            blocking(move || {
+                let _lease = lease;
+                extract_into(&dir, &audio, format, &metadata, || Some(file))
+            })
+            .await
+        } else {
+            blocking(move || extract_cached(&dir, &audio, format)).await
+        };
+        if image.is_some() {
+            return image;
+        }
+    }
+    blocking(move || web.iter().find_map(|path| on_disk(path))).await
+}
+
+/// `path` as the image to serve, when it is a file.
+fn on_disk(path: &Path) -> Option<Image> {
+    let metadata = fs::metadata(path).ok().filter(fs::Metadata::is_file)?;
+    Some(Image {
+        path: path.to_owned(),
+        len: metadata.len(),
+        content_type: sniff(path),
+        stamp: version_stamp(path, &metadata),
+    })
 }
 
 /// Identifies one version of a file: its path, mtime and length.
@@ -269,8 +327,20 @@ impl<F: Seek> Seek for Watched<F> {
 /// cache is unwritable.
 fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<Image> {
     let metadata = fs::metadata(audio).ok().filter(fs::Metadata::is_file)?;
+    extract_into(dir, audio, format, &metadata, || fs::File::open(audio).ok())
+}
+
+/// [`extract_cached`] for the audio file `audio` with `metadata`, which
+/// `open` opens only when its picture is not cached yet.
+fn extract_into(
+    dir: &Path,
+    audio: &Path,
+    format: &str,
+    metadata: &fs::Metadata,
+    open: impl FnOnce() -> Option<fs::File>,
+) -> Option<Image> {
     // The picture is a version of the audio file, whatever its cached copy.
-    let stamp = format!("embedded\0{}", version_stamp(audio, &metadata));
+    let stamp = format!("embedded\0{}", version_stamp(audio, metadata));
     let key = digest(&stamp);
     if without_picture().contains(&key) {
         return None;
@@ -295,7 +365,7 @@ fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<Image> {
             stamp,
         });
     }
-    let cover = match read_picture(fs::File::open(audio).ok()?, format).ok()? {
+    let cover = match read_picture(open()?, format).ok()? {
         Some(cover) => cover,
         None => {
             remember_without_picture(key);

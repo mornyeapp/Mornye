@@ -178,7 +178,7 @@ async fn undecodable_covers_are_served_as_they_are() {
 
 /// A minimal FLAC file: STREAMINFO, then `block` as the last metadata block
 /// of type `kind`, then a frame sync code.
-fn flac(kind: u8, block: &[u8]) -> Vec<u8> {
+pub(super) fn flac(kind: u8, block: &[u8]) -> Vec<u8> {
     let mut bytes = b"fLaC".to_vec();
     bytes.extend_from_slice(&[0, 0, 0, 34]);
     bytes.extend_from_slice(&[0; 34]);

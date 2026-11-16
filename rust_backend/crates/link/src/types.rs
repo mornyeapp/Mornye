@@ -130,6 +130,8 @@ pub struct Shared {
     pub host: Arc<dyn Host>,
     /// Replaced as a whole by `linkSetCatalog`.
     pub catalog: RwLock<Arc<Catalog>>,
+    /// The files the app lends for songs only it can open.
+    pub(crate) leases: crate::source::Leases,
 }
 
 impl Shared {

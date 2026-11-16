@@ -34,12 +34,15 @@ type Socket = WebSocketStream<TlsStream<TcpStream>>;
 const WAIT: Duration = Duration::from_secs(5);
 
 /// Records events and answers requests by `op`: `slow` never answers,
-/// `missing` and `broken` fail, anything else echoes its arguments.
+/// `missing` and `broken` fail, `server/files/open` lends `lent`, anything
+/// else echoes its arguments.
 #[derive(Default)]
 struct FakeHost {
     events: Mutex<Vec<(String, Value)>>,
     requests: Mutex<Vec<(String, String, Value)>>,
+    lent: Mutex<String>,
     changed: Condvar,
+    requested: Condvar,
 }
 
 impl Host for FakeHost {
@@ -53,10 +56,12 @@ impl Host for FakeHost {
             .lock()
             .unwrap()
             .push((op.to_owned(), device_id.to_owned(), args.clone()));
+        self.requested.notify_all();
         let reply = match op {
             "slow" => None,
             "missing" => Some(Err(HostError::new("not_found", "No such item"))),
             "broken" => Some(Err(HostError::new("weird", "Something broke"))),
+            "server/files/open" => Some(Ok(json!({"path": *self.lent.lock().unwrap()}))),
             _ => Some(Ok(json!({"op": op, "args": args}))),
         };
         Box::pin(async move {
@@ -74,6 +79,35 @@ impl Host for FakeHost {
 }
 
 impl FakeHost {
+    /// The arguments of the requests for `op` so far.
+    fn requests_for(&self, op: &str) -> Vec<Value> {
+        self.requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(name, _, _)| name == op)
+            .map(|(_, _, args)| args.clone())
+            .collect()
+    }
+
+    /// Waits for the first request for `op`.
+    fn wait_request(&self, op: &str) -> Value {
+        let deadline = Instant::now() + WAIT;
+        let mut requests = self.requests.lock().unwrap();
+        loop {
+            if let Some((_, _, args)) = requests.iter().find(|(name, _, _)| name == op) {
+                return args.clone();
+            }
+            let now = Instant::now();
+            assert!(now < deadline, "no {op} request: {requests:?}");
+            requests = self
+                .requested
+                .wait_timeout(requests, deadline - now)
+                .unwrap()
+                .0;
+        }
+    }
+
     fn events(&self, method: &str) -> Vec<Value> {
         self.events
             .lock()
@@ -833,6 +867,96 @@ fn phones_upload_song_files_into_the_received_folder() {
     assert_eq!(too_large.json(), json!({"error": "too_large"}));
     assert_eq!(std::fs::read(received.join(name)).unwrap(), b"fLaC");
     assert!(fixture.host.requests.lock().unwrap().is_empty());
+}
+
+#[test]
+fn phones_cannot_send_the_servers_own_requests() {
+    let fixture = Fixture::new();
+    let key = fixture.pair("phone-1");
+    for path in [
+        "/mornye/v1/server",
+        "/mornye/v1/server/files/open",
+        "/mornye/v1/server/files/close",
+    ] {
+        let response = fixture.post_json(
+            path,
+            Some(&key),
+            &json!({"uri": "content://com.example.documents/document/1", "lease": "1"}),
+        );
+        assert_eq!(response.status, 404, "{path}");
+    }
+    assert!(fixture.host.requests.lock().unwrap().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_dropped_connection_returns_the_file_the_app_lent() {
+    use std::os::fd::AsRawFd;
+    let fixture = Fixture::new();
+    // Larger than the socket buffers, so the server is still sending.
+    let audio = fixture.dir.path().join("lent.flac");
+    std::fs::write(&audio, vec![5u8; 16 << 20]).unwrap();
+    let held = std::fs::File::open(&audio).unwrap();
+    *fixture.host.lent.lock().unwrap() = format!("/dev/fd/{}", held.as_raw_fd());
+    let catalog = fixture.dir.path().join("catalog.ndjson");
+    let song = json!({
+        "id": "s", "title": "Song", "artist": "Band", "suffix": "flac",
+        "path": "content://com.example.documents/document/a%3ASong.flac",
+    });
+    std::fs::write(
+        &catalog,
+        format!("{}\n{song}\n", json!({"catalogVersion": 1, "count": 1})),
+    )
+    .unwrap();
+    fixture.server().set_catalog(&catalog).unwrap();
+    let (_, key) = fixture.subsonic_key();
+    let port = fixture.server().port();
+    let fingerprint = fixture.server().fingerprint().to_owned();
+    let host = Arc::clone(&fixture.host);
+    fixture.run(async move {
+        let tls = connect(port, &fingerprint).await;
+        let (mut sender, connection) = hyper::client::conn::http1::handshake(TokioIo::new(tls))
+            .await
+            .unwrap();
+        let connection = tokio::spawn(connection);
+        let request = http::Request::builder()
+            .uri(format!("/rest/stream?id=s&apiKey={key}"))
+            .header("host", "mornye.local")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+        let response = sender.send_request(request).await.unwrap();
+        assert_eq!(response.status(), 200);
+        let mut body = response.into_body();
+        let frame = body.frame().await.unwrap().unwrap();
+        assert!(frame.data_ref().is_some_and(|data| !data.is_empty()));
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(
+            host.requests_for("server/files/close").is_empty(),
+            "the lease lasts while the song is sent"
+        );
+        // The phone goes away mid-song.
+        drop(body);
+        drop(sender);
+        connection.abort();
+        let _ = connection.await;
+    });
+    let closed = fixture.host.wait_request("server/files/close");
+    let opened = fixture.host.requests_for("server/files/open");
+    assert_eq!(opened.len(), 1);
+    assert_eq!(
+        opened[0]["uri"],
+        "content://com.example.documents/document/a%3ASong.flac"
+    );
+    assert_eq!(closed["lease"], opened[0]["lease"]);
+    let devices: Vec<String> = fixture
+        .host
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(_, device, _)| device.clone())
+        .collect();
+    assert!(devices.iter().all(String::is_empty), "{devices:?}");
 }
 
 #[test]
