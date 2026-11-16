@@ -50,19 +50,33 @@ final class MediaArtwork {
     }
 
     static MediaMetadataCompat sanitize(MediaMetadataCompat metadata) {
-        return transform(metadata, false, false);
+        return transform(metadata, false, false, null);
     }
 
     static MediaMetadataCompat forSession(MediaMetadataCompat metadata) {
-        return transform(metadata, true, false);
+        return transform(metadata, true, false, null);
+    }
+
+    /** Like {@link #forSession(MediaMetadataCompat)}, reusing the copies kept in copies. */
+    static MediaMetadataCompat forSession(MediaMetadataCompat metadata, ArtCopies<Bitmap> copies) {
+        return transform(metadata, true, false, copies);
     }
 
     static MediaMetadataCompat withoutArtwork(MediaMetadataCompat metadata) {
-        return transform(metadata, false, true);
+        return transform(metadata, false, true, null);
+    }
+
+    /** The cover's copy for key, kept in copies while the cover stays the same. */
+    static Bitmap copy(Bitmap source, int maxDimension, ArtCopies<Bitmap> copies, String key) {
+        return copies.get(source, key, bitmap -> copy(bitmap, maxDimension));
+    }
+
+    static ArtCopies<Bitmap> newCopies() {
+        return new ArtCopies<>(bitmap -> !bitmap.isRecycled());
     }
 
     private static MediaMetadataCompat transform(MediaMetadataCompat metadata,
-            boolean copyArtwork, boolean omit) {
+            boolean copyArtwork, boolean omit, ArtCopies<Bitmap> copies) {
         MediaMetadataCompat.Builder builder = new MediaMetadataCompat.Builder(metadata);
         Bundle values = metadata.getBundle();
         for (String key : values.keySet()) {
@@ -72,7 +86,9 @@ final class MediaArtwork {
             // Each key gets its own copy: some frameworks consume a bitmap
             // while scaling it, before visiting another key with the same art.
             builder.putBitmap(key, omit || bitmap.isRecycled() ? null
-                    : copyArtwork ? copy(bitmap, MAX_DIMENSION) : bitmap);
+                    : !copyArtwork ? bitmap
+                    : copies == null ? copy(bitmap, MAX_DIMENSION)
+                    : copy(bitmap, MAX_DIMENSION, copies, key));
         }
         return builder.build();
     }
