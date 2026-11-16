@@ -2,6 +2,8 @@ package com.zarz.mornye
 
 import android.app.Activity
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Handler
@@ -22,6 +24,7 @@ import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
+import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.images.WebImage
 import com.mornye.backend.CastBridge
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -139,7 +142,7 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
                     remote.load(MediaLoadRequestData.Builder().setMediaInfo(media.build())
                         .setAutoplay(false).build()).setResultCallback { reply ->
                         if (reply.status.isSuccess) result.success(null)
-                        else result.error("CAST_LOAD", "TV rejected audio (${reply.status.statusCode})", null)
+                        else result.error("CAST_LOAD", loadFailure(reply.status.statusCode), null)
                     }
                 }
                 "play", "pause", "stop", "seek" -> {
@@ -187,6 +190,26 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
                     { result.error("CAST_MEDIA", it.message, null) },
                 )
             }
+        }
+    }
+
+    /**
+     * A TV that cannot fetch the audio from this device keeps trying and never
+     * answers the load, which Google Cast reports as a timeout.
+     */
+    private fun loadFailure(code: Int): String {
+        if (code != CommonStatusCodes.TIMEOUT) return "TV rejected audio ($code)"
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        val vpn = try {
+            connectivity?.getNetworkCapabilities(connectivity.activeNetwork)
+                ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+        } catch (_: RuntimeException) {
+            false
+        }
+        return "The TV could not reach this device. " + if (vpn) {
+            "Allow local network devices in your VPN app, or turn the VPN off."
+        } else {
+            "Check that both are on the same Wi-Fi network."
         }
     }
 

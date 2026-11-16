@@ -1,11 +1,31 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+// ignore: depend_on_referenced_packages
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/cast_playback_deck.dart';
 import 'package:mornye/services/playback_deck.dart';
+
+/// A receiver that takes the audio's address and then says nothing.
+class _StuckLoadTransport implements CastTransport {
+  final sent = StreamController<Object?>.broadcast(sync: true);
+
+  @override
+  Future<Object?> invoke(String method, [Map<String, Object?>? arguments]) =>
+      switch (method) {
+        'load' => Completer<Object?>().future,
+        'register' => Future.value({'url': 'http://192.0.2.2:4000/media/1'}),
+        _ => Future.value(),
+      };
+
+  @override
+  Stream<Object?> events() => sent.stream;
+
+  Future<void> close() => sent.close();
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -137,6 +157,36 @@ void main() {
     await deck.setFileSource('/song.flac');
     expect(calls.where((call) => call.method == 'serve'), hasLength(2));
     expect(calls.last.method, 'load');
+  });
+
+  test('a load waits for the platform to say why the TV did not answer', () {
+    fakeAsync((async) {
+      final transport = _StuckLoadTransport();
+      final output = CastOutput(transport: transport, nativePicker: true);
+      unawaited(output.initialize());
+      async.flushMicrotasks();
+      transport.sent.add({
+        'connected': true,
+        'deviceId': 'tv',
+        'host': '192.0.2.10',
+      });
+      final deck = CastPlaybackDeck(output: output, metadata: () => null);
+      Object? error;
+      unawaited(
+        deck.setFileSource('/song.flac').catchError((Object failure) {
+          error = failure;
+        }),
+      );
+      // Google Cast and the Rust sender both give up before 30 seconds.
+      async.elapse(const Duration(seconds: 30));
+      expect(error, isNull);
+      async.elapse(const Duration(seconds: 6));
+      expect(error, isA<TimeoutException>());
+      unawaited(deck.dispose());
+      async.flushMicrotasks();
+      output.dispose();
+      unawaited(transport.close());
+    });
   });
 
   test('a cancelled load cannot become ready or resume', () async {

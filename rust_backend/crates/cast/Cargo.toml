@@ -19,6 +19,7 @@ tokio-util.workspace = true
 rustls.workspace = true
 tokio-rustls.workspace = true
 mdns-sd.workspace = true
+if-addrs.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 getrandom.workspace = true

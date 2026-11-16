@@ -135,6 +135,11 @@ class CastPlaybackDeck implements PlaybackDeck {
     }
     if (token != _token || _state == PlaybackDeckState.disposed) return;
     _duration = item?.duration ?? Duration.zero;
+    if (_network(Uri.tryParse(url)?.host) != _network(output.host)) {
+      _log.w('The TV and the media server may be on different networks');
+    }
+    // A TV that cannot reach the media server answers nothing. The platform
+    // gives up first, and its error says why; this limit is the backstop.
     await output.command('load', {
       'url': url,
       'mime': mime,
@@ -144,12 +149,16 @@ class CastPlaybackDeck implements PlaybackDeck {
       'album': item?.album ?? '',
       'duration': _duration.inMilliseconds,
       'artwork': ?artwork,
-    });
+    }, const Duration(seconds: 35));
     if (token != _token || _state == PlaybackDeckState.disposed) return;
     _position = Duration.zero;
     _ready = true;
     _setState(PlaybackDeckState.paused);
   }
+
+  /// The first three parts of an IPv4 address, for the log only.
+  static String _network(String? address) =>
+      address == null ? '' : address.substring(0, address.lastIndexOf('.') + 1);
 
   Future<String> _register(String source, String mime) async {
     final reply = await output.request<Map<Object?, Object?>>('register', {

@@ -182,14 +182,17 @@ class CastOutput extends ChangeNotifier {
         .timeout(const Duration(seconds: 45));
   }
 
-  Future<void> command(String name, [Map<String, Object?>? arguments]) =>
-      request<Object?>(name, arguments);
+  Future<void> command(
+    String name, [
+    Map<String, Object?>? arguments,
+    Duration timeout = const Duration(seconds: 25),
+  ]) => request<Object?>(name, arguments, timeout);
 
-  Future<T?> request<T>(String name, [Map<String, Object?>? arguments]) async =>
-      await _transport
-              .invoke(name, arguments)
-              .timeout(const Duration(seconds: 25))
-          as T?;
+  Future<T?> request<T>(
+    String name, [
+    Map<String, Object?>? arguments,
+    Duration timeout = const Duration(seconds: 25),
+  ]) async => await _transport.invoke(name, arguments).timeout(timeout) as T?;
 
   Future<Duration> position() async => Duration(
     milliseconds: (await _transport.invoke('position') as num?)?.toInt() ?? 0,
