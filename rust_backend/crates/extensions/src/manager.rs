@@ -19,7 +19,7 @@ use crate::environment::{
 };
 use crate::manifest::ExtensionManifest;
 use crate::package::{ExtensionPackage, is_package_path};
-use crate::runtime::{LoadMode, lifecycle_result};
+use crate::runtime::{CompiledSource, LoadMode, lifecycle_result};
 use crate::{ExtensionError, ExtensionRuntime, RuntimeLimits};
 use mornye_core::cancellation::RequestLease;
 use mornye_core::fs::{DirBuilderPortableExt, OpenOptionsPortableExt};
@@ -59,6 +59,9 @@ struct Installed {
     manifest_json: String,
     source: PathBuf,
     status: RwLock<Status>,
+    // Survives a retired VM so its reload skips the compile. Loads reuse it
+    // only for identical source text; each install or upgrade has its own.
+    compiled: Mutex<Option<Arc<CompiledSource>>>,
     engine: Mutex<Engine>,
     // Pool maintenance must not wait for a primary VM running post-processing.
     // Code needing both locks takes engine before downloads.

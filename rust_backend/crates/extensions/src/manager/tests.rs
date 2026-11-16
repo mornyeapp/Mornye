@@ -1,10 +1,13 @@
 use super::{ExtensionManager, RuntimeLimits};
+use crate::runtime::source_compiles;
 use crate::storage::{StorageMasterKey, encrypt};
+use mornye_core::cancellation::{CancellationDomain, CancellationRegistry};
 use serde_json::{Value, json};
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 fn manager(directory: &Path) -> ExtensionManager {
     ExtensionManager::new(
@@ -286,6 +289,123 @@ fn manager_and_isolated_vm_share_one_retained_source_allocation() {
         source_bytes
     );
     manager.shutdown();
+}
+
+fn cancelled_call(manager: &ExtensionManager, id: &str) {
+    let registry = CancellationRegistry::new(CancellationDomain::ExtensionRequest);
+    let lease = Arc::new(registry.acquire("").unwrap());
+    std::thread::scope(|scope| {
+        let call = scope.spawn(|| manager.call(id, "spin", "[]", Some(Arc::clone(&lease)), 10_000));
+        std::thread::sleep(Duration::from_millis(50));
+        lease.release();
+        assert!(call.join().unwrap().is_err());
+    });
+}
+
+#[test]
+fn reloads_after_cancelled_calls_reuse_the_validated_compile() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = "/*example.reload*/let calls=0;registerExtension({next(){return ++calls;},spin(){while(true){}}});";
+    let archive = package(directory.path(), "example.reload", "1", source);
+    let installed = manager(directory.path());
+    installed.install(&archive).unwrap();
+    assert_eq!(source_compiles(source), 1);
+    for _ in 0..2 {
+        assert_eq!(
+            installed
+                .call("example.reload", "next", "[]", None, 0)
+                .unwrap(),
+            "1"
+        );
+        cancelled_call(&installed, "example.reload");
+    }
+    // Each reload starts a new VM: script state restarts, the compile does not.
+    assert_eq!(
+        installed
+            .call("example.reload", "next", "[]", None, 0)
+            .unwrap(),
+        "1"
+    );
+    assert_eq!(source_compiles(source), 1);
+
+    // A changed index.js is compiled again instead of running stale bytecode.
+    let changed = "/*example.reload changed*/registerExtension({next(){return 'changed';},spin(){while(true){}}});";
+    let entry = installed.get("example.reload").unwrap();
+    std::fs::write(entry.source.join("index.js"), changed).unwrap();
+    cancelled_call(&installed, "example.reload");
+    assert_eq!(
+        installed
+            .call("example.reload", "next", "[]", None, 0)
+            .unwrap(),
+        "\"changed\""
+    );
+    assert_eq!(source_compiles(changed), 1);
+    installed.shutdown();
+}
+
+#[test]
+fn startup_validation_compile_serves_the_first_call() {
+    let directory = tempfile::tempdir().unwrap();
+    let enabled = "/*example.startup*/registerExtension({ping(){return 'enabled';}});";
+    let disabled = "/*example.later*/registerExtension({ping(){return 'later';}});";
+    let installed = manager(directory.path());
+    for (id, source) in [("example.startup", enabled), ("example.later", disabled)] {
+        installed
+            .install(&package(directory.path(), id, "1", source))
+            .unwrap();
+    }
+    installed.set_enabled("example.later", false).unwrap();
+    installed.shutdown();
+    let compiled = (source_compiles(enabled), source_compiles(disabled));
+
+    let reopened = manager(directory.path());
+    reopened.load_all().unwrap();
+    assert_eq!(
+        reopened
+            .call("example.startup", "ping", "[]", None, 0)
+            .unwrap(),
+        "\"enabled\""
+    );
+    assert_eq!(source_compiles(enabled), compiled.0 + 1);
+    // Disabled packages are still validated at start; enabling one later
+    // compiles it for its new VM.
+    assert_eq!(source_compiles(disabled), compiled.1 + 1);
+    reopened.set_enabled("example.later", true).unwrap();
+    assert_eq!(
+        reopened
+            .call("example.later", "ping", "[]", None, 0)
+            .unwrap(),
+        "\"later\""
+    );
+    reopened.shutdown();
+}
+
+#[test]
+fn upgrades_never_reuse_the_previous_compile() {
+    let directory = tempfile::tempdir().unwrap();
+    let first = "/*example.version*/registerExtension({ping(){return 1;}});";
+    let second = "/*example.version*/registerExtension({ping(){return 2;}});";
+    let installed = manager(directory.path());
+    installed
+        .install(&package(directory.path(), "example.version", "1", first))
+        .unwrap();
+    assert_eq!(
+        installed
+            .call("example.version", "ping", "[]", None, 0)
+            .unwrap(),
+        "1"
+    );
+    installed
+        .upgrade(&package(directory.path(), "example.version", "2", second))
+        .unwrap();
+    assert_eq!(
+        installed
+            .call("example.version", "ping", "[]", None, 0)
+            .unwrap(),
+        "2"
+    );
+    assert_eq!(source_compiles(second), 1);
+    installed.shutdown();
 }
 
 #[test]

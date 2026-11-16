@@ -4,7 +4,7 @@ mod index;
 
 use crate::auth::{AuthRegistry, ExtensionAuth, PendingAuthRequest};
 use crate::manifest::{ExtensionManifest, ManifestError};
-use crate::runtime::LoadMode;
+use crate::runtime::{CompiledSource, LoadMode};
 use crate::signed_session::SignedRegistry;
 use crate::storage::{
     ExtensionStore, StorageError, StorageMasterKey, StoreKind, valid_extension_id,
@@ -289,6 +289,7 @@ impl ExtensionEnvironment {
             LoadMode::Initialize,
             None,
             None,
+            None,
         )
     }
 
@@ -299,8 +300,9 @@ impl ExtensionEnvironment {
         limits: RuntimeLimits,
         mode: LoadMode,
         lease: Option<Arc<mornye_core::cancellation::RequestLease>>,
+        compiled: Option<Arc<CompiledSource>>,
     ) -> Result<Arc<ExtensionRuntime>, EnvironmentError> {
-        self.load_internal(manifest_json, source, limits, mode, None, lease)
+        self.load_internal(manifest_json, source, limits, mode, None, lease, compiled)
     }
 
     pub(crate) fn load_isolated(
@@ -317,9 +319,12 @@ impl ExtensionEnvironment {
             LoadMode::Register,
             Some(primary),
             None,
+            None,
         )
     }
 
+    // A compiled source is used only when its text matches `source`.
+    #[allow(clippy::too_many_arguments)]
     fn load_internal(
         &self,
         manifest_json: &str,
@@ -328,6 +333,7 @@ impl ExtensionEnvironment {
         load_mode: LoadMode,
         primary: Option<&ExtensionRuntime>,
         startup_lease: Option<Arc<mornye_core::cancellation::RequestLease>>,
+        compiled: Option<Arc<CompiledSource>>,
     ) -> Result<Arc<ExtensionRuntime>, EnvironmentError> {
         let _operation = self.enter()?;
         if manifest_json.len() > 1024 * 1024 {
@@ -346,7 +352,9 @@ impl ExtensionEnvironment {
         let mut settings = store.all(StoreKind::Settings)?;
         settings.retain(|key, _| !key.starts_with('_'));
         let isolated = primary.is_some();
-        let compiled_source = primary.map(|runtime| Arc::clone(&runtime.compiled_source));
+        let compiled_source = primary
+            .map(|runtime| Arc::clone(&runtime.compiled_source))
+            .or(compiled);
         let network = primary
             .and_then(ExtensionRuntime::network_session)
             .unwrap_or_else(|| {
