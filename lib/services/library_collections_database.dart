@@ -720,6 +720,29 @@ class LibraryCollectionsDatabase {
     ),
   );
 
+  /// The first [limit] songs of a playlist in playlist order, in pages that
+  /// start at [firstPage] songs and double, so a reader that stops early
+  /// reads and decodes only the pages it took.
+  Stream<List<Track>> playlistTrackPages(
+    String playlistId, {
+    required int firstPage,
+    int limit = 500,
+  }) async* {
+    final db = await database;
+    var offset = 0;
+    for (var size = firstPage; offset < limit; size *= 2) {
+      final pageSize = size < limit - offset ? size : limit - offset;
+      final rows = await db.rawQuery(
+        'SELECT track_json FROM $_tablePlaylistTracks WHERE playlist_id = ? '
+        'ORDER BY added_at ASC, rowid ASC LIMIT ? OFFSET ?',
+        [playlistId, pageSize, offset],
+      );
+      yield _decodeTracks(rows);
+      if (rows.length < pageSize) return;
+      offset += pageSize;
+    }
+  }
+
   static List<Track> _decodeTracks(List<Map<String, Object?>> rows) => [
     for (final row in rows) ?_decodeTrack(row['track_json']),
   ];

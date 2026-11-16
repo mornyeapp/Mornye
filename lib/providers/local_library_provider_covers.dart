@@ -116,12 +116,17 @@ Future<List<String?>> _resolveCovers(
       else
         Future.value(false),
   ]);
-  if (!stored.contains(false)) return [for (final track in tracks) track.cover];
-  final rows = await _libraryRows(tracks);
-  return [
+  final covers = [for (final track in tracks) track.cover];
+  final missing = [
     for (var i = 0; i < tracks.length; i++)
-      stored[i] ? tracks[i].cover : _nonEmptyCoverPath(rows[i]),
+      if (!stored[i]) i,
   ];
+  if (missing.isEmpty) return covers;
+  final rows = await _libraryRows([for (final i in missing) tracks[i]]);
+  for (var j = 0; j < missing.length; j++) {
+    covers[missing[j]] = _nonEmptyCoverPath(rows[j]);
+  }
+  return covers;
 }
 
 /// The cover one song of a collection shows on this device.
@@ -151,18 +156,51 @@ final localLibraryCoversProvider = FutureProvider.autoDispose
       return _resolveCovers(request.tracks);
     }, retry: (_, _) => null);
 
-/// The first cover of a collection this device can load.
-Future<String?> _firstCover(List<LocalLibraryCoverRequest> tracks) async {
+/// Songs of the first page searched for a collection's first cover. Each
+/// later page doubles, so a cover near the start reads a few songs and a long
+/// collection without one still takes few lookups.
+const _firstCoverPage = 16;
+
+/// The first cover of [page] this device can load.
+Future<String?> _firstCoverOfPage(List<LocalLibraryCoverRequest> page) async {
   List<Map<String, dynamic>?>? rows;
-  for (var i = 0; i < tracks.length; i++) {
-    final stored = tracks[i].cover;
+  var looked = 0;
+  for (var i = 0; i < page.length; i++) {
+    final stored = page[i].cover;
     if (stored != null && await _coverLoadsHere(stored)) return stored;
-    // One lookup answers every song without a cover of its own.
-    rows ??= await _libraryRows(tracks);
-    final cover = _nonEmptyCoverPath(rows[i]);
+    // One lookup answers this song and every later one of the page.
+    if (rows == null) {
+      looked = i;
+      rows = await _libraryRows(page.sublist(i));
+    }
+    final cover = _nonEmptyCoverPath(rows[i - looked]);
     if (cover != null) return cover;
   }
   return null;
+}
+
+/// The first cover of a collection this device can load, read page by page
+/// until one answers.
+Future<String?> _firstCover(
+  Stream<List<LocalLibraryCoverRequest>> pages,
+) async {
+  await for (final page in pages) {
+    final cover = await _firstCoverOfPage(page);
+    if (cover != null) return cover;
+  }
+  return null;
+}
+
+Iterable<List<LocalLibraryCoverRequest>> _coverPages(
+  List<LocalLibraryCoverRequest> tracks,
+) sync* {
+  for (
+    var start = 0, size = _firstCoverPage;
+    start < tracks.length;
+    start += size, size *= 2
+  ) {
+    yield tracks.sublist(start, (start + size).clamp(0, tracks.length));
+  }
 }
 
 final localLibraryFirstCoverProvider = FutureProvider.autoDispose
@@ -170,8 +208,25 @@ final localLibraryFirstCoverProvider = FutureProvider.autoDispose
       ref.watch(
         localLibraryProvider.select((state) => state.loadedIndexVersion),
       );
-      return _firstCover(request.tracks);
+      return _firstCover(Stream.fromIterable(_coverPages(request.tracks)));
     });
+
+typedef _PlaylistCoverRequest = ({
+  String id,
+  String? cover,
+  DateTime? updatedAt,
+});
+
+/// Playlist covers answered since the Library index last changed, so a tile
+/// that scrolls back into view or the playlist picker asks no lookup again.
+final _playlistCoversProvider = Provider<Map<_PlaylistCoverRequest, String?>>((
+  ref,
+) {
+  ref.watch(localLibraryProvider.select((state) => state.loadedIndexVersion));
+  return {};
+});
+
+const _playlistCoversKept = 256;
 
 /// The cover of a playlist without an image of its own: `cover`, the stored
 /// cover of its first song, when this device can load it, otherwise the
@@ -179,18 +234,27 @@ final localLibraryFirstCoverProvider = FutureProvider.autoDispose
 /// playlist changed. A failed lookup shows the placeholder, so it is not
 /// retried.
 final playlistCoverProvider = FutureProvider.autoDispose
-    .family<String?, ({String id, String? cover, DateTime? updatedAt})>((
-      ref,
-      request,
-    ) async {
-      ref.watch(
-        localLibraryProvider.select((state) => state.loadedIndexVersion),
-      );
-      final cover = request.cover;
-      if (cover != null && await _coverLoadsHere(cover)) return cover;
-      final tracks = await LibraryCollectionsDatabase.instance
-          .loadPlaylistTracks(request.id);
-      return _firstCover([
-        for (final track in tracks) LocalLibraryCoverRequest.of(track),
-      ]);
+    .family<String?, _PlaylistCoverRequest>((ref, request) async {
+      final covers = ref.watch(_playlistCoversProvider);
+      if (covers.containsKey(request)) return covers[request];
+      final cover = await _playlistCover(request);
+      covers[request] = cover;
+      if (covers.length > _playlistCoversKept) {
+        covers.remove(covers.keys.first);
+      }
+      return cover;
     }, retry: (_, _) => null);
+
+Future<String?> _playlistCover(_PlaylistCoverRequest request) async {
+  final cover = request.cover;
+  if (cover != null && await _coverLoadsHere(cover)) return cover;
+  return _firstCover(
+    LibraryCollectionsDatabase.instance
+        .playlistTrackPages(request.id, firstPage: _firstCoverPage)
+        .map(
+          (tracks) => [
+            for (final track in tracks) LocalLibraryCoverRequest.of(track),
+          ],
+        ),
+  );
+}
