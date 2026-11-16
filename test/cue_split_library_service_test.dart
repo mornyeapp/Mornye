@@ -182,6 +182,45 @@ void main() {
     },
   );
 
+  test('outputs join the folder of the song the split started from', () async {
+    // A song opened from a list carries only the default folder, which
+    // this library does not have.
+    await service().publish(
+      cuePath: cue.path,
+      audioPath: audio.path,
+      tracks: tracks,
+      outputPaths: outputs,
+      sourceItemId: 'cue1',
+    );
+    expect(await visible(), ['output1', 'output2']);
+    expect(
+      (await db.query(
+        'library',
+        where: 'id LIKE ?',
+        whereArgs: ['output%'],
+      )).map((row) => row['source_id']),
+      everyElement('source'),
+    );
+
+    // A song the library does not know keeps the folder it was given.
+    await service().publish(
+      cuePath: cue.path,
+      audioPath: audio.path,
+      tracks: tracks,
+      outputPaths: outputs,
+      sourceId: 'other',
+      sourceItemId: 'unknown',
+    );
+    expect(
+      (await db.query(
+        'library',
+        where: 'id LIKE ?',
+        whereArgs: ['output%'],
+      )).map((row) => row['source_id']),
+      everyElement('other'),
+    );
+  });
+
   test(
     'unavailable output source restores originals without deleting split files',
     () async {
