@@ -56,6 +56,9 @@ const _session = 'session-1';
 /// A phone and a computer with clocks 3.456 s apart, the computer's audio
 /// 150 ppm fast, start delays of 60 ms (phone) and 20 ms (computer), and
 /// position reports off by up to 5 ms.
+///
+/// [engineReadMs], [desktopLatencyMs] and the rate costs model what a real
+/// run measured (see [_measured]); [seed] varies the noise.
 class _Sim {
   _Sim(
     this.async, {
@@ -66,6 +69,12 @@ class _Sim {
     List<int>? followerDurations,
     double desktopPpm = 150,
     bool followerNudges = true,
+    int desktopLatencyMs = 20,
+    int phoneLatencyMs = 60,
+    int engineReadMs = 0,
+    SimRateCost? desktopRateCost,
+    SimRateCost? phoneRateCost,
+    int seed = 0,
   }) {
     final queue = songs ?? [simSong('One'), simSong('Two'), simSong('Three')];
     final lengths = durations ?? [900000, 900000, 900000];
@@ -73,11 +82,13 @@ class _Sim {
       trueNowMs: trueNow,
       queue: queue,
       durations: lengths,
-      playLatencyMs: 60,
+      playLatencyMs: phoneLatencyMs,
       loadMs: 150,
       jitterMs: 5,
       nudges: followerNudges || phoneLeads,
-      random: Random(2),
+      engineReadMs: engineReadMs,
+      rateCost: phoneRateCost,
+      random: Random(2 + seed * 10),
     );
     desktop = SimDeck(
       trueNowMs: trueNow,
@@ -85,16 +96,18 @@ class _Sim {
       durations: lengths,
       clockOffsetMs: 3456,
       audioPpm: desktopPpm,
-      playLatencyMs: 20,
+      playLatencyMs: desktopLatencyMs,
       loadMs: 80,
       jitterMs: 5,
       nudges: followerNudges || !phoneLeads,
-      random: Random(3),
+      engineReadMs: engineReadMs,
+      rateCost: desktopRateCost,
+      random: Random(3 + seed * 10),
     );
     _followerSongs = followerSongs ?? queue;
     _followerDurations = followerDurations ?? lengths;
     final router = LinkHostRouter();
-    wire = _Wire(router, Random(4));
+    wire = _Wire(router, Random(4 + seed * 10));
     host = LinkTogetherHost(
       deck: desktop,
       nowMs: desktop.nowMs,
@@ -121,7 +134,9 @@ class _Sim {
   final errors = <({int atMs, double errorMs})>[];
   Timer? _trace;
 
-  int trueNow() => 5000000 + async.elapsed.inMilliseconds;
+  static const _epochMs = 5000000;
+
+  int trueNow() => _epochMs + async.elapsed.inMilliseconds;
 
   SimDeck get leader => phoneLeads ? phone : desktop;
   SimDeck get follower => phoneLeads ? desktop : phone;
@@ -185,13 +200,13 @@ class _Sim {
   }
 
   /// How far the phone is from where it should be against the computer,
-  /// as heard: positive while it runs ahead. Null unless both play the
+  /// as heard: positive while it runs ahead. Null unless both sound the
   /// same song.
   double? trueErrorMs() {
     final phoneAt = phone.truePosition;
     final desktopAt = desktop.truePosition;
-    if (!phone.playing ||
-        !desktop.playing ||
+    if (!phone.sounding ||
+        !desktop.sounding ||
         phone.refAt(phone.index) != desktop.refAt(desktop.index)) {
       return null;
     }
@@ -215,12 +230,46 @@ class _Sim {
     return heard.fold<double>(0, (sum, error) => sum + error) / heard.length;
   }
 
+  /// The share of the time from [fromMs] into the run on that the error
+  /// heard stays within 20 ms.
+  double inStepShare(int fromMs) {
+    final heard = [
+      for (final sample in errors)
+        if (sample.atMs >= fromMs) sample.errorMs.abs(),
+    ];
+    return heard.where((error) => error <= 20).length / heard.length;
+  }
+
+  /// The follower's rate changes from [fromMs] into the run on.
+  int rateChangesFrom(int fromMs) =>
+      follower.rateChangesAt.where((at) => at - _epochMs >= fromMs).length;
+
   void finish() {
     _trace?.cancel();
     coordinator.stop();
     host.dispose();
   }
 }
+
+/// A computer as a real run measured it (2026-11-17, an Android emulator
+/// leading the macOS app, both release builds): its report runs ahead of
+/// its sound for a moment after each start (the sound follows play by
+/// about 230 ms), the app's player state reads the engine about every half
+/// second, and every rate change costs what [cost] says.
+_Sim _measured(
+  FakeAsync async,
+  SimRateCost cost, {
+  bool phoneLeads = true,
+  int seed = 0,
+}) => _Sim(
+  async,
+  phoneLeads: phoneLeads,
+  desktopLatencyMs: 230,
+  engineReadMs: 500,
+  desktopRateCost: phoneLeads ? cost : null,
+  phoneRateCost: phoneLeads ? null : cost,
+  seed: seed,
+);
 
 void main() {
   group('Play together in a simulated room', () {
@@ -469,6 +518,101 @@ void main() {
           lessThanOrEqualTo(4),
         );
         expect(sim.worstFrom(3000), lessThanOrEqualTo(100));
+        sim.finish();
+      });
+    });
+  });
+
+  group('Play together against measured players', () {
+    /// Five minutes of [cost] on the follower from a start at 18 s, once
+    /// for each of five noise seeds.
+    void run(
+      SimRateCost cost,
+      void Function(_Sim sim) check, {
+      bool phoneLeads = true,
+    }) {
+      for (var seed = 0; seed < 5; seed++) {
+        fakeAsync((async) {
+          final sim = _measured(
+            async,
+            cost,
+            phoneLeads: phoneLeads,
+            seed: seed,
+          );
+          sim.leader.playNow(position: 18000);
+          sim.start();
+          async.elapse(const Duration(minutes: 5));
+          check(sim);
+          sim.finish();
+        });
+      }
+    }
+
+    // The computer as the real run met it: about 24 ms lost on every rate
+    // change, which the aligner used to answer with a nudge every 4 s for
+    // as long as the session lasted.
+    test('a computer that loses time on each rate change gets in step and '
+        'stops changing its rate', () {
+      run(simPlainRateCost, (sim) {
+        expect(sim.coordinator.rejoins, 1);
+        expect(sim.inStepShare(45000), greaterThanOrEqualTo(0.9));
+        expect(sim.meanFrom(45000), lessThanOrEqualTo(12));
+        // The old aligner changed the rate about 120 times here.
+        expect(sim.rateChangesFrom(60000), lessThanOrEqualTo(10));
+      });
+    });
+
+    test('a phone that loses time on each rate change gets in step and '
+        'stops changing its rate', () {
+      run(phoneLeads: false, simPlainRateCost, (sim) {
+        expect(sim.coordinator.rejoins, 1);
+        expect(sim.inStepShare(45000), greaterThanOrEqualTo(0.9));
+        expect(sim.meanFrom(45000), lessThanOrEqualTo(12));
+        expect(sim.rateChangesFrom(60000), lessThanOrEqualTo(10));
+      });
+    });
+
+    test('a computer whose rate changes keep its clock stays within 20 ms', () {
+      run(simPinnedRateCost, (sim) {
+        expect(sim.coordinator.rejoins, 1);
+        expect(sim.worstFrom(45000), lessThanOrEqualTo(20));
+        expect(sim.meanFrom(45000), lessThanOrEqualTo(6));
+        // 150 ppm adds 36 ms in the four minutes; short nudges take it out.
+        expect(sim.rateChangesFrom(60000), lessThanOrEqualTo(12));
+      });
+    });
+
+    test('a computer whose rate changes move it unevenly settles and stops '
+        'nudging', () {
+      run(simTappedRateCost, (sim) {
+        expect(sim.coordinator.rejoins, 1);
+        // Holding leaves up to 80 ms alone; a nudge only past that.
+        expect(sim.worstFrom(60000), lessThanOrEqualTo(100));
+        expect(sim.rateChangesFrom(60000), lessThanOrEqualTo(6));
+      });
+    });
+
+    test('a computer that sounds late after a cue is cued early enough from '
+        'the second cue on', () {
+      fakeAsync((async) {
+        final sim = _measured(async, simPinnedRateCost);
+        sim.phone.playNow(position: 18000);
+        sim.start();
+        async.elapse(const Duration(seconds: 40));
+
+        // The computer sounds 230 ms after its play: the first cue learns
+        // that, so a seek on the phone lines it up at once.
+        for (final position in [90000, 30000]) {
+          sim.phone.seek(Duration(milliseconds: position));
+          final cued = async.elapsed.inMilliseconds;
+          async.elapse(const Duration(seconds: 20));
+          // The phone's seek shows as drift and the cue sounds about 2.5 s
+          // later; from then until a nudge could have done the work.
+          expect(
+            sim.worstFrom(cued + 3000, cued + 8000),
+            lessThanOrEqualTo(25),
+          );
+        }
         sim.finish();
       });
     });
