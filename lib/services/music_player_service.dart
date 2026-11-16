@@ -1917,7 +1917,20 @@ class MusicPlayerHandler extends BaseAudioHandler
     );
     await _claimHardwareMediaButtons();
     if (!_isCurrentPlayRequest(generation, media)) return;
-    if (_dependencies.isAndroid && !media.isNetwork) {
+    // Android opens SAF files through a short-lived file-descriptor lease.
+    // MediaPlayer duplicates that descriptor, so the original can be closed
+    // immediately after play() without retaining a full-file cache copy.
+    // A document that opens has not moved, so only one that does not is
+    // looked for as a moved download.
+    var playbackLease = await _openPlaybackLease(media);
+    if (!_isCurrentPlayRequest(generation, media)) {
+      if (playbackLease != null) {
+        await PlatformBridge.closeContentUriPlaybackLease(playbackLease.token);
+      }
+      return;
+    }
+    if (_dependencies.isAndroid && !media.isNetwork && playbackLease == null) {
+      final requested = media.source;
       try {
         final recovered = await _dependencies.recoverMovedDownload(
           media.source,
@@ -1934,6 +1947,9 @@ class MusicPlayerHandler extends BaseAudioHandler
         _log.w('Could not resolve a moved download: $error');
       }
       if (!_isCurrentPlayRequest(generation, media)) return;
+      if (media.source != requested) {
+        playbackLease = await _openPlaybackLease(media);
+      }
     }
     if (!media.isNetwork) {
       unawaited(_recoverEmbeddedArtwork(media, generation));
@@ -1942,19 +1958,6 @@ class MusicPlayerHandler extends BaseAudioHandler
       ..fetchFor(media)
       ..fetchAhead();
 
-    // Android opens SAF files through a short-lived file-descriptor lease.
-    // MediaPlayer duplicates that descriptor, so the original can be closed
-    // immediately after play() without retaining a full-file cache copy.
-    ContentUriPlaybackLease? playbackLease;
-    if (_dependencies.isAndroid && media.isContentUri && !_cast.active) {
-      try {
-        playbackLease = await PlatformBridge.openContentUriPlaybackLease(
-          media.source,
-        );
-      } catch (e) {
-        _log.w('Failed to open direct SAF playback lease: $e');
-      }
-    }
     var resolved = playbackLease?.path ?? await _formats.resolve(media);
     var usingLocalSafCopy = media.isContentUri && playbackLease == null;
     if (!_isCurrentPlayRequest(generation, media)) {
@@ -2121,6 +2124,20 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (_switchingGeneration == generation) {
         _switchingGeneration = 0;
       }
+    }
+  }
+
+  Future<ContentUriPlaybackLease?> _openPlaybackLease(
+    PlayableMedia media,
+  ) async {
+    if (!_dependencies.isAndroid || !media.isContentUri || _cast.active) {
+      return null;
+    }
+    try {
+      return await _dependencies.openPlaybackLease(media.source);
+    } catch (e) {
+      _log.w('Failed to open direct SAF playback lease: $e');
+      return null;
     }
   }
 

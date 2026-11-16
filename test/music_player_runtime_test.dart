@@ -40,6 +40,7 @@ import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/network_metadata_service.dart';
 import 'package:mornye/services/network_playback_cache.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/source_deletion_events.dart';
@@ -713,6 +714,7 @@ MusicPlayerRuntime _runtime({
   LibraryCollectionsDatabase? collectionsDatabase,
   Future<String?> Function(String)? recoverMissingFile,
   Future<String?> Function(String, String, AppSettings)? recoverMovedDownload,
+  Future<ContentUriPlaybackLease?> Function(String)? openPlaybackLease,
   Future<String> Function(String)? resolveNetworkSource,
   Future<String?> Function(String)? offlineCopy,
   NetworkPlaybackCache? networkCache,
@@ -753,6 +755,7 @@ MusicPlayerRuntime _runtime({
           (_, {displayName}) async => {'replaygain_track_gain': '-6 dB'},
       recoverMissingFile: recoverMissingFile ?? (_) async => null,
       recoverMovedDownload: recoverMovedDownload ?? (_, _, _) async => null,
+      openPlaybackLease: openPlaybackLease ?? (_) async => null,
       resolveNetworkSource:
           resolveNetworkSource ?? NetworkStorageService.instance.resolve,
       offlineCopy: offlineCopy ?? (_) async => null,
@@ -1269,6 +1272,73 @@ void main() {
         (store.active!['media'] as List).map((item) => (item as Map)['source']),
         ['/new-folder/song.flac', '/new-folder/song.flac'],
       );
+    },
+  );
+
+  test(
+    'an Android document that opens is not looked for as a moved download',
+    () async {
+      final decks = <_Deck>[];
+      final recoveries = <String>[];
+      final opened = <String>[];
+      const song = 'content://tree/a/document/song';
+      final handler = await _runtime(
+        isAndroid: true,
+        decks: decks,
+        recoverMovedDownload: (source, id, settings) async {
+          recoveries.add(source);
+          return null;
+        },
+        openPlaybackLease: (uri) async {
+          opened.add(uri);
+          return const ContentUriPlaybackLease(
+            path: '/proc/self/fd/7',
+            token: 'lease',
+          );
+        },
+      ).initialize();
+      await handler.setQueueAndPlay([
+        PlayableMedia.fromJson({..._track.toJson(), 'source': song})!,
+      ]);
+      expect(opened, [song]);
+      expect(recoveries, isEmpty);
+      expect(decks.single.sources, ['/proc/self/fd/7']);
+      expect(handler.playbackState.value.errorMessage, isNull);
+    },
+  );
+
+  test(
+    'an Android document that cannot be opened plays from where it moved',
+    () async {
+      final decks = <_Deck>[];
+      final recoveries = <String>[];
+      final opened = <String>[];
+      const song = 'content://tree/a/document/old';
+      const moved = 'content://tree/a/document/new';
+      final handler = await _runtime(
+        isAndroid: true,
+        decks: decks,
+        recoverMovedDownload: (source, id, settings) async {
+          recoveries.add(source);
+          return source == song ? moved : null;
+        },
+        openPlaybackLease: (uri) async {
+          opened.add(uri);
+          if (uri != moved) throw StateError('missing');
+          return const ContentUriPlaybackLease(
+            path: '/proc/self/fd/8',
+            token: 'lease',
+          );
+        },
+      ).initialize();
+      await handler.setQueueAndPlay([
+        PlayableMedia.fromJson({..._track.toJson(), 'source': song})!,
+      ]);
+      expect(recoveries, [song]);
+      expect(opened, [song, moved]);
+      expect(decks.single.sources, ['/proc/self/fd/8']);
+      expect(handler.mediaItem.value?.extras?['source'], moved);
+      expect(handler.playbackState.value.errorMessage, isNull);
     },
   );
 

@@ -82,6 +82,7 @@ class PlaybackDependencies {
     this.recoverMissingFile = _recoverMissingFile,
     this.fileAccess = checkFileAccess,
     this.recoverMovedDownload = _recoverMovedDownload,
+    this.openPlaybackLease = PlatformBridge.openContentUriPlaybackLease,
     this.initializeHandler = _initializeAudioHandler,
     this.synchronizePlaybackState = _synchronizePlaybackState,
     this.createPersonalization = AutoplayPersonalization.new,
@@ -151,6 +152,9 @@ class PlaybackDependencies {
     AppSettings settings,
   )
   recoverMovedDownload;
+
+  /// Opens an Android document for the song starting to play.
+  final Future<ContentUriPlaybackLease?> Function(String uri) openPlaybackLease;
   final Future<MusicPlayerHandler> Function(MusicPlayerHandler Function())
   initializeHandler;
   final Future<void> Function() synchronizePlaybackState;
