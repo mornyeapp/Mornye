@@ -21,6 +21,9 @@ impl From<String> for HiResCheckError {
 /// checker cannot decode is not an error: it returns `{"supported": false}`
 /// so the UI can say "not checkable" rather than report a broken file.
 /// CPU-bound for a second or two: call it off the main thread.
+/// With `"detailed": true` the whole file is read instead of a sample of it,
+/// which takes several seconds, and the result carries a `report` on its
+/// integrity, real bit depth and any trace of a lossy source.
 /// With `verify_replacement_path`, bypasses sampled analysis and compares the
 /// entire decoded PCM stream, returning only `replacement_equivalent`.
 #[uniffi::export]
@@ -56,9 +59,19 @@ pub fn check_hires_authenticity(
         serde_json::from_str(&options_json)
             .map_err(|error| format!("invalid hi-res check options: {error}"))?
     };
+    let detailed = request
+        .get("detailed")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
     let file = open_audio_file(&path)?;
-    let result = match hires::check_file(file, &path, &options, &check) {
-        Ok(result) => result,
+    let checked = if detailed {
+        hires::inspect_file(file, &path, &options, &check)
+            .map(|inspection| (inspection.check, Some(inspection.report)))
+    } else {
+        hires::check_file(file, &path, &options, &check).map(|result| (result, None))
+    };
+    let (result, report) = match checked {
+        Ok(checked) => checked,
         Err(hires::HiResCheckError::Unsupported) => {
             return Ok(serde_json::json!({"supported": false, "file_path": path}).to_string());
         }
@@ -66,6 +79,10 @@ pub fn check_hires_authenticity(
     };
     let mut value = serde_json::to_value(&result).map_err(|error| error.to_string())?;
     if let Some(object) = value.as_object_mut() {
+        if let Some(report) = report {
+            let report = serde_json::to_value(&report).map_err(|error| error.to_string())?;
+            object.insert("report".into(), report);
+        }
         object.insert("supported".into(), true.into());
         object.insert("is_suspicious".into(), result.is_suspicious().into());
         object.insert("padded_bit_depth".into(), result.padded_bit_depth().into());

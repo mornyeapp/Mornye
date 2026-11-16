@@ -5,6 +5,8 @@ use super::*;
 
 pub(in crate::media::hires) struct StftPlan {
     n: usize,
+    /// Samples from one frame to the next.
+    hop: usize,
     window: Vec<f64>,
     window_power: f64,
     band_low: usize,
@@ -17,6 +19,18 @@ pub(in crate::media::hires) struct StftPlan {
 }
 
 impl StftPlan {
+    /// A plan whose frames lie at least `hop` samples apart, so a pass over
+    /// a whole file reads a bounded number of them.
+    pub(in crate::media::hires) fn spaced(n: usize, sample_rate: u32, hop: usize) -> Self {
+        let mut plan = Self::new(n, sample_rate);
+        plan.hop = plan.hop.max(hop);
+        plan
+    }
+
+    pub(in crate::media::hires) fn size(&self) -> usize {
+        self.n
+    }
+
     pub(in crate::media::hires) fn new(n: usize, sample_rate: u32) -> Self {
         let window: Vec<f64> = (0..n)
             .map(|i| 0.5 - 0.5 * (2.0 * std::f64::consts::PI * i as f64 / n as f64).cos())
@@ -40,6 +54,7 @@ impl StftPlan {
         }
         Self {
             n,
+            hop: n / 4,
             window,
             window_power,
             band_low,
@@ -99,7 +114,7 @@ impl StftAccumulator {
             check()?;
         }
         self.frame_count += 1;
-        self.until_frame = plan.n / 4;
+        self.until_frame = plan.hop;
         if self.signal.iter().all(|sample| *sample == 0.0) {
             return Ok(());
         }

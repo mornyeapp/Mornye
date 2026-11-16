@@ -6151,6 +6151,291 @@
       }
     }
   },
+  "hiResReportSummary": "Reads the whole file and checks its integrity, real bit depth, frequency range and traces of lossy compression.",
+  "@hiResReportSummary": {
+    "description": "What the Hi-Res authenticity inspection does, shown before it runs"
+  },
+  "hiResReportChecking": "Reading the whole file. Long tracks take a little longer.",
+  "@hiResReportChecking": {
+    "description": "Loading text while the whole-file inspection runs"
+  },
+  "hiResReportGradeCorrupt": "Damaged file",
+  "@hiResReportGradeCorrupt": {
+    "description": "Inspection outcome: the audio fails its checksum or cannot be decoded in full"
+  },
+  "hiResReportGradeCorruptBody": "The audio in this file is not what was written when it was made. Get a fresh copy.",
+  "@hiResReportGradeCorruptBody": {
+    "description": "Explains the damaged-file outcome"
+  },
+  "hiResReportGradeLossy": "Made from a lossy file",
+  "@hiResReportGradeLossy": {
+    "description": "Inspection outcome: a lossless file whose audio went through a lossy codec"
+  },
+  "hiResReportGradeLossyBody": "The audio carries the frame pattern of {codec} compression. It was lossy before it was saved as lossless, and that detail does not come back.",
+  "@hiResReportGradeLossyBody": {
+    "description": "Explains the lossy-source outcome; codec is a format name such as AAC",
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportGradeUpscaledBody": "The file claims more resolution than its audio has.",
+  "@hiResReportGradeUpscaledBody": {
+    "description": "Explains the fake Hi-Res outcome"
+  },
+  "hiResReportGradeSuspect": "Signs of a lower-quality source",
+  "@hiResReportGradeSuspect": {
+    "description": "Inspection outcome: evidence of a lossy or lower-resolution source that falls short of proof"
+  },
+  "hiResReportGradeSuspectBody": "Some of the evidence points to a lossy or lower-resolution source. It is not enough to be sure.",
+  "@hiResReportGradeSuspectBody": {
+    "description": "Explains the suspect outcome"
+  },
+  "hiResReportGradeClean": "No problems found",
+  "@hiResReportGradeClean": {
+    "description": "Inspection outcome: nothing was flagged"
+  },
+  "hiResReportGradeCleanBody": "Nothing in the audio points to damage, upscaling or lossy compression.",
+  "@hiResReportGradeCleanBody": {
+    "description": "Explains the clean outcome"
+  },
+  "hiResReportIntegrity": "Integrity",
+  "@hiResReportIntegrity": {
+    "description": "Report section: whether the file's audio is intact"
+  },
+  "hiResReportIntegrityVerified": "The audio matches the checksum stored in the file.",
+  "@hiResReportIntegrityVerified": {
+    "description": "Integrity finding: checksum verified"
+  },
+  "hiResReportIntegrityUnverified": "The file stores no checksum to compare. All of it decoded without errors.",
+  "@hiResReportIntegrityUnverified": {
+    "description": "Integrity finding: no checksum available, decoding succeeded"
+  },
+  "hiResReportIntegrityMismatch": "The decoded audio does not match the checksum stored in the file.",
+  "@hiResReportIntegrityMismatch": {
+    "description": "Integrity finding: checksum mismatch"
+  },
+  "hiResReportIntegrityLength": "The file holds {decoded} of the {declared} it declares.",
+  "@hiResReportIntegrityLength": {
+    "description": "Integrity finding: the audio is shorter or longer than declared; both are formatted durations",
+    "placeholders": {
+      "decoded": {
+        "type": "String"
+      },
+      "declared": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportIntegrityDecodeError": "Decoding stopped at {position}. The file is cut short or damaged.",
+  "@hiResReportIntegrityDecodeError": {
+    "description": "Integrity finding: a decode error; position is a formatted time",
+    "placeholders": {
+      "position": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportChecksum": "Checksum (MD5)",
+  "@hiResReportChecksum": {
+    "description": "Label of the audio checksum row"
+  },
+  "hiResReportBitDepth": "Bit depth",
+  "@hiResReportBitDepth": {
+    "description": "Report section: the real resolution of the samples"
+  },
+  "hiResReportBitDepthFull": "All {bits} bits carry audio.",
+  "@hiResReportBitDepthFull": {
+    "description": "Bit depth finding: the declared depth is real",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportBitDepthCoarse": "Every bit is in use, but quiet samples are spaced like {bits}-bit audio. The file was probably scaled up from a lower resolution.",
+  "@hiResReportBitDepthCoarse": {
+    "description": "Bit depth finding: the samples lie further apart than the declared depth allows; bits is a formatted number",
+    "placeholders": {
+      "bits": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportBitDepthNear16": "The samples sit on a 16-bit grid with low-level noise on top: a 16-bit source stored as {declared}-bit.",
+  "@hiResReportBitDepthNear16": {
+    "description": "Bit depth finding: 16-bit audio with dither in a wider word",
+    "placeholders": {
+      "declared": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportBitDepthFloat": "Floating-point audio has no fixed bit depth to check.",
+  "@hiResReportBitDepthFloat": {
+    "description": "Bit depth finding for floating-point files"
+  },
+  "hiResReportBitDepthUnmeasured": "Too few quiet samples to measure the real resolution.",
+  "@hiResReportBitDepthUnmeasured": {
+    "description": "Bit depth finding when the resolution could not be measured"
+  },
+  "hiResReportMeasuredResolution": "Measured resolution",
+  "@hiResReportMeasuredResolution": {
+    "description": "Label of the measured bit resolution row"
+  },
+  "hiResReportBitsValue": "{bits} bits",
+  "@hiResReportBitsValue": {
+    "description": "A bit count; bits is a formatted number",
+    "placeholders": {
+      "bits": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportFrequency": "Frequency range",
+  "@hiResReportFrequency": {
+    "description": "Report section: how far up the audio reaches"
+  },
+  "hiResReportLowpass": "Low-pass",
+  "@hiResReportLowpass": {
+    "description": "Label of the low-pass filter row"
+  },
+  "hiResReportLowpassValue": "{frequency}, {drop} dB drop",
+  "@hiResReportLowpassValue": {
+    "description": "Where the spectrum is cut and by how much",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      },
+      "drop": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassNone": "No sharp cut stands out in the spectrum.",
+  "@hiResReportLowpassNone": {
+    "description": "Frequency finding: no low-pass filter"
+  },
+  "hiResReportLowpassFormat": "Cut at {frequency}, just below the limit of this sample rate: the format's own filter.",
+  "@hiResReportLowpassFormat": {
+    "description": "Frequency finding: the normal anti-alias filter",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassSourceRate": "Cut at {frequency}, where a 44.1 or 48 kHz recording ends. The higher sample rate holds no music above it.",
+  "@hiResReportLowpassSourceRate": {
+    "description": "Frequency finding: a Hi-Res file with the bandwidth of a lower sample rate",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassHigh": "Cut at {frequency}. A mastering filter does this, and so do MP3 at 320 kbps and Opus.",
+  "@hiResReportLowpassHigh": {
+    "description": "Frequency finding: a cut that is not evidence by itself",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassMedium": "Cut at {frequency}, where lossy encoders near 192 kbps cut. A full-quality master rarely stops this low.",
+  "@hiResReportLowpassMedium": {
+    "description": "Frequency finding: a cut typical of mid-bitrate lossy encoders",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassLow": "Cut at {frequency}, where lossy encoders near 128 kbps cut.",
+  "@hiResReportLowpassLow": {
+    "description": "Frequency finding: a cut typical of low-bitrate lossy encoders",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLossy": "Lossy compression",
+  "@hiResReportLossy": {
+    "description": "Report section: traces of a lossy codec in the audio"
+  },
+  "hiResReportLossyFound": "Found the frame pattern of {codec}: one block every {samples} samples, in step through the whole file. Audio that was never compressed does not have it.",
+  "@hiResReportLossyFound": {
+    "description": "Lossy finding: a codec frame grid was detected; codec is a format name",
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      },
+      "samples": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportLossySuspectedPattern": "A faint MP3 frame pattern showed, too weak to be sure.",
+  "@hiResReportLossySuspectedPattern": {
+    "description": "Lossy finding: weak evidence of an MP3 frame grid"
+  },
+  "hiResReportLossySuspectedLowpass": "No frame pattern was found, but the low-pass above is where a lossy encoder would cut.",
+  "@hiResReportLossySuspectedLowpass": {
+    "description": "Lossy finding: only the low-pass points to a lossy source"
+  },
+  "hiResReportLossyNotFound": "No frame pattern of AAC, Vorbis or MP3 was found. MP3 at high bitrates and Opus can leave none, so this does not rule them out.",
+  "@hiResReportLossyNotFound": {
+    "description": "Lossy finding: nothing detected, with the limits of the test"
+  },
+  "hiResReportLossyHighRate": "Not checked. Above 48 kHz a lossy source would have been resampled, which hides its frame pattern.",
+  "@hiResReportLossyHighRate": {
+    "description": "Lossy finding: the test does not apply to high sample rates"
+  },
+  "hiResReportLossyTooShort": "Not checked: too little audio to measure.",
+  "@hiResReportLossyTooShort": {
+    "description": "Lossy finding: the file is too short or too quiet for the test"
+  },
+  "hiResReportPatternStrength": "Pattern strength",
+  "@hiResReportPatternStrength": {
+    "description": "Label of the codec frame pattern score row"
+  },
+  "hiResReportPatternStrengthValue": "{score} (found from {threshold})",
+  "@hiResReportPatternStrengthValue": {
+    "description": "The frame pattern score next to the score that counts as found",
+    "placeholders": {
+      "score": {
+        "type": "String"
+      },
+      "threshold": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportSpectrum": "Average spectrum",
+  "@hiResReportSpectrum": {
+    "description": "Caption of the spectrum chart"
+  },
+  "hiResReportSpectrumSemantics": "Average spectrum, content up to {frequency}",
+  "@hiResReportSpectrumSemantics": {
+    "description": "Screen reader description of the spectrum chart",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportWholeFile": "Read all {duration} of the audio. No analysis can certify the original master.",
+  "@hiResReportWholeFile": {
+    "description": "Scope and limits of the inspection; duration is a formatted time",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
   "audioAnalysisRescanning": "Re-analyzing audio...",
   "@audioAnalysisRescanning": {
     "description": "Loading text while audio is being re-analyzed after an explicit refresh"

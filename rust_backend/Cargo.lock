@@ -1699,6 +1699,7 @@ dependencies = [
  "chrono",
  "claxon",
  "image",
+ "md-5",
  "regex",
  "roxmltree",
  "rustix",
