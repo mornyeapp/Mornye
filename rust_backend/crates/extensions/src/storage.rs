@@ -322,6 +322,9 @@ impl ExtensionStore {
 
     pub fn set(&self, kind: StoreKind, key: &str, value: Value) -> Result<(), StorageError> {
         self.mutate(kind, |snapshot| {
+            if snapshot.get(key) == Some(&value) {
+                return false;
+            }
             snapshot.insert(key.to_owned(), value);
             true
         })
@@ -506,6 +509,59 @@ mod tests {
             assert_eq!(
                 replacement.all(kind).unwrap(),
                 Map::from_iter([("new".into(), true.into())])
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn setting_an_unchanged_value_does_not_rewrite_the_store() {
+        use serde_json::json;
+        use std::os::unix::fs::MetadataExt;
+
+        let directory = tempfile::tempdir().unwrap();
+        let key = Arc::new(
+            StorageMasterKey::from_base64("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=").unwrap(),
+        );
+        let open = || {
+            ExtensionStore::open(
+                directory.path(),
+                "example.extension",
+                Some(Arc::clone(&key)),
+            )
+            .unwrap()
+        };
+        let store = open();
+        for kind in [
+            StoreKind::Storage,
+            StoreKind::Credentials,
+            StoreKind::Settings,
+        ] {
+            // Every persisted write replaces the file through a rename.
+            let inode = || {
+                fs::metadata(directory.path().join(kind.filename()))
+                    .unwrap()
+                    .ino()
+            };
+            store
+                .set(kind, "region", json!({"code":"example"}))
+                .unwrap();
+            let written = inode();
+            store
+                .set(kind, "region", json!({"code":"example"}))
+                .unwrap();
+            open()
+                .set(kind, "region", json!({"code":"example"}))
+                .unwrap();
+            assert_eq!(inode(), written);
+            store.set(kind, "region", json!({"code":"other"})).unwrap();
+            assert_ne!(inode(), written);
+            let written = inode();
+            store.remove(kind, "absent").unwrap();
+            assert_eq!(inode() != written, kind != StoreKind::Storage);
+            assert_eq!(
+                open().get(kind, "region").unwrap(),
+                Some(json!({"code":"other"}))
             );
         }
     }
