@@ -603,6 +603,17 @@ class _BrowsedLibrary implements LibraryDatabase {
   final album = [song('c', 3), song('a', 1), song('b', 2)];
 
   @override
+  Future<QueueLibraryDbPage> getQueueTrackPageResult(
+    QueueLibraryDbQuery request,
+  ) async => QueueLibraryDbPage(
+    rows: [
+      if (request.offset == 0)
+        for (final row in album) {'source': 'local', 'item': row},
+    ],
+    nextCursor: null,
+  );
+
+  @override
   Future<QueueLibraryDbPage> getQueueAlbumPageResult(
     QueueLibraryDbQuery request,
   ) async => const QueueLibraryDbPage(
@@ -3987,6 +3998,38 @@ void main() {
       expect(handler.queue.value.map((item) => item.id), ['b']);
     },
   );
+
+  test('play with nothing queued shuffles the Library', () async {
+    final runtime = _runtime(
+      libraryDatabase: _BrowsedLibrary(),
+      historyDatabase: _NoHistory(),
+    );
+    final handler = await runtime.initialize();
+    expect(handler.queue.value, isEmpty);
+
+    // What a car or a headset button sends.
+    await handler.play();
+
+    expect(handler.queue.value.map((item) => item.id).toSet(), {'a', 'b', 'c'});
+    expect(handler.playbackState.value.playing, isTrue);
+    expect(
+      handler.playbackState.value.shuffleMode,
+      AudioServiceShuffleMode.all,
+    );
+  });
+
+  test('play with nothing queued and an empty Library stays silent', () async {
+    final runtime = _runtime(
+      libraryDatabase: _BrowsedLibrary()..album.clear(),
+      historyDatabase: _NoHistory(),
+    );
+    final handler = await runtime.initialize();
+
+    await handler.play();
+
+    expect(handler.queue.value, isEmpty);
+    expect(handler.playbackState.value.playing, isFalse);
+  });
 
   test('the star loves songs until the app shell takes it over', () async {
     final loved = _Loved();

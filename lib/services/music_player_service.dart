@@ -2345,6 +2345,16 @@ class MusicPlayerHandler extends BaseAudioHandler
     _pausedByInterruption = false;
     _interruptionActive = false;
     _userPaused = false;
+    if (_media.isEmpty) {
+      // Play from a car, a headset button or the system with nothing queued:
+      // the saved session comes back first, else the Library plays shuffled.
+      await _runtime.restoreSession();
+      if (_disposed) return;
+      if (_media.isEmpty) {
+        await _playBrowserQueue(await _runtime.browser.queueForSearch(''));
+        return;
+      }
+    }
     if (_player.needsSourceReload) {
       final generation = _playRequestGeneration;
       final index = _index;
@@ -2644,17 +2654,14 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (index >= 0) await _playIndex(index);
   }
 
-  /// Plays a spoken request. Without words it resumes the queue, or shuffles
-  /// the Library when there is none.
+  /// Plays a spoken request. Without words it is a plain [play], which
+  /// resumes the queue or shuffles the Library when there is none.
   @override
   Future<void> playFromSearch(
     String query, [
     Map<String, dynamic>? extras,
   ]) async {
-    if (query.trim().isEmpty) {
-      await _runtime.restoreSession();
-      if (_media.isNotEmpty) return play();
-    }
+    if (query.trim().isEmpty) return play();
     await _playBrowserQueue(
       await _runtime.browser.queueForSearch(query, extras),
     );
