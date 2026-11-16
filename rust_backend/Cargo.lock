@@ -1816,6 +1816,7 @@ dependencies = [
  "mornye-cast",
  "mornye-core",
  "mornye-extensions",
+ "mornye-link",
  "mornye-network",
  "mornye-providers",
  "regex",

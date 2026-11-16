@@ -10,6 +10,7 @@
 //! [`LinkServer`] owns its own Tokio runtime. Start and stop it from a plain
 //! thread (the desktop worker pool), not from inside an async task.
 
+pub mod bridge;
 pub mod catalog;
 pub mod subsonic;
 pub mod types;
@@ -124,6 +125,7 @@ impl LinkServer {
                 state.name(),
                 &state.shared.server_id,
                 &state.fingerprint,
+                &state.shared.config.platform,
                 local.port(),
             ) {
                 Ok(advertiser) => (Some(advertiser), None),

@@ -123,6 +123,8 @@ impl Fixture {
                 port: 0,
                 ffmpeg_path,
                 app_version: APP_VERSION.to_owned(),
+                platform: String::new(),
+                features: None,
             },
             server_id: "server-1".to_owned(),
             host: Arc::clone(&host) as Arc<dyn Host>,

@@ -185,6 +185,9 @@ struct Fixture {
     dir: tempfile::TempDir,
     host: Arc<FakeHost>,
     tuning: Tuning,
+    /// The platform and features the next [`Fixture::start`] announces.
+    platform: String,
+    features: Option<Vec<String>>,
     server: Option<LinkServer>,
     client: tokio::runtime::Runtime,
 }
@@ -215,6 +218,8 @@ impl Fixture {
             dir: tempfile::tempdir().unwrap(),
             host: Arc::default(),
             tuning,
+            platform: String::new(),
+            features: None,
             server: None,
             client: tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -231,6 +236,8 @@ impl Fixture {
             port,
             ffmpeg_path: None,
             app_version: "9.9.9".to_owned(),
+            platform: self.platform.clone(),
+            features: self.features.clone(),
         };
         let host: Arc<dyn Host> = self.host.clone();
         self.server = Some(LinkServer::start_with(config, host, self.tuning.clone()).unwrap());
@@ -507,6 +514,9 @@ fn info_reports_the_identity_without_auth() {
     assert_eq!(info["appVersion"], "9.9.9");
     assert_eq!(info["fingerprint"], fixture.server().fingerprint());
     assert_eq!(info["pairing"], false);
+    // Hosts that name nothing read as older hosts with every ability.
+    assert!(info.get("platform").is_none());
+    assert!(info.get("features").is_none());
 
     fixture.begin_pairing();
     assert_eq!(fixture.get("/mornye/v1/info", None).json()["pairing"], true);
@@ -539,6 +549,27 @@ fn info_reports_the_identity_without_auth() {
     );
     assert_eq!(status["clients"], json!([]));
     assert_eq!(fixture.server().summary()["serverId"], status["serverId"]);
+}
+
+#[test]
+fn hosts_announce_their_platform_and_features() {
+    let mut fixture = Fixture::idle(test_tuning());
+    fixture.platform = "android".to_owned();
+    fixture.features = Some(vec![]);
+    fixture.start(free_port());
+    let info = fixture.get("/mornye/v1/info", None).json();
+    assert_eq!(info["platform"], "android");
+    assert_eq!(info["features"], json!([]));
+
+    let key = fixture.pair("phone-1");
+    let mut socket = fixture.socket(&key);
+    let welcome = fixture.run(async {
+        send_hello(&mut socket, "phone-1").await;
+        next_json(&mut socket).await
+    });
+    assert_eq!(welcome["type"], "welcome");
+    assert_eq!(welcome["platform"], "android");
+    assert_eq!(welcome["features"], json!([]));
 }
 
 #[test]

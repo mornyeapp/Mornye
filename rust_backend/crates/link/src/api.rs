@@ -112,17 +112,16 @@ async fn rest(state: &Arc<State>, method: &str, request: http::Request<Incoming>
 
 /// `GET /mornye/v1/info`: what a phone checks before pairing.
 fn info(state: &State) -> HttpResponse {
-    json(
-        200,
-        &object!({
-            "serverId": state.shared.server_id,
-            "name": state.name(),
-            "protocol": 1,
-            "appVersion": state.shared.config.app_version,
-            "fingerprint": state.fingerprint,
-            "pairing": state.pairing.is_open(),
-        }),
-    )
+    let mut info = object!({
+        "serverId": state.shared.server_id,
+        "name": state.name(),
+        "protocol": 1,
+        "appVersion": state.shared.config.app_version,
+        "fingerprint": state.fingerprint,
+        "pairing": state.pairing.is_open(),
+    });
+    state.shared.config.announce(&mut info);
+    json(200, &info)
 }
 
 /// `POST /mornye/v1/pair` `{"deviceId","name","platform","proof"}`.

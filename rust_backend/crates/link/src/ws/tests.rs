@@ -49,6 +49,8 @@ impl Fixture {
                     port: 0,
                     ffmpeg_path: None,
                     app_version: String::new(),
+                    platform: String::new(),
+                    features: None,
                 },
                 server_id: store.server_id(),
                 host: Arc::new(NoopHost),
