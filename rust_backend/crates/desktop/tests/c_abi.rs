@@ -317,6 +317,51 @@ fn method_table_covers_the_host_contract() {
     }
 }
 
+#[test]
+fn hires_check_returns_the_whole_file_report() {
+    let dir = std::env::temp_dir().join(format!("mornye-desktop-hires-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("noise.wav");
+    let frames = 44_100u32;
+    let mut data = b"RIFF".to_vec();
+    data.extend_from_slice(&(36 + frames * 2).to_le_bytes());
+    data.extend_from_slice(b"WAVEfmt ");
+    data.extend_from_slice(&16u32.to_le_bytes());
+    data.extend_from_slice(&1u16.to_le_bytes());
+    data.extend_from_slice(&1u16.to_le_bytes());
+    data.extend_from_slice(&44_100u32.to_le_bytes());
+    data.extend_from_slice(&88_200u32.to_le_bytes());
+    data.extend_from_slice(&2u16.to_le_bytes());
+    data.extend_from_slice(&16u16.to_le_bytes());
+    data.extend_from_slice(b"data");
+    data.extend_from_slice(&(frames * 2).to_le_bytes());
+    let mut state = 1u32;
+    for _ in 0..frames {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        data.extend_from_slice(&((state >> 16) as i16 / 4).to_le_bytes());
+    }
+    std::fs::write(&path, data).unwrap();
+
+    let reply = call(
+        "checkHiResAuthenticity",
+        json!({"file_path": path, "options_json": r#"{"detailed":true}"#}),
+    )
+    .unwrap();
+    let result = match reply {
+        Value::String(raw) => serde_json::from_str(&raw).unwrap(),
+        other => other,
+    };
+    let _ = std::fs::remove_dir_all(dir);
+
+    assert_eq!(result["supported"], true);
+    let report = &result["report"];
+    assert_eq!(report["integrity"]["decoded_frames"], frames);
+    // A WAV file stores no checksum of its audio.
+    assert_eq!(report["integrity"]["status"], "unverified");
+    assert!(report["grade"].is_string());
+    assert!(report["spectrum"]["db"].as_array().is_some_and(|db| db.len() > 1));
+}
+
 fn wait_inbound(method: &str, timeout: Duration) -> Value {
     let (_, data) = wait_matching(0, timeout, |(event_kind, data)| {
         *event_kind == kind::INBOUND_CALL

@@ -11,7 +11,9 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/expressive_button.dart';
+import 'package:mornye/widgets/hires_report_content.dart';
 import 'package:mornye/widgets/hires_report_view.dart';
+import 'package:share_plus/share_plus.dart';
 
 /// On-demand inspection of one whole FLAC/WAV file: integrity, real bit
 /// depth, frequency range and traces of lossy compression.
@@ -19,7 +21,15 @@ class HiResCheckCard extends StatefulWidget {
   final String filePath;
   final String? formatHint;
 
-  const HiResCheckCard({super.key, required this.filePath, this.formatHint});
+  /// What a shared report calls the song.
+  final String? name;
+
+  const HiResCheckCard({
+    super.key,
+    required this.filePath,
+    this.formatHint,
+    this.name,
+  });
 
   /// Only FLAC and PCM WAV are decoded by the Rust checker.
   static bool isCandidate(String filePath, String? formatHint) {
@@ -88,6 +98,21 @@ class _HiResCheckCardState extends State<HiResCheckCard> {
     });
   }
 
+  void _share(HiResCheckResult result, HiResReport report) {
+    final l10n = context.l10n;
+    final text = HiResReportContent.of(
+      l10n,
+      result,
+      report,
+    ).text(name: widget.name);
+    SharePlus.instance.share(
+      ShareParams(
+        text: '${l10n.hiResCheckTitle}\n$text',
+        subject: l10n.hiResCheckTitle,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!HiResCheckCard.isCandidate(widget.filePath, widget.formatHint)) {
@@ -96,7 +121,11 @@ class _HiResCheckCardState extends State<HiResCheckCard> {
     final cs = Theme.of(context).colorScheme;
     final l10n = context.l10n;
     final result = _result;
+    final report = result?.report;
     final mornye = context.isMornye;
+    final onShare = result != null && result.supported && report != null
+        ? () => _share(result, report)
+        : null;
 
     return AppContentCard(
       elevation: 0,
@@ -130,7 +159,21 @@ class _HiResCheckCardState extends State<HiResCheckCard> {
                         ? const CupertinoActivityIndicator()
                         : const AppLoadingIndicator(size: 20, strokeWidth: 2.5),
                   )
-                else if (mornye && (result != null || _error != null))
+                else if (mornye && (result != null || _error != null)) ...[
+                  if (onShare != null)
+                    Tooltip(
+                      message: l10n.hiResReportShare,
+                      child: CupertinoButton(
+                        padding: const EdgeInsets.all(12),
+                        onPressed: onShare,
+                        child: Icon(
+                          CupertinoIcons.share,
+                          color: cs.onSurfaceVariant,
+                          size: 22,
+                          semanticLabel: l10n.hiResReportShare,
+                        ),
+                      ),
+                    ),
                   Tooltip(
                     message: l10n.audioAnalysisRescan,
                     child: CupertinoButton(
@@ -143,8 +186,21 @@ class _HiResCheckCardState extends State<HiResCheckCard> {
                         semanticLabel: l10n.audioAnalysisRescan,
                       ),
                     ),
-                  )
-                else if (result != null || _error != null)
+                  ),
+                ] else if (result != null || _error != null) ...[
+                  if (onShare != null)
+                    AppIconButton(
+                      icon: const Icon(Icons.share_outlined, size: 20),
+                      tooltip: l10n.hiResReportShare,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
+                      ),
+                      color: cs.onSurfaceVariant,
+                      onPressed: onShare,
+                    ),
                   AppIconButton(
                     icon: const Icon(Icons.refresh, size: 20),
                     tooltip: l10n.audioAnalysisRescan,
@@ -157,6 +213,7 @@ class _HiResCheckCardState extends State<HiResCheckCard> {
                     color: cs.onSurfaceVariant,
                     onPressed: _check,
                   ),
+                ],
               ],
             ),
             const SizedBox(height: 8),

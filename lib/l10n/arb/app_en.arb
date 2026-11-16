@@ -6051,17 +6051,9 @@
   "@hiResCheckTitle": {
     "description": "Title of the fake Hi-Res check card"
   },
-  "hiResCheckSummary": "Inspect the spectrum and active bit depth for signs of upsampling or padding.",
-  "@hiResCheckSummary": {
-    "description": "Introductory text for the sampled Hi-Res analysis"
-  },
   "hiResCheckLimitedBandwidth": "Limited bandwidth",
   "@hiResCheckLimitedBandwidth": {
     "description": "Neutral finding: a limited spectrum alone does not prove upsampling"
-  },
-  "hiResCheckNoEvidence": "No upsampling or padding detected",
-  "@hiResCheckNoEvidence": {
-    "description": "No evidence was detected; this does not certify the master"
   },
   "hiResCheckEstimatedCutoff": "Estimated cutoff",
   "@hiResCheckEstimatedCutoff": {
@@ -6074,15 +6066,6 @@
   "hiResCheckBandwidthExplanation": "A lower cutoff can come from mastering. It does not, by itself, prove upsampling.",
   "@hiResCheckBandwidthExplanation": {
     "description": "Explains why the limited-bandwidth finding is neutral"
-  },
-  "hiResCheckSampledExplanation": "Based on {seconds} seconds of audio. This analysis cannot certify the original master.",
-  "@hiResCheckSampledExplanation": {
-    "description": "Limits of the sampled Hi-Res analysis; seconds is a formatted duration",
-    "placeholders": {
-      "seconds": {
-        "type": "String"
-      }
-    }
   },
   "hiResCheckImagingEvidence": "The spectrum contains mirrored bands consistent with upsampling.",
   "@hiResCheckImagingEvidence": {
@@ -6110,17 +6093,9 @@
   "@hiResCheckRun": {
     "description": "Button that starts the Hi-Res authenticity check"
   },
-  "hiResCheckChecking": "Checking Hi-Res authenticity...",
-  "@hiResCheckChecking": {
-    "description": "Loading text while the Hi-Res check runs"
-  },
   "hiResCheckVerdictFake": "Likely fake Hi-Res",
   "@hiResCheckVerdictFake": {
     "description": "Verdict: the file claims Hi-Res but does not measure as it"
-  },
-  "hiResCheckVerdictStandard": "Standard definition, nothing to flag",
-  "@hiResCheckVerdictStandard": {
-    "description": "Verdict: neither sample rate nor bit depth claims Hi-Res"
   },
   "hiResCheckVerdictInconclusive": "Inconclusive: the analyzed segment is too quiet or short",
   "@hiResCheckVerdictInconclusive": {
@@ -6432,6 +6407,73 @@
     "description": "Scope and limits of the inspection; duration is a formatted time",
     "placeholders": {
       "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportShare": "Share report",
+  "@hiResReportShare": {
+    "description": "Button that shares the Hi-Res authenticity report as text"
+  },
+  "hiResBatchAction": "Check authenticity",
+  "@hiResBatchAction": {
+    "description": "Menu action that runs the Hi-Res authenticity check on an album or on several selected songs"
+  },
+  "hiResBatchProgress": "Reading song {current} of {total}",
+  "@hiResBatchProgress": {
+    "description": "Progress of the authenticity check of several songs",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchWaiting": "Waiting",
+  "@hiResBatchWaiting": {
+    "description": "Status of a song the authenticity check has not reached yet"
+  },
+  "hiResBatchReading": "Reading the whole file",
+  "@hiResBatchReading": {
+    "description": "Status of the song the authenticity check is reading now"
+  },
+  "hiResBatchSummary": "{flagged, plural, =0{No problems found in {total, plural, =1{1 song} other{{total} songs}}.} =1{1 of {total} songs needs a look.} other{{flagged} of {total} songs need a look.}}",
+  "@hiResBatchSummary": {
+    "description": "Result of the authenticity check of several songs: how many showed a warning or a problem",
+    "placeholders": {
+      "flagged": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchFailed": "{count, plural, =1{1 song could not be read.} other{{count} songs could not be read.}}",
+  "@hiResBatchFailed": {
+    "description": "How many songs the authenticity check could not read",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchSkipped": "{count, plural, =1{1 song in another format was left out.} other{{count} songs in other formats were left out.}} Only FLAC and WAV can be checked.",
+  "@hiResBatchSkipped": {
+    "description": "How many songs were not checked because of their format",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchMixedFormats": "The songs do not share one format: {formats}. An album from one master usually does.",
+  "@hiResBatchMixedFormats": {
+    "description": "Note that the checked songs differ in bit depth or sample rate; formats is a list such as 24-bit/96kHz (8), 16-bit/44.1kHz (4)",
+    "placeholders": {
+      "formats": {
         "type": "String"
       }
     }
