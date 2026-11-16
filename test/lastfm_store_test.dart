@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/lastfm/lastfm_api.dart';
@@ -6,17 +10,41 @@ import 'package:mornye/services/listenbrainz/listenbrainz_service.dart';
 import 'package:mornye/services/scrobbling/scrobble_listening.dart';
 import 'package:mornye/services/scrobbling/scrobble_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+// ignore: depend_on_referenced_packages
+import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 
 import 'support/lastfm_fakes.dart';
 import 'support/scrobble_fakes.dart';
 
+class _CountingPreferences extends InMemorySharedPreferencesStore {
+  _CountingPreferences(super.data) : super.withData();
+
+  int writes = 0;
+
+  @override
+  Future<bool> setValue(String valueType, String key, Object value) {
+    writes++;
+    return super.setValue(valueType, key, value);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  late Directory root;
+  File queueFile([String key = 'lastfm_scrobbles_v1']) =>
+      File('${root.path}/scrobble_queues/$key.json');
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
+    root = await Directory.systemTemp.createTemp('scrobble-store-');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    const channel = MethodChannel('plugins.flutter.io/path_provider');
+    messenger.setMockMethodCallHandler(channel, (_) async => root.path);
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
   });
+  tearDown(() => root.delete(recursive: true));
 
   test(
     'account session stays in secure storage, outside preferences and queue',
@@ -153,4 +181,131 @@ void main() {
       expect(preferences.getString('lastfm_scrobbles_v1'), 'invalid');
     },
   );
+
+  const stateKey = 'lastfm_scrobbles_v1';
+  String preferenceState(List<QueuedScrobble> queue) => jsonEncode({
+    'enabled': true,
+    'nowPlaying': false,
+    'queue': [for (final entry in queue) entry.toJson()],
+  });
+  Future<Object?> savedSwitches() async =>
+      jsonDecode((await SharedPreferences.getInstance()).getString(stateKey)!);
+  Iterable<String> ids(ScrobbleState state) =>
+      state.queue.map((entry) => entry.id);
+
+  test('a queue saved in preferences moves to its own file once', () async {
+    SharedPreferences.setMockInitialValues({
+      stateKey: preferenceState([lastfmQueued(1), lastfmQueued(2)]),
+    });
+    final state = await LocalLastfmStore().read();
+    expect(state.enabled, isTrue);
+    expect(state.nowPlaying, isFalse);
+    expect(ids(state), ['1', '2']);
+    expect(await savedSwitches(), {'enabled': true, 'nowPlaying': false});
+    expect(await queueFile().exists(), isTrue);
+
+    final preferences = await SharedPreferences.getInstance();
+    final platform = _CountingPreferences({
+      'flutter.$stateKey': preferences.getString(stateKey)!,
+    });
+    SharedPreferencesStorePlatform.instance = platform;
+    final restored = await LocalLastfmStore().read();
+    expect(restored.queue.map((entry) => entry.parameters), [
+      lastfmQueued(1).parameters,
+      lastfmQueued(2).parameters,
+    ]);
+    expect(platform.writes, 0);
+  });
+
+  test(
+    'the old queue stays in preferences until its file is written',
+    () async {
+      final old = preferenceState([lastfmQueued(1)]);
+      SharedPreferences.setMockInitialValues({stateKey: old});
+      final folder = Directory('${root.path}/scrobble_queues')..createSync();
+      await Process.run('chmod', ['555', folder.path]);
+      addTearDown(() => Process.run('chmod', ['755', folder.path]));
+      final store = LocalLastfmStore();
+      expect(ids(await store.read()), ['1']);
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getString(stateKey), old);
+      final queue = [lastfmQueued(1), lastfmQueued(2)];
+      await expectLater(
+        store.write(enabled: true, nowPlaying: false, queue: queue),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(preferences.getString(stateKey), old);
+
+      await Process.run('chmod', ['755', folder.path]);
+      await store.write(enabled: true, nowPlaying: false, queue: queue);
+      expect(await savedSwitches(), {'enabled': true, 'nowPlaying': false});
+      expect(ids(await LocalLastfmStore().read()), ['1', '2']);
+    },
+  );
+
+  test('a listen writes its queue file and no preference', () async {
+    final store = LocalLastfmStore();
+    await store.read();
+    await store.write(enabled: true, nowPlaying: true, queue: []);
+    final preferences = await SharedPreferences.getInstance();
+    final platform = _CountingPreferences({
+      'flutter.$stateKey': preferences.getString(stateKey)!,
+    });
+    SharedPreferencesStorePlatform.instance = platform;
+    // Saved when it counts, saved again once the service accepts it.
+    for (var i = 0; i < 3; i++) {
+      await store.write(
+        enabled: true,
+        nowPlaying: true,
+        queue: [lastfmQueued(i)],
+      );
+      expect(ids(await LocalLastfmStore().read()), ['$i']);
+      await store.write(enabled: true, nowPlaying: true, queue: []);
+    }
+    expect(platform.writes, 0);
+
+    await queueFile().delete();
+    await store.write(enabled: true, nowPlaying: false, queue: []);
+    expect(platform.writes, 1);
+    expect(await queueFile().exists(), isFalse);
+  });
+
+  test(
+    'an older version keeps the switches and its listens join the file',
+    () async {
+      final store = LocalLastfmStore();
+      await store.read();
+      await store.write(
+        enabled: true,
+        nowPlaying: false,
+        queue: [lastfmQueued(1)],
+      );
+      // An older version reads the switches and finds no queue of its own,
+      // then queues a listen in the preference as it always did.
+      expect(await savedSwitches(), {'enabled': true, 'nowPlaying': false});
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(stateKey, preferenceState([lastfmQueued(2)]));
+      expect(ids(await LocalLastfmStore().read()), ['1', '2']);
+      expect(await savedSwitches(), {'enabled': true, 'nowPlaying': false});
+    },
+  );
+
+  test('a write cut short keeps the previous queue', () async {
+    final store = LocalLastfmStore();
+    await store.read();
+    await store.write(
+      enabled: true,
+      nowPlaying: true,
+      queue: [lastfmQueued(1)],
+    );
+    File('${queueFile().path}.tmp').writeAsStringSync('{"queue":[{"id":');
+    final restored = LocalLastfmStore();
+    expect(ids(await restored.read()), ['1']);
+    await restored.write(
+      enabled: true,
+      nowPlaying: true,
+      queue: [lastfmQueued(1), lastfmQueued(2)],
+    );
+    expect(ids(await LocalLastfmStore().read()), ['1', '2']);
+  });
 }

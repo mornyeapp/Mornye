@@ -1,10 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mornye/services/scrobbling/scrobble_listening.dart';
 import 'package:mornye/services/secure_storage_options.dart';
+import 'package:mornye/utils/logger.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+final _log = AppLogger('ScrobbleStore');
 
 /// A listen waiting to reach one service. Each service keeps its own queue,
 /// scoped to the account that played it.
@@ -78,8 +83,12 @@ const scrobbleSecureStorage = FlutterSecureStorage(
   ),
 );
 
-/// Keeps the account in OS secure storage and the switches and queue in
-/// preferences, under keys owned by one service.
+/// Keeps the account in OS secure storage, the switches in preferences and
+/// the queue in a file of its own, under keys owned by one service.
+///
+/// Older versions kept the queue in the preference too. A queue found there
+/// joins the file and leaves the preference only once the file is written,
+/// and a version that only knows the preference still reads the switches.
 class LocalScrobbleStore<S extends ScrobbleAccount>
     implements ScrobbleStore<S> {
   LocalScrobbleStore({
@@ -101,6 +110,12 @@ class LocalScrobbleStore<S extends ScrobbleAccount>
   final Future<SharedPreferences> Function() _preferences;
   @protected
   final FlutterSecureStorage storage;
+  File? _file;
+
+  /// What the file and the preference hold as far as this store knows, so
+  /// a write skips the part that did not change.
+  List<String>? _savedIds;
+  ({bool enabled, bool nowPlaying})? _savedSwitches;
 
   @override
   Future<S?> readSession() async {
@@ -118,22 +133,41 @@ class LocalScrobbleStore<S extends ScrobbleAccount>
     }
   }
 
+  Future<File> _queueFile() async => _file ??= File(
+    '${(await getApplicationSupportDirectory()).path}'
+    '/scrobble_queues/$stateKey.json',
+  );
+
   @override
   Future<ScrobbleState> read() async {
     final preferences = await _preferences();
     final raw = preferences.getString(stateKey);
-    if (raw == null) {
-      return (enabled: false, nowPlaying: true, queue: <QueuedScrobble>[]);
+    final json = raw == null
+        ? const <String, dynamic>{}
+        : jsonDecode(raw) as Map<String, dynamic>;
+    final saved = await _readQueue();
+    final legacy = json['queue'] as List<dynamic>?;
+    final ids = {for (final entry in saved) entry.id};
+    final queue = List.of(saved);
+    for (final entry in legacy ?? const <dynamic>[]) {
+      final listen = QueuedScrobble.fromJson(entry as Map<String, dynamic>);
+      if (ids.add(listen.id)) queue.add(listen);
     }
-    final json = jsonDecode(raw) as Map<String, dynamic>;
-    return (
-      enabled: json['enabled'] == true,
-      nowPlaying: json['nowPlaying'] != false,
-      queue: [
-        for (final entry in json['queue'] as List<dynamic>? ?? [])
-          QueuedScrobble.fromJson(entry as Map<String, dynamic>),
-      ],
-    );
+    final enabled = json['enabled'] == true;
+    final nowPlaying = json['nowPlaying'] != false;
+    _savedIds = [for (final entry in saved) entry.id];
+    _savedSwitches = raw == null || legacy != null
+        ? null
+        : (enabled: enabled, nowPlaying: nowPlaying);
+    if (legacy != null) {
+      try {
+        await write(enabled: enabled, nowPlaying: nowPlaying, queue: queue);
+      } catch (error) {
+        // The preference still holds the queue; the next write moves it.
+        _log.w('Could not move the $stateKey queue to its file: $error');
+      }
+    }
+    return (enabled: enabled, nowPlaying: nowPlaying, queue: queue);
   }
 
   @override
@@ -142,15 +176,46 @@ class LocalScrobbleStore<S extends ScrobbleAccount>
     required bool nowPlaying,
     required List<QueuedScrobble> queue,
   }) async {
+    final ids = [for (final entry in queue) entry.id];
+    if (!listEquals(ids, _savedIds)) {
+      await _writeQueue(queue);
+      _savedIds = ids;
+    }
+    final switches = (enabled: enabled, nowPlaying: nowPlaying);
+    if (switches == _savedSwitches) return;
     final preferences = await _preferences();
     final saved = await preferences.setString(
       stateKey,
-      jsonEncode({
-        'enabled': enabled,
-        'nowPlaying': nowPlaying,
-        'queue': queue.map((entry) => entry.toJson()).toList(),
-      }),
+      jsonEncode({'enabled': enabled, 'nowPlaying': nowPlaying}),
     );
     if (!saved) throw StateError('Could not save the listening queue');
+    _savedSwitches = switches;
+  }
+
+  Future<List<QueuedScrobble>> _readQueue() async {
+    final String raw;
+    try {
+      raw = await (await _queueFile()).readAsString();
+    } on PathNotFoundException {
+      return [];
+    }
+    final json = jsonDecode(raw) as Map<String, dynamic>;
+    return [
+      for (final entry in json['queue'] as List<dynamic>)
+        QueuedScrobble.fromJson(entry as Map<String, dynamic>),
+    ];
+  }
+
+  /// Replaces the file in one step, so an app ended mid-write keeps the
+  /// previous queue whole.
+  Future<void> _writeQueue(List<QueuedScrobble> queue) async {
+    final file = await _queueFile();
+    await file.parent.create(recursive: true);
+    final temporary = File('${file.path}.tmp');
+    await temporary.writeAsString(
+      jsonEncode({'queue': queue.map((entry) => entry.toJson()).toList()}),
+      flush: true,
+    );
+    await temporary.rename(file.path);
   }
 }
