@@ -344,6 +344,13 @@ class LinkClientSession implements LinkSession {
           (serverId is String && serverId != _server.serverId)) {
         throw const LinkException('incompatible');
       }
+      // A phone host leaves out abilities only a computer has.
+      _server = _server.announced(
+        platform: reply['platform'] is String
+            ? reply['platform'] as String
+            : '',
+        features: linkHostFeaturesFromJson(reply['features']),
+      );
       _issue = null;
       _backoff = minBackoff;
       _setState(LinkConnectionState.connected);

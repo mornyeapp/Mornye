@@ -226,6 +226,8 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
       if (!current()) return;
       state = state.copyWith(loading: false, error: error);
     }
+    // A phone host keeps no download queue for other phones.
+    if (!client.server.supports(LinkHostFeatures.downloads)) return;
     final pushes = _downloadPushes;
     try {
       final downloads = linkParseDownloads(await client.get(LinkOps.downloads));

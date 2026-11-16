@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 
@@ -11,6 +12,8 @@ class LinkServerRecord {
     required this.connectionId,
     required this.address,
     required this.fingerprint,
+    this.platform = '',
+    this.features,
   });
 
   final String serverId;
@@ -24,12 +27,52 @@ class LinkServerRecord {
   final String address;
   final String fingerprint;
 
+  /// The host's platform as it announced it, empty for an older host.
+  final String platform;
+
+  /// The [LinkHostFeatures] the host announced; null for an older host,
+  /// which has all of them.
+  final List<String>? features;
+
+  /// Whether the host has the optional ability [feature].
+  bool supports(String feature) => features?.contains(feature) ?? true;
+
+  /// Whether the host is another phone rather than a computer.
+  bool get isPhone => platform == 'android' || platform == 'ios';
+
+  LinkServerRecord copyWith({
+    String? name,
+    String? address,
+    String? platform,
+    Object? features = _keepFeatures,
+  }) => LinkServerRecord(
+    serverId: serverId,
+    name: name ?? this.name,
+    connectionId: connectionId,
+    address: address ?? this.address,
+    fingerprint: fingerprint,
+    platform: platform ?? this.platform,
+    features: identical(features, _keepFeatures)
+        ? this.features
+        : features as List<String>?,
+  );
+
+  /// The same record with what the host announced in [info] or a welcome.
+  LinkServerRecord announced({
+    required String platform,
+    required List<String>? features,
+  }) => platform == this.platform && listEquals(features, this.features)
+      ? this
+      : copyWith(platform: platform, features: features);
+
   Map<String, dynamic> toJson() => {
     'serverId': serverId,
     'name': name,
     'connectionId': connectionId,
     'address': address,
     'fingerprint': fingerprint,
+    if (platform.isNotEmpty) 'platform': platform,
+    'features': ?features,
   };
 
   static LinkServerRecord? fromJson(Object? json) {
@@ -50,9 +93,13 @@ class LinkServerRecord {
       connectionId: connectionId,
       address: address,
       fingerprint: fingerprint,
+      platform: json['platform'] as String? ?? '',
+      features: linkHostFeaturesFromJson(json['features']),
     );
   }
 }
+
+const Object _keepFeatures = Object();
 
 enum LinkConnectionState { disconnected, connecting, connected }
 

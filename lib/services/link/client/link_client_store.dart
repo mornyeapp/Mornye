@@ -100,13 +100,7 @@ class LinkClientStore {
     (current) => [
       for (final record in current)
         record.serverId == serverId
-            ? LinkServerRecord(
-                serverId: record.serverId,
-                name: record.name,
-                connectionId: record.connectionId,
-                address: address,
-                fingerprint: record.fingerprint,
-              )
+            ? record.copyWith(address: address)
             : record,
     ],
   );

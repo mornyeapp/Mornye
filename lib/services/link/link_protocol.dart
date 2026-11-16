@@ -831,6 +831,22 @@ class LinkCommand {
   }
 }
 
+/// The optional abilities a host announces in its info and welcome
+/// (`features`). A host that announces no list is an older one with all of
+/// them.
+abstract final class LinkHostFeatures {
+  /// The host downloads what a phone asks for ([LinkOps.downloads]).
+  static const downloads = 'downloads';
+
+  /// The host opens a link a phone shares ([LinkOps.open]).
+  static const open = 'open';
+
+  /// The host runs file changes on its songs ([LinkOps.libraryJobs]).
+  static const libraryJobs = 'library.jobs';
+
+  static const all = [downloads, open, libraryJobs];
+}
+
 /// `GET /mornye/v1/info`.
 class LinkServerInfo {
   const LinkServerInfo({
@@ -840,6 +856,8 @@ class LinkServerInfo {
     required this.appVersion,
     required this.fingerprint,
     required this.pairing,
+    this.platform = '',
+    this.features,
   });
 
   final String serverId;
@@ -851,6 +869,12 @@ class LinkServerInfo {
   /// Whether a pairing window is open.
   final bool pairing;
 
+  /// The host's platform (`macos`, `android`, ...), empty when not told.
+  final String platform;
+
+  /// [LinkHostFeatures] the host has; null when not told (all of them).
+  final List<String>? features;
+
   Map<String, dynamic> toJson() => {
     'serverId': serverId,
     'name': name,
@@ -858,6 +882,8 @@ class LinkServerInfo {
     'appVersion': appVersion,
     'fingerprint': fingerprint,
     'pairing': pairing,
+    if (platform.isNotEmpty) 'platform': platform,
+    'features': ?features,
   };
 
   static LinkServerInfo? fromJson(Object? json) {
@@ -872,9 +898,19 @@ class LinkServerInfo {
       appVersion: _string(json['appVersion']) ?? '',
       fingerprint: fingerprint.toLowerCase(),
       pairing: json['pairing'] == true,
+      platform: _string(json['platform']) ?? '',
+      features: linkHostFeaturesFromJson(json['features']),
     );
   }
 }
+
+/// A host's announced `features`, or null when it sent no list.
+List<String>? linkHostFeaturesFromJson(Object? value) => value is List
+    ? [
+        for (final feature in value)
+          if (feature is String && feature.isNotEmpty) feature,
+      ]
+    : null;
 
 /// A WebSocket client as the desktop sees it (`linkClients`, `linkStatus`).
 class LinkClientInfo {

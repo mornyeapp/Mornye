@@ -76,6 +76,25 @@ void main() {
     },
   );
 
+  test('a phone host that runs no file changes is not asked', () async {
+    final phone = FakeLinkClient(
+      server: linkTestServer.announced(platform: 'android', features: []),
+      onGet: (op, _) => throw StateError('asked for $op'),
+    );
+    addTearDown(phone.close);
+    final phoneContainer = ProviderContainer(
+      overrides: [linkPhoneClientProvider.overrideWithValue(phone)],
+    );
+    addTearDown(phoneContainer.dispose);
+    phoneContainer.read(linkLibraryJobsProvider);
+    await settle();
+    await phoneContainer.read(linkLibraryJobsProvider.notifier).refresh();
+    final state = phoneContainer.read(linkLibraryJobsProvider);
+    expect(state.loaded, isTrue);
+    expect(state.supported, isFalse);
+    expect(phone.gets, isEmpty);
+  });
+
   test('late HTTP acknowledgement cannot overwrite a completed push', () async {
     client.onPost = (_, body) {
       final id = body['id'] as String;

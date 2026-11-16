@@ -26,6 +26,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         _fileExists &&
         remoteItem != null &&
         linkClient != null &&
+        linkClient.server.supports(LinkHostFeatures.libraryJobs) &&
         linkDesktopSongId(remoteItem.filePath, linkClient.server) != null;
     final container = ProviderScope.containerOf(screenContext, listen: false);
     // The computer's copy offers the file actions of a song on this phone,

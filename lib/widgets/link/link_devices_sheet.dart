@@ -10,6 +10,7 @@ import 'package:mornye/services/link/features/link_desktop_remote.dart';
 import 'package:mornye/services/link/features/link_downloads.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/together/link_together_controller.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -179,7 +180,9 @@ class LinkDevicesSheet extends ConsumerWidget {
               ),
               SettingsItem(
                 key: const ValueKey('link-device-desktop'),
-                icon: Icons.computer,
+                icon: client.server.isPhone
+                    ? Icons.phone_android
+                    : Icons.computer,
                 title: name,
                 subtitle: switch (remote.connection) {
                   LinkConnectionState.connected => l10n.linkConnectionConnected,
@@ -208,16 +211,18 @@ class LinkDevicesSheet extends ConsumerWidget {
             ],
           ),
           const LinkPlayTogetherTiming(),
-          SettingsGroup(
-            children: [
-              SettingsItem(
-                icon: Icons.history,
-                title: l10n.linkFileJobs,
-                subtitle: l10n.linkFileJobsSubtitle(name),
-                onTap: () => choose(showLinkLibraryJobs),
-              ),
-            ],
-          ),
+          // A phone host runs no file changes for other phones.
+          if (client.server.supports(LinkHostFeatures.libraryJobs))
+            SettingsGroup(
+              children: [
+                SettingsItem(
+                  icon: Icons.history,
+                  title: l10n.linkFileJobs,
+                  subtitle: l10n.linkFileJobsSubtitle(name),
+                  onTap: () => choose(showLinkLibraryJobs),
+                ),
+              ],
+            ),
           if (remote.downloads.isNotEmpty) ...[
             SettingsSectionHeader(title: l10n.linkDesktopDownloads(name)),
             SettingsGroup(

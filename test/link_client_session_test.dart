@@ -670,6 +670,27 @@ void main() {
       expect(session.issue, LinkSessionIssue.incompatible);
     });
 
+    test('a welcome tells what the host can do', () async {
+      final session = LinkClientSession(
+        server: _record('https://10.0.0.2:47710'),
+        apiKey: 'key-1',
+        device: _device,
+        ensureAccess: (_) async {},
+        timer: _Timers().call,
+        connectSocket: (_, _, _) async => _FakeSocket(
+          welcome: {..._welcome, 'platform': 'android', 'features': <String>[]},
+        ),
+      );
+      addTearDown(session.dispose);
+      expect(session.server.supports(LinkHostFeatures.downloads), isTrue);
+      session.start();
+      await pumpEventQueue();
+      expect(session.connectionState, LinkConnectionState.connected);
+      expect(session.server.isPhone, isTrue);
+      expect(session.server.supports(LinkHostFeatures.downloads), isFalse);
+      expect(session.server.supports(LinkHostFeatures.libraryJobs), isFalse);
+    });
+
     test('a missing welcome times out', () async {
       final timers = _Timers();
       final session = LinkClientSession(

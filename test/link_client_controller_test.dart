@@ -55,6 +55,42 @@ void main() {
     );
   });
 
+  test('remembers what a host announces when pairing and connecting', () async {
+    final harness = await _started();
+    final base = linkTestTarget('a');
+    final phone = LinkPairingTarget(
+      address: base.address,
+      info: LinkServerInfo(
+        serverId: base.info.serverId,
+        name: 'Pocket',
+        protocol: base.info.protocol,
+        appVersion: base.info.appVersion,
+        fingerprint: base.info.fingerprint,
+        pairing: true,
+        platform: 'android',
+        features: const [],
+      ),
+    );
+    final record = await harness.controller.pair(phone, '123456');
+    await pumpEventQueue();
+    expect(record.isPhone, isTrue);
+    expect(record.supports(LinkHostFeatures.downloads), isFalse);
+    expect((await LinkClientStore().servers()).single.features, isEmpty);
+
+    // The host updated meanwhile: its welcome tells the session.
+    final session = harness.sessions.single;
+    session.server = session.server.announced(
+      platform: 'android',
+      features: const [LinkHostFeatures.open],
+    );
+    session.emit(LinkConnectionState.connected);
+    await pumpEventQueue();
+    expect(harness.state.servers.single.features, [LinkHostFeatures.open]);
+    expect((await LinkClientStore().servers()).single.features, [
+      LinkHostFeatures.open,
+    ]);
+  });
+
   test('pairing publishes the first desktop and follows the choice', () async {
     final harness = await _started();
     expect(harness.state.loaded, isTrue);

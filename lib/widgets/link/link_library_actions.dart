@@ -61,6 +61,7 @@ bool hasLinkLibrarySongs(
 ) {
   final client = container.read(linkPhoneClientProvider);
   return client != null &&
+      client.server.supports(LinkHostFeatures.libraryJobs) &&
       items.any(
         (item) => linkDesktopSongId(item.filePath, client.server) != null,
       );

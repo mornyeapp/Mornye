@@ -345,6 +345,36 @@ void main() {
         expect(row(tester, 'link-device-desktop').onTap, isNull);
       });
 
+      testWidgets('a phone host shows as a phone, without what it lacks', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          host(theme: theme, client: desktop(), item: phoneItem),
+        );
+        await open(tester);
+        expect(row(tester, 'link-device-desktop').icon, Icons.computer);
+        expect(find.text('File changes'), findsOneWidget);
+        await tester.pumpWidget(const SizedBox());
+
+        final phone = FakeLinkClient(
+          server: linkTestServer.announced(platform: 'android', features: []),
+          onGet: (op, query) => switch (op) {
+            LinkOps.state => _desktopState(),
+            LinkOps.downloads => throw StateError('no downloads on a phone'),
+            _ => null,
+          },
+        );
+        await tester.pumpWidget(
+          host(theme: theme, client: phone, item: phoneItem),
+        );
+        await open(tester);
+        expect(row(tester, 'link-device-desktop').icon, Icons.phone_android);
+        expect(find.text('File changes'), findsNothing);
+        expect(find.text('Downloads on Studio PC'), findsNothing);
+        expect(phone.gets, isNot(contains(LinkOps.downloads)));
+        expect(tester.takeException(), isNull);
+      });
+
       testWidgets('the Devices button appears only with a paired desktop', (
         tester,
       ) async {

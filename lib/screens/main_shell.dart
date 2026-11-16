@@ -406,7 +406,7 @@ class _MainShellState extends ConsumerState<MainShell>
         SnackBar(
           content: Text(context.l10n.loadingSharedLink),
           // A paired desktop can take the link instead.
-          action: linkClient == null
+          action: linkClient == null || !linkTakesSharedUrls(linkClient)
               ? null
               : SnackBarAction(
                   label: context.l10n.linkSendToDesktop(

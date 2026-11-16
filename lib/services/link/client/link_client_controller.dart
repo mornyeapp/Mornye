@@ -448,8 +448,28 @@ class LinkClientController extends Notifier<LinkClientState> {
       // A catalog notification can be lost while the phone is offline or
       // suspended, even when the desktop believes it was delivered.
       _scheduleRescan(session);
+      unawaited(_rememberAnnounced(session.server));
     }
   }
+
+  /// Stores what the host announced in its welcome (its platform and
+  /// abilities) for labels and for the next start.
+  Future<void> _rememberAnnounced(LinkServerRecord announced) =>
+      _serial(() async {
+        final stored = state.servers
+            .where((s) => s.serverId == announced.serverId)
+            .firstOrNull;
+        if (_disposed || stored == null) return;
+        final updated = stored.announced(
+          platform: announced.platform,
+          features: announced.features,
+        );
+        if (identical(updated, stored)) return;
+        final servers = await _store.upsert(updated);
+        if (!_disposed) state = state.copyWith(servers: servers);
+      }).catchError(
+        (Object error) => _log.w('Saving the host details failed: $error'),
+      );
 
   void _onMessage(LinkSession session, Map<String, dynamic> message) {
     if (_disposed || !identical(session, _session)) return;
@@ -834,6 +854,8 @@ class LinkClientController extends Notifier<LinkClientState> {
         connectionId: connection.id,
         address: target.address,
         fingerprint: result.fingerprint,
+        platform: target.info.platform,
+        features: target.info.features,
       );
       final servers = await _store.upsert(record);
       var active = state.activeServerId;

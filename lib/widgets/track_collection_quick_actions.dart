@@ -10,6 +10,7 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/cover_cache_manager.dart';
+import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/local_playback.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -279,7 +280,13 @@ class _TrackOptionsSheet extends ConsumerWidget {
       allowQualityVariants: allowQualityVariants,
       hasLocalPlaybackCandidate: hasLocalPlaybackCandidate,
     );
-    final linkClient = ref.watch(linkPhoneClientProvider);
+    final pairedClient = ref.watch(linkPhoneClientProvider);
+    // A phone host downloads nothing for other phones.
+    final linkClient =
+        pairedClient != null &&
+            pairedClient.server.supports(LinkHostFeatures.downloads)
+        ? pairedClient
+        : null;
 
     if (context.isMornye) {
       final l10n = context.l10n;

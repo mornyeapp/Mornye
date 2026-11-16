@@ -18,6 +18,7 @@ import 'package:mornye/services/link/features/link_phone_sender.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
@@ -177,6 +178,12 @@ Future<void> linkOpenUrlOnDesktop(
   }
 }
 
+/// Whether the host of [client] can take a shared link at all: a phone host
+/// neither opens nor downloads one.
+bool linkTakesSharedUrls(LinkClientApi client) =>
+    client.server.supports(LinkHostFeatures.open) ||
+    client.server.supports(LinkHostFeatures.downloads);
+
 /// The choices for a link shared to the app while a desktop is paired:
 /// open it in the desktop app, or let the desktop download it.
 Future<void> showLinkSharedUrlSheet(
@@ -185,7 +192,7 @@ Future<void> showLinkSharedUrlSheet(
   String url,
 ) async {
   final client = ref.read(linkPhoneClientProvider);
-  if (client == null) return;
+  if (client == null || !linkTakesSharedUrls(client)) return;
   final name = linkDesktopName(client);
   final root = Navigator.of(context, rootNavigator: true).context;
   await showAppBottomSheet<void>(
@@ -196,22 +203,24 @@ Future<void> showLinkSharedUrlSheet(
     builder: (sheetContext) => Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AppSheetOption(
-          leading: const AppIcon.adaptive(Icons.open_in_new),
-          title: Text(sheetContext.l10n.linkOpenOnDesktop(name)),
-          onTap: () {
-            Navigator.pop(sheetContext);
-            linkOpenUrlOnDesktop(root, ref, url);
-          },
-        ),
-        AppSheetOption(
-          leading: const AppIcon.adaptive(Icons.download),
-          title: Text(sheetContext.l10n.linkDownloadOnDesktop(name)),
-          onTap: () {
-            Navigator.pop(sheetContext);
-            linkDownloadOnDesktop(root, ref, linkDownloadUrlBody(url));
-          },
-        ),
+        if (client.server.supports(LinkHostFeatures.open))
+          AppSheetOption(
+            leading: const AppIcon.adaptive(Icons.open_in_new),
+            title: Text(sheetContext.l10n.linkOpenOnDesktop(name)),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              linkOpenUrlOnDesktop(root, ref, url);
+            },
+          ),
+        if (client.server.supports(LinkHostFeatures.downloads))
+          AppSheetOption(
+            leading: const AppIcon.adaptive(Icons.download),
+            title: Text(sheetContext.l10n.linkDownloadOnDesktop(name)),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              linkDownloadOnDesktop(root, ref, linkDownloadUrlBody(url));
+            },
+          ),
         const SizedBox(height: 8),
       ],
     ),
@@ -329,7 +338,9 @@ class LinkDownloadOnDesktopButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final client = ref.watch(linkPhoneClientProvider);
-    if (client == null) return const SizedBox.shrink();
+    if (client == null || !client.server.supports(LinkHostFeatures.downloads)) {
+      return const SizedBox.shrink();
+    }
     return HeaderCircleButton(
       icon: Icons.computer,
       tooltip: context.l10n.linkDownloadOnDesktop(linkDesktopName(client)),
