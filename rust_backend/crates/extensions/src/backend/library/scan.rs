@@ -71,6 +71,20 @@ struct AudioFile {
     folder_image: Option<Arc<FolderImage>>,
 }
 
+impl AudioFile {
+    fn expect_folder_image(&self) {
+        if let Some(image) = &self.folder_image {
+            image.artwork.expect_song();
+        }
+    }
+
+    fn folder_image_done(&self) {
+        if let Some(image) = &self.folder_image {
+            image.artwork.song_done();
+        }
+    }
+}
+
 struct ScanSummary {
     deleted: Vec<String>,
     skipped: usize,
@@ -612,6 +626,10 @@ impl Backend {
                 .map_or(2, usize::from)
                 .clamp(2, 6)
         };
+        // A folder image's artwork is kept from its first song to its last.
+        for (_, file) in &audio {
+            file.expect_folder_image();
+        }
         let next = AtomicUsize::new(0);
         let stop = AtomicBool::new(false);
         thread::scope(|scope| -> Result<(), String> {
@@ -639,6 +657,7 @@ impl Backend {
                                 check,
                             )
                         });
+                        file.folder_image_done();
                         if sender.send((*index, file.path.as_str(), result)).is_err() {
                             break;
                         }
@@ -1359,17 +1378,62 @@ mod tests {
 
         assert!(replaced.load(Ordering::Acquire));
         assert_eq!(scanned.len(), 3);
-        assert!(
-            scanned
-                .values()
-                .all(|cover| *cover == Some(thumbnail(&old)))
-        );
+        let expected = Some(thumbnail(&old));
+        assert!(scanned.values().all(|cover| *cover == expected));
         let scanned = scanned_covers(root.path(), &library);
-        assert!(
-            scanned
-                .values()
-                .all(|cover| *cover == Some(thumbnail(&new)))
-        );
+        let expected = Some(thumbnail(&new));
+        assert!(scanned.values().all(|cover| *cover == expected));
+    }
+
+    #[test]
+    fn folder_artwork_is_released_after_the_last_song_that_uses_it() {
+        let root = tempfile::tempdir().unwrap();
+        let library = fs::canonicalize(root.path()).unwrap().join("library");
+        let album = library.join("Album");
+        // Album's image covers its disc folders and its own song; Extras and
+        // Other have their own.
+        for folder in ["CD1", "CD2", "Extras"] {
+            fs::create_dir_all(album.join(folder)).unwrap();
+            fs::write(album.join(folder).join("01.flac"), b"flac").unwrap();
+        }
+        fs::write(album.join("CD1/02.flac"), b"flac").unwrap();
+        fs::write(album.join("z.flac"), b"flac").unwrap();
+        fs::write(album.join("cover.jpg"), b"image").unwrap();
+        fs::write(album.join("Extras/folder.jpg"), b"image").unwrap();
+        fs::create_dir_all(library.join("Other")).unwrap();
+        fs::write(library.join("Other/01.flac"), b"flac").unwrap();
+        fs::write(library.join("Other/cover.jpg"), b"image").unwrap();
+        let backend = backend(root.path(), &library);
+        let files = walk(&backend, &library).unwrap();
+        assert_eq!(files.len(), 6);
+        for file in &files {
+            file.expect_folder_image();
+        }
+
+        let reads = AtomicUsize::new(0);
+        for (index, file) in files.iter().enumerate() {
+            let image = file.folder_image.as_ref().unwrap();
+            image
+                .artwork
+                .get_or_read(&|| Ok(()), || {
+                    reads.fetch_add(1, Ordering::Relaxed);
+                    let cover = mornye_core::tags::CoverArt {
+                        data: b"image".to_vec(),
+                        mime: "image/jpeg".into(),
+                    };
+                    Ok(crate::backend::cover::LibraryArtwork::new(
+                        cover,
+                        &|| Ok(()),
+                    ))
+                })
+                .unwrap();
+            file.folder_image_done();
+            let later = files[index + 1..]
+                .iter()
+                .any(|later| Arc::ptr_eq(later.folder_image.as_ref().unwrap(), image));
+            assert_eq!(image.artwork.is_held(), later, "{}", file.path);
+        }
+        assert_eq!(reads.load(Ordering::Relaxed), 3);
     }
 
     #[test]
@@ -1393,11 +1457,8 @@ mod tests {
         let scanned = scanned_covers(root.path(), &library);
 
         assert_eq!(scanned.len(), 20);
-        assert!(
-            scanned
-                .values()
-                .all(|cover| *cover == Some(thumbnail(&image)))
-        );
+        let expected = Some(thumbnail(&image));
+        assert!(scanned.values().all(|cover| *cover == expected));
         let covers = root.path().join("data/library_covers");
         let names = fs::read_dir(&covers).unwrap().count();
         let files: BTreeSet<_> = fs::read_dir(&covers)
