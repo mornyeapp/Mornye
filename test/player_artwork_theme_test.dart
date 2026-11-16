@@ -156,6 +156,37 @@ void main() {
       expect(palette.requests, [_coverA, _coverB]);
     });
 
+    testWidgets('makes no animation while it only follows the app scheme, '
+        'then moves to a cover', (tester) async {
+      Listenable animation() => tester
+          .widget<AnimatedBuilder>(
+            find
+                .descendant(
+                  of: find.byType(PlayerArtworkTheme),
+                  matching: find.byType(AnimatedBuilder),
+                )
+                .first,
+          )
+          .listenable;
+
+      final theme = AppTheme.light();
+      await tester.pumpWidget(host(null, theme));
+      final element = tester.element(find.byKey(probe));
+      expect(shown(tester), theme.colorScheme);
+      expect(animation(), kAlwaysCompleteAnimation);
+
+      palette.cached[_coverA] = red;
+      await tester.pumpWidget(host(_coverA, theme));
+      expect(animation(), isA<AnimationController>());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(shown(tester).primary, isNot(theme.colorScheme.primary));
+      expect(shown(tester).primary, isNot(red.primary));
+      await tester.pumpAndSettle();
+      expect(shown(tester), red);
+      expect(tester.element(find.byKey(probe)), same(element));
+    });
+
     testWidgets('returns to the app scheme without readable artwork', (
       tester,
     ) async {

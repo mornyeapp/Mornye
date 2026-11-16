@@ -67,13 +67,15 @@ class PlayerArtworkTheme extends StatefulWidget {
 
 class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    value: 1,
-  );
+  /// Made by the first move that animates: a scope that only ever follows
+  /// the app scheme, like a song row that is not playing, never needs one.
+  AnimationController? _controller;
+
+  AnimationController get _animation =>
+      _controller ??= AnimationController(vsync: this, value: 1);
 
   /// The page background for [PlayerArtworkTheme.fadesSurfaceOnly].
-  late final _surface = _SurfaceAnimation(_controller);
+  late final _surface = _SurfaceAnimation(_animation);
 
   /// The current cover's scheme. Null follows the app scheme.
   ColorScheme? _artwork;
@@ -105,7 +107,7 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
@@ -153,15 +155,17 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
     );
     if (!animate || _from == null || motion.duration == Duration.zero) {
       _from = null;
-      _controller.value = 1;
+      _controller?.value = 1;
       return;
     }
-    // From the colour on screen, which may be partway through a move.
-    _surface
-      ..from = _surface.value
-      ..curve = motion.curve;
+    if (widget.fadesSurfaceOnly) {
+      // From the colour on screen, which may be partway through a move.
+      _surface
+        ..from = _surface.value
+        ..curve = motion.curve;
+    }
     _curve = motion.curve;
-    _controller
+    _animation
       ..duration = motion.duration
       ..forward(from: 0);
   }
@@ -182,11 +186,11 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
           )
         : artwork;
     final from = _from;
-    final progress = _controller.value;
+    final progress = _controller?.value ?? 1;
     final scheme = widget.fadesSurfaceOnly || from == null || progress >= 1
         ? target
         : ColorScheme.lerp(from, target, _curve.transform(progress));
-    _surface.to = target.surface;
+    if (widget.fadesSurfaceOnly) _surface.to = target.surface;
     _shown = scheme;
     if (!identical(base, _base) || scheme != _scheme) {
       _base = base;
@@ -240,7 +244,8 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
       );
     }
     return AnimatedBuilder(
-      animation: _controller,
+      // Stands still until a move makes the controller, in the same build.
+      animation: _controller ?? kAlwaysCompleteAnimation,
       builder: (context, child) => Theme(data: _themeFor(base), child: child!),
       child: widget.child,
     );
