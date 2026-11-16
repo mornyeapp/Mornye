@@ -39,6 +39,10 @@ impl Lookup for SystemLookup {
 
 type DohClient = Client<HttpsConnector<HttpConnector>, Full<Bytes>>;
 
+/// How long a host the system resolver failed for, and DoH answered, goes
+/// straight to DoH. Short, so a recovered network is used again quickly.
+const SYSTEM_FAILURE_TTL: Duration = Duration::from_secs(15);
+
 struct Cached {
     addresses: Vec<IpAddr>,
     expires: Instant,
@@ -49,6 +53,7 @@ pub(crate) struct Dns {
     doh: DohClient,
     upstreams: Vec<http::Uri>,
     cache: Mutex<HashMap<String, Cached>>,
+    system_failures: Mutex<HashMap<String, Instant>>,
 }
 
 impl Dns {
@@ -102,6 +107,7 @@ impl Dns {
             doh,
             upstreams,
             cache: Mutex::default(),
+            system_failures: Mutex::default(),
         })
     }
 
@@ -110,14 +116,41 @@ impl Dns {
         host: &str,
         allow_private: bool,
     ) -> io::Result<Vec<SocketAddr>> {
-        let addresses = match self.lookup.lookup(host).await {
-            Ok(addresses) => addresses,
-            Err(original) => {
-                if self.upstreams.is_empty() {
-                    return Err(original);
+        let key = host.to_lowercase();
+        let recent_failure = self
+            .system_failures
+            .lock()
+            .expect("system DNS failure lock")
+            .get(&key)
+            .is_some_and(|expires| Instant::now() < *expires);
+        let skipped = if recent_failure {
+            self.fallback(host).await.ok()
+        } else {
+            None
+        };
+        let addresses = match skipped {
+            Some(addresses) => addresses,
+            None => match self.lookup.lookup(host).await {
+                Ok(addresses) => addresses,
+                Err(original) => {
+                    if self.upstreams.is_empty() {
+                        return Err(original);
+                    }
+                    let addresses = self.fallback(host).await?;
+                    let mut failures = self
+                        .system_failures
+                        .lock()
+                        .expect("system DNS failure lock");
+                    if failures.len() >= 256 {
+                        failures.retain(|_, expires| Instant::now() < *expires);
+                        if failures.len() >= 256 {
+                            failures.clear();
+                        }
+                    }
+                    failures.insert(key, Instant::now() + SYSTEM_FAILURE_TTL);
+                    addresses
                 }
-                self.fallback(host).await?
-            }
+            },
         };
         let addresses: Vec<_> = addresses
             .into_iter()
@@ -263,5 +296,72 @@ impl Service<dns::Name> for Resolver {
                 .await?
                 .into_iter())
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[derive(Default)]
+    struct Failing {
+        calls: AtomicUsize,
+    }
+
+    impl Lookup for Failing {
+        fn lookup(&self, _: &str) -> LookupFuture {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Box::pin(async { Err(io::Error::other("system DNS failure")) })
+        }
+    }
+
+    const HOST: &str = "blocked.example.com";
+    const ADDRESS: IpAddr = IpAddr::V4(std::net::Ipv4Addr::new(93, 184, 216, 34));
+
+    /// A resolver whose DoH answer for `HOST` is already cached, so no test
+    /// reaches the network.
+    fn dns(doh: Vec<IpAddr>) -> (Arc<Failing>, Dns) {
+        let tls = rustls::ClientConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_root_certificates(rustls::RootCertStore::empty())
+        .with_no_client_auth();
+        let lookup = Arc::new(Failing::default());
+        let dns = Dns::new(tls, lookup.clone(), &["https://192.0.2.1/dns-query".into()]).unwrap();
+        dns.cache.lock().unwrap().insert(
+            HOST.into(),
+            Cached {
+                addresses: doh,
+                expires: Instant::now() + Duration::from_secs(60),
+            },
+        );
+        (lookup, dns)
+    }
+
+    #[tokio::test]
+    async fn a_host_the_system_resolver_failed_for_goes_straight_to_doh() {
+        let (lookup, dns) = dns(vec![ADDRESS]);
+        for _ in 0..3 {
+            let addresses = dns.resolve(HOST, false).await.unwrap();
+            assert_eq!(addresses, vec![SocketAddr::new(ADDRESS, 0)]);
+        }
+        assert_eq!(lookup.calls.load(Ordering::SeqCst), 1);
+        // Once the short window ends, the system resolver is asked again.
+        *dns.system_failures.lock().unwrap().get_mut(HOST).unwrap() = Instant::now();
+        dns.resolve(HOST, false).await.unwrap();
+        assert_eq!(lookup.calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn a_failure_doh_cannot_answer_keeps_asking_the_system_resolver() {
+        let (lookup, dns) = dns(Vec::new());
+        for _ in 0..3 {
+            assert!(dns.resolve(HOST, false).await.is_err());
+        }
+        assert_eq!(lookup.calls.load(Ordering::SeqCst), 3);
+        assert!(dns.system_failures.lock().unwrap().is_empty());
     }
 }
