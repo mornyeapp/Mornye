@@ -1489,6 +1489,15 @@ void main() {
     },
   );
 
+  test('Shuffle turns on before the player has been initialized', () async {
+    final runtime = _runtime();
+    await MusicPlayerController(runtime: runtime).setShuffle(true);
+    expect(
+      runtime.handler!.playbackState.value.shuffleMode,
+      AudioServiceShuffleMode.all,
+    );
+  });
+
   for (final desktop in [false, true]) {
     test('Link handoff starts at its position on desktop=$desktop', () async {
       final deck = _HandoffDeck();
