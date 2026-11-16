@@ -81,6 +81,18 @@ controls its own fallback presentation. SDK failures cannot interrupt music
 playback. Presence depends on
 Discord's activity privacy settings, connectivity and mobile background limits.
 
+On Android the SDK binds to the Discord app through the activity it was given,
+and Android releases that connection when the activity is destroyed, while the
+plugin lives on with the shared Flutter engine. The plugin therefore creates a
+new client for each new activity and has the service send the current song
+again. An update that stays unanswered for 20 seconds counts as failed, and a
+client whose update failed is replaced before the next attempt (at most every
+two minutes, and only while the Discord app is installed). Presence that was
+switched on while no activity existed starts when one appears. Without an
+activity (the app swiped away while music plays) presence can lapse until the
+app is opened again. On iOS a token refresh that could not reach Discord keeps
+the account linked and is repeated every 30 seconds.
+
 After staging the SDK, run `flutter test integration_test/discord_sdk_test.dart
 -d <device-id>` on an iOS simulator or Android device to test native startup,
 shutdown and restart without linking an account or publishing any activity.

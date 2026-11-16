@@ -85,7 +85,10 @@
             DiscordPresencePlugin *self = weakSelf;
             if (!self || self->_generation != generation) return;
             if (!response.Successful()) {
-                [self finishAuth:[FlutterError errorWithCode:@"authorization_failed" message:@"Discord authorization failed. Please try again." details:nil]];
+                // Being offline is not a rejected token: "network" lets the
+                // app keep the link and refresh again later.
+                const bool offline = response.Type() == discordpp::ErrorType::NetworkError || response.Retryable();
+                [self finishAuth:[FlutterError errorWithCode:offline ? @"network" : @"authorization_failed" message:@"Discord authorization failed. Please try again." details:nil]];
                 return;
             }
             [self finishAuth:@{@"access": @(access.c_str()), @"refresh": @(refresh.c_str()), @"expiresIn": @(expires)}];

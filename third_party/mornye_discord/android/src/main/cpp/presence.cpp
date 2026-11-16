@@ -3,6 +3,7 @@
 #ifdef MORNYE_DISCORD_SDK
 #define DISCORDPP_IMPLEMENTATION
 #include <discordpp.h>
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -10,6 +11,12 @@ namespace {
 std::unique_ptr<discordpp::Client> client;
 int status = 0;
 uint64_t generation = 0;
+// An update whose result has not arrived yet, and when it was sent.
+bool waiting = false;
+std::chrono::steady_clock::time_point requested;
+// How long an update may stay unanswered. Starting the Discord app's process
+// takes several seconds on a slow phone.
+constexpr std::chrono::seconds kResultTimeout{20};
 
 std::string utf8(JNIEnv* env, jstring value) {
     // JNI's modified UTF-8 corrupts supplementary Unicode (e.g. emoji).
@@ -50,6 +57,12 @@ extern "C" JNIEXPORT jboolean JNICALL JNI_METHOD(nativeStart)(JNIEnv*, jobject) 
 extern "C" JNIEXPORT jint JNICALL JNI_METHOD(nativeTick)(JNIEnv*, jobject) {
 #ifdef MORNYE_DISCORD_SDK
     discordpp::RunCallbacks();
+    // A connection the Discord app dropped without closing never answers.
+    // The update then counts as failed, so that it is sent again.
+    if (waiting && std::chrono::steady_clock::now() - requested > kResultTimeout) {
+        waiting = false;
+        status = 2;
+    }
     return status;
 #else
     return 2;
@@ -79,8 +92,12 @@ extern "C" JNIEXPORT void JNICALL JNI_METHOD(nativeUpdate)(
     if (end > 0) timestamps.SetEnd(end);
     activity.SetTimestamps(timestamps);
     auto request = ++generation;
+    waiting = true;
+    requested = std::chrono::steady_clock::now();
     client->UpdateRichPresence(activity, [request](discordpp::ClientResult result) {
-        if (generation == request) status = result.Successful() ? 1 : 2;
+        if (generation != request) return;
+        waiting = false;
+        status = result.Successful() ? 1 : 2;
     });
 #endif
 }
@@ -88,6 +105,7 @@ extern "C" JNIEXPORT void JNICALL JNI_METHOD(nativeUpdate)(
 extern "C" JNIEXPORT void JNICALL JNI_METHOD(nativeClear)(JNIEnv*, jobject) {
 #ifdef MORNYE_DISCORD_SDK
     ++generation;
+    waiting = false;
     if (client) client->ClearRichPresence();
     status = 0;
 #endif
@@ -96,6 +114,7 @@ extern "C" JNIEXPORT void JNICALL JNI_METHOD(nativeClear)(JNIEnv*, jobject) {
 extern "C" JNIEXPORT void JNICALL JNI_METHOD(nativeStop)(JNIEnv*, jobject) {
 #ifdef MORNYE_DISCORD_SDK
     ++generation;
+    waiting = false;
     if (client) {
         client->ClearRichPresence();
         client->Disconnect();

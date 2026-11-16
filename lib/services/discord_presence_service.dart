@@ -163,8 +163,15 @@ class DiscordPresenceService {
   bool _initialized = false;
   bool _ready = false;
   bool _authenticating = false;
+
+  /// A token refresh could not reach Discord: the account stays linked and
+  /// the refresh is repeated.
+  bool _refreshPending = false;
   bool _visible = false;
   int _generation = 0;
+
+  /// The generation whose start is under way.
+  int? _starting;
   Map<String, Object>? _lastPayload;
   DateTime? _lastUpdate;
   Timer? _pending;
@@ -187,7 +194,7 @@ class DiscordPresenceService {
   Future<void> setEnabled(bool enabled) async {
     if (_enabled == enabled) return;
     _enabled = enabled;
-    final generation = ++_generation;
+    ++_generation;
     _artworkRequest++;
     _artworkKey = null;
     _artwork = null;
@@ -199,12 +206,21 @@ class DiscordPresenceService {
     _lastPayload = null;
     _lastUpdate = null;
     _authenticating = false;
+    _refreshPending = false;
     if (!enabled) {
       _initialized = false;
       status.value = DiscordPresenceStatus.disabled;
       await _invoke('shutdown');
       return;
     }
+    await _start();
+  }
+
+  /// Starts the SDK for the current generation. On Android this needs an
+  /// activity, so a start that found none is repeated when one appears.
+  Future<void> _start() async {
+    final generation = _generation;
+    _starting = generation;
     status.value = DiscordPresenceStatus.connecting;
     try {
       final available = await _channel.invokeMethod<bool>('initialize');
@@ -214,11 +230,15 @@ class DiscordPresenceService {
         status.value = DiscordPresenceStatus.sdkUnavailable;
         return;
       }
+      _retry?.cancel();
       _retry = Timer.periodic(const Duration(seconds: 30), (_) {
-        if (status.value == DiscordPresenceStatus.unavailable) {
-          _lastPayload = null;
-          _schedule();
+        if (status.value != DiscordPresenceStatus.unavailable) return;
+        if (_refreshPending) {
+          unawaited(_authenticate(interactive: false));
+          return;
         }
+        _lastPayload = null;
+        _schedule();
       });
       if (requiresLink) {
         await _authenticate(interactive: false);
@@ -231,6 +251,8 @@ class DiscordPresenceService {
       if (generation == _generation) {
         status.value = DiscordPresenceStatus.sdkUnavailable;
       }
+    } finally {
+      if (_starting == generation) _starting = null;
     }
   }
 
@@ -251,6 +273,7 @@ class DiscordPresenceService {
   Future<void> _authenticate({required bool interactive}) async {
     if (!_enabled || !_initialized || _authenticating || !requiresLink) return;
     _authenticating = true;
+    _refreshPending = false;
     _ready = false;
     _pending?.cancel();
     _refresh?.cancel();
@@ -287,11 +310,19 @@ class DiscordPresenceService {
       _refresh = Timer(Duration(seconds: (expires - 60).clamp(30, 604800)), () {
         unawaited(_authenticate(interactive: false));
       });
-    } catch (_) {
+    } catch (error) {
       // Do not log OAuth tokens or native exception details.
       _tokenWrites = Future.value();
       if (generation == _generation) {
-        status.value = DiscordPresenceStatus.linkRequired;
+        // Being offline does not end the link: the stored token is still
+        // good, so the retry timer refreshes again.
+        _refreshPending =
+            !interactive &&
+            error is PlatformException &&
+            error.code == 'network';
+        status.value = _refreshPending
+            ? DiscordPresenceStatus.unavailable
+            : DiscordPresenceStatus.linkRequired;
       }
     } finally {
       if (generation == _generation) _authenticating = false;
@@ -313,6 +344,9 @@ class DiscordPresenceService {
         status.value = DiscordPresenceStatus.connecting;
       case 'expired':
         unawaited(_authenticate(interactive: false));
+      case 'available':
+        // Android: an activity exists again.
+        if (!_initialized && _starting != _generation) unawaited(_start());
       case 'unavailable':
         status.value = DiscordPresenceStatus.unavailable;
     }

@@ -338,4 +338,89 @@ void main() {
     await tester.runAsync(service.dispose);
     messenger.setMockMethodCallHandler(channel, null);
   });
+
+  testWidgets('a start that found no activity is repeated when one appears', (
+    tester,
+  ) async {
+    final calls = <MethodCall>[];
+    var hasActivity = false;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'initialize') return hasActivity;
+      return null;
+    });
+    final service = DiscordPresenceService(
+      channel: channel,
+      requiresLink: false,
+      resolveArtwork: (_) async => null,
+      now: tester.binding.clock.now,
+    );
+    final player = BaseAudioHandler();
+    service.bind(player);
+    player.mediaItem.add(track('First'));
+    player.playbackState.add(playing(tester.binding.clock.now()));
+    await service.setEnabled(true);
+    expect(service.status.value, DiscordPresenceStatus.sdkUnavailable);
+    hasActivity = true;
+    final handled = Completer<void>();
+    messenger.handlePlatformMessage(
+      channel.name,
+      channel.codec.encodeMethodCall(const MethodCall('status', 'available')),
+      (_) => handled.complete(),
+    );
+    await tester.pump();
+    await handled.future;
+    await tester.pump();
+    expect(calls.where((c) => c.method == 'initialize'), hasLength(2));
+    expect(calls.where((c) => c.method == 'update'), hasLength(1));
+    await tester.runAsync(service.dispose);
+    messenger.setMockMethodCallHandler(channel, null);
+  });
+
+  testWidgets('an offline refresh keeps the account and is repeated', (
+    tester,
+  ) async {
+    final stored = <String?>[];
+    var online = false;
+    var rejected = false;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'initialize') return true;
+      if (call.method == 'refresh') {
+        if (rejected) throw PlatformException(code: 'authorization_failed');
+        if (!online) throw PlatformException(code: 'network');
+        return {
+          'access': 'temporary-access',
+          'refresh': 'rotated-refresh',
+          'expiresIn': 3600,
+        };
+      }
+      return null;
+    });
+    final service = DiscordPresenceService(
+      channel: channel,
+      requiresLink: true,
+      resolveArtwork: (_) async => null,
+      readRefreshToken: () async => 'previous-refresh',
+      writeRefreshToken: (token) async => stored.add(token),
+    );
+    await service.setEnabled(true);
+    expect(service.status.value, DiscordPresenceStatus.unavailable);
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump();
+    expect(service.status.value, DiscordPresenceStatus.unavailable);
+    expect(stored, isEmpty);
+    online = true;
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump();
+    expect(stored, ['rotated-refresh']);
+    expect(service.status.value, DiscordPresenceStatus.connecting);
+
+    // A token Discord rejects still asks for the link again.
+    rejected = true;
+    await service.setEnabled(false);
+    await service.setEnabled(true);
+    expect(service.status.value, DiscordPresenceStatus.linkRequired);
+    await tester.runAsync(service.dispose);
+    messenger.setMockMethodCallHandler(channel, null);
+  });
 }
