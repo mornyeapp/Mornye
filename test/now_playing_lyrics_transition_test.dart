@@ -3716,23 +3716,23 @@ void main() {
     await tester.pump(const Duration(milliseconds: 80));
     expectTimes(35, 145);
     double incomingOffset(Finder label) => tester
-        .widget<SlideTransition>(
+        .widget<FractionalTranslation>(
           find
               .ancestor(
                 of: find.descendant(of: label, matching: find.text('5')),
-                matching: find.byType(SlideTransition),
+                matching: find.byType(FractionalTranslation),
               )
               .first,
         )
-        .position
-        .value
+        .translation
         .dy;
     expect(incomingOffset(elapsed), greaterThan(0));
     expect(incomingOffset(remaining), -incomingOffset(elapsed));
 
-    // Another position report within this second must not restart either roll.
+    // Another position report within this second must not restart either
+    // roll, which ends on the first 30 Hz clock tick past its 280 ms.
     await positionAt(35200);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 240));
     expect(incomingOffset(elapsed), 0);
     expect(incomingOffset(remaining), 0);
     await positionAt(35900);
