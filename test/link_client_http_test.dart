@@ -25,6 +25,31 @@ class _LateRequest implements HttpClientRequest {
 }
 
 void main() {
+  test('only a refused certificate reads as a changed certificate', () {
+    String code(Object error) => linkTransportException(error).code;
+
+    expect(
+      code(
+        const HandshakeException(
+          'Handshake error in client',
+          OSError(
+            'CERTIFICATE_VERIFY_FAILED: application verification failure',
+          ),
+        ),
+      ),
+      LinkClientErrors.certificate,
+    );
+    expect(
+      code(const CertificateException('Bad certificate')),
+      LinkClientErrors.certificate,
+    );
+    // A host that stops while answering presents no certificate at all.
+    expect(
+      code(const HandshakeException('Connection terminated during handshake')),
+      LinkClientErrors.unavailable,
+    );
+  });
+
   for (final upload in [false, true]) {
     test(
       '${upload ? 'upload' : 'JSON'} aborts a request opened after timeout',

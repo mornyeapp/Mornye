@@ -237,6 +237,16 @@ LinkException linkResponseException(LinkHttpResponse response) {
   }, 'HTTP $status');
 }
 
+/// Whether [error] is the pinned certificate being refused. A handshake that
+/// only broke off (a host that stopped while answering) presented no
+/// certificate at all, so it is a host that cannot be reached, not one that
+/// changed.
+bool _certificateRefused(TlsException error) =>
+    error is CertificateException ||
+    '${error.message} ${error.osError?.message ?? ''}'.contains(
+      'CERTIFICATE_VERIFY_FAILED',
+    );
+
 /// The [LinkException] for a transport failure. Messages stay generic, so no
 /// address or credential leaks into logs or the UI.
 LinkException linkTransportException(Object error) => switch (error) {
@@ -249,7 +259,7 @@ LinkException linkTransportException(Object error) => switch (error) {
     LinkClientErrors.localNetworkPermission,
     'Local network access is not allowed',
   ),
-  TlsException() => const LinkException(
+  TlsException() when _certificateRefused(error) => const LinkException(
     LinkClientErrors.certificate,
     'The computer presented another certificate',
   ),
