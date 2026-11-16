@@ -706,7 +706,10 @@ class LibraryDatabase {
   }
 
   /// Resolves a track list with a bounded number of indexed queries instead
-  /// of issuing up to three SQLite calls for every track.
+  /// of issuing up to three SQLite calls for every track. When several rows
+  /// answer one track, a file on this device comes before the same song on
+  /// network storage or a Link device, so it plays without the network and
+  /// is not taken for a song this device still lacks.
   Future<List<Map<String, dynamic>?>> findExistingBatch(
     List<LocalLibraryBatchLookupRequest> requests,
   ) async {
@@ -728,6 +731,7 @@ class LibraryDatabase {
         rawValues: rawValues,
         destination: destination,
         mapRow: LibraryRowMapper.decode,
+        orderBy: "file_path LIKE 'network://%', id",
       );
     }
 
