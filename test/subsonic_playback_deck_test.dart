@@ -22,6 +22,8 @@ class _Deck implements PlaybackDeck {
   @override
   PlaybackDeckState state = PlaybackDeckState.paused;
   @override
+  bool get needsSourceReload => false;
+  @override
   Stream<Duration> get onPositionChanged => positions.stream;
   @override
   Stream<Duration> get onDurationChanged => durations.stream;
@@ -194,6 +196,28 @@ void main() {
       await seek;
       expect(engine.resumes, 1);
       expect(await deck.getCurrentPosition(), Duration.zero);
+    },
+  );
+
+  test(
+    'cancelled seek requests a source reload before playback resumes',
+    () async {
+      await deck.setNetworkSource(url);
+      await deck.resume();
+      engine.holdSource = Completer<void>();
+      final seek = deck.seek(const Duration(seconds: 60));
+      await Future<void>.delayed(Duration.zero);
+      await deck.cancelPreparation();
+      engine.holdSource!.complete();
+      await seek;
+      expect(deck.needsSourceReload, isTrue);
+      expect(await deck.getCurrentPosition(), isNull);
+      expect(engine.resumes, 1);
+      engine.holdSource = null;
+      await deck.setNetworkSource(url);
+      expect(deck.needsSourceReload, isFalse);
+      await deck.resume();
+      expect(engine.resumes, 2);
     },
   );
 

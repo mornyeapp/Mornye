@@ -33,6 +33,7 @@ class SubsonicPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   SubsonicPlaybackStream? _stream;
   Duration _offset = Duration.zero;
   bool _loading = false, _disposed = false, _wantPlaying = false;
+  bool _needsReload = false;
   int _revision = 0;
   int _queueRevision = 0;
   double _volume = 1, _rate = 1;
@@ -50,7 +51,7 @@ class SubsonicPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   @override
   bool get isDirect => inner.isDirect;
   @override
-  bool get needsSourceReload => inner.needsSourceReload;
+  bool get needsSourceReload => _needsReload || inner.needsSourceReload;
   @override
   Stream<PlaybackDeckState> get onPlayerStateChanged => _states.stream;
   @override
@@ -90,6 +91,7 @@ class SubsonicPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
       _loading = false;
       await inner.setNetworkSource(url, arriving: arriving);
       if (_current(revision)) {
+        _needsReload = false;
         if (stream?.duration case final duration?) _durations.add(duration);
       }
     } finally {
@@ -112,6 +114,7 @@ class SubsonicPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     _offset = Duration.zero;
     _loading = false;
     _wantPlaying = false;
+    _needsReload = false;
     return inner.setFileSource(
       path,
       preferBitPerfect: preferBitPerfect,
@@ -141,6 +144,7 @@ class SubsonicPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     target = Duration(seconds: target.inSeconds);
     final revision = ++_revision;
     _loading = true;
+    _needsReload = true;
     try {
       await inner.pause();
       if (!_current(revision)) return;
@@ -150,6 +154,7 @@ class SubsonicPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
       await inner.setVolume(_volume);
       await inner.setPlaybackRate(_rate);
       if (!_current(revision)) return;
+      _needsReload = false;
       _loading = false;
       if (duration != null) _durations.add(duration);
       _positions.add(target);
@@ -163,7 +168,7 @@ class SubsonicPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   Future<Duration?> getCurrentPosition() async {
     final revision = _revision;
     final position = await inner.getCurrentPosition();
-    return _current(revision) && !_loading && position != null
+    return _current(revision) && !_loading && !_needsReload && position != null
         ? _absolute(position)
         : null;
   }
@@ -190,6 +195,7 @@ class SubsonicPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
 
   @override
   Future<void> cancelPreparation() {
+    _needsReload = _needsReload || _loading;
     ++_revision;
     _loading = false;
     _wantPlaying = false;
@@ -203,6 +209,7 @@ class SubsonicPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     _offset = Duration.zero;
     _loading = false;
     _wantPlaying = false;
+    _needsReload = false;
     return inner.stop();
   }
 
