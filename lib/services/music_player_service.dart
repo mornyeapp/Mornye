@@ -174,6 +174,12 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void>? _disposeFuture;
   bool _initialized = false;
   bool _sourceReady = false;
+
+  /// The source was loaded paused ([startPaused]) where it was asked to be
+  /// and has not played since. Decks may still report it stopped (they
+  /// never started it), so play resumes it rather than loading it again
+  /// from the start.
+  bool _heldPaused = false;
   Object? _playbackError;
 
   /// Reloads of the current song after Android's media server died, and
@@ -1793,6 +1799,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
     final generation = ++_playRequestGeneration;
     _sourceReady = false;
+    _heldPaused = false;
     _playbackError = null;
     // Advance the requested index synchronously so consecutive Next taps do
     // not all target the same song while AutoMix/source preparation awaits.
@@ -2092,6 +2099,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       }
       if (!_isCurrentPlayRequest(generation, media)) return;
       _sourceReady = true;
+      _heldPaused = startPaused;
       if (media.source.startsWith('network://')) {
         unawaited(_loadNetworkMetadata(media, generation));
       }
@@ -2110,7 +2118,10 @@ class MusicPlayerHandler extends BaseAudioHandler
         mediaItem.add(_toMediaItem(_media[_index], resolvedSource: resolved));
       }
       _broadcastPosition(effectiveStartPosition, force: true);
-      _broadcastState();
+      // A source held paused is ready to play, whatever the deck reports.
+      _broadcastState(
+        playerState: startPaused ? PlaybackDeckState.paused : null,
+      );
       _lastPeriodicPersistAt = DateTime.now();
       unawaited(_persistSession(position: effectiveStartPosition));
       // Some files do not emit onDurationChanged reliably (stuck at 0:00);
@@ -2385,7 +2396,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       return;
     }
     if ((!_sourceReady ||
-            _player.state == PlaybackDeckState.stopped ||
+            (_player.state == PlaybackDeckState.stopped && !_heldPaused) ||
             _player.state == PlaybackDeckState.completed) &&
         _index >= 0 &&
         _index < _media.length) {
@@ -2428,6 +2439,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         await _player.pause();
         return;
       }
+      _heldPaused = false;
       _broadcastState(playerState: PlaybackDeckState.playing);
     });
   }
