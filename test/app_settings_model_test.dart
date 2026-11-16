@@ -107,6 +107,26 @@ void main() {
     expect(off.copyWith(locale: 'id').swipeToQueue, isFalse);
   });
 
+  test('A Library song tap plays by default and remembers details', () {
+    expect(const AppSettings().librarySongTap, AppSettings.librarySongTapPlay);
+    // Settings saved before the choice existed play on a tap.
+    expect(
+      AppSettings.fromJson({'swipeToQueue': true}).librarySongTap,
+      AppSettings.librarySongTapPlay,
+    );
+    final details = const AppSettings().copyWith(
+      librarySongTap: AppSettings.librarySongTapDetails,
+    );
+    expect(
+      AppSettings.fromJson(details.toJson()).librarySongTap,
+      AppSettings.librarySongTapDetails,
+    );
+    expect(
+      details.copyWith(locale: 'id').librarySongTap,
+      AppSettings.librarySongTapDetails,
+    );
+  });
+
   test('AI translation defaults to Fast and remembers either mode', () {
     expect(const AppSettings().lyricsAiWordSync, isFalse);
     expect(AppSettings.fromJson({}).lyricsAiWordSync, isFalse);

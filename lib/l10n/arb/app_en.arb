@@ -8499,6 +8499,18 @@
   "@swipeToQueueSubtitle": {
     "description": "Subtitle of the swipe songs to queue setting"
   },
+  "librarySongTap": "Tapping a song",
+  "@librarySongTap": {
+    "description": "Library setting choosing whether a tap on a song row plays it or opens its details"
+  },
+  "librarySongTapPlayDescription": "A tap plays the song. The info button opens its details.",
+  "@librarySongTapPlayDescription": {
+    "description": "Description of the tapping a song setting while a tap plays"
+  },
+  "librarySongTapDetailsDescription": "A tap opens the song's details. The play button plays it.",
+  "@librarySongTapDetailsDescription": {
+    "description": "Description of the tapping a song setting while a tap opens the details"
+  },
   "snackbarExtensionInstalledEnable": "{extensionName} installed. Enable it in Settings > Extensions",
   "@snackbarExtensionInstalledEnable": {
     "description": "Snackbar after installing an extension from the repo tab",

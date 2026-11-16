@@ -7373,6 +7373,18 @@
   "@swipeToQueueSubtitle": {
     "description": "Subtitle of the swipe songs to queue setting"
   },
+  "librarySongTap": "Mengetuk lagu",
+  "@librarySongTap": {
+    "description": "Library setting choosing whether a tap on a song row plays it or opens its details"
+  },
+  "librarySongTapPlayDescription": "Ketuk untuk memutar lagu. Tombol info membuka detailnya.",
+  "@librarySongTapPlayDescription": {
+    "description": "Description of the tapping a song setting while a tap plays"
+  },
+  "librarySongTapDetailsDescription": "Ketuk untuk membuka detail lagu. Tombol putar memutarnya.",
+  "@librarySongTapDetailsDescription": {
+    "description": "Description of the tapping a song setting while a tap opens the details"
+  },
   "snackbarExtensionInstalledEnable": "{extensionName} terinstal. Hidupkan di Setelan > Ekstensi",
   "@snackbarExtensionInstalledEnable": {
     "description": "Snackbar after installing an extension from the repo tab",

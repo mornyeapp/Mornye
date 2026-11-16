@@ -1046,6 +1046,14 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setSwipeToQueue(bool enabled) =>
       _commit(state.copyWith(swipeToQueue: enabled));
 
+  void setLibrarySongTap(String mode) => _commit(
+    state.copyWith(
+      librarySongTap: mode == AppSettings.librarySongTapDetails
+          ? AppSettings.librarySongTapDetails
+          : AppSettings.librarySongTapPlay,
+    ),
+  );
+
   void setHomeFeedProvider(String? provider) => _commit(
     provider == null || provider.isEmpty
         ? state.copyWith(clearHomeFeedProvider: true)

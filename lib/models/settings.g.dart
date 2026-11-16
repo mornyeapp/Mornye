@@ -134,6 +134,8 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       json['libraryQualityLabelMode'] as String? ??
       AppSettings.libraryQualityLabelBitDepthOnly,
   swipeToQueue: json['swipeToQueue'] as bool? ?? true,
+  librarySongTap:
+      json['librarySongTap'] as String? ?? AppSettings.librarySongTapPlay,
   askQualityBeforeDownload: json['askQualityBeforeDownload'] as bool? ?? true,
   enableLogging: json['enableLogging'] as bool? ?? false,
   useExtensionProviders: json['useExtensionProviders'] as bool? ?? true,
@@ -327,6 +329,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'defaultLibraryView': instance.defaultLibraryView,
   'libraryQualityLabelMode': instance.libraryQualityLabelMode,
   'swipeToQueue': instance.swipeToQueue,
+  'librarySongTap': instance.librarySongTap,
   'askQualityBeforeDownload': instance.askQualityBeforeDownload,
   'enableLogging': instance.enableLogging,
   'useExtensionProviders': instance.useExtensionProviders,

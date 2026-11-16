@@ -202,6 +202,12 @@ class SettingsSearchCatalog {
             keywords: const ['gesture', 'play next', 'add to queue'],
           ),
         SettingsSearchEntry(
+          icon: Icons.play_circle_outline,
+          title: l10n.librarySongTap,
+          subtitle: '${l10n.tooltipPlay}, ${l10n.nowPlayingDetails}',
+          keywords: const ['tap', 'click', 'info', 'metadata', 'song details'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.library_music_outlined,
           title: l10n.libraryEnableLocalLibrary,
           subtitle: l10n.libraryEnableLocalLibrarySubtitle,

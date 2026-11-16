@@ -133,6 +133,8 @@ class AppSettings {
   static const String libraryQualityLabelBitDepthOnly = 'bit_depth_only';
   static const String libraryQualityLabelBitDepth = 'bit_depth';
   static const String libraryQualityLabelBitDepthBitrate = 'bit_depth_bitrate';
+  static const String librarySongTapPlay = 'play';
+  static const String librarySongTapDetails = 'details';
 
   final String defaultService;
   final String audioQuality;
@@ -300,6 +302,11 @@ class AppSettings {
   /// Phones and tablets: a horizontal swipe on a song row plays it next or
   /// adds it to the queue.
   final bool swipeToQueue;
+
+  /// What a tap on a Library song row with a play button does:
+  /// [librarySongTapPlay] plays it and the button opens its details,
+  /// [librarySongTapDetails] opens its details and the button plays.
+  final String librarySongTap;
   final bool askQualityBeforeDownload;
   final bool enableLogging;
   final bool useExtensionProviders;
@@ -558,6 +565,7 @@ class AppSettings {
     this.defaultLibraryView = 'last',
     this.libraryQualityLabelMode = AppSettings.libraryQualityLabelBitDepthOnly,
     this.swipeToQueue = true,
+    this.librarySongTap = AppSettings.librarySongTapPlay,
     this.askQualityBeforeDownload = true,
     this.enableLogging = false,
     this.useExtensionProviders = true,
@@ -751,6 +759,7 @@ class AppSettings {
     String? defaultLibraryView,
     String? libraryQualityLabelMode,
     bool? swipeToQueue,
+    String? librarySongTap,
     bool? askQualityBeforeDownload,
     bool? enableLogging,
     bool? useExtensionProviders,
@@ -931,6 +940,7 @@ class AppSettings {
       libraryQualityLabelMode:
           libraryQualityLabelMode ?? this.libraryQualityLabelMode,
       swipeToQueue: swipeToQueue ?? this.swipeToQueue,
+      librarySongTap: librarySongTap ?? this.librarySongTap,
       askQualityBeforeDownload:
           askQualityBeforeDownload ?? this.askQualityBeforeDownload,
       enableLogging: enableLogging ?? this.enableLogging,

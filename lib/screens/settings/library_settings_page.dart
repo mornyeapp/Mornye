@@ -10,6 +10,7 @@ import 'package:mornye/controllers/library_re_enrich_all.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_scan_failure.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/download_history_provider.dart';
@@ -29,6 +30,7 @@ import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/ios_library_folder_sheet.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
 
 part 'library_settings_page_widgets.dart';
@@ -578,6 +580,7 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
 
           SliverToBoxAdapter(
             child: SettingsGroup(
+              connected: true,
               children: [
                 SettingsItem(
                   icon: Icons.grid_view_rounded,
@@ -602,7 +605,6 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                     context,
                     settings.libraryQualityLabelMode,
                   ),
-                  showDivider: !queueSwipeOffered,
                 ),
                 if (queueSwipeOffered)
                   SettingsSwitchItem(
@@ -613,8 +615,13 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                     onChanged: (value) => ref
                         .read(settingsProvider.notifier)
                         .setSwipeToQueue(value),
-                    showDivider: false,
                   ),
+                _LibrarySongTapChoice(
+                  mode: settings.librarySongTap,
+                  onChanged: (mode) => ref
+                      .read(settingsProvider.notifier)
+                      .setLibrarySongTap(mode),
+                ),
               ],
             ),
           ),
@@ -1015,5 +1022,89 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
         ],
       ),
     );
+  }
+}
+
+/// What a tap on a Library song row does ([AppSettings.librarySongTap]): a
+/// two-way choice under its title and the current choice's description.
+class _LibrarySongTapChoice extends StatelessWidget {
+  const _LibrarySongTapChoice({required this.mode, required this.onChanged});
+
+  final String mode;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final title = l10n.librarySongTap;
+    final details = mode == AppSettings.librarySongTapDetails;
+    final selected = details
+        ? AppSettings.librarySongTapDetails
+        : AppSettings.librarySongTapPlay;
+    final labels = {
+      AppSettings.librarySongTapPlay: l10n.tooltipPlay,
+      AppSettings.librarySongTapDetails: l10n.nowPlayingDetails,
+    };
+    final choice = context.isMornye
+        ? MornyeSegmentedControl(
+            labels: labels.values.toList(),
+            selectedIndex: labels.keys.toList().indexOf(selected),
+            onChanged: (index) => onChanged(labels.keys.elementAt(index)),
+            samplesBackdrop: false,
+          )
+        : SettingsSegmentedChoice<String>(
+            selected: selected,
+            onChanged: onChanged,
+            semanticLabel: title,
+            options: [
+              for (final MapEntry(:key, :value) in labels.entries)
+                SettingsSegmentOption(value: key, label: value),
+            ],
+          );
+    final content = Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: context.tokens.rowPaddingH,
+        vertical: context.tokens.rowPaddingVCompact,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (!context.isMornye) ...[
+                AppIcon(
+                  Icons.play_circle_outline,
+                  color: colorScheme.onSurfaceVariant,
+                  size: 24,
+                ),
+                SizedBox(width: context.tokens.rowIconGap),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: textTheme.bodyLarge),
+                    const SizedBox(height: 2),
+                    Text(
+                      details
+                          ? l10n.librarySongTapDetailsDescription
+                          : l10n.librarySongTapPlayDescription,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          choice,
+        ],
+      ),
+    );
+    return SettingsSearchTarget(label: title, child: content);
   }
 }
