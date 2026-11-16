@@ -39,8 +39,9 @@ impl Lookup for SystemLookup {
 
 type DohClient = Client<HttpsConnector<HttpConnector>, Full<Bytes>>;
 
-/// How long a host the system resolver failed for, and DoH answered, goes
-/// straight to DoH. Short, so a recovered network is used again quickly.
+/// How long a host the system resolver failed for, and DoH answered, uses
+/// its cached DoH answer without asking the system resolver. Short, so a
+/// recovered network is used again quickly.
 const SYSTEM_FAILURE_TTL: Duration = Duration::from_secs(15);
 
 struct Cached {
@@ -123,11 +124,18 @@ impl Dns {
             .expect("system DNS failure lock")
             .get(&key)
             .is_some_and(|expires| Instant::now() < *expires);
-        let skipped = if recent_failure {
-            self.fallback(host).await.ok()
-        } else {
-            None
-        };
+        // Only a still-valid DoH answer replaces the system resolver; anything
+        // else goes to the system resolver first, as without the window.
+        let skipped = recent_failure
+            .then(|| {
+                self.cache
+                    .lock()
+                    .expect("DNS cache lock")
+                    .get(&key)
+                    .filter(|entry| Instant::now() < entry.expires && !entry.addresses.is_empty())
+                    .map(|entry| entry.addresses.clone())
+            })
+            .flatten();
         let addresses = match skipped {
             Some(addresses) => addresses,
             None => match self.lookup.lookup(host).await {
@@ -302,26 +310,36 @@ impl Service<dns::Name> for Resolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
+    /// A system resolver that fails until it is marked recovered.
     #[derive(Default)]
-    struct Failing {
+    struct System {
         calls: AtomicUsize,
+        recovered: AtomicBool,
     }
 
-    impl Lookup for Failing {
+    impl Lookup for System {
         fn lookup(&self, _: &str) -> LookupFuture {
             self.calls.fetch_add(1, Ordering::SeqCst);
-            Box::pin(async { Err(io::Error::other("system DNS failure")) })
+            let recovered = self.recovered.load(Ordering::SeqCst);
+            Box::pin(async move {
+                if recovered {
+                    Ok(vec![SYSTEM_ADDRESS])
+                } else {
+                    Err(io::Error::other("system DNS failure"))
+                }
+            })
         }
     }
 
     const HOST: &str = "blocked.example.com";
     const ADDRESS: IpAddr = IpAddr::V4(std::net::Ipv4Addr::new(93, 184, 216, 34));
+    const SYSTEM_ADDRESS: IpAddr = IpAddr::V4(std::net::Ipv4Addr::new(93, 184, 216, 35));
 
     /// A resolver whose DoH answer for `HOST` is already cached, so no test
     /// reaches the network.
-    fn dns(doh: Vec<IpAddr>) -> (Arc<Failing>, Dns) {
+    fn dns(doh: Vec<IpAddr>) -> (Arc<System>, Dns) {
         let tls = rustls::ClientConfig::builder_with_provider(Arc::new(
             rustls::crypto::ring::default_provider(),
         ))
@@ -329,7 +347,7 @@ mod tests {
         .unwrap()
         .with_root_certificates(rustls::RootCertStore::empty())
         .with_no_client_auth();
-        let lookup = Arc::new(Failing::default());
+        let lookup = Arc::new(System::default());
         let dns = Dns::new(tls, lookup.clone(), &["https://192.0.2.1/dns-query".into()]).unwrap();
         dns.cache.lock().unwrap().insert(
             HOST.into(),
@@ -363,5 +381,20 @@ mod tests {
         }
         assert_eq!(lookup.calls.load(Ordering::SeqCst), 3);
         assert!(dns.system_failures.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_expired_doh_answer_inside_the_window_asks_the_system_resolver_first() {
+        let (lookup, dns) = dns(vec![ADDRESS]);
+        dns.resolve(HOST, false).await.unwrap();
+        dns.cache.lock().unwrap().get_mut(HOST).unwrap().expires = Instant::now();
+        lookup.recovered.store(true, Ordering::SeqCst);
+        // Asking DoH first would wait for the unreachable upstream.
+        let addresses = tokio::time::timeout(Duration::from_secs(1), dns.resolve(HOST, false))
+            .await
+            .expect("system resolver asked before DoH")
+            .unwrap();
+        assert_eq!(addresses, vec![SocketAddr::new(SYSTEM_ADDRESS, 0)]);
+        assert_eq!(lookup.calls.load(Ordering::SeqCst), 2);
     }
 }
