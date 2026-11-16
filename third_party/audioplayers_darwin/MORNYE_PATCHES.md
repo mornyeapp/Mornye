@@ -113,6 +113,21 @@ per player. A missing value returns a `DarwinAudioError`. A player starts at
   AVFoundation did not set that flag after a seek on macOS, so after a seek
   the old position plays for the latency before the new one.
 
+### Rate changes keep the clock
+
+Upstream sets `player.rate`. On macOS that holds the item's clock while
+the audio restarts at the new rate: every change, with every time pitch
+algorithm and also between two rates other than 1, left the song 21 to 26 ms
+further behind its clock, so small repeated changes (Mornye Link Play
+together nudges 1.02 and back) never closed a gap. `setPlaybackRate` on a
+playing item now pins the item time at the current host instant with
+`setRate(_:time:atHostTime:)`, read from the item's own timebase, turning
+`automaticallyWaitsToMinimizeStalling` off for that call only. Measured
+change: 3.4 ms on a change away from 1, none back to 1. A player that waits
+for data, is not moving, or whose item has the tap (equalizer or pitch shift)
+still sets `rate`: with the tap both ways moved the clock by tens of
+milliseconds per change, the pinned one up to 200 ms when leaving a rate.
+
 ### Packaging
 
 - `darwin/audioplayers_darwin.podspec` adds
@@ -200,6 +215,21 @@ swiftc darwin/audioplayers_darwin/Sources/audioplayers_darwin/{WrappedMediaPlaye
 The same sources can be compiled with the iOS simulator SDK and run with
 `simctl spawn` to check the shared iOS implementation.
 
+`tests/RateChangeTests.swift` plays a generated sine file (muted) through the
+production wrapper and a real AVPlayer, moves its rate between 1, 1.02 and
+0.98, and requires each change to move the item's clock by 8 ms at most
+against the rates asked for (the plain `rate` change lost 21 to 26 ms each
+time). It also checks that a change while paused stays paused, and prints
+the clock movement with the tap attached without asserting it. It takes
+about 20 seconds:
+
+```bash
+cd third_party/audioplayers_darwin
+swiftc darwin/audioplayers_darwin/Sources/audioplayers_darwin/{WrappedMediaPlayer,Utils,AudioPlayerError,EqualizerAudioTap,EqualizerDSP,PitchShifter}.swift \
+  tests/RateChangeTests.swift -o /tmp/rate_change_tests
+/tmp/rate_change_tests
+```
+
 `tests/SourceLifecycleTests.swift` uses a deferred AVPlayer for cancellation and
 real generated WAV files for successful preparation, failed preparation,
 stale completion delivery and a linked next player starting on completion.
@@ -234,6 +264,7 @@ Compared against the pub.dev 6.5.0 package in the local pub cache:
 - `tests/PitchPlaybackTests.swift` (new)
 - `tests/AccurateSeekTests.swift` (new)
 - `tests/SourceLifecycleTests.swift` (new)
+- `tests/RateChangeTests.swift` (new)
 - `pubspec.yaml`, `README.md`, `pubspec.lock` (new)
 
 ## Upgrading

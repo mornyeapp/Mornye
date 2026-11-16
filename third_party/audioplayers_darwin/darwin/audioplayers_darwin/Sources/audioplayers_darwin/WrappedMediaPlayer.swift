@@ -247,8 +247,46 @@ enum ReleaseMode: String {
     updateTimePitch()
     if isPlaying {
       // Setting the rate causes the player to resume playing. So setting it only, when already playing.
-      player.rate = Float(playbackRate)
+      setRateKeepingTime(Float(playbackRate))
     }
+  }
+
+  /// A plain `rate` change holds the item's clock while the audio restarts
+  /// at the new rate, so every change leaves the song 21 to 26 ms further
+  /// behind (measured on macOS with every time pitch algorithm, also
+  /// between two rates other than 1). Small repeated changes, as Mornye
+  /// Link Play together makes, then never close a gap. Pinning the item
+  /// time at this host instant keeps the clock continuous. A player that
+  /// waits for data or is not moving changes its rate the plain way, and so
+  /// does an item with the tap (equalizer or pitch shift): there both ways
+  /// moved the clock by tens of milliseconds per change, the pinned one up
+  /// to 200 ms when leaving a rate.
+  private func setRateKeepingTime(_ rate: Float) {
+    let clock = CMClockGetHostTimeClock()
+    var current: Float64 = 0
+    var anchorItem = CMTime.zero
+    var anchorHost = CMTime.zero
+    guard !tapAttached, tapAttaching == nil,
+      player.timeControlStatus == .playing, player.rate != 0,
+      let item = player.currentItem, item.status == .readyToPlay,
+      let timebase = item.timebase,
+      CMSyncGetRelativeRateAndAnchorTime(
+        timebase, relativeTo: clock, relativeRateOut: &current,
+        anchorTimeOut: &anchorItem, relativeToAnchorTimeOut: &anchorHost) == noErr,
+      current > 0
+    else {
+      player.rate = rate
+      return
+    }
+    let host = CMClockGetTime(clock)
+    let itemTime = CMTimeAdd(
+      anchorItem, CMTimeMultiplyByFloat64(CMTimeSubtract(host, anchorHost), multiplier: current))
+    // The anchored call raises unless the player is told not to wait; the
+    // setting comes back at once, so later stalls are handled as before.
+    let waits = player.automaticallyWaitsToMinimizeStalling
+    player.automaticallyWaitsToMinimizeStalling = false
+    player.setRate(rate, time: itemTime, atHostTime: host)
+    player.automaticallyWaitsToMinimizeStalling = waits
   }
 
   func seek(time: CMTime) async {
