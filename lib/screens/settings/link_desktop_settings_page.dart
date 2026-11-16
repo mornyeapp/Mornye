@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +18,7 @@ import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/beta_badge.dart';
 import 'package:mornye/widgets/desktop/link_text_input_dialog.dart';
+import 'package:mornye/widgets/link/link_row_action.dart';
 import 'package:mornye/widgets/link/link_transfers_view.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
@@ -91,71 +93,18 @@ class LinkDesktopSettingsPage extends ConsumerWidget {
             ),
           ...settingsSectionSlivers(
             title: l10n.linkDesktopSectionComputer,
-            children: [
-              SettingsItem(
-                key: const ValueKey('link-name'),
-                icon: Icons.computer,
-                title: l10n.linkDesktopDeviceName,
-                subtitle: host.name,
-                onTap: () => unawaited(_rename(context, ref)),
-                showDivider: server != null,
-              ),
-              if (server != null) ...[
-                SettingsItem(
-                  icon: Icons.lan_outlined,
-                  title: l10n.linkDesktopAddress,
-                  subtitle: server.urls.join('\n'),
-                  trailing: server.urls.isEmpty
-                      ? null
-                      : _CopyButton(
-                          label: l10n.linkDesktopAddress,
-                          value: server.urls.first,
-                        ),
-                ),
-                SettingsItem(
-                  key: const ValueKey('link-security-code'),
-                  icon: Icons.security_outlined,
-                  title: l10n.linkDesktopSecurityCode,
-                  subtitle: l10n.linkDesktopSecurityCodeHint,
-                  trailing: Text(
-                    _groupedCode(server.shortFingerprint),
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  showDivider: host.catalogSongs != null,
-                ),
-                if (host.catalogSongs != null)
-                  SettingsItem(
-                    icon: Icons.library_music_outlined,
-                    title: l10n.linkDesktopCatalogSongs(host.catalogSongs!),
-                    showDivider: false,
-                  ),
-              ],
-            ],
+            children: linkHostInfoRows(context, ref, host),
           ),
           // Paired devices stay listed, and removable, while the server is
           // off; pairing and new keys need it running.
           if (server != null || phones.isNotEmpty)
             ...settingsSectionSlivers(
               title: l10n.linkDesktopSectionPhones,
-              children: [
-                if (server != null)
-                  SettingsItem(
-                    key: const ValueKey('link-pair'),
-                    icon: Icons.add,
-                    title: l10n.linkDesktopPairPhone,
-                    subtitle: l10n.linkDesktopPairPhoneSubtitle,
-                    onTap: () => unawaited(_pair(context, ref)),
-                  ),
-                if (phones.isEmpty)
-                  SettingsItem(
-                    title: l10n.linkDesktopNoDevices,
-                    showDivider: false,
-                  )
-                else ...[
-                  for (final device in phones)
-                    _DeviceRow(device: device, showDivider: true),
+              children: linkHostPhoneRows(
+                context,
+                ref,
+                host,
+                more: [
                   SettingsSwitchItem(
                     key: const ValueKey('link-hide-disconnected'),
                     icon: Icons.visibility_off,
@@ -172,7 +121,7 @@ class LinkDesktopSettingsPage extends ConsumerWidget {
                   ),
                   const LinkTransfersSettingsItem(),
                 ],
-              ],
+              ),
             ),
           if (server != null || apps.isNotEmpty)
             ...settingsSectionSlivers(
@@ -198,67 +147,10 @@ class LinkDesktopSettingsPage extends ConsumerWidget {
     );
   }
 
-  String _status(BuildContext context, LinkDesktopHostState host) {
-    final l10n = context.l10n;
-    if (!host.enabled) return l10n.linkDesktopEnableSubtitle;
-    return switch (host.phase) {
-      LinkHostPhase.running => l10n.linkDesktopStatusRunning(
-        host.clients.length,
-      ),
-      LinkHostPhase.failed => l10n.linkDesktopStatusFailed(host.error ?? ''),
-      LinkHostPhase.starting ||
-      LinkHostPhase.stopped => l10n.linkDesktopStatusStarting,
-    };
-  }
-
-  Future<void> _rename(BuildContext context, WidgetRef ref) async {
-    final l10n = context.l10n;
-    final name = await showLinkTextInputDialog(
-      context,
-      title: l10n.linkDesktopDeviceName,
-      label: l10n.linkDesktopDeviceName,
-      hint: l10n.linkDesktopDeviceNameHint,
-      confirmLabel: l10n.dialogSave,
-      initialValue: ref.read(linkDesktopHostProvider).name,
-      maxLength: 63,
-    );
-    if (name == null) return;
-    await ref.read(linkDesktopHostProvider.notifier).setName(name);
-  }
-
-  Future<void> _pair(BuildContext context, WidgetRef ref) async {
-    final l10n = context.l10n;
-    final notifier = ref.read(linkDesktopHostProvider.notifier);
-    final LinkPairingWindow window;
-    try {
-      window = await notifier.beginPairing();
-    } on Object {
-      if (context.mounted) _toast(context, l10n.linkDesktopPairFailed);
-      return;
-    }
-    if (!context.mounted) return;
-    final outcome = await showAppDialog<LinkPairingEvent>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => LinkDesktopPairingDialog(
-        window: window,
-        events: notifier.pairingEvents(),
-      ),
-    );
-    if (outcome == null) {
-      await notifier.endPairing();
-      return;
-    }
-    final message = switch (outcome) {
-      LinkPairedEvent(:final name) => l10n.linkDesktopPaired(name),
-      LinkPairingEndedEvent(reason: LinkPairingEndReason.expired) =>
-        l10n.linkDesktopPairExpired,
-      LinkPairingEndedEvent(reason: LinkPairingEndReason.attempts) =>
-        l10n.linkDesktopPairAttempts,
-      LinkPairingEndedEvent() => null,
-    };
-    if (message != null && context.mounted) _toast(context, message);
-  }
+  String _status(BuildContext context, LinkDesktopHostState host) =>
+      host.enabled
+      ? linkHostStatus(context, host)
+      : context.l10n.linkDesktopEnableSubtitle;
 
   Future<void> _addApp(BuildContext context, WidgetRef ref) async {
     final l10n = context.l10n;
@@ -287,12 +179,189 @@ class LinkDesktopSettingsPage extends ConsumerWidget {
   }
 }
 
-/// A paired phone or Subsonic app with its status and a remove button.
+/// The running host's state for its switch: on with the phones connected,
+/// starting, or why it failed.
+String linkHostStatus(BuildContext context, LinkDesktopHostState host) {
+  final l10n = context.l10n;
+  return switch (host.phase) {
+    LinkHostPhase.running => l10n.linkDesktopStatusRunning(host.clients.length),
+    LinkHostPhase.failed => l10n.linkDesktopStatusFailed(host.error ?? ''),
+    LinkHostPhase.starting ||
+    LinkHostPhase.stopped => l10n.linkDesktopStatusStarting,
+  };
+}
+
+/// This device's rows on a Link host page: its name, and while the server
+/// runs its address, security code and the songs it shares. [phone] words
+/// them for a phone shared with other phones.
+List<Widget> linkHostInfoRows(
+  BuildContext context,
+  WidgetRef ref,
+  LinkDesktopHostState host, {
+  bool phone = false,
+}) {
+  final l10n = context.l10n;
+  final server = host.server;
+  return [
+    SettingsItem(
+      key: const ValueKey('link-name'),
+      icon: phone ? Icons.phone_android : Icons.computer,
+      title: l10n.linkDesktopDeviceName,
+      subtitle: host.name,
+      onTap: () => unawaited(linkHostRename(context, ref, phone: phone)),
+      showDivider: server != null,
+    ),
+    if (server != null) ...[
+      SettingsItem(
+        icon: Icons.lan_outlined,
+        title: l10n.linkDesktopAddress,
+        subtitle: server.urls.join('\n'),
+        trailing: server.urls.isEmpty
+            ? null
+            : _CopyButton(
+                label: l10n.linkDesktopAddress,
+                value: server.urls.first,
+              ),
+      ),
+      SettingsItem(
+        key: const ValueKey('link-security-code'),
+        icon: Icons.security_outlined,
+        title: l10n.linkDesktopSecurityCode,
+        subtitle: phone
+            ? l10n.linkPhoneHostSecurityCodeHint
+            : l10n.linkDesktopSecurityCodeHint,
+        trailing: Text(
+          _groupedCode(server.shortFingerprint),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        showDivider: host.catalogSongs != null,
+      ),
+      if (host.catalogSongs != null)
+        SettingsItem(
+          icon: Icons.library_music_outlined,
+          title: l10n.linkDesktopCatalogSongs(host.catalogSongs!),
+          showDivider: false,
+        ),
+    ],
+  ];
+}
+
+/// The paired phones on a Link host page: Pair a phone while the server
+/// runs, then each phone with Remove and the rows in [more], or a note that
+/// none is paired. [phone] words them for a phone shared with other phones.
+List<Widget> linkHostPhoneRows(
+  BuildContext context,
+  WidgetRef ref,
+  LinkDesktopHostState host, {
+  bool phone = false,
+  List<Widget> more = const [],
+}) {
+  final l10n = context.l10n;
+  final phones = [
+    for (final device in host.devices)
+      if (!device.isSubsonicApp) device,
+  ];
+  return [
+    if (host.server != null)
+      SettingsItem(
+        key: const ValueKey('link-pair'),
+        icon: Icons.add,
+        showIconInMornye: phone,
+        title: l10n.linkDesktopPairPhone,
+        subtitle: phone
+            ? l10n.linkPhoneHostPairSubtitle
+            : l10n.linkDesktopPairPhoneSubtitle,
+        onTap: () => unawaited(linkHostPair(context, ref, phone: phone)),
+      ),
+    if (phones.isEmpty)
+      SettingsItem(title: l10n.linkDesktopNoDevices, showDivider: false)
+    else ...[
+      for (final device in phones)
+        _DeviceRow(
+          device: device,
+          phone: phone,
+          showDivider: more.isNotEmpty || device != phones.last,
+        ),
+      ...more,
+    ],
+  ];
+}
+
+/// Asks for a new name for this device; a running server restarts under it.
+Future<void> linkHostRename(
+  BuildContext context,
+  WidgetRef ref, {
+  bool phone = false,
+}) async {
+  final l10n = context.l10n;
+  final name = await showLinkTextInputDialog(
+    context,
+    title: l10n.linkDesktopDeviceName,
+    label: l10n.linkDesktopDeviceName,
+    hint: phone ? l10n.linkPhoneHostNameHint : l10n.linkDesktopDeviceNameHint,
+    confirmLabel: l10n.dialogSave,
+    initialValue: ref.read(linkDesktopHostProvider).name,
+    maxLength: 63,
+  );
+  if (name == null) return;
+  await ref.read(linkDesktopHostProvider.notifier).setName(name);
+}
+
+/// Opens a pairing window and shows its PIN until a phone pairs, the window
+/// closes or the owner cancels.
+Future<void> linkHostPair(
+  BuildContext context,
+  WidgetRef ref, {
+  bool phone = false,
+}) async {
+  final l10n = context.l10n;
+  final notifier = ref.read(linkDesktopHostProvider.notifier);
+  final LinkPairingWindow window;
+  try {
+    window = await notifier.beginPairing();
+  } on Object {
+    if (context.mounted) _toast(context, l10n.linkDesktopPairFailed);
+    return;
+  }
+  if (!context.mounted) return;
+  final outcome = await showAppDialog<LinkPairingEvent>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => LinkDesktopPairingDialog(
+      window: window,
+      events: notifier.pairingEvents(),
+      phone: phone,
+    ),
+  );
+  if (outcome == null) {
+    await notifier.endPairing();
+    return;
+  }
+  final message = switch (outcome) {
+    LinkPairedEvent(:final name) => l10n.linkDesktopPaired(name),
+    LinkPairingEndedEvent(reason: LinkPairingEndReason.expired) =>
+      l10n.linkDesktopPairExpired,
+    LinkPairingEndedEvent(reason: LinkPairingEndReason.attempts) =>
+      l10n.linkDesktopPairAttempts,
+    LinkPairingEndedEvent() => null,
+  };
+  if (message != null && context.mounted) _toast(context, message);
+}
+
+/// A paired phone or Subsonic app with its status and a remove button. On a
+/// phone the button matches the other device rows of its Link page.
 class _DeviceRow extends ConsumerWidget {
-  const _DeviceRow({required this.device, required this.showDivider});
+  const _DeviceRow({
+    required this.device,
+    required this.showDivider,
+    this.phone = false,
+  });
 
   final LinkPairedDevice device;
   final bool showDivider;
+  final bool phone;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -311,17 +380,26 @@ class _DeviceRow extends ConsumerWidget {
     return SettingsItem(
       key: ValueKey('link-device-${device.deviceId}'),
       icon: device.isSubsonicApp ? Icons.vpn_key_outlined : Icons.phone_android,
+      showIconInMornye: phone,
       title: name,
       subtitle: device.isSubsonicApp
           ? '${l10n.linkDesktopSubsonicApp} · $status'
           : status,
       showDivider: showDivider,
-      trailing: AppIconButton(
-        key: ValueKey('link-revoke-${device.deviceId}'),
-        tooltip: l10n.linkDesktopRevoke,
-        icon: AppIcon.adaptive(Icons.delete_outline, size: 22),
-        onPressed: () => unawaited(_revoke(context, ref, name)),
-      ),
+      trailing: phone
+          ? LinkRowAction(
+              key: ValueKey('link-revoke-${device.deviceId}'),
+              tooltip: l10n.linkDesktopRevoke,
+              icon: Icons.link_off,
+              cupertinoIcon: CupertinoIcons.minus_circle,
+              onPressed: () => unawaited(_revoke(context, ref, name)),
+            )
+          : AppIconButton(
+              key: ValueKey('link-revoke-${device.deviceId}'),
+              tooltip: l10n.linkDesktopRevoke,
+              icon: AppIcon.adaptive(Icons.delete_outline, size: 22),
+              onPressed: () => unawaited(_revoke(context, ref, name)),
+            ),
     );
   }
 
@@ -330,7 +408,9 @@ class _DeviceRow extends ConsumerWidget {
     final confirmed = await showAppConfirmDialog(
       context,
       title: l10n.linkDesktopRevokeTitle(name),
-      message: l10n.linkDesktopRevokeMessage,
+      message: phone
+          ? l10n.linkPhoneHostRevokeMessage
+          : l10n.linkDesktopRevokeMessage,
       confirmLabel: l10n.linkDesktopRevoke,
       destructive: true,
       errorConfirm: true,
@@ -360,11 +440,15 @@ class LinkDesktopPairingDialog extends StatefulWidget {
     super.key,
     required this.window,
     required this.events,
+    this.phone = false,
     this.nowMs,
   });
 
   final LinkPairingWindow window;
   final Stream<LinkPairingEvent> events;
+
+  /// Words the instructions for a phone shared with other phones.
+  final bool phone;
 
   /// Overrides the clock in tests.
   final int Function()? nowMs;
@@ -447,7 +531,11 @@ class _LinkDesktopPairingDialogState extends State<LinkDesktopPairingDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(l10n.linkDesktopPairInstructions),
+          Text(
+            widget.phone
+                ? l10n.linkPhoneHostPairInstructions
+                : l10n.linkDesktopPairInstructions,
+          ),
           SizedBox(height: context.tokens.gapLg),
           Semantics(
             label: pin.split('').join(' '),
@@ -465,7 +553,9 @@ class _LinkDesktopPairingDialogState extends State<LinkDesktopPairingDialog> {
           ),
           SizedBox(height: context.tokens.gapLg),
           Text(
-            l10n.linkDesktopPairCheckCode(
+            (widget.phone
+                ? l10n.linkPhoneHostPairCheckCode
+                : l10n.linkDesktopPairCheckCode)(
               _groupedCode(linkShortFingerprint(widget.window.fingerprint)),
             ),
           ),

@@ -10800,17 +10800,17 @@
   "@linkSettingsSubtitle": {
     "description": "Subtitle of the Mornye on your computer entry in phone Settings"
   },
-  "linkPageTitle": "Computers",
+  "linkPageTitle": "Devices",
   "@linkPageTitle": {
-    "description": "Title of the page listing computers running Mornye that the phone can pair with; kept short for the large title"
+    "description": "Title of the page listing computers and phones running Mornye that the phone can pair with; kept short for the large title"
   },
   "linkPageDescription": "Pair with Mornye on your computer to play its library on this phone and control what it plays. Both devices need to be on the same network.",
   "@linkPageDescription": {
     "description": "Introduction at the top of the computers page"
   },
-  "linkPairedSection": "Paired computers",
+  "linkPairedSection": "Paired devices",
   "@linkPairedSection": {
-    "description": "Section header for computers this phone is paired with"
+    "description": "Section header for computers and phones this phone is paired with"
   },
   "linkPhoneSection": "This phone",
   "@linkPhoneSection": {
@@ -10860,17 +10860,17 @@
   "@linkNearbySection": {
     "description": "Section header for computers running Mornye found on the local network"
   },
-  "linkSearching": "Looking for computers...",
+  "linkSearching": "Looking for devices...",
   "@linkSearching": {
-    "description": "Row shown while the phone searches the local network for computers"
+    "description": "Row shown while the phone searches the local network for computers and phones"
   },
-  "linkNoneFoundTitle": "No computers found",
+  "linkNoneFoundTitle": "No devices found",
   "@linkNoneFoundTitle": {
-    "description": "Row shown when the phone is not searching and found no computer"
+    "description": "Row shown when the phone is not searching and found no computer or phone"
   },
-  "linkNoneFound": "Open Mornye on your computer and turn on Share with Mornye on your phone in its settings.",
+  "linkNoneFound": "Open Mornye on your computer and turn on Share with Mornye on your phone in its settings, or turn on Share with other phones on another phone.",
   "@linkNoneFound": {
-    "description": "Hint under the search row when no computer was found yet; Share with Mornye on your phone is the name of the desktop setting"
+    "description": "Hint under the search row when nothing was found yet; Share with Mornye on your phone is the name of the desktop setting, Share with other phones the name of the phone setting"
   },
   "linkAddManually": "Add by address",
   "@linkAddManually": {
@@ -10904,9 +10904,9 @@
   "@linkStateDisconnected": {
     "description": "Status of the paired computer when it cannot be reached"
   },
-  "linkStateInactive": "Tap to use this computer",
+  "linkStateInactive": "Tap to use this device",
   "@linkStateInactive": {
-    "description": "Status of a paired computer other than the one in use; tapping it makes it the one in use"
+    "description": "Status of a paired computer or phone other than the one in use; tapping it makes it the one in use"
   },
   "linkActive": "In use",
   "@linkActive": {
@@ -10942,7 +10942,7 @@
       }
     }
   },
-  "linkPinMessage": "Enter the 6-digit PIN shown on your computer.",
+  "linkPinMessage": "Enter the 6-digit PIN shown on the other device.",
   "@linkPinMessage": {
     "description": "Instruction in the pairing PIN dialog"
   },
@@ -10950,7 +10950,7 @@
   "@linkPinField": {
     "description": "Label of the pairing PIN field"
   },
-  "linkPinCode": "Your computer shows the code {code} next to the PIN. Pair only if it matches.",
+  "linkPinCode": "The other device shows the code {code} next to the PIN. Pair only if it matches.",
   "@linkPinCode": {
     "description": "Security check in the PIN dialog; the placeholder is 8 hexadecimal characters of the computer's certificate fingerprint, grouped as 'ab12 cd34'",
     "placeholders": {
@@ -10959,7 +10959,7 @@
       }
     }
   },
-  "linkPinNotOpen": "Pairing is not open yet. Start pairing in Mornye on your computer to show a PIN.",
+  "linkPinNotOpen": "Pairing is not open yet. Start pairing in Mornye on the other device to show a PIN.",
   "@linkPinNotOpen": {
     "description": "Note in the PIN dialog when the computer reports that no pairing window is open"
   },
@@ -11326,6 +11326,47 @@
         "type": "String"
       }
     }
+  },
+  "linkPhoneHostSection": "Share this phone",
+  "@linkPhoneHostSection": {
+    "description": "Section header on the phone's Mornye Link page for letting other phones use this phone's songs"
+  },
+  "linkPhoneHostTitle": "Share with other phones",
+  "@linkPhoneHostTitle": {
+    "description": "Switch that lets other phones running Mornye pair with this phone and play its songs"
+  },
+  "linkPhoneHostSubtitle": "Other phones can browse and play your songs while Mornye is open or playing",
+  "@linkPhoneHostSubtitle": {
+    "description": "Subtitle of the Share with other phones switch while it is off"
+  },
+  "linkPhoneHostNameHint": "Other phones show this name when they find this phone",
+  "@linkPhoneHostNameHint": {
+    "description": "Hint in the rename dialog of a phone shared with other phones"
+  },
+  "linkPhoneHostSecurityCodeHint": "The other phone shows the same code when it pairs",
+  "@linkPhoneHostSecurityCodeHint": {
+    "description": "Subtitle of the security code row of a phone shared with other phones"
+  },
+  "linkPhoneHostPairSubtitle": "Show a code to enter on the other phone",
+  "@linkPhoneHostPairSubtitle": {
+    "description": "Subtitle of Pair a phone on a phone shared with other phones"
+  },
+  "linkPhoneHostPairInstructions": "Open Mornye on the other phone, choose this phone and enter this code.",
+  "@linkPhoneHostPairInstructions": {
+    "description": "Instruction in the pairing dialog of a phone shared with other phones"
+  },
+  "linkPhoneHostPairCheckCode": "Check that the other phone shows security code {code}.",
+  "@linkPhoneHostPairCheckCode": {
+    "description": "Security check in the pairing dialog of a phone shared with other phones; the placeholder is 8 hexadecimal characters grouped as 'ab12 cd34'",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPhoneHostRevokeMessage": "It has to pair again before it can connect to this phone.",
+  "@linkPhoneHostRevokeMessage": {
+    "description": "Message of the dialog that removes a phone paired with this phone"
   },
   "playlistEditOrder": "Edit order",
   "@playlistEditOrder": {
