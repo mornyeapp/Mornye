@@ -312,6 +312,40 @@ void main() {
       );
 
       test(
+        'Refresh reads songs flagged without lyrics until its pass ends',
+        () async {
+          Future<void> addFlagged(String id) async {
+            await addNativeLibraryTrack(
+              db,
+              nativeLibraryTrack(id)..['hasLyrics'] = false,
+            );
+            lyrics['/music/$id.flac'] = 'Hidden verse of $id';
+          }
+
+          await addFlagged('wrong-flag');
+          await index();
+          expect(await search('hidden verse'), isEmpty);
+
+          await store.clear();
+          final cancelled = store.index(
+            includeLocal: true,
+            cancelled: () => true,
+          );
+          expect((await cancelled.toList()).last.complete, isFalse);
+          reads.clear();
+          expect((await index()).checked, 3);
+          expect(reads, contains('/music/wrong-flag.flac'));
+          expect(await search('hidden verse'), ['wrong-flag']);
+
+          await addFlagged('after-refresh');
+          reads.clear();
+          expect((await index()).checked, 1);
+          expect(reads, isEmpty);
+          expect(await search('hidden verse'), ['wrong-flag']);
+        },
+      );
+
+      test(
         'open searches refresh at a calm rate and once when a pass ends',
         () async {
           for (var i = 0; i < 40; i++) {

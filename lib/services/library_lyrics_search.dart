@@ -52,6 +52,11 @@ class LibraryLyricsSearchStore {
   int _generation = 0;
   int _revision = 0;
 
+  /// Set by [clear] until a pass completes: Refresh reads every file again,
+  /// including files whose scan found no lyrics, in case the flag is wrong.
+  bool _readAll = false;
+  int _clears = 0;
+
   Future<void> open() => _opening ??= _open();
 
   Future<void> _open() async {
@@ -103,8 +108,9 @@ class LibraryLyricsSearchStore {
   /// the user leaves and reopens the Lyrics filter during a native read.
   Future<void> _index(
     Map<String, Object?> song,
-    bool Function() cancelled,
-  ) async {
+    bool Function() cancelled, {
+    required bool readAll,
+  }) async {
     final previous = _readTail;
     final done = Completer<void>();
     _readTail = done.future;
@@ -125,7 +131,8 @@ class LibraryLyricsSearchStore {
       }
       final generation = _generation;
       // An edit can add lyrics before a scan updates the flag.
-      final raw = song['no_lyrics'] == 1 && stored?['version'] != _edited
+      final raw =
+          !readAll && song['no_lyrics'] == 1 && stored?['version'] != _edited
           ? ''
           : await readLyrics(song['file_path'] as String);
       final text = cleanLyricsForDisplay(raw).toLowerCase();
@@ -161,6 +168,7 @@ class LibraryLyricsSearchStore {
     required bool Function() cancelled,
   }) async* {
     await open();
+    final clears = _clears;
     var checked = 0;
     var failed = 0;
     var revision = _revision;
@@ -198,7 +206,7 @@ class LibraryLyricsSearchStore {
         for (final song in rows) {
           if (cancelled()) return;
           try {
-            await _index(song, cancelled);
+            await _index(song, cancelled, readAll: _readAll);
           } catch (_) {
             // A failed probe is retryable, never cached as "no lyrics".
             failed++;
@@ -212,6 +220,7 @@ class LibraryLyricsSearchStore {
       }
     }
     if (!cancelled()) {
+      if (clears == _clears) _readAll = false;
       yield LibraryLyricsIndexProgress(
         checked: checked,
         failed: failed,
@@ -290,6 +299,8 @@ class LibraryLyricsSearchStore {
   Future<void> clear() async {
     _generation++;
     _revision++;
+    _clears++;
+    _readAll = true;
     await open();
     await db.delete(_table);
   }
