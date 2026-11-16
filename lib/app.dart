@@ -11,6 +11,7 @@ import 'package:mornye/providers/equalizer_provider.dart';
 import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/app_orientation.dart';
 import 'package:mornye/services/link/client/link_client_controller.dart';
+import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/link_source_presence.dart';
 import 'package:mornye/services/link/sync/link_sound_sync_runner.dart';
@@ -263,6 +264,8 @@ class MornyeApp extends ConsumerWidget {
       ref.listen(linkTransferOfferNoticesProvider, (_, _) {});
       // Hides a computer's songs while it is not connected.
       ref.listen(linkSourcePresenceProvider, (_, _) {});
+      // Shares this phone with other phones when the owner turned it on.
+      if (!isDesktopPlatform) ref.listen(linkDesktopHostProvider, (_, _) {});
     }
     final router = ref.watch(_routerProvider);
     final localeString = ref.watch(settingsProvider.select((s) => s.locale));

@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
@@ -19,6 +19,8 @@ import 'package:mornye/services/link/desktop/link_library_jobs_host.dart';
 import 'package:mornye/services/link/desktop/link_desktop_transfers.dart';
 import 'package:mornye/services/link/desktop/link_downloads.dart';
 import 'package:mornye/services/link/desktop/link_phone_catalogs.dart';
+import 'package:mornye/services/link/client/link_client_controller.dart';
+import 'package:mornye/services/link/desktop/link_phone_host_lifetime.dart';
 import 'package:mornye/services/link/desktop/link_phone_library.dart';
 import 'package:mornye/services/link/desktop/link_phone_sources.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
@@ -33,6 +35,7 @@ import 'package:mornye/services/link/sync/link_sound_sync_protocol.dart';
 import 'package:mornye/services/link/sync/link_sync_handlers.dart';
 import 'package:mornye/services/link/together/link_together_deck.dart';
 import 'package:mornye/services/link/together/link_together_host.dart';
+import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playable_media.dart';
@@ -48,6 +51,22 @@ const linkDesktopEnabledKey = 'link_desktop_enabled';
 
 /// The name phones see; defaults to the computer's host name.
 const linkDesktopNameKey = 'link_desktop_name';
+
+/// Whether the owner shares this phone with other phones (default off).
+/// Apart from the desktop's key, so a settings backup from a computer does
+/// not turn it on.
+const linkPhoneHostEnabledKey = 'link_phone_host_enabled';
+
+/// The name other phones see; defaults to this phone's name.
+const linkPhoneHostNameKey = 'link_phone_host_name';
+
+/// This phone's name and platform as its host announces them. Tests
+/// override it.
+final linkPhoneHostIdentityProvider =
+    Provider<({Future<String> Function() name, String platform})>((ref) {
+      final environment = ref.watch(linkClientEnvironmentProvider);
+      return (name: environment.deviceName, platform: environment.platform);
+    });
 
 /// The computer's host name without a `.local` or domain suffix.
 String linkDefaultDeviceName() {
@@ -183,6 +202,11 @@ class LinkDesktopHostState {
 /// Runs the Mornye Link server on desktop: keeps its settings, starts and
 /// stops it, exports the catalog, answers forwarded requests through
 /// [linkHostRouterProvider] and pushes the desktop player to phones.
+///
+/// On a phone the same host shares the phone with other phones while the
+/// owner turned it on and the app is open or plays
+/// ([LinkPhoneHostLifetime]). It leaves out what only a computer does
+/// (downloads, opening links, file changes) and announces so.
 class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   static const exportDelay = Duration(seconds: 10);
   static const deletionExportDelay = Duration(milliseconds: 300);
@@ -234,6 +258,23 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   /// The digest of the catalog the server of [_serverRun] read last.
   ({int run, String digest})? _pushedCatalog;
 
+  /// On a phone: whether the app is open or plays, while sharing is on.
+  LinkPhoneHostLifetime? _lifetime;
+  AppLifecycleListener? _lifecycle;
+  ProviderSubscription<bool>? _playing;
+  bool _phonePartsInstalled = false;
+
+  /// Whether this host shares a phone rather than a computer.
+  bool get _phone => !isDesktopPlatform;
+
+  String get _enabledKey =>
+      _phone ? linkPhoneHostEnabledKey : linkDesktopEnabledKey;
+
+  String get _nameKey => _phone ? linkPhoneHostNameKey : linkDesktopNameKey;
+
+  /// A phone host runs only while the app is open or plays.
+  bool get _mayRun => !_phone || (_lifetime?.allowed ?? false);
+
   /// The phones told of that catalog: the server's push reaches only the
   /// phones connected then, so one that connects later is told itself.
   final _catalogTold = <String>{};
@@ -246,8 +287,88 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       _installPhoneSongs();
       _installWebCovers();
       Future.microtask(_restore);
+    } else if (ref.read(linkClientSupportedProvider)) {
+      Future.microtask(_restore);
     }
     return const LinkDesktopHostState();
+  }
+
+  /// What a phone host needs only once sharing starts, so a phone that
+  /// never shares does not set up other phones' songs.
+  void _installPhoneParts() {
+    if (_phonePartsInstalled) return;
+    _phonePartsInstalled = true;
+    _installPhoneSongs();
+    _installWebCovers();
+  }
+
+  /// Follows the app's lifecycle and playback while a phone shares.
+  void _watchPhone() {
+    if (_lifetime != null) return;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    final lifetime = _lifetime = LinkPhoneHostLifetime(
+      foreground:
+          lifecycle != AppLifecycleState.paused &&
+          lifecycle != AppLifecycleState.hidden &&
+          lifecycle != AppLifecycleState.detached,
+      playing: ref.read(playbackPlayingProvider),
+      // iOS suspends a silent app within seconds and may take its listening
+      // socket, so it stops at once instead of serving from a dead socket.
+      grace: ref.read(linkPhoneHostIdentityProvider).platform == 'ios'
+          ? Duration.zero
+          : const Duration(seconds: 10),
+      onChanged: (allowed, reason) {
+        if (!ref.mounted || !state.enabled) return;
+        if (allowed) {
+          unawaited(_queue(_start));
+        } else {
+          unawaited(_queue(() => _stop(reason: reason)));
+        }
+      },
+    );
+    _lifecycle = AppLifecycleListener(
+      onStateChange: (next) {
+        // Inactive covers the iOS control centre and app switcher.
+        if (next == AppLifecycleState.inactive) return;
+        lifetime.foreground = next == AppLifecycleState.resumed;
+      },
+    );
+    _playing = ref.listen(
+      playbackPlayingProvider,
+      (_, playing) => lifetime.playing = playing,
+    );
+  }
+
+  void _unwatchPhone() {
+    _lifetime?.dispose();
+    _lifetime = null;
+    _lifecycle?.dispose();
+    _lifecycle = null;
+    _playing?.close();
+    _playing = null;
+  }
+
+  /// The name a new host takes: the computer's host name, or this phone's
+  /// own name.
+  Future<String> _defaultName() async {
+    if (!_phone) return linkDefaultDeviceName();
+    try {
+      return _cleanName(await ref.read(linkPhoneHostIdentityProvider).name()) ??
+          'Mornye';
+    } on Object catch (error) {
+      _log.w('Could not read this phone\'s name: $error');
+      return 'Mornye';
+    }
+  }
+
+  /// Android 17 asks before an app takes connections on the local network;
+  /// the owner turning sharing on is the moment to ask.
+  Future<void> _askLocalNetwork() async {
+    try {
+      await LocalNetworkAccess.instance.ensureGranted();
+    } on Object catch (error) {
+      _log.w('Link: local network access for sharing was refused: $error');
+    }
   }
 
   /// Fetches the web covers of the songs that have no cover file once an
@@ -342,21 +463,20 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     var enabled = false;
     try {
       final prefs = await SharedPreferences.getInstance();
-      enabled = prefs.getBool(linkDesktopEnabledKey) ?? false;
-      name = _cleanName(prefs.getString(linkDesktopNameKey));
+      enabled = prefs.getBool(_enabledKey) ?? false;
+      name = _cleanName(prefs.getString(_nameKey));
     } on Object catch (error) {
       _log.w('Could not read the Mornye Link settings: $error');
     }
+    name ??= await _defaultName();
     if (!ref.mounted) return;
-    state = state.copyWith(
-      loaded: true,
-      enabled: enabled,
-      name: name ?? linkDefaultDeviceName(),
-    );
+    state = state.copyWith(loaded: true, enabled: enabled, name: name);
     if (enabled) {
+      if (_phone) _watchPhone();
       await _queue(_start);
-    } else {
-      // The paired devices are listed while the server is off as well.
+    } else if (!_phone) {
+      // The paired devices are listed while the server is off as well. A
+      // phone lists them only while it shares.
       await refreshDevices();
     }
   }
@@ -381,48 +501,75 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
 
   /// Turns the server on or off and remembers the choice.
   Future<void> setEnabled(bool enabled) async {
-    if (state.name.isEmpty) {
-      state = state.copyWith(name: linkDefaultDeviceName());
-    }
     state = state.copyWith(enabled: enabled, loaded: true);
-    await _persist((prefs) => prefs.setBool(linkDesktopEnabledKey, enabled));
-    await _queue(enabled ? _start : _stop);
+    if (state.name.isEmpty) {
+      final name = await _defaultName();
+      if (!ref.mounted) return;
+      state = state.copyWith(name: name);
+    }
+    await _persist((prefs) => prefs.setBool(_enabledKey, enabled));
+    if (_phone) {
+      if (enabled) {
+        _watchPhone();
+        await _askLocalNetwork();
+      } else {
+        _unwatchPhone();
+      }
+    }
+    await _queue(enabled ? _start : () => _stop(reason: 'sharing was off'));
   }
 
   /// Renames the server; a running server restarts under the new name.
   Future<void> setName(String name) async {
-    final cleaned = _cleanName(name) ?? linkDefaultDeviceName();
-    if (cleaned == state.name) return;
+    final cleaned = _cleanName(name) ?? await _defaultName();
+    if (cleaned == state.name || !ref.mounted) return;
     state = state.copyWith(name: cleaned);
-    await _persist((prefs) => prefs.setString(linkDesktopNameKey, cleaned));
+    await _persist((prefs) => prefs.setString(_nameKey, cleaned));
     if (!state.enabled) return;
     await _queue(() async {
-      await _stop();
+      await _stop(reason: 'renamed');
       await _start();
     });
   }
 
   /// Starts the server again after a failure.
-  Future<void> retry() => _queue(_start);
+  Future<void> retry() async {
+    if (_phone) await _askLocalNetwork();
+    await _queue(_start);
+  }
 
   String _describe(Object error) => error is PlatformException
       ? (error.message?.isNotEmpty == true ? error.message! : error.code)
       : error.toString();
 
   Future<void> _start() async {
-    if (!ref.mounted || !state.enabled || state.running) return;
+    if (!ref.mounted || !state.enabled || state.running || !_mayRun) return;
+    if (_phone) _installPhoneParts();
     state = state.copyWith(phase: LinkHostPhase.starting, error: null);
     _listenBackend();
     _registerFeatures(ref.read(linkHostRouterProvider));
     try {
-      var server = await _runningServer();
+      // A phone's server never outlives the app, so there is none to adopt.
+      var server = _phone ? null : await _runningServer();
       if (server != null && server.name != state.name) {
         await _backend.stop();
         server = null;
       }
-      server ??= await _backend.start(name: state.name);
+      server ??= await _backend.start(
+        name: state.name,
+        platform: _phone
+            ? ref.read(linkPhoneHostIdentityProvider).platform
+            : Platform.operatingSystem,
+        features: _phone ? const <String>[] : LinkHostFeatures.all,
+      );
       _serverStarted = true;
       _serverRun++;
+      _log.i(
+        _phone
+            ? 'Link: host started on port ${server.port} '
+                  '(${_lifetime?.reason ?? 'sharing is on'})'
+            : 'Link: host started on port ${server.port}',
+      );
       if (!ref.mounted) return;
       state = state.copyWith(phase: LinkHostPhase.running, server: server);
     } on Object catch (error, stack) {
@@ -457,7 +604,8 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     }
   }
 
-  Future<void> _stop() async {
+  /// Stops the server; [reason] goes to the log.
+  Future<void> _stop({String reason = 'stopped'}) async {
     _cancelApp();
     _cancelBackend();
     _exportAgain = false;
@@ -465,6 +613,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       _serverStarted = false;
       try {
         await _backend.stop();
+        _log.i('Link: host stopped ($reason)');
       } on Object catch (error) {
         _log.w('Could not stop Mornye Link: $error');
       }
@@ -525,6 +674,34 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   /// and the Subsonic playlist, star and scrobble ops.
   void _registerFeatures(LinkHostRouter router) {
     (_ops ??= _createOps()).register(router);
+    if (_phone) {
+      // A phone host neither downloads for other phones nor opens their
+      // links, and runs no file changes; it announces so in `features`.
+      router
+        ..unregister(LinkOps.downloads)
+        ..unregister(LinkOps.open);
+    } else {
+      _registerLibraryJobs(router);
+    }
+    _phoneCatalogs?.register(router);
+    _transfers?.register(router);
+    (_together ??= _createTogether()).register(router);
+    registerLinkSyncHandlers(router, ref);
+    ref.read(linkCollectionsChangedHookProvider.notifier).set(() {
+      if (!ref.mounted || !state.running || state.clients.isEmpty) return;
+      unawaited(_send({'type': LinkMessageTypes.collectionsChanged}));
+    });
+    registerLinkSoundSyncHandlers(
+      router,
+      ref,
+      notifyPhones: () {
+        if (!ref.mounted || !state.running || state.clients.isEmpty) return;
+        unawaited(_send({'type': LinkSoundSyncMessages.preferencesChanged}));
+      },
+    );
+  }
+
+  void _registerLibraryJobs(LinkHostRouter router) {
     if (_libraryJobs == null) {
       final executor = LinkLibraryExecutor(
         container: ref.container,
@@ -555,22 +732,6 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       );
     }
     _libraryJobs!.register(router);
-    _phoneCatalogs?.register(router);
-    _transfers?.register(router);
-    (_together ??= _createTogether()).register(router);
-    registerLinkSyncHandlers(router, ref);
-    ref.read(linkCollectionsChangedHookProvider.notifier).set(() {
-      if (!ref.mounted || !state.running || state.clients.isEmpty) return;
-      unawaited(_send({'type': LinkMessageTypes.collectionsChanged}));
-    });
-    registerLinkSoundSyncHandlers(
-      router,
-      ref,
-      notifyPhones: () {
-        if (!ref.mounted || !state.running || state.clients.isEmpty) return;
-        unawaited(_send({'type': LinkSoundSyncMessages.preferencesChanged}));
-      },
-    );
   }
 
   LinkTogetherHost _createTogether() => LinkTogetherHost(
@@ -704,11 +865,18 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     ) async {
       if (linkLocalFilePath(source) != null) _scheduleExport(urgent: true);
     });
-    final updates = _downloadUpdates = LinkDownloadUpdates(
-      items: () => ref.read(linkDownloadItemsProvider),
-      send: (message, id) => _send(message, deviceId: id),
-    )..keepConnected(state.clients);
-    unawaited(updates.publish(snapshotsOnly: true));
+    // A phone host downloads nothing for other phones, so it sends no
+    // download updates either.
+    if (!_phone) {
+      final updates = _downloadUpdates = LinkDownloadUpdates(
+        items: () => ref.read(linkDownloadItemsProvider),
+        send: (message, id) => _send(message, deviceId: id),
+      )..keepConnected(state.clients);
+      unawaited(updates.publish(snapshotsOnly: true));
+      _appSubscriptions.add(
+        ref.listen(linkDownloadItemsProvider, (_, _) => _scheduleDownloads()),
+      );
+    }
     _lyricsTranslations = LinkLyricsTranslations(
       sharing: ref.read(lyricsTranslationSharingProvider),
       send: (message, deviceId) async {
@@ -723,7 +891,6 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     _lyricsTranslations!.connected();
     _appSubscriptions.addAll([
       ref.listen(linkLibraryRevisionProvider, (_, _) => _scheduleExport()),
-      ref.listen(linkDownloadItemsProvider, (_, _) => _scheduleDownloads()),
       ref.listen(
         settingsProvider.select((s) => (s.autoplay, s.autoMix)),
         (_, _) => _onPlayerChanged(),
@@ -1291,6 +1458,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
 
   void _dispose() {
     _together?.dispose();
+    _unwatchPhone();
     _libraryJobs?.close();
     _cancelApp();
     _cancelBackend();

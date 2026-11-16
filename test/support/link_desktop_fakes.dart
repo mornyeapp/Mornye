@@ -98,9 +98,20 @@ class FakeLinkBackend implements LinkDesktopBackend {
       if (entry.message['type'] == type) entry.message,
   ];
 
+  /// What the last [start] announced.
+  String? startPlatform;
+  List<String>? startFeatures;
+
   @override
-  Future<LinkHostServer> start({required String name, int? port}) async {
+  Future<LinkHostServer> start({
+    required String name,
+    int? port,
+    String platform = '',
+    List<String>? features,
+  }) async {
     calls.add('start:$name');
+    startPlatform = platform;
+    startFeatures = features;
     final error = startError;
     if (error != null) throw error;
     running = true;

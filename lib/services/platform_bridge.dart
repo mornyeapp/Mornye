@@ -333,8 +333,15 @@ class PlatformBridge {
   static Future<Map<String, dynamic>> linkStart({
     required String name,
     int? port,
+    String platform = '',
+    List<String>? features,
   }) async => _linkMap(
-    await _channel.invokeMethod('linkStart', {'name': name, 'port': ?port}),
+    await _channel.invokeMethod('linkStart', {
+      'name': name,
+      'port': ?port,
+      if (platform.isNotEmpty) 'platform': platform,
+      'features': ?features,
+    }),
   );
 
   static Future<void> linkStop() => _invokeVoid('linkStop');

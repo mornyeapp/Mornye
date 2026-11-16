@@ -18,6 +18,8 @@ import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/link_transfers.dart';
 import 'package:mornye/utils/desktop_folders.dart';
+import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/file_access.dart';
 import 'package:path/path.dart' as p;
 
 /// A phone song the desktop receives, with its cover when known.
@@ -388,8 +390,14 @@ class _AppTransferDownloads implements LinkTransferDownloads {
   final Ref _ref;
 
   @override
-  LinkOfflineDestination destination() =>
-      LinkDesktopDownloadFolder(_ref.read(settingsProvider));
+  LinkOfflineDestination destination() {
+    final settings = _ref.read(settingsProvider);
+    // A phone host saves where its own downloads go, storage access tree
+    // and iOS bookmark included.
+    return isDesktopPlatform
+        ? LinkDesktopDownloadFolder(settings)
+        : LinkDownloadFolderDestination(settings);
+  }
 
   @override
   Future<void> record(DownloadHistoryItem item) =>
@@ -399,7 +407,7 @@ class _AppTransferDownloads implements LinkTransferDownloads {
   Future<bool> has(String id) async {
     final row = await HistoryDatabase.instance.getById(id);
     final path = row?['filePath'];
-    return path is String && path.isNotEmpty && await File(path).exists();
+    return path is String && await fileExists(path);
   }
 }
 
