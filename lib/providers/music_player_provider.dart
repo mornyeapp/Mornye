@@ -540,8 +540,10 @@ class MusicPlayerController {
 
   Future<void> setShuffle(bool enabled) async {
     if (remote case final remote?) return remote.setShuffle(enabled);
-    // A Shuffle button can be the first thing that starts the player.
-    await (await ensureInitialized())?.setShuffleMode(
+    // A Shuffle button can be the first thing that starts the player. A
+    // player that has not started has no shuffle to turn off.
+    final handler = enabled ? await ensureInitialized() : _handler;
+    await handler?.setShuffleMode(
       enabled ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
     );
   }
