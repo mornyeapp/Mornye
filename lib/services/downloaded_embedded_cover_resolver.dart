@@ -21,6 +21,10 @@ class _EmbeddedCoverCacheEntry {
   });
 }
 
+class _PreviewsCleared extends ChangeNotifier {
+  void fire() => notifyListeners();
+}
+
 class _PendingPreviewValidation {
   final _EmbeddedCoverCacheEntry entry;
   final Set<VoidCallback> callbacks = {};
@@ -245,9 +249,22 @@ class DownloadedEmbeddedCoverResolver {
     await _deletePersistentVariantsForSource(cleanPath);
   }
 
+  /// Fires once previews were deleted from outside a song's own refresh, as
+  /// when the user clears the app cache. A widget that keeps a resolved path
+  /// listens and resolves again: its file is gone and nothing else says so,
+  /// so it would show an empty cover until the app restarts.
+  static Listenable get previewsCleared => _previewsCleared;
+  static final _previewsCleared = _PreviewsCleared();
+
+  /// Tells [previewsCleared] listeners to resolve again. Call it after the
+  /// last delete of a clear: a preview extracted any earlier could be wiped
+  /// with the directory it was written to.
+  static void announcePreviewsCleared() => _previewsCleared.fire();
+
   /// Clears resolver state together with its App Cache-backed disk entries.
   /// Running native work is generation-cancelled and awaited before the disk
   /// directory is wiped, so a completed clear leaves no late staging output.
+  /// Follow it with [announcePreviewsCleared].
   static Future<void> clearPersistentCache() async {
     final keys = <String>{..._cache.keys, ..._pendingExtract.keys};
     for (final key in keys) {

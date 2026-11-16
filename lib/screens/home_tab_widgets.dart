@@ -580,6 +580,17 @@ class _DownloadedOrRemoteCoverState extends State<_DownloadedOrRemoteCover> {
   void initState() {
     super.initState();
     _embeddedCoverPath = _resolveEmbeddedCoverPath();
+    DownloadedEmbeddedCoverResolver.previewsCleared.addListener(
+      _onEmbeddedCoverChanged,
+    );
+  }
+
+  @override
+  void dispose() {
+    DownloadedEmbeddedCoverResolver.previewsCleared.removeListener(
+      _onEmbeddedCoverChanged,
+    );
+    super.dispose();
   }
 
   @override

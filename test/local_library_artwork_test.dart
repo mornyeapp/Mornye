@@ -153,6 +153,46 @@ void main() {
     });
   }
 
+  testWidgets('a cover on screen comes back after the cache is cleared', (
+    tester,
+  ) async {
+    final preview = await playerPreview(tester);
+    expect(preview, isNotNull);
+    final shown = <String?>[];
+    // File work started under the fake clock never ends, so the page is
+    // built and the cache cleared where real I/O completes.
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        app(
+          LocalLibraryArtworkBuilder(
+            coverPath: null,
+            filePath: audio.path,
+            builder: (_, path) {
+              shown.add(path);
+              return Text(path ?? 'placeholder');
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(shown.last, preview);
+
+      // What Storage & Cache does while this page stays open under it.
+      await DownloadedEmbeddedCoverResolver.clearPersistentCache();
+      expect(await File(preview!).exists(), isFalse);
+      DownloadedEmbeddedCoverResolver.announcePreviewsCleared();
+      await tester.pump();
+    });
+    // The deleted file is let go, and the cover is read from the song again.
+    expect(shown.last, isNull);
+    final again = await playerPreview(tester);
+    await tester.pump();
+    expect(shown.last, again);
+    expect(await tester.runAsync(() async => File(again!).readAsBytes()), png);
+    expect(extractions, 2);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('valid scanned file URI avoids extraction', (tester) async {
     await tester.runAsync(() async {
       await scannedCover.writeAsBytes(png);

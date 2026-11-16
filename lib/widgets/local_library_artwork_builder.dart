@@ -32,6 +32,17 @@ class _LocalLibraryArtworkBuilderState
   void initState() {
     super.initState();
     _checkCover();
+    DownloadedEmbeddedCoverResolver.previewsCleared.addListener(
+      _onCoverChanged,
+    );
+  }
+
+  @override
+  void dispose() {
+    DownloadedEmbeddedCoverResolver.previewsCleared.removeListener(
+      _onCoverChanged,
+    );
+    super.dispose();
   }
 
   @override

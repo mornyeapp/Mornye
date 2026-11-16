@@ -316,6 +316,9 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   @override
   void initState() {
     super.initState();
+    DownloadedEmbeddedCoverResolver.previewsCleared.addListener(
+      _onEmbeddedCoverChanged,
+    );
     _completionBridgePlayableProbe = CompletionBridgePlayableProbeCache(
       onPlayable: _fileExistsCache.markExists,
     );
@@ -379,6 +382,9 @@ class _QueueTabState extends ConsumerState<QueueTab> {
 
   @override
   void dispose() {
+    DownloadedEmbeddedCoverResolver.previewsCleared.removeListener(
+      _onEmbeddedCoverChanged,
+    );
     _hideSelectionOverlay();
     _hidePlaylistSelectionOverlay();
     _fileExistsCache.dispose();

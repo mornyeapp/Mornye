@@ -93,6 +93,22 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
       '${widget.albumName.toLowerCase()}|${widget.artistName.toLowerCase()}';
 
   @override
+  void initState() {
+    super.initState();
+    DownloadedEmbeddedCoverResolver.previewsCleared.addListener(
+      _onEmbeddedCoverChanged,
+    );
+  }
+
+  @override
+  void dispose() {
+    DownloadedEmbeddedCoverResolver.previewsCleared.removeListener(
+      _onEmbeddedCoverChanged,
+    );
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(covariant DownloadedAlbumScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.albumName != widget.albumName ||

@@ -144,6 +144,8 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
     await DownloadedEmbeddedCoverResolver.clearPersistentCache();
     final cacheDir = await getApplicationCacheDirectory();
     await CacheMaintenanceService.clearDirectoryContents(cacheDir.path);
+    // Covers on the pages under this one still point at the deleted files.
+    DownloadedEmbeddedCoverResolver.announcePreviewsCleared();
   }
 
   Future<void> _clearTempCache() async {

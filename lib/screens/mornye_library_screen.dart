@@ -834,6 +834,24 @@ class _LibraryBrowseArtwork extends StatefulWidget {
 
 class _LibraryBrowseArtworkState extends State<_LibraryBrowseArtwork> {
   @override
+  void initState() {
+    super.initState();
+    DownloadedEmbeddedCoverResolver.previewsCleared.addListener(_resolveAgain);
+  }
+
+  @override
+  void dispose() {
+    DownloadedEmbeddedCoverResolver.previewsCleared.removeListener(
+      _resolveAgain,
+    );
+    super.dispose();
+  }
+
+  void _resolveAgain() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final entry = widget.entry;
     Widget fallback(BuildContext context) => ColoredBox(
@@ -859,9 +877,7 @@ class _LibraryBrowseArtworkState extends State<_LibraryBrowseArtwork> {
         ? null
         : DownloadedEmbeddedCoverResolver.resolve(
             entry.samplePath,
-            onChanged: () {
-              if (mounted) setState(() {});
-            },
+            onChanged: _resolveAgain,
           );
     final cover = entry.cover?.isNotEmpty == true ? entry.cover! : embedded;
     return cover == null
