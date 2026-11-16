@@ -369,7 +369,21 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   @override
   void didUpdateWidget(covariant SyncedLyricsView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _rowsDirty = true;
+    // A parent rebuild with the same inputs leaves the rows as they are. A
+    // row's long press reads the current callback when it fires.
+    if (oldWidget.colorScheme != widget.colorScheme ||
+        oldWidget.isActive != widget.isActive ||
+        oldWidget.animateWords != widget.animateWords ||
+        oldWidget.showPronunciation != widget.showPronunciation ||
+        oldWidget.showTranslation != widget.showTranslation ||
+        oldWidget.seekPreview != widget.seekPreview ||
+        (oldWidget.onLongPressLine == null) !=
+            (widget.onLongPressLine == null) ||
+        oldWidget.credits?.writers != widget.credits?.writers ||
+        oldWidget.credits?.provider != widget.credits?.provider ||
+        (oldWidget.credits == null) != (widget.credits == null)) {
+      _rowsDirty = true;
+    }
     if (oldWidget.seekPreview != widget.seekPreview) {
       oldWidget.seekPreview.removeListener(_previewChanged);
       widget.seekPreview.addListener(_previewChanged);
@@ -1181,6 +1195,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                   double.infinity,
                 )
               : topPadding;
+          final ambientDirection = Directionality.of(context);
           final rowInputs = (
             visibility,
             loading,
@@ -1194,13 +1209,13 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
             widget.seekPreview.value != null,
             _visible,
             _rowReveal.isAnimating,
+            ambientDirection,
           );
           if (_rowsDirty || rowInputs != _rowInputs) {
             _rowsDirty = false;
             _rowInputs = rowInputs;
             _rowsRevision++;
           }
-          final ambientDirection = Directionality.of(context);
           final list = _lyricList(
             revision: _rowsRevision,
             controller: _scroll,

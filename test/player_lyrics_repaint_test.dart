@@ -873,6 +873,10 @@ void main() {
       var locale = const Locale('en');
       var supplements = false;
       var viewKey = 0;
+      // The app never edits lyrics in place: an edit is new lyrics, which
+      // rebuild the rows. A row input changes with each in-place edit here,
+      // so the rows read it while the line keeps its state.
+      var edits = 0;
       Future<void> pump() async {
         final theme = ThemeData.dark().copyWith(
           textTheme: ThemeData.dark().textTheme.copyWith(
@@ -900,6 +904,7 @@ void main() {
                         isActive: true,
                         showPronunciation: false,
                         showTranslation: supplements,
+                        onLongPressLine: edits.isOdd ? (_) {} : null,
                       ),
                     ),
                   ),
@@ -935,6 +940,7 @@ void main() {
         end: Duration(seconds: 6),
         text: 'AAAA ',
       );
+      edits++;
       await pump();
       expect(_segmentBoxes(tester), same(boxes));
       expect(
@@ -954,6 +960,7 @@ void main() {
         end: Duration(seconds: 20),
         text: 'AA BBBB',
       );
+      edits++;
       await pump();
       expect(_segmentBoxes(tester), isNot(same(boxes)));
       expect(_segmentBoxes(tester), isNot(equals(boxes)));
