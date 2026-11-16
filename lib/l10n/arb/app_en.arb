@@ -680,6 +680,14 @@
   "@libraryFoldersLoadFailed": {
     "description": "Shown when the Folders view fails to load"
   },
+  "libraryGenres": "Genres",
+  "@libraryGenres": {
+    "description": "Library view that groups downloaded and scanned songs by their genre tag"
+  },
+  "libraryGenresEmpty": "Genres appear here once your downloaded or scanned songs have a genre tag.",
+  "@libraryGenresEmpty": {
+    "description": "Shown in the Genres view when no Library song has a genre"
+  },
   "settingsTitle": "Settings",
   "@settingsTitle": {
     "description": "Settings screen title"

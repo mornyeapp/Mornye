@@ -12,11 +12,14 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/providers/library_browse_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/providers/library_genres_provider.dart';
 import 'package:mornye/providers/library_search_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/screens/library_mix_screen.dart';
 import 'package:mornye/screens/library_tracks_folder_screen.dart';
 import 'package:mornye/screens/queue_tab.dart';
 import 'package:mornye/services/history_database.dart';
@@ -32,6 +35,7 @@ import 'package:mornye/widgets/library_directory_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'support/page_back.dart';
 import 'support/tooltip_finder.dart';
 
 class _Settings extends SettingsNotifier {
@@ -187,10 +191,11 @@ void main() {
     bool withQueueItem = true,
     String? librarySection,
     List<Override> overrides = const [],
+    Size size = const Size(1280, 900),
   }) async {
     final preferences = await SharedPreferences.getInstance();
     debugDesktopPlatformOverride = desktop;
-    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final queue = DownloadQueueLookup.fromItems([
@@ -687,6 +692,107 @@ void main() {
       tester.element(find.byType(QueueTab)),
     );
     expect(container.read(settingsProvider).historyFilterMode, 'folders');
+  });
+
+  testWidgets('the Genres tab lists genres and opens one; six tabs scroll at '
+      'phone width', (tester) async {
+    const genre = LibraryBrowseEntry(
+      source: '',
+      key: 'rock',
+      name: 'Rock',
+      artist: '',
+      samplePath: '',
+      trackCount: 2,
+    );
+    await pumpLibrary(
+      tester,
+      size: const Size(390, 844),
+      overrides: [
+        libraryGenresProvider.overrideWith((ref) async => const [genre]),
+        libraryGenreSongsProvider.overrideWith(
+          (ref, key) async => [
+            for (final id in ['a', 'b'])
+              UnifiedLibraryItem.fromLocalLibrary(
+                LocalLibraryItem(
+                  id: id,
+                  trackName: 'Rock song $id',
+                  artistName: 'Artist',
+                  albumName: 'Album',
+                  filePath: '/music/$id.flac',
+                  scannedAt: DateTime(2026, 11, 16),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+    final l10n = l10nOf(tester);
+    final tabs = find.byType(TabBar);
+    expect(tester.widget<TabBar>(tabs).isScrollable, isTrue);
+    expect(
+      find.descendant(of: tabs, matching: find.byType(Tab)),
+      findsNWidgets(6),
+    );
+    final genresTab = find.descendant(
+      of: tabs,
+      matching: find.text(l10n.libraryGenres),
+    );
+    await tester.ensureVisible(genresTab);
+    await tester.pump();
+    await tester.tap(genresTab);
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(QueueTab)),
+    );
+    expect(container.read(settingsProvider).historyFilterMode, 'genres');
+    expect(find.text('Rock'), findsOneWidget);
+    expect(find.text(l10n.tracksCount(2)), findsOneWidget);
+
+    await tester.tap(find.text('Rock'));
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.byType(LibraryMixScreen), findsOneWidget);
+    expect(find.text('Rock song a'), findsOneWidget);
+    expect(find.text('Rock song b'), findsOneWidget);
+    await pageBack(tester);
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    // The last tab is still reachable at phone width.
+    final foldersTab = find.descendant(
+      of: tabs,
+      matching: find.text(l10n.libraryFolders),
+    );
+    await tester.ensureVisible(foldersTab);
+    await tester.pump();
+    await tester.tap(foldersTab);
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.byType(LibraryDirectoryView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the Genres tab explains an empty Library', (tester) async {
+    await pumpLibrary(tester);
+    final l10n = l10nOf(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text(l10n.libraryGenres),
+      ),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    // The mocked database has no songs.
+    expect(find.text(l10n.libraryGenresEmpty), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('the pager leaves sideways swipes to song rows while they '

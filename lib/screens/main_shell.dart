@@ -818,6 +818,11 @@ class _MainShellState extends ConsumerState<MainShell>
         label: l10n.searchSongs,
       ),
       DesktopSidebarLink(
+        id: 'genres',
+        icon: CupertinoIcons.guitars,
+        label: l10n.libraryGenres,
+      ),
+      DesktopSidebarLink(
         id: 'folders',
         icon: CupertinoIcons.folder,
         label: l10n.libraryFolders,
@@ -856,6 +861,12 @@ class _MainShellState extends ConsumerState<MainShell>
         ),
       ),
       'songs' => const Scaffold(body: QueueTab(librarySection: 'all')),
+      'genres' => Scaffold(
+        body: MornyeLibraryScreen(
+          page: MornyeLibraryPage.genres,
+          onOpenSection: (_) {},
+        ),
+      ),
       'folders' => const LibraryDirectoryScreen(),
       'downloads' => const Scaffold(
         body: QueueTab(librarySection: 'downloads'),

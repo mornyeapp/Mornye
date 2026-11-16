@@ -8549,6 +8549,8 @@
   "libraryFoldersEmptyMessage": "Unduh lagu atau tambahkan folder musik di setelan Koleksi Lokal untuk menjelajahinya per folder.",
   "libraryFolderMissing": "Folder ini tidak ada lagi di Koleksi",
   "libraryFoldersLoadFailed": "Tidak dapat membaca folder",
+  "libraryGenres": "Genre",
+  "libraryGenresEmpty": "Genre muncul di sini setelah lagu yang kamu unduh atau pindai memiliki tag genre.",
   "linkDesktopSettingsTitle": "Mornye di ponsel",
   "linkDesktopSettingsSubtitle": "Putar Library dan kendalikan pemutaran dari ponsel",
   "linkDesktopEnableTitle": "Bagikan ke Mornye di ponsel",
