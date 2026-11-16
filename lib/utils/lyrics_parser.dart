@@ -10,7 +10,7 @@ Uint8List _encodeLyricsInBackground(String raw) =>
 
 ParsedLyrics _parseLyricsInBackground(String raw) => LyricsParser.parse(raw);
 
-ParsedLyrics _hydrateParsedLyricsInBackground(Map<String, dynamic> result) {
+ParsedLyrics _hydrateParsedLyrics(Map<String, dynamic> result) {
   LyricWord word(Map<dynamic, dynamic> value) => LyricWord(
     time: Duration(milliseconds: value['timeMs'] as int),
     end: value['endMs'] == null
@@ -251,13 +251,21 @@ class LyricsParser {
     return _withCredits(text, _parseLrcOrPlain(text));
   }
 
+  /// Lyrics up to this many characters are encoded and rebuilt from the
+  /// native result on the calling isolate: below it, an isolate hop costs
+  /// more than the work.
+  static const inlineNativeParseChars = 64 * 1024;
+
   /// Production parsing runs away from rendering. The synchronous parser
   /// remains the compatibility contract for old native builds and test hosts.
   static Future<ParsedLyrics> parseAsyncNative(String? raw) async {
     if (raw == null || raw.isEmpty) return ParsedLyrics.empty;
+    final inline = raw.length <= inlineNativeParseChars;
     Map<String, dynamic> result;
     try {
-      final bytes = await compute(_encodeLyricsInBackground, raw);
+      final bytes = inline
+          ? utf8.encode(raw)
+          : await compute(_encodeLyricsInBackground, raw);
       result = await PlatformBridge.runNativeDataJob({
         'operation': 'parse_lyrics',
       }, bytes: bytes);
@@ -269,7 +277,8 @@ class LyricsParser {
       if (error.message?.contains('XML nesting exceeds') != true) rethrow;
       return compute(_parseLyricsInBackground, raw);
     }
-    return compute(_hydrateParsedLyricsInBackground, result);
+    if (inline) return _hydrateParsedLyrics(result);
+    return compute(_hydrateParsedLyrics, result);
   }
 
   static ParsedLyrics _withCredits(String raw, ParsedLyrics lyrics) {
