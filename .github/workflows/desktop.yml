@@ -13,6 +13,7 @@ on:
       - "lib/services/lastfm/**"
       - "lib/widgets/lastfm_settings.dart"
       - "test/lastfm*_test.dart"
+      - "test/scrobble_listening_test.dart"
       - "test/support/lastfm_fakes.dart"
       - "rust_backend/**"
       - "third_party/**"
@@ -105,7 +106,7 @@ jobs:
         run: |
           dart scripts/prepare_flutter_sdk.dart
           flutter test --no-pub test/semantics_geometry_regression_test.dart
-          flutter test --no-pub test/lastfm_api_test.dart test/lastfm_listening_test.dart test/lastfm_service_test.dart test/lastfm_store_test.dart test/lastfm_settings_test.dart
+          flutter test --no-pub test/lastfm_api_test.dart test/scrobble_listening_test.dart test/lastfm_service_test.dart test/lastfm_store_test.dart test/lastfm_settings_test.dart
 
       # The Xcode "Embed Rust Backend" and "Embed FFmpeg" phases embed the
       # library and the FFmpeg tools built above.
