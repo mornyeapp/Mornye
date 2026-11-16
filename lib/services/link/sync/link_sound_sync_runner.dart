@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/providers/equalizer_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/sync/link_sound_sync_protocol.dart';
@@ -138,6 +139,7 @@ class LinkSoundSyncRunner extends Notifier<void> {
       ),
       (_, _) => _localChanged(),
     );
+    ref.listen(songLyricsOffsetsProvider, (_, _) => _localChanged());
     _attach(ref.read(linkActiveClientProvider));
   }
 

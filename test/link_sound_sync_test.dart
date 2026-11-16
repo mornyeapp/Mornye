@@ -10,6 +10,7 @@ import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/equalizer_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
@@ -25,6 +26,10 @@ Map<String, dynamic> _curve(double first) =>
 
 LinkSoundId _preset(String name) => (LinkSoundKinds.eqPreset, name);
 LinkSoundId _setting(String key) => (LinkSoundKinds.setting, key);
+LinkSoundId _song(String key) => (LinkSoundKinds.songLyricOffset, key);
+
+final _songA = songLyricsOffsetKey('Example Song', 'Example Artist');
+final _songB = songLyricsOffsetKey('Other Song', 'Example Artist');
 
 /// One device's presets and settings in memory.
 class _FakeAccess implements LinkSoundSettingsAccess {
@@ -32,8 +37,22 @@ class _FakeAccess implements LinkSoundSettingsAccess {
   final settings = Map<String, Object>.of(
     linkSoundSettingValues(const AppSettings()),
   );
+
+  /// Song lyric offsets by song key, and when each was set or removed.
+  final songs = <String, int>{};
+  final edited = <String, int>{};
   bool unreadable = false;
   int applied = 0;
+
+  /// Sets a song's offset at [at]; 0 puts it back in sync.
+  void setSong(String key, int offsetMs, int at) {
+    if (offsetMs == 0) {
+      songs.remove(key);
+    } else {
+      songs[key] = offsetMs;
+    }
+    edited[key] = at;
+  }
 
   @override
   Future<LinkSoundValues?> read() async => unreadable
@@ -43,7 +62,13 @@ class _FakeAccess implements LinkSoundSettingsAccess {
             _preset(key): {'settings': value},
           for (final MapEntry(:key, :value) in settings.entries)
             _setting(key): {'value': value},
+          for (final MapEntry(:key, :value) in songs.entries)
+            _song(key): {'offsetMs': value},
         };
+
+  @override
+  int? editedMs(LinkSoundId id) =>
+      id.$1 == LinkSoundKinds.songLyricOffset ? edited[id.$2] : null;
 
   @override
   LinkSoundValues get defaults => {
@@ -57,7 +82,13 @@ class _FakeAccess implements LinkSoundSettingsAccess {
   Future<void> apply(List<LinkSoundItem> winners) async {
     for (final item in winners) {
       applied++;
-      if (item.kind == LinkSoundKinds.eqPreset) {
+      if (item.kind == LinkSoundKinds.songLyricOffset) {
+        setSong(
+          item.key,
+          item.deleted ? 0 : item.data!['offsetMs'] as int,
+          item.updatedMs,
+        );
+      } else if (item.kind == LinkSoundKinds.eqPreset) {
         if (item.deleted) {
           presets.remove(item.key);
         } else {
@@ -249,6 +280,62 @@ void main() {
       expect(items[2].data, isNull);
     });
 
+    test('song offsets keep a song key and a usable offset', () {
+      final items = LinkSoundItem.listFromJson([
+        {
+          'kind': 'songLyricOffset',
+          'key': ' Example Song|Example Artist ',
+          'updatedMs': 5,
+          'origin': 'a',
+          'data': {'offsetMs': 9000},
+        },
+        {
+          'kind': 'songLyricOffset',
+          'key': 'other song|',
+          'updatedMs': 6,
+          'origin': 'a',
+          'deleted': true,
+        },
+        // In sync is only ever a deletion.
+        {
+          'kind': 'songLyricOffset',
+          'key': 'third song|artist',
+          'updatedMs': 5,
+          'origin': 'a',
+          'data': {'offsetMs': 0},
+        },
+        // No title, no separator, no number.
+        {
+          'kind': 'songLyricOffset',
+          'key': '|artist',
+          'updatedMs': 5,
+          'origin': 'a',
+          'data': {'offsetMs': 500},
+        },
+        {
+          'kind': 'songLyricOffset',
+          'key': 'no separator',
+          'updatedMs': 5,
+          'origin': 'a',
+          'data': {'offsetMs': 500},
+        },
+        {
+          'kind': 'songLyricOffset',
+          'key': 'song|artist',
+          'updatedMs': 5,
+          'origin': 'a',
+          'data': {'offsetMs': 'late'},
+        },
+      ]);
+      expect(items.map((item) => item.key), [
+        'example song|example artist',
+        'other song|',
+      ]);
+      expect(items[0].data, {'offsetMs': 2000});
+      expect(items[1].deleted, isTrue);
+      expect(items[1].data, isNull);
+    });
+
     test('compare numbers by value, not by how they are written', () {
       expect(
         linkSoundCanonical({
@@ -400,6 +487,76 @@ void main() {
     });
   });
 
+  group('song lyric offsets', () {
+    test('the newest edit of a song wins, dated by when it was set', () async {
+      final clock = _Clock();
+      final phone = _device(clock);
+      final desk = _device(clock);
+      phone.access.setSong(_songA, 500, clock.now);
+      await _exchange(phone.sync, desk.sync);
+      expect(desk.access.songs, {_songA: 500});
+
+      // The phone changes it while apart, then the computer changes it
+      // later. The phone only meets the computer after both edits.
+      clock.now += 1000;
+      phone.access.setSong(_songA, 800, clock.now);
+      clock.now += 1000;
+      desk.access.setSong(_songA, -300, clock.now);
+      await desk.sync.captureLocal();
+      clock.now += 5000;
+      await _exchange(phone.sync, desk.sync);
+      expect(phone.access.songs, {_songA: -300});
+      expect(desk.access.songs, {_songA: -300});
+    });
+
+    test('a song put back in sync stays in sync everywhere', () async {
+      final clock = _Clock();
+      final phone = _device(clock);
+      final desk = _device(clock);
+      final other = _device(clock);
+      phone.access.setSong(_songA, 500, clock.now);
+      await _exchange(phone.sync, desk.sync);
+      await _exchange(other.sync, desk.sync);
+      expect(other.access.songs, {_songA: 500});
+
+      phone.access.setSong(_songA, 0, clock.now);
+      await _exchange(phone.sync, desk.sync);
+      expect(desk.access.songs, isEmpty);
+      final tombstone = (await desk.sync.exchange(
+        const [],
+      )).items.singleWhere((item) => item.id == _song(_songA));
+      expect(tombstone.deleted, isTrue);
+
+      // The other phone still holds the old offset and offers it.
+      await _exchange(other.sync, desk.sync);
+      expect(desk.access.songs, isEmpty);
+      expect(other.access.songs, isEmpty);
+      await _exchange(phone.sync, desk.sync);
+      expect(phone.access.songs, isEmpty);
+    });
+
+    test(
+      'songs set on different devices both survive every exchange',
+      () async {
+        final clock = _Clock();
+        final phone = _device(clock);
+        final desk = _device(clock);
+        phone.access.setSong(_songA, 500, clock.now);
+        desk.access.setSong(_songB, -500, clock.now);
+        for (var round = 0; round < 3; round++) {
+          await _exchange(phone.sync, desk.sync);
+          expect(phone.access.songs, {_songA: 500, _songB: -500});
+          expect(desk.access.songs, {_songA: 500, _songB: -500});
+          final sent = (await phone.sync.exchange(const [])).items;
+          expect(
+            sent.where((item) => item.kind == LinkSoundKinds.songLyricOffset),
+            hasLength(2),
+          );
+        }
+      },
+    );
+  });
+
   group('phone and desktop', () {
     final deskRouter = Provider<LinkHostRouter>((ref) {
       final router = LinkHostRouter();
@@ -511,6 +668,24 @@ void main() {
         expect(phone.access.presets.keys, unorderedEquals(['Phone', 'Desk']));
       },
     );
+
+    test('a song offset set on the phone reaches the computer', () async {
+      final clock = _Clock();
+      final desk = side(clock);
+      final phone = side(clock, enabled: true);
+      final client = _FakeClient(desk.container.read(deskRouter));
+      addTearDown(client.close);
+      phone.container.read(linkSoundSyncRunnerProvider);
+      phone.container.read(linkActiveClientProvider.notifier).set(client);
+      await _eventually(() => client.posts.isNotEmpty);
+
+      // The player sets the offset; the runner notices the edit.
+      phone.access.setSong(_songA, 700, clock.now);
+      await phone.container
+          .read(songLyricsOffsetsProvider.notifier)
+          .setOffsetMs(_songA, 700);
+      await _eventually(() => desk.access.songs[_songA] == 700);
+    });
 
     test('an older computer without the operation is left alone', () async {
       final clock = _Clock();
@@ -628,6 +803,52 @@ void main() {
         setting(LinkSoundSettingKeys.autoMixEffect, 'pitch'),
       ]);
       expect(container.read(settingsProvider).autoMixPitch, 0);
+    });
+
+    test('read, date and apply song lyric offsets', () async {
+      SharedPreferences.setMockInitialValues({
+        kSongLyricsOffsetsKey: jsonEncode({
+          _songA: [400, 50],
+        }),
+      });
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.listen(songLyricsOffsetsProvider, (_, _) {});
+      final access = container.read(linkSoundSettingsAccessProvider);
+      final values = (await access.read())!;
+      expect(values[_song(_songA)], {'offsetMs': 400});
+      expect(access.editedMs(_song(_songA)), 50);
+      expect(access.editedMs(_setting(LinkSoundSettingKeys.autoMixEcho)), null);
+
+      // A song put back in sync here is dated by when that happened.
+      final songs = container.read(songLyricsOffsetsProvider.notifier);
+      await songs.setOffsetMs(_songA, 0);
+      expect((await access.read())!.containsKey(_song(_songA)), isFalse);
+      expect(access.editedMs(_song(_songA)), isNotNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kSongLyricsOffsetsKey), isNull);
+
+      // A song this device has never played keeps the synced value.
+      LinkSoundItem song(String key, int? offsetMs, int at) => LinkSoundItem(
+        kind: LinkSoundKinds.songLyricOffset,
+        key: key,
+        updatedMs: at,
+        origin: 'peer',
+        deleted: offsetMs == null,
+        data: offsetMs == null ? null : {'offsetMs': offsetMs},
+      );
+      await access.apply([song(_songA, -600, 70), song(_songB, 900, 80)]);
+      expect(container.read(songLyricsOffsetMsProvider(_songA)), -600);
+      expect(container.read(songLyricsOffsetMsProvider(_songB)), 900);
+      expect(access.editedMs(_song(_songB)), 80);
+      expect(decodeSongLyricsOffsets(prefs.getString(kSongLyricsOffsetsKey)), {
+        _songA: const SongLyricsOffset(-600, 70),
+        _songB: const SongLyricsOffset(900, 80),
+      });
+
+      await access.apply([song(_songB, null, 90)]);
+      expect(container.read(songLyricsOffsetsProvider).keys, [_songA]);
+      expect(access.editedMs(_song(_songB)), 90);
     });
   });
 }

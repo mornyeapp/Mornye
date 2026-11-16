@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/equalizer_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/sync/link_sound_sync_protocol.dart';
@@ -87,10 +88,12 @@ void _watchLocalChanges(Ref ref) {
     ),
     (_, _) => changed(),
   );
+  final songs = ref.listen(songLyricsOffsetsProvider, (_, _) => changed());
   ref.onDispose(() {
     timer?.cancel();
     presets.close();
     settings.close();
+    songs.close();
     // A rebuilt host registers again and watches anew.
     _watching[ref] = null;
   });

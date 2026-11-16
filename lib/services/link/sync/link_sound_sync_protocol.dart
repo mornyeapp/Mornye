@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:mornye/models/automix_options.dart';
 import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/models/theme_settings.dart';
 
 /// Mornye Link sound settings sync: the sound a user saved travels between
 /// the phone and the paired computer when the phone's "Sync sound settings"
@@ -15,13 +16,20 @@ import 'package:mornye/models/settings.dart';
 ///   `setting`, key = one of [LinkSoundSettingKeys.all], `data` =
 ///   `{"value": ...}`: volume normalization level and mode, and the shape of
 ///   AutoMix transitions.
+///   `songLyricOffset`, key = the song's title and artist as
+///   `songLyricsOffsetKey` makes it (`"title|artist"`, trimmed and
+///   lowercased), `data` = `{"offsetMs": int}` (-2000 to 2000, never 0):
+///   one song's own lyric timing offset. A song put back in sync is a
+///   tombstone, so an older offset does not return. Both devices keep every
+///   song's offset, whether or not they have the song.
 ///
 /// Not synced, on purpose: the curve playing now and the equalizer switch,
 /// the switches that turn normalization, gapless and AutoMix on (a device
 /// can have its own reasons, such as bit-perfect USB, exclusive output or a
-/// slow phone), volume, speed and pitch, the loud volume warning, the lyric
-/// timing offset (it makes up for this device's own output delay, such as
-/// Bluetooth), output devices, direct USB, spatial audio and skip silence.
+/// slow phone), volume, speed and pitch, the loud volume warning, the
+/// app-wide lyric timing offset (it makes up for this device's own output
+/// delay, such as Bluetooth), output devices, direct USB, spatial audio and
+/// skip silence.
 ///
 /// `POST /mornye/v1/preferences`, body `{"device": sync id, "items": [Item]}`
 /// with every item the phone holds, tombstones included. The desktop merges
@@ -33,8 +41,9 @@ import 'package:mornye/models/settings.dart';
 ///   "deleted": bool, "data": {...} (absent when deleted)}`.
 ///
 /// Conflicts: last writer wins per (kind, key) by `updatedMs`, ties broken
-/// by the greater `origin`, as collections sync does. A deleted preset stays
-/// as a tombstone so an older copy never brings it back.
+/// by the greater `origin`, as collections sync does. A deleted preset or
+/// song offset stays as a tombstone so an older copy never brings it back.
+/// A song offset is dated by when it was set, not when a sync noticed it.
 ///
 /// The desktop sends `{"type": "preferences.changed"}` over the WebSocket
 /// when its side changed (a local edit, or a phone's items it applied); a
@@ -50,7 +59,11 @@ abstract final class LinkSoundSyncMessages {
 abstract final class LinkSoundKinds {
   static const eqPreset = 'eqPreset';
   static const setting = 'setting';
+  static const songLyricOffset = 'songLyricOffset';
 }
+
+/// The longest song key kept, in characters.
+const linkSoundMaxSongKeyLength = 512;
 
 /// The settings that travel, by their [AppSettings] field names.
 abstract final class LinkSoundSettingKeys {
@@ -75,8 +88,8 @@ abstract final class LinkSoundSettingKeys {
   };
 }
 
-/// Most items one request may carry: 100 presets and the settings, plus
-/// room for tombstones.
+/// Most items one request may carry: 100 presets, the settings and up to
+/// 500 song offsets (`kMaxSongLyricsOffsets`), plus room for tombstones.
 const linkSoundMaxItems = 1000;
 
 /// Tombstones kept per device; the oldest go first.
@@ -234,6 +247,33 @@ class LinkSoundItem {
           updatedMs: updatedMs,
           origin: origin,
           data: {'value': value},
+        );
+      case LinkSoundKinds.songLyricOffset:
+        final name = json['key'];
+        if (name is! String) return null;
+        // Lowercasing a key made by this app changes nothing; it only lines
+        // up a differently cased one with the songs here.
+        final key = name.trim().toLowerCase();
+        // A title, then `|` and the artist (which may be empty).
+        if (key.indexOf('|') <= 0 || key.length > linkSoundMaxSongKeyLength) {
+          return null;
+        }
+        Map<String, dynamic>? data;
+        if (!deleted) {
+          final offset = raw is Map ? raw['offsetMs'] : null;
+          if (offset is! num || !offset.isFinite) return null;
+          final offsetMs = normalizeLyricsOffsetMs(offset);
+          // In sync is a deletion, never a live value.
+          if (offsetMs == 0) return null;
+          data = {'offsetMs': offsetMs};
+        }
+        return LinkSoundItem(
+          kind: LinkSoundKinds.songLyricOffset,
+          key: key,
+          updatedMs: updatedMs,
+          origin: origin,
+          deleted: deleted,
+          data: data,
         );
       default:
         return null;

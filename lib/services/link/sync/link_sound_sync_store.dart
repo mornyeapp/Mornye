@@ -9,6 +9,7 @@ import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/equalizer_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/services/link/sync/link_sound_sync_protocol.dart';
 
 /// The synced values one device holds now, by item id.
@@ -24,6 +25,12 @@ abstract interface class LinkSoundSettingsAccess {
   /// Values this app starts with. A value still at its default when first
   /// seen counts as never set, so a value chosen on the other device wins.
   LinkSoundValues get defaults;
+
+  /// When the value under [id] was set or removed on this device, if the
+  /// device knows (a song offset does). A local edit is then dated by it, so
+  /// an edit made while the devices were apart still loses to a newer one
+  /// from the other device. Null dates the edit when a sync notices it.
+  int? editedMs(LinkSoundId id);
 
   /// Applies [winners]: a live item sets its value, a deleted one removes
   /// it. Presets past the app's limit are left out.
@@ -209,8 +216,8 @@ class LinkSoundSync {
     }),
   );
 
-  int _stamp(LinkSoundItem? previous) =>
-      max(_clock(), (previous?.updatedMs ?? -1) + 1);
+  int _stamp(LinkSoundItem? previous, LinkSoundId id) =>
+      max(access.editedMs(id) ?? _clock(), (previous?.updatedMs ?? -1) + 1);
 
   Future<int> _capture() async {
     final local = await access.read();
@@ -232,7 +239,7 @@ class LinkSoundSync {
       _items[id] = LinkSoundItem(
         kind: id.$1,
         key: id.$2,
-        updatedMs: untouched ? 0 : _stamp(current),
+        updatedMs: untouched ? 0 : _stamp(current, id),
         origin: _device!,
         data: data,
       );
@@ -247,7 +254,7 @@ class LinkSoundSync {
       _items[id] = LinkSoundItem(
         kind: id.$1,
         key: id.$2,
-        updatedMs: _stamp(current),
+        updatedMs: _stamp(current, id),
         origin: _device!,
         deleted: true,
       );
@@ -299,7 +306,8 @@ class LinkSoundSync {
   }
 }
 
-/// The app's equalizer presets and sound settings, through their providers.
+/// The app's equalizer presets, sound settings and song lyric offsets,
+/// through their providers.
 class LinkSoundProviderAccess implements LinkSoundSettingsAccess {
   LinkSoundProviderAccess(this._ref);
 
@@ -317,6 +325,7 @@ class LinkSoundProviderAccess implements LinkSoundSettingsAccess {
   Future<LinkSoundValues?> read() async {
     await _ref.read(settingsProvider.notifier).ensureLoaded();
     await _ref.read(equalizerProvider.notifier).ensureLoaded();
+    await _ref.read(songLyricsOffsetsProvider.notifier).ensureLoaded();
     final equalizer = _ref.read(equalizerProvider);
     // A failed read or write leaves the list in doubt.
     if (equalizer.error != null) return null;
@@ -329,23 +338,43 @@ class LinkSoundProviderAccess implements LinkSoundSettingsAccess {
         _ref.read(settingsProvider),
       ).entries)
         (LinkSoundKinds.setting, key): {'value': value},
+      for (final MapEntry(:key, :value)
+          in _ref.read(songLyricsOffsetsProvider).entries)
+        (LinkSoundKinds.songLyricOffset, key): {'offsetMs': value.offsetMs},
     };
+  }
+
+  @override
+  int? editedMs(LinkSoundId id) {
+    if (id.$1 != LinkSoundKinds.songLyricOffset) return null;
+    return _ref.read(songLyricsOffsetsProvider)[id.$2]?.editedMs ??
+        _ref.read(songLyricsOffsetsProvider.notifier).resetAt(id.$2);
   }
 
   @override
   Future<void> apply(List<LinkSoundItem> winners) async {
     final presets = <String, LinkSoundItem>{};
     final settings = <String, Object?>{};
+    final songs = <String, SongLyricsOffset>{};
     for (final item in winners) {
       switch (item.kind) {
         case LinkSoundKinds.eqPreset:
           presets[item.key] = item;
         case LinkSoundKinds.setting:
           settings[item.key] = item.data?['value'];
+        case LinkSoundKinds.songLyricOffset:
+          final offset = item.data?['offsetMs'];
+          songs[item.key] = SongLyricsOffset(
+            item.deleted || offset is! num ? 0 : offset.toInt(),
+            item.updatedMs,
+          );
       }
     }
     if (presets.isNotEmpty) _applyPresets(presets);
     if (settings.isNotEmpty) _applySettings(settings);
+    if (songs.isNotEmpty) {
+      await _ref.read(songLyricsOffsetsProvider.notifier).applySynced(songs);
+    }
   }
 
   void _applyPresets(Map<String, LinkSoundItem> changed) {
