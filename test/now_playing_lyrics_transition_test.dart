@@ -8,7 +8,11 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart'
-    show RenderParagraph, RenderRepaintBoundary, debugOnProfilePaint;
+    show
+        RenderParagraph,
+        RenderRepaintBoundary,
+        ShaderMaskLayer,
+        debugOnProfilePaint;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -53,6 +57,7 @@ import 'package:mornye/widgets/mornye_player_background.dart';
 import 'package:mornye/widgets/mornye_player_artwork.dart';
 import 'package:mornye/widgets/mornye_artwork_contrast.dart';
 import 'package:mornye/widgets/mini_player.dart';
+import 'package:mornye/widgets/mornye_landscape_player.dart';
 import 'package:mornye/widgets/material_player_layout.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
 import 'package:mornye/widgets/mornye_player_layout.dart';
@@ -1132,11 +1137,48 @@ void main() {
 
       expect(
         find.descendant(
-          of: find.byType(ShaderMask),
+          of: find.byType(MornyeLyricsFadeMask),
           matching: find.byType(LyricsMaskEdgeClip),
         ),
         findsOneWidget,
       );
+    });
+
+    testWidgets('Mornye lyric fade drops its layer while controls hide '
+        '(landscape: $landscape)', (tester) async {
+      await pumpNowPlaying(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        size: landscape ? const Size(852, 393) : const Size(393, 852),
+        playback: PlaybackState(playing: true),
+      );
+      mediaItems.add(item('many'));
+      await settlePlayer(tester);
+      await tester.tap(findAppIcon(CupertinoIcons.quote_bubble));
+      await settlePlayer(tester);
+      int masks() => tester.layers.whereType<ShaderMaskLayer>().length;
+      final list = find.byType(ListView);
+      final scrollable = find
+          .descendant(of: list, matching: find.byType(Scrollable))
+          .first;
+      final scroll = tester.state<ScrollableState>(scrollable);
+      expect(masks(), 1);
+
+      await tester.pump(const Duration(seconds: 6));
+      await settlePlayer(tester);
+      expect(masks(), 0);
+      expect(tester.state<ScrollableState>(scrollable), same(scroll));
+
+      final bounds = tester.getRect(list);
+      await tester.tapAt(Offset(bounds.right - 6, bounds.top + 10));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(masks(), 1);
+      await settlePlayer(tester);
+      expect(masks(), 1);
+      expect(tester.state<ScrollableState>(scrollable), same(scroll));
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
     });
   }
 

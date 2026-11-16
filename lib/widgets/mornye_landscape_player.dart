@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/widgets/audio_output_button.dart';
@@ -368,8 +369,8 @@ class _LandscapeLyricsViewport extends ConsumerWidget {
         builder: (context, progress, child) => Stack(
           fit: StackFit.expand,
           children: [
-            ShaderMask(
-              blendMode: BlendMode.dstIn,
+            MornyeLyricsFadeMask(
+              opaque: progress == 0,
               shaderCallback: (bounds) => LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -392,5 +393,55 @@ class _LandscapeLyricsViewport extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// A lyrics fade that paints its child directly while [opaque] says the
+/// whole gradient is opaque, which [BlendMode.dstIn] leaves unchanged. It
+/// stays in the tree in both states, so the lyric list never remounts.
+class MornyeLyricsFadeMask extends ShaderMask {
+  const MornyeLyricsFadeMask({
+    super.key,
+    required this.opaque,
+    required super.shaderCallback,
+    super.child,
+  }) : super(blendMode: BlendMode.dstIn);
+
+  final bool opaque;
+
+  @override
+  RenderShaderMask createRenderObject(BuildContext context) =>
+      _RenderLyricsFadeMask(opaque: opaque, shaderCallback: shaderCallback);
+
+  @override
+  void updateRenderObject(BuildContext context, RenderShaderMask renderObject) {
+    super.updateRenderObject(context, renderObject);
+    (renderObject as _RenderLyricsFadeMask).opaque = opaque;
+  }
+}
+
+class _RenderLyricsFadeMask extends RenderShaderMask {
+  _RenderLyricsFadeMask({required bool opaque, required super.shaderCallback})
+    : _opaque = opaque,
+      super(blendMode: BlendMode.dstIn);
+
+  bool _opaque;
+
+  set opaque(bool value) {
+    if (_opaque == value) return;
+    _opaque = value;
+    markNeedsPaint();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final lyrics = child;
+    if (_opaque && lyrics != null) {
+      // Drop the layer retained from a frame that faded the lyrics.
+      layer = null;
+      context.paintChild(lyrics, offset);
+    } else {
+      super.paint(context, offset);
+    }
   }
 }
