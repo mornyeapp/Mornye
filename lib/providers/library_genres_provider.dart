@@ -1,27 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/unified_library_item.dart';
-import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/library_browse_provider.dart';
-import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/library_song_reads.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/sqlite_helpers.dart' show normalizeLookupText;
 import 'package:mornye/utils/genre_tags.dart';
-
-/// Whether the scanned Library is included, watching what changes the
-/// Library's songs: downloads, the scanned Library and its switch.
-bool _watchLibrary(Ref ref) {
-  ref.watch(
-    downloadHistoryProvider.select((state) => state.loadedIndexVersion),
-  );
-  final includeLocal = ref.watch(
-    settingsProvider.select((s) => s.localLibraryEnabled),
-  );
-  if (includeLocal) {
-    ref.watch(localLibraryProvider.select((state) => state.loadedIndexVersion));
-  }
-  return includeLocal;
-}
 
 class _Genre {
   final spellings = <String, int>{};
@@ -103,7 +87,7 @@ Map<String, List<String>> libraryGenreTagsFromRows(
 /// the Library's songs change.
 final _libraryGenreRowsProvider =
     FutureProvider.autoDispose<List<Map<String, Object?>>>((ref) {
-      final includeLocal = _watchLibrary(ref);
+      final includeLocal = watchLibrarySongs(ref);
       return LibraryDatabase.instance.getGenreSpellings(
         includeLocal: includeLocal,
       );
@@ -126,46 +110,12 @@ final libraryGenresProvider =
 /// pages of the Songs list's query.
 final libraryGenreSongsProvider = FutureProvider.autoDispose
     .family<List<UnifiedLibraryItem>, String>((ref, genre) async {
-      final includeLocal = _watchLibrary(ref);
+      final includeLocal = watchLibrarySongs(ref);
       final separator = _watchSeparator(ref);
       final tags = libraryGenreTagsFromRows(
         await ref.watch(_libraryGenreRowsProvider.future),
         separator: separator,
       )[genre];
       if (tags == null) return const [];
-      const pageSize = 1000;
-      final songs = <UnifiedLibraryItem>[];
-      QueueLibraryDbCursor? cursor;
-      for (var offset = 0; ; offset += pageSize) {
-        final page = await LibraryDatabase.instance.getQueueTrackPageResult(
-          QueueLibraryDbQuery(
-            genreTags: tags,
-            sortMode: 'a-z',
-            includeLocal: includeLocal,
-            limit: pageSize,
-            offset: offset,
-            cursor: cursor,
-          ),
-        );
-        for (final row in page.rows) {
-          final json = Map<String, dynamic>.from(row['item'] as Map);
-          switch (row['source']) {
-            case 'local':
-              songs.add(
-                UnifiedLibraryItem.fromLocalLibrary(
-                  LocalLibraryItem.fromJson(json),
-                ),
-              );
-            case 'downloaded':
-              songs.add(
-                UnifiedLibraryItem.fromDownloadHistory(
-                  DownloadHistoryItem.fromJson(json),
-                ),
-              );
-          }
-        }
-        if (page.rows.length < pageSize || page.nextCursor == null) break;
-        cursor = page.nextCursor;
-      }
-      return songs;
+      return readLibrarySongs(includeLocal: includeLocal, genreTags: tags);
     });

@@ -268,6 +268,7 @@ class LibraryQueueStore {
         request.excludeNetwork ||
         request.albumArtist != null ||
         request.genreTags != null ||
+        request.creditedArtist != null ||
         request.quality != null ||
         request.format != null ||
         request.metadata != null) {
@@ -632,6 +633,7 @@ class LibraryQueueStore {
         !request.excludeNetwork &&
         request.albumArtist == null &&
         request.genreTags == null &&
+        request.creditedArtist == null &&
         request.quality == null &&
         request.format == null &&
         request.metadata == null;
@@ -850,6 +852,15 @@ class LibraryQueueStore {
       );
       args.addAll(tags.map(sqlite.normalizeLookupText));
     }
+    if (request.creditedArtist case final artist?) {
+      final key = sqlite.normalizeLookupText(artist);
+      where.add(
+        "(h.sort_album_artist = ? OR h.sort_artist LIKE ? ESCAPE '\\')",
+      );
+      args
+        ..add(key)
+        ..add('%${_escapeLikePattern(key)}%');
+    }
     final query = sqlite.normalizeLookupText(request.searchQuery);
     if (query.isNotEmpty) {
       final ftsQuery = sqlite.ftsPhraseSearchQuery(query);
@@ -917,6 +928,15 @@ class LibraryQueueStore {
         'l.sort_genre IN (${List.filled(tags.length, '?').join(', ')})',
       );
       args.addAll(tags.map(sqlite.normalizeLookupText));
+    }
+    if (request.creditedArtist case final artist?) {
+      final key = sqlite.normalizeLookupText(artist);
+      where.add(
+        "(l.album_artist_norm = ? OR l.artist_name_norm LIKE ? ESCAPE '\\')",
+      );
+      args
+        ..add(key)
+        ..add('%${_escapeLikePattern(key)}%');
     }
     final query = sqlite.normalizeLookupText(request.searchQuery);
     if (query.isNotEmpty) {

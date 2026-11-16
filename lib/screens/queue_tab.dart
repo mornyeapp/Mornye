@@ -34,6 +34,7 @@ import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/library_directory_view.dart';
 import 'package:mornye/widgets/library_search_results.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
+import 'package:mornye/widgets/library_view_toggle.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/library_playlist_drag_source.dart';
@@ -44,13 +45,6 @@ import 'package:flutter/rendering.dart' show RenderSliver;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
-import 'package:material_3_expressive/material_3_expressive.dart'
-    show
-        M3EButtonGroup,
-        M3EButtonGroupAction,
-        M3EButtonGroupType,
-        M3EButtonSize,
-        M3EButtonStyle;
 import 'package:mornye/providers/library_browse_provider.dart';
 import 'package:mornye/providers/library_genres_provider.dart';
 import 'package:mornye/providers/library_counts_provider.dart';
@@ -89,6 +83,7 @@ import 'package:mornye/screens/listening_rewind_screen.dart';
 import 'package:mornye/screens/favorite_artists_screen.dart';
 import 'package:mornye/screens/downloaded_album_screen.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/screens/library_artist_screen.dart';
 import 'package:mornye/screens/library_tracks_folder_screen.dart';
 import 'package:mornye/screens/library_mix_screen.dart';
 import 'package:mornye/screens/local_album_screen.dart';
@@ -1084,13 +1079,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                           songList: _searchSongList(),
                           onOpenArtist: (artist) => pushPage<void>(
                             context,
-                            (_) => Scaffold(
-                              body: MornyeLibraryScreen(
-                                page: MornyeLibraryPage.albums,
-                                artist: artist,
-                                onOpenSection: (_) {},
-                              ),
-                            ),
+                            (_) => LibraryArtistScreen(artist: artist),
                           ),
                         ),
                         const NavBarSliverSpacer(),

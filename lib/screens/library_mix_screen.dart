@@ -9,6 +9,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_database_models.dart'
     show LocalLibraryItem;
 import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/providers/library_artist_songs_provider.dart';
 import 'package:mornye/providers/library_browse_provider.dart';
 import 'package:mornye/providers/library_genres_provider.dart';
 import 'package:mornye/providers/library_mixes_provider.dart';
@@ -98,19 +99,35 @@ String libraryMixSubtitle(AppLocalizations l10n, LibraryMix mix) =>
 
 /// A mix of the Library's own songs: its cover, Play, Shuffle, Save as
 /// playlist and its songs in play order. [LibraryMixScreen.genre] shows the
-/// songs of one Library genre the same way, under the genre's name.
+/// songs of one Library genre the same way, under the genre's name, and
+/// [LibraryMixScreen.artist] every song of one Library artist.
 class LibraryMixScreen extends ConsumerStatefulWidget {
   const LibraryMixScreen({super.key, required LibraryMixView this.view})
-    : genre = null;
+    : genre = null,
+      artist = null,
+      toolbar = null;
 
   /// The songs of [genre], by title.
   const LibraryMixScreen.genre({
     super.key,
     required LibraryBrowseEntry this.genre,
-  }) : view = null;
+  }) : view = null,
+       artist = null,
+       toolbar = null;
+
+  /// The songs of the Library artist named [artist], by title, with
+  /// [toolbar] above them.
+  const LibraryMixScreen.artist({
+    super.key,
+    required String this.artist,
+    this.toolbar,
+  }) : view = null,
+       genre = null;
 
   final LibraryMixView? view;
   final LibraryBrowseEntry? genre;
+  final String? artist;
+  final Widget? toolbar;
 
   @override
   ConsumerState<LibraryMixScreen> createState() => _LibraryMixScreenState();
@@ -123,7 +140,14 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
   /// The songs, less those deleted from this page.
   late List<UnifiedLibraryItem> _items = widget.view?.items ?? const [];
 
-  /// A genre's songs as they load; null for a mix.
+  /// Where a genre's or an artist's songs come from; null for a mix.
+  late final _songsProvider = switch (widget) {
+    LibraryMixScreen(:final genre?) => libraryGenreSongsProvider(genre.key),
+    LibraryMixScreen(:final artist?) => libraryArtistSongsProvider(artist),
+    _ => null,
+  };
+
+  /// A genre's or an artist's songs as they load; null for a mix.
   AsyncValue<List<UnifiedLibraryItem>>? _genreSongs;
   List<UnifiedLibraryItem>? _loadedGenreSongs;
 
@@ -143,12 +167,14 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
   }
 
   String _title(AppLocalizations l10n) =>
-      widget.genre?.name ?? libraryMixTitle(l10n, widget.view!.mix);
+      widget.genre?.name ??
+      widget.artist ??
+      libraryMixTitle(l10n, widget.view!.mix);
 
   @override
   Widget build(BuildContext context) {
-    if (widget.genre case final genre?) {
-      final songs = ref.watch(libraryGenreSongsProvider(genre.key));
+    if (_songsProvider case final provider?) {
+      final songs = ref.watch(provider);
       _genreSongs = songs;
       // A new read replaces the list; songs deleted here stay out until then.
       if (songs.value case final items?
@@ -184,6 +210,8 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
         onExitSelectionMode: exitSelectionMode,
         appBar: _buildHeader(context),
         slivers: [
+          if (widget.toolbar case final toolbar?)
+            SliverToBoxAdapter(child: toolbar),
           if (_genreSongs case final songs? when !songs.hasValue)
             songs.hasError
                 ? SliverToBoxAdapter(
@@ -191,16 +219,14 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
                       child: ExpressiveButton(
                         text: true,
                         icon: const Icon(Icons.refresh),
-                        onPressed: () => ref.invalidate(
-                          libraryGenreSongsProvider(widget.genre!.key),
-                        ),
+                        onPressed: () => ref.invalidate(_songsProvider!),
                         child: Text(context.l10n.dialogRetry),
                       ),
                     ),
                   )
                 : SliverToBoxAdapter(
                     child: TrackListSkeleton(
-                      itemCount: min(widget.genre!.trackCount, 8),
+                      itemCount: min(widget.genre?.trackCount ?? 8, 8),
                     ),
                   )
           else if (isDesktopPlatform)
@@ -311,9 +337,10 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
     final mix = widget.view?.mix;
     final colorScheme = Theme.of(context).colorScheme;
     final title = _title(l10n);
-    // A genre counts its songs from the list until they load.
-    final count = _loadedGenreSongs == null && widget.genre != null
-        ? widget.genre!.trackCount
+    // A genre counts its songs from the list until they load; an artist's
+    // count is known only then.
+    final count = _songsProvider != null && _loadedGenreSongs == null
+        ? widget.genre?.trackCount
         : _items.length;
     final minutes =
         _items.fold<int>(
@@ -357,7 +384,7 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
             ),
       meta: HeaderMetaRow(
         items: [
-          HeaderMetaItem(l10n.tracksCount(count)),
+          if (count != null) HeaderMetaItem(l10n.tracksCount(count)),
           if (minutes > 0) HeaderMetaItem('$minutes min'),
           if (mix != null) HeaderMetaItem(l10n.homeMixUpdatedDaily),
         ],

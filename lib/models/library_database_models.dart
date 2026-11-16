@@ -317,6 +317,11 @@ class QueueLibraryDbQuery {
   /// Songs whose genre tag, trimmed and case-folded, is one of these. A
   /// genre names every tag that lists it (`libraryGenreTagsFromRows`).
   final List<String>? genreTags;
+
+  /// Songs of the album artist with this name, and songs whose artist tag
+  /// holds the name as text. A tag can hold it inside another name, so the
+  /// reader checks the names the tag lists (`libraryItemCreditsArtist`).
+  final String? creditedArtist;
   final int limit;
   final int offset;
   final String filterMode;
@@ -334,6 +339,7 @@ class QueueLibraryDbQuery {
     this.includeSingleTrackAlbums = false,
     this.albumArtist,
     this.genreTags,
+    this.creditedArtist,
     this.limit = 100,
     this.offset = 0,
     this.filterMode = 'all',

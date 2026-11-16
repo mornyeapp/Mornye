@@ -29,7 +29,7 @@ import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/mornye_mix_banner.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/library_search_results.dart';
-import 'package:mornye/screens/mornye_library_screen.dart';
+import 'package:mornye/screens/library_artist_screen.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
@@ -1193,16 +1193,8 @@ class _HomeTabState extends ConsumerState<HomeTab>
     return LibrarySearchResults(
       query: _libraryQuery,
       shelves: true,
-      onOpenArtist: (artist) => pushPage<void>(
-        context,
-        (_) => Scaffold(
-          body: MornyeLibraryScreen(
-            page: MornyeLibraryPage.albums,
-            artist: artist,
-            onOpenSection: (_) {},
-          ),
-        ),
-      ),
+      onOpenArtist: (artist) =>
+          pushPage<void>(context, (_) => LibraryArtistScreen(artist: artist)),
     );
   }
 

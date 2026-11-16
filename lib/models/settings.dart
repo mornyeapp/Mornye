@@ -291,6 +291,10 @@ class AppSettings {
   @JsonKey(fromJson: libraryAlbumSortModeFromJson)
   final String libraryAlbumSortMode;
 
+  /// A Library artist opens on all their songs instead of their albums:
+  /// the view chosen last on an artist.
+  final bool libraryArtistShowsSongs;
+
   /// Library view opened when switching to the Library tab:
   /// 'last' (keep last used), 'all', 'albums', 'singles', or 'playlists'.
   final String defaultLibraryView;
@@ -562,6 +566,7 @@ class AppSettings {
     this.historyFilterMode = 'all',
     this.historySortMode = 'latest',
     this.libraryAlbumSortMode = 'a-z',
+    this.libraryArtistShowsSongs = false,
     this.defaultLibraryView = 'last',
     this.libraryQualityLabelMode = AppSettings.libraryQualityLabelBitDepthOnly,
     this.swipeToQueue = true,
@@ -756,6 +761,7 @@ class AppSettings {
     String? historyFilterMode,
     String? historySortMode,
     String? libraryAlbumSortMode,
+    bool? libraryArtistShowsSongs,
     String? defaultLibraryView,
     String? libraryQualityLabelMode,
     bool? swipeToQueue,
@@ -936,6 +942,8 @@ class AppSettings {
       historyFilterMode: historyFilterMode ?? this.historyFilterMode,
       historySortMode: historySortMode ?? this.historySortMode,
       libraryAlbumSortMode: libraryAlbumSortMode ?? this.libraryAlbumSortMode,
+      libraryArtistShowsSongs:
+          libraryArtistShowsSongs ?? this.libraryArtistShowsSongs,
       defaultLibraryView: defaultLibraryView ?? this.defaultLibraryView,
       libraryQualityLabelMode:
           libraryQualityLabelMode ?? this.libraryQualityLabelMode,

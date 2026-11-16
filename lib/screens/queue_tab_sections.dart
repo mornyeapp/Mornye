@@ -403,42 +403,16 @@ extension _QueueTabSections on _QueueTabState {
   /// Albums | Singles switch at the top of the Albums page.
   Widget _buildAlbumsModeToggle(BuildContext context) {
     final l10n = context.l10n;
-    final labels = [l10n.historyFilterAlbums, l10n.historyFilterSingles];
-    final selected = _albumsShowSingles ? 1 : 0;
-    final Widget toggle;
-    if (materialExpressiveEnabled(context)) {
-      toggle = MaterialExpressiveScope(
-        skipAutofocus: true,
-        child: M3EButtonGroup(
-          type: M3EButtonGroupType.connected,
-          style: M3EButtonStyle.filled,
-          // Connected segments get no inflated target; keep 48 dp.
-          size: M3EButtonSize.sm.copyWith(height: 48),
-          selectedIndex: selected,
-          selectionRequired: true,
-          onSelectedIndexChanged: (index) {
-            if (index != null) _setAlbumsShowSingles(index == 1);
-          },
-          actions: [
-            for (final label in labels)
-              M3EButtonGroupAction(label: Text(label)),
-          ],
-        ),
-      );
-    } else {
-      toggle = SegmentedButton<int>(
-        showSelectedIcon: false,
-        segments: [
-          for (final (index, label) in labels.indexed)
-            ButtonSegment(value: index, label: Text(label)),
-        ],
-        selected: {selected},
-        onSelectionChanged: (value) => _setAlbumsShowSingles(value.first == 1),
-      );
-    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Align(alignment: AlignmentDirectional.centerStart, child: toggle),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: LibraryViewToggle(
+          labels: [l10n.historyFilterAlbums, l10n.historyFilterSingles],
+          selected: _albumsShowSingles ? 1 : 0,
+          onChanged: (index) => _setAlbumsShowSingles(index == 1),
+        ),
+      ),
     );
   }
 
@@ -458,16 +432,8 @@ extension _QueueTabSections on _QueueTabState {
         final state = ref.watch(libraryBrowseProvider(request));
         final entries = state.value?.entries ?? const <LibraryBrowseEntry>[];
         final sections = _initialSections(entries);
-        void openArtist(String artist) => pushPage<void>(
-          context,
-          (_) => Scaffold(
-            body: MornyeLibraryScreen(
-              page: MornyeLibraryPage.albums,
-              artist: artist,
-              onOpenSection: (_) {},
-            ),
-          ),
-        );
+        void openArtist(String artist) =>
+            pushPage<void>(context, (_) => LibraryArtistScreen(artist: artist));
         final content = CustomScrollView(
           slivers: [
             if (state.isLoading && entries.isEmpty)
