@@ -249,6 +249,16 @@ class AppearanceSettingsPage extends ConsumerWidget {
                       .read(settingsProvider.notifier)
                       .setHistoryViewMode(mode),
                 ),
+                SettingsSwitchItem(
+                  key: const ValueKey('home-continue-listening'),
+                  icon: Icons.play_circle_outline,
+                  title: context.l10n.homeContinueListening,
+                  subtitle: context.l10n.appearanceContinueListeningSubtitle,
+                  value: settings.homeContinueListening,
+                  onChanged: ref
+                      .read(settingsProvider.notifier)
+                      .setHomeContinueListening,
+                ),
               ],
             ),
 

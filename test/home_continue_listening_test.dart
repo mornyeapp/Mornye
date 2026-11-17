@@ -29,53 +29,57 @@ const _cover = 'network://nas/Album/cover.jpg';
 
 /// The Material Home without a feed, resuming a saved song unless
 /// [saved] is false.
-Widget _home({bool saved = true, List<WeeklyRelease> releases = const []}) =>
-    ProviderScope(
-      overrides: [
-        homeNewReleasesProvider.overrideWith((ref) => Stream.value(releases)),
-        weeklyReleasesProvider.overrideWith(
-          (ref, refresh) async => WeeklyReleaseFeed(releases),
+Widget _home({
+  bool saved = true,
+  bool card = true,
+  List<WeeklyRelease> releases = const [],
+}) => ProviderScope(
+  overrides: [
+    homeNewReleasesProvider.overrideWith((ref) => Stream.value(releases)),
+    weeklyReleasesProvider.overrideWith(
+      (ref, refresh) async => WeeklyReleaseFeed(releases),
+    ),
+    settingsProvider.overrideWith(
+      () => FixedSettingsNotifier(
+        AppSettings(
+          searchProvider: 'example',
+          homeFeedProvider: AppSettings.homeFeedProviderOff,
+          hasSearchedBefore: true,
+          homeContinueListening: card,
         ),
-        settingsProvider.overrideWith(
-          () => FixedSettingsNotifier(
-            const AppSettings(
-              searchProvider: 'example',
-              homeFeedProvider: AppSettings.homeFeedProviderOff,
-              hasSearchedBefore: true,
-            ),
-          ),
-        ),
-        extensionProvider.overrideWith(_Extensions.new),
-        exploreProvider.overrideWith(_Explore.new),
-        downloadHistoryProvider.overrideWith(_History.new),
-        recentAccessProvider.overrideWith(_Recent.new),
-        libraryMixesProvider.overrideWith((ref) async => const []),
-        playerUiEnabledProvider.overrideWithValue(true),
-        currentMediaItemProvider.overrideWithBuild(
-          (ref, notifier) => Stream<MediaItem?>.value(null),
-        ),
-        playbackResumeProvider.overrideWith(
-          (ref) async => saved
-              ? (
-                  media: const PlayableMedia(
-                    id: 'network://nas/Album/song.flac',
-                    source: 'network://nas/Album/song.flac',
-                    title: 'Saved song',
-                    artist: 'Artist',
-                    networkArtworkSource: _cover,
-                  ),
-                  position: const Duration(seconds: 23),
-                )
-              : null,
-        ),
-      ],
-      child: MaterialApp(
-        theme: AppTheme.dark(),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const HomeTab(mode: HomeTabMode.combined),
       ),
-    );
+    ),
+    extensionProvider.overrideWith(_Extensions.new),
+    exploreProvider.overrideWith(_Explore.new),
+    downloadHistoryProvider.overrideWith(_History.new),
+    recentAccessProvider.overrideWith(_Recent.new),
+    libraryMixesProvider.overrideWith((ref) async => const []),
+    playerUiEnabledProvider.overrideWithValue(true),
+    currentMediaItemProvider.overrideWithBuild(
+      (ref, notifier) => Stream<MediaItem?>.value(null),
+    ),
+    playbackResumeProvider.overrideWith(
+      (ref) async => saved
+          ? (
+              media: const PlayableMedia(
+                id: 'network://nas/Album/song.flac',
+                source: 'network://nas/Album/song.flac',
+                title: 'Saved song',
+                artist: 'Artist',
+                networkArtworkSource: _cover,
+              ),
+              position: const Duration(seconds: 23),
+            )
+          : null,
+    ),
+  ],
+  child: MaterialApp(
+    theme: AppTheme.dark(),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: const HomeTab(mode: HomeTabMode.combined),
+  ),
+);
 
 /// Opens [_home] in a [width] wide window, as the desktop app when
 /// [desktop] is true.
@@ -84,6 +88,7 @@ Future<void> _open(
   required bool desktop,
   double width = 1280,
   bool saved = true,
+  bool card = true,
   List<WeeklyRelease> releases = const [],
 }) async {
   tester.view.physicalSize = Size(width, 1400);
@@ -91,7 +96,7 @@ Future<void> _open(
   addTearDown(tester.view.reset);
   debugDesktopPlatformOverride = desktop;
   addTearDown(() => debugDesktopPlatformOverride = null);
-  await tester.pumpWidget(_home(saved: saved, releases: releases));
+  await tester.pumpWidget(_home(saved: saved, card: card, releases: releases));
   await tester.pump();
   await tester.pump();
 }
@@ -218,6 +223,22 @@ void main() {
       greaterThan(tester.getRect(find.text('Saved song')).bottom),
     );
   });
+
+  for (final desktop in [false, true]) {
+    testWidgets('Continue listening can be left off Home '
+        '(${desktop ? 'desktop' : 'phone'})', (tester) async {
+      await _open(
+        tester,
+        desktop: desktop,
+        width: desktop ? 1280 : 400,
+        card: false,
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('Continue listening'), findsNothing);
+      expect(find.text('Saved song'), findsNothing);
+      expect(find.text('Shuffle library'), findsOneWidget);
+    });
+  }
 
   testWidgets('a long press changes a shortcut and Reset restores them', (
     tester,

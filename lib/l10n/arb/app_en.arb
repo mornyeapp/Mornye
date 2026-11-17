@@ -3057,6 +3057,10 @@
   "@appearanceForceBlurSubtitle": {
     "description": "Subtitle for the force-blur toggle"
   },
+  "appearanceContinueListeningSubtitle": "Show the last song on Home",
+  "@appearanceContinueListeningSubtitle": {
+    "description": "Subtitle of the switch that shows or hides Home's Continue listening card"
+  },
   "appearanceInterfaceSize": "Interface size",
   "@appearanceInterfaceSize": {
     "description": "Title of the slider that scales the whole app"

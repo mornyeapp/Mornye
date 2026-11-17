@@ -375,7 +375,9 @@ class _HomeSections extends ConsumerWidget {
     final newReleases =
         ref.watch(homeNewReleasesProvider.select((s) => s.value)) ?? const [];
 
-    final showContinue = hasMediaItem || hasResume;
+    final showContinue =
+        (hasMediaItem || hasResume) &&
+        ref.watch(settingsProvider.select((s) => s.homeContinueListening));
 
     final mornye = context.isMornye;
     final recentlyPlayed = mornye

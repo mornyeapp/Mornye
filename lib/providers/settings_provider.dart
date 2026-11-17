@@ -1046,6 +1046,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
     state.copyWith(homeShortcuts: [for (final s in shortcuts) s.name]),
   );
 
+  void setHomeContinueListening(bool enabled) =>
+      _commit(state.copyWith(homeContinueListening: enabled));
+
   void setDefaultLibraryView(String view) => _commit(
     state.copyWith(defaultLibraryView: _normalizeDefaultLibraryView(view)),
   );

@@ -326,6 +326,9 @@ class AppSettings {
   /// The Material Home's shortcuts, in order, by `HomeShortcut` name. Read
   /// them through `HomeShortcut.resolve`, which fills in unknown names.
   final List<String> homeShortcuts;
+
+  /// Whether Home offers the last song again ("Continue listening").
+  final bool homeContinueListening;
   final bool separateSingles;
   final String singleFilenameFormat;
   final String albumFolderStructure;
@@ -592,6 +595,7 @@ class AppSettings {
       'listeningStats',
       'networkStorage',
     ],
+    this.homeContinueListening = true,
     this.separateSingles = false,
     this.singleFilenameFormat = '{title} - {artist}',
     this.albumFolderStructure = 'artist_album',
@@ -787,6 +791,7 @@ class AppSettings {
     String? homeFeedProvider,
     bool clearHomeFeedProvider = false,
     List<String>? homeShortcuts,
+    bool? homeContinueListening,
     bool? separateSingles,
     String? singleFilenameFormat,
     String? albumFolderStructure,
@@ -977,6 +982,8 @@ class AppSettings {
           ? null
           : (homeFeedProvider ?? this.homeFeedProvider),
       homeShortcuts: homeShortcuts ?? this.homeShortcuts,
+      homeContinueListening:
+          homeContinueListening ?? this.homeContinueListening,
       separateSingles: separateSingles ?? this.separateSingles,
       singleFilenameFormat: singleFilenameFormat ?? this.singleFilenameFormat,
       albumFolderStructure: albumFolderStructure ?? this.albumFolderStructure,

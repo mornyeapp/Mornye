@@ -161,6 +161,12 @@ class SettingsSearchCatalog {
           keywords: const ['scale', 'zoom', 'ui size', 'density', 'skala'],
         ),
         SettingsSearchEntry(
+          icon: Icons.play_circle_outline,
+          title: l10n.homeContinueListening,
+          subtitle: l10n.appearanceContinueListeningSubtitle,
+          keywords: const ['home', 'resume', 'last song', 'hide'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.language,
           title: l10n.appearanceLanguage,
           keywords: const ['locale', 'translation'],
