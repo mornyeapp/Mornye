@@ -20,6 +20,7 @@ import 'package:mornye/widgets/expressive_button_group.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/expressive_navigation_bar.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
+import 'package:mornye/widgets/reorderable_priority_item.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/track_card.dart';
 
@@ -588,5 +589,36 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(radius, isNull);
+  });
+
+  testWidgets('priority rows connect only on the Material theme', (
+    tester,
+  ) async {
+    late BorderRadius radius;
+    late double gap;
+    Widget row({required bool first, required bool last}) => Builder(
+      builder: (context) {
+        radius = priorityRowRadius(context, first: first, last: last);
+        gap = priorityRowGap(context, last: last);
+        return const SizedBox();
+      },
+    );
+    await tester.pumpWidget(_host(row(first: true, last: false)));
+    expect(radius.topLeft, const Radius.circular(20));
+    expect(radius.bottomLeft, const Radius.circular(4));
+    expect(gap, 2);
+    await tester.pumpWidget(_host(row(first: false, last: true)));
+    expect(radius.topLeft, const Radius.circular(4));
+    expect(radius.bottomLeft, const Radius.circular(20));
+    expect(gap, 8);
+    await tester.pumpWidget(
+      _host(
+        row(first: true, last: false),
+        theme: MornyeTheme.build(Brightness.dark),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(radius, BorderRadius.circular(16));
+    expect(gap, 8);
   });
 }

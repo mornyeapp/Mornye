@@ -91,6 +91,7 @@ class _ProviderPriorityListPageState
                 key: ValueKey(provider),
                 index: index,
                 isFirst: index == 0,
+                isLast: index == _providers.length - 1,
                 icon: Icons.extension,
                 iconColor: Theme.of(context).colorScheme.secondary,
                 name: extension?.displayName ?? provider,

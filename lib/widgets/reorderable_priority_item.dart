@@ -1,9 +1,27 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/settings_group.dart';
+
+/// Corners of row [first] to [last] of a priority list: Material joins the
+/// rows into one connected list, Mornye keeps separate rounded rows.
+BorderRadius priorityRowRadius(
+  BuildContext context, {
+  required bool first,
+  required bool last,
+}) => context.isMornye
+    ? BorderRadius.circular(16)
+    : connectedRowRadius(context, first: first, last: last);
+
+/// Space under a priority list row: the connected gap between Material rows,
+/// the list's own spacing after its last row and between Mornye rows.
+double priorityRowGap(BuildContext context, {required bool last}) =>
+    context.isMornye || last ? 8 : 2;
 
 /// Shared numbered, draggable row used by provider-priority reorder lists.
 class ReorderablePriorityItem extends StatelessWidget {
   final int index;
   final bool isFirst;
+  final bool isLast;
   final IconData icon;
   final Color iconColor;
   final String name;
@@ -14,6 +32,7 @@ class ReorderablePriorityItem extends StatelessWidget {
     super.key,
     required this.index,
     required this.isFirst,
+    required this.isLast,
     required this.icon,
     required this.iconColor,
     required this.name,
@@ -34,10 +53,10 @@ class ReorderablePriorityItem extends StatelessWidget {
         : colorScheme.surfaceContainerHigh;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: priorityRowGap(context, last: isLast)),
       child: Material(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: priorityRowRadius(context, first: isFirst, last: isLast),
         child: ReorderableDragStartListener(
           index: index,
           child: Padding(

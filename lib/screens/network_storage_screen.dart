@@ -532,39 +532,42 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
                         title: context.l10n.networkConnections,
                       ),
                     ),
-                  SliverList.builder(
-                    itemCount: _connections.length,
-                    itemBuilder: (context, index) {
-                      final c = _connections[index];
-                      final link = links.containsKey(c.id);
-                      return SettingsGroup(
+                  // One group for every connection, as on the settings pages.
+                  if (_connections.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: SettingsGroup(
                         children: [
-                          SettingsItem(
-                            icon: switch ((link, context.isMornye)) {
-                              (true, true) => CupertinoIcons.desktopcomputer,
-                              (true, false) => Icons.computer,
-                              (false, true) => CupertinoIcons.cloud,
-                              (false, false) => Icons.dns_outlined,
-                            },
-                            showIconInMornye: true,
-                            title: c.name,
-                            subtitle:
-                                '${_kindLabel(c, links)} · ${c.root.host}',
-                            onTap: () => _open(c),
-                            showDivider: false,
-                            trailing: link
-                                ? null
-                                : _NetworkIconAction(
-                                    tooltip: context.l10n.networkEditConnection,
-                                    onPressed: () => _edit(c),
-                                    icon: Icons.edit_outlined,
-                                    cupertinoIcon: CupertinoIcons.pencil,
-                                  ),
-                          ),
+                          for (final (index, c) in _connections.indexed)
+                            SettingsItem(
+                              key: ValueKey('network-connection:${c.id}'),
+                              icon: switch ((
+                                links.containsKey(c.id),
+                                context.isMornye,
+                              )) {
+                                (true, true) => CupertinoIcons.desktopcomputer,
+                                (true, false) => Icons.computer,
+                                (false, true) => CupertinoIcons.cloud,
+                                (false, false) => Icons.dns_outlined,
+                              },
+                              showIconInMornye: true,
+                              title: c.name,
+                              subtitle:
+                                  '${_kindLabel(c, links)} · ${c.root.host}',
+                              onTap: () => _open(c),
+                              showDivider: index < _connections.length - 1,
+                              trailing: links.containsKey(c.id)
+                                  ? null
+                                  : _NetworkIconAction(
+                                      tooltip:
+                                          context.l10n.networkEditConnection,
+                                      onPressed: () => _edit(c),
+                                      icon: Icons.edit_outlined,
+                                      cupertinoIcon: CupertinoIcons.pencil,
+                                    ),
+                            ),
                         ],
-                      );
-                    },
-                  ),
+                      ),
+                    ),
                 ],
                 if (!_loading && !_failed && connection != null) ...[
                   SliverToBoxAdapter(

@@ -24,6 +24,7 @@ import 'package:mornye/services/music_player_service.dart'
     show MusicPlayerHandler;
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_action_button.dart';
+import 'package:mornye/widgets/settings_group.dart';
 
 import 'support/tooltip_finder.dart';
 
@@ -510,6 +511,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Mornye Link · 192.168.1.20'), findsOneWidget);
       expect(find.text('Subsonic · nas.test'), findsOneWidget);
+      // The connections are rows of one group, not a card each.
+      final group = find.ancestor(
+        of: find.text('My NAS'),
+        matching: find.byType(SettingsGroup),
+      );
+      expect(tester.widget<SettingsGroup>(group).children, hasLength(2));
       // Link manages the computer, so only the NAS can be edited here.
       expect(findByTooltip('Edit connection'), findsOneWidget);
       expect(tester.takeException(), isNull);
