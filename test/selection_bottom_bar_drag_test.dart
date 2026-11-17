@@ -104,6 +104,56 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    /// How far the actions close in the first frames after a collapsing
+    /// drag of the same length, made over [dragTime], is let go.
+    Future<double> closingAfterRelease(
+      WidgetTester tester,
+      Duration dragTime,
+    ) async {
+      await showPanel(tester, () {});
+      final actions = find
+          .ancestor(
+            of: find.byType(SingleChildScrollView),
+            matching: find.byType(SizeTransition),
+          )
+          .first;
+      double expansion() =>
+          tester.widget<SizeTransition>(actions).sizeFactor.value;
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(AppSheetHandle)),
+      );
+      for (var step = 1; step <= 10; step++) {
+        await gesture.moveBy(
+          const Offset(0, 12),
+          timeStamp: dragTime * step ~/ 10,
+        );
+        await tester.pump(dragTime ~/ 10);
+      }
+      final released = expansion();
+      await gesture.up(timeStamp: dragTime);
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
+      final early = expansion();
+      await tester.pumpAndSettle();
+      expect(find.text('Action').hitTestable(), findsNothing);
+      expect(expansion(), 0);
+      return released - early;
+    }
+
+    testWidgets('$name: a released collapse keeps the finger velocity', (
+      tester,
+    ) async {
+      final quick = await closingAfterRelease(
+        tester,
+        const Duration(milliseconds: 80),
+      );
+      final slow = await closingAfterRelease(
+        tester,
+        const Duration(seconds: 2),
+      );
+      expect(quick, greaterThan(slow + 0.02));
+    });
+
     testWidgets('$name: a long first swipe cannot cancel selection', (
       tester,
     ) async {

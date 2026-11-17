@@ -2,7 +2,9 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -194,22 +196,39 @@ class _AnimatedSelectionBottomBarState extends State<AnimatedSelectionBottomBar>
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_controller.duration != null) return;
-    // Expressive: the bar springs into place while fading without overshoot.
-    const fallback = AppMotionSpec(
-      Duration(milliseconds: 240),
-      Curves.easeOutCubic,
+    // The bar rises into place on the spatial spring while it fades in on
+    // the effects spring, each over its own length. Reduced motion keeps
+    // the fade alone.
+    final slide = AppMotion.spatial(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+      mornye: MornyeMotion.standard,
     );
-    final slide = AppMotion.spatial(context, fallback);
-    final fade = AppMotion.effects(context, fallback);
-    _controller.duration = slide.duration;
+    final fade = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 240), Curves.easeOutCubic),
+    );
+    final length = slide.duration > fade.duration
+        ? slide.duration
+        : fade.duration;
+    Curve within(AppMotionSpec motion) => motion.duration == Duration.zero
+        ? const Threshold(0)
+        : Interval(
+            0,
+            motion.duration.inMicroseconds / length.inMicroseconds,
+            curve: motion.curve,
+          );
+    _controller.duration = length;
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.08),
+      begin: slide.duration == Duration.zero
+          ? Offset.zero
+          : const Offset(0, 0.08),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: slide.curve));
+    ).animate(CurvedAnimation(parent: _controller, curve: within(slide)));
     _fadeAnimation = Tween<double>(
       begin: 0,
       end: 1,
-    ).animate(CurvedAnimation(parent: _controller, curve: fade.curve));
+    ).animate(CurvedAnimation(parent: _controller, curve: within(fade)));
     _controller.forward();
   }
 
@@ -490,8 +509,12 @@ class _SelectionPanelDrag extends StatefulWidget {
 
 class _SelectionPanelDragState extends State<_SelectionPanelDrag>
     with TickerProviderStateMixin {
-  late final AnimationController _offset = AnimationController.unbounded(
+  // Bounded below: a panel returning with the finger's velocity stops at
+  // its place instead of rising past it.
+  late final AnimationController _offset = AnimationController(
     vsync: this,
+    upperBound: double.infinity,
+    animationBehavior: AnimationBehavior.preserve,
   );
   late final _SelectionPanelScrollController _scroll =
       _SelectionPanelScrollController(_drag, _settle);
@@ -544,40 +567,49 @@ class _SelectionPanelDragState extends State<_SelectionPanelDrag>
     if (fromExpanded) {
       final collapse =
           velocity > 700 || (velocity >= -700 && _pull >= threshold);
-      _setExpanded(!collapse);
+      _setExpanded(!collapse, velocity: velocity);
       return true;
     }
     if (_pull < 0) {
       final expand =
           velocity < -700 || (velocity <= 700 && -_pull >= threshold);
-      _setExpanded(expand);
+      _setExpanded(expand, velocity: velocity);
       return true;
     }
     final height = context.size?.height ?? 0;
     _closing =
         velocity > 700 ||
         (velocity >= -700 && _offset.value >= (height * 0.25).clamp(64, 120));
-    _animateToRest(_closing ? height : 0);
+    _animateToRest(_closing ? height : 0, velocity: velocity);
     return true;
   }
 
-  void _setExpanded(bool expanded) {
+  /// The style's slow spatial spring, critically damped in both styles.
+  SpringDescription get _spring => context.isMornye
+      ? MornyeMotion.slowSpring
+      : M3EMotion.expressiveSpatialSlow.toDescription();
+
+  /// Tucks the actions away or brings them back. A drag hands over its
+  /// [velocity] in pixels a second, downward positive; otherwise the
+  /// expansion goes on from its own velocity.
+  void _setExpanded(bool expanded, {double? velocity}) {
     setState(() => _expanded = expanded);
     if (!expanded && _scroll.hasClients) _scroll.jumpTo(0);
-    final motion = AppMotion.spatialSlow(
-      context,
-      AppMotionSpec(
-        MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 220),
-        Curves.easeOutCubic,
-      ),
-    );
-    _expansion.animateTo(
-      expanded ? 1 : 0,
-      duration: motion.duration,
-      curve: motion.curve,
-    );
+    final target = expanded ? 1.0 : 0.0;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _expansion.value = target;
+    } else {
+      _expansion.animateWith(
+        SpringSimulation(
+          _spring,
+          _expansion.value,
+          target,
+          // A downward drag closes the actions by its share of their height.
+          velocity == null ? _expansion.velocity : -velocity / _actionHeight,
+          snapToEnd: true,
+        ),
+      );
+    }
     _animateToRest(0);
   }
 
@@ -593,15 +625,34 @@ class _SelectionPanelDragState extends State<_SelectionPanelDrag>
     if (fromExpanded != null) _setExpanded(fromExpanded);
   }
 
-  Future<void> _animateToRest(double target) async {
+  /// Moves the panel back to its place on the slow spring, from the drag's
+  /// [velocity] when one hands over, or off the screen when closing: a
+  /// short eased exit, faster than any drag that ends it.
+  Future<void> _animateToRest(double target, {double? velocity}) async {
     try {
-      await _offset
-          .animateTo(
-            target,
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-          )
-          .orCancel;
+      if (_closing) {
+        await _offset
+            .animateTo(
+              target,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+            )
+            .orCancel;
+      } else if (MediaQuery.disableAnimationsOf(context)) {
+        _offset.value = target;
+      } else {
+        await _offset
+            .animateWith(
+              SpringSimulation(
+                _spring,
+                _offset.value,
+                target,
+                velocity ?? _offset.velocity,
+                snapToEnd: true,
+              ),
+            )
+            .orCancel;
+      }
       if (mounted && _closing) widget.onClose();
     } on TickerCanceled {
       // Another drag or route disposal can interrupt the settling animation.

@@ -222,10 +222,10 @@ class _MornyeDialogRoute<T> extends RawDialogRoute<T> {
          ).modalBarrierDismissLabel,
          transitionDuration: MediaQuery.disableAnimationsOf(context)
              ? Duration.zero
-             : const Duration(milliseconds: 220),
+             : MornyeMotion.fast.duration,
        );
 
-  // Use a timed exit instead of CupertinoDialogRoute's settling spring.
+  // Use a short timed exit instead of the entrance's settling spring.
   @override
   Duration get reverseTransitionDuration => transitionDuration == Duration.zero
       ? Duration.zero
@@ -243,9 +243,11 @@ class _MornyeDialogRoute<T> extends RawDialogRoute<T> {
     if (MediaQuery.disableAnimationsOf(context)) return child;
     // Keep the backdrop in the page's compositing context. A fading dialog
     // creates an opacity layer that hides the page from its BackdropFilter.
+    // It grows on the fast spring. A dismissal during the entrance keeps
+    // that curve and plays it back from where the dialog is.
     final scaleAnimation = _scaleAnimation ??= CurvedAnimation(
       parent: animation,
-      curve: Curves.easeOutCubic,
+      curve: MornyeMotion.fast.curve,
       reverseCurve: Curves.easeInCubic,
     );
     return ScaleTransition(

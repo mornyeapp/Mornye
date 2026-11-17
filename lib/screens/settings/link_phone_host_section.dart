@@ -42,7 +42,8 @@ class LinkPhoneHostSection extends ConsumerWidget {
     final host = ref.watch(linkDesktopHostProvider);
     final notifier = ref.read(linkDesktopHostProvider.notifier);
     final reduced = MediaQuery.disableAnimationsOf(context);
-    // Mornye and reduced motion take these instead of the springs.
+    // Reduced motion takes this instead of the springs, which are
+    // Material's or Mornye's by style.
     final fallback = AppMotionSpec(
       reduced ? Duration.zero : const Duration(milliseconds: 250),
       Curves.easeOut,

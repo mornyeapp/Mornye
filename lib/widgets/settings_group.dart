@@ -147,11 +147,18 @@ class _SettingsSearchTargetState extends State<SettingsSearchTarget> {
     if (!mounted) return;
     setState(() => _highlighted = true);
 
+    // A scroll as large as the page: a spring that stops at the target
+    // rather than running the list past it. Reduced motion jumps.
+    final scroll = MediaQuery.disableAnimationsOf(context)
+        ? const AppMotionSpec(Duration.zero, Curves.linear)
+        : context.isMornye
+        ? MornyeMotion.standard
+        : AppMotion.materialPage;
     await Scrollable.ensureVisible(
       context,
       alignment: 0.32,
-      duration: const Duration(milliseconds: 480),
-      curve: Curves.easeOutCubic,
+      duration: scroll.duration,
+      curve: scroll.curve,
     );
     if (!mounted) return;
 

@@ -71,6 +71,8 @@ void main() {
               Theme.of(bodyContext).colorScheme.onSurface,
             );
           }
+          // Let the fast spring settle, so the dialog closes from fully open.
+          await tester.pump(const Duration(milliseconds: 150));
           final panel = find.byType(MornyeGlassPanel);
           final openWidth = tester.getRect(panel).width;
           await tester.tap(find.text('Cancel'));

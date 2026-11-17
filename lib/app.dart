@@ -16,6 +16,7 @@ import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/link_source_presence.dart';
 import 'package:mornye/services/link/sync/link_sound_sync_runner.dart';
 import 'package:mornye/services/link/sync/link_sync_runner.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/dynamic_color_wrapper.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/l10n/supported_locales.dart';
@@ -154,6 +155,14 @@ class _OrientationFadeState extends State<_OrientationFade>
         useNavigationRailForWidth(_lastWidth!) !=
             useNavigationRailForWidth(width);
     if (orientationChanged || crossedRailBreakpoint) {
+      // The new layout fades in on the style's effects spring. It starts
+      // from nothing on purpose: the layout under it has just changed.
+      final fade = AppMotion.effects(
+        context,
+        const AppMotionSpec(Duration(milliseconds: 300), Curves.easeOut),
+      );
+      _controller.duration = fade.duration;
+      _opacity.curve = fade.curve;
       _controller.forward(from: 0);
     }
     _lastOrientation = orientation;

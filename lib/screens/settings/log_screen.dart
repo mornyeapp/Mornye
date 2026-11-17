@@ -97,6 +97,8 @@ class _LogScreenState extends State<LogScreen> {
   }
 
   Future<void> _scrollToLatest(int generation) async {
+    // A short follow of the newest row; reduced motion jumps to it.
+    final jump = MediaQuery.disableAnimationsOf(context);
     await WidgetsBinding.instance.endOfFrame;
     while (mounted &&
         generation == _scrollGeneration &&
@@ -105,11 +107,15 @@ class _LogScreenState extends State<LogScreen> {
         _scrollController.hasClients) {
       final position = _scrollController.position;
       if (position.extentAfter <= 0.5) return;
-      await position.animateTo(
-        position.maxScrollExtent,
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOut,
-      );
+      if (jump) {
+        position.jumpTo(position.maxScrollExtent);
+      } else {
+        await position.animateTo(
+          position.maxScrollExtent,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+      }
       // A lazy list refines its extent as new multiline rows are laid out.
       // Follow that estimate until the final row is actually visible.
       await WidgetsBinding.instance.endOfFrame;
