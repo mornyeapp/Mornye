@@ -120,6 +120,46 @@ void main() {
     expect(images.single!.debugDisposed, isFalse);
   });
 
+  testWidgets('a loading header can leave the shadow off its cover', (
+    tester,
+  ) async {
+    _phone(tester);
+    const cover = ValueKey('cover');
+    for (final loading in [false, true]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: CustomScrollView(
+              slivers: [
+                AlbumDetailHeader(
+                  title: 'Album',
+                  expandedHeight: 534,
+                  showTitleInAppBar: false,
+                  blurAndScrimBackground: false,
+                  background: const SizedBox.expand(),
+                  coverShadow: !loading,
+                  coverBuilder: (context, size) =>
+                      SizedBox.square(key: cover, dimension: size),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final frame = tester.widget<Container>(
+        find
+            .ancestor(of: find.byKey(cover), matching: find.byType(Container))
+            .first,
+      );
+      expect(
+        (frame.decoration! as BoxDecoration).boxShadow,
+        loading ? isEmpty : isNotEmpty,
+      );
+    }
+  });
+
   testWidgets('a new window size or theme blurs the header cover again', (
     tester,
   ) async {

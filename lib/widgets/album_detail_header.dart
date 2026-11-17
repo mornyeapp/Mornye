@@ -49,6 +49,7 @@ class AlbumDetailHeader extends StatelessWidget {
     this.paletteSource,
     this.blurAndScrimBackground = true,
     this.coverBuilder,
+    this.coverShadow = true,
     this.subtitle,
     this.meta,
     this.actions,
@@ -85,6 +86,11 @@ class AlbumDetailHeader extends StatelessWidget {
   /// Builds the centered square cover for the given side length; null hides
   /// the cover block (the header wraps it in the shared shadow + rounding).
   final Widget Function(BuildContext context, double coverSize)? coverBuilder;
+
+  /// Whether the Material phone cover casts its shadow. A loading screen
+  /// turns it off: its cover is a flat placeholder, and a picture that has
+  /// not arrived would leave the shadow alone on the page as a grey blur.
+  final bool coverShadow;
 
   /// Artist line under the title (plain text or a clickable artist widget).
   final Widget? subtitle;
@@ -445,11 +451,14 @@ class AlbumDetailHeader extends StatelessWidget {
                           plainArtworkHeader ? tokens.radiusCover : coverRadius,
                         ),
                         boxShadow: [
-                          BoxShadow(
-                            color: headerScheme.shadow.withValues(alpha: 0.45),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
-                          ),
+                          if (coverShadow)
+                            BoxShadow(
+                              color: headerScheme.shadow.withValues(
+                                alpha: 0.45,
+                              ),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
                         ],
                       ),
                       child: ClipRRect(

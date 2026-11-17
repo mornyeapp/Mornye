@@ -119,20 +119,26 @@ class _LoadingOrErrorScaffold extends StatelessWidget {
                 background: hasCover
                     ? CachedCoverImage(imageUrl: cover, fit: BoxFit.cover)
                     : ColoredBox(color: colors.surfaceContainerHighest),
-                coverBuilder: (context, size) => hasCover
-                    ? CachedCoverImage(
-                        imageUrl: cover,
-                        width: size,
-                        height: size,
-                        fit: BoxFit.cover,
-                      )
-                    : ShimmerLoading(
-                        child: SkeletonBox(
-                          width: size,
-                          height: size,
-                          borderRadius: 0,
-                        ),
-                      ),
+                // A flat placeholder until the picture is there, like the
+                // rows below; the cover's shadow comes with the loaded page.
+                coverShadow: false,
+                coverBuilder: (context, size) {
+                  final bone = SkeletonBox(
+                    width: size,
+                    height: size,
+                    borderRadius: 0,
+                  );
+                  final skeleton = ShimmerLoading(child: bone);
+                  if (!hasCover) return skeleton;
+                  return CachedCoverImage(
+                    imageUrl: cover,
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) => skeleton,
+                    errorWidget: (_, _, _) => bone,
+                  );
+                },
                 subtitle: CollectionHeaderSkeletonRows.subtitle(context),
                 meta: CollectionHeaderSkeletonRows.meta(),
                 actions: CollectionHeaderSkeletonRows.actions(context),
