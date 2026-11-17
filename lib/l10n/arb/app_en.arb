@@ -2400,6 +2400,14 @@
   "@trackFileInfo": {
     "description": "Tab title - file information"
   },
+  "trackSectionRelease": "Release",
+  "@trackSectionRelease": {
+    "description": "Section title on the track details page: facts about the release the song belongs to (label, copyright, ISRC, barcode)"
+  },
+  "trackSectionAudio": "Audio",
+  "@trackSectionAudio": {
+    "description": "Section title on the track details page: facts about the sound (duration, quality, tempo, ReplayGain)"
+  },
   "trackLyrics": "Lyrics",
   "@trackLyrics": {
     "description": "Tab title - lyrics"

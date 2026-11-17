@@ -225,6 +225,9 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.text(label), findsOneWidget);
+        // A long menu scrolls, and these rows start below its fold.
+        await tester.ensureVisible(find.text(label));
+        await tester.pumpAndSettle();
         await tester.tap(find.text(label));
         await _settleIo(tester);
         expect(

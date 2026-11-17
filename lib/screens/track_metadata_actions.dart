@@ -308,17 +308,4 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
         '${date.hour.toString().padLeft(2, '0')}:'
         '${date.minute.toString().padLeft(2, '0')}';
   }
-
-  IconData _getServiceIcon(String service) {
-    switch (service.toLowerCase()) {
-      case MusicServices.tidal:
-        return Icons.waves;
-      case MusicServices.qobuz:
-        return Icons.album;
-      case MusicServices.amazon:
-        return Icons.shopping_cart;
-      default:
-        return Icons.cloud_download;
-    }
-  }
 }

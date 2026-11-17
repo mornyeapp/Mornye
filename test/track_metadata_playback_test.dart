@@ -35,6 +35,11 @@ class _Player extends MusicPlayerController {
 
   @override
   Future<void> playSingle(PlayableMedia item) async => played.add(item);
+
+  final queued = <PlayableMedia>[];
+
+  @override
+  Future<void> addToQueue(PlayableMedia item) async => queued.add(item);
 }
 
 void main() {
@@ -136,12 +141,7 @@ void main() {
                 ),
               );
             } else {
-              await tester.scrollUntilVisible(
-                find.text('Play').hitTestable(),
-                300,
-                scrollable: find.byType(Scrollable).first,
-              );
-              await tester.pumpAndSettle();
+              // Play is in the header, on the first screen.
               await tester.tap(find.text('Play'));
             }
             await tester.pumpAndSettle();
@@ -180,6 +180,68 @@ void main() {
           });
         }
       }
+    }
+
+    for (final exists in [true, false]) {
+      testWidgets('metadata header holds the song actions '
+          '(Mornye=$mornye, file exists=$exists)', (tester) async {
+        await tester.binding.setSurfaceSize(const Size(393, 852));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        if (!exists) {
+          messenger.setMockMethodCallHandler(channel, (call) async {
+            return switch (call.method) {
+              'safStat' => jsonEncode({'exists': false}),
+              _ => null,
+            };
+          });
+        }
+        final player = _Player();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              settingsProvider.overrideWith(_Settings.new),
+              musicPlayerControllerProvider.overrideWithValue(player),
+            ],
+            child: MaterialApp(
+              theme: mornye
+                  ? MornyeTheme.build(Brightness.dark)
+                  : AppTheme.dark(),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: TrackMetadataScreen(
+                localItem: LocalLibraryItem(
+                  id: 'local-song',
+                  trackName: 'Song',
+                  artistName: 'Artist',
+                  albumName: 'Album',
+                  filePath: 'content://library/document/song.flac',
+                  scannedAt: DateTime(2026),
+                  format: 'flac',
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Play stays where it is; the round actions need the file.
+        expect(find.text('Play'), findsOneWidget);
+        final round = exists ? findsOneWidget : findsNothing;
+        expect(findByTooltip('Edit Metadata'), round);
+        expect(findByTooltip('Add to queue'), round);
+        // Delete is kept to the More menu.
+        expect(find.text('Delete'), findsNothing);
+
+        await tester.tap(find.text('Play'));
+        await tester.pumpAndSettle();
+        expect(player.played, hasLength(exists ? 1 : 0));
+        if (exists) {
+          await tester.tap(findByTooltip('Add to queue'));
+          await tester.pumpAndSettle();
+          expect(player.queued.single.title, 'Song');
+        }
+        expect(tester.takeException(), isNull);
+      });
     }
   }
 }

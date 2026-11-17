@@ -9,6 +9,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/theme/cover_palette.dart' show HeaderPalette;
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -115,6 +116,13 @@ void main() {
         expect(find.byIcon(CupertinoIcons.back), findsOneWidget);
         expect(find.byIcon(CupertinoIcons.ellipsis), findsOneWidget);
         expect(find.byType(Card), findsNothing);
+        // The sections are built as they scroll in, below the header.
+        await tester.scrollUntilVisible(
+          find.text('Track name'),
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
         final row = find.widgetWithText(MornyeMetadataRow, 'Track name');
         expect(
           find.ancestor(of: row, matching: find.byType(MornyeGlass)),
@@ -187,13 +195,23 @@ void main() {
 
     final headerMeta = find.byType(HeaderMetaRow);
     expect(headerMeta, findsOneWidget);
-    expect(find.byType(ExplicitBadge), findsNWidgets(2));
+    expect(
+      find.descendant(of: headerMeta, matching: find.byType(ExplicitBadge)),
+      findsOneWidget,
+    );
     expect(find.text('Explicit'), findsNothing);
+    // The header takes its colors from the artwork over the theme's surface,
+    // so the details are dark on light here instead of white on a scrim.
+    final scheme = HeaderPalette.of(tester.element(headerMeta));
+    expect(
+      scheme.surface.computeLuminance() - scheme.onSurface.computeLuminance(),
+      greaterThan(0.5),
+    );
     for (final label in const ['16-bit/44.1kHz', '4:10', 'Provider-a']) {
       final text = tester.widget<Text>(
         find.descendant(of: headerMeta, matching: find.text(label)),
       );
-      expect(text.style?.color, Colors.white);
+      expect(text.style?.color, scheme.onSurface);
     }
 
     final separators = tester.widgetList<Text>(
@@ -201,10 +219,15 @@ void main() {
     );
     expect(separators, isNotEmpty);
     expect(
-      separators.every((text) => text.style?.color == Colors.white70),
+      separators.every((text) => text.style?.color == scheme.onSurfaceVariant),
       isTrue,
     );
 
+    await tester.scrollUntilVisible(
+      find.text('Duration'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     final durationLabel = find.text('Duration');
     final metadataRow = find
         .ancestor(of: durationLabel, matching: find.byType(Row))

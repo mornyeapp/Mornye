@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:material_ui/material_ui.dart';
@@ -10,6 +9,8 @@ import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:cupertino_ui/cupertino_ui.dart'
     show CupertinoButton, CupertinoIcons;
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
@@ -82,8 +83,17 @@ import 'package:mornye/theme/cover_palette.dart' show HeaderPalette;
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/widgets/album_detail_header.dart'
-    show HeaderMetaRow, HeaderMetaItem, HeaderCircleButton, HeaderFilledButton;
+    show
+        AlbumDetailHeader,
+        HeaderMetaRow,
+        HeaderMetaItem,
+        HeaderCircleButton,
+        HeaderFilledButton;
 import 'package:mornye/widgets/desktop/context_menu.dart';
+import 'package:mornye/widgets/desktop/detail_header.dart'
+    show desktopDetailSubtitleStyle;
+import 'package:mornye/widgets/error_card.dart';
+import 'package:mornye/widgets/expressive_button_group.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/link/link_library_actions.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
@@ -91,10 +101,9 @@ import 'package:mornye/services/link/link_library_jobs.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/mornye_metadata_row.dart';
-import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/audio_analysis_widget.dart';
+import 'package:mornye/widgets/audio_quality_badges.dart' show ExplicitBadge;
 import 'package:mornye/widgets/hires_check_card.dart';
-import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/batch_convert_sheet.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/open_on_platform_sheet.dart';
@@ -115,7 +124,7 @@ import 'package:mornye/screens/track_metadata_edit_sheet.dart';
 part 'track_metadata_screen_cover.dart';
 part 'track_metadata_screen_display.dart';
 part 'track_metadata_screen_menu.dart';
-part 'track_metadata_mornye.dart';
+part 'track_metadata_header.dart';
 
 part 'track_metadata_cards.dart';
 part 'track_metadata_lyrics.dart';
@@ -129,8 +138,15 @@ class _MetadataItem {
   final String value;
   final String rawValue;
 
-  _MetadataItem(this.label, this.value, {String? rawValue})
-    : rawValue = rawValue ?? value;
+  /// Whether a tap copies the value, for identifiers people paste elsewhere.
+  final bool copyable;
+
+  _MetadataItem(
+    this.label,
+    this.value, {
+    String? rawValue,
+    this.copyable = false,
+  }) : rawValue = rawValue ?? value;
 }
 
 class _EmbeddedCoverPreviewCacheEntry {
@@ -308,13 +324,8 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
 
   @override
   double calculateExpandedHeight(BuildContext context) {
-    final mediaSize = MediaQuery.sizeOf(context);
-    // Desktop windows are wide and short, so the header takes more of the
-    // height to leave the cover room (see _buildHeaderBackground).
-    if (isDesktopPlatform) {
-      return (mediaSize.height * 0.62).clamp(440.0, 640.0);
-    }
-    return (mediaSize.height * 0.55).clamp(360.0, 520.0);
+    // The header of an album, plus the line that names the song's album.
+    return collectionHeaderExpandedHeight(context) + 20;
   }
 
   Future<void> _checkFile() async {
@@ -793,11 +804,8 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (context.isMornye) return _buildMornyePage(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final expandedHeight = calculateExpandedHeight(context);
     final bottomInset = context.navBarBottomInset;
-    final edgeInset = detailHeaderEdgeInset(context);
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -806,81 +814,7 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
         body: CustomScrollView(
           controller: scrollController,
           slivers: [
-            SliverAppBar(
-              expandedHeight: expandedHeight,
-              pinned: true,
-              stretch: true,
-              backgroundColor: colorScheme.surface,
-              surfaceTintColor: Colors.transparent,
-              title: ValueListenableBuilder(
-                valueListenable: showTitleNotifier,
-                builder: (_, showTitle, title) => AnimatedOpacity(
-                  duration: const Duration(milliseconds: 200),
-                  opacity: showTitle ? 1.0 : 0.0,
-                  child: title,
-                ),
-                child: ExplicitTrackTitle(
-                  title: trackName,
-                  explicit: isExplicit,
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              flexibleSpace: LayoutBuilder(
-                builder: (context, constraints) {
-                  final collapseRatio =
-                      (constraints.maxHeight - kToolbarHeight) /
-                      (expandedHeight - kToolbarHeight);
-                  final showContent = collapseRatio > 0.3;
-
-                  return FlexibleSpaceBar(
-                    collapseMode: CollapseMode.pin,
-                    background: _buildHeaderBackground(
-                      context,
-                      colorScheme,
-                      expandedHeight,
-                      showContent,
-                    ),
-                    stretchModes: const [StretchMode.zoomBackground],
-                  );
-                },
-              ),
-              leadingWidth: kToolbarHeight + edgeInset,
-              leading: Padding(
-                padding: EdgeInsetsDirectional.only(start: edgeInset),
-                // Centered so the tight leading slot cannot stretch it.
-                child: Center(
-                  child: HeaderCircleButton(
-                    icon: Icons.arrow_back,
-                    tooltip: MaterialLocalizations.of(
-                      context,
-                    ).backButtonTooltip,
-                    onPressed: _popWithMetadataResult,
-                  ),
-                ),
-              ),
-              actionsPadding: EdgeInsetsDirectional.only(end: edgeInset),
-              actions: [
-                Builder(
-                  builder: (buttonContext) => HeaderCircleButton(
-                    icon: Icons.more_vert,
-                    tooltip: MaterialLocalizations.of(context).showMenuTooltip,
-                    onPressed: () => _showOptionsMenu(
-                      context,
-                      ref,
-                      colorScheme,
-                      anchor: mornyeMenuAnchor(buttonContext),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
+            ..._buildHeader(context, colorScheme),
             SliverToBoxAdapter(
               child: Center(
                 child: ConstrainedBox(
@@ -926,82 +860,6 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
               : context.l10n.snackbarAddedToQueueGeneric,
         ),
       ),
-    );
-  }
-
-  Widget _buildActionButtons(
-    BuildContext context,
-    WidgetRef ref,
-    ColorScheme colorScheme,
-    bool fileExists,
-  ) {
-    if (context.isMornye) {
-      return Row(
-        children: [
-          Expanded(
-            child: HeaderFilledButton(
-              icon: CupertinoIcons.play_fill,
-              label: context.l10n.trackMetadataPlay,
-              onPressed: fileExists
-                  ? () => _openFile(context, rawFilePath)
-                  : null,
-            ),
-          ),
-          if (_canDeleteFile) ...[
-            const SizedBox(width: 12),
-            Expanded(
-              child: HeaderFilledButton(
-                icon: CupertinoIcons.trash,
-                label: context.l10n.trackMetadataDelete,
-                onPressed: () => _confirmDelete(context, ref, colorScheme),
-              ),
-            ),
-          ],
-        ],
-      );
-    }
-    return Row(
-      children: [
-        Expanded(
-          flex: 2,
-          child: ExpressiveButton(
-            onPressed: fileExists
-                ? () => _openFile(context, rawFilePath)
-                : null,
-            icon: const Icon(Icons.play_arrow),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: Text(context.l10n.trackMetadataPlay),
-          ),
-        ),
-        if (_canDeleteFile) ...[
-          const SizedBox(width: 12),
-          Expanded(
-            child: ExpressiveButton(
-              outlined: true,
-              onPressed: () => _confirmDelete(context, ref, colorScheme),
-              icon: Icon(Icons.delete_outline, color: colorScheme.error),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                side: BorderSide(
-                  color: colorScheme.error.withValues(alpha: 0.5),
-                ),
-              ),
-              child: Text(
-                context.l10n.trackMetadataDelete,
-                style: TextStyle(color: colorScheme.error),
-              ),
-            ),
-          ),
-        ],
-      ],
     );
   }
 }

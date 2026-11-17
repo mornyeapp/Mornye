@@ -39,9 +39,8 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        // Mornye also names the page "Metadata" in its navigation bar.
-        final metadata = tester.getTopLeft(find.text('Metadata').last);
-        final lyrics = tester.getTopLeft(find.text('Lyrics').last);
+        final metadata = tester.getTopLeft(find.text('Metadata'));
+        final lyrics = tester.getTopLeft(find.text('Lyrics'));
         if (twoColumns) {
           expect(lyrics.dx, greaterThan(metadata.dx + 400));
           expect(lyrics.dy, moreOrLessEquals(metadata.dy, epsilon: 1));

@@ -10,20 +10,14 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
       context,
       colorScheme,
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(_trackMetadataSectionPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    context.l10n.trackLyrics,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
+                  child: _buildSectionTitle(context, context.l10n.trackLyrics),
                 ),
                 if (hasDisplayLyrics)
                   AppIconButton(
