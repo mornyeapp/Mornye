@@ -248,7 +248,8 @@ void main() {
         await pumpShell(tester, desktop: desktop, mornye: mornye);
         bool libraryActive() => tester
             .widget<QueueTab>(find.byType(QueueTab, skipOffstage: false))
-            .isTabActive;
+            .tabActive!
+            .value;
 
         for (var round = 0; round < 2; round++) {
           ShellNavigationService.requestTab(ShellTab.library);
@@ -355,6 +356,35 @@ void main() {
         .element(find.byType(type, skipOffstage: false).first)
         .visitChildElements((element) => child = element.widget);
     return child;
+  }
+
+  for (final desktop in [true, false]) {
+    for (final mornye in [false, true]) {
+      testWidgets('a switch of tab builds neither Home nor Library again '
+          '(${desktop ? 'desktop' : 'phone'}, '
+          '${mornye ? 'Mornye' : 'Material'})', (tester) async {
+        await pumpShell(tester, desktop: desktop, mornye: mornye);
+        ShellNavigationService.requestTab(ShellTab.library);
+        await settle(tester);
+        ShellNavigationService.requestTab(ShellTab.home);
+        await settle(tester);
+        final home = builtBy(tester, HomeTab);
+        final library = builtBy(tester, QueueTab);
+
+        for (final tab in [
+          ShellTab.library,
+          ShellTab.settings,
+          ShellTab.home,
+        ]) {
+          ShellNavigationService.requestTab(tab);
+          await settle(tester);
+        }
+
+        expect(builtBy(tester, HomeTab), same(home));
+        expect(builtBy(tester, QueueTab), same(library));
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 
   testWidgets('desktop Material width changes rebuild neither Home nor a '

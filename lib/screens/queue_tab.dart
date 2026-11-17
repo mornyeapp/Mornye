@@ -125,9 +125,13 @@ const _historyItemForCompletionBridge = CompletionBridgeTracker.historyItemFor;
 
 class QueueTab extends ConsumerStatefulWidget {
   final String? librarySection;
-  final bool isTabActive;
 
-  const QueueTab({super.key, this.librarySection, this.isTabActive = true});
+  /// Whether the shell shows this tab; it does when this is null. A
+  /// listenable, so a switch of tab reaches the tab without building it
+  /// again.
+  final ValueListenable<bool>? tabActive;
+
+  const QueueTab({super.key, this.librarySection, this.tabActive});
 
   @override
   ConsumerState<QueueTab> createState() => _QueueTabState();
@@ -311,6 +315,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   @override
   void initState() {
     super.initState();
+    widget.tabActive?.addListener(_applyDefaultLibraryViewOnTabVisible);
     DownloadedEmbeddedCoverResolver.previewsCleared.addListener(
       _onEmbeddedCoverChanged,
     );
@@ -350,7 +355,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     if (widget.librarySection != null) return;
     // Route transitions also disable TickerMode. Only a shell tab change
     // should reset the user's current album/single view.
-    final isVisible = widget.isTabActive;
+    final isVisible = widget.tabActive?.value ?? true;
     final becameVisible = isVisible && !_wasTabVisible;
     _wasTabVisible = isVisible;
     if (!becameVisible) return;
@@ -376,7 +381,17 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   }
 
   @override
+  void didUpdateWidget(QueueTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(widget.tabActive, oldWidget.tabActive)) {
+      oldWidget.tabActive?.removeListener(_applyDefaultLibraryViewOnTabVisible);
+      widget.tabActive?.addListener(_applyDefaultLibraryViewOnTabVisible);
+    }
+  }
+
+  @override
   void dispose() {
+    widget.tabActive?.removeListener(_applyDefaultLibraryViewOnTabVisible);
     DownloadedEmbeddedCoverResolver.previewsCleared.removeListener(
       _onEmbeddedCoverChanged,
     );

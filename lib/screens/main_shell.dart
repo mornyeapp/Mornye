@@ -1657,12 +1657,33 @@ class _HomeTabRoot extends StatelessWidget {
   );
 }
 
-class _LibraryTabRoot extends StatelessWidget {
+/// Library's root page: one [QueueTab] for the life of the tab. A switch of
+/// tab changes what it listens to and builds nothing of the Library again.
+class _LibraryTabRoot extends StatefulWidget {
   const _LibraryTabRoot();
 
   @override
-  Widget build(BuildContext context) =>
-      QueueTab(isTabActive: _TabShown.of(context));
+  State<_LibraryTabRoot> createState() => _LibraryTabRootState();
+}
+
+class _LibraryTabRootState extends State<_LibraryTabRoot> {
+  final _shown = ValueNotifier(false);
+  late final _tab = QueueTab(tabActive: _shown);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _shown.value = _TabShown.of(context);
+  }
+
+  @override
+  void dispose() {
+    _shown.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _tab;
 }
 
 class _KeepAliveTabPage extends StatefulWidget {
