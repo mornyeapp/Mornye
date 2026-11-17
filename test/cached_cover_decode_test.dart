@@ -135,7 +135,10 @@ void main() {
           }
         });
         expect(cache.statusForKey(key).live, isTrue);
-        expect(cache.pendingImageCount, 0);
+        // The backdrop prewarm also starts the header's palette, which
+        // reads its own small sample of the cover; only the display
+        // picture must not be decoded again.
+        expect(cache.statusForKey(key).pending, isFalse);
         expect(cache.currentSize, 1);
         await tester.pumpWidget(
           MaterialApp(

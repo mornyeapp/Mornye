@@ -10,6 +10,7 @@ import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 
@@ -529,12 +530,29 @@ Future<void> precacheMetadataBackdrop(
     cacheHeight: isHttpCoverUrl(normalized) ? null : extent,
   );
   if (provider == null) return;
+  // The header takes its colours from the cover as well. Worked out before
+  // the page shows, it opens in them; left to the page, it opens in the
+  // app's colours and changes to the cover's a moment later, the first time
+  // a cover is seen.
+  final paletteSource = isHttpCoverUrl(normalized)
+      ? normalized
+      : coverFilePath(normalized);
+  final brightness = Theme.of(context).brightness;
+  final neutral = !context.isMornye;
   try {
-    await precacheImage(
-      provider,
-      context,
-      onError: (_, _) {},
-    ).timeout(const Duration(milliseconds: 200));
+    await Future.wait([
+      precacheImage(
+        provider,
+        context,
+        onError: (_, _) {},
+      ).timeout(const Duration(milliseconds: 200), onTimeout: () {}),
+      if (paletteSource != null)
+        CoverPalette.resolve(
+          paletteSource,
+          brightness,
+          neutralGrayscale: neutral,
+        ).timeout(const Duration(milliseconds: 300), onTimeout: () => null),
+    ]);
   } catch (_) {}
 }
 
