@@ -43,7 +43,7 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
       duration: incoming.duration,
       reverseDuration: outgoing.duration,
       switchInCurve: incoming.curve,
-      switchOutCurve: outgoing.curve,
+      switchOutCurve: outgoing.leaving,
       layoutBuilder: (currentChild, previousChildren) {
         return Stack(
           alignment: Alignment.topCenter,

@@ -441,7 +441,7 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
             AnimatedSwitcher(
               duration: switchDuration,
               switchInCurve: crossFade.curve,
-              switchOutCurve: crossFade.curve,
+              switchOutCurve: crossFade.leaving,
               child: panel == DesktopInspectorPanel.upNext
                   ? KeyedSubtree(
                       key: const ValueKey('desktop-now-playing-upNext'),

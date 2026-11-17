@@ -1512,7 +1512,7 @@ class SkeletonCrossfade extends StatelessWidget {
     return AnimatedSwitcher(
       duration: fade.duration,
       switchInCurve: fade.curve,
-      switchOutCurve: fade.curve,
+      switchOutCurve: fade.leaving,
       // Loading and loaded screens may carry the same Hero tag (both render
       // the header cover); mute the outgoing child's heroes so a pop during
       // the fade doesn't find duplicate tags.
@@ -1580,7 +1580,7 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
       child: AnimatedSwitcher(
         duration: tick.duration,
         switchInCurve: tick.curve,
-        switchOutCurve: tick.curve,
+        switchOutCurve: tick.leaving,
         child: selected
             ? Icon(
                 Icons.check,

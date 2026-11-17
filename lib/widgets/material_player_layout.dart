@@ -159,7 +159,7 @@ class MaterialPlayerLayout extends StatelessWidget {
         Widget visual() => AnimatedSwitcher(
           duration: crossfade.duration,
           switchInCurve: crossfade.curve,
-          switchOutCurve: crossfade.curve,
+          switchOutCurve: crossfade.leaving,
           child: showLyrics
               ? KeyedSubtree(
                   key: const ValueKey('material-player-lyrics'),
@@ -197,7 +197,7 @@ class MaterialPlayerLayout extends StatelessWidget {
                           child: AnimatedSwitcher(
                             duration: crossfade.duration,
                             switchInCurve: crossfade.curve,
-                            switchOutCurve: crossfade.curve,
+                            switchOutCurve: crossfade.leaving,
                             child: showLyrics
                                 ? KeyedSubtree(
                                     key: const ValueKey('landscape-lyrics'),

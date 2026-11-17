@@ -34,6 +34,27 @@ void main() {
     expect(peak(SpringCurve(M3EMotion.effectsDefault)), lessThanOrEqualTo(1));
   });
 
+  test('a leaving child goes the way the spring moves, fastest first', () {
+    for (final spec in [
+      MornyeMotion.standard,
+      MornyeMotion.effects,
+      AppMotionSpec(
+        SpringCurve(M3EMotion.effectsDefault).duration,
+        SpringCurve(M3EMotion.effectsDefault),
+      ),
+    ]) {
+      // A switcher runs the leaving curve from 1 down to 0: a quarter of the
+      // way through the time it reads the curve at 0.75.
+      final shown = spec.leaving.transform(0.75);
+      expect(shown, closeTo(1 - spec.curve.transform(0.25), 1e-9));
+      expect(shown, lessThan(0.6));
+      // The entrance curve run backwards would still show nearly all of it.
+      expect(spec.curve.transform(0.75), greaterThan(0.9));
+      expect(spec.leaving.transform(1), 1);
+      expect(spec.leaving.transform(0), 0);
+    }
+  });
+
   test('Mornye springs settle without overshoot, except the snappy one', () {
     double peak(AppMotionSpec spec) => [
       for (var t = 0.0; t <= 1; t += 0.005) spec.curve.transform(t),

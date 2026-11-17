@@ -30,7 +30,7 @@ class LibraryArtistScreen extends ConsumerWidget {
     return AnimatedSwitcher(
       duration: motion.duration,
       switchInCurve: motion.curve,
-      switchOutCurve: motion.curve,
+      switchOutCurve: motion.leaving,
       child: songs
           ? LibraryMixScreen.artist(
               key: const ValueKey('library-artist-songs'),

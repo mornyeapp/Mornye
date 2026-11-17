@@ -445,7 +445,7 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
                       duration: enter.duration,
                       reverseDuration: exit.duration,
                       switchInCurve: enter.curve,
-                      switchOutCurve: exit.curve,
+                      switchOutCurve: exit.leaving,
                       layoutBuilder: (current, previous) => Stack(
                         alignment: AlignmentDirectional.centerStart,
                         children: [...previous, ?current],

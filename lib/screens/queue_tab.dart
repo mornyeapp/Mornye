@@ -489,7 +489,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
       return AnimatedSwitcher(
         duration: motion.duration,
         switchInCurve: motion.curve,
-        switchOutCurve: motion.curve,
+        switchOutCurve: motion.leaving,
         child: hidden
             ? AppIconButton(
                 key: const ValueKey('library-search-action'),
@@ -1237,14 +1237,14 @@ class _QueueTabState extends ConsumerState<QueueTab> {
               sizeFactor: CurvedAnimation(
                 parent: animation,
                 curve: over(reveal),
-                reverseCurve: fade.curve.flipped,
+                reverseCurve: fade.leaving,
               ),
               alignment: Alignment.topCenter,
               child: FadeTransition(
                 opacity: CurvedAnimation(
                   parent: animation,
                   curve: over(fade),
-                  reverseCurve: fade.curve.flipped,
+                  reverseCurve: fade.leaving,
                 ),
                 child: child,
               ),

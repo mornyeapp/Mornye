@@ -1527,7 +1527,7 @@ class _SidebarBackdrop extends StatelessWidget {
       return AnimatedSwitcher(
         duration: fade.duration,
         switchInCurve: fade.curve,
-        switchOutCurve: fade.curve,
+        switchOutCurve: fade.leaving,
         layoutBuilder: (current, previous) =>
             Stack(fit: StackFit.expand, children: [...previous, ?current]),
         child: image == null

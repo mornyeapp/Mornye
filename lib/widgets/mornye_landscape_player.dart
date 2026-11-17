@@ -176,7 +176,7 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
                           AnimatedSwitcher(
                             duration: _pageFade.duration,
                             switchInCurve: _pageFade.curve,
-                            switchOutCurve: _pageFade.curve,
+                            switchOutCurve: _pageFade.leaving,
                             layoutBuilder: (current, previous) => Stack(
                               fit: StackFit.expand,
                               children: [

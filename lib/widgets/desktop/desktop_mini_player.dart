@@ -420,7 +420,7 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
               child: AnimatedSwitcher(
                 duration: lineFade.duration,
                 switchInCurve: lineFade.curve,
-                switchOutCurve: lineFade.curve,
+                switchOutCurve: lineFade.leaving,
                 layoutBuilder: (current, previous) => Stack(
                   alignment: AlignmentDirectional.topStart,
                   children: [...previous, ?current],

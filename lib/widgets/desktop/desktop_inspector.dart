@@ -423,7 +423,7 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
     final content = AnimatedSwitcher(
       duration: crossFade.duration,
       switchInCurve: crossFade.curve,
-      switchOutCurve: crossFade.curve,
+      switchOutCurve: crossFade.leaving,
       // Panels keep their fixed width while they cross-fade.
       layoutBuilder: (current, previous) => Stack(
         alignment: AlignmentDirectional.topStart,

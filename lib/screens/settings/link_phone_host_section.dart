@@ -88,7 +88,7 @@ class LinkPhoneHostSection extends ConsumerWidget {
             duration: fadeIn.duration,
             reverseDuration: fadeOut.duration,
             switchInCurve: fadeIn.curve,
-            switchOutCurve: fadeOut.curve,
+            switchOutCurve: fadeOut.leaving,
             layoutBuilder: (current, previous) => Stack(
               alignment: AlignmentDirectional.topStart,
               children: [...previous, ?current],

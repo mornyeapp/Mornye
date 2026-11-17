@@ -11,6 +11,12 @@ class AppMotionSpec {
 
   final Duration duration;
   final Curve curve;
+
+  /// [curve] for the child a switcher takes away (`switchOutCurve`, or a
+  /// `reverseCurve`). Flutter runs that curve backwards, which would hold a
+  /// leaving child in place for most of a spring and drop it at the end;
+  /// flipped, the child leaves the way the spec moves, fastest first.
+  Curve get leaving => curve.flipped;
 }
 
 /// A [Curve] that follows an [M3ESpring] released from rest at 0 toward 1.

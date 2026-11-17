@@ -79,7 +79,7 @@ class _MaskedBackground extends StatelessWidget {
                     child: AnimatedSwitcher(
                       duration: motion.duration,
                       switchInCurve: motion.curve,
-                      switchOutCurve: motion.curve,
+                      switchOutCurve: motion.leaving,
                       layoutBuilder: (current, previous) => Stack(
                         fit: StackFit.expand,
                         children: [...previous, ?current],

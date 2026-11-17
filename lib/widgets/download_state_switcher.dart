@@ -55,7 +55,7 @@ class DownloadStateSwitcher extends StatelessWidget {
           children: [...previous, ?current],
         ),
         transitionBuilder: (child, animation) {
-          final exit = fade.curve.flipped;
+          final exit = fade.leaving;
           final opacity = FadeTransition(
             opacity: CurvedAnimation(
               parent: animation,

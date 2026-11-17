@@ -176,7 +176,7 @@ class MornyePlayerLayout extends ConsumerWidget {
                       child: AnimatedSwitcher(
                         duration: motion.duration,
                         switchInCurve: motion.curve,
-                        switchOutCurve: motion.curve,
+                        switchOutCurve: motion.leaving,
                         transitionBuilder: (child, animation) => FadeTransition(
                           opacity: animation,
                           child: SlideTransition(

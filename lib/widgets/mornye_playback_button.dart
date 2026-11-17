@@ -232,7 +232,7 @@ class _MornyePlaybackButtonState extends State<MornyePlaybackButton>
                 child: AnimatedSwitcher(
                   duration: crossfade.duration,
                   switchInCurve: crossfade.curve,
-                  switchOutCurve: crossfade.curve,
+                  switchOutCurve: crossfade.leaving,
                   child: widget.loading
                       ? const Center(
                           child: SizedBox.square(

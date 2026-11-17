@@ -186,7 +186,7 @@ class LinkTogetherReveal extends StatelessWidget {
       duration: fadeIn.duration,
       reverseDuration: fadeOut.duration,
       switchInCurve: fadeIn.curve,
-      switchOutCurve: fadeOut.curve,
+      switchOutCurve: fadeOut.leaving,
       // Only the shown child sizes the switcher, so the group closes while
       // the leaving one fades.
       layoutBuilder: (current, previous) => Stack(
