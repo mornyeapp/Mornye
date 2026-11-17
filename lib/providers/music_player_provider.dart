@@ -91,10 +91,17 @@ class LocalMediaItemNotifier extends CurrentMediaItemNotifier {
 }
 
 /// A dismissed session stays available on Home without restoring the player.
-final playbackResumeProvider = FutureProvider<PlaybackResumePreview?>((ref) {
+/// With the scanned Library switched off, a session on one of its songs is
+/// not offered.
+final playbackResumeProvider = FutureProvider<PlaybackResumePreview?>((
+  ref,
+) async {
   if (!ref.watch(settingsProvider.select((s) => s.playerMode == 'internal'))) {
     return null;
   }
+  final localLibraryEnabled = ref.watch(
+    settingsProvider.select((s) => s.localLibraryEnabled),
+  );
   final hasCurrent = ref.watch(
     currentMediaItemProvider.select((state) => state.value != null),
   );
@@ -107,7 +114,17 @@ final playbackResumeProvider = FutureProvider<PlaybackResumePreview?>((ref) {
       ref.invalidateSelf();
     }),
   );
-  return loadPlaybackResumePreview(runtime);
+  return resumePreviewForLibrary(
+    await loadPlaybackResumePreview(runtime),
+    localLibraryEnabled: localLibraryEnabled,
+    libraryItem: (media) => _libraryItemForMedia(
+      ref,
+      id: media.id,
+      source: media.source,
+      title: media.title,
+      artist: media.artist,
+    ),
+  );
 });
 
 /// [libraryItemForMedia] with the download History the app has loaded.
