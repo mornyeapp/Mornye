@@ -486,6 +486,63 @@ void main() {
     });
   }
 
+  testWidgets('Material joins the song results into one run', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          librarySearchProvider.overrideWith(
+            (ref, request) async => List.generate(
+              request.limit,
+              (i) => _hit(request.kind, request.offset + i),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: ThemeData(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: CustomScrollView(
+              slivers: [
+                LibrarySearchResults(query: 'Found', onOpenArtist: (_) {}),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Found songs 0'),
+      200,
+      scrollable: scrollable,
+    );
+    TrackCardSegment segment(String title) => tester.widget(
+      find.ancestor(
+        of: find.text(title),
+        matching: find.byType(TrackCardSegment),
+      ),
+    );
+    expect(segment('Found songs 0').first, isTrue);
+    expect(segment('Found songs 0').last, isFalse);
+    // The overview's last song row closes the run although more exist.
+    final last = find.byWidgetPredicate(
+      (widget) => widget is TrackCardSegment && widget.last,
+    );
+    await tester.scrollUntilVisible(last, 200, scrollable: scrollable);
+    expect(tester.widget<TrackCardSegment>(last).first, isFalse);
+    // Other kinds stay flat rows outside any run.
+    expect(
+      find.ancestor(
+        of: find.textContaining('Found albums'),
+        matching: find.byType(TrackCardSegment),
+      ),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('an older query cannot replace newer results', (tester) async {
     final old = Completer<List<LibrarySearchHit>>();
     late StateSetter update;

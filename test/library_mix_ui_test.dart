@@ -124,6 +124,16 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pump(const Duration(seconds: 1));
+      // The rows are one run, which Material draws as a connected list.
+      TrackCardSegment segment(String title) => tester.widget(
+        find.ancestor(
+          of: find.text(title),
+          matching: find.byType(TrackCardSegment),
+        ),
+      );
+      expect(segment('Song 0').first, isTrue);
+      expect(segment('Song 0').last, isFalse);
+      expect(segment('Song 1').first, isFalse);
       await tester.longPress(first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));

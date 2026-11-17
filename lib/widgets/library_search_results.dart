@@ -1005,7 +1005,21 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
                     )
                   : SliverList.builder(
                       itemCount: hits.length.clamp(0, pageSize),
-                      itemBuilder: (context, index) => _row(hits[index]),
+                      // Material joins the filled song rows into one
+                      // connected list, which runs on across pages and ends
+                      // at the last row shown.
+                      itemBuilder: (context, index) =>
+                          kind != LibrarySearchKind.songs
+                          ? _row(hits[index])
+                          : TrackCardSegment(
+                              first: page == 0 && index == 0,
+                              last:
+                                  index == hits.length.clamp(0, pageSize) - 1 &&
+                                  (_kind == null ||
+                                      page == _pages - 1 ||
+                                      hits.length <= pageSize),
+                              child: _row(hits[index]),
+                            ),
                     ),
             );
           }
