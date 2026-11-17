@@ -517,6 +517,47 @@ void main() {
       );
     }
 
+    testWidgets('with reduced motion the shared phone rows open at once', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final backend = FakeLinkBackend();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ...LinkClientHarness().overrides,
+            ...linkHostOverrides(backend: backend, player: FakeLinkPlayer()),
+            playbackPlayingProvider.overrideWithValue(false),
+          ],
+          child: _app(
+            Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(disableAnimations: true),
+                child: const LinkSettingsPage(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await _settle(tester);
+      final toggle = find.byKey(LinkPhoneHostSection.switchKey);
+      await tester.scrollUntilVisible(toggle, 300);
+      await tester.tap(toggle);
+      await _settle(tester);
+      await _settle(tester);
+      expect(find.byKey(LinkPhoneHostSection.contentKey), findsOneWidget);
+      await tester.scrollUntilVisible(toggle, -300);
+      await tester.tap(toggle);
+      await _settle(tester);
+      await _settle(tester);
+      expect(find.byKey(LinkPhoneHostSection.contentKey), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    });
+
     testWidgets('has no Transfers row before a computer is paired', (
       tester,
     ) async {

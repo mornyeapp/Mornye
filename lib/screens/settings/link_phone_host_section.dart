@@ -11,6 +11,20 @@ import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/beta_badge.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
+/// Grows and shrinks around [child]. With reduced motion the size changes at
+/// once: a size animation of no length would finish inside its own layout,
+/// which the framework rejects.
+Widget _sized(AppMotionSpec grow, AppMotionSpec shrink, Widget child) =>
+    grow.duration == Duration.zero
+    ? child
+    : AnimatedSize(
+        alignment: AlignmentDirectional.topStart,
+        duration: grow.duration,
+        reverseDuration: shrink.duration,
+        curve: grow.curve,
+        child: child,
+      );
+
 /// Share this phone, at the end of the phone's Link page: the switch that
 /// makes this phone a Link host for other phones and, while it is on, the
 /// rows of the computer's Link page (name, address, security code, pairing
@@ -66,12 +80,10 @@ class LinkPhoneHostSection extends ConsumerWidget {
           ],
         ),
         // The page ends here, so growing pushes nothing but the spacer.
-        AnimatedSize(
-          alignment: AlignmentDirectional.topStart,
-          duration: grow.duration,
-          reverseDuration: shrink.duration,
-          curve: grow.curve,
-          child: AnimatedSwitcher(
+        _sized(
+          grow,
+          shrink,
+          AnimatedSwitcher(
             duration: fadeIn.duration,
             reverseDuration: fadeOut.duration,
             switchInCurve: fadeIn.curve,
