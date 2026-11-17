@@ -38,7 +38,10 @@ double simTappedRateCost(double from, double to, Random random) =>
 /// extrapolated in between, and play, seek and rate changes restart the
 /// extrapolation without a read. A report right after a play then runs
 /// ahead of the sound by the start delay until the next read. With
-/// [rateCost], every rate change moves the song as the engine does.
+/// [rateCost], every rate change moves the song as the engine does. With
+/// [endedReadMs], a song that ran out reads as stopped at its end for that
+/// long while the next one already sounds, as the app's player state does
+/// until its gapless change is through.
 class SimDeck implements LinkTogetherDeck {
   SimDeck({
     required this.trueNowMs,
@@ -51,6 +54,7 @@ class SimDeck implements LinkTogetherDeck {
     this.jitterMs = 0,
     this.nudges = true,
     this.engineReadMs = 0,
+    this.endedReadMs = 0,
     this.rateCost,
     Random? random,
   }) : _queue = List.of(queue),
@@ -69,8 +73,13 @@ class SimDeck implements LinkTogetherDeck {
   final int jitterMs;
   final bool nudges;
   final int engineReadMs;
+  final int endedReadMs;
   final SimRateCost? rateCost;
   final Random _random;
+
+  /// The song that ran out and until when reports still show it.
+  int _endedIndex = -1;
+  int _endedUntilTrue = 0;
 
   /// The reported position: [_shownPos] at true instant [_shownTrue],
   /// extrapolated at [rate]; [_readTrue] is the last engine read.
@@ -175,6 +184,11 @@ class SimDeck implements LinkTogetherDeck {
     var position = _position(trueNowMs());
     while (position >= _durations[index]) {
       final over = position - _durations[index];
+      if (endedReadMs > 0) {
+        _endedIndex = index;
+        _endedUntilTrue = trueNowMs() + endedReadMs;
+        Timer(Duration(milliseconds: endedReadMs), touch);
+      }
       if (repeat == LinkRepeatMode.one) {
         // Same song again.
       } else if (index + 1 < _queue.length) {
@@ -200,6 +214,17 @@ class SimDeck implements LinkTogetherDeck {
         ? 0
         : _random.nextInt(jitterMs * 2 + 1) - jitterMs;
     final has = index >= 0 && index < _queue.length;
+    if (trueNowMs() < _endedUntilTrue) {
+      return LinkTogetherReport(
+        nowMs: nowMs(),
+        track: _queue[_endedIndex],
+        index: _endedIndex,
+        positionMs: _durations[_endedIndex],
+        durationMs: _durations[_endedIndex],
+        repeat: repeat,
+        rate: rate,
+      );
+    }
     return LinkTogetherReport(
       nowMs: nowMs(),
       track: has ? _queue[index] : null,

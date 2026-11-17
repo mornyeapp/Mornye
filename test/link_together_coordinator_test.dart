@@ -72,6 +72,7 @@ class _Sim {
     int desktopLatencyMs = 20,
     int phoneLatencyMs = 60,
     int engineReadMs = 0,
+    int endedReadMs = 0,
     SimRateCost? desktopRateCost,
     SimRateCost? phoneRateCost,
     int seed = 0,
@@ -87,6 +88,7 @@ class _Sim {
       jitterMs: 5,
       nudges: followerNudges || phoneLeads,
       engineReadMs: engineReadMs,
+      endedReadMs: endedReadMs,
       rateCost: phoneRateCost,
       random: Random(2 + seed * 10),
     );
@@ -101,6 +103,7 @@ class _Sim {
       jitterMs: 5,
       nudges: followerNudges || !phoneLeads,
       engineReadMs: engineReadMs,
+      endedReadMs: endedReadMs,
       rateCost: desktopRateCost,
       random: Random(3 + seed * 10),
     );
@@ -370,6 +373,59 @@ void main() {
         expect(sim.desktop.index, 3);
         expect(sim.coordinator.rejoins, rejoinsAfterStart);
         expect(sim.worstFrom(3000), lessThanOrEqualTo(30));
+        sim.finish();
+      });
+    });
+
+    // A real run (2026-11-17): the phone's player read as stopped for a
+    // moment at each song end, which paused the computer for three seconds.
+    for (final phoneLeads in [true, false]) {
+      test('a song end that reads as stopped pauses nobody, the '
+          '${phoneLeads ? 'phone' : 'computer'} leading', () {
+        fakeAsync((async) {
+          final sim = _Sim(
+            async,
+            phoneLeads: phoneLeads,
+            songs: [
+              for (final title in ['A', 'B', 'C', 'D']) simSong(title),
+            ],
+            durations: const [20000, 20000, 20000, 20000],
+            endedReadMs: 60,
+          );
+          sim.leader.playNow(position: 5000);
+          sim.start();
+          // A phone that follows needs up to 6 s to get in step.
+          async.elapse(const Duration(seconds: 6));
+          final rejoinsAfterStart = sim.coordinator.rejoins;
+          // Song ends at 15, 35 and 55 s.
+          async.elapse(const Duration(seconds: 57));
+
+          expect(sim.phone.index, 3);
+          expect(sim.desktop.index, 3);
+          expect(sim.coordinator.rejoins, rejoinsAfterStart);
+          expect(sim.ended, isEmpty);
+          expect(sim.worstFrom(6000), lessThanOrEqualTo(30));
+          sim.finish();
+        });
+      });
+    }
+
+    test('a leader paused in the last moments of a song still pauses the '
+        'follower', () {
+      fakeAsync((async) {
+        final sim = _Sim(
+          async,
+          phoneLeads: true,
+          durations: const [20000, 20000, 20000],
+        );
+        sim.phone.playNow(position: 5000);
+        sim.start();
+        async.elapse(const Duration(milliseconds: 13500));
+        unawaited(sim.phone.pause());
+        async.elapse(const Duration(seconds: 2));
+
+        expect(sim.desktop.playing, isFalse);
+        expect(sim.desktop.index, 0);
         sim.finish();
       });
     });

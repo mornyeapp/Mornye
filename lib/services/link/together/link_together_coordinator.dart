@@ -202,6 +202,7 @@ class LinkTogetherCoordinator {
   bool _realign = false;
   TrackRef? _missingFor;
   int? _transitionSince;
+  int? _stoppedSince;
   LinkRepeatMode? _repeatSent;
 
   /// The latest drift sample, follower minus leader, for tests.
@@ -421,9 +422,11 @@ class LinkTogetherCoordinator {
     _transitionSince = null;
     if (leader.playing != follower.playing) {
       if (leader.playing && !leader.ready) return;
+      if (_betweenSongs(leader.playing ? follower : leader, now)) return;
       await _rejoin(leader, offset, leader.playing ? 'play' : 'pause');
       return;
     }
+    _stoppedSince = null;
     if (!leader.playing) {
       final target = _followerTarget(leader.positionAt(now));
       if ((follower.positionAt(now) - target).abs() > 1000) {
@@ -528,6 +531,20 @@ class LinkTogetherCoordinator {
       return false;
     }
     final since = _transitionSince ??= now;
+    return now - since < maxTransitionWaitMs;
+  }
+
+  /// Whether [stopped], the one that reads as not playing, only ran out of
+  /// its song: until the next one starts a player reports neither playing
+  /// nor paused, and a cue then would pause the other or land in the middle
+  /// of its own song change.
+  bool _betweenSongs(LinkTogetherReport stopped, int now) {
+    final remaining = stopped.remainingAt(now);
+    if (stopped.ready || remaining == null || remaining >= transitionMs) {
+      _stoppedSince = null;
+      return false;
+    }
+    final since = _stoppedSince ??= now;
     return now - since < maxTransitionWaitMs;
   }
 
