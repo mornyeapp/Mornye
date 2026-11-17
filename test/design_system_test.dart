@@ -19,6 +19,7 @@ import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/mornye_selection_pill.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
@@ -294,14 +295,13 @@ void main() {
           ),
         ),
       );
-      expect(
-        tester.widget<AnimatedAlign>(find.byType(AnimatedAlign)).duration,
-        Duration.zero,
-      );
+      expect(find.byType(MornyeSelectionPill), findsOneWidget);
       expect(find.text('Dark'), findsOneWidget);
       await tester.tap(find.text('Dark'));
       await tester.pump();
       expect(selected, 2);
+      // The pill is at the new selection at once: nothing is left to draw.
+      expect(tester.binding.hasScheduledFrame, isFalse);
       expect(
         tester.getCenter(find.text('System')).dx <
             tester.getCenter(find.text('Dark')).dx,
