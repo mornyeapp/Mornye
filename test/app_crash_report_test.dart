@@ -26,6 +26,21 @@ Map<String, dynamic> _report() => {
 };
 
 void main() {
+  test('an error line ends with the first frames of its stack', () {
+    final stack = StackTrace.fromString(
+      '#0      Player.load (package:example/player.dart:12)\n'
+      '#1      Queue.next (package:example/queue.dart:40)\n'
+      '#2      Shell.tap (package:example/shell.dart:7)\n',
+    );
+    expect(
+      firstStackFrames(stack, count: 2),
+      ' at Player.load (package:example/player.dart:12) < '
+      'Queue.next (package:example/queue.dart:40)',
+    );
+    expect(firstStackFrames(null), '');
+    expect(firstStackFrames(StackTrace.empty), '');
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
   const backend = MethodChannel('com.zarz.mornye/backend');
   final messenger =

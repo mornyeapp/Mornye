@@ -184,13 +184,16 @@ void main() {
       final previousOnError = FlutterError.onError;
       FlutterError.onError = (details) {
         previousOnError?.call(details);
-        _log.e('Uncaught Flutter error: ${details.exceptionAsString()}');
+        _log.e(
+          'Uncaught Flutter error: ${details.exceptionAsString()}'
+          '${firstStackFrames(details.stack)}',
+        );
         unawaited(
           AppCrashService.recordRuntimeError(details.exception, details.stack),
         );
       };
       WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
-        _log.e('Uncaught platform error: $error');
+        _log.e('Uncaught platform error: $error${firstStackFrames(stack)}');
         unawaited(AppCrashService.recordRuntimeError(error, stack));
         return true;
       };

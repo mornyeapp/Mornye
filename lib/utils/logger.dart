@@ -87,6 +87,20 @@ String _redactSensitiveText(String value) {
 /// Crash reports use the same secret filtering as the ordinary log export.
 String redactDiagnosticText(String value) => _redactSensitiveText(value);
 
+/// The first [count] frames of [stack] on one line, to end an error's log
+/// line with where it happened. Empty when there is no stack.
+String firstStackFrames(StackTrace? stack, {int count = 4}) {
+  if (stack == null) return '';
+  final frames = stack
+      .toString()
+      .split('\n')
+      .map((line) => line.replaceFirst(RegExp(r'^#\d+\s+'), '').trim())
+      .where((line) => line.isNotEmpty)
+      .take(count)
+      .join(' < ');
+  return frames.isEmpty ? '' : ' at ${redactDiagnosticText(frames)}';
+}
+
 class LogEntry {
   final DateTime timestamp;
   final String level;
