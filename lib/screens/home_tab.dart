@@ -927,11 +927,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
     // screen at a time, so it stops at its size: Material's standard spatial
     // spring, whose overshoot is a thousandth of the travel, and Mornye's
     // spring. Reduced motion resizes at once.
-    final sectionMotion = MediaQuery.disableAnimationsOf(context)
-        ? const AppMotionSpec(Duration.zero, Curves.linear)
-        : context.isMornye
-        ? MornyeMotion.standard
-        : AppMotion.materialPage;
+    final sectionMotion = AppMotion.surface(context);
     // Without a feed, Home gathers the player, shortcuts and Library shelves.
     final showHomeSections =
         _showsHome && !showFeedSurface && !showEmptyHomeState;

@@ -149,11 +149,7 @@ class _SettingsSearchTargetState extends State<SettingsSearchTarget> {
 
     // A scroll as large as the page: a spring that stops at the target
     // rather than running the list past it. Reduced motion jumps.
-    final scroll = MediaQuery.disableAnimationsOf(context)
-        ? const AppMotionSpec(Duration.zero, Curves.linear)
-        : context.isMornye
-        ? MornyeMotion.standard
-        : AppMotion.materialPage;
+    final scroll = AppMotion.surface(context);
     await Scrollable.ensureVisible(
       context,
       alignment: 0.32,

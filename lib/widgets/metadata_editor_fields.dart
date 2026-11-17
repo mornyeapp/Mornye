@@ -275,18 +275,13 @@ class MetadataEditorSectionCard extends StatelessWidget {
     // the sections below it, so it unfolds on springs that stop at its size
     // (an expressive overshoot would be several fields tall); reduced motion
     // changes both at once.
-    final reduced = MediaQuery.disableAnimationsOf(context);
     const still = AppMotionSpec(Duration.zero, Curves.linear);
     final turn = AppMotion.spatialFast(
       context,
       still,
       mornye: MornyeMotion.fast,
     );
-    final unfold = reduced
-        ? still
-        : context.isMornye
-        ? MornyeMotion.standard
-        : AppMotion.materialPage;
+    final unfold = AppMotion.surface(context);
 
     final headerRow = Row(
       children: [

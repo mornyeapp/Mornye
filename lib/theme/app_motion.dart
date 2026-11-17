@@ -125,6 +125,17 @@ abstract final class AppMotion {
     SpringCurve(M3EMotion.spatialDefault),
   );
 
+  static const _still = AppMotionSpec(Duration.zero, Curves.linear);
+
+  /// A move that must stop at its end: a section that opens above other
+  /// content, a card that unfolds, a scroll most of a page long. Material's
+  /// standard spatial spring and Mornye's standard spring, neither of which
+  /// passes its target; nothing with reduced motion.
+  static AppMotionSpec surface(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return _still;
+    return context.isMornye ? MornyeMotion.standard : materialPage;
+  }
+
   static AppMotionSpec _resolve(
     BuildContext context,
     AppMotionSpec fallback,

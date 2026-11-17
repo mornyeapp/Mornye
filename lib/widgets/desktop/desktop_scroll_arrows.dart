@@ -54,9 +54,7 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
     } else {
       // Most of a viewport: a spring that stops at the target rather than
       // running the row past it.
-      final motion = context.isMornye
-          ? MornyeMotion.standard
-          : AppMotion.materialPage;
+      final motion = AppMotion.surface(context);
       _controller.animateTo(
         target,
         duration: motion.duration,
