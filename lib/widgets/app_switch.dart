@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoColors;
+import 'package:flutter/physics.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -62,9 +64,66 @@ class _MornyeSwitch extends StatefulWidget {
   State<_MornyeSwitch> createState() => _MornyeSwitchState();
 }
 
-class _MornyeSwitchState extends State<_MornyeSwitch> {
+class _MornyeSwitchState extends State<_MornyeSwitch>
+    with SingleTickerProviderStateMixin {
+  /// How far the thumb travels, from off to on.
+  static const double _travel = 22;
+
   double? _dragPosition;
   bool _dragCancelled = false;
+
+  /// The thumb, from off (0) to on (1). A drag places it under the finger;
+  /// otherwise the snappy spring carries it to rest, starting from the
+  /// finger's velocity on release and from its own velocity when a new
+  /// value interrupts it.
+  late final AnimationController _thumb = AnimationController.unbounded(
+    vsync: this,
+    value: widget.value ? 1 : 0,
+  );
+
+  /// The side the thumb is moving to, or null after a drag placed it.
+  late double? _thumbTarget = _thumb.value;
+
+  /// The finger's velocity, in thumb travels a second, for the next move.
+  double? _releaseVelocity;
+
+  @override
+  void dispose() {
+    _thumb.dispose();
+    super.dispose();
+  }
+
+  /// Sends the thumb to the current value's side unless a drag holds it.
+  /// Runs during build, after the parent has applied a new value, so a
+  /// released thumb never heads for the old side first.
+  void _followValue() {
+    if (_dragPosition != null) return;
+    final target = widget.value ? 1.0 : 0.0;
+    final velocity = _releaseVelocity;
+    _releaseVelocity = null;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _thumbTarget = target;
+      if (_thumb.value != target) _thumb.value = target;
+      return;
+    }
+    if (target == _thumbTarget && velocity == null) return;
+    _thumbTarget = target;
+    _thumb.animateWith(
+      SpringSimulation(
+        MornyeMotion.snappySpring,
+        _thumb.value,
+        target,
+        velocity ?? _thumb.velocity,
+        snapToEnd: true,
+      ),
+    );
+  }
+
+  void _place(double position) {
+    _dragPosition = position;
+    _thumbTarget = null;
+    _thumb.value = position;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,16 +132,18 @@ class _MornyeSwitchState extends State<_MornyeSwitch> {
     final scheme = Theme.of(context).colorScheme;
     final active = CupertinoColors.systemGreen.resolveFrom(context);
     final enabled = onChanged != null;
-    final duration = MediaQuery.disableAnimationsOf(context)
+    final fade = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : const Duration(milliseconds: 180);
+        : MornyeMotion.effectsFast.duration;
     final inactive = scheme.brightness == Brightness.dark
         ? const Color(0xff39393d)
         : const Color(0xff8e8e93);
+    _followValue();
 
     final position = _dragPosition ?? (value ? 1.0 : 0.0);
     final control = AnimatedContainer(
-      duration: duration,
+      duration: fade,
+      curve: MornyeMotion.effectsFast.curve,
       width: 63,
       height: 28,
       padding: const EdgeInsets.all(2),
@@ -90,10 +151,16 @@ class _MornyeSwitchState extends State<_MornyeSwitch> {
         color: position >= 0.5 ? active : inactive,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: AnimatedAlign(
-        duration: _dragPosition == null ? duration : Duration.zero,
-        curve: Curves.easeOutCubic,
-        alignment: AlignmentDirectional(-1 + position * 2, 0),
+      child: AnimatedBuilder(
+        animation: _thumb,
+        // The thumb stays inside the track when the spring runs past a side.
+        builder: (context, child) => Align(
+          alignment: AlignmentDirectional(
+            -1 + _thumb.value.clamp(0.0, 1.0) * 2,
+            0,
+          ),
+          child: child,
+        ),
         child: Container(
           width: 37,
           height: 24,
@@ -123,8 +190,10 @@ class _MornyeSwitchState extends State<_MornyeSwitch> {
               // thumb uses only paint/layout, even on a page of switches.
               child: ExcludeSemantics(
                 child: GestureDetector(
+                  // A drag picks the thumb up where it is, also mid-move.
                   onHorizontalDragStart: enabled
-                      ? (_) => setState(() => _dragPosition = value ? 1 : 0)
+                      ? (_) =>
+                            setState(() => _place(_thumb.value.clamp(0.0, 1.0)))
                       : null,
                   onHorizontalDragUpdate: enabled
                       ? (event) {
@@ -133,18 +202,30 @@ class _MornyeSwitchState extends State<_MornyeSwitch> {
                               ? -1.0
                               : 1.0;
                           setState(
-                            () => _dragPosition =
-                                ((_dragPosition ?? (value ? 1 : 0)) +
-                                        event.delta.dx * direction / 22)
-                                    .clamp(0, 1),
+                            () => _place(
+                              ((_dragPosition ?? (value ? 1 : 0)) +
+                                      event.delta.dx * direction / _travel)
+                                  .clamp(0.0, 1.0),
+                            ),
                           );
                         }
                       : null,
                   onHorizontalDragEnd: enabled
-                      ? (_) {
+                      ? (details) {
                           final next =
                               (_dragPosition ?? (value ? 1 : 0)) >= 0.5;
-                          setState(() => _dragPosition = null);
+                          final direction =
+                              Directionality.of(context) == TextDirection.rtl
+                              ? -1.0
+                              : 1.0;
+                          setState(() {
+                            _dragPosition = null;
+                            // The thumb leaves the finger at its speed.
+                            _releaseVelocity =
+                                (details.primaryVelocity ?? 0) *
+                                direction /
+                                _travel;
+                          });
                           if (!_dragCancelled && next != value) onChanged(next);
                         }
                       : null,
