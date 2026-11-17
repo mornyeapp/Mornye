@@ -18,6 +18,7 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/providers/theme_provider.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -1041,21 +1042,29 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   }
 
   @override
-  Widget build(BuildContext context) => LyricsTextScale(
-    child: TweenAnimationBuilder<Offset>(
-      tween: Tween(
-        end: Offset(
-          widget.showPronunciation ? 1 : 0,
-          widget.showTranslation ? 1 : 0,
+  Widget build(BuildContext context) {
+    // Turning pronunciation or translation on resizes every line, so the
+    // lines below move: Material's slow spatial spring stops at the new
+    // size, and Mornye moves them as content, on its standard spring.
+    final supplements = AppMotion.spatialSlow(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+      mornye: MornyeMotion.standard,
+    );
+    return LyricsTextScale(
+      child: TweenAnimationBuilder<Offset>(
+        tween: Tween(
+          end: Offset(
+            widget.showPronunciation ? 1 : 0,
+            widget.showTranslation ? 1 : 0,
+          ),
         ),
+        duration: supplements.duration,
+        curve: supplements.curve,
+        builder: (context, visibility, _) => _buildLyrics(context, visibility),
       ),
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 420),
-      curve: Curves.easeInOutCubic,
-      builder: (context, visibility, _) => _buildLyrics(context, visibility),
-    ),
-  );
+    );
+  }
 
   Widget _buildLyrics(BuildContext context, Offset visibility) {
     final lines = _lines;

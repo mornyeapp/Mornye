@@ -2,8 +2,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_motion.dart';
 
 /// Timing for a track change the app started (a skip button, a headset key,
-/// autoplay): an opacity crossfade that never moves or overshoots. Material
-/// uses the effects spring, Mornye a short ease, and reduced motion cuts.
+/// autoplay): an opacity crossfade that never moves or overshoots. Each
+/// style uses its effects spring, and reduced motion cuts.
 AppMotionSpec playerTrackChangeMotion(BuildContext context) {
   if (MediaQuery.disableAnimationsOf(context)) {
     return const AppMotionSpec(Duration.zero, Curves.linear);

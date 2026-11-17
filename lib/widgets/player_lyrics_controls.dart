@@ -63,19 +63,27 @@ class PlayerLyricsControlsVisibility extends StatelessWidget {
   final bool hidden;
   final Widget child;
 
-  @override
-  Widget build(BuildContext context) => IgnorePointer(
-    ignoring: hidden,
-    child: ExcludeSemantics(
-      excluding: hidden,
-      child: AnimatedOpacity(
-        opacity: hidden ? 0 : 1,
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        child: TickerMode(enabled: !hidden, child: child),
-      ),
-    ),
+  /// The fade, on the style's effects spring; reduced motion cuts.
+  static AppMotionSpec motion(BuildContext context) => AppMotion.effects(
+    context,
+    const AppMotionSpec(Duration.zero, Curves.linear),
+    mornye: MornyeMotion.effects,
   );
+
+  @override
+  Widget build(BuildContext context) {
+    final fade = motion(context);
+    return IgnorePointer(
+      ignoring: hidden,
+      child: ExcludeSemantics(
+        excluding: hidden,
+        child: AnimatedOpacity(
+          opacity: hidden ? 0 : 1,
+          duration: fade.duration,
+          curve: fade.curve,
+          child: TickerMode(enabled: !hidden, child: child),
+        ),
+      ),
+    );
+  }
 }

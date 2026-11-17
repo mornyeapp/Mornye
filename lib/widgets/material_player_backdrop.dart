@@ -60,9 +60,12 @@ class MaterialPlayerBackdrop extends StatelessWidget {
     if (size.width > size.height) return blurredCover;
     final artUri = mediaItem.artUri?.toString();
     final appBarHeight = MediaQuery.paddingOf(context).top + kToolbarHeight;
-    final motion = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 300);
+    // The cover and its shade fade together on the effects spring when the
+    // lyrics cover them.
+    final motion = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+    );
     // A skip fades the next cover in over this one, as the card cover does.
     // It fills the box edge to edge, so it fades without growing.
     final trackChange = playerTrackChangeMotion(context);
@@ -81,8 +84,8 @@ class MaterialPlayerBackdrop extends StatelessWidget {
               : size.width.clamp(0.0, size.height * 0.62),
           child: AnimatedOpacity(
             opacity: showArtwork ? 1 : 0,
-            duration: motion,
-            curve: Curves.easeInOutCubic,
+            duration: motion.duration,
+            curve: motion.curve,
             child: Hero(
               tag: kNowPlayingArtworkHeroTag,
               // The flying cover must keep its fade in the route overlay.
@@ -118,7 +121,8 @@ class MaterialPlayerBackdrop extends StatelessWidget {
           height: appBarHeight + 32,
           child: AnimatedOpacity(
             opacity: showArtwork ? 1 : 0,
-            duration: motion,
+            duration: motion.duration,
+            curve: motion.curve,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(

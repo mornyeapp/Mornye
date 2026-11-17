@@ -89,14 +89,12 @@ class MaterialPlayerLayout extends StatelessWidget {
                         final resting =
                             !ref.watch(playbackPlayingProvider) &&
                             !ref.watch(playbackLoadingProvider);
+                        // The cover is as large as a panel, so it settles
+                        // on the slow spatial spring, which stops at its
+                        // size; reduced motion changes it at once.
                         final motion = AppMotion.spatialSlow(
                           context,
-                          AppMotionSpec(
-                            MediaQuery.disableAnimationsOf(context)
-                                ? Duration.zero
-                                : const Duration(milliseconds: 500),
-                            Curves.easeOutBack,
-                          ),
+                          const AppMotionSpec(Duration.zero, Curves.linear),
                         );
                         return AnimatedScale(
                           scale: resting ? 0.9 : 1,
@@ -153,12 +151,15 @@ class MaterialPlayerLayout extends StatelessWidget {
           ),
         );
 
+        // The cover and the lyrics crossfade on the effects spring.
+        final crossfade = AppMotion.effects(
+          context,
+          const AppMotionSpec(Duration.zero, Curves.linear),
+        );
         Widget visual() => AnimatedSwitcher(
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 300),
-          switchInCurve: Curves.easeInOutCubic,
-          switchOutCurve: Curves.easeInOutCubic,
+          duration: crossfade.duration,
+          switchInCurve: crossfade.curve,
+          switchOutCurve: crossfade.curve,
           child: showLyrics
               ? KeyedSubtree(
                   key: const ValueKey('material-player-lyrics'),
@@ -194,9 +195,9 @@ class MaterialPlayerLayout extends StatelessWidget {
                         ),
                         Expanded(
                           child: AnimatedSwitcher(
-                            duration: MediaQuery.disableAnimationsOf(context)
-                                ? Duration.zero
-                                : const Duration(milliseconds: 300),
+                            duration: crossfade.duration,
+                            switchInCurve: crossfade.curve,
+                            switchOutCurve: crossfade.curve,
                             child: showLyrics
                                 ? KeyedSubtree(
                                     key: const ValueKey('landscape-lyrics'),

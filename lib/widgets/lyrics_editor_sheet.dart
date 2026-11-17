@@ -9,6 +9,7 @@ import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -197,13 +198,19 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = _lines[index].key.currentContext;
       if (context == null || !context.mounted) return;
+      // The list moves as content, on a spring that stops at its place
+      // instead of scrolling past it: Material's slow spatial spring is
+      // critically damped, and Mornye's standard one has no bounce.
+      final motion = AppMotion.spatialSlow(
+        context,
+        const AppMotionSpec(Duration.zero, Curves.linear),
+        mornye: MornyeMotion.standard,
+      );
       Scrollable.ensureVisible(
         context,
         alignment: 0.4,
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
+        duration: motion.duration,
+        curve: motion.curve,
       );
     });
   }

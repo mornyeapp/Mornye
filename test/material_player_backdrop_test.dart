@@ -10,6 +10,7 @@ import 'package:flutter/rendering.dart'
     show ClipRectLayer, PictureLayer, RenderRepaintBoundary, ShaderMaskLayer;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/routes/now_playing_route.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 
@@ -66,7 +67,11 @@ class _WholeBoxMask extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final appBarHeight = MediaQuery.paddingOf(context).top + kToolbarHeight;
-    const motion = Duration(milliseconds: 300);
+    // The same fade as the widget's own.
+    final motion = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+    );
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -87,8 +92,8 @@ class _WholeBoxMask extends StatelessWidget {
               : size.width.clamp(0.0, size.height * 0.62),
           child: AnimatedOpacity(
             opacity: showArtwork ? 1 : 0,
-            duration: motion,
-            curve: Curves.easeInOutCubic,
+            duration: motion.duration,
+            curve: motion.curve,
             child: Hero(
               tag: kNowPlayingArtworkHeroTag,
               child: ShaderMask(
@@ -115,7 +120,8 @@ class _WholeBoxMask extends StatelessWidget {
           height: appBarHeight + 32,
           child: AnimatedOpacity(
             opacity: showArtwork ? 1 : 0,
-            duration: motion,
+            duration: motion.duration,
+            curve: motion.curve,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
