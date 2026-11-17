@@ -10,6 +10,7 @@ import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/mornye_landscape_player.dart';
+import 'package:mornye/widgets/mornye_player_background.dart';
 import 'package:mornye/widgets/mornye_player_favorite_button.dart';
 import 'package:mornye/widgets/mornye_player_queue.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
@@ -100,9 +101,9 @@ class MornyePlayerLayout extends ConsumerWidget {
             onSurfaceVariant: colorScheme.onSurface.withValues(alpha: 0.72),
           );
 
-    final motion = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 380);
+    // Opening a panel moves the cover and the panels as content, in step
+    // with the background behind them.
+    final motion = mornyePlayerPanelMotion(context);
     final queue = ref.watch(playQueueProvider).value ?? const <MediaItem>[];
     final currentIndex = ref.watch(currentQueueIndexProvider);
     final showVolume = ref.watch(
@@ -173,9 +174,9 @@ class MornyePlayerLayout extends ConsumerWidget {
                     child: ExcludeSemantics(
                       excluding: !compact,
                       child: AnimatedSwitcher(
-                        duration: motion,
-                        switchInCurve: Curves.easeInOutCubic,
-                        switchOutCurve: Curves.easeInOutCubic,
+                        duration: motion.duration,
+                        switchInCurve: motion.curve,
+                        switchOutCurve: motion.curve,
                         transitionBuilder: (child, animation) => FadeTransition(
                           opacity: animation,
                           child: SlideTransition(
@@ -236,8 +237,8 @@ class MornyePlayerLayout extends ConsumerWidget {
                               ? 1
                               : 0.73,
                         ),
-                        duration: motion,
-                        curve: Curves.easeInOutCubic,
+                        duration: motion.duration,
+                        curve: motion.curve,
                         builder: (context, scale, child) => Positioned.fromRect(
                           // Both cover layers travel to the actual resting size,
                           // including the smaller cover used while paused.
@@ -417,8 +418,8 @@ class MornyePlayerLayout extends ConsumerWidget {
         final options = showLyrics ? lyricsOptions : null;
         Widget content() => TweenAnimationBuilder<double>(
           tween: Tween(begin: 0, end: compactStage ? 1 : 0),
-          duration: motion,
-          curve: Curves.easeInOutCubic,
+          duration: motion.duration,
+          curve: motion.curve,
           builder: (context, progress, controls) => CustomMultiChildLayout(
             delegate: _PlayerHeaderLayout(
               progress: progress,
@@ -618,10 +619,9 @@ class MornyePlayerLayout extends ConsumerWidget {
     required double visibleHeight,
   }) => TweenAnimationBuilder<double>(
     tween: Tween(begin: 0, end: lyricsControlsHidden ? 1 : 0),
-    duration: MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 220),
-    curve: Curves.easeOutCubic,
+    // In step with the controls fading over it.
+    duration: PlayerLyricsControlsVisibility.motion(context).duration,
+    curve: PlayerLyricsControlsVisibility.motion(context).curve,
     builder: (context, reveal, child) => MornyeLyricsFadeMask(
       opaque: reveal == 1,
       shaderCallback: (bounds) {

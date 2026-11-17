@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:material_ui/material_ui.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/cover_palette.dart';
 
 /// The player's background for a cover whose average is [sourceColor]: the
@@ -78,9 +79,7 @@ class MornyePlayerBackground extends StatelessWidget {
       child: CoverSourceColorBuilder(
         imageSource: artUri?.toString(),
         builder: (context, sourceColor) {
-          final motion = MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 380);
+          final motion = mornyePlayerPanelMotion(context);
           final background = mornyePlayerGradient(
             sourceColor,
             fullBleed: artwork != null,
@@ -92,8 +91,8 @@ class MornyePlayerBackground extends StatelessWidget {
           );
           return TweenAnimationBuilder<LinearGradient>(
             tween: _GradientTween(end: background),
-            duration: motion,
-            curve: Curves.easeInOutCubic,
+            duration: motion.duration,
+            curve: motion.curve,
             builder: (context, gradient, artworkLayer) => DecoratedBox(
               decoration: BoxDecoration(gradient: gradient),
               child: Stack(
@@ -123,9 +122,9 @@ class MornyePlayerBackground extends StatelessWidget {
                 // full cover is fading out behind the lyrics.
                 enabled: artwork != null,
                 child: AnimatedSwitcher(
-                  duration: motion,
-                  switchInCurve: Curves.easeInOutCubic,
-                  switchOutCurve: Curves.easeInOutCubic,
+                  duration: motion.duration,
+                  switchInCurve: motion.curve,
+                  switchOutCurve: motion.curve,
                   layoutBuilder: (current, previous) => Stack(
                     fit: StackFit.expand,
                     children: [
@@ -149,6 +148,15 @@ class MornyePlayerBackground extends StatelessWidget {
     );
   }
 }
+
+/// The Mornye player's change between the full cover and a panel (lyrics or
+/// the queue), and between two covers: the cover, the gradient, the shade
+/// and the moving artwork's glow all change together, as content, on the
+/// standard spring without bounce. Reduced motion changes them at once.
+AppMotionSpec mornyePlayerPanelMotion(BuildContext context) =>
+    MediaQuery.disableAnimationsOf(context)
+    ? const AppMotionSpec(Duration.zero, Curves.linear)
+    : MornyeMotion.standard;
 
 /// How dark [MornyeControlsDim] is at full strength.
 const mornyeControlsDimAlpha = 0.4;
@@ -183,13 +191,12 @@ class MornyeControlsDim extends StatelessWidget {
     );
     final start = (artworkHeight * fadeStart / size.height).clamp(0.0, 1.0);
     final end = ((start + artworkHeight / size.height) / 2).clamp(start, 1.0);
+    final motion = mornyePlayerPanelMotion(context);
     return IgnorePointer(
       child: AnimatedOpacity(
         opacity: strength.clamp(0.0, 1.0),
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 380),
-        curve: Curves.easeInOutCubic,
+        duration: motion.duration,
+        curve: motion.curve,
         child: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(

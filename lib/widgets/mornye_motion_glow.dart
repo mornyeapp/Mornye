@@ -80,13 +80,12 @@ class _MornyeMotionGlowState extends ConsumerState<MornyeMotionGlow> {
     final fadeTop = artworkHeight * widget.fadeStart;
     final fade = artworkHeight - fadeTop;
     final shows = controller != null && !videoSize.isEmpty && fade > 0;
+    final motion = mornyePlayerPanelMotion(context);
     return IgnorePointer(
       child: AnimatedOpacity(
         opacity: shows && widget.visible ? 1 : 0,
-        duration: reducedMotion
-            ? Duration.zero
-            : const Duration(milliseconds: 380),
-        curve: Curves.easeInOutCubic,
+        duration: motion.duration,
+        curve: motion.curve,
         child: !shows
             ? const SizedBox.expand()
             : RepaintBoundary(

@@ -39,11 +39,12 @@ class _MaskedBackground extends StatelessWidget {
       child: CoverSourceColorBuilder(
         imageSource: artUri?.toFilePath(),
         builder: (context, sourceColor) {
-          const motion = Duration(milliseconds: 380);
+          // The same timing as the background under test.
+          final motion = mornyePlayerPanelMotion(context);
           final size = MediaQuery.sizeOf(context);
           return AnimatedContainer(
-            duration: motion,
-            curve: Curves.easeInOutCubic,
+            duration: motion.duration,
+            curve: motion.curve,
             decoration: BoxDecoration(
               gradient: mornyePlayerGradient(
                 sourceColor,
@@ -76,9 +77,9 @@ class _MaskedBackground extends StatelessWidget {
                       ],
                     ).createShader(bounds),
                     child: AnimatedSwitcher(
-                      duration: motion,
-                      switchInCurve: Curves.easeInOutCubic,
-                      switchOutCurve: Curves.easeInOutCubic,
+                      duration: motion.duration,
+                      switchInCurve: motion.curve,
+                      switchOutCurve: motion.curve,
                       layoutBuilder: (current, previous) => Stack(
                         fit: StackFit.expand,
                         children: [...previous, ?current],
