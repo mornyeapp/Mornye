@@ -100,7 +100,7 @@ class DownloadedEmbeddedCoverResolver {
   static const _maxPendingPreviewValidations = 64;
   static DateTime Function() _validationClock = DateTime.now;
   static final _failedExtract = <String, DateTime>{};
-  static const _documentFailureRetryDelay = Duration(seconds: 30);
+  static const _failureRetryDelay = Duration(seconds: 30);
 
   static Directory? _persistentCacheDirectoryOverride;
   static Future<String>? _persistentCacheRootFuture;
@@ -522,10 +522,12 @@ class DownloadedEmbeddedCoverResolver {
       // A SAF provider may temporarily be offline or still opening its remote
       // file. Do not turn that failure into "no artwork" for the whole session.
       // Retry on demand, with a cooldown so scrolling cannot flood the NAS.
+      // A plain file can fail as well, such as a read before the desktop
+      // backend has started: playing or opening the song asks again, a list
+      // does not, so files without a cover are not read at every scroll.
       final failedAt = _failedExtract[cleanPath]!;
-      if (!isContentUri(cleanPath) ||
-          _validationClock().difference(failedAt) <
-              _documentFailureRetryDelay) {
+      if ((!isContentUri(cleanPath) && !isForeground) ||
+          _validationClock().difference(failedAt) < _failureRetryDelay) {
         return Future<String?>.value();
       }
       _failedExtract.remove(cleanPath);
