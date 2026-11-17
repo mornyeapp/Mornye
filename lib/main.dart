@@ -613,6 +613,7 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _logRefreshRate();
       _verificationNotificationSubscription =
           PlatformBridge.verificationNotificationEvents().listen(
             (_) => unawaited(_consumeVerificationNotification()),
@@ -654,8 +655,25 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
   }
 
   @override
+  void didChangeMetrics() => _logRefreshRate();
+
+  double? _loggedRefreshRate;
+
+  /// Notes the refresh rate the device gives the app, each time it changes,
+  /// so a report of choppy motion shows whether the phone held the app at
+  /// 60 Hz.
+  void _logRefreshRate() {
+    if (!mounted) return;
+    final rate = View.maybeOf(context)?.display.refreshRate;
+    if (rate == null || rate == _loggedRefreshRate) return;
+    _loggedRefreshRate = rate;
+    _log.i('Display refresh rate: ${rate.toStringAsFixed(0)} Hz');
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _logRefreshRate();
       unawaited(_consumeVerificationNotification());
       CoverCacheManager.scheduleMaintenance();
       // Native downloads can finish while Flutter is suspended. Refresh the
