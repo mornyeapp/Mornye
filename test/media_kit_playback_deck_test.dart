@@ -98,8 +98,8 @@ void main() {
       engine.completedEvents.add(true);
       await Future<void>.delayed(Duration.zero);
       expect(events, isEmpty);
-      await engine.advance();
-      await Future<void>.delayed(Duration.zero);
+      await engine.advance(started: false);
+      await _settle();
       expect(events, ['next']);
       expect(deck.state, PlaybackDeckState.playing);
       expect(engine.volume, closeTo(100 * 0.7368063, 0.001));
@@ -107,6 +107,11 @@ void main() {
         engine.calls.where((call) => call.first == 'open'),
         hasLength(opens),
       );
+      // mpv keeps the open device only if the option still reads `weak`
+      // when the queued song's first audio is ready.
+      expect(engine.properties['gapless-audio'], 'weak');
+      engine.finishStart();
+      await _settle();
       expect(engine.properties['gapless-audio'], 'no');
       engine.completedEvents.add(true);
       await Future<void>.delayed(Duration.zero);

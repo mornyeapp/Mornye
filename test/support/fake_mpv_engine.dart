@@ -47,14 +47,21 @@ class FakeMpvEngine implements MpvEngine, MpvPlaylistEngine {
     queuedStart = null;
   }
 
-  Future<void> advance() async {
+  /// Moves to the queued song. mpv reports `seeking` until the song's first
+  /// audio is ready; [started] false leaves it there for [finishStart].
+  Future<void> advance({bool started = true}) async {
     final start = queuedStart;
     queuedStart = null;
     queuedSource = null;
     position = Duration.zero;
+    properties.remove('seeking');
     await start?.call();
+    properties['seeking'] = 'yes';
     durationEvents.add(openDuration!);
+    if (started) finishStart();
   }
+
+  void finishStart() => properties['seeking'] = 'no';
 
   @override
   Stream<bool> get completed => completedEvents.stream;

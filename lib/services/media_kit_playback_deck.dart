@@ -495,9 +495,12 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
         // The on_load hook blocks event delivery. Use the synchronous native
         // property setter rather than media_kit's event-acknowledged volume API.
         await _engine.setProperty('volume', _mpvVolume.toString());
-        // With no following entry, completion must wait for the audible tail.
-        await _engine.setProperty('gapless-audio', 'no');
         if (_disposed || token != _token || revision != _nextRevision) return;
+        unawaited(
+          _drainOnceStarted(token, revision).catchError(
+            (Object error) => _log.w('Gapless drain setting: $error'),
+          ),
+        );
         onStarted();
       });
       return !_disposed && token == _token && revision == _nextRevision;
@@ -506,6 +509,29 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
       rethrow;
     }
   }
+
+  /// With no following entry, completion must wait for the audible tail, so
+  /// `gapless-audio` goes back to `no`. mpv decides whether the queued song
+  /// keeps the open device only when that song's first audio is ready, after
+  /// the load hook returns: `no` set inside the hook closes and reopens the
+  /// device at every song change. `seeking` reads `yes` until that decision
+  /// is made, and nothing while the file still loads.
+  Future<void> _drainOnceStarted(int token, int revision) async {
+    for (var attempt = 0; attempt < _startPolls; attempt++) {
+      if (_disposed || token != _token || revision != _nextRevision) return;
+      if (await _engine.getProperty('seeking') == 'no') break;
+      await Future<void>.delayed(_startPoll);
+    }
+    // A newer queued song or source owns the setting by now.
+    if (_disposed || token != _token || revision != _nextRevision) return;
+    await _engine.setProperty('gapless-audio', 'no');
+  }
+
+  static const _startPoll = Duration(milliseconds: 20);
+
+  /// Ten seconds: a song that has not started by then loses only the
+  /// retained device, not its ending.
+  static const _startPolls = 500;
 
   @override
   Future<void> clearNextSource() async {
