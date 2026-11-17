@@ -13,6 +13,7 @@ import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/android_tv.dart';
@@ -161,7 +162,8 @@ class QueueSwipe extends StatefulWidget {
 class _QueueSwipeState extends State<QueueSwipe>
     with SingleTickerProviderStateMixin {
   /// Critically damped, so the row never passes its rest position and
-  /// flashes the other action.
+  /// flashes the other action. Mornye returns on its standard spring, which
+  /// has no bounce either.
   static final _returnSpring = SpringDescription.withDampingRatio(
     mass: 1,
     stiffness: M3EMotion.expressiveSpatialFast.stiffness,
@@ -279,11 +281,23 @@ class _QueueSwipeState extends State<QueueSwipe>
         (velocity.abs() >= QueueSwipe.flingVelocity &&
             velocity.sign == drag.sign &&
             drag.abs() >= _threshold / 2);
-    _settle();
+    _settle(_rowVelocity(drag, velocity));
     if (commit && drag != 0) _run(playNext: _playsNext(drag));
   }
 
-  void _settle() {
+  /// How fast the row moves for a finger moving at [velocity] at [drag]:
+  /// one to one up to the threshold, with the resistance beyond it, and not
+  /// at all against its stop.
+  double _rowVelocity(double drag, double velocity) {
+    final distance = drag.abs();
+    if (distance <= _threshold) return velocity;
+    return _visualOffset(drag).abs() < _width / 2 ? velocity * 0.3 : 0;
+  }
+
+  /// Returns the row to rest from the [velocity] it had when the finger let
+  /// go, in pixels a second. A flick back toward rest is capped where the
+  /// critically damped spring would carry the row past it.
+  void _settle([double velocity = 0]) {
     _haptic.reset();
     _drag = 0;
     if (!mounted) return;
@@ -291,15 +305,23 @@ class _QueueSwipeState extends State<QueueSwipe>
       _offset.value = 0;
       return;
     }
+    final spring = context.isMornye
+        ? MornyeMotion.standardSpring
+        : _returnSpring;
+    final offset = _offset.value;
+    final limit = math.sqrt(spring.stiffness / spring.mass) * offset.abs();
+    final start = velocity.sign == offset.sign || offset == 0
+        ? velocity
+        : velocity.clamp(-limit, limit);
     // The spring stops within half a pixel; land exactly on rest unless a
     // new drag took the row over.
     _offset
         .animateWith(
           SpringSimulation(
-            _returnSpring,
-            _offset.value,
+            spring,
+            offset,
             0,
-            0,
+            start,
             tolerance: const Tolerance(distance: 0.5, velocity: 10),
           ),
         )
@@ -445,6 +467,11 @@ class _QueueSwipeState extends State<QueueSwipe>
         ? (reached ? colorScheme.onPrimary : colorScheme.onPrimaryContainer)
         : (reached ? colorScheme.onTertiary : colorScheme.onTertiaryContainer);
     final scale = expressive ? 0.7 + 0.45 * progress : 1.0;
+    // The fill deepens on the fast effects spring.
+    final deepen = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+    );
     return Padding(
       padding: widget.margin,
       child: Align(
@@ -454,9 +481,8 @@ class _QueueSwipeState extends State<QueueSwipe>
           child: ClipRRect(
             borderRadius: widget.borderRadius,
             child: AnimatedContainer(
-              duration: expressive
-                  ? const Duration(milliseconds: 150)
-                  : Duration.zero,
+              duration: deepen.duration,
+              curve: deepen.curve,
               color: fill,
               child: OverflowBox(
                 minWidth: 0,

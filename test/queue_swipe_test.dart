@@ -153,6 +153,56 @@ void main() {
     });
   });
 
+  group('release', () {
+    for (final mornye in [false, true]) {
+      testWidgets('a flung row keeps the finger\'s speed before it returns '
+          '(Mornye: $mornye)', (tester) async {
+        await pumpList(tester, mornye: mornye);
+        final rest = tester.getTopLeft(song(0)).dx;
+        await tester.fling(song(0), const Offset(100, 0), 1500);
+        await tester.pump();
+        final released = tester.getTopLeft(song(0)).dx;
+        // The touch slop is not part of the swipe.
+        expect(released, greaterThan(rest + 70));
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(tester.getTopLeft(song(0)).dx, greaterThan(released));
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(song(0)).dx, rest);
+        expect(queued, [true]);
+      });
+
+      testWidgets('a flick back toward rest never carries the row past it '
+          '(Mornye: $mornye)', (tester) async {
+        await pumpList(tester, mornye: mornye);
+        final rest = tester.getTopLeft(song(0)).dx;
+        final gesture = await tester.startGesture(tester.getCenter(song(0)));
+        var time = Duration.zero;
+        for (var i = 0; i < 10; i++) {
+          time += const Duration(milliseconds: 16);
+          await gesture.moveBy(const Offset(10, 0), timeStamp: time);
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        // A pause, then a quick flick most of the way back.
+        time += const Duration(milliseconds: 300);
+        for (var i = 0; i < 5; i++) {
+          time += const Duration(milliseconds: 6);
+          await gesture.moveBy(const Offset(-10, 0), timeStamp: time);
+        }
+        await gesture.up(timeStamp: time);
+        await tester.pump();
+        expect(tester.getTopLeft(song(0)).dx, greaterThan(rest + 20));
+        for (var frame = 0; frame < 40; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(tester.getTopLeft(song(0)).dx, greaterThanOrEqualTo(rest));
+          expect(find.text('Add to queue'), findsNothing);
+        }
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(song(0)).dx, rest);
+        expect(queued, isEmpty);
+      });
+    }
+  });
+
   group('threshold', () {
     testWidgets('a short drag does nothing', (tester) async {
       await pumpList(tester);

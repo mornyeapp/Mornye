@@ -1,6 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
 import 'package:mornye/widgets/player_track_swipe.dart';
 
@@ -270,6 +271,144 @@ void main() {
     expect(builds['0'], replacementBuilds);
     expect(find.text('Song 0 updated'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  group('velocity and interruption', () {
+    Future<void> pumpQueue(WidgetTester tester, List<int> selected) =>
+        tester.pumpWidget(
+          MaterialApp(
+            theme: MornyeTheme.build(Brightness.dark),
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 300,
+                  child: PlayerTrackSwipe(
+                    queue: queue,
+                    currentIndex: 1,
+                    onSelected: (item) async =>
+                        selected.add(queue.indexOf(item)),
+                    child: PlayerTrackSwipeTitles(
+                      current: queue[1],
+                      builder: (item) => Text(item.title),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    /// How far the titles move in the first frame after a 100 px swipe
+    /// toward the next song is let go at [speed] pixels a second.
+    Future<double> firstFrameTravel(WidgetTester tester, double speed) async {
+      final selected = <int>[];
+      await pumpQueue(tester, selected);
+      final title = find.text('Song 1');
+      if (speed == 0) {
+        final gesture = await tester.startGesture(tester.getCenter(title));
+        for (var i = 0; i < 10; i++) {
+          await gesture.moveBy(const Offset(-10, 0));
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        // Held still long enough that the release carries no speed.
+        await tester.pump(const Duration(milliseconds: 200));
+        await gesture.up();
+      } else {
+        await tester.fling(title, const Offset(-100, 0), speed);
+      }
+      await tester.pump();
+      final released = tester.getTopLeft(title).dx;
+      await tester.pump(const Duration(milliseconds: 16));
+      final travel = released - tester.getTopLeft(title).dx;
+      await tester.pumpAndSettle();
+      expect(selected, [2]);
+      return travel;
+    }
+
+    testWidgets('a flung skip keeps the finger\'s speed', (tester) async {
+      final still = await firstFrameTravel(tester, 0);
+      final flung = await firstFrameTravel(tester, 1500);
+      expect(still, greaterThan(0));
+      // At 1500 px/s the finger covers 24 px in a 16 ms frame.
+      expect(flung - still, greaterThan(12));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a swipe takes over titles returning to rest where they are', (
+      tester,
+    ) async {
+      final selected = <int>[];
+      await pumpQueue(tester, selected);
+      final title = find.text('Song 1');
+      final rest = tester.getTopLeft(title).dx;
+      final first = await tester.startGesture(tester.getCenter(title));
+      for (var i = 0; i < 6; i++) {
+        await first.moveBy(const Offset(-10, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pump(const Duration(milliseconds: 200));
+      await first.up();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 32));
+      final caught = tester.getTopLeft(title).dx;
+      expect(caught, inExclusiveRange(rest - 60, rest));
+
+      // The titles follow the finger from where they are drawn instead of
+      // finishing their return first.
+      final second = await tester.startGesture(
+        tester.getCenter(find.byType(PlayerTrackSwipeTitles)),
+      );
+      await second.moveBy(const Offset(20, 0));
+      await tester.pump();
+      expect(tester.getTopLeft(title).dx, closeTo(caught + 20, 1));
+      await second.moveBy(const Offset(10, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.getTopLeft(title).dx, closeTo(caught + 30, 1));
+      await second.up();
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(title).dx, closeTo(rest, 0.5));
+      expect(selected, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final mornye in [false, true]) {
+      testWidgets('mini player titles flung away keep moving before they '
+          'return (Mornye: $mornye)', (tester) async {
+        final releases = <double>[];
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: mornye ? MornyeTheme.build(Brightness.dark) : null,
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 300,
+                  child: PlayerTrackSwipe.follow(
+                    onRelease: (details, travel) => releases.add(travel),
+                    child: PlayerTrackSwipeTitles(
+                      current: queue[0],
+                      builder: (item) => Text(item.title),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        final title = find.text('Song 0');
+        final rest = tester.getTopLeft(title).dx;
+        // Past the commit distance, where the titles meet resistance.
+        await tester.fling(title, const Offset(-60, 0), 1500);
+        await tester.pump();
+        final released = tester.getTopLeft(title).dx;
+        expect(released, lessThan(rest - 48));
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(tester.getTopLeft(title).dx, lessThan(released));
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(title).dx, closeTo(rest, 0.5));
+        expect(releases, hasLength(1));
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 
   testWidgets('queue left swipe removes just that occurrence', (tester) async {

@@ -585,4 +585,170 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  group('a released drag keeps the finger\'s velocity', () {
+    const mini = Rect.fromLTWH(20, 700, 360, 64);
+
+    /// How far [surface] moved in the first frame after a drag of [drag]
+    /// (a fraction of the page) is let go at [velocity] pixels a second.
+    Future<double> firstFrameTravel(
+      WidgetTester tester, {
+      required ThemeData theme,
+      required double drag,
+      required double velocity,
+      required Key surface,
+      bool geometry = false,
+    }) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          theme: theme,
+          home: const SizedBox(),
+        ),
+      );
+      final route = _TestPlayerRoute(
+        miniPlayerGeometry: geometry
+            ? () =>
+                  (surface: mini, artwork: const Rect.fromLTWH(28, 710, 44, 44))
+            : null,
+      );
+      navigator.currentState!.push(route);
+      await tester.pumpAndSettle();
+      route.startDrag();
+      route.updateDrag(
+        DragUpdateDetails(
+          globalPosition: Offset(0, 800 * drag),
+          primaryDelta: 800 * drag,
+          delta: Offset(0, 800 * drag),
+        ),
+        800,
+      );
+      await tester.pump();
+      route.endDrag(
+        DragEndDetails(
+          velocity: Velocity(pixelsPerSecond: Offset(0, velocity)),
+          primaryVelocity: velocity,
+        ),
+        800,
+      );
+      await tester.pump();
+      final released = tester.getTopLeft(find.byKey(surface)).dy;
+      await tester.pump(const Duration(milliseconds: 16));
+      final travel = tester.getTopLeft(find.byKey(surface)).dy - released;
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      return travel;
+    }
+
+    testWidgets('a Material page flung down closes faster than one let go', (
+      tester,
+    ) async {
+      final still = await firstFrameTravel(
+        tester,
+        theme: AppTheme.light(),
+        drag: 0.4,
+        velocity: 0,
+        surface: _sheet,
+      );
+      final flung = await firstFrameTravel(
+        tester,
+        theme: AppTheme.light(),
+        drag: 0.4,
+        velocity: 1500,
+        surface: _sheet,
+      );
+      expect(still, greaterThan(0));
+      // At 1500 px/s the finger covers 24 px in a 16 ms frame.
+      expect(flung - still, greaterThan(12));
+    });
+
+    testWidgets('a page flung up settles open faster than one let go', (
+      tester,
+    ) async {
+      for (final theme in [
+        AppTheme.light(),
+        MornyeTheme.build(Brightness.dark),
+      ]) {
+        final still = await firstFrameTravel(
+          tester,
+          theme: theme,
+          drag: 0.2,
+          velocity: 0,
+          surface: _sheet,
+        );
+        final flung = await firstFrameTravel(
+          tester,
+          theme: theme,
+          drag: 0.2,
+          velocity: -1500,
+          surface: _sheet,
+        );
+        expect(still, lessThan(0));
+        expect(still - flung, greaterThan(12));
+      }
+    });
+
+    testWidgets('the Mornye shrink starts from the finger\'s velocity', (
+      tester,
+    ) async {
+      const minimize = ValueKey('player-minimize-surface');
+      final still = await firstFrameTravel(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        drag: 0.4,
+        velocity: 0,
+        surface: minimize,
+        geometry: true,
+      );
+      final flung = await firstFrameTravel(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        drag: 0.4,
+        velocity: 1500,
+        surface: minimize,
+        geometry: true,
+      );
+      expect(still, greaterThan(0));
+      expect(flung - still, greaterThan(8));
+    });
+
+    testWidgets('reduced motion settles a let-go drag at once', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(navigatorKey: navigator, home: const SizedBox()),
+      );
+      final route = _TestPlayerRoute();
+      navigator.currentState!.push(route);
+      await tester.pumpAndSettle();
+      route.startDrag();
+      route.updateDrag(
+        DragUpdateDetails(
+          globalPosition: const Offset(0, 120),
+          primaryDelta: 120,
+          delta: const Offset(0, 120),
+        ),
+        600,
+      );
+      await tester.pump();
+      route.endDrag(
+        DragEndDetails(
+          velocity: const Velocity(pixelsPerSecond: Offset(0, -900)),
+          primaryVelocity: -900,
+        ),
+        600,
+      );
+      await tester.pump();
+      expect(tester.getTopLeft(find.byKey(_sheet)).dy, 0);
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

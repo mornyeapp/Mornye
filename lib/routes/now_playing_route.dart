@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/physics.dart' show SpringSimulation, Tolerance;
 import 'package:flutter/services.dart' show PredictiveBackEvent;
+import 'package:material_3_expressive/material_3_expressive.dart'
+    show M3EMotion;
 import 'package:mornye/services/app_orientation.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -11,7 +13,8 @@ const kNowPlayingArtworkHeroTag = 'now-playing-artwork';
 
 /// Slide-up route for the full player. Supports live drag-to-dismiss: the
 /// page follows the finger (via [startDrag]/[updateDrag]/[endDrag]) and
-/// settles open or pops based on release position and velocity.
+/// settles open or pops based on release position and velocity. Either way
+/// a spring finishes the move from the finger's velocity.
 ///
 /// With [morph], the player instead grows out of the mini player's bounds
 /// and shrinks back into them on close, and Android's predictive back
@@ -54,6 +57,17 @@ class NowPlayingRoute extends PageRoute<void> {
 
   bool _interactiveTransition = false;
   int _dragGeneration = 0;
+
+  /// The finger's speed when the last drag was let go, in controller units
+  /// a second (positive opens). The spring that finishes the move starts
+  /// from it, once.
+  double _releaseVelocity = 0;
+
+  double _takeReleaseVelocity() {
+    final velocity = _releaseVelocity;
+    _releaseVelocity = 0;
+    return velocity;
+  }
 
   // The player paints an opaque surface over the whole screen, including the
   // status bar and bottom safe area. Once settled, the framework therefore
@@ -149,23 +163,50 @@ class NowPlayingRoute extends PageRoute<void> {
   /// judges the app's other springs.
   static const _exitTolerance = Tolerance(distance: 0.002, velocity: 0.02);
 
-  /// The Material shrink runs on [_exitSpring] from wherever the page is,
-  /// so a released drag or back gesture carries on without a seam.
+  /// Mornye moves the page on its own springs, which shape the motion
+  /// themselves: the controller's value is then the page's position, as it
+  /// is while a finger moves the page. Material's slide keeps its curve.
+  bool _mornyeSprings(BuildContext? context) =>
+      morph == null && context != null && context.isMornye;
+
+  /// Where the page sits for a controller [value].
+  double _slideAt(double value) =>
+      _interactiveTransition || _mornyeSprings(navigator?.context)
+      ? value
+      : Easing.emphasizedDecelerate.transform(value);
+
+  SpringSimulation _spring(
+    SpringDescription spring,
+    double end,
+    double velocity,
+  ) => SpringSimulation(
+    spring,
+    controller!.value,
+    end,
+    velocity,
+    tolerance: _exitTolerance,
+    snapToEnd: true,
+  );
+
+  /// Mornye opens on its full-screen spring and closes on the shorter
+  /// standard one. The Material shrink runs on [_exitSpring], and so does a
+  /// Material slide a finger let go. Each starts from wherever the page is
+  /// and from the finger's velocity, so a released drag or back gesture
+  /// carries on without a seam.
   @override
   Simulation? createSimulation({required bool forward}) {
-    if (forward ||
-        _dismissTarget == null ||
-        (morph?.duration ?? Duration.zero) == Duration.zero) {
-      return null;
+    final velocity = _takeReleaseVelocity();
+    if (_reduceMotion) return null;
+    final mornye = _mornyeSprings(navigator?.context);
+    if (forward) {
+      return mornye ? _spring(MornyeMotion.slowSpring, 1, velocity) : null;
     }
-    return SpringSimulation(
-      _exitSpring,
-      controller!.value,
-      0,
-      0,
-      tolerance: _exitTolerance,
-      snapToEnd: true,
-    );
+    if (mornye) return _spring(MornyeMotion.standardSpring, 0, velocity);
+    final shrinks =
+        _dismissTarget != null &&
+        (morph?.duration ?? Duration.zero) > Duration.zero;
+    if (!shrinks && !_interactiveTransition) return null;
+    return _spring(_exitSpring, 0, velocity);
   }
 
   Rect _openRect(Size size, double value) => Rect.lerp(
@@ -176,6 +217,7 @@ class NowPlayingRoute extends PageRoute<void> {
 
   void startDrag() {
     _dragGeneration++;
+    _releaseVelocity = 0;
     // A drag takes over a cancelled back gesture still settling open.
     if (isCurrent) _clearDismiss();
     if (_openFrom != null) {
@@ -184,10 +226,9 @@ class NowPlayingRoute extends PageRoute<void> {
       controller?.value = 1;
     }
     controller?.stop();
-    if (!_interactiveTransition && controller != null) {
-      controller!.value = Easing.emphasizedDecelerate.transform(
-        controller!.value,
-      );
+    // The page stays where it is drawn while the drag takes over.
+    if (controller case final controller?) {
+      controller.value = _slideAt(controller.value);
     }
     _interactiveTransition = true;
     changedInternalState();
@@ -200,6 +241,8 @@ class NowPlayingRoute extends PageRoute<void> {
   void endDrag(DragEndDetails details, double pageHeight) {
     final velocity = (details.primaryVelocity ?? 0) / pageHeight;
     final value = controller?.value ?? 1.0;
+    // The finger moves down, the controller toward zero.
+    _releaseVelocity = -velocity;
     if (velocity > 1.0 || (velocity >= 0 && value < 0.7)) {
       navigator?.pop();
     } else {
@@ -208,24 +251,37 @@ class NowPlayingRoute extends PageRoute<void> {
   }
 
   void cancelDrag() {
+    _releaseVelocity = 0;
     _settleOpen();
   }
 
+  /// Returns the page to open on the style's page spring, from the finger's
+  /// velocity: Material's standard spatial spring, which stops at the top,
+  /// or Mornye's standard spring. Reduced motion puts it back at once.
   void _settleOpen() {
     final generation = _dragGeneration;
+    final velocity = _takeReleaseVelocity();
+    final controller = this.controller;
+    if (controller == null) return;
+    void settled() {
+      if (generation != _dragGeneration || !isCurrent) return;
+      _interactiveTransition = false;
+      changedInternalState();
+    }
+
+    if (_reduceMotion) {
+      controller.value = 1;
+      settled();
+      return;
+    }
     // Keep the same linear position mapping until settling finishes. Switching
     // to the entrance curve on release jumps away from the finger's position.
+    final spring = (navigator?.context.isMornye ?? false)
+        ? MornyeMotion.standardSpring
+        : M3EMotion.spatialDefault.toDescription();
     controller
-        ?.animateTo(
-          1,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-        )
-        .whenCompleteOrCancel(() {
-          if (generation != _dragGeneration || !isCurrent) return;
-          _interactiveTransition = false;
-          changedInternalState();
-        });
+        .animateWith(_spring(spring, 1, velocity))
+        .whenCompleteOrCancel(settled);
   }
 
   @override
@@ -264,9 +320,7 @@ class NowPlayingRoute extends PageRoute<void> {
     if (opening != null) {
       _dismissStart = opening;
     } else {
-      final position = _interactiveTransition
-          ? _dismissStartValue
-          : Easing.emphasizedDecelerate.transform(_dismissStartValue);
+      final position = _slideAt(_dismissStartValue);
       _dismissStart = Rect.fromLTWH(
         0,
         size.height * (1 - position),
@@ -375,11 +429,11 @@ class NowPlayingRoute extends PageRoute<void> {
     // Restoring portrait can resize the window during dismissal. Geometry
     // captured in landscape no longer points at the mini player in that case.
     if (target != null && _dismissSize == size) {
-      final travel = (1 - animation.value / _dismissStartValue).clamp(0.0, 1.0);
-      // The Material shrink already moves on a spring simulation.
-      final progress = morph != null
-          ? travel
-          : Curves.easeInOutCubic.transform(travel);
+      // The shrink runs on a spring simulation in both styles.
+      final progress = (1 - animation.value / _dismissStartValue).clamp(
+        0.0,
+        1.0,
+      );
       final cover = _dismissArtwork;
       return Stack(
         fit: StackFit.expand,
@@ -463,7 +517,7 @@ class NowPlayingRoute extends PageRoute<void> {
     // independent cover flight back to the mini-player on button/back pop.
     final inPlacePop =
         reversing && !_interactiveTransition && !context.isMornye;
-    final slide = _interactiveTransition
+    final slide = _interactiveTransition || _mornyeSprings(context)
         ? animation
         : animation.drive(CurveTween(curve: Easing.emphasizedDecelerate));
     final position = inPlacePop
