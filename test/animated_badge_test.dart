@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -45,14 +47,32 @@ void main() {
     }
   });
 
-  testWidgets('Material settles from 1.15 on a spring', (tester) async {
+  /// Pumps frames until the bump settles and returns the lowest and highest
+  /// scales seen.
+  Future<(double, double)> track(WidgetTester tester) async {
+    var low = scale(tester);
+    var high = low;
+    for (var frame = 0; frame < 60; frame++) {
+      await tester.pump(const Duration(milliseconds: 8));
+      low = math.min(low, scale(tester));
+      high = math.max(high, scale(tester));
+    }
+    await tester.pumpAndSettle();
+    return (low, high);
+  }
+
+  testWidgets('Material pushes from 1 on its fast spatial spring', (
+    tester,
+  ) async {
     await pumpBadge(tester, count: 1);
     expect(scale(tester), 1);
     await pumpBadge(tester, count: 2);
-    expect(scale(tester), closeTo(1.15, 0.001));
-    await tester.pump(const Duration(milliseconds: 60));
-    expect(scale(tester), lessThan(1.15));
-    await tester.pumpAndSettle();
+    // The bump starts from the scale on screen, not from its peak.
+    expect(scale(tester), 1);
+    final (low, high) = await track(tester);
+    expect(high, closeTo(1 + AnimatedBadge.bumpHeight, 0.01));
+    // The expressive spring dips slightly below rest on the way back.
+    expect(low, lessThan(1));
     expect(scale(tester), 1);
 
     // A lower count does not bump.
@@ -60,13 +80,42 @@ void main() {
     expect(scale(tester), 1);
   });
 
-  testWidgets('Mornye keeps its eased bump', (tester) async {
+  testWidgets('Mornye pushes on its fast spring without a bounce', (
+    tester,
+  ) async {
     await pumpBadge(tester, count: 1, mornye: true);
     await pumpBadge(tester, count: 2, mornye: true);
     expect(scale(tester), 1);
-    await tester.pump(const Duration(milliseconds: 120));
-    expect(scale(tester), closeTo(1.3, 0.01));
-    await tester.pumpAndSettle();
+    final (low, high) = await track(tester);
+    expect(high, closeTo(1 + AnimatedBadge.bumpHeight, 0.01));
+    expect(low, greaterThanOrEqualTo(1 - 1e-6));
     expect(scale(tester), 1);
+  });
+
+  testWidgets('a count that grows mid-bump goes on from the scale on screen', (
+    tester,
+  ) async {
+    for (final mornye in [false, true]) {
+      await pumpBadge(tester, count: 1, mornye: mornye);
+      await pumpBadge(tester, count: 2, mornye: mornye);
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
+      final before = scale(tester);
+      expect(before, greaterThan(1.05));
+
+      await pumpBadge(tester, count: 3, mornye: mornye);
+      expect(scale(tester), before);
+      var previous = before;
+      for (var frame = 0; frame < 3; frame++) {
+        await tester.pump(const Duration(milliseconds: 8));
+        // No restart from 1: each frame moves on from the last one.
+        expect(scale(tester), greaterThan(1.05));
+        expect((scale(tester) - previous).abs(), lessThan(0.1));
+        previous = scale(tester);
+      }
+      await tester.pumpAndSettle();
+      expect(scale(tester), 1);
+      await tester.pumpWidget(const SizedBox());
+    }
   });
 }

@@ -1,5 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:flutter/physics.dart';
+import 'package:material_3_expressive/material_3_expressive.dart'
+    show M3EMotion;
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
@@ -1492,7 +1495,7 @@ class _TopResultsSkeleton extends StatelessWidget {
   }
 }
 
-/// Crossfades when the child's runtime type changes — used to swap a loading
+/// Crossfades when the child's runtime type changes: used to swap a loading
 /// skeleton for the loaded screen without a single-frame hard cut.
 class SkeletonCrossfade extends StatelessWidget {
   final Widget child;
@@ -1501,8 +1504,15 @@ class SkeletonCrossfade extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A dissolve, so it stays with reduced motion as well.
+    final fade = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 250), Curves.linear),
+    );
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 250),
+      duration: fade.duration,
+      switchInCurve: fade.curve,
+      switchOutCurve: fade.curve,
       // Loading and loaded screens may carry the same Hero tag (both render
       // the header cover); mute the outgoing child's heroes so a pop during
       // the fade doesn't find duplicate tags.
@@ -1548,6 +1558,10 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
       context,
       const AppMotionSpec(Duration(milliseconds: 200), Curves.linear),
     );
+    final tick = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 150), Curves.linear),
+    );
     return AnimatedContainer(
       duration: fill.duration,
       curve: fill.curve,
@@ -1564,7 +1578,9 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
         ),
       ),
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 150),
+        duration: tick.duration,
+        switchInCurve: tick.curve,
+        switchOutCurve: tick.curve,
         child: selected
             ? Icon(
                 Icons.check,
@@ -1583,13 +1599,21 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
 }
 
 /// Wraps a [Badge] child and plays a brief scale-bump whenever [count] grows.
-/// Material settles from 1.15 on the fast spatial spring; Mornye keeps its
-/// eased bump; reduced motion shows the new count without one.
+///
+/// The bump is a push on a spring at rest at scale 1: it rises to about
+/// 1.15 and settles back, on Material's fast spatial spring (which dips
+/// slightly below 1 on the way) or on Mornye's fast spring (which does
+/// not). A count that grows again mid-bump pushes from the scale and speed
+/// on screen instead of starting over. Reduced motion shows the new count
+/// without one.
 class AnimatedBadge extends StatefulWidget {
   final int count;
   final Widget child;
 
   const AnimatedBadge({super.key, required this.count, required this.child});
+
+  /// How far above 1 a bump from rest reaches.
+  static const bumpHeight = 0.15;
 
   @override
   State<AnimatedBadge> createState() => _AnimatedBadgeState();
@@ -1597,21 +1621,27 @@ class AnimatedBadge extends StatefulWidget {
 
 class _AnimatedBadgeState extends State<AnimatedBadge>
     with SingleTickerProviderStateMixin {
-  static const _bump = AppMotionSpec(
-    Duration(milliseconds: 300),
-    Curves.linear,
-  );
+  static final _materialSpring = M3EMotion.expressiveSpatialFast
+      .toDescription();
+  static final _materialPush = _pushFor(_materialSpring);
+  static final _mornyePush = _pushFor(MornyeMotion.fastSpring);
 
-  // At rest (1) both scales are 1.
-  late final AnimationController _controller = AnimationController(
+  /// The speed, in scale units a second, at which a push from rest on
+  /// [spring] peaks at [AnimatedBadge.bumpHeight].
+  static double _pushFor(SpringDescription spring) {
+    final probe = SpringSimulation(spring, 0, 0, 1);
+    var peak = 0.0;
+    for (var t = 0.0; t < 1; t += 1 / 1000) {
+      peak = math.max(peak, probe.x(t));
+    }
+    return AnimatedBadge.bumpHeight / peak;
+  }
+
+  // The controller holds the scale itself; at rest it is 1.
+  late final AnimationController _controller = AnimationController.unbounded(
     vsync: this,
     value: 1,
   );
-  late final Animation<double> _bumpScale = TweenSequence<double>([
-    TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.3), weight: 40),
-    TweenSequenceItem(tween: Tween(begin: 1.3, end: 1.0), weight: 60),
-  ]).animate(_controller);
-  late Animation<double> _scaleAnimation = _bumpScale;
   int _previousCount = 0;
 
   @override
@@ -1625,18 +1655,19 @@ class _AnimatedBadgeState extends State<AnimatedBadge>
     super.didUpdateWidget(oldWidget);
     if (widget.count > _previousCount &&
         !MediaQuery.disableAnimationsOf(context)) {
-      final motion = AppMotion.spatialFast(context, _bump);
-      _scaleAnimation = materialExpressiveEnabled(context)
-          ? _controller.drive(
-              Tween<double>(
-                begin: 1.15,
-                end: 1,
-              ).chain(CurveTween(curve: motion.curve)),
-            )
-          : _bumpScale;
-      _controller
-        ..duration = motion.duration
-        ..forward(from: 0);
+      final mornye = context.isMornye;
+      final push = mornye ? _mornyePush : _materialPush;
+      // A badge already rising faster than a push keeps its speed.
+      _controller.animateWith(
+        SpringSimulation(
+          mornye ? MornyeMotion.fastSpring : _materialSpring,
+          _controller.value,
+          1,
+          math.max(_controller.velocity, push),
+          // Rests at exactly 1, so the badge is not left a hair off scale.
+          snapToEnd: true,
+        ),
+      );
     }
     _previousCount = widget.count;
   }
@@ -1649,6 +1680,6 @@ class _AnimatedBadgeState extends State<AnimatedBadge>
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(scale: _scaleAnimation, child: widget.child);
+    return ScaleTransition(scale: _controller, child: widget.child);
   }
 }
