@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/scroll_edge_fade.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
@@ -35,21 +37,33 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
 
   void _nextPage() {
     if (_currentPage < _totalPages - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeOutQuart,
-      );
+      _turnToPage(_currentPage + 1);
     } else {
       _completeTutorial();
     }
   }
 
-  void _prevPage() {
-    _pageController.previousPage(
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.easeOutQuart,
+  void _prevPage() => _turnToPage(_currentPage - 1);
+
+  /// A page moves on the slow spatial spring, which stops at the page
+  /// without overshoot; reduced motion shows the page at once.
+  void _turnToPage(int page) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pageController.jumpToPage(page);
+      return;
+    }
+    final motion = AppMotion.spatialSlow(context, _pageMotion);
+    _pageController.animateToPage(
+      page,
+      duration: motion.duration,
+      curve: motion.curve,
     );
   }
+
+  static const _pageMotion = AppMotionSpec(
+    Duration(milliseconds: 600),
+    Curves.easeOutQuart,
+  );
 
   void _completeTutorial() {
     ref.read(settingsProvider.notifier).setTutorialComplete();
@@ -75,6 +89,15 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     final activeIndicatorWidth = 32 * scale;
     final bottomGap = (32 * scale) + ((textScale - 1) * 8);
     final actionButtonHeight = (56 * scale) + ((textScale - 1) * 6);
+    final backFade = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 300), Curves.linear),
+    );
+    final indicatorMotion = AppMotion.spatialFast(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+      mornye: MornyeMotion.fast,
+    );
 
     final scaffold = Scaffold(
       backgroundColor: colorScheme.surface,
@@ -91,7 +114,8 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     AnimatedOpacity(
-                      duration: const Duration(milliseconds: 300),
+                      duration: backFade.duration,
+                      curve: backFade.curve,
                       opacity: _currentPage > 0 ? 1.0 : 0.0,
                       child: AppIconButton.filledTonal(
                         onPressed: _currentPage > 0 ? _prevPage : null,
@@ -221,9 +245,11 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(_totalPages, (index) {
                         final isActive = _currentPage == index;
+                        // The fast spatial spring overshoots by itself in
+                        // Material; Mornye settles without a bounce.
                         return AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutBack,
+                          duration: indicatorMotion.duration,
+                          curve: indicatorMotion.curve,
                           margin: EdgeInsets.symmetric(horizontal: 4 * scale),
                           height: pageIndicatorHeight,
                           width: isActive
@@ -302,52 +328,40 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     List<(IconData, String)> features,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
+    // The tips rise one after another on the spatial spring and fade in on
+    // the effects spring; reduced motion shows them at once.
     return Column(
       children: features.asMap().entries.map((entry) {
         final index = entry.key;
         final feature = entry.value;
-        return TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: 1),
-          duration: Duration(milliseconds: 600 + (index * 200)),
-          curve: Curves.easeOutQuart,
-          builder: (context, value, child) {
-            return Transform.translate(
-              offset: Offset(0, 20 * (1 - value)),
-              child: Opacity(
-                opacity: value,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Icon(
-                          feature.$1,
-                          size: 24,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Text(
-                          feature.$2,
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(
-                                color: colorScheme.onSurface,
-                                fontWeight: FontWeight.w500,
-                              ),
-                        ),
-                      ),
-                    ],
+        return StaggeredListItem(
+          index: index,
+          staggerDelay: const Duration(milliseconds: 100),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(feature.$1, size: 24, color: colorScheme.primary),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Text(
+                    feature.$2,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              ],
+            ),
+          ),
         );
       }).toList(),
     );
@@ -412,6 +426,13 @@ class _InteractiveSearchExampleState extends State<_InteractiveSearchExample> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    // The demo frame grows on the default spatial spring, whose overshoot
+    // stays under a pixel at this size; reduced motion resizes at once.
+    final grow = AppMotion.spatial(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+      mornye: MornyeMotion.standard,
+    );
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -436,10 +457,9 @@ class _InteractiveSearchExampleState extends State<_InteractiveSearchExample> {
             },
           ),
 
-          AnimatedSize(
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeOutBack,
-            child: _showResult
+          _resize(
+            grow,
+            _showResult
                 // The result is a plain row inside the demo frame, not a
                 // second card.
                 ? Padding(
@@ -504,6 +524,16 @@ class _InteractiveSearchExampleState extends State<_InteractiveSearchExample> {
       ),
     );
   }
+
+  // A zero-length AnimatedSize re-dirties itself during layout.
+  static Widget _resize(AppMotionSpec motion, Widget child) =>
+      motion.duration == Duration.zero
+      ? child
+      : AnimatedSize(
+          duration: motion.duration,
+          curve: motion.curve,
+          child: child,
+        );
 }
 
 class _InteractiveDownloadExample extends StatefulWidget {
@@ -551,6 +581,10 @@ class _InteractiveDownloadExampleState
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final tint = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 300), Curves.linear),
+    );
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = constraints.maxWidth;
@@ -639,7 +673,8 @@ class _InteractiveDownloadExampleState
                       widthFactor: 1,
                       heightFactor: 1,
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
+                        duration: tint.duration,
+                        curve: tint.curve,
                         padding: EdgeInsets.all(buttonPadding),
                         decoration: BoxDecoration(
                           color: _isCompleted
@@ -713,6 +748,18 @@ class _TutorialPage extends StatelessWidget {
     final scale = (shortestSide / 390).clamp(0.86, 1.05);
 
     final isActive = currentIndex == index;
+    // The icon drops into place on the default spatial spring, which lands
+    // with a slight overshoot in Material and none in Mornye; the text
+    // fades on the effects spring.
+    final drop = AppMotion.spatial(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+      mornye: MornyeMotion.standard,
+    );
+    final fade = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 500), Curves.easeOut),
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -739,8 +786,8 @@ class _TutorialPage extends StatelessWidget {
                   children: [
                     SizedBox(height: topGap),
                     AnimatedContainer(
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.easeOutBack,
+                      duration: drop.duration,
+                      curve: drop.curve,
                       transform: Matrix4.translationValues(
                         0,
                         isActive ? 0 : -20,
@@ -759,9 +806,9 @@ class _TutorialPage extends StatelessWidget {
                     ),
                     SizedBox(height: iconTextGap),
                     AnimatedOpacity(
-                      duration: const Duration(milliseconds: 500),
+                      duration: fade.duration,
                       opacity: isActive ? 1.0 : 0.0,
-                      curve: Curves.easeOut,
+                      curve: fade.curve,
                       child: Text(
                         title,
                         style: Theme.of(context).textTheme.headlineLarge
@@ -775,9 +822,9 @@ class _TutorialPage extends StatelessWidget {
                     ),
                     SizedBox(height: descriptionGap),
                     AnimatedOpacity(
-                      duration: const Duration(milliseconds: 500),
+                      duration: fade.duration,
                       opacity: isActive ? 1.0 : 0.0,
-                      curve: Curves.easeOut,
+                      curve: fade.curve,
                       child: Text(
                         description,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(

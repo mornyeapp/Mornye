@@ -6,6 +6,7 @@ import 'package:material_3_expressive/material_3_expressive.dart'
     show M3EShapeKind;
 import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
@@ -26,6 +27,9 @@ const lyricsShareMaxLines = 5;
 const lyricsShareCardSize = Size(360, 640);
 
 typedef LyricsShareLine = ({String text, bool background});
+
+/// Reduced motion: the pickers change at once.
+const _still = AppMotionSpec(Duration.zero, Curves.linear);
 
 /// Lines a card can quote: timed lines in order, or the plain text's lines.
 List<LyricsShareLine> lyricsShareLines(ParsedLyrics lyrics) {
@@ -413,7 +417,13 @@ class _BackgroundPicker extends StatelessWidget {
         colors: [Color(0xFFFFFFFF), Color(0xFFE8E4DC)],
       ),
     };
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    // A small control: the fast spatial spring overshoots by itself in
+    // Material, Mornye settles without a bounce, reduced motion jumps.
+    final morph = AppMotion.spatialFast(
+      context,
+      _still,
+      mornye: MornyeMotion.fast,
+    );
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -445,10 +455,8 @@ class _BackgroundPicker extends StatelessWidget {
                         // The chosen swatch morphs from a circle into a larger
                         // rounded square, the Expressive selection cue.
                         child: AnimatedContainer(
-                          duration: reduceMotion
-                              ? Duration.zero
-                              : const Duration(milliseconds: 260),
-                          curve: Curves.easeOutBack,
+                          duration: morph.duration,
+                          curve: morph.curve,
                           width: option == value ? 42 : 32,
                           height: option == value ? 42 : 32,
                           clipBehavior: Clip.antiAlias,
@@ -511,10 +519,14 @@ class _SelectionCount extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final active = count > 0;
+    final tint = AppMotion.effectsFast(
+      context,
+      _still,
+      mornye: MornyeMotion.effectsFast,
+    );
     return AnimatedContainer(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 200),
+      duration: tint.duration,
+      curve: tint.curve,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: ShapeDecoration(
         color: active ? colors.primaryContainer : colors.surfaceContainerHigh,
@@ -561,9 +573,18 @@ class _LineChoice extends StatelessWidget {
             top: first ? outer : inner,
             bottom: last ? outer : inner,
           );
-    final duration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 220);
+    // The row reshapes on the default spatial spring and its check on the
+    // fast one; reduced motion jumps.
+    final reshape = AppMotion.spatial(
+      context,
+      _still,
+      mornye: MornyeMotion.standard,
+    );
+    final check = AppMotion.spatialFast(
+      context,
+      _still,
+      mornye: MornyeMotion.fast,
+    );
     return Padding(
       padding: EdgeInsets.only(bottom: last ? 0 : 2),
       child: MergeSemantics(
@@ -572,8 +593,8 @@ class _LineChoice extends StatelessWidget {
           // The container clips its own ink, so the press highlight follows
           // the corners while they animate.
           child: AnimatedContainer(
-            duration: duration,
-            curve: Curves.easeOutCubic,
+            duration: reshape.duration,
+            curve: reshape.curve,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: selected
@@ -595,8 +616,8 @@ class _LineChoice extends StatelessWidget {
                     child: Row(
                       children: [
                         AnimatedContainer(
-                          duration: duration,
-                          curve: Curves.easeOutBack,
+                          duration: check.duration,
+                          curve: check.curve,
                           width: 24,
                           height: 24,
                           decoration: BoxDecoration(
