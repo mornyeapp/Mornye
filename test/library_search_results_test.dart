@@ -281,6 +281,8 @@ void main() {
           expect(info, tapPlays ? findsOneWidget : findsNothing);
           expect(play, tapPlays ? findsNothing : findsOneWidget);
           await tester.tap(tapPlays ? info : song);
+          // Details wait a moment for the picture inside the file.
+          await tester.pump(const Duration(milliseconds: 300));
           await tester.pumpAndSettle();
           final details = tester.widget<TrackMetadataScreen>(
             find.byType(TrackMetadataScreen),

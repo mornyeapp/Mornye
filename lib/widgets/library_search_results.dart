@@ -350,6 +350,12 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
           );
           if (!mounted || item == null) return;
           if (!play) {
+            await prepareTrackDetailsCover(
+              context,
+              item.filePath,
+              fallback: item.localCoverPath ?? item.coverUrl,
+            );
+            if (!mounted) return;
             await pushPage<void>(
               context,
               (_) => TrackMetadataScreen(

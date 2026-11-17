@@ -8,7 +8,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:path/path.dart' as p;
 import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/services/cover_store.dart';
+import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 
 class CachedCoverImage extends StatelessWidget {
@@ -534,6 +536,36 @@ Future<void> precacheMetadataBackdrop(
       onError: (_, _) {},
     ).timeout(const Duration(milliseconds: 200));
   } catch (_) {}
+}
+
+/// Readies the cover Track details shows for a song in a file, before the
+/// page is pushed. The page prefers the file's own picture over [fallback]
+/// (the Library's cover) as soon as it knows it; read here first, the page
+/// opens on that picture instead of changing to it a moment later, the
+/// first time a song is opened. A slow read gives up after a short wait and
+/// the page changes cover once it has it.
+Future<void> prepareTrackDetailsCover(
+  BuildContext context,
+  String filePath, {
+  String? fallback,
+}) async {
+  final embedded = await trackDetailsEmbeddedCover(filePath);
+  // Only Material's header has the blurred backdrop.
+  if (!context.mounted || context.isMornye) return;
+  await precacheMetadataBackdrop(context, embedded ?? fallback);
+}
+
+/// The picture inside the song's file, waiting a short while for a first
+/// read. Null when the file has none, or the read is not done in time.
+Future<String?> trackDetailsEmbeddedCover(String filePath) async {
+  if (filePath.startsWith('network://')) return null;
+  try {
+    return await DownloadedEmbeddedCoverResolver.resolveOrExtract(
+      filePath,
+    ).timeout(const Duration(milliseconds: 300));
+  } catch (_) {
+    return null;
+  }
 }
 
 /// Pre-warms the cover cache at the metadata-screen display size so the hero

@@ -181,7 +181,7 @@ extension _QueueTabNavigation on _QueueTabState {
 
     final navigator = Navigator.of(context);
     final embeddedCoverPath = context.isMornye
-        ? DownloadedEmbeddedCoverResolver.resolve(historyItem.filePath)
+        ? await trackDetailsEmbeddedCover(historyItem.filePath)
         : await DownloadedEmbeddedCoverResolver.resolveOrExtract(
             historyItem.filePath,
             onChanged: _onEmbeddedCoverChanged,
@@ -226,7 +226,7 @@ extension _QueueTabNavigation on _QueueTabState {
   }) async {
     final navigator = Navigator.of(context);
     final embeddedCoverPath = context.isMornye
-        ? DownloadedEmbeddedCoverResolver.resolve(item.filePath)
+        ? await trackDetailsEmbeddedCover(item.filePath)
         : await DownloadedEmbeddedCoverResolver.resolveOrExtract(
             item.filePath,
             onChanged: _onEmbeddedCoverChanged,
@@ -275,9 +275,11 @@ extension _QueueTabNavigation on _QueueTabState {
     int? navigationIndex,
   }) async {
     _searchFocusNode.unfocus();
-    if (!context.isMornye) {
-      await precacheMetadataBackdrop(context, item.coverPath);
-    }
+    await prepareTrackDetailsCover(
+      context,
+      item.filePath,
+      fallback: item.coverPath,
+    );
     if (!mounted) return;
     await Navigator.push(
       context,

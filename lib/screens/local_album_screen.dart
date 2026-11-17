@@ -230,6 +230,12 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
 
   Future<void> _openMetadata(LocalLibraryItem track) async {
     final tracks = _sortedTracksCache;
+    await prepareTrackDetailsCover(
+      context,
+      track.filePath,
+      fallback: track.coverPath,
+    );
+    if (!mounted) return;
     await Navigator.of(context).push(
       slidePageRoute<void>(
         page: TrackMetadataScreen(

@@ -307,13 +307,19 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
     );
   }
 
-  Future<void> _openDetails(UnifiedLibraryItem item) {
+  Future<void> _openDetails(UnifiedLibraryItem item) async {
     final local = [for (final item in _items) ?item.localItem];
     final downloads = [for (final item in _items) ?item.historyItem];
     // The details pager steps through one kind of record.
     final localOnly = local.length == _items.length;
     final downloadsOnly = downloads.length == _items.length;
-    return pushPage<void>(
+    await prepareTrackDetailsCover(
+      context,
+      item.filePath,
+      fallback: item.localCoverPath ?? item.coverUrl,
+    );
+    if (!mounted) return;
+    await pushPage<void>(
       context,
       (_) => TrackMetadataScreen(
         item: item.historyItem,

@@ -182,6 +182,8 @@ Future<void> _albumRowTapTest(
     tapPlays ? findsOneWidget : findsNothing,
   );
   await tester.tap(tapPlays ? button : find.text('Song 2'));
+  // Details wait a moment for the picture inside the file.
+  await tester.pump(const Duration(milliseconds: 300));
   await tester.pumpAndSettle();
   final metadata = tester.widget<TrackMetadataScreen>(
     find.byType(TrackMetadataScreen),

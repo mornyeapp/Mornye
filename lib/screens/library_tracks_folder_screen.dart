@@ -1609,7 +1609,11 @@ Future<void> _openCollectionTrack(
   if (!context.mounted) return;
 
   if (localItem != null) {
-    await precacheMetadataBackdrop(context, localItem.coverPath);
+    await prepareTrackDetailsCover(
+      context,
+      localItem.filePath,
+      fallback: localItem.coverPath,
+    );
     if (!context.mounted) return;
     await Navigator.of(context).push(
       slidePageRoute<void>(page: TrackMetadataScreen(localItem: localItem)),
