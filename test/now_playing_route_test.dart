@@ -385,11 +385,17 @@ void main() {
       tester,
     ) async {
       final navigator = await pumpApp(tester);
-      navigator.currentState!.push(route());
+      final player = route();
+      navigator.currentState!.push(player);
       // The first frame lays the route out offstage to measure Heroes.
       await tester.pump();
       await tester.pump();
       expect(tester.getRect(find.byKey(surface)), mini);
+      // The player's own content comes in behind the growing surface.
+      final content = player.contentOpacity(
+        CurveTween(curve: const Interval(0.4, 1)),
+      );
+      expect(content.value, 0);
       await tester.pump(const Duration(milliseconds: 150));
       final growing = tester.getRect(find.byKey(surface));
       expect(growing.top, inExclusiveRange(0, mini.top));
@@ -404,20 +410,41 @@ void main() {
 
       navigator.currentState!.pop();
       await tester.pump();
-      // The shrink only moves toward the mini player, never past it, and
-      // ends sooner than the entrance.
+      // The shrink only moves toward the mini player, never past it, at
+      // the pace of the entrance: still well short of the bar after a
+      // tenth of a second, and done in about half a second.
       var previousTop = 0.0;
       var elapsed = Duration.zero;
       while (find.byKey(minimize).evaluate().isNotEmpty) {
         final top = tester.getRect(find.byKey(minimize)).top;
         expect(top, greaterThanOrEqualTo(previousTop));
         expect(top, lessThanOrEqualTo(mini.top + 0.01));
+        if (elapsed == const Duration(milliseconds: 96)) {
+          expect(top, lessThan(mini.top * 0.6));
+        }
+        // The content stays with the page instead of fading on the spring.
+        expect(content.value, 1);
+        // The player is still on screen most of the way down.
+        if (elapsed == const Duration(milliseconds: 144)) {
+          final opacity = tester
+              .widget<Opacity>(
+                find
+                    .descendant(
+                      of: find.byKey(minimize),
+                      matching: find.byType(Opacity),
+                    )
+                    .first,
+              )
+              .opacity;
+          expect(opacity, greaterThan(0.25));
+        }
         previousTop = top;
         await tester.pump(const Duration(milliseconds: 16));
         elapsed += const Duration(milliseconds: 16);
       }
       expect(previousTop, greaterThan(mini.top - 20));
-      expect(elapsed, lessThan(const Duration(milliseconds: 450)));
+      expect(elapsed, greaterThan(const Duration(milliseconds: 450)));
+      expect(elapsed, lessThan(const Duration(milliseconds: 650)));
       expect(find.byKey(_sheet), findsNothing);
       expect(tester.takeException(), isNull);
     });

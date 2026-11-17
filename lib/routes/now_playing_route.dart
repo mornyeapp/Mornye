@@ -150,12 +150,14 @@ class NowPlayingRoute extends PageRoute<void> {
       ? Duration.zero
       : const Duration(milliseconds: 300);
 
-  /// Moves the Material shrink: critically damped, so the surface never
-  /// passes the mini player, and stiff enough to settle in about 350ms,
-  /// shorter than the slow spatial spring of the entrance (about 485ms).
+  /// Moves the Material shrink on the spring of the entrance, the slow
+  /// spatial one for full-screen surfaces, kept critically damped so the
+  /// surface never passes the mini player. It settles in about 520ms. A
+  /// spring more than twice as stiff had the player gone in an eighth of a
+  /// second, in a handful of frames.
   static final _exitSpring = SpringDescription.withDampingRatio(
     mass: 1,
-    stiffness: 700,
+    stiffness: M3EMotion.expressiveSpatialSlow.stiffness,
     ratio: 1,
   );
 
@@ -188,8 +190,8 @@ class NowPlayingRoute extends PageRoute<void> {
     snapToEnd: true,
   );
 
-  /// Mornye opens on its full-screen spring and closes on the shorter
-  /// standard one. The Material shrink runs on [_exitSpring], and so does a
+  /// Mornye opens and closes on its full-screen spring, as a system sheet
+  /// does. The Material shrink runs on [_exitSpring], and so does a
   /// Material slide a finger let go. Each starts from wherever the page is
   /// and from the finger's velocity, so a released drag or back gesture
   /// carries on without a seam.
@@ -201,7 +203,7 @@ class NowPlayingRoute extends PageRoute<void> {
     if (forward) {
       return mornye ? _spring(MornyeMotion.slowSpring, 1, velocity) : null;
     }
-    if (mornye) return _spring(MornyeMotion.standardSpring, 0, velocity);
+    if (mornye) return _spring(MornyeMotion.slowSpring, 0, velocity);
     final shrinks =
         _dismissTarget != null &&
         (morph?.duration ?? Duration.zero) > Duration.zero;
@@ -289,8 +291,20 @@ class NowPlayingRoute extends PageRoute<void> {
     // A committed back gesture already shrinks toward the mini player.
     if (_dismissTarget == null) _captureDismiss();
     if (_reduceMotion) controller!.reverseDuration = Duration.zero;
+    _poppedAt = controller!.value;
     return super.didPop(result);
   }
+
+  /// Where the route was when it was popped, from a finger or settled.
+  double? _poppedAt;
+
+  /// The player's own [fade] over the route's animation: it comes in behind
+  /// the growing surface and follows a finger. Once the route is popped it
+  /// holds where it was, because the page fades as a whole on the way out;
+  /// left on the closing spring, which covers most of its way early, the
+  /// content was gone in a tenth of a second.
+  Animation<double> contentOpacity(Animatable<double> fade) =>
+      animation!.drive(_HeldAfterPop(this, fade));
 
   bool get _reduceMotion {
     final context = navigator?.context;
@@ -444,7 +458,9 @@ class NowPlayingRoute extends PageRoute<void> {
             bounds: Rect.lerp(_dismissStart, target.surface, progress)!,
             size: size,
             radius: radius * progress,
-            opacity: 1 - const Interval(0.15, 0.85).transform(progress),
+            // Gone only as it reaches the mini player: fading out sooner
+            // hides most of the spring's travel and reads as a cut.
+            opacity: 1 - const Interval(0.3, 1).transform(progress),
             child: child,
           ),
           if (cover != null)
@@ -562,6 +578,16 @@ class NowPlayingRoute extends PageRoute<void> {
       ),
     ),
   );
+}
+
+class _HeldAfterPop extends Animatable<double> {
+  _HeldAfterPop(this.route, this.fade);
+
+  final NowPlayingRoute route;
+  final Animatable<double> fade;
+
+  @override
+  double transform(double t) => fade.transform(route._poppedAt ?? t);
 }
 
 /// Feeds Android's predictive back to the player route while it is the

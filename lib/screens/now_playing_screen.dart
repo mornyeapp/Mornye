@@ -548,11 +548,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         );
       };
     }
+    final contentFade = CurveTween(
+      curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
+    );
     final contentOpacity = mornye
         ? kAlwaysCompleteAnimation
-        : routeAnimation.drive(
-            CurveTween(curve: const Interval(0.4, 1.0, curve: Curves.easeOut)),
-          );
+        : route is NowPlayingRoute
+        // Holds through the shrink back to the mini player.
+        ? route.contentOpacity(contentFade)
+        : routeAnimation.drive(contentFade);
 
     // The embedded desktop player keeps a toolbar for its minimize button,
     // which a route reaches by swiping down instead.
