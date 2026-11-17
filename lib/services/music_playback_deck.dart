@@ -642,15 +642,19 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
           return;
         }
         usbAudioStatus.value = UsbAudioStatus.failure(response);
+        // Every refusal is logged, also the ones without a detail (no DAC,
+        // permission declined): the song then plays through Android's mixer.
         final detail = response?['detail'] as String?;
-        if (detail != null && detail.isNotEmpty) {
-          _log.w('Native output ${usbAudioStatus.value.reason}: $detail');
-        }
+        _log.w(
+          'Native output ${usbAudioStatus.value.reason}'
+          '${detail == null || detail.isEmpty ? '' : ': $detail'}',
+        );
         if (response?['fatal'] == true) {
           throw UsbDsdUnavailable();
         }
-      } on PlatformException {
+      } on PlatformException catch (error) {
         if (_disposed || preparingToken != _token) return;
+        _log.w('Native output unsupported: ${error.message ?? error.code}');
         usbAudioStatus.value = const UsbAudioStatus(reason: 'unsupported');
       } on MissingPluginException {
         if (_disposed || preparingToken != _token) return;
