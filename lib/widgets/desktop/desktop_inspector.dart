@@ -414,10 +414,16 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
   Widget build(BuildContext context) {
     final shown = _shown;
     if (shown == null) return const SizedBox.shrink();
+    // Switching panels cross-fades on the effects spring of the style.
+    final crossFade = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+      mornye: MornyeMotion.effects,
+    );
     final content = AnimatedSwitcher(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 180),
+      duration: crossFade.duration,
+      switchInCurve: crossFade.curve,
+      switchOutCurve: crossFade.curve,
       // Panels keep their fixed width while they cross-fade.
       layoutBuilder: (current, previous) => Stack(
         alignment: AlignmentDirectional.topStart,
