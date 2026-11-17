@@ -745,6 +745,22 @@
   "@downloadSingleFilenameFormatDescription": {
     "description": "Subtitle description for single filename format setting"
   },
+  "downloadSaveFolderCover": "Save Album Covers",
+  "@downloadSaveFolderCover": {
+    "description": "Files setting that saves an album's cover image into the album's download folder"
+  },
+  "downloadSaveFolderCoverSubtitle": "Adds the album's cover to its folder as folder.jpg, for albums that have their own folder",
+  "@downloadSaveFolderCoverSubtitle": {
+    "description": "Subtitle of the Save Album Covers switch. Keep 'folder.jpg' as is: it is a file name"
+  },
+  "downloadFolderCoverSize": "Album Cover File Size",
+  "@downloadFolderCoverSize": {
+    "description": "Files setting for the pixel size of the album cover saved as folder.jpg"
+  },
+  "downloadFolderCoverSizeDescription": "Downscale the cover before saving it as folder.jpg. Images already within the limit are kept unchanged.",
+  "@downloadFolderCoverSizeDescription": {
+    "description": "Description of the Album Cover File Size picker. Keep 'folder.jpg' as is: it is a file name"
+  },
   "downloadSaveMotionArtwork": "Save Animated Covers",
   "@downloadSaveMotionArtwork": {
     "description": "Files setting that copies an album's animated cover video into the album's download folder"

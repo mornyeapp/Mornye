@@ -1676,7 +1676,7 @@ class _DownloadRun {
         onStageCompleted?.call('network upload');
       }
 
-      await n._saveDownloadedMotionArtwork(
+      await n._saveDownloadedAlbumFiles(
         n.ref,
         item,
         trackToDownload,

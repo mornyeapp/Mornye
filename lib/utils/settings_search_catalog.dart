@@ -864,6 +864,12 @@ class SettingsSearchCatalog {
           keywords: const ['single naming', 'file template'],
         ),
         SettingsSearchEntry(
+          icon: Icons.image_outlined,
+          title: l10n.downloadSaveFolderCover,
+          subtitle: l10n.downloadSaveFolderCoverSubtitle,
+          keywords: const ['folder.jpg', 'cover file', 'album art', 'artwork'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.motion_photos_on_outlined,
           title: l10n.downloadSaveMotionArtwork,
           subtitle: l10n.downloadSaveMotionArtworkSubtitle,

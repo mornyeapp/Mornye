@@ -97,6 +97,7 @@ void main() {
 
   ({SongLeftovers leftovers, _Queue queue}) setUpLeftovers({
     bool removeEmptyFolders = true,
+    bool saveFolderCover = false,
     SongFolderStore? documents,
     Future<({String name, List<({String uri, bool root})> folders})?> Function(
       String source,
@@ -123,6 +124,7 @@ void main() {
           AppSettings(
             downloadDirectory: root,
             removeEmptyFolders: removeEmptyFolders,
+            saveFolderCover: saveFolderCover,
           ),
         ),
         downloadQueueProvider.overrideWith(() => queue),
@@ -163,6 +165,17 @@ void main() {
 
     expect(exists('Artist/Album/Song.lrc'), isFalse);
     expect(exists('Artist/Album/folder.jpg'), isTrue);
+  });
+
+  test('removes the album cover file while downloads save it', () async {
+    final song = file('Artist/Album/Song.flac');
+    file('Artist/Album/Folder.jpg');
+    final (:leftovers, queue: _) = setUpLeftovers(saveFolderCover: true);
+
+    expect(await leftovers.delete(song), isTrue);
+    await _until(() => !exists('Artist'));
+
+    expect(exists('Artist'), isFalse);
   });
 
   test('keeps the artist folder while another album is in it', () async {

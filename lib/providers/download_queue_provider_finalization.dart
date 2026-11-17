@@ -48,6 +48,95 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
     info: _log.i,
   );
 
+  /// Saves what a finished download keeps beside the song: the album's cover
+  /// file and its animated cover. The arguments are those of
+  /// [_saveDownloadedMotionArtwork].
+  Future<void> _saveDownloadedAlbumFiles(
+    Ref ref,
+    DownloadItem item,
+    Track track,
+    Map<String, dynamic> result, {
+    required AppSettings settings,
+    required String quality,
+    String? filePath,
+    String? treeUri,
+    String? relativeDir,
+    Track? folderTrack,
+  }) => Future.wait([
+    _saveDownloadedFolderCover(
+      ref,
+      item,
+      track,
+      result,
+      settings: settings,
+      quality: quality,
+      filePath: filePath,
+      treeUri: treeUri,
+      relativeDir: relativeDir,
+      folderTrack: folderTrack,
+    ),
+    _saveDownloadedMotionArtwork(
+      ref,
+      item,
+      track,
+      result,
+      settings: settings,
+      quality: quality,
+      filePath: filePath,
+      treeUri: treeUri,
+      relativeDir: relativeDir,
+      folderTrack: folderTrack,
+    ),
+  ]);
+
+  /// Saves the album's cover as `folder.jpg` beside [filePath] when the
+  /// settings ask and the song sits in the album's own folder.
+  Future<void> _saveDownloadedFolderCover(
+    Ref ref,
+    DownloadItem item,
+    Track track,
+    Map<String, dynamic> result, {
+    required AppSettings settings,
+    required String quality,
+    String? filePath,
+    String? treeUri,
+    String? relativeDir,
+    Track? folderTrack,
+  }) async {
+    if (!settings.saveFolderCover || filePath == null) return;
+    try {
+      // The cover the song itself carries: the backend's, then the track's.
+      final url =
+          normalizeRemoteHttpUrl(result['cover_url']?.toString()) ??
+          normalizeRemoteHttpUrl(track.coverUrl) ??
+          normalizeRemoteHttpUrl(item.track.coverUrl);
+      if (url == null ||
+          !await _holdsAlbumFiles(
+            folderTrack ?? track,
+            item,
+            settings,
+            quality,
+            filePath: filePath,
+            relativeDir: relativeDir,
+          ) ||
+          !ref.mounted) {
+        return;
+      }
+      final saved = await ref
+          .read(folderCoverFileProvider)
+          .save(
+            url,
+            maxDimension: settings.folderCoverMaxDimension,
+            song: filePath,
+            treeUri: treeUri,
+            relativeDir: relativeDir,
+          );
+      if (saved) _log.i('Cover saved to the album folder');
+    } catch (error) {
+      _log.w('Optional folder cover was not saved: ${error.runtimeType}');
+    }
+  }
+
   /// Saves the album's animated cover for the player and, when the settings
   /// ask, as `cover.mp4` beside [filePath] in the album's own folder: an
   /// Android document there needs [treeUri] and [relativeDir]. The folder

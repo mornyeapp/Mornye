@@ -173,6 +173,9 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   lockScreenLyrics: json['lockScreenLyrics'] as bool? ?? false,
   motionArtworkEnabled: json['motionArtworkEnabled'] as bool? ?? true,
   saveMotionArtworkFile: json['saveMotionArtworkFile'] as bool? ?? false,
+  saveFolderCover: json['saveFolderCover'] as bool? ?? false,
+  folderCoverMaxDimension:
+      (json['folderCoverMaxDimension'] as num?)?.toInt() ?? 0,
   removeEmptyFolders: json['removeEmptyFolders'] as bool? ?? true,
   listeningStatisticsEnabled:
       json['listeningStatisticsEnabled'] as bool? ?? true,
@@ -356,6 +359,8 @@ Map<String, dynamic> _$AppSettingsToJson(
   'lockScreenLyrics': instance.lockScreenLyrics,
   'motionArtworkEnabled': instance.motionArtworkEnabled,
   'saveMotionArtworkFile': instance.saveMotionArtworkFile,
+  'saveFolderCover': instance.saveFolderCover,
+  'folderCoverMaxDimension': instance.folderCoverMaxDimension,
   'removeEmptyFolders': instance.removeEmptyFolders,
   'listeningStatisticsEnabled': instance.listeningStatisticsEnabled,
   'autoConvertDownloads': instance.autoConvertDownloads,

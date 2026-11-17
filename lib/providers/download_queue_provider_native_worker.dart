@@ -1257,7 +1257,7 @@ extension _DownloadQueueNativeWorker on DownloadQueueNotifier {
 
     if (result.nativeFinalized) {
       final nativeFinalizedFilePath = filePath;
-      await _saveDownloadedMotionArtwork(
+      await _saveDownloadedAlbumFiles(
         ref,
         item,
         item.track,
@@ -1531,7 +1531,7 @@ extension _DownloadQueueNativeWorker on DownloadQueueNotifier {
         lowerFilePath.endsWith('.ogg');
 
     final completedFilePath = filePath;
-    await _saveDownloadedMotionArtwork(
+    await _saveDownloadedAlbumFiles(
       ref,
       item,
       trackToDownload,

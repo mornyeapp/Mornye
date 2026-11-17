@@ -832,6 +832,17 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setSaveMotionArtworkFile(bool enabled) =>
       _commit(state.copyWith(saveMotionArtworkFile: enabled));
 
+  void setSaveFolderCover(bool enabled) =>
+      _commit(state.copyWith(saveFolderCover: enabled));
+
+  void setFolderCoverMaxDimension(int maxDimension) => _commit(
+    state.copyWith(
+      folderCoverMaxDimension: _normalizeEmbeddedCoverMaxDimension(
+        maxDimension,
+      ),
+    ),
+  );
+
   void setRemoveEmptyFolders(bool enabled) =>
       _commit(state.copyWith(removeEmptyFolders: enabled));
 

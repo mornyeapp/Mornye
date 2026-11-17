@@ -37,6 +37,7 @@ import 'package:mornye/services/download_retry_backoff.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/download_request_payload.dart';
+import 'package:mornye/services/folder_cover_file.dart';
 import 'package:mornye/services/folder_path_template.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_reorganizer.dart';

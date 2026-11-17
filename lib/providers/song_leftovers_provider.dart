@@ -7,6 +7,8 @@ import 'package:path/path.dart' as p;
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/folder_cover_file.dart'
+    show folderCoverFileNames;
 import 'package:mornye/services/lyrics_sidecar.dart' show mlrcExtension;
 import 'package:mornye/services/motion_artwork_folder.dart'
     show motionArtworkFileName;
@@ -119,7 +121,8 @@ final songLeftoversProvider = Provider<SongLeftovers>(SongLeftovers.new);
 /// on, the album and artist folders they leave empty inside the download
 /// and Local Library folders. A folder still counts as empty when it only
 /// holds system index files, Mornye's `cover.mp4` or lyrics files of songs
-/// that are gone. Folders are removed while the download queue is idle, so
+/// that are gone, or the `folder.jpg` downloads save while Save Album
+/// Covers is on. Folders are removed while the download queue is idle, so
 /// a download never loses the folder it is writing into. Network songs and
 /// CUE tracks are only deleted.
 class SongLeftovers {
@@ -306,9 +309,13 @@ class SongLeftovers {
 
   Future<void> _removeEmptyFolders(_SongPlace place) async {
     final store = place.store;
+    final covers = _ref.read(settingsProvider).saveFolderCover;
     for (final folder in place.removable) {
       final entries = await store.list(folder);
-      if (entries == null || entries.any(_keepsFolder)) return;
+      if (entries == null ||
+          entries.any((entry) => _keepsFolder(entry, covers: covers))) {
+        return;
+      }
       for (final entry in entries) {
         if (!await store.delete(entry.id, folder: false)) return;
       }
@@ -326,13 +333,15 @@ class SongLeftovers {
 
   /// Whether [entry] is something of the user's that keeps its folder:
   /// anything but system index files, Mornye's `cover.mp4` and lyrics files
-  /// left by songs that are gone.
-  static bool _keepsFolder(SongFolderEntry entry) {
+  /// left by songs that are gone. With [covers], while downloads save
+  /// `folder.jpg`, that cover is no longer the user's either.
+  static bool _keepsFolder(SongFolderEntry entry, {required bool covers}) {
     if (entry.folder) return true;
     final name = entry.name.toLowerCase();
     final leftover =
         const {'.ds_store', 'thumbs.db', 'desktop.ini'}.contains(name) ||
         name == motionArtworkFileName ||
+        (covers && folderCoverFileNames.contains(name)) ||
         name.startsWith('._') ||
         _isLyrics(entry);
     return !leftover;

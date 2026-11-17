@@ -222,6 +222,29 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
                   ),
                 ),
                 SettingsSwitchItem(
+                  icon: Icons.image_outlined,
+                  title: context.l10n.downloadSaveFolderCover,
+                  subtitle: context.l10n.downloadSaveFolderCoverSubtitle,
+                  value: settings.saveFolderCover,
+                  onChanged: ref
+                      .read(settingsProvider.notifier)
+                      .setSaveFolderCover,
+                ),
+                if (settings.saveFolderCover)
+                  SettingsItem(
+                    icon: Icons.photo_size_select_large_outlined,
+                    title: context.l10n.downloadFolderCoverSize,
+                    subtitle: _folderCoverSizeLabel(
+                      context,
+                      settings.folderCoverMaxDimension,
+                    ),
+                    onTap: () => _showFolderCoverSizePicker(
+                      context,
+                      ref,
+                      settings.folderCoverMaxDimension,
+                    ),
+                  ),
+                SettingsSwitchItem(
                   icon: Icons.motion_photos_on_outlined,
                   title: context.l10n.downloadSaveMotionArtwork,
                   subtitle: context.l10n.downloadSaveMotionArtworkSubtitle,
@@ -766,6 +789,31 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
       ),
     );
   }
+
+  String _folderCoverSizeLabel(BuildContext context, int maxDimension) =>
+      maxDimension <= 0
+      ? context.l10n.optionsEmbeddedCoverSizeOriginal
+      : '$maxDimension × $maxDimension px';
+
+  void _showFolderCoverSizePicker(
+    BuildContext context,
+    WidgetRef ref,
+    int current,
+  ) => showAppChoiceSheet(
+    context: context,
+    title: context.l10n.downloadFolderCoverSize,
+    subtitle: context.l10n.downloadFolderCoverSizeDescription,
+    selected: current,
+    choices: [
+      for (final maxDimension in const [0, 500, 1000, 1500, 2000])
+        AppChoice(
+          maxDimension,
+          maxDimension == 0 ? Icons.image_outlined : Icons.compress_outlined,
+          _folderCoverSizeLabel(context, maxDimension),
+        ),
+    ],
+    onSelected: ref.read(settingsProvider.notifier).setFolderCoverMaxDimension,
+  );
 
   void _showAlbumFolderStructurePicker(
     BuildContext context,

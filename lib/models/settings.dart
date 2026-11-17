@@ -361,6 +361,13 @@ class AppSettings {
   /// Copy a download's animated cover into its album folder as `cover.mp4`.
   final bool saveMotionArtworkFile;
 
+  /// Save a download's cover into its album folder as `folder.jpg`, for
+  /// players that do not read the cover inside a song.
+  final bool saveFolderCover;
+
+  /// The longest side of that cover in pixels; 0 keeps the original.
+  final int folderCoverMaxDimension;
+
   /// Delete the album and artist folders a deleted song leaves empty, inside
   /// the download and Local Library folders.
   final bool removeEmptyFolders;
@@ -600,6 +607,8 @@ class AppSettings {
     this.lockScreenLyrics = false,
     this.motionArtworkEnabled = true,
     this.saveMotionArtworkFile = false,
+    this.saveFolderCover = false,
+    this.folderCoverMaxDimension = 0,
     this.removeEmptyFolders = true,
     this.listeningStatisticsEnabled = true,
     this.autoConvertDownloads = false,
@@ -793,6 +802,8 @@ class AppSettings {
     bool? lockScreenLyrics,
     bool? motionArtworkEnabled,
     bool? saveMotionArtworkFile,
+    bool? saveFolderCover,
+    int? folderCoverMaxDimension,
     bool? removeEmptyFolders,
     bool? listeningStatisticsEnabled,
     bool? autoConvertDownloads,
@@ -985,6 +996,9 @@ class AppSettings {
       motionArtworkEnabled: motionArtworkEnabled ?? this.motionArtworkEnabled,
       saveMotionArtworkFile:
           saveMotionArtworkFile ?? this.saveMotionArtworkFile,
+      saveFolderCover: saveFolderCover ?? this.saveFolderCover,
+      folderCoverMaxDimension:
+          folderCoverMaxDimension ?? this.folderCoverMaxDimension,
       removeEmptyFolders: removeEmptyFolders ?? this.removeEmptyFolders,
       listeningStatisticsEnabled:
           listeningStatisticsEnabled ?? this.listeningStatisticsEnabled,
