@@ -37,32 +37,42 @@ class _Reveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reduced = MediaQuery.disableAnimationsOf(context);
-    final motion = AppMotion.spatial(
+    // Each part rises on the default spatial spring after its own delay and
+    // fades in on the effects spring over the same clock; reduced motion
+    // shows it at once.
+    const still = AppMotionSpec(Duration.zero, Curves.linear);
+    final rise = AppMotion.spatial(
       context,
-      AppMotionSpec(
-        reduced ? Duration.zero : const Duration(milliseconds: 420),
-        Curves.easeOutCubic,
-      ),
+      still,
+      mornye: MornyeMotion.standard,
     );
-    if (motion.duration == Duration.zero) return child;
+    if (rise.duration == Duration.zero) return child;
+    final fade = AppMotion.effects(
+      context,
+      still,
+      mornye: MornyeMotion.effects,
+    );
     const stagger = Duration(milliseconds: 90);
-    final total = motion.duration + stagger * order;
+    final delay = stagger * order;
+    final span = rise.duration > fade.duration ? rise.duration : fade.duration;
+    final total = delay + span;
+    double progress(double elapsed, Duration length) =>
+        (elapsed / length.inMicroseconds).clamp(0.0, 1.0);
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
+      tween: Tween(begin: 0, end: total.inMicroseconds.toDouble()),
       duration: total,
-      curve: Interval(
-        stagger.inMicroseconds * order / total.inMicroseconds,
-        1,
-        curve: motion.curve,
-      ),
-      builder: (context, t, child) => Opacity(
-        opacity: t.clamp(0.0, 1.0),
-        child: Transform.translate(
-          offset: Offset(0, 28 * (1 - t)),
-          child: child,
-        ),
-      ),
+      builder: (context, time, child) {
+        final elapsed = time - delay.inMicroseconds;
+        final moved = rise.curve.transform(progress(elapsed, rise.duration));
+        final opacity = fade.curve.transform(progress(elapsed, fade.duration));
+        return Opacity(
+          opacity: opacity.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, 28 * (1 - moved)),
+            child: child,
+          ),
+        );
+      },
       child: child,
     );
   }
@@ -357,7 +367,25 @@ class _MonthChart extends StatelessWidget {
       fontWeight: FontWeight.w600,
       color: accent.withValues(alpha: 0.8),
     );
-    final reduced = MediaQuery.disableAnimationsOf(context);
+    // Each bar grows on the slow spatial spring, which stops at its height,
+    // one month after another; reduced motion draws them grown.
+    final grow = AppMotion.spatialSlow(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+      mornye: MornyeMotion.slow,
+    );
+    final reduced = grow.duration == Duration.zero;
+    const barStagger = Duration(milliseconds: 60);
+    Duration barLength(int month) =>
+        reduced ? Duration.zero : barStagger * month + grow.duration;
+    Curve barCurve(int month) => reduced
+        ? Curves.linear
+        : Interval(
+            (barStagger * month).inMicroseconds /
+                barLength(month).inMicroseconds,
+            1,
+            curve: grow.curve,
+          );
     return ExcludeSemantics(
       child: SizedBox(
         height: 180,
@@ -373,13 +401,11 @@ class _MonthChart extends StatelessWidget {
                     Expanded(
                       child: Align(
                         alignment: Alignment.bottomCenter,
-                        // Bars grow from the baseline, the peak month last.
+                        // Bars grow from the baseline, January first.
                         child: TweenAnimationBuilder<double>(
                           tween: Tween(begin: reduced ? 1 : 0, end: 1),
-                          duration: reduced
-                              ? Duration.zero
-                              : Duration(milliseconds: 600 + month * 60),
-                          curve: Curves.easeOutCubic,
+                          duration: barLength(month),
+                          curve: barCurve(month),
                           builder: (context, t, _) => FractionallySizedBox(
                             heightFactor:
                                 peak <= 0 || (milliseconds[month] ?? 0) <= 0

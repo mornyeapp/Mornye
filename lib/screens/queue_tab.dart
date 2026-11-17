@@ -1203,15 +1203,51 @@ class _QueueTabState extends ConsumerState<QueueTab> {
         final isPaused = ref.watch(
           downloadQueueProvider.select((state) => state.isPaused),
         );
+        // The header opens on the default spatial spring and fades on the
+        // effects spring, both on one switcher clock; it leaves in the
+        // fade's shorter time. Reduced motion switches at once.
+        const still = AppMotionSpec(Duration.zero, Curves.linear);
+        final reveal = AppMotion.spatial(
+          context,
+          still,
+          mornye: MornyeMotion.standard,
+        );
+        final fade = AppMotion.effects(
+          context,
+          still,
+          mornye: MornyeMotion.effects,
+        );
+        final length = reveal.duration > fade.duration
+            ? reveal.duration
+            : fade.duration;
+        Curve over(AppMotionSpec spec) => length == Duration.zero
+            ? Curves.linear
+            : Interval(
+                0,
+                spec.duration.inMicroseconds / length.inMicroseconds,
+                curve: spec.curve,
+              );
         return SliverToBoxAdapter(
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 260),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
+            duration: length,
+            reverseDuration: fade.duration,
+            // Played backwards, the entrance springs would hold the leaving
+            // header open and opaque for most of its exit.
             transitionBuilder: (child, animation) => SizeTransition(
-              sizeFactor: animation,
+              sizeFactor: CurvedAnimation(
+                parent: animation,
+                curve: over(reveal),
+                reverseCurve: fade.curve.flipped,
+              ),
               alignment: Alignment.topCenter,
-              child: FadeTransition(opacity: animation, child: child),
+              child: FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: over(fade),
+                  reverseCurve: fade.curve.flipped,
+                ),
+                child: child,
+              ),
             ),
             child: queueCount == 0
                 ? const SizedBox(

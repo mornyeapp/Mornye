@@ -11,6 +11,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/providers/equalizer_provider.dart';
 import 'package:mornye/services/playback_equalizer.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';

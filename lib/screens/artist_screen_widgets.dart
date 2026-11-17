@@ -1466,6 +1466,11 @@ extension _ArtistScreenSections on _ArtistScreenState {
     required double sectionHeight,
     required bool showTypeBadge,
   }) {
+    // The selection overlay is a tint, on the fast effects spring.
+    final selectionTint = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 200), Curves.linear),
+    );
     return Semantics(
       button: true,
       selected: isSelectionMode && isSelected,
@@ -1518,7 +1523,8 @@ extension _ArtistScreenSections on _ArtistScreenState {
                     if (isSelected || showsSelectionBar)
                       Positioned.fill(
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                          duration: selectionTint.duration,
+                          curve: selectionTint.curve,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
                             color: isSelected

@@ -923,10 +923,15 @@ class _HomeTabState extends ConsumerState<HomeTab>
     final showLibraryResults = _searchingLibrary && hasSearchInput;
     // The library scope waits for input before showing local matches.
     final showLibraryPrompt = _searchingLibrary && !hasSearchInput;
-    final sectionMotion = AppMotion.spatial(
-      context,
-      const AppMotionSpec(Duration(milliseconds: 250), Curves.easeOut),
-    );
+    // A section opening or closing moves everything below it, as much as a
+    // screen at a time, so it stops at its size: Material's standard spatial
+    // spring, whose overshoot is a thousandth of the travel, and Mornye's
+    // spring. Reduced motion resizes at once.
+    final sectionMotion = MediaQuery.disableAnimationsOf(context)
+        ? const AppMotionSpec(Duration.zero, Curves.linear)
+        : context.isMornye
+        ? MornyeMotion.standard
+        : AppMotion.materialPage;
     // Without a feed, Home gathers the player, shortcuts and Library shelves.
     final showHomeSections =
         _showsHome && !showFeedSurface && !showEmptyHomeState;
@@ -1221,14 +1226,12 @@ class _HomeTabState extends ConsumerState<HomeTab>
     required bool showEmptyHomeState,
   }) {
     return SliverToBoxAdapter(
-      child: AnimatedSize(
+      child: _resizeSection(
         // A provider installed offscreen replaces the empty panel without
         // carrying its height into the compact intro on the first frame.
         key: ValueKey(showEmptyHomeState),
-        alignment: AlignmentDirectional.topStart,
-        duration: sectionMotion.duration,
-        curve: sectionMotion.curve,
-        child: (hasResults || showExplore || !_showsHome)
+        sectionMotion,
+        (hasResults || showExplore || !_showsHome)
             ? const SizedBox.shrink()
             : _buildHomeIntro(
                 colorScheme: colorScheme,
@@ -1352,15 +1355,9 @@ class _HomeTabState extends ConsumerState<HomeTab>
     required bool showEmptyHomeState,
   }) {
     return SliverToBoxAdapter(
-      child: AnimatedSize(
-        // Sections stay where they are while the space below them opens or
-        // closes; centered, they would sink and rise as a section comes or
-        // goes (such as Continue listening when the player hides).
-        alignment: AlignmentDirectional.topStart,
-        duration: sectionMotion.duration,
-        curve: sectionMotion.curve,
-        child:
-            (!_showsHome ||
+      child: _resizeSection(
+        sectionMotion,
+        (!_showsHome ||
                 hasResults ||
                 showRecentAccess ||
                 showExplore ||
@@ -1368,6 +1365,24 @@ class _HomeTabState extends ConsumerState<HomeTab>
             ? const SizedBox.shrink()
             : _HomeSections(inset: 16 + homeContentInset(context)),
       ),
+    );
+  }
+
+  /// Opens or closes the space a Home section takes. Sections stay where
+  /// they are while the space below them opens or closes; centered, they
+  /// would sink and rise as a section comes or goes (such as Continue
+  /// listening when the player hides).
+  static Widget _resizeSection(AppMotionSpec motion, Widget child, {Key? key}) {
+    // A zero-length AnimatedSize re-dirties itself during layout.
+    if (motion.duration == Duration.zero) {
+      return KeyedSubtree(key: key, child: child);
+    }
+    return AnimatedSize(
+      key: key,
+      alignment: AlignmentDirectional.topStart,
+      duration: motion.duration,
+      curve: motion.curve,
+      child: child,
     );
   }
 

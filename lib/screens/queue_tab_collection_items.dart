@@ -709,8 +709,14 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
       },
       builder: (context, candidateData, rejectedData) {
         final isHovering = candidateData.isNotEmpty;
+        // The drop highlight is a tint, on the fast effects spring.
+        final tint = AppMotion.effectsFast(
+          context,
+          const AppMotionSpec(Duration(milliseconds: 150), Curves.linear),
+        );
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          duration: tint.duration,
+          curve: tint.curve,
           decoration: isHovering
               ? BoxDecoration(
                   borderRadius: BorderRadius.circular(12),

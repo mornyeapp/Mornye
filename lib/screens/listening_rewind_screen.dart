@@ -130,14 +130,21 @@ class ListeningRewindBanner extends ConsumerWidget {
       ListeningRewindSpotlight.monthly => _MonthlyRewindBanner(margin: margin),
       ListeningRewindSpotlight.yearly => _YearlyRewindBanner(margin: margin),
     };
-    // Grows in rather than shifting the list when the check completes.
+    // Grows in on the default spatial spring rather than shifting the list
+    // when the check completes. Reduced motion shows it at once: a size
+    // animation of no length would finish inside its own layout.
+    final grow = AppMotion.spatial(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+      mornye: MornyeMotion.standard,
+    );
+    final banner = child ?? const SizedBox(width: double.infinity);
+    if (grow.duration == Duration.zero) return banner;
     return AnimatedSize(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
+      duration: grow.duration,
+      curve: grow.curve,
       alignment: Alignment.topCenter,
-      child: child ?? const SizedBox(width: double.infinity),
+      child: banner,
     );
   }
 }

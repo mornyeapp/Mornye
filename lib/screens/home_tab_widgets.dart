@@ -767,8 +767,16 @@ class _QuickPicksPageViewState extends State<_QuickPicksPageView> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(widget.totalPages, (index) {
                 final isActive = index == _currentPage;
+                // A small indicator: the fast spatial spring; reduced
+                // motion switches at once.
+                final dot = AppMotion.spatialFast(
+                  context,
+                  const AppMotionSpec(Duration.zero, Curves.linear),
+                  mornye: MornyeMotion.fast,
+                );
                 return AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: dot.duration,
+                  curve: dot.curve,
                   width: isActive ? 8 : 6,
                   height: isActive ? 8 : 6,
                   margin: const EdgeInsets.symmetric(horizontal: 3),

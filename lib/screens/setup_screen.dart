@@ -702,11 +702,21 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
       await _saveProgress(step: step);
       if (!mounted) return;
       setState(() => _currentStep = step);
-      await _pageController?.animateToPage(
-        step,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+      // A step moves on the slow spatial spring, which stops at the page
+      // without overshoot; reduced motion shows the step at once.
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _pageController?.jumpToPage(step);
+      } else {
+        final motion = AppMotion.spatialSlow(
+          context,
+          const AppMotionSpec(Duration(milliseconds: 300), Curves.easeInOut),
+        );
+        await _pageController?.animateToPage(
+          step,
+          duration: motion.duration,
+          curve: motion.curve,
+        );
+      }
     } catch (e, stack) {
       _log.e('Failed to save setup step', e, stack);
     } finally {

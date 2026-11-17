@@ -137,6 +137,12 @@ class _EqualizerOverview extends ConsumerWidget {
     final tokens = context.tokens;
     final enabled = settings.enabled;
     final curveColor = enabled ? colors.primary : colors.outline;
+    // Turning the equalizer on or off recolors the title and the curve on
+    // the effects spring.
+    final recolor = AppMotion.effects(
+      context,
+      AppMotionSpec(tokens.motionMedium, Curves.linear),
+    );
     return Padding(
       padding: EdgeInsetsDirectional.fromSTEB(
         tokens.rowPaddingH,
@@ -154,7 +160,8 @@ class _EqualizerOverview extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     AnimatedDefaultTextStyle(
-                      duration: tokens.motionMedium,
+                      duration: recolor.duration,
+                      curve: recolor.curve,
                       style: theme.textTheme.headlineSmall!.copyWith(
                         fontWeight: FontWeight.w600,
                         color: enabled
@@ -207,7 +214,8 @@ class _EqualizerOverview extends ConsumerWidget {
               height: 152,
               child: TweenAnimationBuilder<Color?>(
                 tween: ColorTween(end: curveColor),
-                duration: tokens.motionMedium,
+                duration: recolor.duration,
+                curve: recolor.curve,
                 builder: (context, color, _) => CustomPaint(
                   size: Size.infinite,
                   painter: _EqualizerCurve(

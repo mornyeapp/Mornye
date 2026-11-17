@@ -72,7 +72,18 @@ class _LibraryPageTabsState extends State<_LibraryPageTabs>
   void didUpdateWidget(covariant _LibraryPageTabs oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.selectedIndex != _controller.index) {
-      _controller.animateTo(widget.selectedIndex);
+      // The indicator moves to the selection on the default spatial
+      // spring; reduced motion moves it at once.
+      final motion = AppMotion.spatial(
+        context,
+        const AppMotionSpec(Duration.zero, Curves.linear),
+        mornye: MornyeMotion.standard,
+      );
+      _controller.animateTo(
+        widget.selectedIndex,
+        duration: motion.duration,
+        curve: motion.curve,
+      );
     }
   }
 
