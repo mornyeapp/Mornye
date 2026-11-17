@@ -52,10 +52,15 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
     if (MediaQuery.disableAnimationsOf(context)) {
       _controller.jumpTo(target);
     } else {
+      // Most of a viewport: a spring that stops at the target rather than
+      // running the row past it.
+      final motion = context.isMornye
+          ? MornyeMotion.standard
+          : AppMotion.materialPage;
       _controller.animateTo(
         target,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
+        duration: motion.duration,
+        curve: motion.curve,
       );
     }
   }
@@ -74,8 +79,14 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
           ValueListenableBuilder<bool>(
             valueListenable: _hovered,
             builder: (context, hovered, _) {
+              // Mornye fades on its effects springs and leaves faster.
               if (context.isMornye) {
-                return _ArrowsFade(hovered: hovered, child: _arrows(context));
+                return _ArrowsFade(
+                  hovered: hovered,
+                  enter: MornyeMotion.effects,
+                  exit: MornyeMotion.effectsFast,
+                  child: _arrows(context),
+                );
               }
               // Material fades on the effects spring and leaves faster.
               return _ArrowsFade(
@@ -216,15 +227,9 @@ class _ArrowsFade extends StatefulWidget {
   const _ArrowsFade({
     required this.hovered,
     required this.child,
-    this.enter = _mornyeFade,
-    this.exit = _mornyeFade,
+    required this.enter,
+    required this.exit,
   });
-
-  /// Mornye fades 250 ms each way.
-  static const _mornyeFade = AppMotionSpec(
-    Duration(milliseconds: 250),
-    Curves.linear,
-  );
 
   final bool hovered;
   final Widget child;

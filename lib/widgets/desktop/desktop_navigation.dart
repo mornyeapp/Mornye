@@ -371,7 +371,11 @@ class _NowPlayingTransition extends StatefulWidget {
 class _NowPlayingTransitionState extends State<_NowPlayingTransition>
     with SingleTickerProviderStateMixin {
   static const double _rise = 24;
-  static const _mornyeEntrance = AppMotionSpec(
+
+  /// The resting value of [_fade] and [_move] before the first entrance.
+  /// The entrances themselves are the style's springs; reduced motion
+  /// opens and closes at once.
+  static const _initialEntrance = AppMotionSpec(
     Duration(milliseconds: 220),
     Curves.easeOutCubic,
   );
@@ -382,8 +386,8 @@ class _NowPlayingTransitionState extends State<_NowPlayingTransition>
   );
 
   // The entrance in use: the fade covers the first [_fadeEnd] of it.
-  AppMotionSpec _fade = _mornyeEntrance;
-  AppMotionSpec _move = _mornyeEntrance;
+  AppMotionSpec _fade = _initialEntrance;
+  AppMotionSpec _move = _initialEntrance;
   double _fadeEnd = 1;
   double _distance = 0;
 
@@ -402,10 +406,11 @@ class _NowPlayingTransitionState extends State<_NowPlayingTransition>
       return;
     }
     if (widget.open) {
-      _fade = AppMotion.effects(context, _mornyeEntrance);
-      _move = AppMotion.spatialSlow(context, _mornyeEntrance);
+      _fade = AppMotion.effects(context, _initialEntrance);
+      _move = AppMotion.spatialSlow(context, _initialEntrance);
       _distance = materialExpressiveEnabled(context) ? _rise : 0;
-      final entrance = _fade.duration > _move.duration
+      // Mornye only fades, so its entrance ends with the fade.
+      final entrance = _distance == 0 || _fade.duration > _move.duration
           ? _fade.duration
           : _move.duration;
       _fadeEnd = _fade.duration.inMicroseconds / entrance.inMicroseconds;
@@ -1434,14 +1439,12 @@ class DesktopSidebar extends ConsumerWidget {
     );
     final panel = ValueListenableBuilder<Color?>(
       valueListenable: ShellNavigationService.chromeSurface,
-      // The tint follows the backdrop's 300 ms crossfade instead of
-      // landing in one frame.
+      // The tint follows the backdrop's crossfade instead of landing in one
+      // frame.
       builder: (context, tint, child) => TweenAnimationBuilder<Color?>(
         tween: ColorTween(end: panelColor(context, tint)),
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+        duration: _SidebarBackdrop.crossFade(context).duration,
+        curve: _SidebarBackdrop.crossFade(context).curve,
         child: child,
         builder: (context, color, child) => DecoratedBox(
           // One piece with the window: only a hairline parts it
@@ -1506,6 +1509,13 @@ class _SidebarBackdrop extends StatelessWidget {
   /// Decoded width; the fewer pixels, the softer the enlarged image.
   static const int _decodeWidth = 48;
 
+  /// The artwork's crossfade, which the panel's tint follows: Mornye's
+  /// effects spring, or a cut with reduced motion.
+  static AppMotionSpec crossFade(BuildContext context) =>
+      MediaQuery.disableAnimationsOf(context)
+      ? const AppMotionSpec(Duration.zero, Curves.linear)
+      : MornyeMotion.effects;
+
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<String?>(
     valueListenable: ShellNavigationService.chromeBackdrop,
@@ -1513,10 +1523,11 @@ class _SidebarBackdrop extends StatelessWidget {
       final image = source == null
           ? null
           : coverImageProvider(source, cacheWidth: _decodeWidth);
+      final fade = crossFade(context);
       return AnimatedSwitcher(
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 300),
+        duration: fade.duration,
+        switchInCurve: fade.curve,
+        switchOutCurve: fade.curve,
         layoutBuilder: (current, previous) =>
             Stack(fit: StackFit.expand, children: [...previous, ?current]),
         child: image == null

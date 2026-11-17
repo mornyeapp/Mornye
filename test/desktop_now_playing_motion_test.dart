@@ -213,7 +213,8 @@ void main() {
       // Showing the lyrics builds them once.
       final lyrics = tester.widget(find.byType(PlayerLyricsSection));
       final opacities = <double>{};
-      for (var frame = 0; frame < 30; frame++) {
+      // Long enough for either style's open spring to settle.
+      for (var frame = 0; frame < 40; frame++) {
         await tester.pump(const Duration(milliseconds: 16));
         opacities.add(panelOpacity());
         final coverSize = tester.getSize(cover);

@@ -408,13 +408,19 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
           );
           final current = _followPlayback(ref, lines);
           final next = _leadLineAfter(lines, current);
+          final lineFade = AppMotion.effects(
+            context,
+            const AppMotionSpec(Duration.zero, Curves.linear),
+            mornye: MornyeMotion.effects,
+          );
           return Padding(
             padding: const EdgeInsets.only(top: 10),
             child: SingleChildScrollView(
+              // The lines cross-fade on the effects spring of the style.
               child: AnimatedSwitcher(
-                duration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 220),
+                duration: lineFade.duration,
+                switchInCurve: lineFade.curve,
+                switchOutCurve: lineFade.curve,
                 layoutBuilder: (current, previous) => Stack(
                   alignment: AlignmentDirectional.topStart,
                   children: [...previous, ?current],

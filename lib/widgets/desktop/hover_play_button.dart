@@ -111,12 +111,11 @@ class _DesktopCoverHoverState extends State<DesktopCoverHover> {
               ? DesktopCoverHover._mornyeRadius
               : DesktopCoverHover._materialRadius,
         );
-    final fade = mornye
-        ? const AppMotionSpec(Duration(milliseconds: 100), Curves.easeIn)
-        : AppMotion.effectsFast(
-            context,
-            const AppMotionSpec(Duration(milliseconds: 100), Curves.easeOut),
-          );
+    // Hover feedback stays quick: the fast effects spring of the style.
+    final fade = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 100), Curves.easeOut),
+    );
     final Widget layer = mornye
         ? AnimatedOpacity(
             key: const ValueKey('desktop-hover-scrim'),
@@ -193,12 +192,10 @@ class _DesktopCoverHoverState extends State<DesktopCoverHover> {
     final diameter = mornye
         ? DesktopCoverHover._mornyeDiameter
         : DesktopCoverHover._diameter;
-    final fade = mornye
-        ? const AppMotionSpec(Duration(milliseconds: 100), Curves.easeIn)
-        : AppMotion.effectsFast(
-            context,
-            const AppMotionSpec(Duration(milliseconds: 120), Curves.linear),
-          );
+    final fade = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 120), Curves.linear),
+    );
     return Align(
       alignment: AlignmentDirectional.bottomStart,
       child: Padding(

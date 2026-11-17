@@ -378,8 +378,12 @@ class _QualityKey implements Comparable<_QualityKey> {
   }
 }
 
-/// How fast a Mornye row's hover actions appear.
-const _mornyeRowFade = Duration(milliseconds: 100);
+/// How a row's hover actions appear: quickly, on the fast effects spring of
+/// the style.
+AppMotionSpec _rowActionFade(BuildContext context) => AppMotion.effectsFast(
+  context,
+  AppMotionSpec(context.tokens.motionFast, Curves.linear),
+);
 
 String _formatDuration(Duration duration) {
   final hours = duration.inHours;
@@ -656,8 +660,8 @@ class _TrackTableRowViewState extends State<_TrackTableRowView> {
                 opacity: hovered || selected || current || _trailingFocused
                     ? 1
                     : 0,
-                duration: material ? tokens.motionFast : _mornyeRowFade,
-                curve: material ? Curves.linear : Curves.easeIn,
+                duration: _rowActionFade(context).duration,
+                curve: _rowActionFade(context).curve,
                 child: child,
               ),
               child: row.trailing,
@@ -897,8 +901,8 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
             onFocusChange: (focused) => setState(() => _focused = focused),
             child: AnimatedOpacity(
               opacity: active ? 1 : 0,
-              duration: context.isMornye ? _mornyeRowFade : tokens.motionFast,
-              curve: context.isMornye ? Curves.easeIn : Curves.linear,
+              duration: _rowActionFade(context).duration,
+              curve: _rowActionFade(context).curve,
               child: Builder(
                 builder: (buttonContext) => IconButton(
                   tooltip: l10n.showMenuTooltip,

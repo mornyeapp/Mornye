@@ -1,5 +1,6 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -191,6 +192,11 @@ List<Widget> desktopDetailHeaderSlivers(
                     onPressed: () => Navigator.maybePop(context),
                   ))
           : null);
+  // The bar's title fades on the fast effects spring of the style.
+  final titleFade = AppMotion.effectsFast(
+    context,
+    AppMotionSpec(context.tokens.motionFast, Curves.linear),
+  );
 
   return [
     SliverLayoutInfoBuilder(
@@ -210,7 +216,8 @@ List<Widget> desktopDetailHeaderSlivers(
           titleSpacing: 0,
           title: AnimatedOpacity(
             opacity: showTitle ? 1 : 0,
-            duration: context.tokens.motionFast,
+            duration: titleFade.duration,
+            curve: titleFade.curve,
             child: Text(
               appBarTitle ?? title,
               maxLines: 1,

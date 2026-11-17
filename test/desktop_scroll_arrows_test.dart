@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
@@ -92,10 +93,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 125));
     expect(
       tester.widget<Opacity>(fade).opacity,
-      closeTo(0.5, 0.01),
-      reason: 'a linear 250ms fade is halfway',
+      inExclusiveRange(0.5, 1),
+      reason: 'the effects spring is most of the way in by half its length',
     );
-    await tester.pump(const Duration(milliseconds: 125));
+    await tester.pump(MornyeMotion.effects.duration);
     expect(tester.widget<Opacity>(fade).opacity, 1);
     expect(
       tester.getSize(
@@ -159,7 +160,7 @@ void main() {
       } else {
         await tester.pump(const Duration(milliseconds: 50));
         expect(opacity(), inExclusiveRange(0, 1));
-        // The exit is shorter than Mornye's 250 ms.
+        // The exit is shorter than the entrance.
         await tester.pump(const Duration(milliseconds: 60));
         await tester.pump();
         expect(arrow, findsNothing);

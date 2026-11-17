@@ -391,12 +391,17 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
   ) {
     final panel = _lastPanel;
     final showsLyrics = panel == DesktopInspectorPanel.lyrics;
-    // Panels cross-fade only when one replaces another; a panel that opens
-    // shows at once and fades with the panel side.
-    final switchDuration =
-        MediaQuery.disableAnimationsOf(context) || progress < 0.5
-        ? Duration.zero
-        : const Duration(milliseconds: 180);
+    // Panels cross-fade on the effects spring only when one replaces
+    // another; a panel that opens shows at once and fades with the panel
+    // side.
+    final crossFade = progress < 0.5
+        ? const AppMotionSpec(Duration.zero, Curves.linear)
+        : AppMotion.effects(
+            context,
+            const AppMotionSpec(Duration.zero, Curves.linear),
+            mornye: MornyeMotion.effects,
+          );
+    final switchDuration = crossFade.duration;
     return Padding(
       padding: const EdgeInsetsDirectional.fromSTEB(0, 72, 48, 80),
       child: Stack(
@@ -412,6 +417,7 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
               child: AnimatedOpacity(
                 opacity: showsLyrics ? 1 : 0,
                 duration: switchDuration,
+                curve: crossFade.curve,
                 child: NoScrollbars(
                   child: PlayerLyricsSection(
                     metadata: _metadata,
@@ -429,19 +435,24 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
               ),
             ),
           ),
-          AnimatedSwitcher(
-            duration: switchDuration,
-            child: panel == DesktopInspectorPanel.upNext
-                ? KeyedSubtree(
-                    key: const ValueKey('desktop-now-playing-upNext'),
-                    child: NoScrollbars(
-                      child: context.isMornye
-                          ? MornyePlayerQueue(colorScheme: colorScheme)
-                          : DesktopMaterialQueue(colorScheme: colorScheme),
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
+          // A closed panel drops the queue at once rather than fading it
+          // out behind the panel side that already has.
+          if (panel != null)
+            AnimatedSwitcher(
+              duration: switchDuration,
+              switchInCurve: crossFade.curve,
+              switchOutCurve: crossFade.curve,
+              child: panel == DesktopInspectorPanel.upNext
+                  ? KeyedSubtree(
+                      key: const ValueKey('desktop-now-playing-upNext'),
+                      child: NoScrollbars(
+                        child: context.isMornye
+                            ? MornyePlayerQueue(colorScheme: colorScheme)
+                            : DesktopMaterialQueue(colorScheme: colorScheme),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
         ],
       ),
     );

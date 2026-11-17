@@ -11,6 +11,7 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/material_expressive.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/services/cast_output.dart';
@@ -713,16 +714,19 @@ class _MornyeLcdArtworkState extends State<_MornyeLcdArtwork> {
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    final motion = reduceMotion
-        ? Duration.zero
-        : const Duration(milliseconds: 150);
+    // A hover: the fast spring for the lift, the fast effects spring for
+    // the overlay.
+    final lift = MornyeMotion.fast;
+    final fade = reduceMotion
+        ? const AppMotionSpec(Duration.zero, Curves.linear)
+        : MornyeMotion.effectsFast;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedScale(
         scale: _hovered && !reduceMotion ? 1.1 : 1,
-        duration: motion,
-        curve: Curves.easeOut,
+        duration: reduceMotion ? Duration.zero : lift.duration,
+        curve: lift.curve,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -731,8 +735,8 @@ class _MornyeLcdArtworkState extends State<_MornyeLcdArtwork> {
               child: AnimatedOpacity(
                 key: const ValueKey('desktop-player-artwork-overlay'),
                 opacity: _hovered ? 1 : 0,
-                duration: motion,
-                curve: Curves.easeOut,
+                duration: fade.duration,
+                curve: fade.curve,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.45),
@@ -1078,7 +1082,8 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
   }
 }
 
-/// The popover entrance: 250ms of fade with a short rise.
+/// The popover entrance: a fade with a short rise on the effects spring,
+/// which never overshoots, so the rise lands without a bounce.
 class _MornyePopoverEntrance extends StatelessWidget {
   const _MornyePopoverEntrance({required this.child});
 
@@ -1089,10 +1094,8 @@ class _MornyePopoverEntrance extends StatelessWidget {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: reduceMotion
-          ? Duration.zero
-          : const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
+      duration: reduceMotion ? Duration.zero : MornyeMotion.effects.duration,
+      curve: MornyeMotion.effects.curve,
       builder: (context, progress, child) => Opacity(
         opacity: progress,
         child: Transform.translate(
