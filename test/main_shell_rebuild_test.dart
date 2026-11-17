@@ -186,6 +186,31 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
+      testWidgets('switching tabs rebuilds no page of a tab ($platform, '
+          '$style)', (tester) async {
+        await pumpShell(tester, desktop: desktop, mornye: mornye);
+        final probeBuilds = await pushProbeInLibrary(tester);
+        final builds = probeBuilds.single;
+        List<Widget> pages() => [
+          ...tester.widgetList(find.byType(HomeTab, skipOffstage: false)),
+          tester.widget(find.byType(_ProbePage, skipOffstage: false)),
+        ];
+        final before = pages();
+
+        for (final tab in [
+          ShellTab.library,
+          ShellTab.settings,
+          ShellTab.home,
+        ]) {
+          ShellNavigationService.requestTab(tab);
+          await settle(tester);
+        }
+
+        expect(probeBuilds.single, builds);
+        expectSameInstances(before, pages());
+        expect(tester.takeException(), isNull);
+      });
+
       for (final (badge, setCount) in <(String, void Function(int))>[
         ('download', (count) => queue.setQueued(count)),
         ('Store update', (count) => repo.setUpdates(count)),

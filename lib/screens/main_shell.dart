@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:mornye/controllers/open_audio_controller.dart';
 import 'package:mornye/services/audio_file_open_service.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
@@ -1012,21 +1013,20 @@ class _MainShellState extends ConsumerState<MainShell>
         navigatorKey: _homeTabNavigatorKey,
         observers: [_homePreviewStopObserver],
         heroAnimationsEnabled: heroAnimationsEnabled,
-        child: Builder(
-          builder: (context) => HomeTab(
-            mode: context.isMornye ? HomeTabMode.browse : HomeTabMode.combined,
-          ),
-        ),
+        child: const _HomeTabRoot(),
       ),
-      _TabNavigator(
+      _TabShown(
         key: const ValueKey('tab-library'),
-        navigatorKey: _libraryTabNavigatorKey,
-        observers: [
-          _libraryPreviewStopObserver,
-          if (isDesktopPlatform) _libraryDepthObserver,
-        ],
-        heroAnimationsEnabled: heroAnimationsEnabled,
-        child: _LibraryTabRoot(isTabActive: _currentIndex == 1),
+        shown: _currentIndex == 1,
+        child: _TabNavigator(
+          navigatorKey: _libraryTabNavigatorKey,
+          observers: [
+            _libraryPreviewStopObserver,
+            if (isDesktopPlatform) _libraryDepthObserver,
+          ],
+          heroAnimationsEnabled: heroAnimationsEnabled,
+          child: const _LibraryTabRoot(),
+        ),
       ),
       if (showStore)
         _TabNavigator(
@@ -1510,6 +1510,29 @@ class _TabNavigatorState extends State<_TabNavigator> {
       MaterialApp.createMaterialHeroController();
   final _nowPlayingCloser = DesktopNowPlayingCloser();
 
+  /// The navigator as last built. A [Navigator] that is built again builds
+  /// the page of every route on it again, so every tab's pages would follow
+  /// each switch of tab; the same one is handed back until what it is made
+  /// from changes.
+  Navigator? _navigator;
+
+  @override
+  void didUpdateWidget(_TabNavigator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(widget.child, oldWidget.child) ||
+        widget.navigatorKey != oldWidget.navigatorKey ||
+        widget.heroAnimationsEnabled != oldWidget.heroAnimationsEnabled ||
+        !listEquals(widget.observers, oldWidget.observers)) {
+      _navigator = null;
+    }
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _navigator = null;
+  }
+
   @override
   void dispose() {
     _chromeObserver.detach();
@@ -1519,7 +1542,7 @@ class _TabNavigatorState extends State<_TabNavigator> {
 
   @override
   Widget build(BuildContext context) {
-    return Navigator(
+    return _navigator ??= Navigator(
       key: widget.navigatorKey,
       routeDirectionalTraversalEdgeBehavior: isAndroidTv
           ? TraversalEdgeBehavior.parentScope
@@ -1610,15 +1633,36 @@ class _PageDepthObserver extends NavigatorObserver {
   }
 }
 
-class _LibraryTabRoot extends ConsumerWidget {
-  final bool isTabActive;
+/// Whether a tab is the one on screen, for the tab's root page. It reaches
+/// the page from above the tab's navigator: handed down as a parameter it
+/// would build the navigator again, and every page on it.
+class _TabShown extends InheritedWidget {
+  const _TabShown({super.key, required this.shown, required super.child});
 
-  const _LibraryTabRoot({required this.isTabActive});
+  final bool shown;
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_TabShown>()?.shown ?? true;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return QueueTab(isTabActive: isTabActive);
-  }
+  bool updateShouldNotify(_TabShown oldWidget) => shown != oldWidget.shown;
+}
+
+class _HomeTabRoot extends StatelessWidget {
+  const _HomeTabRoot();
+
+  @override
+  Widget build(BuildContext context) => HomeTab(
+    mode: context.isMornye ? HomeTabMode.browse : HomeTabMode.combined,
+  );
+}
+
+class _LibraryTabRoot extends StatelessWidget {
+  const _LibraryTabRoot();
+
+  @override
+  Widget build(BuildContext context) =>
+      QueueTab(isTabActive: _TabShown.of(context));
 }
 
 class _KeepAliveTabPage extends StatefulWidget {
