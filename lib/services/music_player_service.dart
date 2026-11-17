@@ -1857,15 +1857,22 @@ class MusicPlayerHandler extends BaseAudioHandler
     // Link may resolve a network song to its completed local copy.
     // A file still arriving resolves to its HTTP stream instead.
     try {
-      if (const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme)) {
-        if (_settings.usbBitPerfect && _dependencies.isAndroid) {
-          // The USB output plays whole local files only, so this song goes
-          // through Android's mixer, at the level the DAC was left on.
-          _log.i(
-            'USB output not used: this song streams '
-            '(${Uri.tryParse(media.source)?.scheme ?? 'file'} source)',
-          );
-        }
+      final streams = const {
+        'http',
+        'https',
+      }.contains(Uri.tryParse(path)?.scheme);
+      if (_settings.usbBitPerfect && _dependencies.isAndroid) {
+        // The USB output plays whole local files only: a song that streams
+        // goes through Android's mixer, at the level the DAC was left on.
+        final scheme = Uri.tryParse(media.source)?.scheme ?? '';
+        final kind = scheme.isEmpty ? 'file' : scheme;
+        _log.i(
+          streams
+              ? 'USB output not used: this song streams ($kind source)'
+              : 'USB output requested ($kind source)',
+        );
+      }
+      if (streams) {
         await _player.setNetworkSource(
           path,
           arriving: _runtime.streamsArrivingFile(path),

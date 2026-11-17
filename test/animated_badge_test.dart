@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 
@@ -60,6 +61,26 @@ void main() {
     await tester.pumpAndSettle();
     return (low, high);
   }
+
+  testWidgets('the bump keeps its height at every Animation speed', (
+    tester,
+  ) async {
+    addTearDown(() => MotionPace.speed = 1);
+    for (final speed in [0.5, 2.0, 1.0]) {
+      MotionPace.speed = speed;
+      for (final mornye in [true, false]) {
+        await pumpBadge(tester, count: 1, mornye: mornye);
+        await pumpBadge(tester, count: 2, mornye: mornye);
+        final (_, high) = await track(tester);
+        expect(
+          high,
+          closeTo(1 + AnimatedBadge.bumpHeight, 0.01),
+          reason: 'speed $speed, mornye $mornye',
+        );
+        await tester.pumpWidget(const SizedBox());
+      }
+    }
+  });
 
   testWidgets('Material pushes from 1 on its fast spatial spring', (
     tester,

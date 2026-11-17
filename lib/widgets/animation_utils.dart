@@ -1623,8 +1623,10 @@ class _AnimatedBadgeState extends State<AnimatedBadge>
     with SingleTickerProviderStateMixin {
   static final _materialSpring = M3EMotion.expressiveSpatialFast
       .toDescription();
-  static final _materialPush = _pushFor(_materialSpring);
-  static final _mornyePush = _pushFor(MornyeMotion.fastSpring);
+
+  /// The push of each style's spring, by Animation speed: a slower spring
+  /// reaches the same height on a gentler push.
+  static final _pushes = <(bool mornye, double timeScale), double>{};
 
   /// The speed, in scale units a second, at which a push from rest on
   /// [spring] peaks at [AnimatedBadge.bumpHeight].
@@ -1656,14 +1658,14 @@ class _AnimatedBadgeState extends State<AnimatedBadge>
     if (widget.count > _previousCount &&
         !MediaQuery.disableAnimationsOf(context)) {
       final mornye = context.isMornye;
-      // The pushes are measured on the designed springs; at another pace
-      // the same height takes a push that much faster or slower.
-      final push =
-          (mornye ? _mornyePush : _materialPush) / MotionPace.timeScale;
+      final spring = mornye
+          ? MornyeMotion.fastSpring
+          : MotionPace.spring(_materialSpring);
+      final push = _pushes[(mornye, MotionPace.timeScale)] ??= _pushFor(spring);
       // A badge already rising faster than a push keeps its speed.
       _controller.animateWith(
         SpringSimulation(
-          mornye ? MornyeMotion.fastSpring : MotionPace.spring(_materialSpring),
+          spring,
           _controller.value,
           1,
           math.max(_controller.velocity, push),
