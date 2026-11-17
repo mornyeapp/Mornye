@@ -1746,7 +1746,7 @@ class _HomeShortcuts extends ConsumerWidget {
       ),
       HomeShortcut.link => (
         label: l10n.linkSettingsTitle,
-        icon: Icons.computer,
+        icon: Icons.devices,
         onTap: () => open(const LinkSettingsPage()),
       ),
     };

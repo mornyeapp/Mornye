@@ -350,7 +350,7 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
               title: l10n.linkPhoneSection,
               children: [
                 SettingsSwitchItem(
-                  icon: Icons.computer,
+                  icon: Icons.devices_other_outlined,
                   title: l10n.linkShowComputerSongsTitle,
                   subtitle: l10n.linkShowComputerSongsSubtitle,
                   value: options.showComputerSongs,

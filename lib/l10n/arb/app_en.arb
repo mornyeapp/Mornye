@@ -1406,7 +1406,7 @@
   "@setupNearbyEnable": {
     "description": "Setup step title and button for the Android Nearby devices permission; Nearby devices is the Android permission name"
   },
-  "setupNearbyDescription": "Mornye Link uses it to find your computer on the same network, and network storage needs it to reach a server at home.",
+  "setupNearbyDescription": "Mornye Link uses it to find your other devices on the same network, and network storage needs it to reach a server at home.",
   "@setupNearbyDescription": {
     "description": "Setup step explaining why Android's Nearby devices permission is needed"
   },
@@ -10809,21 +10809,21 @@
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
   },
-  "linkSettingsTitle": "Mornye on your computer",
+  "linkSettingsTitle": "Mornye on other devices",
   "@linkSettingsTitle": {
-    "description": "Phone Settings entry that pairs the phone with the Mornye desktop app on the local network"
+    "description": "Phone Settings entry that pairs the phone with Mornye on a computer or on another phone on the local network"
   },
-  "linkSettingsSubtitle": "Play and control your computer's library",
+  "linkSettingsSubtitle": "Play and control the library of a computer or another phone",
   "@linkSettingsSubtitle": {
-    "description": "Subtitle of the Mornye on your computer entry in phone Settings"
+    "description": "Subtitle of the Mornye on other devices entry in phone Settings"
   },
   "linkPageTitle": "Devices",
   "@linkPageTitle": {
     "description": "Title of the page listing computers and phones running Mornye that the phone can pair with; kept short for the large title"
   },
-  "linkPageDescription": "Pair with Mornye on your computer to play its library on this phone and control what it plays. Both devices need to be on the same network.",
+  "linkPageDescription": "Pair with Mornye on a computer or another phone to play its library on this phone and control what it plays. Both devices need to be on the same network.",
   "@linkPageDescription": {
-    "description": "Introduction at the top of the computers page"
+    "description": "Introduction at the top of the page listing computers and phones the phone can pair with"
   },
   "linkPairedSection": "Paired devices",
   "@linkPairedSection": {
@@ -10831,31 +10831,31 @@
   },
   "linkPhoneSection": "This phone",
   "@linkPhoneSection": {
-    "description": "Section header for what this phone shares with and how it follows its paired computer"
+    "description": "Section header for what this phone shares with and how it follows its paired computer or phone"
   },
-  "linkShareSongsTitle": "Show songs on the computer",
+  "linkShareSongsTitle": "Show songs on the other device",
   "@linkShareSongsTitle": {
-    "description": "Switch title: this phone's songs appear in the paired computer's Library"
+    "description": "Switch title: this phone's songs appear in the Library of the paired computer or phone"
   },
-  "linkShareSongsSubtitle": "Songs on this phone appear in the computer's Library and play there while this phone is connected",
+  "linkShareSongsSubtitle": "Songs on this phone appear in the other device's Library and play there while this phone is connected",
   "@linkShareSongsSubtitle": {
-    "description": "Switch subtitle for showing this phone's songs on the computer"
+    "description": "Switch subtitle for showing this phone's songs on the paired computer or phone"
   },
-  "linkShowComputerSongsTitle": "Show computer songs in Library",
+  "linkShowComputerSongsTitle": "Show songs from paired devices",
   "@linkShowComputerSongsTitle": {
-    "description": "Switch title: songs from paired computers appear in this phone's Library"
+    "description": "Switch title: songs from paired computers and phones appear in this phone's Library"
   },
-  "linkShowComputerSongsSubtitle": "Hide songs from paired computers without disconnecting Mornye Link. Songs saved to this phone stay in Library.",
+  "linkShowComputerSongsSubtitle": "Hide songs from paired devices without disconnecting Mornye Link. Songs saved to this phone stay in Library.",
   "@linkShowComputerSongsSubtitle": {
-    "description": "Switch subtitle: hiding computer songs preserves the Link connection and songs saved on the phone"
+    "description": "Switch subtitle: hiding a paired device's songs preserves the Link connection and songs saved on the phone"
   },
-  "linkFollowDesktopTitle": "Follow the computer's playback",
+  "linkFollowDesktopTitle": "Follow the other device's playback",
   "@linkFollowDesktopTitle": {
-    "description": "Switch title: the phone's player shows the computer when the computer starts playing"
+    "description": "Switch title: the phone's player shows the paired computer or phone when that device starts playing"
   },
-  "linkFollowDesktopSubtitle": "When the computer starts playing, this phone shows and controls it",
+  "linkFollowDesktopSubtitle": "When the other device starts playing, this phone shows and controls it",
   "@linkFollowDesktopSubtitle": {
-    "description": "Switch subtitle for following the computer's playback"
+    "description": "Switch subtitle for following the paired device's playback"
   },
   "linkHideDisconnectedTitle": "Hide songs while disconnected",
   "@linkHideDisconnectedTitle": {
@@ -10867,9 +10867,9 @@
   },
   "linkSyncSoundTitle": "Sync sound settings",
   "@linkSyncSoundTitle": {
-    "description": "Mornye Link phone switch: the user's saved sound settings travel between this phone and the paired computer"
+    "description": "Mornye Link phone switch: the user's saved sound settings travel between this phone and the paired computer or phone"
   },
-  "linkSyncSoundSubtitle": "Equalizer presets, volume normalization level and mix transitions stay the same on this phone and the computer",
+  "linkSyncSoundSubtitle": "Equalizer presets, volume normalization level and mix transitions stay the same on this phone and the other device",
   "@linkSyncSoundSubtitle": {
     "description": "Subtitle of the Sync sound settings switch; names what is synced"
   },
@@ -10891,17 +10891,17 @@
   },
   "linkAddManually": "Add by address",
   "@linkAddManually": {
-    "description": "Button and dialog title for pairing with a computer by typing its address and port"
+    "description": "Button and dialog title for pairing with a computer or phone by typing its address and port"
   },
-  "linkManualHost": "Computer address",
+  "linkManualHost": "Device address",
   "@linkManualHost": {
-    "description": "Field label for the computer's IP address or host name"
+    "description": "Field label for the IP address or host name of the computer or phone to pair with"
   },
   "linkManualPort": "Port",
   "@linkManualPort": {
-    "description": "Field label for the network port of the Mornye desktop server"
+    "description": "Field label for the network port Mornye shares on, on the computer or phone to pair with"
   },
-  "linkManualMessage": "Mornye on your computer shows its address and port where you turn on sharing.",
+  "linkManualMessage": "Mornye on the other device shows its address and port where you turn on sharing.",
   "@linkManualMessage": {
     "description": "Explains where to find the address and port to type"
   },
@@ -10993,9 +10993,9 @@
       }
     }
   },
-  "linkPairedWithoutLibrary": "Paired with {name}. Computer songs stay hidden from Library.",
+  "linkPairedWithoutLibrary": "Paired with {name}. Its songs stay hidden from Library.",
   "@linkPairedWithoutLibrary": {
-    "description": "Message after pairing succeeded while computer songs are hidden from this phone's Library",
+    "description": "Message after pairing succeeded while songs from paired devices are hidden from this phone's Library",
     "placeholders": {
       "name": {
         "type": "String"
@@ -11257,11 +11257,11 @@
       }
     }
   },
-  "linkErrorBadPin": "That PIN is not right. Check the PIN on your computer and try again.",
+  "linkErrorBadPin": "That PIN is not right. Check the PIN on the other device and try again.",
   "@linkErrorBadPin": {
     "description": "Pairing error when the PIN is wrong"
   },
-  "linkErrorPairingClosed": "Pairing is not open on your computer. Start pairing there, then try again.",
+  "linkErrorPairingClosed": "Pairing is not open on the other device. Start pairing there, then try again.",
   "@linkErrorPairingClosed": {
     "description": "Pairing error when the computer has no pairing window open"
   },
@@ -11269,23 +11269,23 @@
   "@linkErrorTooManyAttempts": {
     "description": "Pairing error when the computer rate limits pairing attempts"
   },
-  "linkErrorCertificateTitle": "Computer not verified",
+  "linkErrorCertificateTitle": "Device not verified",
   "@linkErrorCertificateTitle": {
     "description": "Title of the warning shown when the computer's certificate does not match what it reported"
   },
-  "linkErrorCertificate": "The computer's security certificate does not match what it reported. Someone on this network may be intercepting the connection, so pairing stopped.",
+  "linkErrorCertificate": "The device's security certificate does not match what it reported. Someone on this network may be intercepting the connection, so pairing stopped.",
   "@linkErrorCertificate": {
     "description": "Warning shown when the certificate seen during the connection differs from the computer's reported fingerprint"
   },
-  "linkErrorIncompatible": "This computer runs a Mornye version that cannot pair with this phone. Update Mornye on both devices.",
+  "linkErrorIncompatible": "That device runs a Mornye version that cannot pair with this phone. Update Mornye on both devices.",
   "@linkErrorIncompatible": {
     "description": "Pairing error when the computer is not a compatible Mornye desktop"
   },
-  "linkErrorUnreachable": "The computer could not be reached. Check that Mornye is open on it and that both devices are on the same network.",
+  "linkErrorUnreachable": "The device could not be reached. Check that Mornye is open on it and that both devices are on the same network.",
   "@linkErrorUnreachable": {
     "description": "Pairing error when the computer cannot be reached"
   },
-  "linkErrorTimeout": "The computer did not answer in time. Try again.",
+  "linkErrorTimeout": "The device did not answer in time. Try again.",
   "@linkErrorTimeout": {
     "description": "Pairing error when the computer does not answer"
   },
@@ -11301,7 +11301,7 @@
   "@linkLocalNetworkTitle": {
     "description": "Title of the notice shown when the phone is not allowed to use the local network"
   },
-  "linkLocalNetworkMessage": "Mornye needs local network access to find your computer and connect to it.",
+  "linkLocalNetworkMessage": "Mornye needs local network access to find your other devices and connect to them.",
   "@linkLocalNetworkMessage": {
     "description": "Explains why local network access is needed"
   },
@@ -11313,7 +11313,7 @@
   "@linkWifiOffTitle": {
     "description": "Title of the notice shown when the phone is not connected to Wi-Fi or Ethernet"
   },
-  "linkWifiOffMessage": "Connect this phone to the same Wi-Fi network as your computer.",
+  "linkWifiOffMessage": "Connect this phone to the same Wi-Fi network as the other device.",
   "@linkWifiOffMessage": {
     "description": "Explains that the phone must join the computer's Wi-Fi network"
   },
@@ -11326,7 +11326,7 @@
       }
     }
   },
-  "linkIssueCertificate": "{name} presented a different security certificate. Pair again only if you reinstalled or reset Mornye on that computer.",
+  "linkIssueCertificate": "{name} presented a different security certificate. Pair again only if you reinstalled or reset Mornye on that device.",
   "@linkIssueCertificate": {
     "description": "Warning when a paired computer's certificate changed",
     "placeholders": {

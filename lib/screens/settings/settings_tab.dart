@@ -276,7 +276,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
           ),
           if (Platform.isAndroid || Platform.isIOS)
             _Destination(
-              icon: Icons.computer,
+              icon: Icons.devices,
               iconColor: Colors.deepPurple,
               title: l10n.linkSettingsTitle,
               subtitle: l10n.linkSettingsSubtitle,
@@ -285,9 +285,13 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                 'desktop',
                 'pc',
                 'mac',
+                'phone',
+                'device',
                 'pair',
                 'link',
                 'komputer',
+                'ponsel',
+                'perangkat',
               ],
               pageBuilder: () => const LinkSettingsPage(),
               beta: true,

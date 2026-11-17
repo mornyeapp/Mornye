@@ -216,7 +216,8 @@ IconData _cupertinoFor(IconData icon) {
     Icons.check_circle_outline => CupertinoIcons.checkmark_circle,
     Icons.help_outline => CupertinoIcons.question_circle,
     Icons.phone_android => CupertinoIcons.device_phone_portrait,
-    Icons.computer => CupertinoIcons.desktopcomputer,
+    // Cupertino has no glyph of several devices.
+    Icons.computer || Icons.devices => CupertinoIcons.desktopcomputer,
     Icons.hub_outlined => CupertinoIcons.link,
     Icons.campaign_outlined => CupertinoIcons.speaker_2,
     Icons.drag_handle => CupertinoIcons.line_horizontal_3,
