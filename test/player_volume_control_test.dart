@@ -8,14 +8,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_output_volume.dart';
+import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/services/system_volume_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_slider.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
+
+/// Another device at 80% volume.
+class _Remote extends Fake implements RemotePlayback {
+  final writes = <double>[];
+
+  @override
+  Stream<double> get volumes => Stream.value(0.8);
+
+  @override
+  Future<void> setVolume(double value) async => writes.add(value);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -209,6 +222,50 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  for (final beside in [false, true]) {
+    testWidgets('with another device shown, the slider sets '
+        '${beside ? 'this device while it sounds too' : 'that device'}', (
+      tester,
+    ) async {
+      final remote = _Remote();
+      final systemWrites = <double>[];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activeRemotePlaybackProvider.overrideWithValue(remote),
+            soundsBesideRemoteProvider.overrideWithValue(beside),
+            systemVolumeProvider.overrideWith((ref) => Stream.value(0.3)),
+            systemVolumeWriterProvider.overrideWith(
+              (ref) =>
+                  (value) async => systemWrites.add(value),
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(body: PlayerVolumeControl()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      AppSlider slider() => tester.widget(find.byType(AppSlider));
+      expect(slider().value, beside ? 0.3 : 0.8);
+
+      final finger = await tester.startGesture(
+        tester.getCenter(find.byType(AppSlider)),
+      );
+      await finger.moveBy(const Offset(20, 0));
+      await tester.pump();
+      await finger.moveBy(const Offset(-120, 0));
+      await tester.pump();
+      await finger.up();
+      await tester.pumpAndSettle();
+      expect(beside ? systemWrites : remote.writes, isNotEmpty);
+      expect(beside ? remote.writes : systemWrites, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final reducedMotion in [false, true]) {

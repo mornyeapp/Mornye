@@ -243,6 +243,13 @@ void main() {
                   ref.watch(linkRemotePlaybackProvider) ??
                   ref.watch(linkFollowedPhonePlaybackProvider),
             ),
+            // Playing together, this phone sounds while its screens show
+            // the computer: its volume controls stay its own.
+            soundsBesideRemoteProvider.overrideWith(
+              (ref) => ref.watch(
+                linkPlayTogetherProvider.select((state) => state.active),
+              ),
+            ),
             // Also while songs transfer, so the computer can still ask for
             // this phone's files and hear how a transfer stands, and while
             // the two play together.

@@ -27,6 +27,11 @@ final musicPlayerRuntimeProvider = Provider<MusicPlayerRuntime>(
 /// The app root overrides it with Mornye Link's paired desktop.
 final activeRemotePlaybackProvider = Provider<RemotePlayback?>((ref) => null);
 
+/// Whether this device sounds too while [activeRemotePlaybackProvider]
+/// plays, so its volume controls set its own volume. The app root overrides
+/// it with Mornye Link's Play together.
+final soundsBesideRemoteProvider = Provider<bool>((ref) => false);
+
 /// External apps own playback on this device. A remote Mornye player keeps
 /// its controls while this device is only controlling it.
 final playerUiEnabledProvider = Provider<bool>(

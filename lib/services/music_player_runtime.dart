@@ -375,6 +375,7 @@ class MusicPlayerRuntime {
   Future<void> Function()? exclusiveAudioHook;
   RemotePlayback? _remote;
   RemoteMediaSession? _remoteSession;
+  bool _soundsBesideRemote = false;
   final _arriving = <String, ({String url, Future<void> done})>{};
   bool _coversPrepared = false;
   static const _coverTrimDelay = Duration(minutes: 2);
@@ -745,7 +746,15 @@ class MusicPlayerRuntime {
             remote,
             local: system.local,
             onLocal: () => _showSession(null),
+            ownVolume: _soundsBesideRemote,
           );
+  }
+
+  /// Whether this device sounds too while a remote one is shown, as when
+  /// the two play together: the system volume keys then stay on this device.
+  set soundsBesideRemote(bool value) {
+    _soundsBesideRemote = value;
+    _remoteSession?.ownVolume = value;
   }
 
   /// The default runtime lives for the app lifetime. Scoped runtimes close

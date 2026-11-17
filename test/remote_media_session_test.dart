@@ -271,6 +271,37 @@ void main() {
     );
   });
 
+  test('Android volume keys stay here while this device sounds too', () async {
+    remote.volume.add(0.4);
+    session.ownVolume = true;
+    expect(session.androidPlaybackInfo.value, isA<LocalAndroidPlaybackInfo>());
+
+    // The remote's volume is still heard, but the keys do not set it.
+    remote.volume.add(0.6);
+    expect(session.androidPlaybackInfo.value, isA<LocalAndroidPlaybackInfo>());
+    await session.androidAdjustRemoteVolume(AndroidVolumeDirection.raise);
+    expect(remote.volumeWrites, isEmpty);
+
+    // Alone again, the keys return to the remote at its latest volume.
+    session.ownVolume = false;
+    final info = session.androidPlaybackInfo.value as RemoteAndroidPlaybackInfo;
+    expect(info.volumeControlType, AndroidVolumeControlType.absolute);
+    expect(info.volume, 60);
+    await session.androidAdjustRemoteVolume(AndroidVolumeDirection.raise);
+    expect(remote.volumeWrites, [0.65]);
+  });
+
+  test('a session made while this device sounds starts with its own keys', () {
+    final beside = RemoteMediaSession(
+      remote,
+      local: local,
+      onLocal: () {},
+      ownVolume: true,
+    );
+    addTearDown(beside.dispose);
+    expect(beside.androidPlaybackInfo.value, isA<LocalAndroidPlaybackInfo>());
+  });
+
   test('switching back restores local Android volume handling', () async {
     final system = SwitchAudioHandler(local);
     expect(

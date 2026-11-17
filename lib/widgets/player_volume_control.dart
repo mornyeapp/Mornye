@@ -95,7 +95,9 @@ class _PlayerVolumeControlState extends ConsumerState<PlayerVolumeControl> {
 
   Future<void> _flushVolume() async {
     _writing = true;
-    final remote = ref.read(activeRemotePlaybackProvider);
+    final remote = ref.read(soundsBesideRemoteProvider)
+        ? null
+        : ref.read(activeRemotePlaybackProvider);
     final write = remote == null
         ? ref.read(systemVolumeWriterProvider)
         : remote.setVolume;
@@ -125,8 +127,10 @@ class _PlayerVolumeControlState extends ConsumerState<PlayerVolumeControl> {
   @override
   Widget build(BuildContext context) {
     // While another device plays in this one's place, the slider sets its
-    // volume.
-    final remote = ref.watch(activeRemotePlaybackProvider) != null;
+    // volume. While this one sounds too, it sets this one's.
+    final remote =
+        ref.watch(activeRemotePlaybackProvider) != null &&
+        !ref.watch(soundsBesideRemoteProvider);
     final usb = remote
         ? null
         : ref.watch(usbVolumeProvider).value ?? usbHardwareVolume.value;
