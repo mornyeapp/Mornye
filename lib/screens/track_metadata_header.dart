@@ -20,6 +20,35 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
       HeaderMetaItem(_service[0].toUpperCase() + _service.substring(1)),
   ];
 
+  /// The cover on its way between a list row and the header: this page's
+  /// cover, with corners that go from the row thumbnail's to the header's.
+  /// Without it the cover would fly with square corners and get them back
+  /// on landing. The flight's animation is at 1 on this page both ways.
+  Widget _coverFlight(
+    BuildContext flight,
+    Animation<double> animation,
+    HeroFlightDirection direction,
+    BuildContext from,
+    BuildContext to,
+  ) {
+    final header = direction == HeroFlightDirection.push ? to : from;
+    final corners = BorderRadiusTween(
+      begin: flight.tokens.borderRadiusThumb,
+      end: header
+          .findAncestorWidgetOfExactType<ClipRRect>()
+          ?.borderRadius
+          .resolve(Directionality.of(flight)),
+    ).animate(animation);
+    return AnimatedBuilder(
+      animation: corners,
+      builder: (context, cover) => ClipRRect(
+        borderRadius: corners.value ?? BorderRadius.zero,
+        child: cover,
+      ),
+      child: (header.widget as Hero).child,
+    );
+  }
+
   /// The header albums and playlists have, for one song: its cover, title,
   /// artist and album, the file's quality and the song's main actions. The
   /// rest of the actions stay in the More menu.
@@ -107,9 +136,11 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
           ? artworkSource
           : coverFilePath(artworkSource),
       blurAndScrimBackground: artworkSource != null,
-      // The square cover keeps the Hero flight from a list thumbnail square.
+      // The header rounds the cover outside the Hero, so the flight rounds
+      // it itself.
       coverBuilder: (context, coverSize) => Hero(
         tag: _coverHeroTag,
+        flightShuttleBuilder: _coverFlight,
         child: SizedBox.square(
           dimension: coverSize,
           child: artworkImage(cacheWidth: coverCacheWidth, iconSize: 48),

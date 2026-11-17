@@ -9,6 +9,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/cover_palette.dart' show HeaderPalette;
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
@@ -237,4 +238,104 @@ void main() {
     expect(row.crossAxisAlignment, CrossAxisAlignment.baseline);
     expect(row.textBaseline, TextBaseline.alphabetic);
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets('the cover keeps rounded corners while it flies between a '
+        'list row and the header (mornye=$mornye)', (tester) async {
+      final item = LocalLibraryItem(
+        id: 'flight-track',
+        filePath: '/missing/flight-track.flac',
+        trackName: 'Track',
+        artistName: 'Artist',
+        albumName: 'Album',
+        scannedAt: DateTime(2026),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: GestureDetector(
+                    key: const ValueKey('row'),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => TrackMetadataScreen(localItem: item),
+                      ),
+                    ),
+                    child: const Hero(
+                      tag: 'cover_lib_flight-track',
+                      child: SizedBox.square(
+                        dimension: 48,
+                        child: ColoredBox(color: Colors.green),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      // The row thumbnail's corner, and the header's, read from the page at
+      // rest below.
+      final thumbCorner = tester
+          .element(find.byKey(const ValueKey('row')))
+          .tokens
+          .radiusThumb;
+      late double headerCorner;
+      Set<double> corners() => {
+        for (final clip in tester.widgetList<ClipRRect>(find.byType(ClipRRect)))
+          if (clip.borderRadius case final BorderRadius radius)
+            radius.topLeft.x,
+      };
+      // Corners that changed between two moments of a flight: the cover's.
+      Future<Set<double>> movingCorners() async {
+        await tester.pump(const Duration(milliseconds: 60));
+        final early = corners();
+        await tester.pump(const Duration(milliseconds: 60));
+        return corners().difference(early);
+      }
+
+      await tester.tap(find.byKey(const ValueKey('row')));
+      await tester.pump();
+      await tester.pump();
+      final arriving = await movingCorners();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      headerCorner =
+          (tester
+                      .widget<ClipRRect>(
+                        find
+                            .ancestor(
+                              of: find.byType(Hero),
+                              matching: find.byType(ClipRRect),
+                            )
+                            .first,
+                      )
+                      .borderRadius
+                  as BorderRadius)
+              .topLeft
+              .x;
+      expect(headerCorner, greaterThan(thumbCorner));
+      expect(arriving, hasLength(1));
+      expect(arriving.single, inExclusiveRange(thumbCorner, headerCorner));
+
+      Navigator.of(tester.element(find.byType(TrackMetadataScreen))).pop();
+      await tester.pump();
+      await tester.pump();
+      final leaving = await movingCorners();
+      expect(leaving, hasLength(1));
+      expect(leaving.single, inExclusiveRange(thumbCorner, headerCorner));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.takeException(), isNull);
+    });
+  }
 }
