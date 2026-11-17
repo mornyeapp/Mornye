@@ -50,6 +50,9 @@ class PlayerLyricsControlsCollapse extends StatelessWidget {
 }
 
 /// Fades controls without changing the lyric viewport or active scroll gesture.
+///
+/// Hidden controls stay mounted but stop animating: the time labels would
+/// otherwise roll their digits every second, a frame at a time, unseen.
 class PlayerLyricsControlsVisibility extends StatelessWidget {
   const PlayerLyricsControlsVisibility({
     super.key,
@@ -71,7 +74,7 @@ class PlayerLyricsControlsVisibility extends StatelessWidget {
             ? Duration.zero
             : const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
-        child: child,
+        child: TickerMode(enabled: !hidden, child: child),
       ),
     ),
   );

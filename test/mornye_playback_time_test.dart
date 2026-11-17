@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/mornye_playback_time.dart';
+import 'package:mornye/widgets/player_lyrics_controls.dart';
 
 Widget _app(int seconds, {bool remaining = false, bool reduceMotion = false}) =>
     MaterialApp(
@@ -143,5 +144,28 @@ void main() {
     expect(find.text('0:36'), findsOneWidget);
     expect(find.byType(AnimatedSwitcher), findsNothing);
     expect(tester.hasRunningAnimations, isFalse);
+  });
+
+  testWidgets('Hidden lyric controls update time without drawing a roll', (
+    tester,
+  ) async {
+    Widget hidden(int seconds, {required bool hidden}) =>
+        PlayerLyricsControlsVisibility(hidden: hidden, child: _app(seconds));
+    await tester.pumpWidget(hidden(34, hidden: true));
+    await tester.pumpWidget(hidden(35, hidden: true));
+    expect(find.text('5'), findsOneWidget);
+    expect(find.text('4'), findsNothing);
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    expect(DecorativePhase.debugClockRunning, isFalse);
+
+    // Shown again, the digits roll as before.
+    await tester.pumpWidget(hidden(35, hidden: false));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpWidget(hidden(36, hidden: false));
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(find.text('5'), findsOneWidget);
+    expect(find.text('6'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(tester.takeException(), isNull);
   });
 }
