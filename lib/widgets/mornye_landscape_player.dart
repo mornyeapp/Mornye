@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/widgets/audio_output_button.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/utils/android_tv.dart';
@@ -119,6 +120,15 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
     super.dispose();
   }
 
+  // Pages dissolve on Mornye's effects spring and the actions on its fast
+  // one; reduced motion cuts.
+  static const _still = AppMotionSpec(Duration.zero, Curves.linear);
+  AppMotionSpec get _pageFade =>
+      MediaQuery.disableAnimationsOf(context) ? _still : MornyeMotion.effects;
+  AppMotionSpec get _actionsFade => MediaQuery.disableAnimationsOf(context)
+      ? _still
+      : MornyeMotion.effectsFast;
+
   @override
   Widget build(BuildContext context) => Listener(
     onPointerDown: (_) => _hideTimer?.cancel(),
@@ -164,9 +174,9 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
                         fit: StackFit.expand,
                         children: [
                           AnimatedSwitcher(
-                            duration: MediaQuery.disableAnimationsOf(context)
-                                ? Duration.zero
-                                : const Duration(milliseconds: 180),
+                            duration: _pageFade.duration,
+                            switchInCurve: _pageFade.curve,
+                            switchOutCurve: _pageFade.curve,
                             layoutBuilder: (current, previous) => Stack(
                               fit: StackFit.expand,
                               children: [
@@ -225,13 +235,8 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
                                                           ? 1
                                                           : 0,
                                                       duration:
-                                                          MediaQuery.disableAnimationsOf(
-                                                            context,
-                                                          )
-                                                          ? Duration.zero
-                                                          : const Duration(
-                                                              milliseconds: 180,
-                                                            ),
+                                                          _actionsFade.duration,
+                                                      curve: _actionsFade.curve,
                                                       child:
                                                           widget.lyricsOptions!,
                                                     ),
@@ -256,10 +261,8 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
                                   excluding: !_actionsVisible,
                                   child: AnimatedOpacity(
                                     opacity: _actionsVisible ? 1 : 0,
-                                    duration:
-                                        MediaQuery.disableAnimationsOf(context)
-                                        ? Duration.zero
-                                        : const Duration(milliseconds: 180),
+                                    duration: _actionsFade.duration,
+                                    curve: _actionsFade.curve,
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 20,
@@ -362,9 +365,11 @@ class _LandscapeLyricsViewport extends ConsumerWidget {
       key: const ValueKey('landscape-lyrics-viewport'),
       child: TweenAnimationBuilder<double>(
         tween: Tween(end: controlsVisible ? 1 : 0),
+        // Follows the actions it makes room for.
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
-            : const Duration(milliseconds: 180),
+            : MornyeMotion.effectsFast.duration,
+        curve: MornyeMotion.effectsFast.curve,
         child: child,
         builder: (context, progress, child) => Stack(
           fit: StackFit.expand,

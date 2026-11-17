@@ -26,9 +26,9 @@ class CachedCoverImage extends StatelessWidget {
   final Widget Function(BuildContext, String)? placeholder;
   final BorderRadius? borderRadius;
 
-  /// How long a cover fades in once it decodes. Null fades it on the effects
-  /// spring on Material and over [_fadeIn] on Mornye, except under reduced
-  /// motion or while its list flings. Zero keeps the cut (player artwork).
+  /// How long a cover fades in once it decodes. Null fades it on the fast
+  /// effects spring of the app's style, except under reduced motion or
+  /// while its list flings. Zero keeps the cut (player artwork).
   /// A cover already in the memory cache never fades: octo_image shows a
   /// synchronous hit at once, so scrolling back does not fade it again.
   final Duration? fadeInDuration;

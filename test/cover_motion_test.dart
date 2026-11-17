@@ -134,9 +134,7 @@ void main() {
       expect(fades.map((fade) => fade.opacity.value), everyElement(1));
     });
 
-    testWidgets('Material fades on the effects spring, Mornye eases out', (
-      tester,
-    ) async {
+    testWidgets('each style fades on its own effects spring', (tester) async {
       await tester.pumpWidget(_app(_cover()));
       var widget = tester.widget<CachedNetworkImage>(
         find.byType(CachedNetworkImage),
@@ -154,8 +152,8 @@ void main() {
       // Let the app's theme animation reach the Mornye theme.
       await tester.pump(const Duration(seconds: 1));
       widget = tester.widget(find.byType(CachedNetworkImage));
-      expect(widget.fadeOutDuration, const Duration(milliseconds: 150));
-      expect(widget.fadeOutCurve, Curves.easeOut);
+      expect(widget.fadeOutDuration, MornyeMotion.effectsFast.duration);
+      expect(widget.fadeOutCurve, MornyeMotion.effectsFast.curve);
     });
 
     testWidgets('reduced motion and an explicit zero cut the cover in', (

@@ -1,5 +1,6 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_content_card.dart';
@@ -270,6 +271,22 @@ class MetadataEditorSectionCard extends StatelessWidget {
     final cs = colorScheme;
     final collapsible = onHeaderTap != null;
     const inset = 16.0;
+    // The chevron turns on the fast spatial spring. The card's height moves
+    // the sections below it, so it unfolds on springs that stop at its size
+    // (an expressive overshoot would be several fields tall); reduced motion
+    // changes both at once.
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    const still = AppMotionSpec(Duration.zero, Curves.linear);
+    final turn = AppMotion.spatialFast(
+      context,
+      still,
+      mornye: MornyeMotion.fast,
+    );
+    final unfold = reduced
+        ? still
+        : context.isMornye
+        ? MornyeMotion.standard
+        : AppMotion.materialPage;
 
     final headerRow = Row(
       children: [
@@ -287,8 +304,8 @@ class MetadataEditorSectionCard extends StatelessWidget {
         if (collapsible)
           AnimatedRotation(
             turns: expanded ? 0.5 : 0,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutCubic,
+            duration: turn.duration,
+            curve: turn.curve,
             child: Icon(
               context.isMornye
                   ? CupertinoIcons.chevron_down
@@ -313,25 +330,29 @@ class MetadataEditorSectionCard extends StatelessWidget {
             child: headerRow,
           );
 
-    final content = AnimatedSize(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-      alignment: Alignment.topCenter,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          header,
-          if (children.isNotEmpty)
-            Padding(
-              padding: EdgeInsets.fromLTRB(inset, 0, inset, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: children,
-              ),
+    final column = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        header,
+        if (children.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.fromLTRB(inset, 0, inset, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
             ),
-        ],
-      ),
+          ),
+      ],
     );
+    // A zero-length AnimatedSize re-dirties itself during layout.
+    final content = unfold.duration == Duration.zero
+        ? column
+        : AnimatedSize(
+            duration: unfold.duration,
+            curve: unfold.curve,
+            alignment: Alignment.topCenter,
+            child: column,
+          );
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: context.isMornye

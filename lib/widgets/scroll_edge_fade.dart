@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:mornye/theme/app_motion.dart';
 
 /// Overlays a gradient on the trailing edge of a scrollable while more
 /// content remains beyond it, signalling that the view can scroll.
@@ -40,6 +41,12 @@ class _ScrollEdgeFadeState extends State<ScrollEdgeFade> {
   Widget build(BuildContext context) {
     final background = Theme.of(context).scaffoldBackgroundColor;
     final horizontal = widget.axis == Axis.horizontal;
+    // The edge dissolves on the effects spring, and with reduced motion as
+    // well.
+    final fade = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 200), Curves.linear),
+    );
     final scrollable = NotificationListener<ScrollMetricsNotification>(
       onNotification: (notification) => _onMetrics(notification.metrics),
       child: NotificationListener<ScrollUpdateNotification>(
@@ -50,7 +57,8 @@ class _ScrollEdgeFadeState extends State<ScrollEdgeFade> {
     if (widget.fadeContent) {
       return TweenAnimationBuilder<double>(
         tween: Tween(end: _hasMore ? 1 : 0),
-        duration: const Duration(milliseconds: 200),
+        duration: fade.duration,
+        curve: fade.curve,
         builder: (context, strength, child) => ShaderMask(
           blendMode: BlendMode.dstIn,
           shaderCallback: (bounds) {
@@ -92,7 +100,8 @@ class _ScrollEdgeFadeState extends State<ScrollEdgeFade> {
           child: IgnorePointer(
             child: AnimatedOpacity(
               opacity: _hasMore ? 1 : 0,
-              duration: const Duration(milliseconds: 200),
+              duration: fade.duration,
+              curve: fade.curve,
               child: Container(
                 width: horizontal ? widget.size : null,
                 height: horizontal ? null : widget.size,

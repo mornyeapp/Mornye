@@ -272,6 +272,8 @@ void main() {
         await scrollTo(700);
         final shown = _titleOpacities(tester);
         await scrollTo(0);
+        // Mornye's effects spring settles in a long, quiet tail.
+        await tester.pump(const Duration(seconds: 1));
 
         expect(pageBuilds, 0);
         expect(_titleOpacities(tester), hidden);

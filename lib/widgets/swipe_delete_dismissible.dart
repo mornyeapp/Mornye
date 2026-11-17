@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/swipe_commit_haptic.dart';
@@ -48,10 +49,17 @@ class _SwipeDeleteDismissibleState extends State<SwipeDeleteDismissible> {
     final margin =
         TrackCardSegment.marginOf(context) ??
         const EdgeInsets.symmetric(horizontal: 16, vertical: 4);
+    // The fill turns at the threshold on the fast effects spring; reduced
+    // motion keeps the short dissolve.
+    final tint = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 150), Curves.linear),
+    );
     Widget background({required bool reached, required double progress}) {
       final scale = 0.7 + 0.45 * (progress / _threshold).clamp(0.0, 1.0);
       return AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: tint.duration,
+        curve: tint.curve,
         margin: margin,
         decoration: BoxDecoration(
           color: reached ? colorScheme.error : colorScheme.errorContainer,

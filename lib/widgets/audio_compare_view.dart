@@ -563,6 +563,30 @@ class _CompareExplanationState extends State<_CompareExplanation> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final tokens = context.tokens;
+    // The chevron turns on the fast spatial spring and the text unfolds on
+    // the default one; reduced motion changes both at once.
+    const still = AppMotionSpec(Duration.zero, Curves.linear);
+    final turn = AppMotion.spatialFast(
+      context,
+      still,
+      mornye: MornyeMotion.fast,
+    );
+    final unfold = AppMotion.spatial(
+      context,
+      still,
+      mornye: MornyeMotion.standard,
+    );
+    final body = _open
+        ? Padding(
+            padding: EdgeInsets.only(top: tokens.gapXs),
+            child: Text(
+              l10n.audioCompareExplainBody,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          )
+        : const SizedBox(width: double.infinity);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -591,7 +615,8 @@ class _CompareExplanationState extends State<_CompareExplanation> {
                   ),
                   AnimatedRotation(
                     turns: _open ? 0.5 : 0,
-                    duration: tokens.motionFast,
+                    duration: turn.duration,
+                    curve: turn.curve,
                     child: AppIcon.adaptive(
                       Icons.expand_more,
                       color: cs.onSurfaceVariant,
@@ -602,21 +627,16 @@ class _CompareExplanationState extends State<_CompareExplanation> {
             ),
           ),
         ),
-        AnimatedSize(
-          duration: tokens.motionFast,
-          alignment: Alignment.topCenter,
-          child: _open
-              ? Padding(
-                  padding: EdgeInsets.only(top: tokens.gapXs),
-                  child: Text(
-                    l10n.audioCompareExplainBody,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                )
-              : const SizedBox(width: double.infinity),
-        ),
+        // A zero-length AnimatedSize re-dirties itself during layout.
+        if (unfold.duration == Duration.zero)
+          body
+        else
+          AnimatedSize(
+            duration: unfold.duration,
+            curve: unfold.curve,
+            alignment: Alignment.topCenter,
+            child: body,
+          ),
       ],
     );
   }

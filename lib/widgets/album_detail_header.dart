@@ -170,6 +170,12 @@ class AlbumDetailHeader extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
           ),
     );
+    // The title dissolves in on the effects spring, and with reduced motion
+    // as well.
+    final titleFade = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 180), Curves.linear),
+    );
     Widget toolbar({bool collapsed = true}) => SliverAppBar(
       pinned: true,
       backgroundColor: collapsed ? scheme.surface : Colors.transparent,
@@ -182,7 +188,8 @@ class AlbumDetailHeader extends StatelessWidget {
           opacity: showTitle || appBarTitle != null || (immersive && collapsed)
               ? 1
               : 0,
-          duration: const Duration(milliseconds: 180),
+          duration: titleFade.duration,
+          curve: titleFade.curve,
           child: Text(
             appBarTitle ?? title,
             maxLines: 1,
@@ -521,7 +528,8 @@ class AlbumDetailHeader extends StatelessWidget {
                           ),
                         )
                       : AnimatedOpacity(
-                          duration: tokens.motionFast,
+                          duration: titleFade.duration,
+                          curve: titleFade.curve,
                           opacity: showContent ? 1.0 : 0.0,
                           child: content,
                         ),

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:video_player/video_player.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/services/music_player_service.dart';
@@ -16,7 +17,11 @@ class MotionHeaderBanner extends ConsumerStatefulWidget {
   final ValueChanged<double>? onAspectRatioChanged;
   final VoidCallback? onError;
   final VideoPlayerController? controller;
-  final Duration fadeDuration;
+
+  /// How long the video dissolves in over [fallback]. Null dissolves on the
+  /// effects spring of the app's style, and over 400 ms with reduced
+  /// motion. Zero cuts it in.
+  final Duration? fadeDuration;
 
   const MotionHeaderBanner({
     super.key,
@@ -25,7 +30,7 @@ class MotionHeaderBanner extends ConsumerStatefulWidget {
     this.onAspectRatioChanged,
     this.onError,
     this.controller,
-    this.fadeDuration = const Duration(milliseconds: 400),
+    this.fadeDuration,
   });
 
   @override
@@ -210,6 +215,13 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
     }
     final controller = _controller;
     final showVideo = _ready && !_failed && controller != null;
+    final explicit = widget.fadeDuration;
+    final fade = explicit != null
+        ? AppMotionSpec(explicit, Curves.linear)
+        : AppMotion.effects(
+            context,
+            const AppMotionSpec(Duration(milliseconds: 400), Curves.linear),
+          );
 
     return Stack(
       fit: StackFit.expand,
@@ -217,7 +229,8 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
         widget.fallback,
         AnimatedOpacity(
           opacity: showVideo ? 1.0 : 0.0,
-          duration: widget.fadeDuration,
+          duration: fade.duration,
+          curve: fade.curve,
           child: showVideo
               ? FittedBox(
                   fit: BoxFit.cover,

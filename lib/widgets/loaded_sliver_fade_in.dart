@@ -10,7 +10,7 @@ const loadedFadeFirstFrame = Duration(milliseconds: 16);
 /// Keep one instance, under a stable key, where the skeleton and the loaded
 /// sliver take turns: while [loading] it shows [sliver] (the skeleton) as it
 /// is, and the build that turns [loading] off fades the loaded [sliver] in,
-/// on the effects spring on Material and over 150 ms ease-out on Mornye.
+/// on the effects spring of the app's style.
 /// Content already there on the first build, later rebuilds and scrolling
 /// never fade, and nothing staggers. Reduced motion and a false [enabled]
 /// cut. Hit testing does not wait for the fade.
