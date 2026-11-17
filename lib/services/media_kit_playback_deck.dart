@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show AppExitResponse;
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:media_kit/media_kit.dart';
 import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/services/media_kit_audio_filters.dart';
@@ -16,6 +18,10 @@ final _log = AppLogger('MediaKitDeck');
 
 typedef MpvLogError = ({String prefix, String text});
 
+/// A line mpv's audio output wrote below the error level. A [warning] is a
+/// fault such as an underrun; the rest describe the device as it opens.
+typedef MpvOutputNote = ({String prefix, String text, bool warning});
+
 /// The libmpv operations [MediaKitPlaybackDeck] uses. [MediaKitEngine] is the
 /// media_kit implementation; host tests substitute a fake.
 abstract interface class MpvEngine {
@@ -23,6 +29,7 @@ abstract interface class MpvEngine {
   Stream<Duration> get duration;
   Stream<int> get sampleRate;
   Stream<MpvLogError> get errors;
+  Stream<MpvOutputNote> get outputNotes;
   Duration get position;
 
   /// Loads [source] paused.
@@ -55,7 +62,13 @@ abstract interface class MpvPlaylistEngine implements MpvEngine {
 class MediaKitEngine implements MpvEngine, MpvPlaylistEngine {
   MediaKitEngine()
     : _player = NativePlayer(
-        configuration: const PlayerConfiguration(title: 'Mornye'),
+        // Verbose, for the audio output's own account of the device it
+        // opened (see [outputNotes]); mpv writes little else at this level
+        // while a song plays.
+        configuration: const PlayerConfiguration(
+          title: 'Mornye',
+          logLevel: MPVLogLevel.v,
+        ),
       ) {
     _player.onLoadHooks.add(_onLoad);
     _configured = Future.wait([
@@ -151,6 +164,25 @@ class MediaKitEngine implements MpvEngine, MpvPlaylistEngine {
   Stream<MpvLogError> get errors => _player.stream.log
       .where((log) => log.level == 'error')
       .map((log) => (prefix: log.prefix, text: log.text));
+
+  static const _noteLevels = {'warn', 'info', 'v'};
+
+  // The output drivers log as `ao` and `ao/NAME`. The player core reports
+  // an underrun it noticed itself.
+  @override
+  Stream<MpvOutputNote> get outputNotes => _player.stream.log
+      .where(
+        (log) =>
+            _noteLevels.contains(log.level) &&
+            (log.prefix == 'ao' ||
+                log.prefix.startsWith('ao/') ||
+                (log.level == 'warn' &&
+                    log.text.toLowerCase().contains('underrun'))),
+      )
+      .map(
+        (log) =>
+            (prefix: log.prefix, text: log.text, warning: log.level == 'warn'),
+      );
   @override
   Duration get position => _player.state.position;
 
@@ -259,7 +291,9 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
         _equalizerChanged();
       }),
       _engine.errors.listen(_onError),
+      _engine.outputNotes.listen(_onOutputNote),
     ]);
+    _live.add(this);
     // At once, so a source opened right away already plays at the current
     // speed and pitch.
     _equalizerWrite = _syncEqualizer();
@@ -295,6 +329,51 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
 
   static const _loadTimeout = Duration(seconds: 20);
 
+  /// The decks not yet disposed, for [releaseOutputs].
+  static final _live = <MediaKitPlaybackDeck>{};
+  static AppLifecycleListener? _exitListener;
+
+  /// Desktop startup: gives the audio device back when the app is asked to
+  /// quit. Nothing else closes it: the process would end with the stream
+  /// open, and an exclusive device has been reported to stay silent after
+  /// that until it is plugged in again.
+  static void releaseOutputsOnExit() {
+    _exitListener ??= AppLifecycleListener(
+      onExitRequested: () async {
+        try {
+          await releaseOutputs();
+        } catch (error) {
+          // The quit goes on whatever happens here.
+          _log.w('Closing the audio output before quitting: $error');
+        }
+        return AppExitResponse.exit;
+      },
+    );
+  }
+
+  /// Stops every deck and waits, for [timeout] at most, until libmpv has
+  /// closed its audio output.
+  static Future<void> releaseOutputs({
+    Duration timeout = const Duration(milliseconds: 800),
+  }) async {
+    final decks = _live.toList();
+    if (decks.isEmpty) return;
+    final watch = Stopwatch()..start();
+    // The quit waits for this, so a stop held up behind a source that is
+    // still opening does not get longer than the same limit.
+    final closed = await Future.wait([
+      for (final deck in decks)
+        deck._releaseOutput(timeout).timeout(timeout, onTimeout: () => false),
+    ]);
+    _log.i(
+      closed.contains(false)
+          ? 'An audio output was still open ${watch.elapsedMilliseconds} ms '
+                'after the quit request'
+          : 'Audio output closed for quitting '
+                '(${watch.elapsedMilliseconds} ms)',
+    );
+  }
+
   final _states = StreamController<PlaybackDeckState>.broadcast();
   final _durations = StreamController<Duration>.broadcast();
   final _positions = StreamController<Duration>.broadcast();
@@ -315,6 +394,15 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
 
   /// The source last opened, for reopening it when exclusive output fails.
   String? _source;
+
+  /// Where the song was when [_releaseOutput] stopped the engine, which
+  /// reports zero from then on. Null while the engine is in use.
+  Duration? _releasedAt;
+
+  /// Output notes already logged, each once: they repeat with every song.
+  final _loggedNotes = <String>{};
+  final _warningClock = Stopwatch();
+  int _warningsHeld = 0;
 
   /// The output property as last set; null before the first set.
   ({String name, String value})? _output;
@@ -532,6 +620,58 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     if (pending != null && !pending.isCompleted) pending.complete(error);
   }
 
+  static const _warningInterval = Duration(seconds: 5);
+
+  /// Keeps the output's account of itself in the log: the device period,
+  /// buffer and format once each, and faults such as an underrun, which can
+  /// repeat many times a second, at most once per [_warningInterval].
+  void _onOutputNote(MpvOutputNote note) {
+    if (_disposed) return;
+    final line = 'mpv ${note.prefix}: ${note.text}';
+    if (!note.warning) {
+      // Not counted as logged while logging is off, so the lines are there
+      // once the listener turns it on and plays the next song.
+      if ((LogBuffer.loggingEnabled || kDebugMode) &&
+          _loggedNotes.length < 200 &&
+          _loggedNotes.add(line)) {
+        _log.i(line);
+      }
+      return;
+    }
+    if (_warningClock.isRunning && _warningClock.elapsed < _warningInterval) {
+      _warningsHeld++;
+      return;
+    }
+    _log.w(_warningsHeld == 0 ? line : '$line ($_warningsHeld more before)');
+    _warningsHeld = 0;
+    _warningClock
+      ..reset()
+      ..start();
+  }
+
+  /// Stops the engine without a deck state change, which the player would
+  /// save as the end of the song. `stop` returns before libmpv is idle,
+  /// where it closes the output, so this waits for that. False when the
+  /// output was still open after [timeout].
+  Future<bool> _releaseOutput(Duration timeout) async {
+    if (_disposed) return true;
+    _releasedAt ??= _engine.position;
+    _syncPositionTimer();
+    final watch = Stopwatch()..start();
+    try {
+      await _engine.stop();
+      while ((await _engine.getProperty('current-ao')).isNotEmpty) {
+        if (_disposed) return true;
+        if (watch.elapsed >= timeout) return false;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      return true;
+    } catch (error) {
+      _log.w('Closing the audio output: $error');
+      return false;
+    }
+  }
+
   @override
   void startPositionUpdates(Duration interval, {bool Function()? wanted}) {
     _positionInterval = interval;
@@ -545,7 +685,10 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   /// then: an idle deck does not wake the isolate.
   void _syncPositionTimer() {
     final interval = _positionInterval;
-    if (_disposed || interval == null || _state != PlaybackDeckState.playing) {
+    if (_disposed ||
+        interval == null ||
+        _releasedAt != null ||
+        _state != PlaybackDeckState.playing) {
       _positionTimer?.cancel();
       _positionTimer = null;
       return;
@@ -684,6 +827,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     _pendingLoad = loaded;
     _failure = null;
     _duration = null;
+    _releasedAt = null;
     _source = source;
     String? error;
     try {
@@ -751,6 +895,8 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
 
   @override
   Future<Duration?> getCurrentPosition() async {
+    final released = _releasedAt;
+    if (released != null) return released;
     // Asked directly: media_kit's cached position trails a pause or seek.
     final seconds = double.tryParse(await _engine.getProperty('time-pos'));
     if (seconds == null || !seconds.isFinite) return _engine.position;
@@ -940,6 +1086,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     await stop();
     _setState(PlaybackDeckState.disposed);
     _disposed = true;
+    _live.remove(this);
     for (final subscription in _subscriptions) {
       await subscription.cancel();
     }

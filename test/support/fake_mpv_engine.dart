@@ -10,6 +10,7 @@ class FakeMpvEngine implements MpvEngine, MpvPlaylistEngine {
   final durationEvents = StreamController<Duration>.broadcast();
   final sampleRateEvents = StreamController<int>.broadcast();
   final errorEvents = StreamController<MpvLogError>.broadcast();
+  final outputNoteEvents = StreamController<MpvOutputNote>.broadcast();
   @override
   Duration position = Duration.zero;
   double volume = 100;
@@ -63,6 +64,8 @@ class FakeMpvEngine implements MpvEngine, MpvPlaylistEngine {
   Stream<int> get sampleRate => sampleRateEvents.stream;
   @override
   Stream<MpvLogError> get errors => errorEvents.stream;
+  @override
+  Stream<MpvOutputNote> get outputNotes => outputNoteEvents.stream;
 
   @override
   Future<void> open(String source) async {
@@ -138,6 +141,7 @@ class FakeMpvEngine implements MpvEngine, MpvPlaylistEngine {
     await durationEvents.close();
     await sampleRateEvents.close();
     await errorEvents.close();
+    await outputNoteEvents.close();
   }
 
   Iterable<List<String>> get filterWrites =>

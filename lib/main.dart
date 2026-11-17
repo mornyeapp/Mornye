@@ -38,6 +38,7 @@ import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/desktop_deep_links.dart';
 import 'package:mornye/services/desktop_diagnostics.dart';
 import 'package:mornye/services/desktop_library_watcher.dart';
+import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/link/desktop/link_phone_playback.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
@@ -122,6 +123,7 @@ void main() {
       // Desktop: log files and the unclean-exit marker, before the error
       // hooks below start writing to them.
       await DesktopDiagnostics.initialize();
+      if (isDesktopPlatform) MediaKitPlaybackDeck.releaseOutputsOnExit();
       LicenseRegistry.addLicense(() async* {
         yield LicenseEntryWithLineBreaks(
           const [AppInfo.appName],

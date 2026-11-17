@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -578,6 +579,78 @@ void main() {
         ['speed', '0.75'],
       ]);
       await second.dispose();
+    });
+  });
+
+  group('quitting', () {
+    test('stops the engine and waits until its output is closed', () async {
+      final positions = <Duration>[];
+      final states = <PlaybackDeckState>[];
+      deck.onPositionChanged.listen(positions.add);
+      deck.startPositionUpdates(const Duration(milliseconds: 10));
+      await deck.setFileSource('/song.flac');
+      await deck.resume();
+      engine.position = const Duration(seconds: 3);
+      // libmpv closes the output a moment after `stop` returns.
+      engine.properties['current-ao'] = 'wasapi';
+      Timer(
+        const Duration(milliseconds: 40),
+        () => engine.properties.remove('current-ao'),
+      );
+      deck.onPlayerStateChanged.listen(states.add);
+
+      await MediaKitPlaybackDeck.releaseOutputs();
+
+      expect(engine.calls.last, ['stop']);
+      expect(engine.properties, isNot(contains('current-ao')));
+      // The stopped engine reports zero, which is not where the song was.
+      engine.position = Duration.zero;
+      positions.clear();
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(positions, isEmpty);
+      expect(await deck.getCurrentPosition(), const Duration(seconds: 3));
+      // No state change the player would save as the end of the song.
+      expect(states, isEmpty);
+      expect(deck.state, PlaybackDeckState.playing);
+
+      // A song opened after a quit that did not happen plays as usual.
+      await deck.setFileSource('/next.flac');
+      await deck.resume();
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(positions, isNotEmpty);
+      expect(await deck.getCurrentPosition(), Duration.zero);
+    });
+
+    test('does not wait past the timeout for an output left open', () async {
+      await deck.setFileSource('/song.flac');
+      await deck.resume();
+      engine.properties['current-ao'] = 'wasapi';
+      final watch = Stopwatch()..start();
+      await MediaKitPlaybackDeck.releaseOutputs(
+        timeout: const Duration(milliseconds: 60),
+      );
+      expect(engine.calls, contains(equals(['stop'])));
+      expect(watch.elapsedMilliseconds, lessThan(1000));
+    });
+
+    testWidgets('a quit request closes the output and lets the app quit', (
+      tester,
+    ) async {
+      MediaKitPlaybackDeck.releaseOutputsOnExit();
+      final response = await tester.runAsync(
+        tester.binding.handleRequestAppExit,
+      );
+      expect(response, AppExitResponse.exit);
+      expect(engine.calls, contains(equals(['stop'])));
+    });
+
+    test('leaves a disposed deck alone', () async {
+      final other = FakeMpvEngine();
+      final disposed = MediaKitPlaybackDeck(playerId: 'gone', engine: other);
+      await disposed.dispose();
+      other.calls.clear();
+      await MediaKitPlaybackDeck.releaseOutputs();
+      expect(other.calls, isEmpty);
     });
   });
 

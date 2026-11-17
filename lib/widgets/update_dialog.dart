@@ -7,6 +7,7 @@ import 'package:mornye/services/update_checker.dart';
 import 'package:mornye/services/apk_downloader.dart';
 import 'package:mornye/services/desktop_diagnostics.dart';
 import 'package:mornye/services/desktop_updater.dart';
+import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/notification_service.dart';
 import 'package:mornye/services/update_progress_notifications.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -200,8 +201,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
           await updater.startWindowsInstaller(file);
           // The installer waits for this process to close its files. A
           // planned quit, so the next launch reports no crash.
-          DesktopDiagnostics.instance?.endSession();
-          exit(0);
+          await _quitForUpdate();
         case UpdateInstallKind.macosDiskImage:
           await updater.openDiskImage(file);
           if (mounted) {
@@ -239,6 +239,12 @@ class _UpdateDialogState extends State<UpdateDialog> {
     if (_desktopFinish == _DesktopFinish.restart) {
       await DesktopUpdater().restartAppImage(widget.updateInfo.appImagePath!);
     }
+    await _quitForUpdate();
+  }
+
+  /// `exit` asks nobody, so the audio device is given back here.
+  Future<Never> _quitForUpdate() async {
+    await MediaKitPlaybackDeck.releaseOutputs();
     DesktopDiagnostics.instance?.endSession();
     exit(0);
   }

@@ -129,4 +129,29 @@ void main() {
       skip: !Platform.isWindows,
     );
   }
+
+  testWidgets('quitting gives the exclusive device back', (tester) async {
+    final directory = await Directory.systemTemp.createTemp('wasapi-');
+    final source = File('${directory.path}/tone.wav');
+    await source.writeAsBytes(_toneWav(44100));
+    playbackExclusiveOutput.value = true;
+    final deck = MediaKitPlaybackDeck(playerId: 'wasapi-quit');
+    try {
+      await deck.configureOutput();
+      await deck.setVolume(0);
+      await deck.setFileSource(source.path);
+      await deck.resume();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(await deck.debugProperty('current-ao'), 'wasapi');
+      // A paused song holds the device as well.
+      await deck.pause();
+      await MediaKitPlaybackDeck.releaseOutputs();
+      expect(await deck.debugProperty('current-ao'), isEmpty);
+    } finally {
+      await deck.dispose();
+      playbackExclusiveOutput.value = false;
+      playbackExclusiveStatus.value = ExclusiveOutputStatus.pending;
+      await directory.delete(recursive: true);
+    }
+  }, skip: !Platform.isWindows);
 }
