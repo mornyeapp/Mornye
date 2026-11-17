@@ -8406,6 +8406,15 @@
       }
     }
   },
+  "linkDesktopPlayTogetherSubtitle": "This computer and {name}",
+  "@linkDesktopPlayTogetherSubtitle": {
+    "description": "Mornye Link desktop Devices sheet: under Play together, the computer and the phone that play at the same time",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "linkPlayTogetherTiming": "Phone timing",
   "@linkPlayTogetherTiming": {
     "description": "Mornye Link Devices sheet: slider that plays this phone earlier or later than the desktop while playing together"

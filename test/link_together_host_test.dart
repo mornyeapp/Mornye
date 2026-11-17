@@ -390,4 +390,77 @@ void main() {
       expect(host.active, isFalse);
     });
   });
+
+  test('a device picked in Devices ends it, whoever owns the queue', () {
+    for (final role in ['follower', 'leader']) {
+      fakeAsync((async) {
+        final deck = SimDeck(
+          trueNowMs: () => 2000000 + async.elapsed.inMilliseconds,
+          queue: songs,
+          durations: lengths,
+        );
+        final sent = <Map<String, dynamic>>[];
+        var delivered = 1;
+        final phones = <String?>[];
+        late final LinkTogetherHost host;
+        host = LinkTogetherHost(
+          deck: deck,
+          nowMs: deck.nowMs,
+          send: (message, _) async {
+            sent.add(message);
+            return delivered;
+          },
+          onChanged: () => phones.add(host.deviceId),
+        );
+        final router = LinkHostRouter();
+        host.register(router);
+        Map<String, dynamic> start(String session) => {
+          'session': session,
+          'role': role,
+        };
+        List<String> actions() => [
+          for (final message in sent)
+            if (message['type'] == LinkTogetherMessages.action)
+              message['action'] as String,
+        ];
+
+        // Nothing to end.
+        expect(run(async, host.leave(keepHere: true)), isFalse);
+
+        deck.playNow(position: 60000);
+        run(async, call(router, LinkTogetherOps.start, start('s1')));
+        expect(phones, ['phone-1']);
+
+        // This computer: the phone is told and this computer plays on.
+        expect(run(async, host.leave(keepHere: true)), isTrue, reason: role);
+        expect(actions(), [LinkTogetherActions.left]);
+        expect(host.active, isFalse);
+        expect(deck.playing, isTrue);
+        expect(phones, ['phone-1', null]);
+
+        // The phone: it ends the session itself, which pauses this computer.
+        sent.clear();
+        run(async, call(router, LinkTogetherOps.start, start('s2')));
+        expect(run(async, host.leave(keepHere: false)), isTrue, reason: role);
+        expect(actions(), [LinkTogetherActions.leftForPhone]);
+        expect(host.active, isTrue);
+        run(
+          async,
+          call(router, LinkTogetherOps.stop, const {
+            'session': 's2',
+            'pause': true,
+          }),
+        );
+        expect(host.active, isFalse);
+        expect(deck.playing, isFalse);
+        expect(phones, ['phone-1', null, 'phone-1', null]);
+
+        // A phone that cannot be told keeps the session.
+        run(async, call(router, LinkTogetherOps.start, start('s3')));
+        delivered = 0;
+        expect(run(async, host.leave(keepHere: true)), isFalse);
+        expect(host.active, isTrue);
+      });
+    }
+  });
 }

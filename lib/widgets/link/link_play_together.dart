@@ -99,9 +99,7 @@ String linkPlayTogetherTimingLabel(AppLocalizations l10n, int shiftMs) {
 }
 
 /// The phone timing slider of the Devices sheet, in its own group under the
-/// device choices while Play together runs. It slides open on the slow
-/// spatial spring, which stops at its size because the rows below move with
-/// it, and fades in on the effects spring; closing is shorter.
+/// device choices while Play together runs.
 class LinkPlayTogetherTiming extends ConsumerWidget {
   const LinkPlayTogetherTiming({super.key});
 
@@ -112,6 +110,63 @@ class LinkPlayTogetherTiming extends ConsumerWidget {
         (state) => state.phase == LinkTogetherPhase.active,
       ),
     );
+    return LinkTogetherReveal(
+      child: visible
+          ? const _TimingGroup(key: ValueKey('link-together-timing'))
+          : null,
+    );
+  }
+}
+
+/// What a computer's Devices sheet shows while it plays together with the
+/// phone [name]: a checked Play together row in its own group under the
+/// device choices. The phone starts and times it, so the row is not a
+/// button; choosing a device above ends it.
+class LinkDesktopPlayTogether extends StatelessWidget {
+  const LinkDesktopPlayTogether({super.key, required this.name});
+
+  /// The phone's name, or null while this computer plays alone.
+  final String? name;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = this.name;
+    return LinkTogetherReveal(
+      child: name == null
+          ? null
+          : SettingsGroup(
+              key: const ValueKey('desktop-link-together'),
+              children: [
+                SettingsItem(
+                  icon: Icons.devices,
+                  title: context.l10n.linkPlayTogether,
+                  titleTrailing: const BetaBadge(),
+                  subtitle: context.l10n.linkDesktopPlayTogetherSubtitle(name),
+                  trailing: AppIcon(
+                    Icons.check,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  selected: true,
+                  showDivider: false,
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// Opens and closes a group of the Devices sheet that only shows while Play
+/// together runs; [child] is null while it is closed. It slides open on the
+/// slow spatial spring, which stops at its size because the rows below move
+/// with it, and fades in on the effects spring; closing is shorter.
+class LinkTogetherReveal extends StatelessWidget {
+  const LinkTogetherReveal({super.key, required this.child});
+
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = child != null;
     final tokens = context.tokens;
     final reduced = MediaQuery.disableAnimationsOf(context);
     final entrance = AppMotionSpec(
@@ -127,29 +182,32 @@ class LinkPlayTogetherTiming extends ConsumerWidget {
         : AppMotion.spatial(context, exit);
     final fadeIn = AppMotion.effects(context, entrance);
     final fadeOut = AppMotion.effectsFast(context, exit);
+    final switcher = AnimatedSwitcher(
+      duration: fadeIn.duration,
+      reverseDuration: fadeOut.duration,
+      switchInCurve: fadeIn.curve,
+      switchOutCurve: fadeOut.curve,
+      // Only the shown child sizes the switcher, so the group closes while
+      // the leaving one fades.
+      layoutBuilder: (current, previous) => Stack(
+        alignment: AlignmentDirectional.topStart,
+        children: [
+          for (final child in previous)
+            PositionedDirectional(top: 0, start: 0, end: 0, child: child),
+          ?current,
+        ],
+      ),
+      child: child ?? const SizedBox(width: double.infinity),
+    );
+    // With reduced motion the size changes at once. A size animation of no
+    // length would finish inside its own layout, which the framework
+    // rejects.
+    if (size.duration == Duration.zero) return switcher;
     return AnimatedSize(
       duration: size.duration,
       curve: size.curve,
       alignment: AlignmentDirectional.topStart,
-      child: AnimatedSwitcher(
-        duration: fadeIn.duration,
-        reverseDuration: fadeOut.duration,
-        switchInCurve: fadeIn.curve,
-        switchOutCurve: fadeOut.curve,
-        // Only the shown child sizes the switcher, so the group closes while
-        // the leaving slider fades.
-        layoutBuilder: (current, previous) => Stack(
-          alignment: AlignmentDirectional.topStart,
-          children: [
-            for (final child in previous)
-              PositionedDirectional(top: 0, start: 0, end: 0, child: child),
-            ?current,
-          ],
-        ),
-        child: visible
-            ? const _TimingGroup(key: ValueKey('link-together-timing'))
-            : const SizedBox(width: double.infinity),
-      ),
+      child: switcher,
     );
   }
 }

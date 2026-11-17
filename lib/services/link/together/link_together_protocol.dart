@@ -35,8 +35,13 @@ abstract final class LinkTogetherActions {
   static const next = 'next';
   static const previous = 'previous';
 
-  /// Another song was picked there: the computer plays on alone.
+  /// Another song or This computer was picked there: the computer plays on
+  /// alone.
   static const left = 'left';
+
+  /// The phone was picked in the computer's Devices: the phone plays on
+  /// alone and ends the session, which pauses the computer.
+  static const leftForPhone = 'left_for_phone';
 }
 
 /// Which device owns the queue in a session.

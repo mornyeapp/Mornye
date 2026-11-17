@@ -254,10 +254,16 @@ class LinkTogetherCoordinator {
   }
 
   /// A `together.action` push: the computer's own controls, while it
-  /// follows, drive the queue's owner.
+  /// follows, drive the queue's owner. A device picked in the computer's
+  /// Devices ends the session whichever device owns the queue.
   Future<void> onDesktopAction(String action) async {
-    if (_ended || !phoneLeads) return;
+    if (_ended) return;
     _log.i('Link: together, the computer asked for $action');
+    if (action == LinkTogetherActions.leftForPhone) {
+      _end(LinkTogetherEnd.leftOnPhone);
+      return;
+    }
+    if (!phoneLeads && action != LinkTogetherActions.left) return;
     switch (action) {
       case LinkTogetherActions.pause:
         await _phone.pause();

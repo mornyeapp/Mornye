@@ -125,6 +125,7 @@ class LinkDesktopHostState {
     this.libraryJobs = const [],
     this.catalogSongs,
     this.followedPhone,
+    this.togetherPhone,
   });
 
   /// Whether the saved settings were read.
@@ -163,6 +164,9 @@ class LinkDesktopHostState {
   /// Continue on phone. Null while the desktop shows its own player.
   final String? followedPhone;
 
+  /// The connected phone this device plays together with, or null.
+  final String? togetherPhone;
+
   bool get running => phase == LinkHostPhase.running && server != null;
 
   LinkDesktopHostState copyWith({
@@ -179,6 +183,7 @@ class LinkDesktopHostState {
     List<LinkHostedLibraryJob>? libraryJobs,
     Object? catalogSongs = _keep,
     Object? followedPhone = _keep,
+    Object? togetherPhone = _keep,
   }) => LinkDesktopHostState(
     loaded: loaded ?? this.loaded,
     enabled: enabled ?? this.enabled,
@@ -197,6 +202,9 @@ class LinkDesktopHostState {
     followedPhone: identical(followedPhone, _keep)
         ? this.followedPhone
         : followedPhone as String?,
+    togetherPhone: identical(togetherPhone, _keep)
+        ? this.togetherPhone
+        : togetherPhone as String?,
   );
 }
 
@@ -751,7 +759,17 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     onStarted: (_) {
       if (ref.mounted) stopFollowingPhone();
     },
+    onChanged: () {
+      if (ref.mounted) {
+        state = state.copyWith(togetherPhone: _together?.deviceId);
+      }
+    },
   );
+
+  /// Ends Play together from this computer's Devices choices: with
+  /// [keepHere] this computer plays on, else the phone does.
+  Future<bool> endTogether({required bool keepHere}) async =>
+      await _together?.leave(keepHere: keepHere) ?? false;
 
   /// The name [deviceId] gave when it paired, else its id.
   String deviceName(String deviceId) => _deviceName(deviceId);

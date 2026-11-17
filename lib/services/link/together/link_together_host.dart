@@ -21,6 +21,7 @@ class LinkTogetherHost {
     required Future<int> Function(Map<String, dynamic> message, String deviceId)
     send,
     void Function(String deviceId)? onStarted,
+    void Function()? onChanged,
     int Function()? nowMs,
     LinkTogetherFollower? follower,
     this.ownActionMs = 1500,
@@ -28,6 +29,7 @@ class LinkTogetherHost {
   }) : _deck = deck,
        _send = send,
        _onStarted = onStarted,
+       _onChanged = onChanged,
        _nowMs = nowMs ?? _wallClockMs {
     _follower = follower ?? LinkTogetherFollower(deck: deck, nowMs: _nowMs);
   }
@@ -36,6 +38,9 @@ class LinkTogetherHost {
   final Future<int> Function(Map<String, dynamic> message, String deviceId)
   _send;
   final void Function(String deviceId)? _onStarted;
+
+  /// Runs when a session starts or ends, after [deviceId] changed.
+  final void Function()? _onChanged;
   final int Function() _nowMs;
   late final LinkTogetherFollower _follower;
 
@@ -51,6 +56,7 @@ class LinkTogetherHost {
   StreamSubscription<void>? _changes;
   LinkTogetherReport? _lastSeen;
   LinkTogetherReport? _lastSent;
+  bool _disposed = false;
 
   /// The phone in a session, if any.
   String? get deviceId => _deviceId;
@@ -101,6 +107,7 @@ class LinkTogetherHost {
     _lastSent = null;
     _changes = _deck.changes.listen((_) => _onChange());
     _onStarted?.call(request.deviceId);
+    _onChanged?.call();
     _log.i(
       'Link: together started, this computer '
       '${role == LinkTogetherRole.leader ? 'leads' : 'follows'}',
@@ -155,6 +162,31 @@ class LinkTogetherHost {
     _follower.cancel(resume: !pause);
     _deck.end();
     if (pause) unawaited(_deck.pause());
+    if (!_disposed) _onChanged?.call();
+  }
+
+  /// Ends Play together from this computer's Devices choices. With
+  /// [keepHere] this computer plays on alone and the phone stops; otherwise
+  /// the phone plays on and ends the session, which pauses this computer.
+  /// False when no session runs or the phone could not be told.
+  Future<bool> leave({required bool keepHere}) async {
+    final deviceId = _deviceId;
+    final session = _session;
+    if (deviceId == null || session == null) return false;
+    final delivered = await _send({
+      'type': LinkTogetherMessages.action,
+      'session': session,
+      'action': keepHere
+          ? LinkTogetherActions.left
+          : LinkTogetherActions.leftForPhone,
+    }, deviceId);
+    if (delivered == 0) return false;
+    _log.i(
+      'Link: together, ${keepHere ? 'this computer' : 'the phone'} was '
+      'chosen here',
+    );
+    if (keepHere && _session == session) _end(pause: false);
+    return true;
   }
 
   void _onChange() {
@@ -237,5 +269,8 @@ class LinkTogetherHost {
     return LinkTogetherActions.left;
   }
 
-  void dispose() => _end(pause: false);
+  void dispose() {
+    _disposed = true;
+    _end(pause: false);
+  }
 }

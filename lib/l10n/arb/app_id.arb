@@ -7479,6 +7479,7 @@
   "linkPlayingOn": "Diputar di {name}",
   "linkPlayTogether": "Putar bersama",
   "linkPlayTogetherSubtitle": "Ponsel ini dan {name}",
+  "linkDesktopPlayTogetherSubtitle": "Komputer ini dan {name}",
   "linkPlayTogetherTiming": "Waktu ponsel",
   "linkPlayTogetherTimingValue": "{value} ms",
   "linkPlayTogetherEarlier": "Lebih awal",

@@ -479,6 +479,36 @@ void main() {
       });
     });
 
+    test("a device picked in the computer's Devices ends it, whoever owns "
+        'the queue', () {
+      for (final phoneLeads in [true, false]) {
+        for (final keepHere in [true, false]) {
+          fakeAsync((async) {
+            final sim = _Sim(async, phoneLeads: phoneLeads);
+            sim.leader.playNow(position: 30000);
+            sim.start();
+            async.elapse(const Duration(seconds: 6));
+            expect(sim.ended, isEmpty);
+
+            unawaited(sim.host.leave(keepHere: keepHere));
+            async.elapse(const Duration(seconds: 1));
+            final reason = 'phoneLeads $phoneLeads, keepHere $keepHere';
+            expect(sim.ended, [
+              keepHere
+                  ? LinkTogetherEnd.leftOnDesktop
+                  : LinkTogetherEnd.leftOnPhone,
+            ], reason: reason);
+            // The phone's controller pauses whichever device was not picked;
+            // the computer ended its own side only when it plays on.
+            expect(sim.host.active, !keepHere, reason: reason);
+            expect(sim.desktop.playing, isTrue, reason: reason);
+            expect(sim.phone.playing, isTrue, reason: reason);
+            sim.finish();
+          });
+        }
+      }
+    });
+
     test('a song picked on the phone while it follows ends it', () {
       fakeAsync((async) {
         final sim = _Sim(async, phoneLeads: false);
