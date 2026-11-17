@@ -864,9 +864,9 @@
   "@aboutMobileDeveloper": {
     "description": "Role description for mobile dev"
   },
-  "aboutLogoArtist": "Artist berbakat yang membuat logo indah untuk aplikasi kami!",
-  "@aboutLogoArtist": {
-    "description": "Role description for logo artist"
+  "aboutAppManager": "Manajer aplikasi dan moderator",
+  "@aboutAppManager": {
+    "description": "Role description for the contributor who manages the app's community and moderates it"
   },
   "aboutTranslators": "Penerjemah",
   "@aboutTranslators": {

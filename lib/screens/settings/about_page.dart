@@ -50,7 +50,7 @@ class AboutPage extends StatelessWidget {
                 ),
                 _ContributorItem(
                   name: 'Amonoman',
-                  description: context.l10n.aboutLogoArtist,
+                  description: context.l10n.aboutAppManager,
                   githubUsername: 'Amonoman',
                   showDivider: true,
                 ),
