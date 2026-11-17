@@ -287,12 +287,49 @@ void main() {
 
       ShellNavigationService.requestTab(ShellTab.library);
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 16));
-      // The page jumps at once, then fades in.
+      await tester.pump(const Duration(milliseconds: 32));
+      // The page shown fades out first.
+      expect(tabPage(tester), 0.0);
+      final leaving = tabOpacity(tester);
+      expect(leaving, inExclusiveRange(0, 1));
+      await tester.pump(const Duration(milliseconds: 32));
+      expect(tabPage(tester), 0.0);
+      expect(tabOpacity(tester), lessThan(leaving));
+      // Then the new page fades in.
+      await tester.pump(const Duration(milliseconds: 60));
       expect(tabPage(tester), 1.0);
-      expect(tabOpacity(tester), inExclusiveRange(0, 1));
+      final entering = tabOpacity(tester);
+      expect(entering, lessThan(1));
+      await tester.pump(const Duration(milliseconds: 32));
+      expect(tabPage(tester), 1.0);
+      expect(tabOpacity(tester), greaterThan(entering));
       await settle(tester);
       expect(tabPage(tester), 1.0);
+      expect(tabOpacity(tester), 1);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a destination change during the fade in fades out from '
+        'where it is ($platform)', (tester) async {
+      await pumpShell(tester, desktop: desktop, mornye: false);
+      ShellNavigationService.requestTab(ShellTab.library);
+      await tester.pump();
+      // Past the fade out and partly into the fade in.
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 48));
+      expect(tabPage(tester), 1.0);
+      final shown = tabOpacity(tester);
+      expect(shown, inExclusiveRange(0.05, 1));
+
+      ShellNavigationService.requestTab(ShellTab.home);
+      await tester.pump();
+      // The page does not start again from nothing, nor jump yet.
+      expect(tabPage(tester), 1.0);
+      expect(tabOpacity(tester), closeTo(shown, 0.001));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tabOpacity(tester), lessThan(shown));
+      await settle(tester);
+      expect(tabPage(tester), 0.0);
       expect(tabOpacity(tester), 1);
       expect(tester.takeException(), isNull);
     });

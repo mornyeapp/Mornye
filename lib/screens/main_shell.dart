@@ -130,7 +130,7 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   int _currentIndex = 0;
   final _mornyeChrome = MornyeChromeController();
   // Preserves the tab view element (and its kept-alive tabs) when the body
@@ -138,19 +138,29 @@ class _MainShellState extends ConsumerState<MainShell>
   final GlobalKey _pageViewKey = GlobalKey();
   late final PageController _pageController;
   late final AnimationController _tabJumpTransitionController;
-  // Material fade through between destinations; [_playTabFadeThrough] sets
-  // the curves. Transitions update their layers directly; no shell subtree
-  // rebuilds per animation frame.
+  // Material fade through between destinations: [_fadeThroughToCurrentTab]
+  // fades the page shown out on [_tabExitController], then
+  // [_playTabFadeThrough] fades the new one in and sets the curves.
+  // Transitions update their layers directly; no shell subtree rebuilds per
+  // animation frame.
+  late final AnimationController _tabExitController;
+  bool _tabLeaving = false;
+  static const _tabExitDuration = Duration(milliseconds: 90);
   late final CurvedAnimation _tabJumpOpacity = CurvedAnimation(
     parent: _tabJumpTransitionController,
-    curve: Curves.easeOutCubic,
+    curve: Easing.standardDecelerate,
   );
   late final CurvedAnimation _tabJumpScaleCurve = CurvedAnimation(
     parent: _tabJumpTransitionController,
-    curve: Curves.easeOutCubic,
+    curve: Easing.standardDecelerate,
+  );
+  // One opacity layer for both halves: the lower of the two.
+  late final Animation<double> _tabOpacity = AnimationMin<double>(
+    _tabJumpOpacity,
+    _tabExitController,
   );
   late final Animation<double> _tabJumpScale = Tween<double>(
-    begin: 0.985,
+    begin: 0.92,
     end: 1,
   ).animate(_tabJumpScaleCurve);
   bool _hasCheckedUpdate = false;
@@ -274,6 +284,11 @@ class _MainShellState extends ConsumerState<MainShell>
     _tabJumpTransitionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 180),
+      value: 1,
+    );
+    _tabExitController = AnimationController(
+      vsync: this,
+      duration: _tabExitDuration,
       value: 1,
     );
     ShellNavigationService.registerTabSelectionHandler(
@@ -458,6 +473,7 @@ class _MainShellState extends ConsumerState<MainShell>
     _tabJumpOpacity.dispose();
     _tabJumpScaleCurve.dispose();
     _tabJumpTransitionController.dispose();
+    _tabExitController.dispose();
     _mornyeChrome.dispose();
     _libraryDepthObserver.dispose();
     super.dispose();
@@ -551,19 +567,56 @@ class _MainShellState extends ConsumerState<MainShell>
         // page at the same time continuously invalidates its live backdrop.
         _tabJumpTransitionController.value = 1;
       } else {
-        // Top-level destinations have no spatial order, so Material jumps
-        // to the page and fades it in (M3 fade through) instead of sliding
-        // through its neighbours.
-        _pageController.jumpToPage(index);
-        _playTabFadeThrough();
+        // Top-level destinations have no spatial order, so Material fades
+        // through to the page (M3 fade through) instead of sliding through
+        // its neighbours.
+        _fadeThroughToCurrentTab();
       }
     }
   }
 
+  /// Material fade through to the page of [_currentIndex]: the page shown
+  /// fades out, then the new one fades in ([_playTabFadeThrough]). A change
+  /// made while a page is still fading in starts from the opacity it has,
+  /// and one made during the fade out only renames where it ends, so quick
+  /// taps never flash a page in from nothing. Reduced motion jumps.
+  void _fadeThroughToCurrentTab() {
+    if (!materialExpressiveEnabled(context)) {
+      _showCurrentTabPage();
+      return;
+    }
+    if (_tabLeaving) return;
+    final shown = _tabOpacity.value;
+    _tabJumpTransitionController.stop();
+    if (shown <= 0.01) {
+      _showCurrentTabPage();
+      return;
+    }
+    _tabLeaving = true;
+    _tabExitController.value = shown;
+    _tabExitController
+        .animateTo(
+          0,
+          duration: _tabExitDuration * shown,
+          curve: Easing.standardAccelerate,
+        )
+        .whenCompleteOrCancel(() {
+          if (mounted && _tabLeaving) _showCurrentTabPage();
+        });
+  }
+
+  /// Jumps to the page of [_currentIndex] and fades it in.
+  void _showCurrentTabPage() {
+    _tabLeaving = false;
+    if (_pageController.hasClients) _pageController.jumpToPage(_currentIndex);
+    _playTabFadeThrough();
+    _tabExitController.value = 1;
+  }
+
   /// Fades the Material tab view in after a destination change: opacity on
-  /// the effects spring, a slight scale up on the spatial spring. The scale
-  /// spring's overshoot stays below a pixel, so the page never spills over
-  /// the rail. Reduced motion shows the page at once.
+  /// the effects spring, a scale up from 92 percent on the standard spatial
+  /// spring, whose overshoot stays far below a pixel, so the page never
+  /// spills over the rail. Reduced motion shows the page at once.
   void _playTabFadeThrough() {
     if (!materialExpressiveEnabled(context)) {
       _tabJumpTransitionController.value = 1;
@@ -571,10 +624,10 @@ class _MainShellState extends ConsumerState<MainShell>
     }
     const fallback = AppMotionSpec(
       Duration(milliseconds: 180),
-      Curves.easeOutCubic,
+      Easing.standardDecelerate,
     );
     final opacity = AppMotion.effects(context, fallback);
-    final scale = AppMotion.spatial(context, fallback);
+    final scale = AppMotion.materialPage;
     final total = opacity.duration > scale.duration
         ? opacity.duration
         : scale.duration;
@@ -1092,7 +1145,7 @@ class _MainShellState extends ConsumerState<MainShell>
               ],
             )
           : FadeTransition(
-              opacity: _tabJumpOpacity,
+              opacity: _tabOpacity,
               child: ScaleTransition(
                 scale: _tabJumpScale,
                 child: PageView.builder(
