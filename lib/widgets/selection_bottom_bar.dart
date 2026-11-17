@@ -587,7 +587,7 @@ class _SelectionPanelDragState extends State<_SelectionPanelDrag>
   /// The style's slow spatial spring, critically damped in both styles.
   SpringDescription get _spring => context.isMornye
       ? MornyeMotion.slowSpring
-      : M3EMotion.expressiveSpatialSlow.toDescription();
+      : MotionPace.spring(M3EMotion.expressiveSpatialSlow.toDescription());
 
   /// Tucks the actions away or brings them back. A drag hands over its
   /// [velocity] in pixels a second, downward positive; otherwise the

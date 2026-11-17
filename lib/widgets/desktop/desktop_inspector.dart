@@ -318,7 +318,7 @@ AppMotionSpec desktopInspectorMotion(BuildContext context) => AppMotion.spatial(
 /// pane's own velocity.
 SpringDescription _inspectorSpring(BuildContext context) => context.isMornye
     ? MornyeMotion.standardSpring
-    : M3EMotion.expressiveSpatialDefault.toDescription();
+    : MotionPace.spring(M3EMotion.expressiveSpatialDefault.toDescription());
 
 /// Opens and closes [panel] with motion, keeping the last panel on screen
 /// while it leaves. Beside the content the pane grows from the trailing

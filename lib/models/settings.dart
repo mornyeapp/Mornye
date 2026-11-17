@@ -77,6 +77,14 @@ double interfaceScaleFromJson(Object? value) => value is num && value.isFinite
     ? value.toDouble().clamp(minInterfaceScale, maxInterfaceScale)
     : 1;
 
+/// Slowest and fastest Animation speed, as a factor of the designed speed.
+const double minAnimationSpeed = 0.5;
+const double maxAnimationSpeed = 2;
+
+double animationSpeedFromJson(Object? value) => value is num && value.isFinite
+    ? value.toDouble().clamp(minAnimationSpeed, maxAnimationSpeed)
+    : 1;
+
 /// Sort choices offered by the Library, in display order.
 const librarySortModes = [
   'latest',
@@ -351,6 +359,11 @@ class AppSettings {
   /// and TV scale. 1 is the normal size.
   @JsonKey(fromJson: interfaceScaleFromJson)
   final double interfaceScale;
+
+  /// Animation speed: how fast the app's own motion plays. 1 is the
+  /// designed speed, 2 twice as fast.
+  @JsonKey(fromJson: animationSpeedFromJson)
+  final double animationSpeed;
   final String
   extensionVerificationBrowserMode; // 'external_first' or 'in_app_first'
   final String locale;
@@ -604,6 +617,7 @@ class AppSettings {
     this.heroAnimationsEnabled = true,
     this.forceBackdropBlur = false,
     this.interfaceScale = 1,
+    this.animationSpeed = 1,
     this.extensionVerificationBrowserMode = 'in_app_first',
     this.locale = 'system',
     this.lyricsMode = 'embed',
@@ -800,6 +814,7 @@ class AppSettings {
     bool? heroAnimationsEnabled,
     bool? forceBackdropBlur,
     double? interfaceScale,
+    double? animationSpeed,
     String? extensionVerificationBrowserMode,
     String? locale,
     String? lyricsMode,
@@ -993,6 +1008,7 @@ class AppSettings {
           heroAnimationsEnabled ?? this.heroAnimationsEnabled,
       forceBackdropBlur: forceBackdropBlur ?? this.forceBackdropBlur,
       interfaceScale: interfaceScale ?? this.interfaceScale,
+      animationSpeed: animationSpeed ?? this.animationSpeed,
       extensionVerificationBrowserMode:
           extensionVerificationBrowserMode ??
           this.extensionVerificationBrowserMode,

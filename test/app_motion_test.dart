@@ -1,3 +1,4 @@
+import 'package:flutter/physics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
@@ -128,6 +129,61 @@ void main() {
       expect(spec.curve, Curves.easeOutCubic);
       expect(spec.duration, const Duration(milliseconds: 250));
     }
+  });
+
+  group('Animation speed', () {
+    tearDown(() => MotionPace.speed = 1);
+
+    test('leaves the designed motion alone at normal speed', () {
+      final designed = MornyeMotion.standard;
+      expect(MornyeMotion.standard, same(designed));
+      expect(
+        MotionPace.duration(const Duration(milliseconds: 300)),
+        const Duration(milliseconds: 300),
+      );
+      expect(MornyeMotion.standardSpring, same(MornyeMotion.standardSpring));
+    });
+
+    test('shortens and lengthens the presets, keeping their curves', () {
+      final designed = MornyeMotion.standard;
+      final page = AppMotion.materialPage;
+      MotionPace.speed = 2;
+      expect(MornyeMotion.standard.duration, designed.duration * 0.5);
+      expect(MornyeMotion.standard.curve, same(designed.curve));
+      expect(AppMotion.materialPage.duration, page.duration * 0.5);
+      MotionPace.speed = 0.5;
+      expect(MornyeMotion.standard.duration, designed.duration * 2);
+      for (final invalid in [0.0, -1.0, double.nan, double.infinity]) {
+        MotionPace.speed = invalid;
+        expect(MornyeMotion.standard, same(designed));
+      }
+    });
+
+    test('a paced spring is the designed spring on a faster clock', () {
+      final designed = MornyeMotion.snappySpring;
+      MotionPace.speed = 2;
+      final paced = MornyeMotion.snappySpring;
+      final a = SpringSimulation(designed, 0, 1, 0);
+      final b = SpringSimulation(paced, 0, 1, 0);
+      for (final t in [0.05, 0.1, 0.2, 0.35, 0.6]) {
+        expect(b.x(t / 2), closeTo(a.x(t), 1e-9));
+      }
+    });
+
+    testWidgets('Material and Mornye sites follow it; reduced motion does '
+        'not', (tester) async {
+      final themes = [AppTheme.light(), MornyeTheme.build(Brightness.light)];
+      for (final theme in themes) {
+        final designed = await resolve(tester, theme: theme);
+        MotionPace.speed = 2;
+        final fast = await resolve(tester, theme: theme);
+        expect(fast.duration, designed.duration * 0.5);
+        expect(fast.curve, same(designed.curve));
+        final reduced = await resolve(tester, theme: theme, reduceMotion: true);
+        expect(reduced.duration, const Duration(milliseconds: 250));
+        MotionPace.speed = 1;
+      }
+    });
   });
 
   testWidgets('Mornye uses its own spring where the site animates', (

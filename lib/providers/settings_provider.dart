@@ -1115,6 +1115,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setInterfaceScale(double scale) =>
       _commit(state.copyWith(interfaceScale: interfaceScaleFromJson(scale)));
 
+  void setAnimationSpeed(double speed) =>
+      _commit(state.copyWith(animationSpeed: animationSpeedFromJson(speed)));
+
   void setExtensionVerificationBrowserMode(String mode) => _commit(
     state.copyWith(
       extensionVerificationBrowserMode:

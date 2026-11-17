@@ -307,7 +307,7 @@ class _QueueSwipeState extends State<QueueSwipe>
     }
     final spring = context.isMornye
         ? MornyeMotion.standardSpring
-        : _returnSpring;
+        : MotionPace.spring(_returnSpring);
     final offset = _offset.value;
     final limit = math.sqrt(spring.stiffness / spring.mass) * offset.abs();
     final start = velocity.sign == offset.sign || offset == 0

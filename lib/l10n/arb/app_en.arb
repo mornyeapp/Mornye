@@ -3077,6 +3077,22 @@
   "@appearanceInterfaceSizeLarger": {
     "description": "Label at the large end of the Interface size slider"
   },
+  "appearanceAnimationSpeed": "Animation speed",
+  "@appearanceAnimationSpeed": {
+    "description": "Title of the slider that makes the app's animations play slower or faster"
+  },
+  "appearanceAnimationSpeedDescription": "How fast pages, sheets and controls move. Lyrics keep time with the song.",
+  "@appearanceAnimationSpeedDescription": {
+    "description": "Explanation under the Animation speed slider"
+  },
+  "appearanceAnimationSpeedSlower": "Slower",
+  "@appearanceAnimationSpeedSlower": {
+    "description": "Label at the slow end of the Animation speed slider"
+  },
+  "appearanceAnimationSpeedFaster": "Faster",
+  "@appearanceAnimationSpeedFaster": {
+    "description": "Label at the fast end of the Animation speed slider"
+  },
   "queueClearAll": "Clear All",
   "@queueClearAll": {
     "description": "Button - clear all queue items"

@@ -597,7 +597,7 @@ class _MainShellState extends ConsumerState<MainShell>
     _tabExitController
         .animateTo(
           0,
-          duration: _tabExitDuration * shown,
+          duration: MotionPace.duration(_tabExitDuration) * shown,
           curve: Easing.standardAccelerate,
         )
         .whenCompleteOrCancel(() {

@@ -17,6 +17,40 @@ class AppMotionSpec {
   /// leaving child in place for most of a spring and drop it at the end;
   /// flipped, the child leaves the way the spec moves, fastest first.
   Curve get leaving => curve.flipped;
+
+  /// This spec at the pace of [MotionPace].
+  AppMotionSpec get paced => MotionPace.timeScale == 1
+      ? this
+      : AppMotionSpec(MotionPace.duration(duration), curve);
+}
+
+/// How fast the app's own motion plays (Settings > Appearance > Animation
+/// speed). The presets of [AppMotion] and [MornyeMotion], page pushes, the
+/// player's opening and the tab switch follow it. Motion that keeps time
+/// with a song (lyrics, the seek bar), a finger's own movement and the
+/// framework's built-in component motion do not.
+abstract final class MotionPace {
+  static double _timeScale = 1;
+
+  /// The factor a designed duration is multiplied by: above 1 is slower.
+  static double get timeScale => _timeScale;
+
+  /// Sets the pace from a speed factor, where 2 is twice as fast.
+  static set speed(double speed) {
+    _timeScale = speed.isFinite && speed > 0 ? 1 / speed : 1;
+  }
+
+  static Duration duration(Duration designed) =>
+      _timeScale == 1 ? designed : designed * _timeScale;
+
+  /// [designed] with the same shape, played at the pace.
+  static SpringDescription spring(SpringDescription designed) => _timeScale == 1
+      ? designed
+      : SpringDescription(
+          mass: designed.mass,
+          stiffness: designed.stiffness / (_timeScale * _timeScale),
+          damping: designed.damping / _timeScale,
+        );
 }
 
 /// A [Curve] that follows an [M3ESpring] released from rest at 0 toward 1.
@@ -69,37 +103,54 @@ abstract final class MornyeMotion {
         bounce: bounce,
       );
 
+  static final SpringDescription _fastSpring = _spring(250);
+  static final SpringDescription _standardSpring = _spring(350);
+  static final SpringDescription _slowSpring = _spring(500);
+  static final SpringDescription _snappySpring = _spring(350, 0.15);
+  static final SpringDescription _effectsFastSpring = _spring(150);
+  static final SpringDescription _effectsSpring = _spring(250);
+
   /// Small controls: a press, a check, a chip, a hover.
-  static final SpringDescription fastSpring = _spring(250);
+  static SpringDescription get fastSpring => MotionPace.spring(_fastSpring);
 
   /// Content that moves or resizes: rows, panels, a selection.
-  static final SpringDescription standardSpring = _spring(350);
+  static SpringDescription get standardSpring =>
+      MotionPace.spring(_standardSpring);
 
   /// Full-screen surfaces, at the pace of the system's default spring.
-  static final SpringDescription slowSpring = _spring(500);
+  static SpringDescription get slowSpring => MotionPace.spring(_slowSpring);
 
   /// A control with a physical feel that lands with a slight bounce, as the
   /// system's `snappy` spring: a selection pill, a switch thumb. Not for a
   /// surface whose size resizes other content.
-  static final SpringDescription snappySpring = _spring(350, 0.15);
+  static SpringDescription get snappySpring => MotionPace.spring(_snappySpring);
 
   /// Opacity and color of small controls.
-  static final SpringDescription effectsFastSpring = _spring(150);
+  static SpringDescription get effectsFastSpring =>
+      MotionPace.spring(_effectsFastSpring);
 
   /// Opacity and color of content.
-  static final SpringDescription effectsSpring = _spring(250);
+  static SpringDescription get effectsSpring =>
+      MotionPace.spring(_effectsSpring);
 
   static AppMotionSpec _spec(SpringDescription spring) {
     final curve = SpringCurve.of(spring);
     return AppMotionSpec(curve.duration, curve);
   }
 
-  static final AppMotionSpec fast = _spec(fastSpring);
-  static final AppMotionSpec standard = _spec(standardSpring);
-  static final AppMotionSpec slow = _spec(slowSpring);
-  static final AppMotionSpec snappy = _spec(snappySpring);
-  static final AppMotionSpec effectsFast = _spec(effectsFastSpring);
-  static final AppMotionSpec effects = _spec(effectsSpring);
+  static final AppMotionSpec _fast = _spec(_fastSpring);
+  static final AppMotionSpec _standard = _spec(_standardSpring);
+  static final AppMotionSpec _slow = _spec(_slowSpring);
+  static final AppMotionSpec _snappy = _spec(_snappySpring);
+  static final AppMotionSpec _effectsFast = _spec(_effectsFastSpring);
+  static final AppMotionSpec _effects = _spec(_effectsSpring);
+
+  static AppMotionSpec get fast => _fast.paced;
+  static AppMotionSpec get standard => _standard.paced;
+  static AppMotionSpec get slow => _slow.paced;
+  static AppMotionSpec get snappy => _snappy.paced;
+  static AppMotionSpec get effectsFast => _effectsFast.paced;
+  static AppMotionSpec get effects => _effects.paced;
 }
 
 /// The app's motion presets, by theme.
@@ -122,14 +173,18 @@ abstract final class AppMotion {
   static final _effectsDefault = SpringCurve(M3EMotion.effectsDefault);
 
   static AppMotionSpec _spec(SpringCurve curve) =>
-      AppMotionSpec(curve.duration, curve);
+      AppMotionSpec(MotionPace.duration(curve.duration), curve);
+
+  static final _spatialStandard = SpringCurve(M3EMotion.spatialDefault);
+  static final AppMotionSpec _materialPage = AppMotionSpec(
+    _spatialStandard.duration,
+    _spatialStandard,
+  );
 
   /// Material's standard spatial spring, for a surface as large as a page:
   /// its overshoot is a thousandth of the travel, where the expressive
   /// springs would push a page past its own bounds.
-  static final AppMotionSpec materialPage = _spec(
-    SpringCurve(M3EMotion.spatialDefault),
-  );
+  static AppMotionSpec get materialPage => _materialPage.paced;
 
   static const _still = AppMotionSpec(Duration.zero, Curves.linear);
 
@@ -214,9 +269,11 @@ abstract final class AppMotion {
   static AnimationStyle? surfaceEntrance(BuildContext context) =>
       materialExpressiveEnabled(context)
       ? AnimationStyle(
-          duration: _spatialSlow.duration,
+          duration: MotionPace.duration(_spatialSlow.duration),
           curve: _spatialSlow,
-          reverseDuration: const Duration(milliseconds: 200),
+          reverseDuration: MotionPace.duration(
+            const Duration(milliseconds: 200),
+          ),
         )
       : null;
 }

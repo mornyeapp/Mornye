@@ -51,6 +51,25 @@ void main() {
     expect(AppSettings.fromJson({'interfaceScale': 3}).interfaceScale, 1.3);
   });
 
+  test('Animation speed defaults to normal and restores within range', () {
+    expect(const AppSettings().animationSpeed, 1);
+    expect(AppSettings.fromJson({}).animationSpeed, 1);
+    for (final value in [0.5, 0.75, 1.5, 2.0]) {
+      final settings = const AppSettings().copyWith(animationSpeed: value);
+      final restored = AppSettings.fromJson(settings.toJson());
+      expect(restored.animationSpeed, value);
+      expect(restored.copyWith(locale: 'id').animationSpeed, value);
+    }
+    for (final invalid in ['', double.nan, double.infinity]) {
+      expect(
+        AppSettings.fromJson({'animationSpeed': invalid}).animationSpeed,
+        1,
+      );
+    }
+    expect(AppSettings.fromJson({'animationSpeed': 0.1}).animationSpeed, 0.5);
+    expect(AppSettings.fromJson({'animationSpeed': 9}).animationSpeed, 2);
+  });
+
   test('Playback speed and pitch default to normal and restore in range', () {
     const defaults = AppSettings();
     expect(defaults.playbackSpeed, 1);

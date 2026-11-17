@@ -66,11 +66,15 @@ class ReducedMotionPageTransitionsBuilder extends PageTransitionsBuilder {
 
   final PageTransitionsBuilder builder;
 
+  // Read at every push and pop, so a changed Animation speed applies from
+  // the next page.
   @override
-  Duration get transitionDuration => builder.transitionDuration;
+  Duration get transitionDuration =>
+      MotionPace.duration(builder.transitionDuration);
 
   @override
-  Duration get reverseTransitionDuration => builder.reverseTransitionDuration;
+  Duration get reverseTransitionDuration =>
+      MotionPace.duration(builder.reverseTransitionDuration);
 
   @override
   DelegatedTransitionBuilder? get delegatedTransition {

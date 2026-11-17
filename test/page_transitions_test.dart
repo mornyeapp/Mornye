@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/page_transitions.dart';
@@ -53,6 +54,23 @@ double _opacityAbove(WidgetTester tester, String label) => tester
 void main() {
   final material = AppTheme.light();
   final mornye = MornyeTheme.build(Brightness.light);
+
+  test('page pushes and pops follow the Animation speed', () {
+    addTearDown(() => MotionPace.speed = 1);
+    for (final theme in [material, mornye]) {
+      for (final platform in TargetPlatform.values) {
+        final builder = theme.pageTransitionsTheme.builders[platform];
+        if (builder == null) continue;
+        MotionPace.speed = 1;
+        final push = builder.transitionDuration;
+        final pop = builder.reverseTransitionDuration;
+        expect(push, _builderFor(theme, platform).transitionDuration);
+        MotionPace.speed = 2;
+        expect(builder.transitionDuration, push * 0.5);
+        expect(builder.reverseTransitionDuration, pop * 0.5);
+      }
+    }
+  });
 
   test('every platform has a builder in both styles', () {
     for (final platform in [

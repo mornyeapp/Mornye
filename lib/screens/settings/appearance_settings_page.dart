@@ -211,6 +211,7 @@ class AppearanceSettingsPage extends ConsumerWidget {
                         .read(settingsProvider.notifier)
                         .setHeroAnimationsEnabled(value),
                   ),
+                  const _AnimationSpeedSlider(),
                   const CustomFontSetting(),
                   SettingsSwitchItem(
                     icon: Icons.blur_on,

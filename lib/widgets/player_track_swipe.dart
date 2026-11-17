@@ -107,7 +107,7 @@ class _PlayerTrackSwipeState extends State<PlayerTrackSwipe>
     }
     final spring = context.isMornye
         ? MornyeMotion.standardSpring
-        : _materialSpring;
+        : MotionPace.spring(_materialSpring);
     final offset = _offset.value;
     var start = velocity;
     if (target == 0 && offset != 0 && velocity.sign != offset.sign) {

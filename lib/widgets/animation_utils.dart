@@ -1656,11 +1656,14 @@ class _AnimatedBadgeState extends State<AnimatedBadge>
     if (widget.count > _previousCount &&
         !MediaQuery.disableAnimationsOf(context)) {
       final mornye = context.isMornye;
-      final push = mornye ? _mornyePush : _materialPush;
+      // The pushes are measured on the designed springs; at another pace
+      // the same height takes a push that much faster or slower.
+      final push =
+          (mornye ? _mornyePush : _materialPush) / MotionPace.timeScale;
       // A badge already rising faster than a push keeps its speed.
       _controller.animateWith(
         SpringSimulation(
-          mornye ? MornyeMotion.fastSpring : _materialSpring,
+          mornye ? MornyeMotion.fastSpring : MotionPace.spring(_materialSpring),
           _controller.value,
           1,
           math.max(_controller.velocity, push),

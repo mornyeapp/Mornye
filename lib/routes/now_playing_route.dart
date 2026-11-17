@@ -143,12 +143,12 @@ class NowPlayingRoute extends PageRoute<void> {
 
   @override
   Duration get transitionDuration =>
-      morph?.duration ?? const Duration(milliseconds: 400);
+      morph?.duration ?? MotionPace.duration(const Duration(milliseconds: 400));
 
   @override
   Duration get reverseTransitionDuration => morph?.duration == Duration.zero
       ? Duration.zero
-      : const Duration(milliseconds: 300);
+      : MotionPace.duration(const Duration(milliseconds: 300));
 
   /// Moves the Material shrink on the spring of the entrance, the slow
   /// spatial one for full-screen surfaces, kept critically damped so the
@@ -208,7 +208,7 @@ class NowPlayingRoute extends PageRoute<void> {
         _dismissTarget != null &&
         (morph?.duration ?? Duration.zero) > Duration.zero;
     if (!shrinks && !_interactiveTransition) return null;
-    return _spring(_exitSpring, 0, velocity);
+    return _spring(MotionPace.spring(_exitSpring), 0, velocity);
   }
 
   Rect _openRect(Size size, double value) => Rect.lerp(
@@ -280,7 +280,7 @@ class NowPlayingRoute extends PageRoute<void> {
     // to the entrance curve on release jumps away from the finger's position.
     final spring = (navigator?.context.isMornye ?? false)
         ? MornyeMotion.standardSpring
-        : M3EMotion.spatialDefault.toDescription();
+        : MotionPace.spring(M3EMotion.spatialDefault.toDescription());
     controller
         .animateWith(_spring(spring, 1, velocity))
         .whenCompleteOrCancel(settled);

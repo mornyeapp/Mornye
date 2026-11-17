@@ -281,6 +281,10 @@ class MornyeApp extends ConsumerWidget {
     final heroAnimationsEnabled = ref.watch(
       settingsProvider.select((s) => s.heroAnimationsEnabled),
     );
+    // The motion presets read the pace as each animation starts.
+    MotionPace.speed = ref.watch(
+      settingsProvider.select((s) => s.animationSpeed),
+    );
     final scrollBehavior = appScrollBehavior(
       disableOverscrollEffects: disableOverscrollEffects,
     );
