@@ -163,6 +163,30 @@ extension _TrackMetadataCover on _TrackMetadataScreenState {
         sourcePath != cleanFilePath) {
       return;
     }
+    // A song opened on its library cover changes to the file's own picture
+    // here, often while the cover still flies in. Decoded first, the new
+    // picture is there in the frame the cover lands or changes; otherwise
+    // the cover blinks empty for a frame.
+    if (newPreviewPath != null && newPreviewPath != oldPreviewPath) {
+      final cover = coverImageProvider(
+        newPreviewPath,
+        cacheWidth: coverCacheWidthForViewport(context),
+      );
+      await Future.wait([
+        if (cover != null)
+          precacheImage(
+            cover,
+            context,
+            onError: (_, _) {},
+          ).timeout(const Duration(milliseconds: 400), onTimeout: () {}),
+        precacheMetadataBackdrop(context, newPreviewPath),
+      ]);
+      if (!mounted ||
+          generation != _metadataLoadGeneration ||
+          sourcePath != cleanFilePath) {
+        return;
+      }
+    }
 
     setState(() {
       _embeddedCoverPreviewPath = newPreviewPath;

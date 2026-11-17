@@ -32,12 +32,13 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
     BuildContext to,
   ) {
     final header = direction == HeroFlightDirection.push ? to : from;
+    // The desktop Mornye header clips with continuous corners instead.
+    final headerCorners =
+        header.findAncestorWidgetOfExactType<ClipRRect>()?.borderRadius ??
+        header.findAncestorWidgetOfExactType<ClipRSuperellipse>()?.borderRadius;
     final corners = BorderRadiusTween(
       begin: flight.tokens.borderRadiusThumb,
-      end: header
-          .findAncestorWidgetOfExactType<ClipRRect>()
-          ?.borderRadius
-          .resolve(Directionality.of(flight)),
+      end: headerCorners?.resolve(Directionality.of(flight)),
     ).animate(animation);
     return AnimatedBuilder(
       animation: corners,
@@ -215,15 +216,22 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
   /// Play as the one wide filled button, between a round Edit and a round
   /// Add to queue. A round button is left out where the song cannot take
   /// its action; Play stays, disabled, while the file is missing.
+  ///
+  /// Until the file has been checked the song is taken to be there, so the
+  /// row has its buttons from the first frame of the page's entrance instead
+  /// of gaining them a moment later. Edit on a network song still waits to
+  /// learn whether its connection accepts writes.
   Widget _buildHeaderActions(BuildContext header, bool showPlayer) {
     final tokens = header.tokens;
     final l10n = header.l10n;
+    final unchecked = _fileAccess == null;
+    final hasFile = _fileExists || unchecked;
     final play = HeaderFilledButton(
       icon: Icons.play_arrow,
       label: l10n.trackMetadataPlay,
-      onPressed: _fileExists ? () => _openFile(context, rawFilePath) : null,
+      onPressed: hasFile ? () => _openFile(context, rawFilePath) : null,
     );
-    final edit = _canEditMetadataFile
+    final edit = (unchecked ? !_isNetworkItem : _canEditMetadataFile)
         ? HeaderCircleButton(
             icon: Icons.edit_outlined,
             tooltip: l10n.trackEditMetadata,
@@ -235,7 +243,7 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
             ),
           )
         : null;
-    final queue = _fileExists && showPlayer
+    final queue = hasFile && showPlayer
         ? HeaderCircleButton(
             icon: Icons.playlist_add,
             tooltip: l10n.trackAddToQueue,

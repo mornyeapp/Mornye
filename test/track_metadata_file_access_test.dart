@@ -7,10 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_history_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> _settleFileIo(WidgetTester tester) async {
@@ -145,5 +147,57 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+
+    testWidgets('the header has its buttons before the file check answers, '
+        'and drops the round ones for a missing file (Mornye=$mornye)', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
+        channel,
+        (call) async => call.method == 'safStat' ? {'exists': false} : null,
+      );
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      final item = DownloadHistoryItem(
+        id: 'unchecked-track',
+        trackName: 'Track',
+        artistName: 'Artist',
+        albumName: 'Album',
+        filePath: 'content://provider/music/unchecked.flac',
+        service: 'provider-a',
+        downloadedAt: DateTime(2026),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [playerUiEnabledProvider.overrideWithValue(true)],
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: TrackMetadataScreen(item: item),
+          ),
+        ),
+      );
+      // The app's buttons, not flutter_test's own tooltip type.
+      Finder round(String tooltip) => find.byWidgetPredicate(
+        (widget) => widget is HeaderCircleButton && widget.tooltip == tooltip,
+      );
+      VoidCallback? play() => tester
+          .widget<HeaderFilledButton>(find.byType(HeaderFilledButton))
+          .onPressed;
+      // The first frame, before the check of the file has answered.
+      expect(round('Edit Metadata'), findsOneWidget);
+      expect(round('Add to queue'), findsOneWidget);
+      expect(play(), isNotNull);
+
+      await tester.pumpAndSettle();
+      expect(round('Edit Metadata'), findsNothing);
+      expect(round('Add to queue'), findsNothing);
+      expect(play(), isNull);
+      expect(tester.takeException(), isNull);
+    });
   }
 }

@@ -579,14 +579,18 @@ class _CoverPaletteBuilderState extends State<CoverPaletteBuilder> {
     if (_resolvedSource != source ||
         _resolvedBrightness != brightness ||
         _resolvedNeutral != neutral) {
+      // Another cover in the same look keeps the scheme on screen until its
+      // own arrives, so the header does not blink through the app's colours.
+      final held =
+          _resolvedBrightness == brightness && _resolvedNeutral == neutral
+          ? _scheme
+          : null;
       _resolvedSource = source;
       _resolvedBrightness = brightness;
       _resolvedNeutral = neutral;
-      _scheme = CoverPalette.peek(
-        source,
-        brightness,
-        neutralGrayscale: neutral,
-      );
+      _scheme =
+          CoverPalette.peek(source, brightness, neutralGrayscale: neutral) ??
+          held;
     }
 
     final resolved = CoverPalette.resolve(
