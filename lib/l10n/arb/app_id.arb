@@ -336,6 +336,7 @@
   "usbDecodeFailed": "Decoding lagu ini berhenti saat pemutaran langsung. Pemutaran dijeda; pilih lagu untuk melanjutkan.",
   "usbAndroidVersion": "Output USB Bit-Perfect butuh Android 14 atau lebih baru. Coba driver Direct USB. Menggunakan pemutaran normal.",
   "usbOutputLossySource": "{codec}, sumber lossy",
+  "usbOutputResampled": "{rate}, di-resample ke {output}",
   "upgradeIntroContinue": "Lanjut",
   "cacheMotionArtwork": "Cover bergerak offline",
   "cacheMotionArtworkDesc": "Video album yang didownload. Menghapusnya tidak akan menghapus file musik dan cover biasa.",
@@ -8721,6 +8722,7 @@
     "description": "Audio info sheet, Bit-perfect row on iPhone and iPad: iOS sends every app's sound through its mixer, so no setting can make playback bit-perfect"
   },
   "audioInfoBitPerfectLossy": "Tidak, di-decode dari sumber lossy",
+  "audioInfoBitPerfectResampled": "Tidak, di-resample ke rate yang diterima DAC",
   "audioInfoDevice": "Perangkat",
   "audioInfoDeviceType": "{type, select, speaker{Speaker ponsel} earpiece{Speaker telepon} wired_headphones{Headphone kabel} wired_headset{Headset kabel} line{Line out} bluetooth{Bluetooth} bluetooth_le{Bluetooth LE Audio} usb{Audio USB} usb_headset{Headset USB} hdmi{HDMI} dock{Dock} cast{Cast} hearing_aid{Alat bantu dengar} airplay{AirPlay} car{Audio mobil} other{Lainnya}}",
   "@audioInfoDeviceType": {

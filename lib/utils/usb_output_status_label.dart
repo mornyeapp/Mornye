@@ -10,7 +10,7 @@ String usbOutputStatusLabel(
         ? '${status.bitDepth}-bit PCM'
         : status.transport == 'dop'
         ? 'DSD (DoP)'
-        : 'DSD (Native)'} · ${(status.sampleRate! / 1000).toStringAsFixed(1)} kHz',
+        : 'DSD (Native)'} · ${_activeRate(l10n, status)}',
   'ready' => l10n.usbOutputReady,
   'preparing' => l10n.usbOutputPreparing,
   'cancelled' => l10n.usbOutputCancelled,
@@ -43,6 +43,14 @@ String usbOutputStatusLabel(
   'android_version' => l10n.usbAndroidVersion,
   _ => l10n.usbBitPerfectFallback,
 };
+
+/// The song's rate, and the rate it is converted to when the DAC refused it.
+String _activeRate(AppLocalizations l10n, UsbAudioStatus status) {
+  String khz(int rate) => '${(rate / 1000).toStringAsFixed(1)} kHz';
+  final rate = khz(status.sampleRate!);
+  final output = status.outputSampleRate;
+  return output == null ? rate : l10n.usbOutputResampled(rate, khz(output));
+}
 
 /// The codec with its bit depth, such as "ALAC 24-bit" or "Vorbis".
 String? _sourceFormat(UsbAudioStatus status) {

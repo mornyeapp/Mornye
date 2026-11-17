@@ -72,6 +72,7 @@ class UsbAudioStatus {
     this.lossy = false,
     this.sourceBitDepth,
     this.channels,
+    this.outputSampleRate,
   });
 
   /// A native reply that did not start the output. Keeps the specific
@@ -103,6 +104,10 @@ class UsbAudioStatus {
   final bool lossy;
   final int? sourceBitDepth;
   final int? channels;
+
+  /// The rate sent to the DAC when it refused the song's own [sampleRate]
+  /// and the song is converted: the chain is not bit-perfect. Null otherwise.
+  final int? outputSampleRate;
 }
 
 final AudioContext _musicAudioContext = AudioContext(
@@ -615,13 +620,18 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
             codec: response?['codec'] as String?,
             lossy: response?['lossy'] == true,
             sourceBitDepth: (response?['sourceBitDepth'] as num?)?.toInt(),
+            outputSampleRate: response?['resampled'] == true
+                ? (response?['carrierRate'] as num?)?.toInt()
+                : null,
           );
           final codec = _preparedStatus.codec;
+          final outputRate = _preparedStatus.outputSampleRate;
           _log.i(
             'Native output prepared: ${_preparedStatus.driver}, '
             '${_preparedStatus.sampleRate} Hz, ${_preparedStatus.bitDepth}-bit'
             '${codec == null ? '' : ', $codec'}'
-            '${_preparedStatus.lossy ? ' (lossy source)' : ''}',
+            '${_preparedStatus.lossy ? ' (lossy source)' : ''}'
+            '${outputRate == null ? '' : ', resampled to $outputRate Hz'}',
           );
           // A DAC level that falls from one song to the next shows here:
           // what the DAC read when opened against what the app set last.

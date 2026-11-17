@@ -9,12 +9,15 @@ enum AudioBitPerfectStatus {
   processed,
   unverified,
   lossySource,
+  resampled,
 }
 
 /// Exclusive access bypasses mixing but does not verify unchanged PCM samples.
 /// Only an active verified direct path proves that. Applied software gain or
 /// tempo changes rule it out even when the output is exclusive. A direct path
-/// fed by a decoded lossy source has no lossless original to preserve.
+/// fed by a decoded lossy source has no lossless original to preserve, and
+/// one [resampled] for a DAC that refused the song's rate changed every
+/// sample.
 AudioBitPerfectStatus audioBitPerfectStatus({
   required bool directActive,
   required bool exclusiveActive,
@@ -22,10 +25,12 @@ AudioBitPerfectStatus audioBitPerfectStatus({
   double tempo = 1,
   double softwareVolume = 1,
   bool lossySource = false,
+  bool resampled = false,
 }) {
   if (directActive) {
-    return lossySource
-        ? AudioBitPerfectStatus.lossySource
+    if (lossySource) return AudioBitPerfectStatus.lossySource;
+    return resampled
+        ? AudioBitPerfectStatus.resampled
         : AudioBitPerfectStatus.verified;
   }
   if (!exclusiveActive) return AudioBitPerfectStatus.systemMixed;

@@ -1,17 +1,19 @@
 //! Android-owned USB permission and a bounded, mixer-free USB audio transport.
-//! No resampling or gain processing occurs at this boundary.
+//! No resampling or gain processing occurs at this boundary: a song whose
+//! rate the DAC refuses passes through [`UsbResampler`] before it gets here.
 
 #[cfg(any(test, target_os = "android"))]
 mod descriptors;
 #[cfg(any(test, target_os = "android"))]
 mod framing;
+mod resample;
 #[cfg(target_os = "android")]
 #[allow(unsafe_code)] // libusb ownership is confined to this worker module.
 mod transport;
 #[cfg(any(test, target_os = "android"))]
 mod volume;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 #[uniffi(flat_error)]
@@ -155,5 +157,52 @@ impl UsbDirectOutput {
             let _ = db;
             unreachable!("Android-only constructor")
         }
+    }
+}
+
+/// Converts PCM to a rate the DAC accepts when it refuses the song's own.
+/// Samples are little-endian and left-justified in `subslot` bytes, `bits`
+/// of them valid, exactly as [`UsbDirectOutput::write`] takes them.
+#[derive(uniffi::Object)]
+pub struct UsbResampler {
+    resampler: Mutex<resample::Resampler>,
+}
+
+#[uniffi::export]
+impl UsbResampler {
+    #[uniffi::constructor]
+    pub fn create(
+        source_rate: u32,
+        output_rate: u32,
+        channels: u8,
+        subslot: u8,
+        bits: u8,
+    ) -> Result<Arc<Self>, UsbAudioError> {
+        let resampler =
+            resample::Resampler::new(source_rate, output_rate, channels, subslot, bits)?;
+        Ok(Arc::new(Self {
+            resampler: Mutex::new(resampler),
+        }))
+    }
+
+    /// Takes whole frames; returns the output frames they complete.
+    pub fn process(&self, data: Vec<u8>) -> Result<Vec<u8>, UsbAudioError> {
+        self.lock().process(&data).map_err(Into::into)
+    }
+
+    /// The frames still inside the filter once the source has ended.
+    pub fn finish(&self) -> Vec<u8> {
+        self.lock().finish()
+    }
+
+    /// Forgets the audio heard so far, as after a seek.
+    pub fn reset(&self) {
+        self.lock().reset();
+    }
+}
+
+impl UsbResampler {
+    fn lock(&self) -> std::sync::MutexGuard<'_, resample::Resampler> {
+        self.resampler.lock().expect("USB resampler")
     }
 }

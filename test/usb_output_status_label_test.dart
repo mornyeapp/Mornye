@@ -130,6 +130,20 @@ void main() {
           usbOutputStatusLabel(l10n, lossy),
           'DAC · ${l10n.usbOutputLossySource('AAC')} · 24-bit PCM · 44.1 kHz',
         );
+        // A rate the DAC refused is named with the rate it plays instead.
+        expect(
+          usbOutputStatusLabel(
+            l10n,
+            const UsbAudioStatus(
+              reason: 'active',
+              device: 'DAC',
+              sampleRate: 96000,
+              bitDepth: 24,
+              outputSampleRate: 48000,
+            ),
+          ),
+          'DAC · 24-bit PCM · ${l10n.usbOutputResampled('96.0 kHz', '48.0 kHz')}',
+        );
       },
     );
   }

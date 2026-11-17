@@ -657,6 +657,7 @@ class _AudioFacts {
         AudioBitPerfectStatus.processed => l10n.audioInfoBitPerfectProcessed,
         AudioBitPerfectStatus.unverified => l10n.audioInfoBitPerfectUnverified,
         AudioBitPerfectStatus.lossySource => l10n.audioInfoBitPerfectLossy,
+        AudioBitPerfectStatus.resampled => l10n.audioInfoBitPerfectResampled,
       }, emphasis: _bitPerfect == AudioBitPerfectStatus.verified),
     ];
   }
@@ -669,6 +670,7 @@ class _AudioFacts {
     tempo: processing?.autoMixRate ?? 1,
     softwareVolume: softwareVolume,
     lossySource: usb.lossy,
+    resampled: usb.outputSampleRate != null,
   );
 
   bool get _bluetoothFormatUnreported =>
@@ -677,7 +679,7 @@ class _AudioFacts {
   bool get _androidOutputUnreported => !direct && route?.platform == 'android';
 
   int? get _outputRate {
-    if (direct) return usb.sampleRate;
+    if (direct) return usb.outputSampleRate ?? usb.sampleRate;
     // Shared mixer properties cannot describe an exclusive engine's output.
     if (exclusive || _androidOutputUnreported) return null;
     return route?.device?.mixerSampleRate ?? route?.mixerSampleRate;

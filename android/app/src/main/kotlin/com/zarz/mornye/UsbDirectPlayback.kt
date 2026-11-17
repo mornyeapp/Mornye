@@ -17,6 +17,7 @@ import android.os.PowerManager
 import com.mornye.backend.UsbDirectOutput
 import com.mornye.backend.UsbOutputFormat
 import com.mornye.backend.UsbHardwareVolume
+import com.mornye.backend.UsbResampler
 import io.flutter.plugin.common.MethodCall
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -62,6 +63,10 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
     // A mono source sent to a stereo-only DAC, each sample on both channels.
     private var upmixMono = false
     private var upmixBuffer: ByteBuffer? = null
+    // Set while the DAC plays another rate than the song's, which it refused.
+    private var resampler: UsbResampler? = null
+    private var resamplerDrained = false
+    private var resampleInput = ByteArray(0)
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -283,22 +288,40 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 }
                 var opened: UsbDirectOutput? = null
                 var refused: Exception? = null
-                for ((outChannels, outBits) in attempts) {
-                    try {
-                        opened = UsbDirectOutput.open(usb.fileDescriptor, descriptors, rate.toUInt(), outChannels.toUByte(), outBits.toUByte(), isDsd, allowDop)
-                        requestedBits = outBits
-                        upmixMono = outChannels != channels
-                        break
-                    } catch (error: Exception) {
-                        // The format check fails before libusb touches the device.
-                        if (error.message?.startsWith("No compatible USB format") != true) throw error
-                        if (refused == null) refused = error
+                // A DAC that refuses the song's rate gets the song converted
+                // to a rate it takes. DSD is never converted.
+                val rates = listOf(rate) + if (isDsd) emptyList() else UsbDirectFormats.resampleRates(rate)
+                var deviceRefusals = 0
+                rates@ for (outRate in rates) {
+                    for ((outChannels, outBits) in attempts) {
+                        try {
+                            opened = UsbDirectOutput.open(usb.fileDescriptor, descriptors, outRate.toUInt(), outChannels.toUByte(), outBits.toUByte(), isDsd, allowDop)
+                            requestedBits = outBits
+                            upmixMono = outChannels != channels
+                            break@rates
+                        } catch (error: Exception) {
+                            if (UsbDirectFormats.classifyOutput(error.message) != UsbDirectFormats.DAC_FORMAT) throw error
+                            if (refused == null) refused = error
+                            // The format check fails before libusb touches the
+                            // device. A rate the DAC itself refused is refused
+                            // in every layout, and a DAC is not asked often.
+                            if (error.message?.startsWith("No compatible USB format") != true) {
+                                if (++deviceRefusals == 4) break@rates
+                                continue@rates
+                            }
+                        }
                     }
                 }
                 // The first refusal names the format the song asked for.
                 val audio = opened ?: throw requireNotNull(refused)
                 output = audio
                 format = audio.format()
+                val outputRate = audio.format().sampleRate
+                if (!isDsd && outputRate.toInt() != rate) {
+                    resampler = UsbResampler.create(rate.toUInt(), outputRate, channels.toUByte(),
+                        audio.format().subslot, audio.format().bits)
+                    android.util.Log.i("UsbDirect", "DAC refused $rate Hz; converting to $outputRate Hz")
+                }
                 // What the DAC read when it was opened, for the log: a level
                 // that falls between tracks was set by something else.
                 val connected = audio.volume()
@@ -333,6 +356,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                     "codec" to source.codec, "lossy" to source.lossy,
                     "duration" to durationUs / 1000,
                     "transport" to f.encoding, "carrierRate" to f.sampleRate.toLong(), "driver" to "usb_direct",
+                    "resampled" to (resampler != null),
                     "volume" to volumeMap(audio.volume()), "volumeTrace" to volumeTrace,
                     "volumeBlocked" to (!audio.volume().available && !allowFixedVolume)), null)
             } catch (error: Exception) {
@@ -352,7 +376,8 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
             if (data == null) ended = true else pending = ByteBuffer.wrap(data)
         } else {
             pending = try {
-                val data = requireNotNull(pcm).read(f.subslot.toInt() * 8)
+                val source = requireNotNull(pcm)
+                val data = resampled(source.read(f.subslot.toInt() * 8), source.ended)
                 if (upmixMono && data != null) {
                     BitPerfectPcm.duplicateMono(data, f.subslot.toInt(), upmixBuffer).also { upmixBuffer = it }
                 } else data
@@ -363,6 +388,26 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
             }
             ended = requireNotNull(pcm).ended
         }
+    }
+
+    /**
+     * [data] at the rate the DAC plays, when that is not the song's. With
+     * [last], what the filter still holds follows. Null when the filter
+     * needs more input before its next frame.
+     */
+    private fun resampled(data: ByteBuffer?, last: Boolean): ByteBuffer? {
+        val converter = resampler ?: return data
+        var output = ByteArray(0)
+        if (data != null && data.hasRemaining()) {
+            if (resampleInput.size != data.remaining()) resampleInput = ByteArray(data.remaining())
+            data.duplicate().get(resampleInput)
+            output = converter.process(resampleInput)
+        }
+        if (last && !resamplerDrained) {
+            resamplerDrained = true
+            output += converter.finish()
+        }
+        return if (output.isEmpty()) null else ByteBuffer.wrap(output)
     }
 
     private fun resume() {
@@ -446,6 +491,8 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
         val f = requireNotNull(format)
         val target = positionUs.coerceIn(0, durationUs.coerceAtLeast(0))
         baseUs = dsd?.seek(target, f.encoding) ?: target.also { pcm?.seek(it) }
+        resampler?.reset()
+        resamplerDrained = false
         pending = null
         writtenFrames = 0
         ended = false
@@ -487,6 +534,9 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
         dsd = null
         format = null
         pending = null
+        resampler?.destroy()
+        resampler = null
+        resamplerDrained = false
         upmixMono = false
         ended = false
         failed = false

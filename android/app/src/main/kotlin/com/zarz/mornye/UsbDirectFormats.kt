@@ -70,6 +70,24 @@ internal object UsbDirectFormats {
         else -> type.removePrefix("audio/").removePrefix("x-").uppercase()
     }
 
+    private val standardRates = listOf(44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000)
+
+    private fun isCdFamily(rate: Int) = rate % 11025 == 0
+
+    /**
+     * The rates to convert a song to when the DAC refuses its own [rate],
+     * best first. Lower rates come first, those of the song's own family
+     * (44.1 or 48 kHz) ahead of the rest because they convert by a whole
+     * ratio; then the higher rates from the nearest up, since a DAC without
+     * 44.1 kHz nearly always has 48 kHz.
+     */
+    fun resampleRates(rate: Int): List<Int> {
+        val family = isCdFamily(rate)
+        val lower = standardRates.filter { it < rate }
+            .sortedWith(compareBy({ isCdFamily(it) != family }, { -it }))
+        return lower + standardRates.filter { it > rate }
+    }
+
     /**
      * Maps a Rust transport or Android device error to a reason. Unknown
      * messages stay [UNSUPPORTED]; the log keeps the original text.

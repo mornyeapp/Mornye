@@ -44,6 +44,21 @@ class UsbDirectFormatsTest {
     }
 
     @Test
+    fun convertsARefusedRateToTheNearestLowerRateOfItsFamilyFirst() {
+        assertEquals(
+            listOf(48000, 88200, 44100, 176400, 192000, 352800, 384000),
+            UsbDirectFormats.resampleRates(96000),
+        )
+        assertEquals(listOf(44100, 48000), UsbDirectFormats.resampleRates(88200).take(2))
+        assertEquals(listOf(96000, 48000, 176400), UsbDirectFormats.resampleRates(192000).take(3))
+        // A DAC without 44.1 kHz nearly always has 48 kHz.
+        assertEquals(listOf(48000, 88200), UsbDirectFormats.resampleRates(44100).take(2))
+        assertEquals(listOf(44100, 88200), UsbDirectFormats.resampleRates(48000).take(2))
+        assertEquals(listOf(44100, 48000), UsbDirectFormats.resampleRates(22050).take(2))
+        assertEquals(listOf(44100, 48000), UsbDirectFormats.resampleRates(32000).take(2))
+    }
+
+    @Test
     fun namesCodecsAndDescribesSources() {
         assertEquals("ALAC", UsbDirectFormats.codecName("audio/alac"))
         assertEquals("AAC", UsbDirectFormats.codecName("audio/mp4a-latm"))

@@ -102,6 +102,17 @@ void main() {
     );
   });
 
+  test('a direct path resampled for the DAC is not called bit-perfect', () {
+    expect(
+      audioBitPerfectStatus(
+        directActive: true,
+        exclusiveActive: false,
+        resampled: true,
+      ),
+      AudioBitPerfectStatus.resampled,
+    );
+  });
+
   for (final mornye in [false, true]) {
     testWidgets(
       'exclusive path and bit-perfect facts stay consistent (Mornye=$mornye)',
