@@ -80,9 +80,23 @@ class LinkRuntimeTogetherDeck implements LinkTogetherDeck {
     final now = _nowMs();
     final handler = _runtime.handler;
     if (handler == null) return LinkTogetherReport(nowMs: now);
-    final state = handler.playbackState.value;
-    final queue = handler.queue.value;
-    final current = handler.mediaItem.value;
+    return reportOf(
+      state: handler.playbackState.value,
+      queue: handler.queue.value,
+      current: handler.mediaItem.value,
+      nowMs: now,
+      refFor: _refFor,
+    );
+  }
+
+  /// The report for a player in [state] on [current] of [queue].
+  static LinkTogetherReport reportOf({
+    required PlaybackState state,
+    required List<MediaItem> queue,
+    required MediaItem? current,
+    required int nowMs,
+    required TrackRef Function(MediaItem item) refFor,
+  }) {
     var index = state.queueIndex ?? -1;
     if (current != null &&
         (index < 0 || index >= queue.length || queue[index].id != current.id)) {
@@ -90,15 +104,24 @@ class LinkRuntimeTogetherDeck implements LinkTogetherDeck {
     }
     // Buffering holds the position still, so it says nothing of drift.
     final ready = state.processingState == AudioProcessingState.ready;
+    final duration = current?.duration?.inMilliseconds;
+    // A song that ran out stands at its end. Its state still carries the
+    // last position read while it played, which can lie well before the
+    // listed length, and a song change read from there looks like one
+    // picked by hand.
+    final ended =
+        state.processingState == AudioProcessingState.completed &&
+        duration != null &&
+        duration > 0;
     return LinkTogetherReport(
-      nowMs: now,
-      track: current == null ? null : _refFor(current),
+      nowMs: nowMs,
+      track: current == null ? null : refFor(current),
       index: current == null ? -1 : index,
       playing: state.playing,
       ready: ready && current != null,
       // Extrapolated at the session's rate, nudges included.
-      positionMs: state.position.inMilliseconds,
-      durationMs: current?.duration?.inMilliseconds,
+      positionMs: ended ? duration : state.position.inMilliseconds,
+      durationMs: duration,
       repeat: _repeat(state.repeatMode),
       rate: state.speed,
     );

@@ -364,7 +364,10 @@ class LinkTogetherCoordinator {
         return;
       }
     }
-    if (last.playing && !phone.playing && !_follower.silent) {
+    if (last.playing &&
+        !phone.playing &&
+        !_follower.silent &&
+        !_ranOut(phone, now)) {
       // A call or another app took the sound: only the phone waits.
       _held = true;
       _log.i('Link: together, the phone paused by itself and waits');
@@ -539,13 +542,21 @@ class LinkTogetherCoordinator {
   /// nor paused, and a cue then would pause the other or land in the middle
   /// of its own song change.
   bool _betweenSongs(LinkTogetherReport stopped, int now) {
-    final remaining = stopped.remainingAt(now);
-    if (stopped.ready || remaining == null || remaining >= transitionMs) {
+    if (!_ranOut(stopped, now)) {
       _stoppedSince = null;
       return false;
     }
     final since = _stoppedSince ??= now;
     return now - since < maxTransitionWaitMs;
+  }
+
+  /// Whether [report] shows a song that ran out, not one that was paused.
+  bool _ranOut(LinkTogetherReport report, int now) {
+    final remaining = report.remainingAt(now);
+    return !report.playing &&
+        !report.ready &&
+        remaining != null &&
+        remaining < transitionMs;
   }
 
   /// The follower's position for the leader at [leaderMs], with the timing
