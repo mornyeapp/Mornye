@@ -115,4 +115,96 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('a list left far down opens there without building the rows '
+      'above', (tester) async {
+    final built = <int>{};
+    final queue = [
+      for (var index = 0; index < 300; index++) _CountedItem(index, built),
+    ];
+    final theme = MornyeTheme.build(Brightness.dark);
+    final shown = ValueNotifier(true);
+    addTearDown(shown.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_Settings.new),
+          musicPlayerControllerProvider.overrideWithValue(_Player()),
+          currentMediaItemProvider.overrideWithBuild(
+            (ref, notifier) => Stream.value(queue[0]),
+          ),
+          playQueueProvider.overrideWith((ref) => Stream.value(queue)),
+          playbackStateProvider.overrideWith(
+            (ref) => Stream.value(PlaybackState(queueIndex: 0)),
+          ),
+        ],
+        child: MaterialApp(
+          theme: theme,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ValueListenableBuilder(
+              valueListenable: shown,
+              builder: (context, shown, _) => shown
+                  ? MornyePlayerQueue(colorScheme: theme.colorScheme)
+                  : const SizedBox(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    ScrollPosition position() =>
+        tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+    position().jumpTo(12000);
+    await tester.pumpAndSettle();
+    final offset = position().pixels;
+    final visible = {
+      for (final element in find.byType(ListTile).evaluate())
+        (element.widget as ListTile).title,
+    }.length;
+    expect(visible, greaterThan(3));
+    final firstShown = built.reduce((a, b) => a > b ? a : b) - 20;
+
+    shown.value = false;
+    await tester.pumpAndSettle();
+    expect(find.byType(MornyePlayerQueue), findsNothing);
+    built.clear();
+    shown.value = true;
+    await tester.pump();
+
+    expect(position().pixels, offset);
+    expect(built, isNotEmpty);
+    expect(built.where((index) => index < firstShown), isEmpty);
+    expect(find.byType(ListTile).evaluate().length, greaterThan(3));
+    // The rows kept just above the screen are real ones a frame later, and
+    // scrolling back up builds the rows passed.
+    await tester.pumpAndSettle();
+    position().jumpTo(offset - 2000);
+    await tester.pumpAndSettle();
+    expect(
+      find.byType(SizedBox).evaluate().where((element) {
+        final box = element.widget as SizedBox;
+        return box.key is ObjectKey;
+      }),
+      isEmpty,
+    );
+    expect(built.where((index) => index < firstShown), isNotEmpty);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+/// A queue entry that records when a row reads its title to draw it.
+class _CountedItem extends MediaItem {
+  _CountedItem(this.index, this.built)
+    : super(id: 'song-$index', title: 'Song $index', artist: 'Artist');
+
+  final int index;
+  final Set<int> built;
+
+  @override
+  String get title {
+    built.add(index);
+    return super.title;
+  }
 }

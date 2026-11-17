@@ -1,6 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/rendering.dart' show RenderSliverMultiBoxAdaptor;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -11,13 +12,73 @@ import 'package:mornye/widgets/player_queue_dismissible.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
 
 /// Upcoming tracks share the player's artwork backdrop and transport controls.
-class MornyePlayerQueue extends ConsumerWidget {
+class MornyePlayerQueue extends ConsumerStatefulWidget {
   const MornyePlayerQueue({super.key, required this.colorScheme});
 
   final ColorScheme colorScheme;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MornyePlayerQueue> createState() => _MornyePlayerQueueState();
+}
+
+class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
+  static const _placeId = ValueKey('mornye-player-queue-rows');
+  final _listKey = GlobalKey();
+
+  /// On the frame that opens the list where it was left, the rows above
+  /// that place are empty boxes [_passedRowHeight] tall: a list without
+  /// fixed row heights builds every row it passes, and none of these reach
+  /// the screen.
+  int _passedRows = 0;
+  double _passedRowHeight = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final place = PageStorage.maybeOf(
+      context,
+    )?.readState(context, identifier: _placeId);
+    if (place case (
+      rows: final int rows,
+      height: final double height,
+    ) when rows > 0 && height > 0) {
+      _passedRows = rows;
+      _passedRowHeight = height;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _passedRows = 0);
+      });
+    }
+  }
+
+  /// Keeps, next to the scroll offset the list restores by itself, the first
+  /// row the list holds there and a row's height.
+  bool _rememberPlace(ScrollEndNotification notification) {
+    if (notification.depth == 0) {
+      // The list lays out for where the scroll ended at the end of the frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _savePlace();
+      });
+    }
+    return false;
+  }
+
+  void _savePlace() {
+    final list = _listKey.currentContext?.findRenderObject();
+    ({int rows, double height})? place;
+    if (list is RenderSliverMultiBoxAdaptor) {
+      final first = list.firstChild;
+      if (first != null) {
+        place = (rows: list.indexOf(first), height: first.size.height);
+      }
+    }
+    PageStorage.maybeOf(
+      context,
+    )?.writeState(context, place, identifier: _placeId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = widget.colorScheme;
     final queue = ref.watch(playQueueProvider).value ?? const <MediaItem>[];
     final playback = ref.watch(
       playbackStateProvider.select(
@@ -100,7 +161,7 @@ class MornyePlayerQueue extends ConsumerWidget {
       ),
     );
 
-    return CustomScrollView(
+    final list = CustomScrollView(
       key: const PageStorageKey('mornye-player-queue'),
       slivers: [
         SliverPadding(
@@ -264,6 +325,7 @@ class MornyePlayerQueue extends ConsumerWidget {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             sliver: SliverReorderableList(
+              key: _listKey,
               itemCount: count,
               onReorderItem: (oldIndex, newIndex) {
                 if (!locked) {
@@ -277,6 +339,12 @@ class MornyePlayerQueue extends ConsumerWidget {
               ),
               itemBuilder: (context, index) {
                 final item = queue[start + index];
+                if (index < _passedRows) {
+                  return SizedBox(
+                    key: ObjectKey(item),
+                    height: _passedRowHeight,
+                  );
+                }
                 return PlayerQueueDismissible(
                   key: ObjectKey(item),
                   enabled: !locked,
@@ -333,6 +401,10 @@ class MornyePlayerQueue extends ConsumerWidget {
             ),
           ),
       ],
+    );
+    return NotificationListener<ScrollEndNotification>(
+      onNotification: _rememberPlace,
+      child: list,
     );
   }
 }
