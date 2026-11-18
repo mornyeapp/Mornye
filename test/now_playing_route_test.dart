@@ -778,4 +778,77 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  // Issue 918: back closed the player while a finger was still on it. The
+  // finger's release then drove the popped route back on screen, and the
+  // next drag down popped the page below, leaving nothing.
+  for (final late in ['cancel', 'drag', 'release']) {
+    testWidgets('a touch that ends after the player closed changes nothing '
+        '($late)', (tester) async {
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(navigatorKey: navigator, home: const Text('Home')),
+      );
+      final route = _TestPlayerRoute();
+      navigator.currentState!.push(route);
+      await tester.pumpAndSettle();
+      const height = 600.0;
+      final down = DragUpdateDetails(
+        globalPosition: const Offset(0, 300),
+        primaryDelta: 300,
+        delta: const Offset(0, 300),
+      );
+      if (late == 'release') {
+        route.startDrag();
+        route.updateDrag(down, height);
+      }
+
+      navigator.currentState!.pop();
+      await tester.pump();
+      switch (late) {
+        case 'cancel':
+          route.cancelDrag();
+        case 'drag':
+          route.startDrag();
+          route.updateDrag(down, height);
+          route.endDrag(DragEndDetails(primaryVelocity: 0), height);
+        default:
+          route.endDrag(DragEndDetails(primaryVelocity: 0), height);
+      }
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(_sheet), findsNothing);
+      expect(find.text('Home'), findsOneWidget);
+      expect(navigator.currentState!.canPop(), isFalse);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('a drag let go under another route does not pop that route', (
+    tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(navigatorKey: navigator, home: const Text('Home')),
+    );
+    final route = _TestPlayerRoute();
+    navigator.currentState!.push(route);
+    await tester.pumpAndSettle();
+    route.startDrag();
+    navigator.currentState!.push(
+      MaterialPageRoute<void>(builder: (_) => const Text('Above')),
+    );
+    await tester.pumpAndSettle();
+    route.endDrag(
+      DragEndDetails(
+        velocity: const Velocity(pixelsPerSecond: Offset(0, 2000)),
+        primaryVelocity: 2000,
+      ),
+      600,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Above'), findsOneWidget);
+    expect(route.isActive, isTrue);
+    expect(tester.takeException(), isNull);
+  });
 }

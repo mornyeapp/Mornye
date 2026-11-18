@@ -217,7 +217,10 @@ class NowPlayingRoute extends PageRoute<void> {
     morph!.curve.transform(value),
   )!;
 
+  // A touch that began before the player closed still ends afterwards.
+  // Driving a popped route would put the page back on screen for good.
   void startDrag() {
+    if (!isActive) return;
     _dragGeneration++;
     _releaseVelocity = 0;
     // A drag takes over a cancelled back gesture still settling open.
@@ -237,15 +240,18 @@ class NowPlayingRoute extends PageRoute<void> {
   }
 
   void updateDrag(DragUpdateDetails details, double pageHeight) {
+    if (!isActive) return;
     controller?.value -= (details.primaryDelta ?? 0) / pageHeight;
   }
 
   void endDrag(DragEndDetails details, double pageHeight) {
+    if (!isActive) return;
     final velocity = (details.primaryVelocity ?? 0) / pageHeight;
     final value = controller?.value ?? 1.0;
     // The finger moves down, the controller toward zero.
     _releaseVelocity = -velocity;
-    if (velocity > 1.0 || (velocity >= 0 && value < 0.7)) {
+    // Only the player itself is popped, never a route above or below it.
+    if (isCurrent && (velocity > 1.0 || (velocity >= 0 && value < 0.7))) {
       navigator?.pop();
     } else {
       _settleOpen();
@@ -253,6 +259,7 @@ class NowPlayingRoute extends PageRoute<void> {
   }
 
   void cancelDrag() {
+    if (!isActive) return;
     _releaseVelocity = 0;
     _settleOpen();
   }
@@ -378,7 +385,7 @@ class NowPlayingRoute extends PageRoute<void> {
     final navigator = this.navigator;
     if (isCurrent) {
       navigator?.pop();
-    } else {
+    } else if (isActive) {
       // Another route arrived during the gesture; the player stays open.
       _clearDismiss();
       _interactiveTransition = false;
@@ -398,6 +405,7 @@ class NowPlayingRoute extends PageRoute<void> {
     if (!_backGestureActive) return;
     _backGestureActive = false;
     navigator?.didStopUserGesture();
+    if (!isActive) return;
     final generation = _dragGeneration;
     const fallback = AppMotionSpec(
       Duration(milliseconds: 220),
