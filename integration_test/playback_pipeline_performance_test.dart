@@ -191,6 +191,7 @@ class _MeasuredDeck implements PlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    int usbMaxSampleRate = 0,
   }) {
     source = path;
     return trace.call(
@@ -203,6 +204,7 @@ class _MeasuredDeck implements PlaybackDeck {
         requiresDsd: requiresDsd,
         allowFixedVolume: allowFixedVolume,
         dapExclusive: dapExclusive,
+        usbMaxSampleRate: usbMaxSampleRate,
       ),
     );
   }
