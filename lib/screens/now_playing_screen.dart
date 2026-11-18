@@ -58,6 +58,7 @@ import 'package:mornye/widgets/mornye_player_background.dart';
 import 'package:mornye/widgets/mornye_artwork_contrast.dart';
 import 'package:mornye/widgets/mornye_player_actions_sheet.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
+import 'package:mornye/widgets/mornye_cover_glow.dart';
 import 'package:mornye/widgets/mornye_motion_glow.dart';
 import 'package:mornye/widgets/mornye_player_artwork.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
@@ -944,20 +945,33 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 }
                 _coverDim[cover] = dim;
               },
-              child: MornyePlayerBackground(
-                artUri: mediaItem.artUri,
-                squareArtwork: squareArtwork,
-                artworkAspectRatio: artworkRatio,
-                fadeStart: fadeStart,
-                artwork: showsFullArtwork
-                    ? PlayerTransitionArtwork(
-                        artworkKey: _motionArtworkKey,
-                        child: Hero(
-                          tag: kNowPlayingArtworkHeroTag,
-                          child: artwork(),
-                        ),
-                      )
-                    : null,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  MornyePlayerBackground(
+                    artUri: mediaItem.artUri,
+                    squareArtwork: squareArtwork,
+                    artworkAspectRatio: artworkRatio,
+                    fadeStart: fadeStart,
+                    artwork: showsFullArtwork
+                        ? PlayerTransitionArtwork(
+                            artworkKey: _motionArtworkKey,
+                            child: Hero(
+                              tag: kNowPlayingArtworkHeroTag,
+                              child: artwork(),
+                            ),
+                          )
+                        : null,
+                  ),
+                  // Inside the sample: the labels sit on its colour.
+                  MornyeCoverGlow(
+                    artUri: mediaItem.artUri?.toString(),
+                    visible: showsFullArtwork && stillFullBleed,
+                    squareArtwork: squareArtwork,
+                    artworkAspectRatio: artworkRatio,
+                    fadeStart: fadeStart,
+                  ),
+                ],
               ),
             ),
             MornyeMotionGlow(

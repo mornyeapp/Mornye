@@ -16,7 +16,8 @@ import 'package:video_player/video_player.dart';
 /// It goes over [MornyePlayerBackground] with the same artwork geometry and
 /// under [MornyeControlsDim]. Without a playing video, and where the device
 /// does not draw continuously filtered effects ([mornyeLiquidGlassProvider]),
-/// it draws nothing and the page keeps its cover-coloured fade.
+/// it draws nothing and the page keeps its cover-coloured fade. A still cover
+/// has the same look from `MornyeCoverGlow`.
 class MornyeMotionGlow extends ConsumerStatefulWidget {
   const MornyeMotionGlow({
     super.key,
@@ -51,6 +52,24 @@ class MornyeMotionGlow extends ConsumerStatefulWidget {
   /// How much the one colour is darkened for the white labels on it, on top
   /// of [MornyeControlsDim].
   static const colourShade = 0.12;
+
+  /// How far into the fade the one colour starts: under the part of the soft
+  /// copy that hides the artwork, so its upper edge is never seen.
+  static const colourStart = 0.47;
+
+  /// The soft copy over the fade: it comes in over the sharp artwork and
+  /// leaves again over the one colour.
+  static const softMask = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    stops: [0, 0.4, 0.55, 1],
+    colors: [
+      Color(0x00000000),
+      Color(0xff000000),
+      Color(0xff000000),
+      Color(0x00000000),
+    ],
+  );
 
   @override
   ConsumerState<MornyeMotionGlow> createState() => _MornyeMotionGlowState();
@@ -92,12 +111,10 @@ class _MornyeMotionGlowState extends ConsumerState<MornyeMotionGlow> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Starts under the part of the soft copy that hides
-                    // the video, so its upper edge is never seen.
                     Positioned(
                       left: 0,
                       right: 0,
-                      top: fadeTop + fade * 0.47,
+                      top: fadeTop + fade * MornyeMotionGlow.colourStart,
                       bottom: 0,
                       child: _OneColour(controller: controller),
                     ),
@@ -206,22 +223,10 @@ class _SoftVideo extends StatelessWidget {
   final Size videoSize;
   final double artworkHeight;
 
-  static const _mask = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    stops: [0, 0.4, 0.55, 1],
-    colors: [
-      Color(0x00000000),
-      Color(0xff000000),
-      Color(0xff000000),
-      Color(0x00000000),
-    ],
-  );
-
   @override
   Widget build(BuildContext context) => ShaderMask(
     blendMode: BlendMode.dstIn,
-    shaderCallback: _mask.createShader,
+    shaderCallback: MornyeMotionGlow.softMask.createShader,
     // The blur spreads past its box, where the mask would not reach it.
     child: ClipRect(
       child: ImageFiltered(
