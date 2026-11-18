@@ -323,10 +323,15 @@ class PlayerMetadataController extends ChangeNotifier {
   /// set or those cannot carry them (TTML, lyrics without timing, none at
   /// all); then into a `.mlrc` file next to the song. An existing `.mlrc`
   /// file is kept in step with the song's file.
+  /// With [clearMissingTranslations], a translation [shown] no longer
+  /// carries is removed from the song's file and its `.mlrc` file, instead
+  /// of being kept: the translation editor sets this when the user cleared
+  /// a line.
   /// Throws [LyricsSaveUnsupported] when neither can be written.
   Future<LyricsSaveTarget> saveShownLyrics(
     ParsedLyrics shown, {
     required bool preferSidecar,
+    bool clearMissingTranslations = false,
   }) async {
     final source = this.source;
     if (_disposed || _item == null || source == null || source.isEmpty) {
@@ -336,7 +341,11 @@ class PlayerMetadataController extends ChangeNotifier {
     final raw = _lyricsRaw;
     final inLrcFile = _lyricsInLrcFile;
     final embedded = _songFileTakesTranslations
-        ? lyricsWithTranslations(raw, shown)
+        ? lyricsWithTranslations(
+            raw,
+            shown,
+            clearMissingTranslations: clearMissingTranslations,
+          )
         : null;
     final sidecarWritable = _sidecar.canWrite(source);
     final LyricsSaveTarget target;
@@ -354,11 +363,19 @@ class PlayerMetadataController extends ChangeNotifier {
         await _saveSongLyrics(source, embedded!, inLrcFile: inLrcFile);
         // An older .mlrc file would bring back what the song now replaces.
         if (_saved != null && sidecarWritable) {
-          mlrc = buildMlrc(raw: embedded, shown: shown);
+          mlrc = buildMlrc(
+            raw: embedded,
+            shown: shown,
+            clearMissingTranslations: clearMissingTranslations,
+          );
           await _sidecar.write(source, mlrc);
         }
       } else {
-        mlrc = buildMlrc(raw: raw, shown: shown);
+        mlrc = buildMlrc(
+          raw: raw,
+          shown: shown,
+          clearMissingTranslations: clearMissingTranslations,
+        );
         await _sidecar.write(source, mlrc);
       }
       await _metadataEvents.publish(source);

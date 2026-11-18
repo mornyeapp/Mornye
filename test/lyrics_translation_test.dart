@@ -510,6 +510,120 @@ void main() {
       expect(lyricsWithTranslations(synced, lyrics), isNull);
       expect(lyricsTranslationUnsaved(lyrics, lyrics), isFalse);
     });
+
+    test('removes a translation a hand edit cleared', () {
+      final raw =
+          '[00:01.00]Bonjour\n'
+          '[x-translation:1000:${encoded('Hello')}]\n'
+          '[00:02.00]Merci\n'
+          '[x-translation:2000:${encoded('Thanks')}]';
+      final lyrics = LyricsParser.parse(raw);
+      expect(lyrics.lines.map((line) => line.translation), ['Hello', 'Thanks']);
+      final edited = ParsedLyrics(
+        synced: true,
+        wordSynced: false,
+        lines: [lyrics.lines.first.withTranslation(null), lyrics.lines.last],
+        plainText: lyrics.plainText,
+      );
+      final updated = lyricsWithTranslations(
+        raw,
+        edited,
+        clearMissingTranslations: true,
+      )!;
+      expect(updated, isNot(contains(encoded('Hello'))));
+      expect(updated, contains('[x-translation:2000:${encoded('Thanks')}]'));
+      final reread = LyricsParser.parse(updated);
+      expect(reread.lines.map((line) => line.translation), [null, 'Thanks']);
+    });
+
+    test('keeps a saved translation a partial shown does not mention', () {
+      final raw =
+          '[00:01.00]Bonjour\n'
+          '[x-translation:1000:${encoded('Hello')}]\n'
+          '[00:02.00]Merci';
+      final lyrics = LyricsParser.parse(raw);
+      final partial = ParsedLyrics(
+        synced: true,
+        wordSynced: false,
+        lines: [lyrics.lines.first.withTranslation(null)],
+        plainText: lyrics.plainText,
+      );
+      expect(lyricsWithTranslations(raw, partial), isNull);
+    });
+  });
+
+  group('manual translation', () {
+    test('edits one line and keeps the rest, with their timing', () {
+      final lyrics = _lyrics(['Hola', 'Mundo', 'Hola']);
+      final source = LyricsTranslationSource.of(lyrics);
+      expect(source.texts, ['Hola', 'Mundo']);
+      final previous = LyricsTranslationResult(
+        ['Hello', 'World'],
+        alignments: [
+          const [LyricsTranslationChunk('Hello', 0)],
+          const [LyricsTranslationChunk('World', 0)],
+        ],
+      );
+      final edited = ParsedLyrics(
+        synced: true,
+        wordSynced: false,
+        lines: [
+          lyrics.lines[0].withTranslation('Hi there'),
+          lyrics.lines[1].withTranslation('World'),
+          lyrics.lines[2].withTranslation('Hi there'),
+        ],
+        plainText: lyrics.plainText,
+      );
+      final result = manualLyricsTranslationResult(
+        source: source,
+        edited: edited,
+        previous: previous,
+      );
+      expect(result.translations, ['Hi there', 'World']);
+      // The edited line loses its word timing; the untouched one keeps it.
+      expect(result.alignments, [
+        isEmpty,
+        [const LyricsTranslationChunk('World', 0)],
+      ]);
+    });
+
+    test('adds a translation where there was none', () {
+      final lyrics = _lyrics(['Hola', 'Mundo']);
+      final source = LyricsTranslationSource.of(lyrics);
+      final edited = ParsedLyrics(
+        synced: true,
+        wordSynced: false,
+        lines: [lyrics.lines[0].withTranslation('Hello'), lyrics.lines[1]],
+        plainText: lyrics.plainText,
+      );
+      final result = manualLyricsTranslationResult(
+        source: source,
+        edited: edited,
+      );
+      expect(result.translations, ['Hello', null]);
+      expect(result.alignments, isEmpty);
+    });
+
+    test('clearing a line leaves it untranslated', () {
+      final lyrics = _lyrics(['Hola', 'Mundo']);
+      final source = LyricsTranslationSource.of(lyrics);
+      final previous = const LyricsTranslationResult(['Hello', 'World']);
+      final edited = ParsedLyrics(
+        synced: true,
+        wordSynced: false,
+        lines: [
+          lyrics.lines[0].withTranslation(null),
+          lyrics.lines[1].withTranslation('World'),
+        ],
+        plainText: lyrics.plainText,
+      );
+      final result = manualLyricsTranslationResult(
+        source: source,
+        edited: edited,
+        previous: previous,
+      );
+      expect(result.translations, [null, 'World']);
+    });
   });
 
   group('batching', () {

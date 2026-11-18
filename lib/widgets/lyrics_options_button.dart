@@ -25,6 +25,7 @@ import 'package:mornye/widgets/app_menu_button.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/lyrics_editor_sheet.dart';
+import 'package:mornye/widgets/lyrics_translation_editor_sheet.dart';
 import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/lyrics_size_setting.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
@@ -267,6 +268,11 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
         metadata.canSaveTranslations &&
         !translating &&
         lyricsTranslationUnsaved(original, lyrics);
+    // A translation can be written or edited by hand whether or not an AI
+    // provider is set up, as long as the song has lines to translate and
+    // the translation can be saved with it.
+    final canEditTranslation =
+        metadata.canSaveTranslations && !source.isEmpty && !translating;
     // Synced lyrics can always be timed, for this song or every song.
     final timing = original.synced;
     if (canSaveTranslation &&
@@ -274,7 +280,11 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
       _scheduleAutoSave(lyrics);
     }
     final language =
-        pronunciation || translation || canTranslate || translating;
+        pronunciation ||
+        translation ||
+        canTranslate ||
+        translating ||
+        canEditTranslation;
     if (!language && !timing) {
       return canEdit ? _editButton(context) : null;
     }
@@ -319,6 +329,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           canTranslate: canTranslate,
           translating: translating,
           canSaveTranslation: canSaveTranslation,
+          canEditTranslation: canEditTranslation,
           canEdit: canEdit,
           timing: timing,
         ),
@@ -368,6 +379,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     required bool canTranslate,
     required bool translating,
     required bool canSaveTranslation,
+    required bool canEditTranslation,
     required bool canEdit,
     required bool timing,
   }) async {
@@ -421,6 +433,14 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
       ],
       if (canSaveTranslation)
         ('saveTranslation', l10n.nowPlayingSaveTranslation, Icons.save_alt),
+      if (canEditTranslation)
+        (
+          'editTranslation',
+          translation
+              ? l10n.lyricsTranslationEditTitle
+              : l10n.lyricsTranslationAddTitle,
+          Icons.edit_note,
+        ),
       if (timing) ('timing', l10n.lyricsOffset, Icons.timer_outlined),
       if (canEdit) ('edit', l10n.lyricsEditTitle, Icons.edit_note),
     ];
@@ -493,9 +513,12 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           unawaited(_saveTranslation());
       }
     } finally {
-      // The language sheet, the timing sheet and the editor keep controls
+      // The language sheet, the timing sheet and the editors keep controls
       // visible until they close.
-      if (action != 'translateInto' && action != 'edit' && action != 'timing') {
+      if (action != 'translateInto' &&
+          action != 'edit' &&
+          action != 'editTranslation' &&
+          action != 'timing') {
         _setOpen(false);
       }
     }
@@ -516,6 +539,15 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     if (action == 'edit') {
       try {
         if (mounted) await openLyricsEditor(context, widget.metadata);
+      } finally {
+        _setOpen(false);
+      }
+    }
+    if (action == 'editTranslation') {
+      try {
+        if (mounted) {
+          await openLyricsTranslationEditor(context, widget.metadata);
+        }
       } finally {
         _setOpen(false);
       }

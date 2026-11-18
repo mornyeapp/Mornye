@@ -57,12 +57,23 @@ String sidecarPathFor(String path, String extension) {
 /// The `.mlrc` text for [shown], the song's lyrics as the player displays
 /// them. Synced LRC [raw] lyrics are kept as written, with tags for what
 /// [shown] adds; TTML and lyrics without timing are written from [shown].
-String buildMlrc({required String raw, required ParsedLyrics shown}) {
+/// [clearMissingTranslations] is passed on to [lyricsWithTranslations]:
+/// a translation [shown] no longer carries is removed from the file too.
+String buildMlrc({
+  required String raw,
+  required ParsedLyrics shown,
+  bool clearMissingTranslations = false,
+}) {
   final lrc = LyricsDraft.canEdit(raw) && raw.trim().isNotEmpty
       ? LyricsDraft.parse(raw)
       : null;
   final body = lrc != null && lrc.synced
-      ? lyricsWithTranslations(raw, shown) ?? lrc.toLrc()
+      ? lyricsWithTranslations(
+              raw,
+              shown,
+              clearMissingTranslations: clearMissingTranslations,
+            ) ??
+            lrc.toLrc()
       : _lrcOf(shown);
   return '$_mlrcHeader\n$body\n';
 }
