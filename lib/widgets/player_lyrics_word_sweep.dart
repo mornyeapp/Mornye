@@ -145,7 +145,7 @@ class _WordHighlightedLyricLineState
     super.didChangeDependencies();
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
     _displayLead = lyricsDisplayLead(
-      View.maybeOf(context)?.display.refreshRate,
+      displayOf(View.maybeOf(context))?.refreshRate,
     );
     _updateVisualEnd();
     _syncSubscriptions();

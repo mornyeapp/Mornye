@@ -26,6 +26,7 @@ import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/synced_lyrics_scroll.dart';
 import 'package:mornye/utils/text_direction.dart';
+import 'package:mornye/utils/view_display.dart';
 import 'package:mornye/widgets/aligned_lyric_pronunciation.dart';
 import 'package:mornye/widgets/lyric_blur.dart';
 import 'package:mornye/widgets/lyric_supplement_transition.dart';
@@ -365,7 +366,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     super.didChangeDependencies();
     _rowsDirty = true;
     _displayLead = lyricsDisplayLead(
-      View.maybeOf(context)?.display.refreshRate,
+      displayOf(View.maybeOf(context))?.refreshRate,
     );
     // Appearance can rebuild when transport controls fade (for example with
     // custom glass clarity). Keep the existing playback subscription and the

@@ -54,6 +54,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/local_library_scan_prefs.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/view_display.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart'
     show restoreDesktopSidebar;
 import 'package:mornye/widgets/desktop/desktop_inspector.dart'
@@ -669,7 +670,7 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
   /// 60 Hz.
   void _logRefreshRate() {
     if (!mounted) return;
-    final rate = View.maybeOf(context)?.display.refreshRate;
+    final rate = displayOf(View.maybeOf(context))?.refreshRate;
     if (rate == null || rate == _loggedRefreshRate) return;
     _loggedRefreshRate = rate;
     _log.i('Display refresh rate: ${rate.toStringAsFixed(0)} Hz');

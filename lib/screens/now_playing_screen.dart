@@ -25,6 +25,7 @@ import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/utils/synced_lyrics_scroll.dart';
+import 'package:mornye/utils/view_display.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -1297,7 +1298,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         state.speed <= 0) {
       return state.position;
     }
-    final lead = lyricsDisplayLead(View.maybeOf(context)?.display.refreshRate);
+    final lead = lyricsDisplayLead(
+      displayOf(View.maybeOf(context))?.refreshRate,
+    );
     return state.position + lead * state.speed;
   }
 
