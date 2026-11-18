@@ -32,7 +32,7 @@ class UsbDirectFormatsTest {
             "Invalid USB device/configuration" to UsbDirectFormats.DAC_OPEN,
             "Implicit feedback is not supported" to UsbDirectFormats.DAC_UNSUPPORTED,
             "USB bus speed unavailable or unsupported" to UsbDirectFormats.DAC_UNSUPPORTED,
-            "USB endpoint bandwidth too small" to UsbDirectFormats.DAC_UNSUPPORTED,
+            "USB endpoint bandwidth too small" to UsbDirectFormats.DAC_FORMAT,
             "Multiple USB configurations are not supported" to UsbDirectFormats.DAC_UNSUPPORTED,
             "No supported USB endpoint" to UsbDirectFormats.DAC_UNSUPPORTED,
             "USB clock selector 40 reports input 3 of 2" to UsbDirectFormats.DAC_UNSUPPORTED,

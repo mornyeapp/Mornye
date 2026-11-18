@@ -247,6 +247,11 @@ pub fn clock_source(
     Err("USB clock topology loops".into())
 }
 
+/// Bytes of queued audio for 1.5 s at `rate` frames a second, whole frames.
+pub fn queue_bytes(rate: u32, frame: usize) -> usize {
+    (rate as usize * 3 / 2 * frame).max(256 * 1024) / frame.max(1) * frame.max(1)
+}
+
 /// The rates a UAC2 clock source lists in its RANGE reply: a 2-byte count,
 /// then MIN, MAX and RES of 4 bytes each. A malformed or empty reply gives
 /// none, which [`clock_offers`] takes as a clock that did not say.
@@ -661,6 +666,16 @@ mod tests {
             }
         }
         reply
+    }
+    #[test]
+    fn the_queue_holds_the_same_time_at_every_rate() {
+        // 96 kHz in 32-bit stereo once got a third of a second.
+        assert_eq!(queue_bytes(96000, 8), 96000 * 8 * 3 / 2);
+        assert_eq!(queue_bytes(192000, 8), 192000 * 8 * 3 / 2);
+        assert_eq!(queue_bytes(44100, 4), 264600);
+        // Never below the old floor, and always whole frames.
+        assert_eq!(queue_bytes(8000, 2), 262144);
+        assert_eq!(queue_bytes(8000, 6) % 6, 0);
     }
     #[test]
     fn a_clock_is_only_set_to_a_rate_it_lists() {

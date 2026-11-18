@@ -103,6 +103,14 @@ impl Output {
             }
         }
     }
+    /// Bytes the queue holds: 1.5 s at any rate, so a stalled source thread
+    /// does not cut a high-rate song sooner than a CD-rate one.
+    fn capacity(&self) -> usize {
+        descriptors::queue_bytes(
+            self.format.sample_rate,
+            self.format.subslot as usize * self.format.channels as usize,
+        )
+    }
     pub fn write(&self, data: Vec<u8>) -> Result<u32, String> {
         let frame = self.format.subslot as usize * self.format.channels as usize;
         if data.len() > 256 * 1024 || !data.len().is_multiple_of(frame) {
@@ -115,8 +123,11 @@ impl Output {
         if s.closed {
             return Err("USB output closed".into());
         }
-        let capacity = (self.format.sample_rate as usize * frame / 5).max(256 * 1024);
-        let n = data.len().min(capacity.saturating_sub(s.bytes.len())) / frame * frame;
+        let n = data
+            .len()
+            .min(self.capacity().saturating_sub(s.bytes.len()))
+            / frame
+            * frame;
         s.bytes.extend(&data[..n]);
         self.shared.1.notify_all();
         Ok(n as u32)
@@ -130,8 +141,7 @@ impl Output {
         if s.closed {
             return Err("USB output closed".into());
         }
-        let capacity = (self.format.sample_rate as usize * frame / 5).max(256 * 1024);
-        Ok((capacity.saturating_sub(s.bytes.len()) / frame * frame) as u32)
+        Ok((self.capacity().saturating_sub(s.bytes.len()) / frame * frame) as u32)
     }
     pub fn start(&self) -> Result<(), String> {
         let mut s = self.shared.0.lock().unwrap();

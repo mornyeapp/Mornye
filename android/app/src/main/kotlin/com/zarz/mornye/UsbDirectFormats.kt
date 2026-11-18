@@ -112,6 +112,8 @@ internal object UsbDirectFormats {
         return when {
             text.startsWith("No compatible USB format") ||
                 text.startsWith("USB clock does not offer") ||
+                // The endpoint is too small for this rate; a lower one fits.
+                text.contains("bandwidth too small") ||
                 text.contains("clock rate could not be verified") ||
                 text.contains("Variable USB clock has no rate control") -> DAC_FORMAT
             text.startsWith("Cannot open USB device") ||
@@ -119,7 +121,7 @@ internal object UsbDirectFormats {
                 text.startsWith("USB disconnected") -> DAC_OPEN
             listOf(
                 "Implicit feedback", "bus speed", "packet interval", "interval/packet size",
-                "bandwidth too small", "feedback endpoint", "Multiple USB configurations",
+                "feedback endpoint", "Multiple USB configurations",
                 "malformed USB descriptor", "No supported USB endpoint", "Short USB control response",
                 "USB transfer allocation failed", "USB clock selector", "USB clock topology",
             ).any { text.contains(it) } -> DAC_UNSUPPORTED

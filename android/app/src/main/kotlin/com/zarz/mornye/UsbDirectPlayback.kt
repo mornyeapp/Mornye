@@ -310,13 +310,11 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                             if (UsbDirectFormats.classifyOutput(error.message) != UsbDirectFormats.DAC_FORMAT) throw error
                             if (refused == null) refused = error
                             val message = error.message.orEmpty()
-                            // The format check fails before libusb touches the
-                            // device, and a clock that does not list the rate
-                            // is only read. A rate the DAC itself refused is
-                            // refused in every layout, and a DAC is not asked
-                            // often.
+                            // Refusals that never set anything on the DAC are
+                            // free; one the DAC itself gave ends this rate.
                             if (message.startsWith("USB clock does not offer")) continue@rates
-                            if (!message.startsWith("No compatible USB format")) {
+                            if (!message.startsWith("No compatible USB format") &&
+                                !message.contains("bandwidth too small")) {
                                 if (++deviceRefusals == 4) break@rates
                                 continue@rates
                             }
