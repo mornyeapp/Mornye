@@ -114,11 +114,8 @@ class DownloadQueuePersistence {
       final now = DateTime.now().toIso8601String();
       final changed = <DownloadItem>[];
       for (final item in items) {
-        if (item.status == DownloadStatus.completed ||
-            (item.status == DownloadStatus.failed &&
-                item.errorType != DownloadErrorType.verificationRequired)) {
-          continue;
-        }
+        // Failed songs stay until the user retries or dismisses them.
+        if (item.status == DownloadStatus.completed) continue;
         final saved = _saved[item.id];
         final cached = identical(saved?.item, item) && saved?.payload != null;
         seenIds.add(item.id);

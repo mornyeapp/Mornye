@@ -72,7 +72,10 @@ RestoredDownloadQueue _decodeRows(List<Map<String, dynamic>> rows) {
       if (item.status != status) {
         item = item.copyWith(status: status, progress: 0);
       }
-      if (status == DownloadStatus.queued || status == DownloadStatus.skipped) {
+      // Failed and cancelled songs come back shown, not restarted.
+      if (status == DownloadStatus.queued ||
+          status == DownloadStatus.skipped ||
+          status == DownloadStatus.failed) {
         pending.add(item);
       }
     } catch (_) {
