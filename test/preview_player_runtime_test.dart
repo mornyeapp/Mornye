@@ -210,6 +210,7 @@ class _PreviewDeck implements PlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    int usbMaxSampleRate = 0,
   }) async => calls.add('file $path');
   @override
   Future<void> cancelPreparation() async {}

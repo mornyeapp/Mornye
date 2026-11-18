@@ -57,6 +57,9 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
     // app last let go of that DAC: a reopen right after is a track change.
     private val deviceVolumes = mutableMapOf<Int, Double>()
     private val deviceReleases = mutableMapOf<Int, Long>()
+    // The rate each DAC played a song rate at, so a rate it refused once is
+    // not asked of it again for every song.
+    private val deviceRates = mutableMapOf<Int, MutableMap<Int, Int>>()
     // DACs whose access prompt the user declined this session, so later
     // tracks do not prompt again. Touched on the main thread only.
     private val declinedDevices = mutableSetOf<String>()
@@ -78,6 +81,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 worker.post {
                     deviceVolumes.remove(device.deviceId)
                     deviceReleases.remove(device.deviceId)
+                    deviceRates.remove(device.deviceId)
                     if (device.deviceId == deviceId) fail("USB disconnected")
                 }
             } else if (intent.action == permissionAction) {
@@ -288,9 +292,12 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 }
                 var opened: UsbDirectOutput? = null
                 var refused: Exception? = null
-                // A DAC that refuses the song's rate gets the song converted
-                // to a rate it takes. DSD is never converted.
-                val rates = listOf(rate) + if (isDsd) emptyList() else UsbDirectFormats.resampleRates(rate)
+                // A DAC that refuses the song's rate, or a song above the rate
+                // the user allows, is converted to a rate the DAC takes. DSD
+                // is never converted.
+                val maxRate = request.call.argument<Int>("maxSampleRate") ?: 0
+                val playedRates = deviceRates.getOrPut(request.device.deviceId) { mutableMapOf() }
+                val rates = if (isDsd) listOf(rate) else UsbDirectFormats.outputRates(rate, maxRate, playedRates[rate])
                 var deviceRefusals = 0
                 rates@ for (outRate in rates) {
                     for ((outChannels, outBits) in attempts) {
@@ -302,10 +309,14 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                         } catch (error: Exception) {
                             if (UsbDirectFormats.classifyOutput(error.message) != UsbDirectFormats.DAC_FORMAT) throw error
                             if (refused == null) refused = error
+                            val message = error.message.orEmpty()
                             // The format check fails before libusb touches the
-                            // device. A rate the DAC itself refused is refused
-                            // in every layout, and a DAC is not asked often.
-                            if (error.message?.startsWith("No compatible USB format") != true) {
+                            // device, and a clock that does not list the rate
+                            // is only read. A rate the DAC itself refused is
+                            // refused in every layout, and a DAC is not asked
+                            // often.
+                            if (message.startsWith("USB clock does not offer")) continue@rates
+                            if (!message.startsWith("No compatible USB format")) {
                                 if (++deviceRefusals == 4) break@rates
                                 continue@rates
                             }
@@ -317,10 +328,11 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 output = audio
                 format = audio.format()
                 val outputRate = audio.format().sampleRate
+                if (!isDsd) playedRates[rate] = outputRate.toInt()
                 if (!isDsd && outputRate.toInt() != rate) {
                     resampler = UsbResampler.create(rate.toUInt(), outputRate, channels.toUByte(),
                         audio.format().subslot, audio.format().bits)
-                    android.util.Log.i("UsbDirect", "DAC refused $rate Hz; converting to $outputRate Hz")
+                    android.util.Log.i("UsbDirect", "Converting $rate Hz to $outputRate Hz for the DAC")
                 }
                 // What the DAC read when it was opened, for the log: a level
                 // that falls between tracks was set by something else.

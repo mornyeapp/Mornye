@@ -1885,6 +1885,7 @@ class MusicPlayerHandler extends BaseAudioHandler
           allowFixedVolume: _settings.usbAllowFixedVolume,
           dapExclusive: _settings.dapExclusive,
           allowDop: _settings.usbDsdOverPcm,
+          usbMaxSampleRate: _settings.usbMaxSampleRate,
           requiresDsd: _requiresDsd(media),
         );
       }

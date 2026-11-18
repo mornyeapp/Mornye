@@ -223,7 +223,8 @@ abstract interface class PlaybackDeck {
 
   /// Loads a local file. The output flags request Android's native USB and
   /// exclusive paths; other decks ignore them, except that [requiresDsd]
-  /// throws when the deck cannot play DSD.
+  /// throws when the deck cannot play DSD. [usbMaxSampleRate] above zero is
+  /// the highest rate the direct USB driver may set on the DAC.
   Future<void> setFileSource(
     String path, {
     bool preferBitPerfect = false,
@@ -232,6 +233,7 @@ abstract interface class PlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    int usbMaxSampleRate = 0,
   });
 
   /// Abandons a source that is still preparing, if any.

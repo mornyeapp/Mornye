@@ -89,6 +89,17 @@ internal object UsbDirectFormats {
     }
 
     /**
+     * The rates to open the DAC at for a song at [rate], in order: the one
+     * the DAC played this rate at before ([played]), the song's own, then
+     * [resampleRates]. A [limit] above zero leaves out every rate past it,
+     * for a DAC that takes a high rate and then plays silence.
+     */
+    fun outputRates(rate: Int, limit: Int = 0, played: Int? = null): List<Int> {
+        val rates = (listOfNotNull(played) + rate + resampleRates(rate)).distinct()
+        return rates.filter { limit <= 0 || it <= limit }.ifEmpty { rates }
+    }
+
+    /**
      * Maps a Rust transport or Android device error to a reason. Unknown
      * messages stay [UNSUPPORTED]; the log keeps the original text.
      */
@@ -100,6 +111,7 @@ internal object UsbDirectFormats {
         }
         return when {
             text.startsWith("No compatible USB format") ||
+                text.startsWith("USB clock does not offer") ||
                 text.contains("clock rate could not be verified") ||
                 text.contains("Variable USB clock has no rate control") -> DAC_FORMAT
             text.startsWith("Cannot open USB device") ||

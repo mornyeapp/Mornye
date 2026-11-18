@@ -23,6 +23,7 @@ class UsbDirectFormatsTest {
         val cases = mapOf(
             "No compatible USB format for 1ch 16-bit 44100 Hz; DAC offers 2ch 16-bit" to UsbDirectFormats.DAC_FORMAT,
             "USB clock rate could not be verified" to UsbDirectFormats.DAC_FORMAT,
+            "USB clock does not offer 96000 Hz" to UsbDirectFormats.DAC_FORMAT,
             "Variable USB clock has no rate control" to UsbDirectFormats.DAC_FORMAT,
             "USB error -9" to UsbDirectFormats.DAC_FORMAT,
             "USB error -6" to UsbDirectFormats.DAC_OPEN,
@@ -41,6 +42,23 @@ class UsbDirectFormatsTest {
         )
         for ((message, reason) in cases) assertEquals(message, reason, UsbDirectFormats.classifyOutput(message))
         assertEquals(UsbDirectFormats.UNSUPPORTED, UsbDirectFormats.classifyOutput(null))
+    }
+
+    @Test
+    fun opensTheDacAtTheSongRateUnlessALimitOrAnEarlierRefusalSaysOtherwise() {
+        assertEquals(listOf(96000, 48000, 88200), UsbDirectFormats.outputRates(96000).take(3))
+        // The user's limit: nothing above it is ever asked of the DAC.
+        assertEquals(listOf(48000, 44100), UsbDirectFormats.outputRates(96000, limit = 48000))
+        assertEquals(listOf(44100, 48000), UsbDirectFormats.outputRates(88200, limit = 48000))
+        assertEquals(listOf(48000, 44100), UsbDirectFormats.outputRates(48000, limit = 48000))
+        assertEquals(listOf(96000, 48000, 88200, 44100), UsbDirectFormats.outputRates(192000, limit = 96000))
+        // The rate the DAC played this song rate at before comes first.
+        assertEquals(listOf(48000, 96000, 88200), UsbDirectFormats.outputRates(96000, played = 48000).take(3))
+        assertEquals(listOf(96000, 48000), UsbDirectFormats.outputRates(96000, played = 96000).take(2))
+        // One remembered from before the limit was set does not pass it.
+        assertEquals(listOf(48000, 44100), UsbDirectFormats.outputRates(96000, limit = 48000, played = 96000))
+        // A limit below every rate leaves the list as it was.
+        assertEquals(UsbDirectFormats.outputRates(96000), UsbDirectFormats.outputRates(96000, limit = 8000))
     }
 
     @Test

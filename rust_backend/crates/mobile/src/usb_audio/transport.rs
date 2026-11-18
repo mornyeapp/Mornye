@@ -421,6 +421,26 @@ impl Session {
         }
         Ok(())
     }
+    /// The rates a UAC2 clock source lists (RANGE), or none when it does not
+    /// answer: the count first, then the whole list, as Linux asks for it.
+    fn clock_ranges(&self, index: u16) -> Vec<(u32, u32, u32)> {
+        let mut count = [0; 2];
+        if self
+            .control(true, 2, 0x100, index, &mut count, false)
+            .is_err()
+        {
+            return Vec::new();
+        }
+        let count = u16::from_le_bytes(count) as usize;
+        if count == 0 || count > 64 {
+            return Vec::new();
+        }
+        let mut reply = vec![0; 2 + 12 * count];
+        match self.control(true, 2, 0x100, index, &mut reply, false) {
+            Ok(()) => descriptors::clock_ranges(&reply),
+            Err(_) => Vec::new(),
+        }
+    }
     fn configure(&mut self, a: Alternate, f: UsbOutputFormat) -> Result<(), String> {
         let ep = a
             .endpoints
@@ -486,6 +506,11 @@ impl Session {
             let mut current = [0; 4];
             self.control(true, 1, 0x100, index, &mut current, false)?;
             if current != rate {
+                // A rate the clock does not list is never set: some DACs
+                // take the request and then play silence.
+                if !descriptors::clock_offers(&self.clock_ranges(index), f.sample_rate) {
+                    return Err(format!("USB clock does not offer {} Hz", f.sample_rate));
+                }
                 self.control(false, 1, 0x100, index, &mut rate, false)?;
             }
             self.control(true, 1, 0x100, index, &mut current, false)?;

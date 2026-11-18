@@ -247,6 +247,35 @@ pub fn clock_source(
     Err("USB clock topology loops".into())
 }
 
+/// The rates a UAC2 clock source lists in its RANGE reply: a 2-byte count,
+/// then MIN, MAX and RES of 4 bytes each. A malformed or empty reply gives
+/// none, which [`clock_offers`] takes as a clock that did not say.
+pub fn clock_ranges(reply: &[u8]) -> Vec<(u32, u32, u32)> {
+    let Some((count, triplets)) = reply.split_first_chunk::<2>() else {
+        return Vec::new();
+    };
+    let count = u16::from_le_bytes(*count) as usize;
+    let (triplets, _) = triplets.as_chunks::<12>();
+    if count == 0 || triplets.len() < count {
+        return Vec::new();
+    }
+    let word = |bytes: &[u8]| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    triplets[..count]
+        .iter()
+        .map(|t| (word(&t[..4]), word(&t[4..8]), word(&t[8..])))
+        .filter(|(min, max, _)| *max > 0 && min <= max)
+        .collect()
+}
+
+/// Whether a clock with these ranges runs at `rate`. A range with a step
+/// holds only the rates the step lands on.
+pub fn clock_offers(ranges: &[(u32, u32, u32)], rate: u32) -> bool {
+    ranges.is_empty()
+        || ranges.iter().any(|&(min, max, step)| {
+            (min..=max).contains(&rate) && (step <= 1 || (rate - min).is_multiple_of(step))
+        })
+}
+
 /// A deliberately small exact-match registry based on documented USB transport
 /// identities in Linux sound/usb/quirks.c, not a product-name heuristic.
 fn native_encoding(device: &Device, a: &Alternate) -> Option<&'static str> {
@@ -623,5 +652,50 @@ mod tests {
         );
         d.revision = 0x100;
         assert!(formats(&d, 2822400, 2, 1, true, false).is_empty());
+    }
+    fn range_reply(count: u16, ranges: &[(u32, u32, u32)]) -> Vec<u8> {
+        let mut reply = count.to_le_bytes().to_vec();
+        for (min, max, step) in ranges {
+            for value in [min, max, step] {
+                reply.extend(value.to_le_bytes());
+            }
+        }
+        reply
+    }
+    #[test]
+    fn a_clock_is_only_set_to_a_rate_it_lists() {
+        // A DAC whose DSP stops at 48 kHz lists two discrete rates.
+        let listed = [(44100, 44100, 0), (48000, 48000, 0)];
+        let ranges = clock_ranges(&range_reply(2, &listed));
+        assert_eq!(ranges, listed);
+        assert!(clock_offers(&ranges, 44100));
+        assert!(clock_offers(&ranges, 48000));
+        assert!(!clock_offers(&ranges, 96000));
+        assert!(!clock_offers(&ranges, 88200));
+        // A continuous range, and one that only holds the rates its step lands on.
+        assert!(clock_offers(&[(8000, 96000, 1)], 44100));
+        assert!(!clock_offers(&[(8000, 96000, 1)], 192000));
+        assert!(clock_offers(&[(44100, 176400, 44100)], 88200));
+        assert!(!clock_offers(&[(44100, 176400, 44100)], 96000));
+    }
+    #[test]
+    fn a_clock_that_does_not_say_is_tried_at_any_rate() {
+        // No answer, a count of zero, fewer ranges than counted, or only
+        // ranges that cannot be: nothing is known, so nothing is ruled out.
+        for reply in [
+            vec![],
+            vec![1],
+            range_reply(0, &[]),
+            range_reply(2, &[(48000, 48000, 0)]),
+            range_reply(1, &[(0, 0, 0)]),
+            range_reply(1, &[(96000, 48000, 0)]),
+        ] {
+            let ranges = clock_ranges(&reply);
+            assert!(ranges.is_empty(), "{reply:?}");
+            assert!(clock_offers(&ranges, 384000));
+        }
+        // Bytes past the counted ranges are ignored.
+        let padded = range_reply(1, &[(48000, 48000, 0), (96000, 96000, 0)]);
+        assert_eq!(clock_ranges(&padded), [(48000, 48000, 0)]);
     }
 }

@@ -218,6 +218,10 @@ class AppSettings {
   final bool usbDirect;
   final bool usbDsdOverPcm;
   final bool usbAllowFixedVolume;
+
+  /// The highest sample rate the direct USB driver sets on the DAC, in Hz;
+  /// a song above it is converted. 0 leaves the choice to the DAC.
+  final int usbMaxSampleRate;
   final bool dapExclusive;
 
   /// Android beta, off by default: play the music player and AutoMix through
@@ -554,6 +558,7 @@ class AppSettings {
     this.usbDirect = false,
     this.usbDsdOverPcm = false,
     this.usbAllowFixedVolume = false,
+    this.usbMaxSampleRate = 0,
     this.dapExclusive = false,
     this.media3Engine = false,
     this.skipSilence = false,
@@ -753,6 +758,7 @@ class AppSettings {
     bool? usbDirect,
     bool? usbDsdOverPcm,
     bool? usbAllowFixedVolume,
+    int? usbMaxSampleRate,
     bool? dapExclusive,
     bool? media3Engine,
     bool? skipSilence,
@@ -927,6 +933,7 @@ class AppSettings {
       usbDirect: usbDirect ?? this.usbDirect,
       usbDsdOverPcm: usbDsdOverPcm ?? this.usbDsdOverPcm,
       usbAllowFixedVolume: usbAllowFixedVolume ?? this.usbAllowFixedVolume,
+      usbMaxSampleRate: usbMaxSampleRate ?? this.usbMaxSampleRate,
       dapExclusive: dapExclusive ?? this.dapExclusive,
       media3Engine: media3Engine ?? this.media3Engine,
       skipSilence: skipSilence ?? this.skipSilence,

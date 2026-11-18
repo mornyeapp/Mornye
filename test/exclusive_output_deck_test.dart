@@ -78,6 +78,7 @@ class _Deck implements PlaybackDeck, QueuedPlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    int usbMaxSampleRate = 0,
   }) async {
     calls.add('file $path');
     await pendingSource?.future;

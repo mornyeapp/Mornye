@@ -85,6 +85,39 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
     filled: false,
   );
 
+  String _usbRateLabel(int rate) => rate <= 0
+      ? context.l10n.usbMaxSampleRateAuto
+      : '${(rate / 1000).toStringAsFixed(rate % 1000 == 0 ? 0 : 1)} kHz';
+
+  Future<void> _showUsbMaxSampleRate(int current) async {
+    const rates = [0, 48000, 96000, 192000];
+    final colorScheme = Theme.of(context).colorScheme;
+    final rate = await showAppBottomSheet<int>(
+      context: context,
+      title: context.l10n.usbMaxSampleRate,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: SettingsGroup(
+          children: [
+            for (final rate in rates)
+              SettingsItem(
+                title: _usbRateLabel(rate),
+                selected: rate == current,
+                trailing: rate == current
+                    ? AppIcon(Icons.check, color: colorScheme.primary)
+                    : null,
+                showDivider: rate != rates.last,
+                onTap: () => Navigator.pop(sheetContext, rate),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (rate != null && mounted) {
+      ref.read(settingsProvider.notifier).setUsbMaxSampleRate(rate);
+    }
+  }
+
   /// Learning cannot be restored once cleared, so a stray tap must not wipe it.
   Future<void> _confirmResetLearning() async {
     final confirmed = await showAppConfirmDialog(
@@ -703,6 +736,16 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                       onChanged: (value) => ref
                           .read(settingsProvider.notifier)
                           .setUsbDsdOverPcm(value),
+                    ),
+                    SettingsItem(
+                      icon: Icons.speed,
+                      title: context.l10n.usbMaxSampleRate,
+                      subtitle: [
+                        _usbRateLabel(settings.usbMaxSampleRate),
+                        context.l10n.usbMaxSampleRateDescription,
+                      ].join('\n\n'),
+                      onTap: () =>
+                          _showUsbMaxSampleRate(settings.usbMaxSampleRate),
                     ),
                     SettingsSwitchItem(
                       icon: Icons.volume_up_outlined,
