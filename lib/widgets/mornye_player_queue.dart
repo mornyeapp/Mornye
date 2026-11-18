@@ -10,6 +10,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/player_queue_artwork.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
+import 'package:mornye/widgets/scaled_drag_proxy.dart';
 
 /// Upcoming tracks share the player's artwork backdrop and transport controls.
 class MornyePlayerQueue extends ConsumerStatefulWidget {
@@ -332,10 +333,13 @@ class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
                   controller.moveQueueItem(start + oldIndex, start + newIndex);
                 }
               },
-              proxyDecorator: (child, index, animation) => Material(
-                color: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(12),
-                child: child,
+              proxyDecorator: (child, index, animation) => ScaledDragProxy(
+                animation: animation,
+                child: Material(
+                  color: colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(12),
+                  child: child,
+                ),
               ),
               itemBuilder: (context, index) {
                 final item = queue[start + index];

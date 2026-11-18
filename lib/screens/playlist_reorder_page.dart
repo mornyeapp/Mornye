@@ -9,6 +9,7 @@ import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/discard_changes_dialog.dart';
 import 'package:mornye/widgets/priority_settings_scaffold.dart';
+import 'package:mornye/widgets/scaled_drag_proxy.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 /// Reorders one playlist. Rows drag by their handle or after a long press,
@@ -51,6 +52,7 @@ class _PlaylistReorderPageState extends ConsumerState<PlaylistReorderPage> {
         SliverPadding(
           padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
           sliver: SliverReorderableList(
+            proxyDecorator: ScaledDragProxy.plain,
             itemCount: _entries.length,
             itemBuilder: (context, index) {
               final entry = _entries[index];

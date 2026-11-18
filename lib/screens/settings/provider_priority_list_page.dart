@@ -6,6 +6,7 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/discard_changes_dialog.dart';
 import 'package:mornye/widgets/priority_settings_scaffold.dart';
 import 'package:mornye/widgets/reorderable_priority_item.dart';
+import 'package:mornye/widgets/scaled_drag_proxy.dart';
 
 /// Reorderable priority list shared by the download- and metadata-provider
 /// priority pages; the two differ only in which provider list they read/write
@@ -79,6 +80,7 @@ class _ProviderPriorityListPageState
             horizontal: 16 + wideListInset(context),
           ),
           sliver: SliverReorderableList(
+            proxyDecorator: ScaledDragProxy.plain,
             itemCount: _providers.length,
             itemBuilder: (context, index) {
               final provider = _providers[index];

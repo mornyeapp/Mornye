@@ -9,6 +9,7 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/discard_changes_dialog.dart';
 import 'package:mornye/widgets/priority_settings_scaffold.dart';
 import 'package:mornye/widgets/reorderable_priority_item.dart';
+import 'package:mornye/widgets/scaled_drag_proxy.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/constants/music_services.dart';
 
@@ -103,6 +104,7 @@ class _LyricsProviderPriorityPageState
               horizontal: 16 + wideListInset(context),
             ),
             sliver: SliverReorderableList(
+              proxyDecorator: ScaledDragProxy.plain,
               itemCount: _enabledProviders.length,
               itemBuilder: (context, index) {
                 final id = _enabledProviders[index];

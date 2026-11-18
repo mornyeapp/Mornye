@@ -6,6 +6,7 @@ import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
+import 'package:mornye/widgets/scaled_drag_proxy.dart';
 
 /// Picks how a Library album orders its songs, for the header. [songs] are
 /// the album's titles as the page shows them.
@@ -128,6 +129,18 @@ class _CustomOrderListState extends ConsumerState<_CustomOrderList> {
     padding: const EdgeInsets.only(bottom: 16),
     itemCount: _songs.length,
     onReorderItem: _move,
+    // The list's own lift, inside the proxy that follows a scaled page.
+    proxyDecorator: (child, index, animation) => ScaledDragProxy(
+      animation: animation,
+      child: AnimatedBuilder(
+        animation: animation,
+        child: child,
+        builder: (context, child) => Material(
+          elevation: 6 * Curves.easeInOut.transform(animation.value),
+          child: child,
+        ),
+      ),
+    ),
     itemBuilder: (context, index) => ListTile(
       key: ValueKey('album-order-${_songs[index].$1}'),
       title: Text(

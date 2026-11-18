@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/android_tv.dart';
+import 'package:mornye/widgets/scaled_drag_proxy.dart';
 
 /// Keeps touch-first tablets on the bottom navigation used by phones. A rail
 /// is reserved for genuinely desktop-width windows; the old 600dp threshold
@@ -88,6 +89,12 @@ class _AdaptiveUiScalerState extends State<AdaptiveUiScaler> {
   // Keeps the app's state (open pages, scroll positions) when the scale
   // starts or stops being 1, which adds or removes the layers around it.
   final _contentKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    ScaledDragProxy.trackPointers();
+  }
 
   @override
   Widget build(BuildContext context) {

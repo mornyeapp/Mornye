@@ -7,6 +7,7 @@ import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/widgets/scaled_drag_proxy.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 /// Editing has its own drag gestures, leaving normal track selection intact.
@@ -41,6 +42,7 @@ class _CollectionReorderSliverState extends State<CollectionReorderSliver> {
   Widget build(BuildContext context) => SliverPadding(
     padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
     sliver: SliverReorderableList(
+      proxyDecorator: ScaledDragProxy.plain,
       itemCount: widget.entries.length,
       onReorderItem: (oldIndex, newIndex) {
         widget.onReorder(oldIndex, newIndex);

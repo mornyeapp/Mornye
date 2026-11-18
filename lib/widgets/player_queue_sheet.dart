@@ -15,6 +15,7 @@ import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_queue_artwork.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
+import 'package:mornye/widgets/scaled_drag_proxy.dart';
 
 Future<void> showPlayerQueueSheet(
   BuildContext context,
@@ -211,33 +212,35 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
               onReorderItem: (oldIndex, newIndex) {
                 if (!locked) controller.moveQueueItem(oldIndex, newIndex);
               },
-              proxyDecorator: (child, index, animation) {
-                if (!expressive) {
-                  return Material(
-                    elevation: 4,
-                    color: colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                    child: child,
-                  );
-                }
-                return AnimatedBuilder(
-                  animation: animation,
-                  child: child,
-                  builder: (context, child) {
-                    final t = _liftSpring.transform(animation.value);
-                    return Transform.scale(
-                      scale: 1 + 0.03 * t,
-                      child: Material(
-                        elevation: 6 * t.clamp(0.0, 1.0),
+              proxyDecorator: (child, index, animation) => ScaledDragProxy(
+                animation: animation,
+                child: !expressive
+                    ? Material(
+                        elevation: 4,
                         color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(_rowRadius + 8 * t),
-                        clipBehavior: Clip.antiAlias,
+                        borderRadius: BorderRadius.circular(12),
                         child: child,
+                      )
+                    : AnimatedBuilder(
+                        animation: animation,
+                        child: child,
+                        builder: (context, child) {
+                          final t = _liftSpring.transform(animation.value);
+                          return Transform.scale(
+                            scale: 1 + 0.03 * t,
+                            child: Material(
+                              elevation: 6 * t.clamp(0.0, 1.0),
+                              color: colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(
+                                _rowRadius + 8 * t,
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: child,
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                );
-              },
+              ),
               itemBuilder: (context, i) {
                 final item = queue[i];
                 if (i < _passedRows) {
