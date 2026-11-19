@@ -194,6 +194,20 @@ void main() {
     expect(await files(), isNot(contains(endsWith('.part'))));
   });
 
+  test('a copy is arriving only while wanted and not yet stored', () async {
+    final release = server.hold(_a);
+    final subject = cache();
+    expect(subject.arriving(_a), isFalse);
+
+    subject.want([_a]);
+    await server.startedDownloading(_a);
+    expect(subject.arriving(_a), isTrue);
+
+    release.complete();
+    expect(await subject.ready(_a, _wait), isTrue);
+    expect(subject.arriving(_a), isFalse);
+  });
+
   test('the least recently used copies go first, never a wanted one', () async {
     final subject = cache(maxFiles: 2)..want([_a]);
     expect(await subject.ready(_a, _wait), isTrue);

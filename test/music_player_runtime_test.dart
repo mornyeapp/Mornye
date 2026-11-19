@@ -2464,6 +2464,116 @@ void main() {
       cache.want([]);
     });
 
+    group('with the USB output on', () {
+      const usb = MethodChannel('com.zarz.mornye/usb_pcm');
+      const settings = AppSettings(pauseOnMute: false, usbBitPerfect: true);
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+
+      void outputPresent(bool present) {
+        messenger.setMockMethodCallHandler(
+          usb,
+          (call) async => call.method == 'outputPresent' ? present : null,
+        );
+        addTearDown(() => messenger.setMockMethodCallHandler(usb, null));
+      }
+
+      test('a song still downloading waits for its whole copy', () async {
+        outputPresent(true);
+        final release = Completer<void>();
+        final cache = await networkCache(release: release.future);
+        final decks = <_Deck>[];
+        final handler = await _runtime(
+          settings: settings,
+          isAndroid: true,
+          decks: decks,
+          networkCache: cache,
+          resolveNetworkSource: (_) async => 'http://127.0.0.1:1/song.flac',
+        ).initialize();
+
+        final playing = handler.setQueueAndPlay([song]);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(decks.single.sources, isEmpty);
+        release.complete();
+        await playing;
+
+        expect(cache.owns(decks.single.sources.single), isTrue);
+      });
+
+      test('a song whose download fails streams', () async {
+        outputPresent(true);
+        final release = Completer<void>();
+        final cache = await networkCache(release: release.future);
+        final decks = <_Deck>[];
+        final handler = await _runtime(
+          settings: settings,
+          isAndroid: true,
+          decks: decks,
+          networkCache: cache,
+          resolveNetworkSource: (_) async => 'http://127.0.0.1:1/song.flac',
+        ).initialize();
+
+        final playing = handler.setQueueAndPlay([song]);
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        release.completeError(StateError('server gone'));
+        await playing;
+
+        expect(decks.single.sources, ['stream http://127.0.0.1:1/song.flac']);
+      });
+
+      test('a newer song does not wait for the one before it', () async {
+        outputPresent(true);
+        final cache = await networkCache(release: Completer<void>().future);
+        final temp = await Directory.systemTemp.createTemp('player-local-');
+        addTearDown(() => temp.delete(recursive: true));
+        final local = await File('${temp.path}/local.flac').writeAsBytes([4]);
+        final decks = <_Deck>[];
+        final handler = await _runtime(
+          settings: settings,
+          isAndroid: true,
+          decks: decks,
+          networkCache: cache,
+          resolveNetworkSource: (_) async => 'http://127.0.0.1:1/song.flac',
+        ).initialize();
+
+        unawaited(handler.setQueueAndPlay([song]));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await handler
+            .setQueueAndPlay([
+              PlayableMedia(
+                id: 'local-song',
+                source: local.path,
+                title: 'Local song',
+                artist: 'Artist',
+              ),
+            ])
+            .timeout(const Duration(seconds: 5));
+
+        expect(decks.single.sources, [local.path]);
+        cache.want([]);
+      });
+
+      test('without a connected output the song streams at once', () async {
+        outputPresent(false);
+        final cache = await networkCache(release: Completer<void>().future);
+        final decks = <_Deck>[];
+        final handler = await _runtime(
+          settings: settings,
+          isAndroid: true,
+          decks: decks,
+          networkCache: cache,
+          resolveNetworkSource: (_) async => 'http://127.0.0.1:1/song.flac',
+        ).initialize();
+
+        await handler
+            .setQueueAndPlay([song])
+            .timeout(const Duration(seconds: 5));
+
+        expect(decks.single.sources, ['stream http://127.0.0.1:1/song.flac']);
+        cache.want([]);
+      });
+    });
+
     test('a saved offline copy plays before a prefetched one', () async {
       final cache = await networkCache();
       cache.want([source]);

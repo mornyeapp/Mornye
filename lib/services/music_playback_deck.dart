@@ -267,6 +267,25 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     } on MissingPluginException catch (_) {}
   }
 
+  /// Whether the output a bit-perfect song would open is connected. True
+  /// when the platform cannot say.
+  static Future<bool> bitPerfectOutputPresent({
+    required bool directUsb,
+    required bool dapExclusive,
+  }) async {
+    try {
+      return await _channel.invokeMethod<bool>('outputPresent', {
+            'direct': directUsb,
+            'dapExclusive': dapExclusive,
+          }) ??
+          true;
+    } on PlatformException catch (_) {
+      return true;
+    } on MissingPluginException catch (_) {
+      return true;
+    }
+  }
+
   static Stream<dynamic>? _nativeEvents;
   static int _nextToken = 0;
   final AudioPlayer _ordinary;

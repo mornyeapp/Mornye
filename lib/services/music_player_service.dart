@@ -1911,6 +1911,36 @@ class MusicPlayerHandler extends BaseAudioHandler
     return path;
   }
 
+  /// The USB output plays whole files only. With it on and its output
+  /// connected, a network song without a copy downloads before it starts
+  /// instead of streaming through Android's mixer.
+  Future<void> _fetchWholeForUsb(PlayableMedia media, int generation) async {
+    if (!_settings.usbBitPerfect ||
+        !_dependencies.isAndroid ||
+        !media.source.startsWith('network://')) {
+      return;
+    }
+    if (!await AudioplayersPlaybackDeck.bitPerfectOutputPresent(
+      directUsb: _settings.usbDirect,
+      dapExclusive: _settings.dapExclusive,
+    )) {
+      return;
+    }
+    if (!_isCurrentPlayRequest(generation, media)) return;
+    final watch = Stopwatch()..start();
+    final whole = await _prefetch.whole(
+      media,
+      () => _isCurrentPlayRequest(generation, media),
+    );
+    if (!_isCurrentPlayRequest(generation, media)) return;
+    final waited = watch.elapsedMilliseconds;
+    if (!whole) {
+      _log.w('USB output: no whole copy of this network song ($waited ms)');
+    } else if (waited >= 500) {
+      _log.i('USB output: fetched this network song whole ($waited ms)');
+    }
+  }
+
   Future<void> _loadIndex(
     int generation,
     PlayableMedia media, {
@@ -2001,6 +2031,10 @@ class MusicPlayerHandler extends BaseAudioHandler
       ..fetchFor(media)
       ..fetchAhead();
 
+    if (playbackLease == null) {
+      await _fetchWholeForUsb(media, generation);
+      if (!_isCurrentPlayRequest(generation, media)) return;
+    }
     var resolved = playbackLease?.path ?? await _formats.resolve(media);
     var usingLocalSafCopy = media.isContentUri && playbackLease == null;
     if (!_isCurrentPlayRequest(generation, media)) {

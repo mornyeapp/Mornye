@@ -278,6 +278,14 @@ class NetworkPlaybackCache {
     return waiter.future.timeout(within, onTimeout: () => false);
   }
 
+  /// Whether [source] is wanted and its copy can still arrive: not stored
+  /// yet, and its download has not failed recently.
+  bool arriving(String source) =>
+      !_unavailable &&
+      _wanted.contains(source) &&
+      !_entries.containsKey(source) &&
+      !_failedRecently(source);
+
   /// Forgets the copy of [source], as after its file was edited or deleted.
   /// A song still wanted downloads again.
   Future<void> invalidate(String source) async {
