@@ -81,11 +81,19 @@ double nativeWorkerFinalizingProgress(double progress) {
   return min(normalized, 0.99);
 }
 
+/// Whether a backend failure came from an extension sandbox path rejection
+/// rather than the user's download folder losing OS permissions.
+bool isExtensionSandboxPathError(String? errorMessage) {
+  final message = errorMessage?.trim().toLowerCase() ?? '';
+  return message.contains('within extension sandbox');
+}
+
 /// Whether a backend failure means the selected destination could not be
 /// written. This intentionally stays provider-agnostic: once an output path is
 /// unwritable, trying more audio providers against that same path only wastes
 /// time and hides the actionable storage failure behind a later network error.
 bool isStorageWriteFailure({String? errorType, String? errorMessage}) {
+  if (isExtensionSandboxPathError(errorMessage)) return false;
   if (errorType?.trim().toLowerCase() == 'permission') return true;
 
   final message = errorMessage?.trim().toLowerCase() ?? '';
