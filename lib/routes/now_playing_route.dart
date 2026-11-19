@@ -443,10 +443,8 @@ class NowPlayingRoute extends PageRoute<void> {
   ) {
     final target = _dismissTarget;
     final size = MediaQuery.sizeOf(context);
-    // The Mornye mini player is a rounded capsule; the Material one is a
-    // square bar, which the shrinking surface keeps square. Material dims
-    // the page behind while the player covers it.
-    final radius = context.isMornye ? 28.0 : 0.0;
+    // The Material mini player is a square bar, which its surface keeps.
+    // Material dims the page behind while the player covers it.
     final scrim = context.isMornye ? 0.0 : 0.32;
     // Restoring portrait can resize the window during dismissal. Geometry
     // captured in landscape no longer points at the mini player in that case.
@@ -457,15 +455,16 @@ class NowPlayingRoute extends PageRoute<void> {
         1.0,
       );
       final cover = _dismissArtwork;
+      final bounds = Rect.lerp(_dismissStart, target.surface, progress)!;
       return Stack(
         fit: StackFit.expand,
         children: [
           if (scrim > 0) _scrim(scrim * (1 - progress)),
           _surface(
             key: const ValueKey('player-minimize-surface'),
-            bounds: Rect.lerp(_dismissStart, target.surface, progress)!,
+            bounds: bounds,
             size: size,
-            radius: radius * progress,
+            radius: _pageRadius(context, bounds.top),
             // Gone only as it reaches the mini player: fading out sooner
             // hides most of the spring's travel and reads as a cut.
             opacity: 1 - const Interval(0.3, 1).transform(progress),
@@ -524,7 +523,7 @@ class NowPlayingRoute extends PageRoute<void> {
             key: const ValueKey('player-expand-surface'),
             bounds: _openRect(size, animation.value),
             size: size,
-            radius: radius * (1 - progress),
+            radius: 0,
             // The mini player shows through until the surface covers it.
             opacity: Interval(
               0,
@@ -550,9 +549,40 @@ class NowPlayingRoute extends PageRoute<void> {
     final opacity = inPlacePop ? animation : kAlwaysCompleteAnimation;
     return SlideTransition(
       position: position,
-      child: FadeTransition(opacity: opacity, child: child),
+      child: FadeTransition(
+        opacity: opacity,
+        child: context.isMornye
+            ? AnimatedBuilder(
+                animation: slide,
+                builder: (context, page) {
+                  final radius = _pageRadius(
+                    context,
+                    size.height * (1 - slide.value),
+                  );
+                  // Always in the tree, so the page under it never moves.
+                  return ClipRRect(
+                    key: const ValueKey('player-slide-corners'),
+                    clipBehavior: radius > 0 ? Clip.antiAlias : Clip.none,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(radius),
+                    ),
+                    child: page,
+                  );
+                },
+                child: child,
+              )
+            : child,
+      ),
     );
   }
+
+  /// The Mornye mini player's corner, which the page keeps while it moves.
+  static const _capsuleRadius = 32.0;
+
+  /// The corner of a page whose top edge is [top] below the screen's: square
+  /// at rest, round within the corner's own length of leaving.
+  double _pageRadius(BuildContext context, double top) =>
+      context.isMornye ? top.clamp(0.0, _capsuleRadius) : 0;
 
   Widget _scrim(double opacity) => IgnorePointer(
     child: ColoredBox(color: Colors.black.withValues(alpha: opacity)),

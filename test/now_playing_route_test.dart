@@ -333,6 +333,64 @@ void main() {
     });
   }
 
+  testWidgets('the Mornye page moves with round corners and rests square', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        theme: MornyeTheme.build(Brightness.dark),
+        home: const SizedBox(),
+      ),
+    );
+    const corners = ValueKey('player-slide-corners');
+    const minimize = ValueKey('player-minimize-surface');
+    ClipRRect clip(Key key) => tester.widget<ClipRRect>(find.byKey(key));
+    navigator.currentState!.push(
+      _TestPlayerRoute(
+        miniPlayerGeometry: () => (
+          surface: const Rect.fromLTWH(16, 700, 368, 56),
+          artwork: const Rect.fromLTWH(24, 706, 44, 44),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(tester.getTopLeft(find.byKey(_sheet)).dy, greaterThan(32));
+    expect(
+      clip(corners).borderRadius,
+      const BorderRadius.vertical(top: Radius.circular(32)),
+    );
+    expect(clip(corners).clipBehavior, Clip.antiAlias);
+    await tester.pumpAndSettle();
+    expect(clip(corners).clipBehavior, Clip.none);
+
+    navigator.currentState!.pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.getTopLeft(find.byKey(minimize)).dy, greaterThan(32));
+    expect(clip(minimize).borderRadius, BorderRadius.circular(32));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a Material page slides up with square corners', (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(navigatorKey: navigator, home: const SizedBox()),
+    );
+    navigator.currentState!.push(_TestPlayerRoute());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(tester.getTopLeft(find.byKey(_sheet)).dy, greaterThan(0));
+    expect(find.byKey(const ValueKey('player-slide-corners')), findsNothing);
+    await tester.pumpAndSettle();
+  });
+
   group('Material morph', () {
     const mini = Rect.fromLTWH(0, 700, 400, 72);
     const morph = AppMotionSpec(Duration(milliseconds: 500), Curves.linear);
