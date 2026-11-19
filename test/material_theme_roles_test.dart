@@ -303,6 +303,40 @@ void main() {
       );
       expect(find.byType(Divider), findsOneWidget);
     });
+
+    testWidgets('a menu keeps its groups on one surface, with a divider', (
+      tester,
+    ) async {
+      ContextMenuAction action(String label) => ContextMenuAction(
+        icon: Icons.queue_music,
+        label: label,
+        onSelected: () {},
+      );
+      await tester.pumpWidget(
+        _host(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showContextMenu(
+                context,
+                position: const Offset(100, 100),
+                groups: [
+                  [action('Save offline'), action('Export')],
+                  [action('Edit order')],
+                ],
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // The package draws a divider only inside a surface, between its rows.
+      final divider = tester.getCenter(find.byType(M3EMenuDividerWidget)).dy;
+      expect(divider, greaterThan(tester.getCenter(find.text('Export')).dy));
+      expect(divider, lessThan(tester.getCenter(find.text('Edit order')).dy));
+    });
   });
 
   group('settings fills', () {

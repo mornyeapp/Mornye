@@ -47,8 +47,8 @@ const double _mornyeMenuWidth = 280;
 ///
 /// Material opens the M3E menu popup of More buttons, or under reduced
 /// motion a [MenuAnchor] with the M3 Expressive menu container; Mornye
-/// opens the dense [MornyeContextMenu]. Empty groups are dropped and the
-/// remaining ones are set apart (dividers, or separate M3E surfaces). The
+/// opens the dense [MornyeContextMenu]. Empty groups are dropped and a
+/// divider sets the remaining ones apart, inside the one menu surface. The
 /// chosen action runs once the menu has been dismissed, so it can open its
 /// own dialog or sheet. The future completes after that action has started,
 /// with whether a row was chosen.
@@ -143,29 +143,28 @@ Future<bool> _showExpressiveContextMenu(
   }
 
   var index = 0;
-  final children = [
-    for (final group in groups)
-      M3EMenuGroup(
-        children: [
-          for (final action in group)
-            if (action.checked)
-              M3EMenuSelectable(
-                label: action.label,
-                value: index++,
-                leading: AppIcon(action.icon, size: 20),
-                selected: true,
-                enabled: action.onSelected != null,
-              )
-            else
-              M3EMenuEntry(
-                label: action.label,
-                value: index++,
-                leading: AppIcon(action.icon, size: 20),
-                isDestructive: action.destructive,
-                enabled: action.onSelected != null,
-              ),
-        ],
-      ),
+  // One surface, as a menu is one object: a divider sets the groups apart.
+  final children = <M3EMenuNode>[
+    for (final (position, group) in groups.indexed) ...[
+      if (position > 0) const M3EMenuDivider(),
+      for (final action in group)
+        if (action.checked)
+          M3EMenuSelectable(
+            label: action.label,
+            value: index++,
+            leading: AppIcon(action.icon, size: 20),
+            selected: true,
+            enabled: action.onSelected != null,
+          )
+        else
+          M3EMenuEntry(
+            label: action.label,
+            value: index++,
+            leading: AppIcon(action.icon, size: 20),
+            isDestructive: action.destructive,
+            enabled: action.onSelected != null,
+          ),
+    ],
   ];
   late final OverlayEntry entry;
   // Once dismissed, the closing menu lets clicks through to the page.
