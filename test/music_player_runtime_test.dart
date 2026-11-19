@@ -2521,6 +2521,38 @@ void main() {
         expect(decks.single.sources, ['stream http://127.0.0.1:1/song.flac']);
       });
 
+      test('a saved copy that is gone plays from a fetched copy', () async {
+        outputPresent(true);
+        final cache = await networkCache();
+        final temp = await Directory.systemTemp.createTemp('player-gone-');
+        addTearDown(() => temp.delete(recursive: true));
+        final decks = <_Deck>[];
+        var remoteRequests = 0;
+        final handler = await _runtime(
+          settings: settings,
+          isAndroid: true,
+          decks: decks,
+          networkCache: cache,
+          resolveNetworkSource: (_) async {
+            remoteRequests++;
+            return 'http://127.0.0.1:1/song.flac';
+          },
+        ).initialize();
+
+        await handler.setQueueAndPlay([
+          PlayableMedia(
+            id: 'saved-song',
+            source: '${temp.path}/gone.flac',
+            originSource: source,
+            title: 'NAS song',
+            artist: 'Artist',
+          ),
+        ]);
+
+        expect(cache.owns(decks.single.sources.single), isTrue);
+        expect(remoteRequests, 0);
+      });
+
       test('a newer song does not wait for the one before it', () async {
         outputPresent(true);
         final cache = await networkCache(release: Completer<void>().future);

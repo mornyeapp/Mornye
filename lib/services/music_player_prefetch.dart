@@ -87,17 +87,16 @@ class _MusicPrefetch {
     }
   }
 
-  /// Downloads [media] ahead of its neighbours and waits for the whole copy
+  /// Downloads [source] ahead of its neighbours and waits for the whole copy
   /// while [current] holds. False when it has to stream instead: the copy
   /// cannot be kept, its download failed, or [within] passed.
   Future<bool> whole(
-    PlayableMedia media,
+    String source,
     bool Function() current, {
     Duration within = wholeWithin,
   }) async {
     final cache = _cache;
-    if (cache == null || !media.source.startsWith('network://')) return false;
-    final source = media.source;
+    if (cache == null || !source.startsWith('network://')) return false;
     try {
       if (await cache.lookup(source) != null) return true;
       if (!current()) return false;
@@ -114,11 +113,11 @@ class _MusicPrefetch {
     return false;
   }
 
-  Future<String?> lookup(PlayableMedia media) async {
+  Future<String?> lookup(String source) async {
     final cache = _cache;
     if (cache == null) return null;
     try {
-      return await cache.lookup(media.source);
+      return await cache.lookup(source);
     } catch (_) {
       return null;
     }

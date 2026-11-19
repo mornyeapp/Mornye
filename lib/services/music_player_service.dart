@@ -1305,7 +1305,9 @@ class MusicPlayerHandler extends BaseAudioHandler
       }
       // A whole prefetched copy opens as a local file on every engine; a
       // song still downloading streams from the server instead.
-      if (await _prefetch.lookup(media) case final cached?) return cached;
+      if (await _prefetch.lookup(media.source) case final cached?) {
+        return cached;
+      }
       try {
         return await _dependencies.resolveNetworkSource(media.source);
       } catch (_) {
@@ -1315,6 +1317,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
     if (media.originSource case final origin?) {
       if (!await fileExists(media.source)) {
+        if (await _prefetch.lookup(origin) case final cached?) return cached;
         try {
           return await _dependencies.resolveNetworkSource(origin);
         } catch (_) {
@@ -1915,11 +1918,18 @@ class MusicPlayerHandler extends BaseAudioHandler
   /// connected, a network song without a copy downloads before it starts
   /// instead of streaming through Android's mixer.
   Future<void> _fetchWholeForUsb(PlayableMedia media, int generation) async {
-    if (!_settings.usbBitPerfect ||
-        !_dependencies.isAndroid ||
-        !media.source.startsWith('network://')) {
-      return;
-    }
+    if (!_settings.usbBitPerfect || !_dependencies.isAndroid) return;
+    // A saved copy that is gone would stream from the server it came from.
+    final origin = media.originSource;
+    final source = media.source.startsWith('network://')
+        ? media.source
+        : origin != null &&
+              origin.startsWith('network://') &&
+              !media.isContentUri &&
+              !await fileExists(media.source)
+        ? origin
+        : null;
+    if (source == null || !_isCurrentPlayRequest(generation, media)) return;
     if (!await AudioplayersPlaybackDeck.bitPerfectOutputPresent(
       directUsb: _settings.usbDirect,
       dapExclusive: _settings.dapExclusive,
@@ -1929,7 +1939,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (!_isCurrentPlayRequest(generation, media)) return;
     final watch = Stopwatch()..start();
     final whole = await _prefetch.whole(
-      media,
+      source,
       () => _isCurrentPlayRequest(generation, media),
     );
     if (!_isCurrentPlayRequest(generation, media)) return;
