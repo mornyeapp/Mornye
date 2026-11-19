@@ -6555,6 +6555,15 @@
       }
     }
   },
+  "hiResBatchSpectrumSemantics": "Average spectrum of {count} songs, one line for each",
+  "@hiResBatchSpectrumSemantics": {
+    "description": "Screen reader description of the chart that draws the spectra of several checked songs together",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "audioAnalysisRescanning": "Re-analyzing audio...",
   "@audioAnalysisRescanning": {
     "description": "Loading text while audio is being re-analyzed after an explicit refresh"

@@ -6024,6 +6024,15 @@
       }
     }
   },
+  "hiResBatchSpectrumSemantics": "Spektrum rata-rata {count} lagu, satu garis untuk tiap lagu",
+  "@hiResBatchSpectrumSemantics": {
+    "description": "Screen reader description of the chart that draws the spectra of several checked songs together",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "audioAnalysisRescanning": "Menganalisis ulang audio...",
   "@audioAnalysisRescanning": {
     "description": "Loading text while audio is being re-analyzed after an explicit refresh"
