@@ -679,6 +679,41 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     );
   }
 
+  /// Stores a hand-written or hand-edited translation of [original] in the
+  /// cache and in memory, so the player shows it instead of the AI text it
+  /// replaces, and shares it with linked devices. The file save itself is
+  /// done by the caller through `PlayerMetadataController.saveShownLyrics`;
+  /// without an AI model configured there is no cache key, and the file
+  /// alone carries the translation, so this is a no-op then.
+  Future<void> saveManualTranslation(
+    ParsedLyrics original,
+    ParsedLyrics edited,
+  ) async {
+    // A translation in flight would overwrite this edit as soon as it
+    // lands, so it stops here.
+    cancel();
+    final source = LyricsTranslationSource.cached(original);
+    if (source.isEmpty) return;
+    final settings = ref.read(settingsProvider);
+    final target = _targetOf(source, settings);
+    final key = _cacheKey(source, settings, language: target.code);
+    if (key == null) return;
+    final cache = ref.read(lyricsTranslationCacheProvider);
+    final previous = state.results[key] ?? await cache.read(key);
+    final result = manualLyricsTranslationResult(
+      source: source,
+      edited: edited,
+      previous: previous,
+    );
+    await cache.write(key, result);
+    if (!ref.mounted) return;
+    state = LyricsTranslationState(
+      results: {...state.results, key: result},
+      job: state.job,
+    );
+    _publish(source.hash, target.code, result);
+  }
+
   /// Stops the running job. With [owner], only a job that owner started.
   void cancel({Object? owner}) {
     if (owner != null && !identical(owner, _owner)) return;

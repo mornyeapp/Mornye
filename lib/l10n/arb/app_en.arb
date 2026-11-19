@@ -8034,6 +8034,31 @@
   "@nowPlayingTranslationSavedMlrc": {
     "description": "Snackbar after the shown lyrics translation was written into a .mlrc lyrics file next to the song. Keep '.mlrc' as is: it is a file extension"
   },
+  "lyricsTranslationEditTitle": "Edit translation",
+  "@lyricsTranslationEditTitle": {
+    "description": "Player lyrics menu action and title of the translation editor, which edits the translation of each lyric line by hand"
+  },
+  "lyricsTranslationAddTitle": "Add translation",
+  "@lyricsTranslationAddTitle": {
+    "description": "Player lyrics menu action and title of the translation editor when the song has no translation yet, so the user writes one by hand"
+  },
+  "lyricsTranslationEditSubtitle": "Translation into {language}",
+  "@lyricsTranslationEditSubtitle": {
+    "description": "Subtitle of the translation editor naming the language the translation is written in; language is that language's own name",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsTranslationEditWordTimingNote": "Editing a line removes its word-by-word timing for that line. An empty field clears that line's translation.",
+  "@lyricsTranslationEditWordTimingNote": {
+    "description": "Note at the top of the translation editor explaining that editing a translated line drops its word timing and clearing a field removes that line's translation"
+  },
+  "lyricsTranslationEditSaved": "Translation saved",
+  "@lyricsTranslationEditSaved": {
+    "description": "Snackbar after a hand-edited lyrics translation was saved with the song"
+  },
   "lyricsAiSectionFiles": "Files",
   "@lyricsAiSectionFiles": {
     "description": "AI Translation settings section about saving translations with the songs"
