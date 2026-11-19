@@ -9570,6 +9570,10 @@
   "@homeOnRepeat": {
     "description": "Home section header for the most played tracks of the last four weeks"
   },
+  "homeFromYourLibrary": "From your Library",
+  "@homeFromYourLibrary": {
+    "description": "Home section header for the day's albums from the Library, shown in On repeat's place while listening is not recorded"
+  },
   "homeShortcuts": "Shortcuts",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"

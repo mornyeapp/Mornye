@@ -139,6 +139,86 @@ final homeRecentlyPlayedProvider =
       return memo.recentlyPlayed = tracks;
     });
 
+/// Albums read for the day's picks; a larger Library moves the window daily.
+const _homeAlbumPool = 300;
+
+/// Where the day's window starts among [albumCount] albums.
+@visibleForTesting
+int homeLibraryAlbumPoolOffset(int albumCount, String day) =>
+    albumCount <= _homeAlbumPool
+    ? 0
+    : stableTextHash(day) % (albumCount - _homeAlbumPool + 1);
+
+/// The day's albums from [pool]. Each album has its own place in the day's
+/// order, so a Library change swaps a cover instead of the whole shelf.
+@visibleForTesting
+List<LibraryBrowseEntry> homeLibraryAlbumPicks(
+  List<LibraryBrowseEntry> pool, {
+  required String day,
+  int limit = _homeShelfLimit,
+}) {
+  final order = {
+    for (final album in pool)
+      if (album.name.trim().isNotEmpty)
+        album: stableTextHash('$day|${album.source}|${album.key}'),
+  };
+  final albums = order.keys.toList()
+    ..sort((a, b) {
+      final byOrder = order[a]!.compareTo(order[b]!);
+      return byOrder != 0 ? byOrder : a.key.compareTo(b.key);
+    });
+  return albums.take(limit).toList();
+}
+
+/// Albums of the Library, picked anew each day. Home shows them in On
+/// repeat's place while listening is not recorded.
+final homeLibraryAlbumsProvider =
+    FutureProvider.autoDispose<List<LibraryBrowseEntry>>((ref) async {
+      final includeLocal = ref.watch(
+        settingsProvider.select((s) => s.localLibraryEnabled),
+      );
+      ref.watch(downloadHistoryProvider.select((s) => s.loadedIndexVersion));
+      if (includeLocal) ref.watch(localLibraryIndexRevisionProvider);
+      final memo = ref.read(_homeShelfMemoProvider);
+      final counts = await ref.watch(
+        libraryCountsProvider(
+          LibraryCountsRequest.all(localLibraryEnabled: includeLocal),
+        ).future,
+      );
+      final day = listeningDay(DateTime.now());
+      final page = await LibraryDatabase.instance.getQueueAlbumPageResult(
+        QueueLibraryDbQuery(
+          includeLocal: includeLocal,
+          sortMode: 'a-z',
+          limit: _homeAlbumPool,
+          offset: homeLibraryAlbumPoolOffset(counts.albumCount, day),
+        ),
+      );
+      final albums = homeLibraryAlbumPicks([
+        for (final row in page.rows)
+          LibraryBrowseEntry.fromRow(row, isArtist: false),
+      ], day: day);
+      final last = memo.libraryAlbums;
+      if (last != null && _sameAlbums(last, albums)) return last;
+      return memo.libraryAlbums = albums;
+    });
+
+bool _sameAlbums(List<LibraryBrowseEntry> a, List<LibraryBrowseEntry> b) {
+  if (a.length != b.length) return false;
+  for (var index = 0; index < a.length; index++) {
+    final one = a[index], other = b[index];
+    if (one.source != other.source ||
+        one.key != other.key ||
+        one.name != other.name ||
+        one.artist != other.artist ||
+        one.cover != other.cover ||
+        one.samplePath != other.samplePath) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /// Up to [limit] played songs of the last four weeks that can be played
 /// again, matched to the Library. Reloads with what changes them.
 Future<List<HomeRepeatTrack>> _homeReplayableTracks(
@@ -146,6 +226,12 @@ Future<List<HomeRepeatTrack>> _homeReplayableTracks(
   required int limit,
   bool latestFirst = false,
 }) async {
+  // Turning the record off hides what it already holds, without clearing it.
+  if (!ref.watch(
+    settingsProvider.select((s) => s.listeningStatisticsEnabled),
+  )) {
+    return const [];
+  }
   // A track that ends may have just earned a play. One that starts after
   // none, such as a restored session's, follows no play.
   ref.listen(currentMediaItemProvider.select((s) => s.value?.id), (
@@ -325,6 +411,7 @@ class _HomeShelfMemo {
   Map<String, _HomeRepeatMatch> repeatMatches = {};
   List<HomeRepeatTrack>? onRepeat;
   List<HomeRepeatTrack>? recentlyPlayed;
+  List<LibraryBrowseEntry>? libraryAlbums;
 }
 
 final _homeShelfMemoProvider = Provider<_HomeShelfMemo>(
@@ -370,6 +457,12 @@ class _HomeSections extends ConsumerWidget {
     );
     final onRepeat =
         ref.watch(homeOnRepeatProvider.select((s) => s.value)) ?? const [];
+    // Read only without a listening record, when they take On repeat's place.
+    final libraryAlbums =
+        ref.watch(settingsProvider.select((s) => s.listeningStatisticsEnabled))
+        ? const <LibraryBrowseEntry>[]
+        : ref.watch(homeLibraryAlbumsProvider.select((s) => s.value)) ??
+              const <LibraryBrowseEntry>[];
     final mixes =
         ref.watch(libraryMixesProvider.select((s) => s.value)) ?? const [];
     final newReleases =
@@ -466,6 +559,16 @@ class _HomeSections extends ConsumerWidget {
           shelf: true,
           child: _HomeOnRepeatShelf(
             tracks: onRepeat,
+            inset: mornye ? inset + 8 : inset,
+          ),
+        )
+      else if (libraryAlbums.isNotEmpty)
+        _HomeSection(
+          title: l10n.homeFromYourLibrary,
+          inset: inset,
+          shelf: true,
+          child: _HomeLibraryAlbumsShelf(
+            albums: libraryAlbums,
             inset: mornye ? inset + 8 : inset,
           ),
         ),
@@ -1381,6 +1484,85 @@ class _HomeRecentlyPlayedShelf extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// Library albums as covers named by album. Choosing one opens the album.
+class _HomeLibraryAlbumsShelf extends StatelessWidget {
+  const _HomeLibraryAlbumsShelf({required this.albums, required this.inset});
+
+  final List<LibraryBrowseEntry> albums;
+  final double inset;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return _HomeShelfSize(
+      inset: inset,
+      builder: (context, coverSize) {
+        final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
+            .round();
+        return _HomeShelf(
+          inset: inset,
+          coverSize: coverSize,
+          itemCount: albums.length,
+          itemBuilder: (context, index) {
+            final album = albums[index];
+            return _HomeShelfTile(
+              size: coverSize,
+              title: album.name,
+              subtitle: album.artist,
+              semanticLabel: context.l10n.a11yOpenAlbum(album.name),
+              cover: album.source == 'local'
+                  ? LocalLibraryArtworkBuilder(
+                      coverPath: album.cover,
+                      filePath: album.samplePath,
+                      builder: (context, cover) => PlayerArtwork(
+                        artUri: cover,
+                        colorScheme: colorScheme,
+                        cacheWidth: cacheWidth,
+                        iconSize: 32,
+                      ),
+                    )
+                  : _DownloadedOrRemoteCover(
+                      downloadedFilePath: album.samplePath,
+                      imageUrl: album.cover,
+                      width: coverSize,
+                      height: coverSize,
+                      borderRadius: BorderRadius.zero,
+                      fallbackIcon: Icons.album_outlined,
+                      fallbackIconSize: 32,
+                      colorScheme: colorScheme,
+                    ),
+              onTap: () => _open(context, album),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _open(BuildContext context, LibraryBrowseEntry album) {
+    pushPage<void>(
+      context,
+      (_) => album.source == 'local'
+          ? LocalAlbumScreen(
+              albumName: album.name,
+              artistName: album.artist,
+              coverPath: album.cover,
+              loadTracks: () async => [
+                for (final row
+                    in await LibraryDatabase.instance
+                        .getQueueLocalAlbumTracksByKey(album.key))
+                  LocalLibraryItem.fromJson(row),
+              ],
+            )
+          : DownloadedAlbumScreen(
+              albumName: album.name,
+              artistName: album.artist,
+              coverUrl: album.cover,
+            ),
     );
   }
 }

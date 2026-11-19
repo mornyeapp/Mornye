@@ -578,7 +578,7 @@ bool _remote(String source) =>
 
 /// A stable 32-bit FNV-1a hash, since [String.hashCode] may change between
 /// runs.
-int _stableHash(String value) {
+int stableTextHash(String value) {
   var hash = 0x811c9dc5;
   for (final unit in value.codeUnits) {
     hash = ((hash ^ unit) * 0x01000193) & 0xffffffff;
@@ -846,7 +846,7 @@ class _MixBuilder {
   }
 
   Random _random(LibraryMixKind kind, String key) =>
-      Random(_stableHash('$day|${kind.name}|$key'));
+      Random(stableTextHash('$day|${kind.name}|$key'));
 
   LibraryMix? _favorites() {
     final played = songs.where((song) => plays(song) > 0).toList()
