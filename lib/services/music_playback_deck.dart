@@ -770,6 +770,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
         }
       } else if (reason == 'route_changed' || reason == 'idle') {
         if (!_routeLost) {
+          _log.w('Native output paused: status read back as $reason');
           _pauseLostRoute(const UsbAudioStatus(reason: 'route_changed'));
         }
       }
@@ -788,6 +789,11 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
       case 'active':
         usbAudioStatus.value = _preparedStatus;
       case 'paused':
+        // Why the output stopped on its own, for a tester's exported log.
+        _log.w(
+          'Native output paused: ${event['reason']}'
+          '${event['detail'] is String ? ': ${event['detail']}' : ''}',
+        );
         _routeLost = true;
         _timer?.cancel();
         _setState(PlaybackDeckState.paused);

@@ -532,7 +532,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
         output = null
         connection?.close()
         connection = null
-        emit(mapOf("token" to token, "event" to "paused", "reason" to reason))
+        emit(mapOf("token" to token, "event" to "paused", "reason" to reason, "detail" to message))
     }
 
     private fun closeSource() {
