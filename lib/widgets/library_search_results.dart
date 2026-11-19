@@ -19,7 +19,6 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/services/playable_media.dart' show PlayableMedia;
-import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -474,9 +473,7 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
         : () => _open(hit, play: true);
     Widget card({MediaPlaybackUi? playback}) => TrackCard(
       key: playback == null ? key : null,
-      style: hit.kind == LibrarySearchKind.songs && !context.isMornye
-          ? TrackCardStyle.filled
-          : TrackCardStyle.flat,
+      style: collectionTrackCardStyle(context),
       leading: ClipRRect(
         borderRadius: BorderRadius.circular(
           hit.kind == LibrarySearchKind.artists ? 28 : 8,
@@ -1005,21 +1002,18 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
                     )
                   : SliverList.builder(
                       itemCount: hits.length.clamp(0, pageSize),
-                      // Material joins the filled song rows into one
+                      // Material joins a kind's filled rows into one
                       // connected list, which runs on across pages and ends
                       // at the last row shown.
-                      itemBuilder: (context, index) =>
-                          kind != LibrarySearchKind.songs
-                          ? _row(hits[index])
-                          : TrackCardSegment(
-                              first: page == 0 && index == 0,
-                              last:
-                                  index == hits.length.clamp(0, pageSize) - 1 &&
-                                  (_kind == null ||
-                                      page == _pages - 1 ||
-                                      hits.length <= pageSize),
-                              child: _row(hits[index]),
-                            ),
+                      itemBuilder: (context, index) => TrackCardSegment(
+                        first: page == 0 && index == 0,
+                        last:
+                            index == hits.length.clamp(0, pageSize) - 1 &&
+                            (_kind == null ||
+                                page == _pages - 1 ||
+                                hits.length <= pageSize),
+                        child: _row(hits[index]),
+                      ),
                     ),
             );
           }

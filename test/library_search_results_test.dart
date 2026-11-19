@@ -486,7 +486,9 @@ void main() {
     });
   }
 
-  testWidgets('Material joins the song results into one run', (tester) async {
+  testWidgets('Material joins the results of each kind into a run', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -531,15 +533,22 @@ void main() {
       (widget) => widget is TrackCardSegment && widget.last,
     );
     await tester.scrollUntilVisible(last, 200, scrollable: scrollable);
-    expect(tester.widget<TrackCardSegment>(last).first, isFalse);
-    // Other kinds stay flat rows outside any run.
-    expect(
-      find.ancestor(
-        of: find.textContaining('Found albums'),
-        matching: find.byType(TrackCardSegment),
-      ),
-      findsNothing,
-    );
+    expect(tester.widget<TrackCardSegment>(last.first).first, isFalse);
+    // Albums, artists and playlists are runs of the same filled rows.
+    for (final kind in ['albums', 'artists', 'playlists']) {
+      final first = find.text('Found $kind 0');
+      await tester.scrollUntilVisible(first, 200, scrollable: scrollable);
+      expect(segment('Found $kind 0').first, isTrue);
+      expect(segment('Found $kind 0').last, isFalse);
+      expect(
+        tester
+            .widget<TrackCard>(
+              find.ancestor(of: first, matching: find.byType(TrackCard)),
+            )
+            .style,
+        TrackCardStyle.filled,
+      );
+    }
     expect(tester.takeException(), isNull);
   });
 
