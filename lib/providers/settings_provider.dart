@@ -371,7 +371,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
   }
 
   Future<void> _commit(AppSettings next) {
-    if (state.downloadDirectory.startsWith('/') &&
+    if (isAbsoluteLocalPath(state.downloadDirectory) &&
         state.downloadDirectory != next.downloadDirectory) {
       _previousDownloadDirectories.add(state.downloadDirectory);
     }

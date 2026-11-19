@@ -212,6 +212,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
   bool _requiresFolderReselection(DownloadItem item) =>
       item.status == DownloadStatus.failed &&
       item.networkDownloadFolder.isEmpty &&
+      !isExtensionSandboxPathError(item.error) &&
       (item.errorType == DownloadErrorType.permission ||
           item.error == safPermissionLostErrorMessage ||
           item.error == downloadFolderAccessLostErrorMessage);
