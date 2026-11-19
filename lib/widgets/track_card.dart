@@ -214,7 +214,7 @@ class TrackCard extends StatelessWidget {
     // Material selection and the current track use solid roles. A selected
     // current row keeps the selection fill and shows its state through the
     // shape, the glyph and the title weight.
-    final Color? cardColor;
+    final Color cardColor;
     final Color? contentColor;
     if (isSelected) {
       cardColor = material
@@ -238,8 +238,9 @@ class TrackCard extends StatelessWidget {
               .withValues(alpha: 0);
       contentColor = null;
     } else {
-      // The card theme's tone, which the expressive card does not read.
-      cardColor = theme.cardTheme.color;
+      // The fill of every connected list, so a run of rows reads the same
+      // whether it holds songs, folders, artists or settings.
+      cardColor = settingsGroupColor(context);
       contentColor = null;
     }
     // Text without a colour of its own in the leading slot or the subtitle
@@ -249,7 +250,7 @@ class TrackCard extends StatelessWidget {
     );
     // Trailing controls sit directly on the fill: their content roles take
     // its content colour, and a filled control inverts against it.
-    final trailingTheme = contentColor == null || cardColor == null
+    final trailingTheme = contentColor == null
         ? theme
         : theme.copyWith(
             colorScheme: colorScheme.copyWith(

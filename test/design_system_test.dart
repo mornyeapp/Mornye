@@ -781,6 +781,19 @@ void main() {
       expect(findAppIcon(Icons.check), findsOneWidget);
     });
 
+    testWidgets('a filled row takes the fill of the other connected lists', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        host(const TrackCard(leading: SizedBox.shrink(), title: 'Song')),
+      );
+
+      final context = tester.element(find.text('Song'));
+      final card = tester.widget<AppContentCard>(find.byType(AppContentCard));
+      expect(card.color, settingsGroupColor(context));
+      expect(card.color, isNot(Theme.of(context).colorScheme.surface));
+    });
+
     testWidgets('flat style keeps the row transparent', (tester) async {
       await tester.pumpWidget(
         host(
