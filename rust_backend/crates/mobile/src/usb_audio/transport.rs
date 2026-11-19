@@ -386,7 +386,7 @@ impl Session {
                 continue;
             }
             let packets = (4000 / s.interval).clamp(1, 32) as usize;
-            for _ in 0..descriptors::TRANSFERS {
+            for _ in 0..4 {
                 s.slots.push(Slot::new(packets, s.endpoint.max_packet)?);
             }
             if let Some(ep) = &s.feedback {
@@ -657,7 +657,6 @@ impl Session {
                     return Err("USB feedback stopped or invalid".into());
                 }
             }
-            let mut in_flight = self.slots.iter().filter(|slot| slot.pending).count();
             for slot in &mut self.slots {
                 if slot.pending {
                     continue;
@@ -668,12 +667,7 @@ impl Session {
                     }
                     s.frames += slot.music_frames;
                     slot.music_frames = 0;
-                    slot.submitted = false;
                 }
-                if !descriptors::feeds_transfer(in_flight, s.bytes.len(), slot.bytes.len()) {
-                    continue;
-                }
-                in_flight += 1;
                 let mut packet_lengths = [0usize; 32];
                 let lengths = &mut packet_lengths[..packets];
                 for length in lengths.iter_mut() {

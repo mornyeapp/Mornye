@@ -252,19 +252,6 @@ pub fn queue_bytes(rate: u32, frame: usize) -> usize {
     (rate as usize * 3 / 2 * frame).max(256 * 1024) / frame.max(1) * frame.max(1)
 }
 
-/// Transfers of about 4 ms that are always in flight, padded with silence
-/// when the queue runs dry.
-pub const TRANSFERS_FLOOR: usize = 4;
-/// Transfers in flight while the queue has music for them, about 96 ms: the
-/// time the worker may be kept off the processor before the DAC starves.
-pub const TRANSFERS: usize = 24;
-
-/// Whether a free transfer goes out now: up to the floor always, past it
-/// only when `queued` bytes fill its `capacity`, so no silence is added.
-pub fn feeds_transfer(in_flight: usize, queued: usize, capacity: usize) -> bool {
-    in_flight < TRANSFERS_FLOOR || queued >= capacity
-}
-
 /// The rates a UAC2 clock source lists in its RANGE reply: a 2-byte count,
 /// then MIN, MAX and RES of 4 bytes each. A malformed or empty reply gives
 /// none, which [`clock_offers`] takes as a clock that did not say.
@@ -689,15 +676,6 @@ mod tests {
         // Never below the old floor, and always whole frames.
         assert_eq!(queue_bytes(8000, 2), 262144);
         assert_eq!(queue_bytes(8000, 6) % 6, 0);
-    }
-    #[test]
-    fn transfers_past_the_floor_carry_music_only() {
-        // An empty queue still keeps the floor in flight, as silence.
-        assert!(feeds_transfer(0, 0, 4096));
-        assert!(feeds_transfer(TRANSFERS_FLOOR - 1, 0, 4096));
-        assert!(!feeds_transfer(TRANSFERS_FLOOR, 4095, 4096));
-        assert!(feeds_transfer(TRANSFERS_FLOOR, 4096, 4096));
-        assert!(feeds_transfer(TRANSFERS - 1, 8192, 4096));
     }
     #[test]
     fn a_clock_is_only_set_to_a_rate_it_lists() {

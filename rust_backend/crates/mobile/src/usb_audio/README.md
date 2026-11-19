@@ -9,12 +9,9 @@ opt-in under Settings > Playback > Hi-res and bit-perfect audio.
 
 - Android asks for USB permission; the engine, not the Activity, owns the
   connection. Permission denial and absent hardware leave PCM on normal output.
-- One Rust worker owns libusb, its claimed interfaces, the isochronous output
-  transfers, and a separate explicit-feedback transfer. Up to 24 transfers of
-  about 4 ms are in flight while the queue has music for them, so the DAC
-  keeps playing when the worker is late; at least four always are, padded with
-  silence in an underrun. The bounded queue holds 1.5 s of audio (minimum
-  256 KiB). There is no gain; a rate the DAC refuses is resampled.
+- One Rust worker owns libusb, its claimed interfaces, four isochronous output
+  transfers, and a separate explicit-feedback transfer. The bounded queue holds
+  approximately 200 ms of audio (minimum 256 KiB). There is no resampling or gain.
 - UAC1 fixed rates are verified from descriptors; variable UAC1/UAC2 rates are
   read back from the endpoint/clock. Implicit feedback, ambiguous clocks, and
   multiple configurations fail closed. Endpoint capacities bound packet sizes.
