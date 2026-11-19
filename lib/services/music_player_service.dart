@@ -2642,6 +2642,11 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (generation != _playRequestGeneration || _disposed) return;
       resumeMedia = _media[_index].toJson();
     }
+    if (_dependencies.isAndroid &&
+        _settings.usbBitPerfect &&
+        _settings.usbDirect) {
+      await AudioplayersPlaybackDeck.endUsbSession();
+    }
     await _player.stop();
     if (generation != _playRequestGeneration || _disposed) return;
     _sourceReady = false;

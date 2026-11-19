@@ -2604,6 +2604,45 @@ void main() {
         expect(decks.single.sources, ['stream http://127.0.0.1:1/song.flac']);
         cache.want([]);
       });
+
+      for (final direct in [true, false]) {
+        test('stopping hands a Direct USB DAC back: $direct', () async {
+          final calls = <String>[];
+          messenger.setMockMethodCallHandler(usb, (call) async {
+            calls.add(call.method);
+            return call.method == 'outputPresent' ? false : null;
+          });
+          addTearDown(() => messenger.setMockMethodCallHandler(usb, null));
+          final temp = await Directory.systemTemp.createTemp('player-usb-');
+          addTearDown(() => temp.delete(recursive: true));
+          final local = await File('${temp.path}/local.flac').writeAsBytes([4]);
+          final handler = await _runtime(
+            settings: AppSettings(
+              pauseOnMute: false,
+              usbBitPerfect: true,
+              usbDirect: direct,
+            ),
+            isAndroid: true,
+          ).initialize();
+          await handler.setQueueAndPlay([
+            PlayableMedia(
+              id: 'local-song',
+              source: local.path,
+              title: 'Local song',
+              artist: 'Artist',
+            ),
+          ]);
+          // A song change lets go of the DAC without touching its level.
+          expect(calls, isNot(contains('endSession')));
+
+          await handler.stop();
+
+          expect(
+            calls.where((call) => call == 'endSession'),
+            hasLength(direct ? 1 : 0),
+          );
+        });
+      }
     });
 
     test('a saved offline copy plays before a prefetched one', () async {

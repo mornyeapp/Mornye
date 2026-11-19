@@ -267,6 +267,17 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     } on MissingPluginException catch (_) {}
   }
 
+  /// Hands a Direct USB DAC back at the level it connected with and lets go
+  /// of it. Only when playback ends: Direct USB lowers that level to play,
+  /// and no song may follow through Android's mixer at the higher one.
+  static Future<void> endUsbSession() async {
+    try {
+      await _channel.invokeMethod<void>('endSession');
+    } on PlatformException catch (_) {
+      // The level stays where playback left it.
+    } on MissingPluginException catch (_) {}
+  }
+
   /// Whether the output a bit-perfect song would open is connected. True
   /// when the platform cannot say.
   static Future<bool> bitPerfectOutputPresent({

@@ -211,6 +211,14 @@ internal object UsbDirectFormats {
         return output
     }
 
+    /**
+     * The level to write back when playback ends on a DAC that connected at
+     * [original] dB and now reads [current] dB, or null to leave it: the app
+     * only undoes its own lowering, it never turns a DAC down further.
+     */
+    fun levelToHandBack(original: Double?, current: Double): Double? =
+        original?.takeIf { it > current }
+
     /** A new track reopens the DAC within this long of closing the last one. */
     const val TRACK_CHANGE_WINDOW_MS = 10_000L
 

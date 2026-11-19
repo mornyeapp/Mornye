@@ -80,6 +80,13 @@ class UsbBitPerfectPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Even
             result.success(phoneOutput || runCatching { usbOutputPresent() }.getOrDefault(true))
             return
         }
+        if (call.method == "endSession") {
+            // Only Direct USB changes the DAC's own level.
+            val playback = direct
+            if (playback == null) result.success(null)
+            else playback.command(call) { _, _ -> main.post { result.success(null) } }
+            return
+        }
         if (call.method == "prepare") {
             if (useHiRes) hiRes?.command(MethodCall("stop", null)) { _, _ -> }
             else if (useDirect) direct?.command(MethodCall("stop", null)) { _, _ -> }

@@ -57,6 +57,9 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
     // app last let go of that DAC: a reopen right after is a track change.
     private val deviceVolumes = mutableMapOf<Int, Double>()
     private val deviceReleases = mutableMapOf<Int, Long>()
+    // The level each DAC had before the app first lowered it, written back
+    // when playback ends so other apps do not play through a lowered DAC.
+    private val deviceOriginals = mutableMapOf<Int, Double>()
     // The rate each DAC played a song rate at, so a rate it refused once is
     // not asked of it again for every song.
     private val deviceRates = mutableMapOf<Int, MutableMap<Int, Int>>()
@@ -81,6 +84,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 worker.post {
                     deviceVolumes.remove(device.deviceId)
                     deviceReleases.remove(device.deviceId)
+                    deviceOriginals.remove(device.deviceId)
                     deviceRates.remove(device.deviceId)
                     if (device.deviceId == deviceId) fail("USB disconnected")
                 }
@@ -111,7 +115,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
             done(null, null)
             return
         }
-        if (call.method == "prepare" || call.method == "stop") {
+        if (call.method == "prepare" || call.method == "stop" || call.method == "endSession") {
             revision++
             permission?.done?.invoke(mapOf("reason" to "cancelled"), null)
             permission = null
@@ -149,6 +153,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
         worker.post {
             try {
                 val value: Any? = when (call.method) {
+                    "endSession" -> { handBack(); null }
                     "resume" -> { resume(); null }
                     "pause" -> { pause(); null }
                     "seek" -> { seek((call.argument<Number>("position")?.toLong() ?: 0) * 1000); null }
@@ -338,6 +343,7 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 val volumeTrace = mutableMapOf<String, Any>("connectedDb" to connected.restoreLimitDb)
                 if (connected.available) {
                     val id = request.device.deviceId
+                    deviceOriginals.putIfAbsent(id, connected.restoreLimitDb)
                     val since = deviceReleases[id]?.let { android.os.SystemClock.elapsedRealtime() - it }
                     since?.let { volumeTrace["sinceReleaseMs"] = it }
                     deviceVolumes[id]?.let {
@@ -557,11 +563,36 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
         writtenFrames = 0
     }
 
+    /**
+     * Ends the playback session: the DAC goes back to the level it connected
+     * with and is let go. Never between two songs, where the next one could
+     * play through Android's mixer at that higher level.
+     */
+    private fun handBack() {
+        val audio = output
+        val original = deviceId?.let { deviceOriginals[it] }
+        // A session that ends without the DAC open learns its level afresh.
+        deviceOriginals.clear()
+        if (audio != null && !failed) {
+            runCatching {
+                // Nothing is in flight when the level rises.
+                pause()
+                val now = audio.volume()
+                val level = if (now.available) UsbDirectFormats.levelToHandBack(original, now.currentDb) else null
+                if (level != null) {
+                    val set = audio.setVolume(level)
+                    android.util.Log.i("UsbDirect", "DAC handed back at ${set.currentDb} dB (played at ${now.currentDb} dB)")
+                }
+            }.onFailure { android.util.Log.w("UsbDirect", "DAC level not handed back: ${it.message}") }
+        }
+        closeSource()
+    }
+
     fun dispose() {
         revision++
         permission?.done?.invoke(mapOf("reason" to "cancelled"), null)
         permission = null
         context.unregisterReceiver(receiver)
-        worker.post { closeSource(); writeBuffer = ByteArray(0); thread.quitSafely() }
+        worker.post { handBack(); writeBuffer = ByteArray(0); thread.quitSafely() }
     }
 }

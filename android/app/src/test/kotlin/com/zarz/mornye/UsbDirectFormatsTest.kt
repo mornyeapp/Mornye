@@ -244,4 +244,14 @@ class UsbDirectFormatsTest {
         // A DAC that connects louder still gets the remembered level.
         assertEquals(-18.0, UsbDirectFormats.restoredVolumeDb(-18.0, 0.0, null), 0.0)
     }
+
+    @Test
+    fun handsADacBackAtTheLevelItConnectedWith() {
+        // The app lowered it to play; other apps get the level they had.
+        assertEquals(0.0, UsbDirectFormats.levelToHandBack(0.0, -40.0)!!, 0.0)
+        // Never lower than it plays now, and nothing without a known level.
+        assertNull(UsbDirectFormats.levelToHandBack(-52.0, -40.0))
+        assertNull(UsbDirectFormats.levelToHandBack(-40.0, -40.0))
+        assertNull(UsbDirectFormats.levelToHandBack(null, -40.0))
+    }
 }
