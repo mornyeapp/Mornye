@@ -17,7 +17,14 @@ class MetadataEditorOptions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!context.isMornye) return SettingsGroup(children: children);
+    if (!context.isMornye) {
+      // Sheet options carry their own dividers, so only standard rows split.
+      return SettingsGroup(
+        connected:
+            children.isNotEmpty && children.every((child) => child is ListTile),
+        children: children,
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Material(

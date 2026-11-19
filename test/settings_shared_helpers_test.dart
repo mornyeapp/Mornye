@@ -645,6 +645,6 @@ void main() {
     expect(group.children, same(rows));
     final plain = settingsSectionSlivers(title: 'Section', children: const []);
     final plainGroup = (plain[1] as SliverToBoxAdapter).child! as SettingsGroup;
-    expect((plainGroup.connected, plainGroup.glass), (false, false));
+    expect((plainGroup.connected, plainGroup.glass), (null, false));
   });
 }

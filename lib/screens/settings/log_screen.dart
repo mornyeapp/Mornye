@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus;
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart'
     show mornyeGlassLevelProvider;
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -468,12 +469,13 @@ class _LogScreenState extends State<LogScreen> {
                     ],
                   ),
                 ),
-                Divider(
-                  height: 1,
-                  indent: 56,
-                  endIndent: 20,
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-                ),
+                if (context.isMornye)
+                  Divider(
+                    height: 1,
+                    indent: 56,
+                    endIndent: 20,
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                  ),
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,

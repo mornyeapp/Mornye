@@ -228,6 +228,20 @@ BorderRadius connectedRowRadius(
   );
 }
 
+/// Whether a group's [children] are rows, each drawn as its own connected
+/// surface: several children are, custom ones included, unless a spacer or
+/// divider shows a hand-built form. One child alone is when it is a standard
+/// row; other single content keeps its card.
+bool settingsGroupHasRows(List<Widget> children) {
+  bool standard(Widget child) =>
+      child is SettingsItem || child is SettingsSwitchItem || child is ListTile;
+  return switch (children) {
+    [] => false,
+    [final only] => standard(only),
+    _ => !children.any((child) => child is SizedBox || child is Divider),
+  };
+}
+
 class _ConnectedRowsScope extends InheritedWidget {
   const _ConnectedRowsScope({required super.child});
 
@@ -240,17 +254,16 @@ class SettingsGroup extends StatelessWidget {
   final EdgeInsetsGeometry? margin;
   final bool glass;
 
-  /// Connects custom [children] that are each one complete row, such as
-  /// extension rows. Groups of [SettingsItem], [SettingsSwitchItem] and [ListTile]
-  /// connect without it.
-  final bool connected;
+  /// Whether each of [children] is one complete row with its own connected
+  /// surface. Null decides from the children, see [settingsGroupHasRows].
+  final bool? connected;
 
   const SettingsGroup({
     super.key,
     required this.children,
     this.margin,
     this.glass = false,
-    this.connected = false,
+    this.connected,
   });
 
   @override
@@ -298,19 +311,9 @@ class SettingsGroup extends StatelessWidget {
     }
 
     final expressive = materialExpressiveEnabled(context);
-    // Only groups of standard rows split into connected tiles. Forms and
-    // custom content keep one card, so spacers never become empty tiles.
-    final standardRows =
-        children.isNotEmpty &&
-        (connected ||
-            children.every(
-              (child) =>
-                  child is SettingsItem ||
-                  child is SettingsSwitchItem ||
-                  child is ListTile,
-            ));
+    final rows = connected ?? settingsGroupHasRows(children);
     // Connected surfaces are static layout, so reduced motion keeps the gaps.
-    if (!context.isMornye && standardRows) {
+    if (!context.isMornye && rows) {
       // Expressive connected list: every row is its own surface separated by
       // a 2dp gap. The group's ends keep the card radius, inner corners stay
       // tight, and the gaps replace row dividers.
@@ -369,7 +372,7 @@ class SettingsGroup extends StatelessWidget {
 List<Widget> settingsSectionSlivers({
   required String title,
   required List<Widget> children,
-  bool connected = false,
+  bool? connected,
   bool glass = false,
 }) => [
   SliverToBoxAdapter(child: SettingsSectionHeader(title: title)),

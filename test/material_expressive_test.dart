@@ -500,6 +500,49 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('custom rows among standard ones keep the group connected', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        SettingsGroup(
+          children: [
+            SettingsSwitchItem(title: 'Switch', value: true, onChanged: (_) {}),
+            const Padding(padding: EdgeInsets.all(16), child: Text('Slider')),
+            SettingsItem(title: 'Last', onTap: () {}),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final group = find.byType(SettingsGroup);
+    expect(
+      find.descendant(of: group, matching: find.byType(M3ECard)),
+      findsNothing,
+    );
+    // Each row has its own surface, 2dp from the next.
+    Rect surface(String text) => tester.getRect(
+      find.ancestor(of: find.text(text), matching: find.byType(Material)).first,
+    );
+    expect(surface('Slider').top, surface('Switch').bottom + 2);
+    expect(surface('Last').top, surface('Slider').bottom + 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('a group decides from its children whether they are rows', () {
+    const row = SettingsItem(title: 'Row');
+    const custom = Padding(padding: EdgeInsets.zero);
+    expect(settingsGroupHasRows(const []), isFalse);
+    expect(settingsGroupHasRows(const [row]), isTrue);
+    // Single content, such as a chart, keeps its card.
+    expect(settingsGroupHasRows(const [custom]), isFalse);
+    expect(settingsGroupHasRows(const [row, custom]), isTrue);
+    expect(settingsGroupHasRows(const [custom, custom]), isTrue);
+    // A hand-built form.
+    expect(settingsGroupHasRows(const [custom, SizedBox(), custom]), isFalse);
+    expect(settingsGroupHasRows(const [row, Divider(), row]), isFalse);
+  });
+
   testWidgets('button group squishes neighbours and keeps a plain fallback', (
     tester,
   ) async {
