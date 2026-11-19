@@ -719,55 +719,67 @@ class _MixBuilder {
   List<LibraryMix> build() {
     _index();
     if (songs.length < libraryMixMinLibrary) return const [];
-    final mixes = <LibraryMix>[];
-    if (_favorites() case final mix?) mixes.add(mix);
-
-    // Adds up to [count] mixes from [keys], passing over a key that makes
-    // none, and returns how many it added.
-    int take<T>(Iterator<T> keys, LibraryMix? Function(T) make, int count) {
-      var added = 0;
-      while (added < count &&
-          mixes.length < libraryMixMaxCount &&
-          keys.moveNext()) {
-        if (_add(mixes, make(keys.current))) added++;
+    // Made in the order of who keeps the songs two mixes share: favorites,
+    // then genres, before the kinds that cut across them.
+    final made = <LibraryMix>[];
+    List<LibraryMix> make<T>(
+      Iterable<T> keys,
+      LibraryMix? Function(T) build,
+      int count,
+    ) {
+      final added = <LibraryMix>[];
+      for (final key in keys) {
+        if (added.length == count) break;
+        final mix = build(key);
+        if (_add(made, mix)) added.add(mix!);
       }
       return added;
     }
 
-    // Every kind gets a turn before any gets more, so the shelf is varied
-    // before it is deep.
+    final favorites = make([_favorites], (build) => build(), 1);
     final ranked = _families();
-    final families = ranked.iterator;
     final tried = <String>{};
     LibraryMix? genreMix(String family) {
       tried.add(family);
       return _genreMix(family);
     }
 
-    final genres = take(families, genreMix, _leadGenreMixes);
-    for (final make in [_fresh, _rediscover, _discover, _deepCuts, _yearMix]) {
-      if (mixes.length >= libraryMixMaxCount) break;
-      _add(mixes, make());
-    }
-    final decades = _decades().iterator;
-    take(decades, _decadeMix, 1);
+    final genres = make(ranked, genreMix, _maxGenreMixes);
+    final found = make(
+      [_fresh, _rediscover, _discover, _deepCuts, _yearMix],
+      (build) => build(),
+      5,
+    );
+    final decades = make(_decades(), _decadeMix, _maxDecadeMixes);
     // Where tags are missing or little else came out, the artists played
     // most anchor up to three mixes of their own.
     final tagged = songs.where((song) => familiesById[song.id]!.isNotEmpty);
-    final sparse = mixes.length < 3 || tagged.length * 2 < songs.length;
-    final artists = _mixArtists(sparse: sparse).iterator;
-    LibraryMix? artistMix(String artist) =>
-        mixes.any((mix) => mix.key == artist) ? null : _artistMix(artist);
-    take(artists, artistMix, 1);
-    take(families, genreMix, _maxGenreMixes - genres);
-    take(decades, _decadeMix, _maxDecadeMixes - 1);
-    take(artists, artistMix, (sparse ? 3 : _maxArtistMixes) - 1);
+    final sparse = made.length < 3 || tagged.length * 2 < songs.length;
+    final artists = make(
+      _mixArtists(sparse: sparse),
+      (artist) =>
+          made.any((mix) => mix.key == artist) ? null : _artistMix(artist),
+      sparse ? 3 : _maxArtistMixes,
+    );
     // One genre past those played most, a different one each day.
     final others = [
       for (final family in ranked)
         if (!tried.contains(family)) family,
     ]..shuffle(_random(LibraryMixKind.genre, 'rotation'));
-    take(others.iterator, genreMix, 1);
+    final extra = make(others, genreMix, 1);
+    // Every kind gets a turn before any gets more, so a full shelf is
+    // varied before it is deep.
+    final mixes = [
+      ...favorites,
+      ...genres.take(_leadGenreMixes),
+      ...found,
+      ...decades.take(1),
+      ...artists.take(1),
+      ...genres.skip(_leadGenreMixes),
+      ...decades.skip(1),
+      ...artists.skip(1),
+      ...extra,
+    ].take(libraryMixMaxCount).toList();
     // Favorites lead and the two mixes played most follow. Discoveries, which
     // no play count brings forward, then take turns with the rest by plays.
     double weight(LibraryMix mix) =>

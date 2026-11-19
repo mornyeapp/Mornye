@@ -591,6 +591,38 @@ void main() {
       expect(first.length, greaterThan(1));
     });
 
+    test('a genre keeps its mix over an artist mix of the same songs', () {
+      const played = ['Rock', 'Pop', 'Jazz'];
+      final songs = [
+        for (final genre in played)
+          for (var a = 0; a < 12; a++)
+            for (var s = 0; s < 3; s++)
+              _song('$genre$a-$s', '$genre Act $a', genre),
+        // The fourth genre, whose one played artist has songs enough to
+        // name a mix drawn from the same songs.
+        for (var a = 0; a < 8; a++)
+          for (var s = 0; s < 5; s++)
+            _song('metal$a-$s', 'Metal Act $a', 'Metal'),
+      ];
+      final mixes = buildLibraryMixes(
+        LibraryMixRequest(
+          songs: songs,
+          at: day,
+          exists: exists,
+          plays: {
+            for (final genre in played)
+              for (var a = 0; a < 4; a++) 'local_$genre$a-0': 9,
+            for (var s = 0; s < 5; s++) 'local_metal0-$s': 2,
+          },
+        ),
+      );
+      expect([
+        for (final mix in mixes)
+          if (mix.kind == LibraryMixKind.genre) mix.key,
+      ], containsAll(['rock', 'pop', 'jazz', 'metal']));
+      expect(mixes.where((mix) => mix.kind == LibraryMixKind.artist), isEmpty);
+    });
+
     test('one genre past the five played most joins, a new one each day', () {
       final songs = _wideLibrary();
       const leading = ['hiphop', 'rock', 'country', 'electronic', 'folk'];
