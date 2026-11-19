@@ -268,8 +268,8 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   }
 
   /// Hands a Direct USB DAC back at the level it connected with and lets go
-  /// of it. Only when playback ends: Direct USB lowers that level to play,
-  /// and no song may follow through Android's mixer at the higher one.
+  /// of it. Only while nothing plays (playback ended, or sat paused): Direct
+  /// USB lowers that level, and no song may run on at the higher one.
   static Future<void> endUsbSession() async {
     try {
       await _channel.invokeMethod<void>('endSession');
@@ -490,6 +490,16 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   PlaybackDeckState _directState = PlaybackDeckState.stopped;
   UsbAudioStatus _preparedStatus = const UsbAudioStatus();
 
+  /// How long a Direct USB song that is not playing keeps the DAC. Holding
+  /// it leaves every other app without sound through that DAC.
+  @visibleForTesting
+  static Duration usbIdleRelease = const Duration(seconds: 5);
+  Timer? _idleTimer;
+  int _idleEpoch = 0;
+
+  /// Where the song stood when the idle DAC was let go; play reloads there.
+  Duration? _releasedAt;
+
   @override
   bool get isDirect => _direct;
   @override
@@ -681,6 +691,8 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
               ? const UsbAudioStatus(reason: 'volume_unavailable')
               : const UsbAudioStatus(reason: 'ready');
           _durations.add(_duration!);
+          // A song prepared and never started holds the DAC as well.
+          _armIdleRelease();
           return;
         }
         usbAudioStatus.value = UsbAudioStatus.failure(response);
@@ -805,6 +817,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
       case 'complete':
         _timer?.cancel();
         _setState(PlaybackDeckState.completed);
+        _armIdleRelease();
         _completions.add(null);
     }
   }
@@ -812,6 +825,57 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   void _setState(PlaybackDeckState value) {
     _directState = value;
     if (!_disposed) _states.add(value);
+  }
+
+  void _cancelIdleRelease() {
+    _idleEpoch++;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+  }
+
+  void _armIdleRelease() {
+    _idleTimer?.cancel();
+    if (!_direct || _routeLost || _preparedStatus.driver != 'usb_direct') {
+      return;
+    }
+    _idleTimer = Timer(usbIdleRelease, () => unawaited(_releaseIdle()));
+  }
+
+  /// Lets go of a Direct USB DAC that is not playing, at the level it
+  /// connected with, so other apps play through it. Play reloads the song.
+  Future<void> _releaseIdle() async {
+    if (_disposed ||
+        !_direct ||
+        _routeLost ||
+        _directState == PlaybackDeckState.playing) {
+      return;
+    }
+    final token = _token;
+    final epoch = _idleEpoch;
+    final ended = _directState == PlaybackDeckState.completed;
+    try {
+      final position = ended ? Duration.zero : await getCurrentPosition();
+      if (_disposed ||
+          token != _token ||
+          epoch != _idleEpoch ||
+          !_direct ||
+          _routeLost ||
+          _directState == PlaybackDeckState.playing) {
+        return;
+      }
+      // Set first: a play that arrives now reloads instead of resuming.
+      _routeLost = true;
+      _releasedAt = position ?? Duration.zero;
+      await _channel.invokeMethod<void>('endSession');
+      if (_disposed || token != _token || !_direct) return;
+      usbHardwareVolume.value = null;
+      usbAudioStatus.value = const UsbAudioStatus(reason: 'ready');
+      _log.i('Native output released while idle: usb_direct');
+    } on PlatformException catch (error) {
+      _log.w('Idle USB output not released: ${error.message ?? error.code}');
+    } on MissingPluginException {
+      // An older native build keeps the DAC until the song stops.
+    }
   }
 
   void _pauseLostRoute(UsbAudioStatus status) {
@@ -835,6 +899,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
       checkError();
       return;
     }
+    _cancelIdleRelease();
     if (_volumeBlocked) {
       usbAudioStatus.value = const UsbAudioStatus(reason: 'volume_unavailable');
       throw UsbOutputUnavailable(
@@ -905,12 +970,21 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     final token = _token;
     _timer?.cancel();
     await _channel.invokeMethod<void>('pause');
-    if (token == _token && _direct) _setState(PlaybackDeckState.paused);
+    if (token == _token && _direct) {
+      _setState(PlaybackDeckState.paused);
+      _armIdleRelease();
+    }
   }
 
   @override
   Future<void> seek(Duration position) async {
     if (!_direct) return _ordinary.seek(position);
+    if (_releasedAt != null) {
+      // The DAC was let go while idle: play reloads the song from here.
+      _releasedAt = position;
+      _positions.add(position);
+      return;
+    }
     final token = _token;
     await _channel.invokeMethod<void>('seek', {
       'position': position.inMilliseconds,
@@ -944,6 +1018,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   @override
   Future<Duration?> getCurrentPosition() async {
     if (!_direct) return _ordinary.getCurrentPosition();
+    if (_releasedAt case final released?) return released;
     final milliseconds = await _channel.invokeMethod<int>('position');
     return milliseconds == null ? null : Duration(milliseconds: milliseconds);
   }
@@ -955,6 +1030,8 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   @override
   Future<void> stop() async {
     _timer?.cancel();
+    _cancelIdleRelease();
+    _releasedAt = null;
     if (_direct || _preparing) {
       _token = ++_nextToken;
       _preparing = false;

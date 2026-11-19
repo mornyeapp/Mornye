@@ -321,6 +321,122 @@ void main() {
       expect(native.sources['usb-test'], isNull);
     });
 
+    group('an idle Direct USB DAC', () {
+      const wait = Duration(milliseconds: 150);
+
+      setUp(() {
+        final usual = AudioplayersPlaybackDeck.usbIdleRelease;
+        AudioplayersPlaybackDeck.usbIdleRelease = const Duration(
+          milliseconds: 30,
+        );
+        addTearDown(() => AudioplayersPlaybackDeck.usbIdleRelease = usual);
+      });
+
+      test('is let go while paused, and play reloads the song', () async {
+        await deck.setFileSource(
+          '/one.flac',
+          preferBitPerfect: true,
+          directUsb: true,
+        );
+        await deck.resume();
+        position = 42000;
+        await deck.pause();
+        expect(deck.needsSourceReload, isFalse);
+
+        await _until(() => usbCalls.contains('endSession'));
+
+        expect(deck.needsSourceReload, isTrue);
+        expect(deck.state, PlaybackDeckState.paused);
+        expect(usbAudioStatus.value.reason, 'ready');
+        // The song keeps its place without asking the closed output.
+        position = 0;
+        final calls = usbCalls.length;
+        expect(await deck.getCurrentPosition(), const Duration(seconds: 42));
+        await deck.seek(const Duration(seconds: 50));
+        expect(await deck.getCurrentPosition(), const Duration(seconds: 50));
+        expect(usbCalls, hasLength(calls));
+        await expectLater(deck.resume(), throwsA(isA<UsbOutputUnavailable>()));
+        expect(usbCalls, isNot(contains('seek')));
+      });
+
+      test('is kept by a song that plays on within the delay', () async {
+        await deck.setFileSource(
+          '/one.flac',
+          preferBitPerfect: true,
+          directUsb: true,
+        );
+        await deck.resume();
+        await deck.pause();
+        await deck.resume();
+
+        await Future<void>.delayed(wait);
+
+        expect(usbCalls, isNot(contains('endSession')));
+        expect(deck.needsSourceReload, isFalse);
+        expect(deck.state, PlaybackDeckState.playing);
+      });
+
+      test('is let go by a song prepared and never started', () async {
+        position = 7000;
+        await deck.setFileSource(
+          '/one.flac',
+          preferBitPerfect: true,
+          directUsb: true,
+        );
+
+        await _until(() => usbCalls.contains('endSession'));
+
+        expect(deck.needsSourceReload, isTrue);
+        expect(await deck.getCurrentPosition(), const Duration(seconds: 7));
+      });
+
+      test('is let go after the last song, which then restarts', () async {
+        await deck.setFileSource(
+          '/one.flac',
+          preferBitPerfect: true,
+          directUsb: true,
+        );
+        await deck.resume();
+        position = 60000;
+        await event('complete');
+
+        await _until(() => usbCalls.contains('endSession'));
+
+        expect(await deck.getCurrentPosition(), Duration.zero);
+      });
+
+      test('a new song ends the wait', () async {
+        await deck.setFileSource(
+          '/one.flac',
+          preferBitPerfect: true,
+          directUsb: true,
+        );
+        await deck.resume();
+        await deck.pause();
+        await deck.setFileSource(
+          '/two.flac',
+          preferBitPerfect: true,
+          directUsb: true,
+        );
+        await deck.resume();
+
+        await Future<void>.delayed(wait);
+
+        expect(usbCalls, isNot(contains('endSession')));
+      });
+
+      test('the Android mixer output is never let go', () async {
+        await deck.setFileSource('/one.flac', preferBitPerfect: true);
+        await deck.resume();
+        await deck.pause();
+
+        await Future<void>.delayed(wait);
+
+        expect(usbCalls, isNot(contains('endSession')));
+        expect(deck.needsSourceReload, isFalse);
+      });
+    });
+
     tearDown(() async {
       await deck.dispose();
       native.messenger.setMockMethodCallHandler(methods, null);

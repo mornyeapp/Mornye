@@ -564,9 +564,9 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
     }
 
     /**
-     * Ends the playback session: the DAC goes back to the level it connected
-     * with and is let go. Never between two songs, where the next one could
-     * play through Android's mixer at that higher level.
+     * The DAC goes back to the level it connected with and is let go, when
+     * playback ends or has sat idle. Never between two songs, where the next
+     * one could play through Android's mixer at that higher level.
      */
     private fun handBack() {
         val audio = output
