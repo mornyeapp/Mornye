@@ -9527,6 +9527,90 @@
   "profileRemovePhoto": "Remove photo",
   "profilePhotoError": "Choose a valid image smaller than 20 MB.",
   "profileSaveError": "Could not save your profile. Please try again.",
+  "profileEditAction": "Edit profile",
+  "profileNowPlaying": "Now playing",
+  "profileListeningSince": "Listening since {date}",
+  "@profileListeningSince": {
+    "description": "Line under the profile name; date is the month and year of the first recorded listening, such as November 2026",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "profileHours": "{hours} h",
+  "@profileHours": {
+    "description": "A listening time in hours; hours is an already formatted number such as 12.5 or 240",
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "profileAllTime": "All time",
+  "profileStatListening": "Listening time",
+  "profileStatSongs": "Songs played",
+  "profileStatArtists": "Artists played",
+  "profileStatActiveDays": "Listening days",
+  "profileStatStreak": "Current streak",
+  "profileDays": "{count, plural, =1{1 day} other{{count} days}}",
+  "@profileDays": {
+    "description": "A number of days, as the value of a streak or of the days with listening",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileLast30Days": "Last 30 days",
+  "profileTaste": "Music taste",
+  "profileTasteNote": "Share of your listening time, for songs whose genre your Library knows.",
+  "profileTasteEmpty": "The songs you played have no genre in your Library yet.",
+  "profileTasteMostly": "Mostly {genre}",
+  "@profileTasteMostly": {
+    "description": "Line under the profile name when one genre takes at least half of the listening time",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTasteMostlyWith": "Mostly {genre}, with {others}",
+  "@profileTasteMostlyWith": {
+    "description": "Line under the profile name when one genre takes at least half of the listening time; others is one or two more genres, such as Rock, Jazz",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      },
+      "others": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTasteMix": "A mix of {genres}",
+  "@profileTasteMix": {
+    "description": "Line under the profile name when no genre takes half of the listening time; genres is two or three genres, such as Pop, Rock, Jazz",
+    "placeholders": {
+      "genres": {
+        "type": "String"
+      }
+    }
+  },
+  "profileHabits": "Listening habits",
+  "profileAverageDay": "On a listening day",
+  "profileTopAlbums": "Top albums",
+  "profileCollection": "Your collection",
+  "profileListeningOff": "Record listening is off, so your listening is not shown here.",
+  "profileWeekdayChart": "Listening time by day of the week, most on {day}",
+  "@profileWeekdayChart": {
+    "description": "Screen reader description of the chart of listening time per weekday; day is a weekday name such as Saturday",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "profileRecentChart": "Listening time on each of the last 30 days",
   "homeGreetingMorning1": "Good morning",
   "homeGreetingMorning2": "Rise and shine",
   "homeGreetingMorning3": "Fresh start",

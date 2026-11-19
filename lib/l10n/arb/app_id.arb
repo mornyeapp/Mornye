@@ -8197,6 +8197,90 @@
   "profileRemovePhoto": "Hapus foto",
   "profilePhotoError": "Pilih foto yang di bawah 20MB.",
   "profileSaveError": "Tidak dapat menyimpan profil Anda. Coba lagi.",
+  "profileEditAction": "Edit profil",
+  "profileNowPlaying": "Sedang diputar",
+  "profileListeningSince": "Mendengarkan sejak {date}",
+  "@profileListeningSince": {
+    "description": "Line under the profile name; date is the month and year of the first recorded listening, such as November 2026",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "profileHours": "{hours} jam",
+  "@profileHours": {
+    "description": "A listening time in hours; hours is an already formatted number such as 12.5 or 240",
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "profileAllTime": "Sepanjang waktu",
+  "profileStatListening": "Waktu mendengarkan",
+  "profileStatSongs": "Lagu diputar",
+  "profileStatArtists": "Artis diputar",
+  "profileStatActiveDays": "Hari mendengarkan",
+  "profileStatStreak": "Rentetan saat ini",
+  "profileDays": "{count} hari",
+  "@profileDays": {
+    "description": "A number of days, as the value of a streak or of the days with listening",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileLast30Days": "30 hari terakhir",
+  "profileTaste": "Selera musik",
+  "profileTasteNote": "Bagian dari waktu mendengarkan Anda, untuk lagu yang genrenya diketahui Koleksi.",
+  "profileTasteEmpty": "Lagu yang Anda putar belum punya genre di Koleksi.",
+  "profileTasteMostly": "Kebanyakan {genre}",
+  "@profileTasteMostly": {
+    "description": "Line under the profile name when one genre takes at least half of the listening time",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTasteMostlyWith": "Kebanyakan {genre}, dengan {others}",
+  "@profileTasteMostlyWith": {
+    "description": "Line under the profile name when one genre takes at least half of the listening time; others is one or two more genres, such as Rock, Jazz",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      },
+      "others": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTasteMix": "Campuran {genres}",
+  "@profileTasteMix": {
+    "description": "Line under the profile name when no genre takes half of the listening time; genres is two or three genres, such as Pop, Rock, Jazz",
+    "placeholders": {
+      "genres": {
+        "type": "String"
+      }
+    }
+  },
+  "profileHabits": "Kebiasaan mendengarkan",
+  "profileAverageDay": "Pada hari mendengarkan",
+  "profileTopAlbums": "Album teratas",
+  "profileCollection": "Koleksi Anda",
+  "profileListeningOff": "Catat waktu mendengarkan sedang mati, jadi kebiasaan mendengarkan Anda tidak ditampilkan di sini.",
+  "profileWeekdayChart": "Waktu mendengarkan per hari dalam seminggu, terbanyak pada {day}",
+  "@profileWeekdayChart": {
+    "description": "Screen reader description of the chart of listening time per weekday; day is a weekday name such as Saturday",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "profileRecentChart": "Waktu mendengarkan pada tiap hari dalam 30 hari terakhir",
   "homeGreetingMorning1": "Selamat pagi",
   "homeGreetingMorning2": "Pagi yang cerah",
   "homeGreetingMorning3": "Awali harimu",

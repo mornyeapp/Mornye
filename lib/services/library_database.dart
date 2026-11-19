@@ -570,6 +570,16 @@ class LibraryDatabase {
     includeLocal: includeLocal,
   );
 
+  /// The genre tags of the Library songs with [matchKeys]; see
+  /// [LibraryQueueStore.genresOfSongs].
+  Future<List<Map<String, Object?>>> getGenresOfSongs(
+    List<String> matchKeys, {
+    required bool includeLocal,
+  }) => _queueRead(
+    (store) => store.genresOfSongs(matchKeys, includeLocal: includeLocal),
+    includeLocal: includeLocal,
+  );
+
   Future<List<Map<String, dynamic>>> getQueueLocalAlbumTracks(
     String albumName,
     String artistName,

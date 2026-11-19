@@ -393,6 +393,46 @@ class LibraryQueueStore {
     ''');
   }
 
+  /// The genre tag of each Library song among [matchKeys] (title and artist
+  /// as the Library compares them) that has one, as `match_key` and
+  /// `genre_name` rows. A song in both sources, or in several files, is
+  /// listed once per file.
+  Future<List<Map<String, Object?>>> genresOfSongs(
+    List<String> matchKeys, {
+    required bool includeLocal,
+  }) async {
+    final rows = <Map<String, Object?>>[];
+    // Under SQLite's limit of 999 variables with both sources.
+    const chunk = 400;
+    for (var start = 0; start < matchKeys.length; start += chunk) {
+      final keys = matchKeys.sublist(
+        start,
+        (start + chunk).clamp(0, matchKeys.length),
+      );
+      final marks = List.filled(keys.length, '?').join(',');
+      final parts = <String>[
+        '''
+          SELECT match_key, TRIM(genre) AS genre_name
+          FROM history_db.history
+          WHERE sort_genre != '' AND match_key IN ($marks)
+        ''',
+        if (includeLocal)
+          '''
+            SELECT l.match_key, TRIM(l.genre) AS genre_name
+            FROM ${LibrarySchema.visibleView} l
+            WHERE l.sort_genre != '' AND l.match_key IN ($marks)
+          ''',
+      ];
+      rows.addAll(
+        await _db.rawQuery(parts.join(' UNION ALL '), [
+          ...keys,
+          if (includeLocal) ...keys,
+        ]),
+      );
+    }
+    return rows;
+  }
+
   String _escapeLikePattern(String value) {
     return value
         .replaceAll('\\', r'\\')
