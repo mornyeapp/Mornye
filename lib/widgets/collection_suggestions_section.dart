@@ -191,13 +191,17 @@ class _CollectionSuggestionsSliverState
       sliver: SliverList.list(
         children: [
           header,
-          for (final track in tracks)
-            _SuggestionRow(
+          for (final (index, track) in tracks.indexed)
+            TrackCardSegment.at(
               key: ValueKey('suggestion:${track.source}:${track.id}'),
-              track: track,
-              addTooltip: addTooltip,
-              onAdd: () => _add(track),
-              onDownload: () => _download(track),
+              index: index,
+              count: tracks.length,
+              child: _SuggestionRow(
+                track: track,
+                addTooltip: addTooltip,
+                onAdd: () => _add(track),
+                onDownload: () => _download(track),
+              ),
             ),
         ],
       ),
@@ -254,7 +258,6 @@ class _SuggestionsHeader extends StatelessWidget {
 
 class _SuggestionRow extends ConsumerWidget {
   const _SuggestionRow({
-    super.key,
     required this.track,
     required this.addTooltip,
     required this.onAdd,
@@ -271,7 +274,7 @@ class _SuggestionRow extends ConsumerWidget {
     final size = context.tokens.coverCompact;
     final cover = track.coverUrl?.trim() ?? '';
     return TrackCard(
-      style: TrackCardStyle.flat,
+      style: collectionTrackCardStyle(context),
       leadingArtwork: true,
       leading: ClipRRect(
         borderRadius: context.tokens.borderRadiusThumb,

@@ -817,7 +817,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
 
   Widget _folderRow(LibraryDirectory parent, LibraryDirectory folder) {
     return TrackCard(
-      style: context.isMornye ? TrackCardStyle.flat : TrackCardStyle.filled,
+      style: collectionTrackCardStyle(context),
       leading: _FolderArtwork(folder: folder),
       leadingArtwork: folder.cover != null,
       // Top-level entries of several volumes read as their paths.
@@ -854,7 +854,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
             : () => _play(items, start: item);
         void openDetails() => _openDetails(item);
         return TrackCard(
-          style: context.isMornye ? TrackCardStyle.flat : TrackCardStyle.filled,
+          style: collectionTrackCardStyle(context),
           leading: _SongArtwork(item: item, size: context.tokens.coverList),
           leadingArtwork: true,
           title: item.trackName,

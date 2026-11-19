@@ -543,8 +543,10 @@ class _LibraryTracksFolderScreenState
                 final entry = entries[index];
                 final isSelected = selectedIds.contains(entry.key);
                 final isInHistory = inHistory[index];
-                return KeyedSubtree(
+                return TrackCardSegment.at(
                   key: ValueKey(entry.key),
+                  index: index,
+                  count: entries.length,
                   child: StaggeredListItem(
                     index: index,
                     child: _CollectionTrackTile(
@@ -1437,7 +1439,7 @@ class _CollectionTrackTile extends ConsumerWidget {
     void openDetails() => _navigateToMetadata(context, ref);
 
     return TrackCard(
-      style: TrackCardStyle.flat,
+      style: collectionTrackCardStyle(context),
       queueSwipe: queueSwipe,
       isSelectionMode: isSelectionMode,
       isSelected: isSelected,

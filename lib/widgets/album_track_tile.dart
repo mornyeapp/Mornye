@@ -58,7 +58,7 @@ class AlbumTrackTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return TrackCard(
-      style: TrackCardStyle.flat,
+      style: collectionTrackCardStyle(context),
       queueSwipe: queueSwipe,
       isSelectionMode: isSelectionMode,
       isSelected: isSelected,

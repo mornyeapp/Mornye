@@ -21,6 +21,7 @@ import 'package:mornye/widgets/loaded_sliver_fade_in.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
+import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/track_list_tile.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
@@ -492,8 +493,11 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
           final track = _tracks[index];
           final selectionId = _trackSelectionId(track, index);
           final isInHistory = existingHistoryKeys.contains(historyKeys[index]);
-          return KeyedSubtree(
+          // Material joins the rows into one connected list.
+          return TrackCardSegment.at(
             key: ValueKey(track.id),
+            index: index,
+            count: _tracks.length,
             child: StaggeredListItem(
               index: index,
               child: TrackListTile(

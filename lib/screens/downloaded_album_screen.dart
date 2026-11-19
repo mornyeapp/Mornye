@@ -56,6 +56,7 @@ import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
+import 'package:mornye/widgets/track_card.dart';
 
 class DownloadedAlbumScreen extends ConsumerStatefulWidget {
   final String albumName;
@@ -667,8 +668,11 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
             final track = tracks[index];
-            return KeyedSubtree(
+            // Material joins the rows into one connected list.
+            return TrackCardSegment.at(
               key: ValueKey(track.id),
+              index: index,
+              count: tracks.length,
               child: StaggeredListItem(
                 index: index,
                 child: _buildTrackItem(context, track, tracks, index),
@@ -700,8 +704,10 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
         SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
             final track = discTracks[index];
-            return KeyedSubtree(
+            return TrackCardSegment.at(
               key: ValueKey(track.id),
+              index: index,
+              count: discTracks.length,
               child: StaggeredListItem(
                 index: discRevealStart + index,
                 child: _buildTrackItem(

@@ -16,6 +16,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/album_track_tile.dart';
 import 'package:mornye/widgets/song_row_tap.dart';
+import 'package:mornye/widgets/track_card.dart';
 
 import 'support/app_icon_finder.dart';
 import 'support/tooltip_finder.dart';
@@ -157,6 +158,22 @@ Future<void> _pauseAndResume(
       ? find.text('Song $number')
       : find.descendant(of: row(number), matching: find.byType(IconButton));
   final rowGlyph = tapPlays ? findsNothing : findsOneWidget;
+  // Material joins the album's rows as the Library does; Mornye rows stay
+  // flat.
+  TrackCard card(int number) => tester.widget(
+    find.descendant(of: row(number), matching: find.byType(TrackCard)),
+  );
+  TrackCardSegment segment(int number) => tester.widget(
+    find.ancestor(of: row(number), matching: find.byType(TrackCardSegment)),
+  );
+  for (final number in [1, 2]) {
+    expect(
+      card(number).style,
+      mornye ? TrackCardStyle.flat : TrackCardStyle.filled,
+    );
+  }
+  expect((segment(1).first, segment(1).last), (true, false));
+  expect((segment(2).first, segment(2).last), (false, true));
   expect(
     findByTooltip('Show details'),
     tapPlays ? findsNWidgets(2) : findsNothing,

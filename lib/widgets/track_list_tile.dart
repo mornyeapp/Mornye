@@ -79,7 +79,7 @@ class TrackListTile extends ConsumerWidget {
         : false;
 
     return TrackCard(
-      style: TrackCardStyle.flat,
+      style: collectionTrackCardStyle(context),
       isSelectionMode: isSelectionMode,
       isSelected: isSelected,
       isCurrent: playback.isCurrent,

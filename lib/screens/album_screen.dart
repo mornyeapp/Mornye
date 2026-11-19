@@ -32,6 +32,7 @@ import 'package:mornye/widgets/loaded_sliver_fade_in.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/cross_extension_share_sheet.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
+import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/track_list_tile.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/detail_header.dart';
@@ -760,8 +761,19 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
           final track = tracks[index];
           final selectionId = _trackSelectionId(track, index);
           final isInHistory = existingHistoryKeys.contains(historyKeys[index]);
-          final row = KeyedSubtree(
+          final disc = discNumber(track);
+          final startsDisc =
+              hasMultipleDiscs &&
+              (index == 0 || discNumber(tracks[index - 1]) != disc);
+          final endsDisc =
+              hasMultipleDiscs &&
+              index < tracks.length - 1 &&
+              discNumber(tracks[index + 1]) != disc;
+          // Material joins the rows of a disc into one connected list.
+          final row = TrackCardSegment(
             key: ValueKey(selectionId),
+            first: index == 0 || startsDisc,
+            last: index == tracks.length - 1 || endsDisc,
             child: StaggeredListItem(
               index: index,
               child: TrackListTile(
@@ -800,9 +812,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
               ),
             ),
           );
-          final disc = discNumber(track);
-          if (hasMultipleDiscs &&
-              (index == 0 || discNumber(tracks[index - 1]) != disc)) {
+          if (startsDisc) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

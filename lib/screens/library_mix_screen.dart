@@ -453,9 +453,7 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
                   mediaItemPlaybackUiProvider(_rowKey(item)),
                 );
                 return TrackCard(
-                  style: context.isMornye
-                      ? TrackCardStyle.flat
-                      : TrackCardStyle.filled,
+                  style: collectionTrackCardStyle(context),
                   leadingArtwork: true,
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(tokens.radiusThumb),

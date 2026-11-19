@@ -15,15 +15,20 @@ import 'package:mornye/widgets/settings_group.dart';
 
 /// How a [TrackCard] paints its container.
 enum TrackCardStyle {
-  /// Filled card surface. Used where rows are discrete objects the user acts
-  /// on individually: the download queue, history, the local library.
+  /// Filled card surface: the Library, the download queue, history, and in
+  /// Material every song list (see [collectionTrackCardStyle]).
   filled,
 
-  /// Transparent container. Used inside a collection that already has its own
-  /// header and reads as one continuous list: album, playlist and folder track
-  /// lists.
+  /// Transparent container: Mornye song lists, and rows inside a surface
+  /// that is already filled.
   flat,
 }
+
+/// The style of a song row under a collection's header (album, playlist,
+/// mix): filled in Material, where a [TrackCardSegment] joins the rows as in
+/// the Library, and flat in Mornye.
+TrackCardStyle collectionTrackCardStyle(BuildContext context) =>
+    context.isMornye ? TrackCardStyle.flat : TrackCardStyle.filled;
 
 /// Marks a filled [TrackCard] as one row of a run of cards, so the Material
 /// theme draws the run as an expressive connected list: 2dp apart, large
