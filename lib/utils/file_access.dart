@@ -12,6 +12,15 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/ios_container_paths.dart';
 import 'package:mornye/utils/mime_utils.dart';
 
+/// Returns whether [path] is an absolute local filesystem path (POSIX `/...`
+/// or Windows drive/UNC path, excluding root-relative `\...` paths).
+bool isAbsoluteLocalPath(String path) {
+  final trimmed = path.trim();
+  if (trimmed.isEmpty) return false;
+  if (trimmed.startsWith('/')) return true;
+  return p.windows.isAbsolute(trimmed) && !p.windows.isRootRelative(trimmed);
+}
+
 /// Whether the queue should run its iOS output-directory path-shape check
 /// (which can replace [outputDir] with the default Documents folder when the
 /// path looks like iCloud Drive or an invalid container path).
