@@ -868,7 +868,12 @@ extension _ArtistScreenSections on _ArtistScreenState {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            context.isMornye ? 16 : connectedRunTitleInset,
+            24,
+            16,
+            12,
+          ),
           child: Text(
             context.l10n.artistPopular,
             style: Theme.of(

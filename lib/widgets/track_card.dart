@@ -30,6 +30,15 @@ enum TrackCardStyle {
 TrackCardStyle collectionTrackCardStyle(BuildContext context) =>
     context.isMornye ? TrackCardStyle.flat : TrackCardStyle.filled;
 
+/// Space between a collection header and the Material run of rows under it,
+/// which would otherwise start at the header's edge. Flat rows need none.
+double collectionRunTopGap(BuildContext context) =>
+    context.isMornye ? 0 : context.tokens.gapMd;
+
+/// Start inset of a title set above a Material run of rows: a step inside
+/// the run's edge, where the Library's date and letter headers sit.
+const double connectedRunTitleInset = 20;
+
 /// Marks a filled [TrackCard] as one row of a run of cards, so the Material
 /// theme draws the run as an expressive connected list: 2dp apart, large
 /// corners at the ends of the run and small corners between rows.

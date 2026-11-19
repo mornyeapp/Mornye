@@ -19,6 +19,7 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/services/playable_media.dart' show PlayableMedia;
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -974,6 +975,12 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
             slivers.add(
               SliverToBoxAdapter(
                 child: ListTile(
+                  contentPadding: context.isMornye
+                      ? null
+                      : const EdgeInsetsDirectional.only(
+                          start: connectedRunTitleInset,
+                          end: 24,
+                        ),
                   title: Text(
                     _label(kind),
                     style: Theme.of(context).textTheme.titleLarge,

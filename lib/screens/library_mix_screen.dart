@@ -437,7 +437,9 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
   Widget _buildTrackList(BuildContext context) {
     final tokens = context.tokens;
     return SliverPadding(
-      padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
+      padding: EdgeInsets.symmetric(
+        horizontal: wideListInset(context),
+      ).copyWith(top: collectionRunTopGap(context)),
       sliver: SliverList.builder(
         itemCount: _items.length,
         itemBuilder: (context, index) {

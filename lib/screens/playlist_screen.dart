@@ -487,7 +487,9 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       );
     }
     return SliverPadding(
-      padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
+      padding: EdgeInsets.symmetric(
+        horizontal: wideListInset(context),
+      ).copyWith(top: collectionRunTopGap(context)),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate((context, index) {
           final track = _tracks[index];

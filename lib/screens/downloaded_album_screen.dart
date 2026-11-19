@@ -664,7 +664,9 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
     if (isDesktopPlatform) return _buildDesktopTable(context, tracks);
     if (discMap.length <= 1) {
       return SliverPadding(
-        padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
+        padding: EdgeInsets.symmetric(
+          horizontal: wideListInset(context),
+        ).copyWith(top: collectionRunTopGap(context)),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
             final track = tracks[index];

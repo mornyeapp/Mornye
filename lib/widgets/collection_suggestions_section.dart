@@ -220,7 +220,13 @@ class _SuggestionsHeader extends StatelessWidget {
     final l10n = context.l10n;
     final textTheme = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 4, 4),
+      // Lines up with the covers of flat rows; a step inside a filled run.
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        connectedRunTitleInset,
+        0,
+        4,
+        8,
+      ),
       child: Row(
         children: [
           Expanded(

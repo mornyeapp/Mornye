@@ -743,7 +743,10 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
     }
 
     return SliverPadding(
-      padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
+      // A disc label brings its own space above the first run.
+      padding: EdgeInsets.symmetric(
+        horizontal: wideListInset(context),
+      ).copyWith(top: hasMultipleDiscs ? 0 : collectionRunTopGap(context)),
       sliver: SliverMainAxisGroup(slivers: slivers),
     );
   }

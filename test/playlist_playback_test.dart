@@ -858,6 +858,9 @@ void main() {
           matching: find.byType(TrackCard),
         );
         await tester.scrollUntilVisible(row, 200);
+        // The whole row, so the tap lands on its button.
+        await tester.ensureVisible(row);
+        await tester.pumpAndSettle();
         expect(
           find.descendant(of: row, matching: findByTooltip('Show details')),
           tapPlays ? findsOneWidget : findsNothing,
