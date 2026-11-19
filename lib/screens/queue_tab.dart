@@ -200,6 +200,19 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     return mode == 'albums' && _albumsShowSingles ? 'singles' : mode;
   }
 
+  /// The page the pager rests on. It changes once a move has settled, so a
+  /// drag under way is never cut short by the page it is heading for.
+  int _restingPage = 0;
+
+  /// Whether the page at [index] lists song rows, which take the queue
+  /// swipe. A grid of songs and the collection pages have none.
+  bool _pageHasSongRows(int index, String viewMode) =>
+      switch (_modeForPage(index)) {
+        'all' || 'singles' => viewMode != 'grid',
+        'folders' => true,
+        _ => false,
+      };
+
   bool _isPageControllerInitialized = false;
   bool _wasTabVisible = false;
   final TextEditingController _searchController = TextEditingController();
@@ -346,6 +359,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
         ref.read(settingsProvider.notifier).setHistoryFilterMode(initialMode);
       });
     }
+    _restingPage = initialPage;
     _filterPageController = PageController(initialPage: initialPage);
   }
 
@@ -1113,43 +1127,61 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                       isPageLoading: isLibraryPageLoading,
                       inMemoryHistoryItems: inMemoryHistoryItems,
                     )
-                  : PageView.builder(
-                      controller: _filterPageController!,
-                      // While song rows swipe to queue, the tabs alone
-                      // change pages, so the two sideways swipes never
-                      // compete.
-                      physics: queueSwipeEnabled(ref)
-                          ? const NeverScrollableScrollPhysics()
-                          : const ClampingScrollPhysics(),
-                      onPageChanged: _onFilterPageChanged,
-                      itemCount: _filterModes.length,
-                      itemBuilder: (context, index) {
-                        if (_filterModes[index] == 'artists') {
-                          return _buildArtistsPage(context, colorScheme);
+                  : NotificationListener<ScrollEndNotification>(
+                      onNotification: (notification) {
+                        final metrics = notification.metrics;
+                        if (notification.depth != 0 ||
+                            metrics is! PageMetrics) {
+                          return false;
                         }
-                        if (_filterModes[index] == 'genres') {
-                          return _buildGenresPage(context, colorScheme);
+                        final page = metrics.page?.round();
+                        if (page != null && page != _restingPage) {
+                          setState(() => _restingPage = page);
                         }
-                        if (_filterModes[index] == 'folders') {
-                          return const LibraryDirectoryView(showHeader: false);
-                        }
-                        final filterMode = _modeForPage(index);
-                        final filterData = getFilterData(filterMode);
-                        return _buildFilterContent(
-                          context: context,
-                          colorScheme: colorScheme,
-                          filterMode: filterMode,
-                          historyViewMode: historyViewMode,
-                          hasQueueItems: hasQueueItems,
-                          filterData: filterData,
-                          collectionState: collectionState,
-                          hasMoreLibrary: filterMode == historyFilterMode
-                              ? hasMoreLibrary
-                              : false,
-                          isPageLoading: isLibraryPageLoading,
-                          inMemoryHistoryItems: inMemoryHistoryItems,
-                        );
+                        return false;
                       },
+                      child: PageView.builder(
+                        controller: _filterPageController!,
+                        // On a page of song rows that swipe to queue, the
+                        // tabs alone change pages, so the two sideways
+                        // swipes never compete.
+                        physics:
+                            queueSwipeEnabled(ref) &&
+                                _pageHasSongRows(_restingPage, historyViewMode)
+                            ? const NeverScrollableScrollPhysics()
+                            : const ClampingScrollPhysics(),
+                        onPageChanged: _onFilterPageChanged,
+                        itemCount: _filterModes.length,
+                        itemBuilder: (context, index) {
+                          if (_filterModes[index] == 'artists') {
+                            return _buildArtistsPage(context, colorScheme);
+                          }
+                          if (_filterModes[index] == 'genres') {
+                            return _buildGenresPage(context, colorScheme);
+                          }
+                          if (_filterModes[index] == 'folders') {
+                            return const LibraryDirectoryView(
+                              showHeader: false,
+                            );
+                          }
+                          final filterMode = _modeForPage(index);
+                          final filterData = getFilterData(filterMode);
+                          return _buildFilterContent(
+                            context: context,
+                            colorScheme: colorScheme,
+                            filterMode: filterMode,
+                            historyViewMode: historyViewMode,
+                            hasQueueItems: hasQueueItems,
+                            filterData: filterData,
+                            collectionState: collectionState,
+                            hasMoreLibrary: filterMode == historyFilterMode
+                                ? hasMoreLibrary
+                                : false,
+                            isPageLoading: isLibraryPageLoading,
+                            inMemoryHistoryItems: inMemoryHistoryItems,
+                          );
+                        },
+                      ),
                     ),
             ),
           ),

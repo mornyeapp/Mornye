@@ -815,20 +815,50 @@ void main() {
           ),
         )
         .physics;
+    Future<void> settle() async {
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+
+    Future<void> openTab(String label) async {
+      final tab = find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text(label),
+      );
+      await tester.ensureVisible(tab);
+      await tester.pump();
+      await tester.tap(tab);
+      await settle();
+    }
+
     expect(container.read(settingsProvider).swipeToQueue, isTrue);
     expect(pagerPhysics(), isA<NeverScrollableScrollPhysics>());
 
-    // The tabs still change pages.
-    await tester.tap(
-      find.descendant(
-        of: find.byType(TabBar),
-        matching: find.text(l10n.libraryFolders),
-      ),
+    // A grid of songs has no rows to swipe, so the pager swipes.
+    container.read(settingsProvider.notifier).setHistoryViewMode('grid');
+    await tester.pump();
+    expect(pagerPhysics(), isA<ClampingScrollPhysics>());
+    container.read(settingsProvider.notifier).setHistoryViewMode('list');
+    await tester.pump();
+    expect(pagerPhysics(), isA<NeverScrollableScrollPhysics>());
+
+    // So does a page of collections, and a drag from it lands on the songs.
+    await openTab(l10n.historyFilterAlbums);
+    expect(pagerPhysics(), isA<ClampingScrollPhysics>());
+    final pager = find.descendant(
+      of: find.byType(QueueTab),
+      matching: find.byType(PageView),
     );
-    for (var i = 0; i < 20; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
+    await tester.fling(pager, const Offset(600, 0), 2000);
+    await settle();
+    expect(tester.widget<PageView>(pager).controller!.page, 0);
+    expect(pagerPhysics(), isA<NeverScrollableScrollPhysics>());
+
+    // The tabs still change pages, and Folders lists song rows.
+    await openTab(l10n.libraryFolders);
     expect(find.byType(LibraryDirectoryView), findsOneWidget);
+    expect(pagerPhysics(), isA<NeverScrollableScrollPhysics>());
 
     // With the setting off the pager swipes as before.
     container.read(settingsProvider.notifier).setSwipeToQueue(false);
