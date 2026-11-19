@@ -14,6 +14,7 @@ import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/library_browse_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/providers/library_directory_provider.dart';
 import 'package:mornye/providers/library_genres_provider.dart';
 import 'package:mornye/providers/library_search_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
@@ -24,6 +25,7 @@ import 'package:mornye/screens/library_tracks_folder_screen.dart';
 import 'package:mornye/screens/queue_tab.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/library_directory_index.dart';
 import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/playable_media.dart' show PlayableMedia;
 import 'package:mornye/theme/app_theme.dart';
@@ -802,7 +804,25 @@ void main() {
 
   testWidgets('the pager leaves sideways swipes to song rows while they '
       'swipe to queue', (tester) async {
-    await pumpLibrary(tester);
+    await pumpLibrary(
+      tester,
+      overrides: [
+        // Songs sit beside the folders on the Folders page.
+        libraryDirectoryIndexProvider.overrideWith(
+          (ref) async => LibraryDirectoryIndex.build([
+            for (final song in ['a', 'b'])
+              LibraryDirectoryEntry(
+                source: 'downloaded',
+                id: song,
+                path: '/storage/emulated/0/Music/$song.flac',
+              ),
+          ]),
+        ),
+        libraryDirectoryItemsLoaderProvider.overrideWithValue(
+          (tracks) async => const [],
+        ),
+      ],
+    );
     final l10n = l10nOf(tester);
     final container = ProviderScope.containerOf(
       tester.element(find.byType(QueueTab)),
@@ -864,6 +884,47 @@ void main() {
     container.read(settingsProvider.notifier).setSwipeToQueue(false);
     await tester.pump();
     expect(pagerPhysics(), isA<ClampingScrollPhysics>());
+  });
+
+  testWidgets('the Folders page swipes while it lists folders only', (
+    tester,
+  ) async {
+    await pumpLibrary(
+      tester,
+      overrides: [
+        libraryDirectoryIndexProvider.overrideWith(
+          (ref) async => LibraryDirectoryIndex.build([
+            for (final album in ['One', 'Two'])
+              LibraryDirectoryEntry(
+                source: 'downloaded',
+                id: album,
+                path: '/storage/emulated/0/Music/$album/song.flac',
+              ),
+          ]),
+        ),
+      ],
+    );
+    final l10n = l10nOf(tester);
+    final tab = find.descendant(
+      of: find.byType(TabBar),
+      matching: find.text(l10n.libraryFolders),
+    );
+    await tester.ensureVisible(tab);
+    await tester.pump();
+    await tester.tap(tab);
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.byType(LibraryDirectoryView), findsOneWidget);
+    final pager = find.descendant(
+      of: find.byType(QueueTab),
+      matching: find.byType(PageView),
+    );
+    expect(
+      tester.widget<PageView>(pager).physics,
+      isA<ClampingScrollPhysics>(),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   for (final mornye in [false, true]) {

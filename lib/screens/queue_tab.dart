@@ -48,6 +48,7 @@ import 'package:intl/intl.dart' show DateFormat;
 import 'package:mornye/providers/library_browse_provider.dart';
 import 'package:mornye/providers/library_genres_provider.dart';
 import 'package:mornye/providers/library_counts_provider.dart';
+import 'package:mornye/providers/library_directory_provider.dart';
 import 'package:mornye/providers/library_search_provider.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/widgets/app_shape.dart';
@@ -205,11 +206,16 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   int _restingPage = 0;
 
   /// Whether the page at [index] lists song rows, which take the queue
-  /// swipe. A grid of songs and the collection pages have none.
+  /// swipe. A grid of songs, the collection pages and folder rows have none.
   bool _pageHasSongRows(int index, String viewMode) =>
       switch (_modeForPage(index)) {
         'all' || 'singles' => viewMode != 'grid',
-        'folders' => true,
+        // Folders open on their own page; only songs beside them swipe.
+        'folders' => ref.watch(
+          libraryDirectoryIndexProvider.select(
+            (index) => index.value?.root.tracks.isNotEmpty ?? false,
+          ),
+        ),
         _ => false,
       };
 
