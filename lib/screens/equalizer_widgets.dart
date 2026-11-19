@@ -304,19 +304,26 @@ class _PresetBar extends ConsumerWidget {
               padding: EdgeInsets.symmetric(horizontal: inset),
               child: Row(
                 children: [
-                  Flexible(
-                    child: ExpressiveButton(
-                      onPressed: onSave,
-                      tonal: true,
-                      icon: const AppIcon(Icons.bookmark_add_outlined),
-                      child: Text(
-                        l10n.equalizerSavePreset,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                  // The button takes the room up to the icons and keeps its
+                  // own width at the start, so the icons end the row. A
+                  // Flexible beside a Spacer left them mid-row: the two
+                  // halved the free width and the button used little of its
+                  // half.
+                  Expanded(
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: ExpressiveButton(
+                        onPressed: onSave,
+                        tonal: true,
+                        icon: const AppIcon(Icons.bookmark_add_outlined),
+                        child: Text(
+                          l10n.equalizerSavePreset,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
                   ),
-                  const Spacer(),
                   ExpressiveIconButton(
                     tooltip: l10n.libraryFilterReset,
                     icon: const AppIcon(Icons.restart_alt),
