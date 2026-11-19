@@ -55,6 +55,7 @@ import 'package:mornye/controllers/track_history_snapshot.dart';
 import 'package:mornye/widgets/download_service_picker.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
+import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
 import 'package:mornye/widgets/track_collection_quick_actions.dart';
 import 'package:mornye/widgets/animation_utils.dart';

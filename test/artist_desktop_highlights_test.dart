@@ -6,15 +6,21 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/track_provider.dart';
 import 'package:mornye/screens/artist_screen.dart';
+import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/artist_featured_album_card.dart';
+import 'package:mornye/widgets/settings_group.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   tearDown(() => debugDesktopPlatformOverride = null);
 
-  Future<void> pumpArtist(WidgetTester tester, {required bool desktop}) async {
+  Future<void> pumpArtist(
+    WidgetTester tester, {
+    required bool desktop,
+    bool mornye = true,
+  }) async {
     debugDesktopPlatformOverride = desktop;
     SharedPreferences.setMockInitialValues({});
     await tester.binding.setSurfaceSize(Size(desktop ? 1000 : 430, 1200));
@@ -27,7 +33,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          theme: MornyeTheme.build(Brightness.dark),
+          theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.dark(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: ArtistScreen(
@@ -141,6 +147,34 @@ void main() {
     expect(firstSong.top, greaterThan(popular.bottom));
     expect(secondSong.top, greaterThan(firstSong.bottom));
     expect(secondSong.left, closeTo(firstSong.left, 0.01));
+    expect(tester.takeException(), isNull);
+    await dispose(tester);
+  });
+
+  testWidgets('Material joins a page of popular songs into one list', (
+    tester,
+  ) async {
+    await pumpArtist(tester, desktop: false, mornye: false);
+    Finder row(int song) => find
+        .ancestor(of: find.text('Song $song'), matching: find.byType(Material))
+        .first;
+    BorderRadius corners(int song) =>
+        (tester.widget<Material>(row(song)).shape! as RoundedRectangleBorder)
+                .borderRadius
+            as BorderRadius;
+    final fill = settingsGroupColor(tester.element(find.text('Popular')));
+    for (final song in [0, 1, 4]) {
+      expect(tester.widget<Material>(row(song)).color, fill);
+    }
+    // Large corners close the run, small ones sit between its rows.
+    expect(corners(0).topLeft.x, greaterThan(corners(0).bottomLeft.x));
+    expect(corners(1).topLeft, corners(1).bottomLeft);
+    expect(corners(4).bottomLeft, corners(0).topLeft);
+    expect(
+      tester.getRect(row(1)).top - tester.getRect(row(0)).bottom,
+      closeTo(2, 0.01),
+    );
+    expect(tester.getRect(row(0)).left, 16);
     expect(tester.takeException(), isNull);
     await dispose(tester);
   });
