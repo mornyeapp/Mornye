@@ -32,7 +32,7 @@ final _log = AppLogger('LibraryMixes');
 
 // Versioned so new kinds of mixes replace a cache made before them the
 // same day.
-const _cacheKey = 'home_library_mixes_v2';
+const _cacheKey = 'home_library_mixes_v3';
 
 /// The year a release date such as `2019-05-10` or `2019` names, or null.
 int? libraryMixReleaseYear(Object? releaseDate) {

@@ -35,6 +35,29 @@ List<PlayableMedia> _library() {
   ];
 }
 
+/// Two large genres and seven small ones, each enough for a mix.
+List<PlayableMedia> _wideLibrary() {
+  const small = [
+    'Country',
+    'Electronic',
+    'Folk',
+    'Jazz',
+    'Metal',
+    'Pop',
+    'Reggae',
+  ];
+  return [
+    for (var a = 0; a < 30; a++)
+      for (var s = 0; s < 6; s++) _song('hh$a-$s', 'Rapper $a', 'Hip-Hop'),
+    for (var a = 0; a < 20; a++)
+      for (var s = 0; s < 6; s++) _song('rock$a-$s', 'Band $a', 'Rock'),
+    for (final (g, genre) in small.indexed)
+      for (var a = 0; a < 7; a++)
+        for (var s = 0; s < 3; s++)
+          _song('small$g-$a-$s', '$genre Act $a', genre),
+  ];
+}
+
 Map<String, Object?> _json(List<LibraryMix> mixes) => {
   for (final mix in mixes) '${mix.kind.name}:${mix.key}': mix.toJson(),
 };
@@ -480,6 +503,155 @@ void main() {
       for (final id in decades.single.songIds) {
         expect(id, matches(RegExp(r'^local_(rock|hh)[0-2]-')));
       }
+    });
+
+    test('Deep Cuts holds what the artists played most are not played for', () {
+      final songs = _wideLibrary();
+      final mixes = buildLibraryMixes(
+        LibraryMixRequest(
+          songs: songs,
+          at: day,
+          exists: exists,
+          // One song each of five rappers is played.
+          plays: {for (var a = 0; a < 5; a++) 'local_hh$a-0': 9.0 - a},
+        ),
+      );
+      final deep = mixes.singleWhere(
+        (mix) => mix.kind == LibraryMixKind.deepCuts,
+      );
+      expect(deep.songIds.length, greaterThanOrEqualTo(libraryMixMinSongs));
+      for (final id in deep.songIds) {
+        expect(id, matches(RegExp(r'^local_hh[0-4]-[1-5]$')));
+      }
+    });
+
+    test('the newest year with enough songs is a mix', () {
+      final songs = _library();
+      Map<String, int> released(int year) => {
+        for (var a = 0; a < 2; a++)
+          for (var s = 0; s < 6; s++) ...{
+            'local_hh$a-$s': year,
+            'local_rock$a-$s': year,
+          },
+        for (var a = 0; a < 4; a++)
+          for (var s = 0; s < 3; s++) 'local_jazz$a-$s': year,
+      };
+      LibraryMix year(Map<String, int> years) => buildLibraryMixes(
+        LibraryMixRequest(songs: songs, at: day, exists: exists, years: years),
+      ).singleWhere((mix) => mix.kind == LibraryMixKind.year);
+
+      final thisYear = year(released(2026));
+      expect(thisYear.key, '2026');
+      expect(thisYear.label, '2026');
+      expect(thisYear.songIds.toSet(), released(2026).keys.toSet());
+      // Too few this year: the last one names the mix.
+      expect(year({...released(2025), 'local_jazz6-0': 2026}).label, '2025');
+      // A Library all of one year has no year to set apart.
+      expect(
+        buildLibraryMixes(
+          LibraryMixRequest(
+            songs: songs,
+            at: day,
+            exists: exists,
+            years: {for (final song in songs) song.id: 2026},
+          ),
+        ).where((mix) => mix.kind == LibraryMixKind.year),
+        isEmpty,
+      );
+    });
+
+    test('a tagged Library names a mix after an artist played much', () {
+      final songs = _wideLibrary();
+      List<LibraryMix> artists(DateTime at) => [
+        for (final mix in buildLibraryMixes(
+          LibraryMixRequest(
+            songs: songs,
+            at: at,
+            exists: exists,
+            plays: {
+              for (var a = 0; a < 4; a++)
+                for (var s = 0; s < 6; s++) 'local_hh$a-$s': 20.0 - a,
+            },
+          ),
+        ))
+          if (mix.kind == LibraryMixKind.artist) mix,
+      ];
+      final leading = {'Rapper 0', 'Rapper 1', 'Rapper 2', 'Rapper 3'};
+      final first = <String>{};
+      for (var d = 0; d < 12; d++) {
+        final mixes = artists(day.add(Duration(days: d)));
+        expect(mixes, isNotEmpty);
+        expect(mixes.length, lessThanOrEqualTo(2));
+        for (final mix in mixes) {
+          expect(leading, contains(mix.label));
+        }
+        first.add(mixes.first.label);
+      }
+      // The artist is not the same one every day.
+      expect(first.length, greaterThan(1));
+    });
+
+    test('one genre past the five played most joins, a new one each day', () {
+      final songs = _wideLibrary();
+      const leading = ['hiphop', 'rock', 'country', 'electronic', 'folk'];
+      const others = {'jazz', 'metal', 'pop', 'reggae'};
+      final extra = <String>{};
+      for (var d = 0; d < 12; d++) {
+        final genres = [
+          for (final mix in buildLibraryMixes(
+            LibraryMixRequest(
+              songs: songs,
+              at: day.add(Duration(days: d)),
+              exists: exists,
+            ),
+          ))
+            if (mix.kind == LibraryMixKind.genre) mix.key,
+        ];
+        expect(genres.toSet(), containsAll(leading));
+        expect(genres.length, 6);
+        final added = genres.toSet().difference(leading.toSet()).single;
+        expect(others, contains(added));
+        extra.add(added);
+      }
+      expect(extra.length, greaterThan(1));
+    });
+
+    test('discoveries take turns with the mixes played less', () {
+      final songs = _wideLibrary();
+      final mixes = buildLibraryMixes(
+        LibraryMixRequest(
+          songs: songs,
+          at: day,
+          exists: exists,
+          plays: {
+            for (var a = 0; a < 4; a++)
+              for (var s = 0; s < 3; s++) 'local_hh$a-$s': 12.0 - a,
+            'local_rock0-0': 3,
+          },
+          pastPlays: {
+            for (var a = 4; a < 12; a++)
+              for (var s = 0; s < 4; s++) 'local_rock$a-$s': 2,
+          },
+          added: {
+            for (var a = 0; a < 7; a++)
+              for (var s = 0; s < 3; s++)
+                'local_small0-$a-$s': day.subtract(const Duration(days: 3)),
+          },
+        ),
+      );
+      bool discovery(LibraryMix mix) => const {
+        LibraryMixKind.fresh,
+        LibraryMixKind.rediscover,
+        LibraryMixKind.discover,
+        LibraryMixKind.deepCuts,
+      }.contains(mix.kind);
+      expect(mixes.first.kind, LibraryMixKind.favorites);
+      expect(mixes.where(discovery).length, greaterThanOrEqualTo(2));
+      expect(discovery(mixes[1]) || discovery(mixes[2]), isFalse);
+      expect(discovery(mixes[3]), isTrue);
+      expect(discovery(mixes[4]), isFalse);
+      expect(discovery(mixes[5]), isTrue);
+      expect(mixes.length, lessThanOrEqualTo(libraryMixMaxCount));
     });
 
     test('discoveries follow the favorites and the two mixes played most', () {

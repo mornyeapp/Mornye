@@ -621,7 +621,7 @@ void main() {
           songIds: [for (var index = 0; index < 12; index++) 'dl_d$index'],
         );
         SharedPreferences.setMockInitialValues({
-          'home_library_mixes_v2': jsonEncode({
+          'home_library_mixes_v3': jsonEncode({
             'day': listeningDay(DateTime.now()),
             'includeLocal': false,
             'count': 30,
