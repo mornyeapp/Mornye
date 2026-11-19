@@ -39,6 +39,10 @@ double collectionRunTopGap(BuildContext context) =>
 /// the run's edge, where the Library's date and letter headers sit.
 const double connectedRunTitleInset = 20;
 
+/// End inset of a control beside such a title, which puts it in line with
+/// the trailing controls of the rows.
+const double connectedRunTrailingInset = 28;
+
 /// Marks a filled [TrackCard] as one row of a run of cards, so the Material
 /// theme draws the run as an expressive connected list: 2dp apart, large
 /// corners at the ends of the run and small corners between rows.

@@ -6,6 +6,7 @@ import 'package:mornye/providers/collection_suggestions_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/services/collection_suggestions.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -221,10 +222,10 @@ class _SuggestionsHeader extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Padding(
       // Lines up with the covers of flat rows; a step inside a filled run.
-      padding: const EdgeInsetsDirectional.fromSTEB(
+      padding: EdgeInsetsDirectional.fromSTEB(
         connectedRunTitleInset,
         0,
-        4,
+        context.isMornye ? 4 : connectedRunTrailingInset,
         8,
       ),
       child: Row(

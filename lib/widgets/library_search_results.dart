@@ -979,7 +979,7 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
                       ? null
                       : const EdgeInsetsDirectional.only(
                           start: connectedRunTitleInset,
-                          end: 24,
+                          end: connectedRunTrailingInset,
                         ),
                   title: Text(
                     _label(kind),
