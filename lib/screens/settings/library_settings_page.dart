@@ -504,6 +504,9 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
     if (mode == AppSettings.libraryQualityLabelFileFormat) {
       return context.l10n.libraryQualityLabelFileFormat;
     }
+    if (mode == AppSettings.libraryQualityLabelSimple) {
+      return context.l10n.libraryQualityLabelSimple;
+    }
     if (mode == AppSettings.libraryQualityLabelBitDepthOnly) {
       return context.l10n.audioAnalysisBitDepth;
     }
@@ -537,6 +540,12 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
         (AppSettings.libraryQualityLabelFileFormat, Icons.audio_file_rounded),
       ])
         AppChoice(value, icon, _getQualityLabelModeLabel(context, value)),
+      AppChoice(
+        AppSettings.libraryQualityLabelSimple,
+        Icons.short_text_rounded,
+        context.l10n.libraryQualityLabelSimple,
+        subtitle: context.l10n.libraryQualityLabelSimpleSubtitle,
+      ),
     ],
     onSelected: (mode) =>
         ref.read(settingsProvider.notifier).setLibraryQualityLabelMode(mode),

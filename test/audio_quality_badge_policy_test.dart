@@ -215,6 +215,50 @@ void main() {
       );
     });
 
+    test('the simple mode names a tier, Dolby or the format', () {
+      const mode = AppSettings.libraryQualityLabelSimple;
+      expect(normalizeLibraryQualityLabelMode(mode), mode);
+      String? label({
+        String? format,
+        String? filePath,
+        int? bitrateKbps,
+        int? bitDepth,
+        int? sampleRate,
+        String? storedQuality,
+      }) => buildLibraryAudioQualityLabel(
+        mode: mode,
+        format: format,
+        filePath: filePath,
+        bitrateKbps: bitrateKbps,
+        bitDepth: bitDepth,
+        sampleRate: sampleRate,
+        storedQuality: storedQuality,
+      );
+
+      expect(
+        label(format: 'flac', bitDepth: 16, sampleRate: 44100),
+        'Lossless',
+      );
+      expect(label(format: 'flac', bitDepth: 24, sampleRate: 96000), 'Hi-Res');
+      expect(label(format: 'alac', bitDepth: 24, sampleRate: 48000), 'Hi-Res');
+      // A lossless file whose bit depth was never read is still lossless.
+      expect(label(filePath: '/music/song.wav'), 'Lossless');
+      expect(label(format: 'flac', storedQuality: '24-bit/96kHz'), 'Hi-Res');
+      expect(label(bitDepth: 16), 'Lossless');
+      for (final dolby in ['eac3', 'ec-3', 'ac3', 'ac4']) {
+        expect(label(format: dolby, bitrateKbps: 768), 'Dolby');
+      }
+      expect(label(format: 'opus', bitrateKbps: 375), 'OPUS');
+      expect(label(format: 'mp3', bitrateKbps: 320), 'MP3');
+      expect(label(format: 'm4a', bitrateKbps: 256), 'M4A');
+      // An unknown format keeps its own name: it may be lossy.
+      expect(label(format: 'wma', bitDepth: 16), 'WMA');
+      expect(label(), isNull);
+      expect(shouldHighlightAudioQualityBadge('Hi-Res'), isTrue);
+      expect(shouldHighlightAudioQualityBadge('Lossless'), isFalse);
+      expect(formatLibraryGridAudioQualityLabel('Hi-Res'), 'Hi-Res');
+    });
+
     test('shows only bit depth when requested', () {
       expect(
         buildLibraryAudioQualityLabel(

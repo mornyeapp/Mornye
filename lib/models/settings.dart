@@ -157,6 +157,7 @@ class AppSettings {
   static const String libraryQualityLabelBitDepthOnly = 'bit_depth_only';
   static const String libraryQualityLabelBitDepth = 'bit_depth';
   static const String libraryQualityLabelBitDepthBitrate = 'bit_depth_bitrate';
+  static const String libraryQualityLabelSimple = 'simple';
   static const String librarySongTapPlay = 'play';
   static const String librarySongTapDetails = 'details';
 

@@ -198,6 +198,9 @@ class SettingsSearchCatalog {
             'flac',
             'mp3',
             'kbps',
+            'simple',
+            'lossless',
+            'hi-res',
           ],
         ),
         if (!isDesktopPlatform && !isAndroidTv)

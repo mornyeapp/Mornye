@@ -38,8 +38,27 @@ String normalizeLibraryQualityLabelMode(String? mode) {
       AppSettings.libraryQualityLabelBitDepthBitrate,
     AppSettings.libraryQualityLabelBitrate =>
       AppSettings.libraryQualityLabelBitrate,
+    AppSettings.libraryQualityLabelSimple =>
+      AppSettings.libraryQualityLabelSimple,
     _ => AppSettings.libraryQualityLabelBitDepthOnly,
   };
+}
+
+const simpleQualityHiRes = 'Hi-Res';
+const simpleQualityLossless = 'Lossless';
+const simpleQualityDolby = 'Dolby';
+
+/// The short label: a tier for lossless audio, "Dolby" for Dolby codecs and
+/// the format's name for anything else.
+String? simpleAudioQualityLabel({String? format, int? bitDepth}) {
+  final known = normalizeAudioFormatValue(format);
+  if (const {'eac3', 'ac3', 'ac4'}.contains(known)) return simpleQualityDolby;
+  final depth = bitDepth ?? 0;
+  final lossless =
+      const {'flac', 'alac', 'wav', 'aiff'}.contains(known) ||
+      (normalizeOptionalString(format) == null && depth > 0);
+  if (!lossless) return _libraryFileFormatLabel(format);
+  return depth >= 24 ? simpleQualityHiRes : simpleQualityLossless;
 }
 
 String? _libraryFileFormatLabel(String? format) {
@@ -104,6 +123,12 @@ String? buildLibraryAudioQualityLabel({
 
   if (normalizedMode == AppSettings.libraryQualityLabelFileFormat) {
     return _libraryFileFormatLabel(effectiveFormat);
+  }
+  if (normalizedMode == AppSettings.libraryQualityLabelSimple) {
+    return simpleAudioQualityLabel(
+      format: effectiveFormat,
+      bitDepth: effectiveBitDepth,
+    );
   }
 
   if (isLossyAudioFormat(effectiveFormat)) {
@@ -186,7 +211,8 @@ bool isDetailedLibraryAudioQualityLabel(String quality) {
 /// also supporting newer labels that display a measured bitrate instead.
 bool shouldHighlightAudioQualityBadge(String quality) {
   final normalized = quality.trim().toLowerCase();
-  if (_highlightBitDepthPattern.hasMatch(normalized)) {
+  if (_highlightBitDepthPattern.hasMatch(normalized) ||
+      normalized == simpleQualityHiRes.toLowerCase()) {
     return true;
   }
 

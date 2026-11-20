@@ -82,6 +82,7 @@ final List<_Sheet> _library = [
       'bit_depth',
       'bit_depth_bitrate',
       'file_format',
+      'simple',
     ],
     [
       Icons.speed_rounded,
@@ -89,6 +90,7 @@ final List<_Sheet> _library = [
       Icons.graphic_eq_rounded,
       Icons.multiline_chart_rounded,
       Icons.audio_file_rounded,
+      Icons.short_text_rounded,
     ],
     (s) => s.libraryQualityLabelMode,
   ),
@@ -159,7 +161,11 @@ void main() {
           ],
           [
             for (final (i, value) in values.indexed)
-              (icons[i], value == current, page is LyricsSettingsPage),
+              (
+                icons[i],
+                value == current,
+                page is LyricsSettingsPage || value == 'simple',
+              ),
           ],
         );
 

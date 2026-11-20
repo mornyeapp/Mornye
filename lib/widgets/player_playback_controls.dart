@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart' show M3ETheme;
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/link/link_source_names.dart';
@@ -613,20 +614,29 @@ class _PlaybackModeSegment extends ConsumerWidget {
   }
 }
 
-class _QualityBadge extends StatelessWidget {
+class _QualityBadge extends ConsumerWidget {
   final PlayerMetadataController metadata;
   final ColorScheme colorScheme;
 
   const _QualityBadge({required this.metadata, required this.colorScheme});
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: metadata,
-    builder: (context, _) => _buildBadge(context),
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The Library's Simple label mode shortens this line as well.
+    final simple = ref.watch(
+      settingsProvider.select(
+        (s) =>
+            s.libraryQualityLabelMode == AppSettings.libraryQualityLabelSimple,
+      ),
+    );
+    return ListenableBuilder(
+      listenable: metadata,
+      builder: (context, _) => _buildBadge(context, simple: simple),
+    );
+  }
 
-  Widget _buildBadge(BuildContext context) {
-    final text = metadata.qualityLabel;
+  Widget _buildBadge(BuildContext context, {required bool simple}) {
+    final text = simple ? metadata.simpleQualityLabel : metadata.qualityLabel;
     if (text == null || text.isEmpty) return const SizedBox.shrink();
     final mornye = context.isMornye;
     final radius = BorderRadius.circular(20);

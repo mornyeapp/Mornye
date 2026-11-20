@@ -9,6 +9,8 @@ import 'package:mornye/services/playback_metadata.dart';
 import 'package:mornye/services/player_lyrics_persistence.dart';
 import 'package:mornye/services/saf_siblings.dart';
 import 'package:mornye/services/source_metadata_events.dart';
+import 'package:mornye/utils/audio_format_utils.dart';
+import 'package:mornye/utils/audio_quality_badge_policy.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_draft.dart';
@@ -670,6 +672,18 @@ class PlayerMetadataController extends ChangeNotifier {
     final bitrate = readPositiveInt(meta['bitrate']) ?? 0;
     if (bitDepth == 0 && bitrate > 0) parts.add('$bitrate kbps');
     return parts.isEmpty ? null : parts.join('  ·  ');
+  }
+
+  /// [qualityLabel] as one short word, for the Simple quality label mode.
+  String? get simpleQualityLabel {
+    final meta = metadata;
+    if (meta == null) return null;
+    return simpleAudioQualityLabel(
+      format:
+          detectedAudioFormatFromMetadata(meta) ??
+          (meta['format'] ?? meta['audio_codec'])?.toString(),
+      bitDepth: readPositiveInt(meta['bit_depth']),
+    );
   }
 
   @override

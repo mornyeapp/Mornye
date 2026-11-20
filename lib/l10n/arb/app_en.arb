@@ -2488,6 +2488,14 @@
   "@libraryQualityLabelFileFormat": {
     "description": "Library audio quality label mode that shows the detected file format"
   },
+  "libraryQualityLabelSimple": "Simple",
+  "@libraryQualityLabelSimple": {
+    "description": "Library audio quality label mode that shows one short word instead of the technical figures"
+  },
+  "libraryQualityLabelSimpleSubtitle": "Lossless, Hi-Res or the format's name, in the player too",
+  "@libraryQualityLabelSimpleSubtitle": {
+    "description": "Explains the Simple audio quality label mode. Lossless and Hi-Res are the labels shown and stay in English."
+  },
   "trackReleaseDate": "Release date",
   "@trackReleaseDate": {
     "description": "Metadata label - release date"
