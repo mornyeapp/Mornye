@@ -11,6 +11,9 @@ import 'package:mornye/widgets/app_snack_bar.dart';
 /// Plays [track] from download history or the local library when a matching
 /// file already exists on disk.
 ///
+/// With [queue], the album or playlist holding [track] at [queueIndex], a
+/// local hit plays the whole list from there, skipping songs with no file.
+///
 /// Returns true when playback started (or when an error was surfaced to the
 /// user), so callers can skip enqueueing a download; returns false when no
 /// local copy is available. Stale history entries whose file no longer exists
@@ -18,9 +21,20 @@ import 'package:mornye/widgets/app_snack_bar.dart';
 Future<bool> playLocalIfAvailable(
   BuildContext context,
   WidgetRef ref,
-  Track track,
-) async {
+  Track track, {
+  List<Track>? queue,
+  int queueIndex = 0,
+}) async {
   final historyNotifier = ref.read(downloadHistoryProvider.notifier);
+  final playsQueue =
+      queue != null &&
+      queue.length > 1 &&
+      queueIndex >= 0 &&
+      queueIndex < queue.length &&
+      queue[queueIndex].id == track.id;
+  Future<void> playQueue(String path) => ref
+      .read(playbackProvider.notifier)
+      .playTrackList(queue!, startIndex: queueIndex, startPath: path);
 
   try {
     DownloadHistoryItem? historyItem = await historyNotifier
@@ -36,6 +50,10 @@ Future<bool> playLocalIfAvailable(
 
     if (historyItem != null) {
       final exists = await fileExists(historyItem.filePath);
+      if (exists && playsQueue) {
+        await playQueue(historyItem.filePath);
+        return true;
+      }
       if (exists) {
         await ref
             .read(playbackProvider.notifier)
@@ -62,6 +80,10 @@ Future<bool> playLocalIfAvailable(
         );
 
     if (localItem != null && await fileExists(localItem.filePath)) {
+      if (playsQueue) {
+        await playQueue(localItem.filePath);
+        return true;
+      }
       await ref
           .read(playbackProvider.notifier)
           .playLocalPath(

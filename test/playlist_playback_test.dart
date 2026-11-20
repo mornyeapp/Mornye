@@ -1028,6 +1028,23 @@ void main() {
   );
 
   test(
+    'a start file found elsewhere plays when the lookup misses it',
+    () async {
+      await container
+          .read(playbackProvider.notifier)
+          .playTrackList(_tracks, startIndex: 1, startPath: '/found.flac');
+      expect(player.queue.map((item) => item.title), [
+        'First',
+        'Unavailable',
+        'Selected',
+        'Last',
+      ]);
+      expect(player.queue[1].source, '/found.flac');
+      expect(player.index, 1);
+    },
+  );
+
+  test(
     'single-file and catalog playback keep the genre for Autoplay',
     () async {
       final controller = container.read(playbackProvider.notifier);

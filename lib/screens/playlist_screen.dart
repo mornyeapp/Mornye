@@ -464,6 +464,8 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ref,
         tracks[index],
         isInHistory: inHistory[index],
+        queue: tracks,
+        queueIndex: index,
         onDownload: ({bool forceQualityPicker = false}) => _downloadTrack(
           context,
           tracks[index],
@@ -508,6 +510,8 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
                 child: TrackListTile(
                   track: track,
                   isInHistory: isInHistory,
+                  queue: _tracks,
+                  queueIndex: index,
                   isSelectionMode: isSelectionMode,
                   isSelected: selectedIds.contains(selectionId),
                   onToggleSelection: () => toggleSelection(selectionId),

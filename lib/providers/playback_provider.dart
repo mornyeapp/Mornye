@@ -164,7 +164,13 @@ class PlaybackController extends Notifier<PlaybackState> {
     }
   }
 
-  Future<void> playTrackList(List<Track> tracks, {int startIndex = 0}) async {
+  /// [startPath] is a file already found for the start track; it plays even
+  /// if the batch lookup misses that track.
+  Future<void> playTrackList(
+    List<Track> tracks, {
+    int startIndex = 0,
+    String? startPath,
+  }) async {
     if (tracks.isEmpty) return;
 
     final safeStart = startIndex.clamp(0, tracks.length - 1);
@@ -174,7 +180,9 @@ class PlaybackController extends Notifier<PlaybackState> {
       // visited, preserving the original forward/wrap fallback order.
       for (var offset = 0; offset < tracks.length; offset++) {
         final index = (safeStart + offset) % tracks.length;
-        final path = (await resolveTrackFilePaths([tracks[index]])).single;
+        final path =
+            (await resolveTrackFilePaths([tracks[index]])).single ??
+            (offset == 0 ? startPath : null);
         if (path == null) continue;
         if (isCueVirtualPath(path)) {
           skippedCueVirtualTrack = true;
@@ -189,7 +197,8 @@ class PlaybackController extends Notifier<PlaybackState> {
             : 'No local audio file is available to open. Download the track first.',
       );
     }
-    final resolvedPaths = await resolveTrackFilePaths(tracks);
+    final resolvedPaths = [...await resolveTrackFilePaths(tracks)];
+    if (startPath != null) resolvedPaths[safeStart] ??= startPath;
 
     if (await _useInternalPlayer()) {
       final queue = <PlayableMedia>[];

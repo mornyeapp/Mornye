@@ -729,6 +729,8 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
         ref,
         tracks[index],
         isInHistory: inHistory[index],
+        queue: tracks,
+        queueIndex: index,
         onDownload: ({bool forceQualityPicker = false}) => _downloadTrack(
           context,
           tracks[index],
@@ -785,6 +787,8 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
                 child: TrackListTile(
                   track: track,
                   isInHistory: isInHistory,
+                  queue: tracks,
+                  queueIndex: index,
                   onDownload: ({bool forceQualityPicker = false}) =>
                       _downloadTrack(
                         context,
