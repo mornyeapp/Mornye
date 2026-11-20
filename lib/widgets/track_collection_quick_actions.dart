@@ -22,6 +22,9 @@ import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/widgets/settings_group.dart';
+import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/track_collection_action_policy.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
 
@@ -414,75 +417,73 @@ class _TrackOptionsSheet extends ConsumerWidget {
       );
     }
 
+    // The song stays in place above the rows, which are one connected group
+    // like the other menus.
     return SafeArea(
       top: false,
-      child: SingleChildScrollView(
-        controller: scrollController,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Column(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AppSheetHandle(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              connectedRunTitleInset,
+              12,
+              connectedRunTitleInset,
+              8,
+            ),
+            child: Row(
               children: [
-                const AppSheetHandle(),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  child: Row(
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: track.coverUrl != null && track.coverUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: track.coverUrl!,
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 112,
+                          cacheManager: CoverCacheManager.instance,
+                          errorWidget: (context, url, error) => Container(
+                            width: 56,
+                            height: 56,
+                            color: colorScheme.surfaceContainerHighest,
+                            child: AppIcon(
+                              Icons.music_note,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 56,
+                          height: 56,
+                          color: colorScheme.surfaceContainerHighest,
+                          child: AppIcon(
+                            Icons.music_note,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child:
-                            track.coverUrl != null && track.coverUrl!.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: track.coverUrl!,
-                                width: 56,
-                                height: 56,
-                                fit: BoxFit.cover,
-                                memCacheWidth: 112,
-                                cacheManager: CoverCacheManager.instance,
-                                errorWidget: (context, url, error) => Container(
-                                  width: 56,
-                                  height: 56,
-                                  color: colorScheme.surfaceContainerHighest,
-                                  child: AppIcon(
-                                    Icons.music_note,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                width: 56,
-                                height: 56,
-                                color: colorScheme.surfaceContainerHighest,
-                                child: AppIcon(
-                                  Icons.music_note,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
+                      Text(
+                        track.name,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              track.name,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            ClickableArtistName(
-                              artistName: track.artistName,
-                              artistId: track.artistId,
-                              coverUrl: track.coverUrl,
-                              extensionId: track.source,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
+                      const SizedBox(height: 2),
+                      ClickableArtistName(
+                        artistName: track.artistName,
+                        artistId: track.artistId,
+                        coverUrl: track.coverUrl,
+                        extensionId: track.source,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -490,129 +491,140 @@ class _TrackOptionsSheet extends ConsumerWidget {
                 ),
               ],
             ),
-            if (context.isMornye)
-              Divider(
-                height: 1,
-                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-              ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              controller: scrollController,
+              padding: EdgeInsets.only(bottom: context.tokens.gapLg),
+              child: SettingsGroup(
+                children: [
+                  if (qualityVariantAction ==
+                      QualityVariantMenuAction.playLocal)
+                    SettingsItem(
+                      icon: Icons.play_arrow_rounded,
+                      title: context.l10n.trackMetadataPlay,
+                      onTap: () => _playLocal(context, ref),
+                    )
+                  else if (qualityVariantAction ==
+                      QualityVariantMenuAction.downloadAnotherQuality)
+                    SettingsItem(
+                      icon: Icons.download_outlined,
+                      title: context.l10n.trackOptionDownloadQualityVariant,
+                      onTap: () => _downloadQualityVariant(context, ref),
+                    ),
+                  if (linkClient != null)
+                    SettingsItem(
+                      icon: Icons.computer,
+                      title: context.l10n.linkDownloadOnDesktop(
+                        linkDesktopName(linkClient),
+                      ),
+                      onTap: () => _downloadOnDesktop(context, ref),
+                    ),
 
-            if (qualityVariantAction == QualityVariantMenuAction.playLocal)
-              _OptionTile(
-                icon: Icons.play_arrow_rounded,
-                title: context.l10n.trackMetadataPlay,
-                onTap: () => _playLocal(context, ref),
-              )
-            else if (qualityVariantAction ==
-                QualityVariantMenuAction.downloadAnotherQuality)
-              _OptionTile(
-                icon: Icons.download_outlined,
-                title: context.l10n.trackOptionDownloadQualityVariant,
-                onTap: () => _downloadQualityVariant(context, ref),
-              ),
-            if (linkClient != null)
-              _OptionTile(
-                icon: Icons.computer,
-                title: context.l10n.linkDownloadOnDesktop(
-                  linkDesktopName(linkClient),
-                ),
-                onTap: () => _downloadOnDesktop(context, ref),
-              ),
-
-            _OptionTile(
-              icon: Icons.content_copy_rounded,
-              title: context.l10n.trackOptionCopyTrackName,
-              onTap: () => _copyText(context, track.name),
-            ),
-            _OptionTile(
-              icon: Icons.person_outline_rounded,
-              title: context.l10n.trackOptionCopyArtist,
-              onTap: () => _copyText(context, track.artistName),
-            ),
-            _OptionTile(
-              icon: Icons.copy_all_rounded,
-              title: context.l10n.trackOptionCopyTrackAndArtist,
-              onTap: () =>
-                  _copyText(context, '${track.name} - ${track.artistName}'),
-            ),
-            if (link != null)
-              _OptionTile(
-                icon: Icons.link,
-                title: context.l10n.trackOptionCopyLink(link.serviceName),
-                onTap: () => _copyLink(context, link),
-              ),
-
-            _OptionTile(
-              icon: Icons.album_outlined,
-              title: context.l10n.homeGoToAlbum,
-              onTap: () => _goToAlbum(context),
-            ),
-
-            _OptionTile(
-              icon: isLoved ? Icons.favorite : Icons.favorite_border,
-              iconColor: isLoved ? colorScheme.error : null,
-              title: isLoved
-                  ? context.l10n.trackOptionRemoveFromLoved
-                  : context.l10n.trackOptionAddToLoved,
-              onTap: () async {
-                Navigator.pop(context);
-                final added = await ref
-                    .read(libraryCollectionsProvider.notifier)
-                    .toggleLoved(track);
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      added
-                          ? context.l10n.collectionAddedToLoved(track.name)
-                          : context.l10n.collectionRemovedFromLoved(track.name),
+                  SettingsItem(
+                    icon: Icons.content_copy_rounded,
+                    title: context.l10n.trackOptionCopyTrackName,
+                    onTap: () => _copyText(context, track.name),
+                  ),
+                  SettingsItem(
+                    icon: Icons.person_outline_rounded,
+                    title: context.l10n.trackOptionCopyArtist,
+                    onTap: () => _copyText(context, track.artistName),
+                  ),
+                  SettingsItem(
+                    icon: Icons.copy_all_rounded,
+                    title: context.l10n.trackOptionCopyTrackAndArtist,
+                    onTap: () => _copyText(
+                      context,
+                      '${track.name} - ${track.artistName}',
                     ),
                   ),
-                );
-              },
-            ),
-            _OptionTile(
-              icon: isInWishlist
-                  ? Icons.playlist_add_check_circle
-                  : Icons.add_circle_outline,
-              iconColor: isInWishlist ? colorScheme.primary : null,
-              title: isInWishlist
-                  ? context.l10n.trackOptionRemoveFromWishlist
-                  : context.l10n.trackOptionAddToWishlist,
-              onTap: () async {
-                Navigator.pop(context);
-                final added = await ref
-                    .read(libraryCollectionsProvider.notifier)
-                    .toggleWishlist(track);
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      added
-                          ? context.l10n.collectionAddedToWishlist(track.name)
-                          : context.l10n.collectionRemovedFromWishlist(
-                              track.name,
-                            ),
+                  if (link != null)
+                    SettingsItem(
+                      icon: Icons.link,
+                      title: context.l10n.trackOptionCopyLink(link.serviceName),
+                      onTap: () => _copyLink(context, link),
                     ),
-                  ),
-                );
-              },
-            ),
-            _OptionTile(
-              icon: Icons.playlist_add,
-              title: context.l10n.collectionAddToPlaylist,
-              onTap: () {
-                final rootContext = Navigator.of(
-                  context,
-                  rootNavigator: true,
-                ).context;
-                Navigator.pop(context);
-                showAddTrackToPlaylistSheet(rootContext, ref, track);
-              },
-            ),
 
-            const SizedBox(height: 16),
-          ],
-        ),
+                  SettingsItem(
+                    icon: Icons.album_outlined,
+                    title: context.l10n.homeGoToAlbum,
+                    onTap: () => _goToAlbum(context),
+                  ),
+
+                  SettingsItem(
+                    icon: isLoved ? Icons.favorite : Icons.favorite_border,
+                    iconColor: isLoved ? colorScheme.error : null,
+                    title: isLoved
+                        ? context.l10n.trackOptionRemoveFromLoved
+                        : context.l10n.trackOptionAddToLoved,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      final added = await ref
+                          .read(libraryCollectionsProvider.notifier)
+                          .toggleLoved(track);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            added
+                                ? context.l10n.collectionAddedToLoved(
+                                    track.name,
+                                  )
+                                : context.l10n.collectionRemovedFromLoved(
+                                    track.name,
+                                  ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  SettingsItem(
+                    icon: isInWishlist
+                        ? Icons.playlist_add_check_circle
+                        : Icons.add_circle_outline,
+                    iconColor: isInWishlist ? colorScheme.primary : null,
+                    title: isInWishlist
+                        ? context.l10n.trackOptionRemoveFromWishlist
+                        : context.l10n.trackOptionAddToWishlist,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      final added = await ref
+                          .read(libraryCollectionsProvider.notifier)
+                          .toggleWishlist(track);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            added
+                                ? context.l10n.collectionAddedToWishlist(
+                                    track.name,
+                                  )
+                                : context.l10n.collectionRemovedFromWishlist(
+                                    track.name,
+                                  ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  SettingsItem(
+                    icon: Icons.playlist_add,
+                    title: context.l10n.collectionAddToPlaylist,
+                    onTap: () {
+                      final rootContext = Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).context;
+                      Navigator.pop(context);
+                      showAddTrackToPlaylistSheet(rootContext, ref, track);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -690,41 +702,5 @@ class _TrackOptionsSheet extends ConsumerWidget {
         SnackBar(content: Text(rootContext.l10n.snackbarFileNotFound)),
       );
     }
-  }
-}
-
-class _OptionTile extends StatelessWidget {
-  final IconData icon;
-  final Color? iconColor;
-  final String title;
-  final VoidCallback onTap;
-
-  const _OptionTile({
-    required this.icon,
-    this.iconColor,
-    required this.title,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: AppIcon(
-          icon,
-          color: iconColor ?? colorScheme.onPrimaryContainer,
-          size: 20,
-        ),
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      onTap: onTap,
-    );
   }
 }

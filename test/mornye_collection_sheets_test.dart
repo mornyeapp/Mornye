@@ -18,6 +18,7 @@ import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
+import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/track_collection_quick_actions.dart';
 
 const _track = Track(
@@ -255,6 +256,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(rows.position.pixels, greaterThan(0));
     expect(find.text('Add to playlist').hitTestable(), findsOneWidget);
+    // The rows are one connected group under the song, which stays put.
+    expect(
+      find.descendant(
+        of: find.byType(SettingsGroup),
+        matching: find.byType(SettingsItem),
+      ),
+      findsNWidgets(7),
+    );
+    expect(find.text('Example track').hitTestable(), findsOneWidget);
 
     await tester.drag(find.text('Add to playlist'), const Offset(0, 300));
     await tester.pumpAndSettle();
