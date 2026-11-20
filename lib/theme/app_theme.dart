@@ -36,7 +36,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       pageTransitionsTheme: materialPageTransitionsTheme,
-      appBarTheme: _appBarTheme(scheme),
+      appBarTheme: _appBarTheme(scheme, family),
       cardTheme: _cardTheme(scheme),
       elevatedButtonTheme: _elevatedButtonTheme(scheme),
       filledButtonTheme: _filledButtonTheme(scheme),
@@ -48,14 +48,14 @@ class AppTheme {
       dialogTheme: _dialogTheme(scheme),
       bottomSheetTheme: _bottomSheetTheme,
       navigationBarTheme: _navigationBarTheme(scheme),
-      snackBarTheme: _snackBarTheme(scheme),
+      snackBarTheme: _snackBarTheme(scheme, family),
       progressIndicatorTheme: _progressIndicatorTheme(scheme),
       switchTheme: _switchTheme(scheme),
       chipTheme: _chipTheme(scheme),
       popupMenuTheme: _popupMenuTheme(scheme),
       menuTheme: _menuTheme(scheme),
       menuButtonTheme: _menuButtonTheme,
-      tabBarTheme: _tabBarTheme(scheme),
+      tabBarTheme: _tabBarTheme(scheme, family),
       dividerTheme: _dividerTheme(scheme),
       tooltipTheme: _tooltipTheme,
       extensions: <ThemeExtension<dynamic>>[
@@ -88,7 +88,7 @@ class AppTheme {
       colorScheme: scheme,
       pageTransitionsTheme: materialPageTransitionsTheme,
       scaffoldBackgroundColor: isAmoled ? Colors.black : null,
-      appBarTheme: _appBarTheme(scheme, isAmoled: isAmoled),
+      appBarTheme: _appBarTheme(scheme, family, isAmoled: isAmoled),
       cardTheme: _cardTheme(scheme),
       elevatedButtonTheme: _elevatedButtonTheme(scheme),
       filledButtonTheme: _filledButtonTheme(scheme),
@@ -100,14 +100,14 @@ class AppTheme {
       dialogTheme: _dialogTheme(scheme),
       bottomSheetTheme: _bottomSheetTheme,
       navigationBarTheme: _navigationBarTheme(scheme, isAmoled: isAmoled),
-      snackBarTheme: _snackBarTheme(scheme),
+      snackBarTheme: _snackBarTheme(scheme, family),
       progressIndicatorTheme: _progressIndicatorTheme(scheme),
       switchTheme: _switchTheme(scheme),
       chipTheme: _chipTheme(scheme),
       popupMenuTheme: _popupMenuTheme(scheme),
       menuTheme: _menuTheme(scheme),
       menuButtonTheme: _menuButtonTheme,
-      tabBarTheme: _tabBarTheme(scheme),
+      tabBarTheme: _tabBarTheme(scheme, family),
       dividerTheme: _dividerTheme(scheme),
       tooltipTheme: _tooltipTheme,
       extensions: <ThemeExtension<dynamic>>[
@@ -144,8 +144,16 @@ class AppTheme {
     );
   }
 
+  // A component given its own text style takes nothing from the text theme,
+  // so each style below names the family, and a title role its roundness.
+  static List<FontVariation>? _brandVariations(String? family) =>
+      family == bundledFontFamily
+      ? const [FontVariation('ROND', brandRoundness)]
+      : null;
+
   static AppBarTheme _appBarTheme(
-    ColorScheme scheme, {
+    ColorScheme scheme,
+    String? family, {
     bool isAmoled = false,
   }) => AppBarTheme(
     elevation: 0,
@@ -158,6 +166,8 @@ class AppTheme {
       color: scheme.onSurface,
       fontSize: 22,
       fontWeight: FontWeight.w500,
+      fontFamily: family,
+      fontVariations: _brandVariations(family),
     ),
     systemOverlayStyle: SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -290,14 +300,17 @@ class AppTheme {
     labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
   );
 
-  static SnackBarThemeData _snackBarTheme(ColorScheme scheme) =>
+  static SnackBarThemeData _snackBarTheme(ColorScheme scheme, String? family) =>
       SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_tokens.radiusControl),
         ),
         backgroundColor: scheme.inverseSurface,
-        contentTextStyle: TextStyle(color: scheme.onInverseSurface),
+        contentTextStyle: TextStyle(
+          color: scheme.onInverseSurface,
+          fontFamily: family,
+        ),
       );
 
   static ProgressIndicatorThemeData _progressIndicatorTheme(
@@ -366,14 +379,19 @@ class AppTheme {
     ),
   );
 
-  static TabBarThemeData _tabBarTheme(ColorScheme scheme) => TabBarThemeData(
-    indicatorSize: TabBarIndicatorSize.label,
-    indicator: UnderlineTabIndicator(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
-      borderSide: BorderSide(color: scheme.primary, width: 3),
-    ),
-    labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-  );
+  static TabBarThemeData _tabBarTheme(ColorScheme scheme, String? family) =>
+      TabBarThemeData(
+        indicatorSize: TabBarIndicatorSize.label,
+        indicator: UnderlineTabIndicator(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+          borderSide: BorderSide(color: scheme.primary, width: 3),
+        ),
+        labelStyle: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontFamily: family,
+          fontVariations: _brandVariations(family),
+        ),
+      );
 
   static ChipThemeData _chipTheme(ColorScheme scheme) => ChipThemeData(
     shape: RoundedRectangleBorder(

@@ -9,6 +9,7 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/dynamic_color_wrapper.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
+import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -403,6 +404,68 @@ void main() {
         cardFill(tester, SettingsInfoTone.neutral),
         scheme.surfaceContainerHighest.withValues(alpha: 0.5),
       );
+    });
+  });
+
+  group('component text styles', () {
+    // A component given its own style takes nothing from the text theme.
+    List<TextStyle?> styles(ThemeData theme) => [
+      theme.appBarTheme.titleTextStyle,
+      theme.snackBarTheme.contentTextStyle,
+      theme.tabBarTheme.labelStyle,
+    ];
+
+    test('name the bundled, an imported or no family', () {
+      for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+        for (final style in styles(theme)) {
+          expect(style?.fontFamily, AppTheme.bundledFontFamily);
+        }
+        // Title roles carry the brand roundness, as in the text theme.
+        expect(theme.appBarTheme.titleTextStyle?.fontVariations, [
+          const FontVariation('ROND', AppTheme.brandRoundness),
+        ]);
+        expect(theme.snackBarTheme.contentTextStyle?.fontVariations, isNull);
+      }
+      for (final style in styles(AppTheme.dark(fontFamily: 'Imported'))) {
+        expect(style?.fontFamily, 'Imported');
+        expect(style?.fontVariations, isNull);
+      }
+      for (final style in styles(AppTheme.light(useSystemFont: true))) {
+        expect(style?.fontFamily, isNull);
+      }
+    });
+
+    testWidgets('an app bar title and a selection action show the app font', (
+      tester,
+    ) async {
+      final theme = AppTheme.dark();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Scaffold(
+            appBar: AppBar(title: const Text('Title')),
+            body: SelectionActionButton(
+              icon: Icons.add,
+              label: 'Action',
+              onPressed: () {},
+              colorScheme: theme.colorScheme,
+            ),
+          ),
+        ),
+      );
+
+      String? family(String text) => tester
+          .widget<RichText>(
+            find.descendant(
+              of: find.text(text),
+              matching: find.byType(RichText),
+            ),
+          )
+          .text
+          .style
+          ?.fontFamily;
+      expect(family('Title'), AppTheme.bundledFontFamily);
+      expect(family('Action'), AppTheme.bundledFontFamily);
     });
   });
 }

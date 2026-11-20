@@ -62,7 +62,12 @@ class ArtistConcertsButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(7),
           side: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
         ),
-        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        // A button's own text style takes no family from the theme.
+        textStyle: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          fontFamily: Theme.of(context).textTheme.labelLarge?.fontFamily,
+        ),
       ),
       icon: const Icon(Icons.confirmation_number_rounded, size: 16),
       label: label,

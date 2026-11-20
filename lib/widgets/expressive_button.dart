@@ -26,9 +26,26 @@ class ExpressiveButton extends StatelessWidget {
   /// Low-emphasis action without a container, like [TextButton].
   final bool text;
 
+  /// [style] with its text style in the theme's font: a button's own text
+  /// style replaces the theme's label style whole, family included.
+  static ButtonStyle? _inThemeFont(BuildContext context, ButtonStyle? style) {
+    final text = style?.textStyle;
+    final family = Theme.of(context).textTheme.labelLarge?.fontFamily;
+    if (style == null || text == null || family == null) return style;
+    return style.copyWith(
+      textStyle: WidgetStateProperty.resolveWith((states) {
+        final resolved = text.resolve(states);
+        return resolved == null || resolved.fontFamily != null
+            ? resolved
+            : resolved.copyWith(fontFamily: family);
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final icon = this.icon == null ? null : symbolIconWidget(this.icon!);
+    final style = _inThemeFont(context, this.style);
     if (!materialExpressiveEnabled(context)) {
       if (icon != null) {
         // Keep the standard icon spacing and asymmetric padding.
