@@ -701,7 +701,10 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
         )
       else if (!songsValue.hasValue)
         SliverToBoxAdapter(
-          child: TrackListSkeleton(itemCount: min(folder.tracks.length, 8)),
+          child: TrackListSkeleton(
+            itemCount: min(folder.tracks.length, 8),
+            underHeader: false,
+          ),
         )
       else if (isDesktopPlatform)
         _songTable(context, items)
