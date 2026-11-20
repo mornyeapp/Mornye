@@ -470,10 +470,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
             artist: widget.artistName,
             heroTag: heroTag,
           ),
-          child: Hero(
-            tag: heroTag,
-            child: cover,
-          ),
+          child: Hero(tag: heroTag, child: cover),
         );
       },
       // Built inside the header, so desktop reads its artwork scheme.

@@ -294,14 +294,13 @@ class MornyePlayerLayout extends ConsumerWidget {
                                   child: PlayerArtworkDragRegion(
                                     onTap: expanded
                                         ? () => showEnlargedAlbumArt(
-                                              context,
-                                              artUri: mediaItem.artUri
-                                                  ?.toString(),
-                                              title: mediaItem.title,
-                                              artist: mediaItem.artist,
-                                              heroTag:
-                                                  kNowPlayingArtworkHeroTag,
-                                            )
+                                            context,
+                                            artUri: mediaItem.artUri
+                                                ?.toString(),
+                                            title: mediaItem.title,
+                                            artist: mediaItem.artist,
+                                            heroTag: kNowPlayingArtworkHeroTag,
+                                          )
                                         : null,
                                     child: Hero(
                                       tag: kNowPlayingArtworkHeroTag,

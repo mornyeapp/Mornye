@@ -95,25 +95,22 @@ class _EnlargedAlbumArtViewerState extends State<EnlargedAlbumArtViewer>
 
   void _springBackToCenter() {
     if (_springController.isAnimating) _springController.stop();
-    _springAnimation = Tween<Offset>(
-      begin: _tilt,
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _springController,
-      curve: Curves.easeOutCubic,
-    ));
+    _springAnimation = Tween<Offset>(begin: _tilt, end: Offset.zero).animate(
+      CurvedAnimation(parent: _springController, curve: Curves.easeOutCubic),
+    );
     _springController.forward(from: 0);
   }
 
   void _handleHover(PointerHoverEvent event) {
     if (_isZoomed || _isDragging) return;
     final size = MediaQuery.sizeOf(context);
-    final normX =
-        ((event.localPosition.dx - size.width / 2) / (size.width / 2))
-            .clamp(-1.0, 1.0);
+    final normX = ((event.localPosition.dx - size.width / 2) / (size.width / 2))
+        .clamp(-1.0, 1.0);
     final normY =
-        ((event.localPosition.dy - size.height / 2) / (size.height / 2))
-            .clamp(-1.0, 1.0);
+        ((event.localPosition.dy - size.height / 2) / (size.height / 2)).clamp(
+          -1.0,
+          1.0,
+        );
     setState(() {
       _tilt = Offset(normX, normY);
     });
@@ -146,7 +143,9 @@ class _EnlargedAlbumArtViewerState extends State<EnlargedAlbumArtViewer>
       );
     }
 
-    if (uri.startsWith('/') || uri.startsWith(r'\\') || (uri.length > 2 && uri[1] == ':')) {
+    if (uri.startsWith('/') ||
+        uri.startsWith(r'\\') ||
+        (uri.length > 2 && uri[1] == ':')) {
       return Image.file(
         File(uri),
         fit: BoxFit.contain,
@@ -222,7 +221,8 @@ class _EnlargedAlbumArtViewerState extends State<EnlargedAlbumArtViewer>
                       radius: 1.2,
                       colors: [
                         Colors.white.withValues(
-                          alpha: (0.18 * (_tilt.distance.clamp(0.0, 1.0))).clamp(0.0, 0.25),
+                          alpha: (0.18 * (_tilt.distance.clamp(0.0, 1.0)))
+                              .clamp(0.0, 0.25),
                         ),
                         Colors.white.withValues(alpha: 0.0),
                       ],
@@ -238,10 +238,7 @@ class _EnlargedAlbumArtViewerState extends State<EnlargedAlbumArtViewer>
     );
 
     if (widget.heroTag != null) {
-      artCard = Hero(
-        tag: widget.heroTag!,
-        child: artCard,
-      );
+      artCard = Hero(tag: widget.heroTag!, child: artCard);
     }
 
     final dismissProgress = (_dismissDragOffsetY / 300.0).clamp(0.0, 0.6);
@@ -272,8 +269,8 @@ class _EnlargedAlbumArtViewerState extends State<EnlargedAlbumArtViewer>
             setState(() {
               _tilt = Offset(normX, normY);
               if (details.delta.dy > 0 || _dismissDragOffsetY > 0) {
-                _dismissDragOffsetY =
-                    (_dismissDragOffsetY + details.delta.dy).clamp(0.0, 600.0);
+                _dismissDragOffsetY = (_dismissDragOffsetY + details.delta.dy)
+                    .clamp(0.0, 600.0);
               }
             });
           },
@@ -320,7 +317,9 @@ class _EnlargedAlbumArtViewerState extends State<EnlargedAlbumArtViewer>
                         foregroundColor: Colors.white,
                       ),
                       icon: const AppIcon(Icons.close, size: 24),
-                      tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).closeButtonTooltip,
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ),
@@ -356,7 +355,11 @@ class _EnlargedAlbumArtViewerState extends State<EnlargedAlbumArtViewer>
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Padding(
-                      padding: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
+                      padding: const EdgeInsets.only(
+                        bottom: 24,
+                        left: 24,
+                        right: 24,
+                      ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: BackdropFilter(
@@ -393,7 +396,9 @@ class _EnlargedAlbumArtViewerState extends State<EnlargedAlbumArtViewer>
                                   Text(
                                     widget.artist!,
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.75),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.75,
+                                      ),
                                       fontSize: 14,
                                     ),
                                     maxLines: 1,

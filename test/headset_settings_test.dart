@@ -89,7 +89,10 @@ void main() {
       expect(container.read(settingsProvider).headsetSingleClickAction, 'next');
 
       notifier.setHeadsetDoubleClickAction('previous');
-      expect(container.read(settingsProvider).headsetDoubleClickAction, 'previous');
+      expect(
+        container.read(settingsProvider).headsetDoubleClickAction,
+        'previous',
+      );
 
       notifier.setHeadsetTripleClickAction('none');
       expect(container.read(settingsProvider).headsetTripleClickAction, 'none');

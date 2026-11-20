@@ -5,7 +5,9 @@ import 'package:mornye/widgets/enlarged_album_art_viewer.dart';
 
 void main() {
   group('EnlargedAlbumArtViewer Tests', () {
-    testWidgets('renders artwork modal with title, artist, and close button', (tester) async {
+    testWidgets('renders artwork modal with title, artist, and close button', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -58,7 +60,9 @@ void main() {
       expect(find.byType(EnlargedAlbumArtViewer), findsNothing);
     });
 
-    testWidgets('responds to 3D hover movements and returns to center', (tester) async {
+    testWidgets('responds to 3D hover movements and returns to center', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(

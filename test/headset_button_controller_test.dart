@@ -6,7 +6,7 @@ import 'package:mornye/models/settings.dart';
 /// Test audio handler implementing the headset button debouncing and multi-tap logic.
 class TestHeadsetButtonHandler extends BaseAudioHandler {
   TestHeadsetButtonHandler({AppSettings? settings})
-      : settings = settings ?? const AppSettings();
+    : settings = settings ?? const AppSettings();
 
   AppSettings settings;
   int headsetClickCount = 0;
@@ -135,88 +135,97 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Headset Button Multi-Tap Controller Tests', () {
-    test('1 Tap executes Single Click action (play/pause toggle) after timeout', () async {
-      final handler = TestHeadsetButtonHandler(
-        settings: const AppSettings(
-          headsetTimeoutMs: 250,
-          headsetSingleClickAction: 'play_pause',
-        ),
-      );
+    test(
+      '1 Tap executes Single Click action (play/pause toggle) after timeout',
+      () async {
+        final handler = TestHeadsetButtonHandler(
+          settings: const AppSettings(
+            headsetTimeoutMs: 250,
+            headsetSingleClickAction: 'play_pause',
+          ),
+        );
 
-      // Initially paused
-      expect(handler.playbackState.value.playing, false);
+        // Initially paused
+        expect(handler.playbackState.value.playing, false);
 
-      await handler.click(MediaButton.media);
-      expect(handler.headsetClickCount, 1);
-      // Not yet executed before timeout expires
-      expect(handler.executedActions, isEmpty);
-      expect(handler.vibratedCount, 1);
+        await handler.click(MediaButton.media);
+        expect(handler.headsetClickCount, 1);
+        // Not yet executed before timeout expires
+        expect(handler.executedActions, isEmpty);
+        expect(handler.vibratedCount, 1);
 
-      // Wait past the timeout window
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+        // Wait past the timeout window
+        await Future<void>.delayed(const Duration(milliseconds: 300));
 
-      expect(handler.executedActions, ['play_pause']);
-      expect(handler.playbackState.value.playing, true);
-      expect(handler.headsetClickCount, 0);
+        expect(handler.executedActions, ['play_pause']);
+        expect(handler.playbackState.value.playing, true);
+        expect(handler.headsetClickCount, 0);
 
-      // Second click should pause
-      await handler.click(MediaButton.media);
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      expect(handler.playbackState.value.playing, false);
-      expect(handler.vibratedCount, 2);
-    });
+        // Second click should pause
+        await handler.click(MediaButton.media);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(handler.playbackState.value.playing, false);
+        expect(handler.vibratedCount, 2);
+      },
+    );
 
-    test('2 Taps (Double Press) skips to next track within detection window', () async {
-      final handler = TestHeadsetButtonHandler(
-        settings: const AppSettings(
-          headsetTimeoutMs: 300,
-          headsetDoubleClickAction: 'next',
-        ),
-      );
+    test(
+      '2 Taps (Double Press) skips to next track within detection window',
+      () async {
+        final handler = TestHeadsetButtonHandler(
+          settings: const AppSettings(
+            headsetTimeoutMs: 300,
+            headsetDoubleClickAction: 'next',
+          ),
+        );
 
-      // Tap 1
-      await handler.click(MediaButton.media);
-      expect(handler.headsetClickCount, 1);
+        // Tap 1
+        await handler.click(MediaButton.media);
+        expect(handler.headsetClickCount, 1);
 
-      // Delay less than timeout (e.g. 100ms)
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+        // Delay less than timeout (e.g. 100ms)
+        await Future<void>.delayed(const Duration(milliseconds: 100));
 
-      // Tap 2
-      await handler.click(MediaButton.media);
-      expect(handler.headsetClickCount, 2);
-      expect(handler.vibratedCount, 2);
+        // Tap 2
+        await handler.click(MediaButton.media);
+        expect(handler.headsetClickCount, 2);
+        expect(handler.vibratedCount, 2);
 
-      // Actions should not have executed yet
-      expect(handler.executedActions, isEmpty);
+        // Actions should not have executed yet
+        expect(handler.executedActions, isEmpty);
 
-      // Wait for timeout to expire
-      await Future<void>.delayed(const Duration(milliseconds: 350));
+        // Wait for timeout to expire
+        await Future<void>.delayed(const Duration(milliseconds: 350));
 
-      expect(handler.executedActions, ['next', 'skipped_to_next']);
-      expect(handler.headsetClickCount, 0);
-    });
+        expect(handler.executedActions, ['next', 'skipped_to_next']);
+        expect(handler.headsetClickCount, 0);
+      },
+    );
 
-    test('3 Taps (Triple Press) immediately executes skip to previous without delay', () async {
-      final handler = TestHeadsetButtonHandler(
-        settings: const AppSettings(
-          headsetTimeoutMs: 400,
-          headsetTripleClickAction: 'previous',
-        ),
-      );
+    test(
+      '3 Taps (Triple Press) immediately executes skip to previous without delay',
+      () async {
+        final handler = TestHeadsetButtonHandler(
+          settings: const AppSettings(
+            headsetTimeoutMs: 400,
+            headsetTripleClickAction: 'previous',
+          ),
+        );
 
-      // Tap 1
-      await handler.click(MediaButton.media);
-      // Tap 2
-      await handler.click(MediaButton.media);
-      // Tap 3
-      await handler.click(MediaButton.media);
+        // Tap 1
+        await handler.click(MediaButton.media);
+        // Tap 2
+        await handler.click(MediaButton.media);
+        // Tap 3
+        await handler.click(MediaButton.media);
 
-      // Triple tap fires immediately without waiting for timer
-      expect(handler.executedActions, ['previous', 'skipped_to_previous']);
-      expect(handler.headsetClickCount, 0);
-      expect(handler.headsetClickTimer, isNull);
-      expect(handler.vibratedCount, 3);
-    });
+        // Triple tap fires immediately without waiting for timer
+        expect(handler.executedActions, ['previous', 'skipped_to_previous']);
+        expect(handler.headsetClickCount, 0);
+        expect(handler.headsetClickTimer, isNull);
+        expect(handler.vibratedCount, 3);
+      },
+    );
 
     test('Long press cancels pending click timer and seeks properly', () async {
       final handler = TestHeadsetButtonHandler(
@@ -240,45 +249,54 @@ void main() {
       expect(handler.executedActions, ['fast_forwarded']);
     });
 
-    test('Custom Action Remapping works for single, double, and triple tap', () async {
-      final handler = TestHeadsetButtonHandler(
-        settings: const AppSettings(
-          headsetTimeoutMs: 200,
-          headsetSingleClickAction: 'next',
-          headsetDoubleClickAction: 'previous',
-          headsetTripleClickAction: 'none',
-        ),
-      );
+    test(
+      'Custom Action Remapping works for single, double, and triple tap',
+      () async {
+        final handler = TestHeadsetButtonHandler(
+          settings: const AppSettings(
+            headsetTimeoutMs: 200,
+            headsetSingleClickAction: 'next',
+            headsetDoubleClickAction: 'previous',
+            headsetTripleClickAction: 'none',
+          ),
+        );
 
-      // Single click should trigger next
-      await handler.click(MediaButton.media);
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-      expect(handler.executedActions, ['next', 'skipped_to_next']);
-      handler.executedActions.clear();
+        // Single click should trigger next
+        await handler.click(MediaButton.media);
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        expect(handler.executedActions, ['next', 'skipped_to_next']);
+        handler.executedActions.clear();
 
-      // Double click should trigger previous
-      await handler.click(MediaButton.media);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      await handler.click(MediaButton.media);
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-      expect(handler.executedActions, ['previous', 'skipped_to_previous']);
-      handler.executedActions.clear();
+        // Double click should trigger previous
+        await handler.click(MediaButton.media);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await handler.click(MediaButton.media);
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        expect(handler.executedActions, ['previous', 'skipped_to_previous']);
+        handler.executedActions.clear();
 
-      // Triple click should trigger none
-      await handler.click(MediaButton.media);
-      await handler.click(MediaButton.media);
-      await handler.click(MediaButton.media);
-      expect(handler.executedActions, ['none']);
-    });
+        // Triple click should trigger none
+        await handler.click(MediaButton.media);
+        await handler.click(MediaButton.media);
+        await handler.click(MediaButton.media);
+        expect(handler.executedActions, ['none']);
+      },
+    );
 
-    test('Dedicated MediaButton.next and MediaButton.previous work directly', () async {
-      final handler = TestHeadsetButtonHandler();
+    test(
+      'Dedicated MediaButton.next and MediaButton.previous work directly',
+      () async {
+        final handler = TestHeadsetButtonHandler();
 
-      await handler.click(MediaButton.next);
-      expect(handler.executedActions, ['skipped_to_next']);
+        await handler.click(MediaButton.next);
+        expect(handler.executedActions, ['skipped_to_next']);
 
-      await handler.click(MediaButton.previous);
-      expect(handler.executedActions, ['skipped_to_next', 'skipped_to_previous']);
-    });
+        await handler.click(MediaButton.previous);
+        expect(handler.executedActions, [
+          'skipped_to_next',
+          'skipped_to_previous',
+        ]);
+      },
+    );
   });
 }
