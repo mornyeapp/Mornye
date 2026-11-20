@@ -456,6 +456,12 @@ class SettingsSearchCatalog {
           keywords: const ['artwork', 'cover', 'blur', 'fade', 'gradient'],
         ),
         SettingsSearchEntry(
+          icon: Icons.fit_screen_outlined,
+          title: l10n.playerCoverWhole,
+          subtitle: l10n.playerCoverWholeDescription,
+          keywords: const ['artwork', 'cover', 'crop', 'cut', 'fit', 'square'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.splitscreen_outlined,
           title: l10n.landscapeLyricsArtwork,
           subtitle: l10n.landscapeLyricsArtworkDescription,

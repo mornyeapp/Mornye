@@ -9426,6 +9426,14 @@
   "@playerCoverFadeLong": {
     "description": "Cover fade choice: the blur reaches far up the cover"
   },
+  "playerCoverWhole": "Whole cover",
+  "@playerCoverWhole": {
+    "description": "Setting that shows a full screen cover without cropping its sides"
+  },
+  "playerCoverWholeDescription": "Keep the sides of a full screen cover. It then ends above the title",
+  "@playerCoverWholeDescription": {
+    "description": "Subtitle of the Whole cover setting"
+  },
   "musicHaptics": "Music haptics",
   "@musicHaptics": {
     "description": "Setting that vibrates the phone along with the music"

@@ -518,6 +518,16 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                     .setPlayerCoverFade(fade),
               ),
               SettingsSwitchItem(
+                icon: Icons.fit_screen_outlined,
+                title: context.l10n.playerCoverWhole,
+                subtitle: context.l10n.playerCoverWholeDescription,
+                value: settings.playerCoverWhole,
+                enabled: coverStyle == 'fullscreen',
+                onChanged: (value) => ref
+                    .read(settingsProvider.notifier)
+                    .setPlayerCoverWhole(value),
+              ),
+              SettingsSwitchItem(
                 icon: Icons.splitscreen_outlined,
                 title: context.l10n.landscapeLyricsArtwork,
                 subtitle: context.l10n.landscapeLyricsArtworkDescription,

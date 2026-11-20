@@ -25,6 +25,7 @@ class MaterialPlayerBackdrop extends StatelessWidget {
     required this.colorScheme,
     required this.showArtwork,
     this.fadeStart = mediumFadeStart,
+    this.wholeCover = false,
     this.playsMotionArtwork = false,
     this.videoUrl,
     this.resolvingVideo = false,
@@ -42,6 +43,9 @@ class MaterialPlayerBackdrop extends StatelessWidget {
 
   /// The share of the cover's height where it starts to fade into the blur.
   final double fadeStart;
+
+  /// Keeps the cover square, with its sides, so it ends above the title.
+  final bool wholeCover;
 
   /// Plays [videoUrl] in place of the sharp cover, which shows until the
   /// video is ready. The phone player sets it; desktop keeps a still cover.
@@ -85,8 +89,8 @@ class MaterialPlayerBackdrop extends StatelessWidget {
           left: 0,
           right: 0,
           // Taller than wide on phones: the sides are cropped so the cover
-          // reaches down to the title instead of leaving an empty band.
-          height: size.width < size.height * 0.56
+          // reaches down to the title, unless the whole cover is asked for.
+          height: !wholeCover && size.width < size.height * 0.56
               ? size.height * 0.56
               : size.width.clamp(0.0, size.height * 0.62),
           child: AnimatedOpacity(

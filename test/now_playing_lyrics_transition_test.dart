@@ -758,6 +758,46 @@ void main() {
   });
 
   for (final mornye in [false, true]) {
+    testWidgets('the whole cover setting keeps a full screen cover square '
+        '($mornye)', (tester) async {
+      await pumpNowPlaying(
+        tester,
+        theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.light(),
+        size: const Size(390, 844),
+      );
+      mediaItems.add(item('first'));
+      await settlePlayer(tester);
+      final settings = ProviderScope.containerOf(
+        tester.element(find.byType(NowPlayingScreen)),
+      ).read(settingsProvider.notifier);
+      settings.setPlayerCoverStyle('fullscreen');
+      await settlePlayer(tester);
+      // The cover's box: 390 wide, and cropped to reach 56% of the height.
+      Size cover() => mornye
+          ? Size(
+              390,
+              390 /
+                  tester
+                      .widget<MornyePlayerBackground>(
+                        find.byType(MornyePlayerBackground),
+                      )
+                      .artworkAspectRatio!,
+            )
+          : tester.getSize(
+              find.descendant(
+                of: find.byType(MaterialPlayerBackdrop),
+                matching: find.byType(Hero),
+              ),
+            );
+      expect(cover().width, 390);
+      expect(cover().height, closeTo(844 * 0.56, 0.01));
+      settings.setPlayerCoverWhole(true);
+      await settlePlayer(tester);
+      expect(cover().width, 390);
+      expect(cover().height, closeTo(390, 0.01));
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('cover style switches live and survives rotation ($mornye)', (
       tester,
     ) async {

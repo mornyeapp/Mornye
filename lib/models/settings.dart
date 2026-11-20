@@ -297,6 +297,8 @@ class AppSettings {
   final String playerCoverStyle; // 'default' (card), 'fullscreen' or ''
   @JsonKey(fromJson: playerCoverFadeFromJson)
   final String playerCoverFade; // 'short', 'medium' or 'long'
+  /// A full screen cover keeps its sides, and so ends above the title.
+  final bool playerCoverWhole;
   final bool landscapeLyricsArtwork;
   final bool autoHideLyricsControls;
 
@@ -596,6 +598,7 @@ class AppSettings {
     this.musicHapticsStrength = 0.5,
     this.playerCoverStyle = '',
     this.playerCoverFade = 'medium',
+    this.playerCoverWhole = false,
     this.landscapeLyricsArtwork = false,
     this.autoHideLyricsControls = true,
     this.autoHideLyricsControlsWithAccessibility = false,
@@ -797,6 +800,7 @@ class AppSettings {
     double? musicHapticsStrength,
     String? playerCoverStyle,
     String? playerCoverFade,
+    bool? playerCoverWhole,
     bool? landscapeLyricsArtwork,
     bool? autoHideLyricsControls,
     bool? autoHideLyricsControlsWithAccessibility,
@@ -977,6 +981,7 @@ class AppSettings {
       musicHapticsStrength: musicHapticsStrength ?? this.musicHapticsStrength,
       playerCoverStyle: playerCoverStyle ?? this.playerCoverStyle,
       playerCoverFade: playerCoverFade ?? this.playerCoverFade,
+      playerCoverWhole: playerCoverWhole ?? this.playerCoverWhole,
       landscapeLyricsArtwork:
           landscapeLyricsArtwork ?? this.landscapeLyricsArtwork,
       autoHideLyricsControls:

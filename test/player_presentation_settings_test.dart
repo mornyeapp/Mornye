@@ -152,6 +152,62 @@ void main() {
       );
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('whole cover is off, then switched on, saved and searchable, '
+        'mornye $mornye', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      expect(AppSettings.fromJson(const {}).playerCoverWhole, isFalse);
+      final container = ProviderContainer(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(
+            const AppSettings(playerCoverStyle: 'fullscreen'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : AppTheme.light(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const PlaybackSettingsPage(),
+          ),
+        ),
+      );
+      final title = find.text('Whole cover');
+      await tester.scrollUntilVisible(
+        title,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(title);
+      await tester.pumpAndSettle();
+      await tester.tap(title);
+      await tester.pumpAndSettle();
+      expect(container.read(settingsProvider).playerCoverWhole, isTrue);
+      final prefs = await SharedPreferences.getInstance();
+      final restored = AppSettings.fromJson(
+        jsonDecode(prefs.getString('app_settings')!) as Map<String, dynamic>,
+      );
+      expect(restored.playerCoverWhole, isTrue);
+      final l10n = AppLocalizations.of(tester.element(title));
+      expect(
+        SettingsSearchCatalog(l10n).playback.where(
+          (entry) =>
+              entry.title == l10n.playerCoverWhole &&
+              entry.matches(SettingsSearchQuery('crop')),
+        ),
+        hasLength(1),
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
 
   test('fullscreen lyrics accessibility opt-in survives a round trip', () {

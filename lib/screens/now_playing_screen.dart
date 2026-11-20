@@ -366,6 +366,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final coverFade = ref.watch(
       settingsProvider.select((s) => s.playerCoverFade),
     );
+    final wholeCover = ref.watch(
+      settingsProvider.select((s) => s.playerCoverWhole),
+    );
     return LyricsScreenAwake(
       visible: _currentPage == 1 && mediaItem != null,
       child: mornye
@@ -374,6 +377,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               mediaItem,
               fullScreenCover: fullScreenCover,
               coverFade: coverFade,
+              wholeCover: wholeCover,
             )
           // Material takes the track's artwork scheme. The providers it needs
           // are read above, so the scoped builder reads none. A skip moves
@@ -388,6 +392,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                   mediaItem,
                   fullScreenCover: fullScreenCover,
                   coverFade: coverFade,
+                  wholeCover: wholeCover,
                 ),
               ),
             ),
@@ -399,6 +404,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     MediaItem? mediaItem, {
     required bool fullScreenCover,
     required String coverFade,
+    required bool wholeCover,
   }) {
     final mornye = context.isMornye;
     final colorScheme = mornye
@@ -468,10 +474,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final fullBleed = mornye && (motionArtwork != null || fullScreenCover);
     final screen = MediaQuery.sizeOf(context);
     // A still cover is cropped at the sides to reach down to the title, as
-    // in the Material full-screen style; landscape keeps the square card.
+    // in the Material full-screen style; landscape keeps the square card,
+    // and so does the whole cover setting.
     final stillFullBleed = fullBleed && motionArtwork == null;
     final artworkRatio = stillFullBleed
-        ? _landscape || screen.height <= 0
+        ? _landscape || wholeCover || screen.height <= 0
               ? 1.0
               : (screen.width / (screen.height * 0.56)).clamp(0.5, 1.0)
         : motionRatio;
@@ -920,6 +927,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               MaterialPlayerBackdrop.mediumFadeStart,
               coverFade,
             ),
+            wholeCover: wholeCover,
             playsMotionArtwork: true,
             videoUrl: motionArtwork?.source,
             resolvingVideo: motionState?.isLoading == true,
