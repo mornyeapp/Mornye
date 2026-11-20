@@ -60,17 +60,28 @@ class _PlayerQueueSwipeRegionState extends State<PlayerQueueSwipeRegion> {
 
 /// Artwork forwards vertical drags inside scroll views to the player route.
 class PlayerArtworkDragRegion extends StatelessWidget {
-  const PlayerArtworkDragRegion({super.key, required this.child});
+  const PlayerArtworkDragRegion({super.key, required this.child, this.onTap});
 
   final Widget child;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final route = ModalRoute.of(context);
-    if (route is! NowPlayingRoute) return PlayerTrackSwipeRegion(child: child);
+    if (route is! NowPlayingRoute) {
+      return PlayerTrackSwipeRegion(
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: onTap,
+          child: child,
+        ),
+      );
+    }
     final pageHeight = MediaQuery.sizeOf(context).height;
     return PlayerTrackSwipeRegion(
       child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: onTap,
         onVerticalDragStart: (_) => route.startDrag(),
         onVerticalDragUpdate: (details) =>
             route.updateDrag(details, pageHeight),

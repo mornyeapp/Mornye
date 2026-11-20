@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/cover_palette.dart';
+import 'package:mornye/widgets/enlarged_album_art_viewer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/album_track_sort_provider.dart';
@@ -434,31 +435,47 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
           : MotionHeaderBanner(videoUrl: motion.source, fallback: background),
       paletteSource: coverPath,
       blurAndScrimBackground: coverPath != null,
-      coverBuilder: (context, coverSize) => coverPath != null
-          ? Image.file(
-              File(coverPath),
-              fit: BoxFit.cover,
-              width: coverSize,
-              height: coverSize,
-              cacheWidth: cacheWidth,
-              gaplessPlayback: true,
-              errorBuilder: (_, _, _) => Container(
+      coverBuilder: (context, coverSize) {
+        final heroTag = 'album-cover-${widget.albumName}-${widget.artistName}';
+        final cover = coverPath != null
+            ? Image.file(
+                File(coverPath),
+                fit: BoxFit.cover,
+                width: coverSize,
+                height: coverSize,
+                cacheWidth: cacheWidth,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) => Container(
+                  color: colorScheme.surfaceContainerHighest,
+                  child: Icon(
+                    Icons.album,
+                    size: 48,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            : Container(
                 color: colorScheme.surfaceContainerHighest,
                 child: Icon(
                   Icons.album,
                   size: 48,
                   color: colorScheme.onSurfaceVariant,
                 ),
-              ),
-            )
-          : Container(
-              color: colorScheme.surfaceContainerHighest,
-              child: Icon(
-                Icons.album,
-                size: 48,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
+              );
+        return GestureDetector(
+          onTap: () => showEnlargedAlbumArt(
+            context,
+            artUri: coverPath,
+            title: widget.albumName,
+            artist: widget.artistName,
+            heroTag: heroTag,
+          ),
+          child: Hero(
+            tag: heroTag,
+            child: cover,
+          ),
+        );
+      },
       // Built inside the header, so desktop reads its artwork scheme.
       subtitle: Builder(
         builder: (header) => Text(

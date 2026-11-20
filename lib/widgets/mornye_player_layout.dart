@@ -16,6 +16,7 @@ import 'package:mornye/widgets/mornye_player_queue.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
+import 'package:mornye/widgets/enlarged_album_art_viewer.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
 import 'package:mornye/widgets/player_lyric_preview.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
@@ -291,6 +292,17 @@ class MornyePlayerLayout extends ConsumerWidget {
                                         : 'compact-player-artwork',
                                   ),
                                   child: PlayerArtworkDragRegion(
+                                    onTap: expanded
+                                        ? () => showEnlargedAlbumArt(
+                                              context,
+                                              artUri: mediaItem.artUri
+                                                  ?.toString(),
+                                              title: mediaItem.title,
+                                              artist: mediaItem.artist,
+                                              heroTag:
+                                                  kNowPlayingArtworkHeroTag,
+                                            )
+                                        : null,
                                     child: Hero(
                                       tag: kNowPlayingArtworkHeroTag,
                                       child: expanded
