@@ -14,6 +14,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
+import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
@@ -222,6 +223,45 @@ void main() {
     await tester.tap(find.byIcon(CupertinoIcons.ellipsis));
     await tester.pumpAndSettle();
     expect(find.textContaining('link'), findsNothing);
+  });
+
+  testWidgets('a pull down closes the Material track menu when rows scroll', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 420);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      _app(
+        const TrackCollectionQuickActions(track: _track),
+        _Collections(),
+        brightness: Brightness.light,
+        mornye: false,
+      ),
+    );
+    await tester.tap(find.byType(TrackCollectionQuickActions));
+    await tester.pumpAndSettle();
+    final rows = tester.state<ScrollableState>(
+      find.descendant(
+        of: find.byType(AppScrollableSheet),
+        matching: find.byType(Scrollable),
+      ),
+    );
+
+    // A drag up grows the sheet, the next one reaches the last row.
+    await tester.drag(find.text('Copy track name'), const Offset(0, -100));
+    await tester.pumpAndSettle();
+    await tester.drag(find.text('Copy track name'), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    expect(rows.position.pixels, greaterThan(0));
+    expect(find.text('Add to playlist').hitTestable(), findsOneWidget);
+
+    await tester.drag(find.text('Add to playlist'), const Offset(0, 300));
+    await tester.pumpAndSettle();
+    expect(rows.position.pixels, 0);
+    await tester.drag(find.text('Copy track name'), const Offset(0, 400));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppScrollableSheet), findsNothing);
   });
 
   for (final brightness in Brightness.values) {
