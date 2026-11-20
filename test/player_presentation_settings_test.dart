@@ -73,6 +73,87 @@ void main() {
     }
   });
 
+  test('cover fade is medium unless a known extent is saved', () {
+    expect(AppSettings.fromJson(const {}).playerCoverFade, 'medium');
+    for (final value in ['short', 'medium', 'long']) {
+      final saved = const AppSettings().copyWith(playerCoverFade: value);
+      expect(AppSettings.fromJson(saved.toJson()).playerCoverFade, value);
+    }
+    for (final Object? value in ['wide', '', 7, null]) {
+      final restored = AppSettings.fromJson({
+        'playerCoverFade': value,
+        'musicHaptics': true,
+      });
+      expect(restored.playerCoverFade, 'medium');
+      expect(restored.musicHaptics, isTrue);
+    }
+    // Medium keeps a cover's own start; the others scale the faded part.
+    expect(playerCoverFadeStart(0.72, 'medium'), 0.72);
+    expect(playerCoverFadeStart(0.72, 'short'), closeTo(0.818, 1e-9));
+    expect(playerCoverFadeStart(0.72, 'long'), closeTo(0.608, 1e-9));
+    expect(playerCoverFadeStart(0.58, 'long'), closeTo(0.412, 1e-9));
+    expect(playerCoverFadeStart(0.58, 'wide'), 0.58);
+  });
+
+  for (final mornye in [false, true]) {
+    testWidgets('cover fade is chosen, saved and searchable, mornye $mornye', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final container = ProviderContainer(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(
+            const AppSettings(playerCoverStyle: 'fullscreen'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : AppTheme.light(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const PlaybackSettingsPage(),
+          ),
+        ),
+      );
+      final title = find.text('Cover fade');
+      await tester.scrollUntilVisible(
+        title,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      // The connected choice lays a label out twice to size its buttons.
+      await tester.ensureVisible(find.text('Long').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Long').hitTestable().first);
+      await tester.pumpAndSettle();
+      expect(container.read(settingsProvider).playerCoverFade, 'long');
+      final prefs = await SharedPreferences.getInstance();
+      final restored = AppSettings.fromJson(
+        jsonDecode(prefs.getString('app_settings')!) as Map<String, dynamic>,
+      );
+      expect(restored.playerCoverFade, 'long');
+      final l10n = AppLocalizations.of(tester.element(title));
+      expect(
+        SettingsSearchCatalog(l10n).playback.where(
+          (entry) =>
+              entry.title == l10n.playerCoverFade &&
+              entry.matches(SettingsSearchQuery('blur')),
+        ),
+        hasLength(1),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   test('fullscreen lyrics accessibility opt-in survives a round trip', () {
     final legacy = AppSettings.fromJson({'autoHideLyricsControls': true});
     expect(

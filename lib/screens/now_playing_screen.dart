@@ -10,6 +10,7 @@ import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/player_track_navigation.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/settings.dart' show playerCoverFadeStart;
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -362,10 +363,18 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         (s) => s.playerCoverStyleFor(mornye: mornye) == 'fullscreen',
       ),
     );
+    final coverFade = ref.watch(
+      settingsProvider.select((s) => s.playerCoverFade),
+    );
     return LyricsScreenAwake(
       visible: _currentPage == 1 && mediaItem != null,
       child: mornye
-          ? _buildPlayer(context, mediaItem, fullScreenCover: fullScreenCover)
+          ? _buildPlayer(
+              context,
+              mediaItem,
+              fullScreenCover: fullScreenCover,
+              coverFade: coverFade,
+            )
           // Material takes the track's artwork scheme. The providers it needs
           // are read above, so the scoped builder reads none. A skip moves
           // only the page background, so the whole player is not rebuilt
@@ -378,6 +387,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                   context,
                   mediaItem,
                   fullScreenCover: fullScreenCover,
+                  coverFade: coverFade,
                 ),
               ),
             ),
@@ -388,6 +398,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     BuildContext context,
     MediaItem? mediaItem, {
     required bool fullScreenCover,
+    required String coverFade,
   }) {
     final mornye = context.isMornye;
     final colorScheme = mornye
@@ -905,6 +916,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             mediaItem: mediaItem,
             colorScheme: colorScheme,
             showArtwork: materialFullScreen && _currentPage != 1,
+            fadeStart: playerCoverFadeStart(
+              MaterialPlayerBackdrop.mediumFadeStart,
+              coverFade,
+            ),
             playsMotionArtwork: true,
             videoUrl: motionArtwork?.source,
             resolvingVideo: motionState?.isLoading == true,
@@ -919,7 +934,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       );
     }
     final showsFullArtwork = fullBleed && !_landscape && _currentPage == 0;
-    final fadeStart = stillFullBleed ? 0.72 : 0.58;
+    final fadeStart = playerCoverFadeStart(
+      stillFullBleed ? 0.72 : 0.58,
+      coverFade,
+    );
     return HeroMode(
       // A route Hero renders outside the panel's gradient and slide, briefly
       // exposing a detached rectangle. Keep Mornye artwork inside its panel.

@@ -10,6 +10,22 @@ part 'settings.g.dart';
 String playerCoverStyleFromJson(Object? value) =>
     value == 'default' || value == 'fullscreen' ? value as String : '';
 
+/// How far up a full screen cover its fade reaches: 'short', 'medium' or
+/// 'long'.
+String playerCoverFadeFromJson(Object? value) =>
+    value == 'short' || value == 'long' ? value as String : 'medium';
+
+/// Where a full screen cover starts to fade, as a share of its height, when
+/// it starts at [medium] for the medium [fade].
+double playerCoverFadeStart(double medium, String fade) =>
+    1 -
+    (1 - medium) *
+        switch (fade) {
+          'short' => 0.65,
+          'long' => 1.4,
+          _ => 1.0,
+        };
+
 /// Pre-amp applied on top of ReplayGain during playback, in whole dB.
 /// -7 dB targets -25 LUFS from the -18 LUFS tag reference.
 double playbackNormalizationPreampFromJson(Object? value) =>
@@ -278,6 +294,8 @@ class AppSettings {
   final double musicHapticsStrength;
   @JsonKey(fromJson: playerCoverStyleFromJson)
   final String playerCoverStyle; // 'default' (card), 'fullscreen' or ''
+  @JsonKey(fromJson: playerCoverFadeFromJson)
+  final String playerCoverFade; // 'short', 'medium' or 'long'
   final bool landscapeLyricsArtwork;
   final bool autoHideLyricsControls;
 
@@ -576,6 +594,7 @@ class AppSettings {
     this.musicHapticsSensitivity = 0.5,
     this.musicHapticsStrength = 0.5,
     this.playerCoverStyle = '',
+    this.playerCoverFade = 'medium',
     this.landscapeLyricsArtwork = false,
     this.autoHideLyricsControls = true,
     this.autoHideLyricsControlsWithAccessibility = false,
@@ -776,6 +795,7 @@ class AppSettings {
     double? musicHapticsSensitivity,
     double? musicHapticsStrength,
     String? playerCoverStyle,
+    String? playerCoverFade,
     bool? landscapeLyricsArtwork,
     bool? autoHideLyricsControls,
     bool? autoHideLyricsControlsWithAccessibility,
@@ -955,6 +975,7 @@ class AppSettings {
           musicHapticsSensitivity ?? this.musicHapticsSensitivity,
       musicHapticsStrength: musicHapticsStrength ?? this.musicHapticsStrength,
       playerCoverStyle: playerCoverStyle ?? this.playerCoverStyle,
+      playerCoverFade: playerCoverFade ?? this.playerCoverFade,
       landscapeLyricsArtwork:
           landscapeLyricsArtwork ?? this.landscapeLyricsArtwork,
       autoHideLyricsControls:

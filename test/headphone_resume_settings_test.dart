@@ -93,10 +93,14 @@ void main() {
     ) async {
       final container = await _pumpPage(tester, mornye: mornye);
       await _scrollToChoice(tester);
+      // The page has other choices of this kind: this is the one with Always.
       expect(
-        mornye
-            ? find.byType(MornyeSegmentedControl)
-            : find.byType(SettingsSegmentedChoice<String>),
+        find.ancestor(
+          of: _option('Always'),
+          matching: mornye
+              ? find.byType(MornyeSegmentedControl)
+              : find.byType(SettingsSegmentedChoice<String>),
+        ),
         findsOneWidget,
       );
       expect(find.text(_title), findsOneWidget);

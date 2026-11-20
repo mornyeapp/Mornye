@@ -9398,6 +9398,26 @@
   "@playerCoverStyleFullScreenDescription": {
     "description": "Subtitle of the full screen cover art style"
   },
+  "playerCoverFade": "Cover fade",
+  "@playerCoverFade": {
+    "description": "Setting for how far up a full screen cover its fade into the blur reaches"
+  },
+  "playerCoverFadeDescription": "How far up the full screen cover the blur reaches",
+  "@playerCoverFadeDescription": {
+    "description": "Subtitle of the Cover fade setting"
+  },
+  "playerCoverFadeShort": "Short",
+  "@playerCoverFadeShort": {
+    "description": "Cover fade choice: the blur covers little of the cover"
+  },
+  "playerCoverFadeMedium": "Medium",
+  "@playerCoverFadeMedium": {
+    "description": "Cover fade choice: the usual extent of the blur"
+  },
+  "playerCoverFadeLong": "Long",
+  "@playerCoverFadeLong": {
+    "description": "Cover fade choice: the blur reaches far up the cover"
+  },
   "musicHaptics": "Music haptics",
   "@musicHaptics": {
     "description": "Setting that vibrates the phone along with the music"

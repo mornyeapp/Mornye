@@ -447,6 +447,12 @@ class SettingsSearchCatalog {
           keywords: const ['artwork', 'cover', 'full screen', 'immersive'],
         ),
         SettingsSearchEntry(
+          icon: Icons.blur_linear,
+          title: l10n.playerCoverFade,
+          subtitle: l10n.playerCoverFadeDescription,
+          keywords: const ['artwork', 'cover', 'blur', 'fade', 'gradient'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.splitscreen_outlined,
           title: l10n.landscapeLyricsArtwork,
           subtitle: l10n.landscapeLyricsArtworkDescription,

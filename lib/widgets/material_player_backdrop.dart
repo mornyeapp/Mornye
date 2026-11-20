@@ -24,17 +24,24 @@ class MaterialPlayerBackdrop extends StatelessWidget {
     required this.mediaItem,
     required this.colorScheme,
     required this.showArtwork,
+    this.fadeStart = mediumFadeStart,
     this.playsMotionArtwork = false,
     this.videoUrl,
     this.resolvingVideo = false,
     this.onVideoError,
   });
 
+  /// Where the cover starts to fade at the medium Cover fade setting.
+  static const mediumFadeStart = 0.72;
+
   final MediaItem mediaItem;
   final ColorScheme colorScheme;
 
   /// False behind lyrics, where only the blurred surface remains.
   final bool showArtwork;
+
+  /// The share of the cover's height where it starts to fade into the blur.
+  final double fadeStart;
 
   /// Plays [videoUrl] in place of the sharp cover, which shows until the
   /// video is ready. The phone player sets it; desktop keeps a still cover.
@@ -90,6 +97,7 @@ class MaterialPlayerBackdrop extends StatelessWidget {
               tag: kNowPlayingArtworkHeroTag,
               // The flying cover must keep its fade in the route overlay.
               child: _FadedArtwork(
+                fadeStart: fadeStart,
                 child: !playsMotionArtwork
                     ? PlayerArtwork(
                         artUri: artUri,
@@ -146,20 +154,19 @@ class MaterialPlayerBackdrop extends StatelessWidget {
   }
 }
 
-const _fadeStart = 0.72;
-
-const _fade = LinearGradient(
+/// The cover whole down to [fadeStart] of its height, then fading out.
+LinearGradient _fade(double fadeStart) => LinearGradient(
   begin: Alignment.topCenter,
   end: Alignment.bottomCenter,
-  stops: [0, _fadeStart, 1],
-  colors: [Colors.white, Colors.white, Colors.transparent],
+  stops: [0, fadeStart, 1],
+  colors: const [Colors.white, Colors.white, Colors.transparent],
 );
 
 /// Top of the band [_fade] changes: a whole device pixel at least one pixel
 /// above the first faded row, so a row the edge crosses is unfaded on
 /// either side of it.
-double _fadeTop(double height, double devicePixelRatio) {
-  final row = (height * _fadeStart * devicePixelRatio).floorToDouble() - 1;
+double _fadeTop(double height, double fadeStart, double devicePixelRatio) {
+  final row = (height * fadeStart * devicePixelRatio).floorToDouble() - 1;
   return math.max(0.0, row) / devicePixelRatio;
 }
 
@@ -167,8 +174,9 @@ double _fadeTop(double height, double devicePixelRatio) {
 /// offscreen mask; a second copy of the same artwork, sharing its decode,
 /// draws the rows above it directly.
 class _FadedArtwork extends StatelessWidget {
-  const _FadedArtwork({required this.child});
+  const _FadedArtwork({required this.fadeStart, required this.child});
 
+  final double fadeStart;
   final Widget child;
 
   @override
@@ -177,9 +185,16 @@ class _FadedArtwork extends StatelessWidget {
     return Stack(
       fit: StackFit.passthrough,
       children: [
-        ClipRect(clipper: _AboveFade(devicePixelRatio), child: child),
+        ClipRect(
+          clipper: _AboveFade(fadeStart, devicePixelRatio),
+          child: child,
+        ),
         ExcludeSemantics(
-          child: _FadeBand(devicePixelRatio: devicePixelRatio, child: child),
+          child: _FadeBand(
+            fadeStart: fadeStart,
+            devicePixelRatio: devicePixelRatio,
+            child: child,
+          ),
         ),
       ],
     );
@@ -187,37 +202,57 @@ class _FadedArtwork extends StatelessWidget {
 }
 
 class _AboveFade extends CustomClipper<Rect> {
-  const _AboveFade(this.devicePixelRatio);
+  const _AboveFade(this.fadeStart, this.devicePixelRatio);
 
+  final double fadeStart;
   final double devicePixelRatio;
 
   @override
-  Rect getClip(Size size) =>
-      Rect.fromLTRB(0, 0, size.width, _fadeTop(size.height, devicePixelRatio));
+  Rect getClip(Size size) => Rect.fromLTRB(
+    0,
+    0,
+    size.width,
+    _fadeTop(size.height, fadeStart, devicePixelRatio),
+  );
 
   @override
   bool shouldReclip(_AboveFade oldClipper) =>
+      oldClipper.fadeStart != fadeStart ||
       oldClipper.devicePixelRatio != devicePixelRatio;
 }
 
 class _FadeBand extends SingleChildRenderObjectWidget {
-  const _FadeBand({required this.devicePixelRatio, required super.child});
+  const _FadeBand({
+    required this.fadeStart,
+    required this.devicePixelRatio,
+    required super.child,
+  });
 
+  final double fadeStart;
   final double devicePixelRatio;
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderFadeBand(devicePixelRatio);
+      _RenderFadeBand(fadeStart, devicePixelRatio);
 
   @override
   void updateRenderObject(BuildContext context, _RenderFadeBand renderObject) =>
-      renderObject.devicePixelRatio = devicePixelRatio;
+      renderObject
+        ..fadeStart = fadeStart
+        ..devicePixelRatio = devicePixelRatio;
 }
 
 /// Paints its child from [_fadeTop] down, masked by [_fade] laid over the
 /// whole box, so the mask's offscreen layer spans only that band.
 class _RenderFadeBand extends RenderProxyBox {
-  _RenderFadeBand(this._devicePixelRatio);
+  _RenderFadeBand(this._fadeStart, this._devicePixelRatio);
+
+  double _fadeStart;
+  set fadeStart(double value) {
+    if (value == _fadeStart) return;
+    _fadeStart = value;
+    markNeedsPaint();
+  }
 
   double _devicePixelRatio;
   set devicePixelRatio(double value) {
@@ -242,14 +277,14 @@ class _RenderFadeBand extends RenderProxyBox {
       _clip.layer = null;
       return;
     }
-    final top = _fadeTop(size.height, _devicePixelRatio);
+    final top = _fadeTop(size.height, _fadeStart, _devicePixelRatio);
     final band = Rect.fromLTRB(0, top, size.width, size.height);
     // The layer draws the shader from the band's corner, so the gradient's
     // box starts above it, where the cover's box starts.
     layer = (layer ?? ShaderMaskLayer())
-      ..shader = _fade.createShader(
-        Rect.fromLTWH(0, -top, size.width, size.height),
-      )
+      ..shader = _fade(
+        _fadeStart,
+      ).createShader(Rect.fromLTWH(0, -top, size.width, size.height))
       ..maskRect = band.shift(offset)
       ..blendMode = BlendMode.dstIn;
     context.pushLayer(layer!, (context, offset) {

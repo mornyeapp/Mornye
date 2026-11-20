@@ -507,6 +507,16 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                       .setPlayerCoverStyle(style),
                   showDivider: true,
                 ),
+              _CoverFadeChoice(
+                fade: settings.playerCoverFade,
+                // Motion artwork is full screen in Mornye with either style.
+                enabled:
+                    coverStyle == 'fullscreen' ||
+                    (context.isMornye && settings.motionArtworkEnabled),
+                onChanged: (fade) => ref
+                    .read(settingsProvider.notifier)
+                    .setPlayerCoverFade(fade),
+              ),
               SettingsSwitchItem(
                 icon: Icons.splitscreen_outlined,
                 title: context.l10n.landscapeLyricsArtwork,
@@ -893,29 +903,92 @@ class _HeadphoneResumeChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    return _SegmentedSettingRow(
+      icon: Icons.headphones_outlined,
+      title: l10n.playbackOnHeadphonesConnected,
+      description: switch (mode) {
+        'after_disconnect' => l10n.playbackResumeOnReconnectDescription,
+        'always' => l10n.playbackOnHeadphonesConnectedDescription,
+        _ => l10n.playbackHeadphonesOffDescription,
+      },
+      labels: {
+        'off': l10n.playbackHeadphonesOff,
+        'after_disconnect': l10n.playbackHeadphonesAfterDisconnect,
+        'always': l10n.playbackHeadphonesAlways,
+      },
+      selected: mode,
+      enabled: enabled,
+      onChanged: onChanged,
+    );
+  }
+}
+
+/// How far up a full screen cover its fade reaches: short, medium or long.
+class _CoverFadeChoice extends StatelessWidget {
+  const _CoverFadeChoice({
+    required this.fade,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String fade;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return _SegmentedSettingRow(
+      icon: Icons.blur_linear,
+      title: l10n.playerCoverFade,
+      description: l10n.playerCoverFadeDescription,
+      labels: {
+        'short': l10n.playerCoverFadeShort,
+        'medium': l10n.playerCoverFadeMedium,
+        'long': l10n.playerCoverFadeLong,
+      },
+      selected: fade,
+      enabled: enabled,
+      onChanged: onChanged,
+    );
+  }
+}
+
+/// A setting with a few short choices: its title and description over a
+/// connected choice, keyed by the stored value in [labels].
+class _SegmentedSettingRow extends StatelessWidget {
+  const _SegmentedSettingRow({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.labels,
+    required this.selected,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final Map<String, String> labels;
+  final String selected;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final title = l10n.playbackOnHeadphonesConnected;
-    final labels = {
-      'off': l10n.playbackHeadphonesOff,
-      'after_disconnect': l10n.playbackHeadphonesAfterDisconnect,
-      'always': l10n.playbackHeadphonesAlways,
-    };
-    final description = switch (mode) {
-      'after_disconnect' => l10n.playbackResumeOnReconnectDescription,
-      'always' => l10n.playbackOnHeadphonesConnectedDescription,
-      _ => l10n.playbackHeadphonesOffDescription,
-    };
     final showIcon = !context.isMornye;
     final choice = context.isMornye
         ? MornyeSegmentedControl(
             labels: labels.values.toList(),
-            selectedIndex: labels.keys.toList().indexOf(mode),
+            selectedIndex: labels.keys.toList().indexOf(selected),
             onChanged: (index) => onChanged(labels.keys.elementAt(index)),
             samplesBackdrop: false,
           )
         : SettingsSegmentedChoice<String>(
-            selected: mode,
+            selected: selected,
             onChanged: onChanged,
             semanticLabel: title,
             options: [
@@ -937,7 +1010,7 @@ class _HeadphoneResumeChoice extends StatelessWidget {
               children: [
                 if (showIcon) ...[
                   AppIcon(
-                    Icons.headphones_outlined,
+                    icon,
                     color: enabled
                         ? colorScheme.onSurfaceVariant
                         : colorScheme.outline,

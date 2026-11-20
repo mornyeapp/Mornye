@@ -583,6 +583,24 @@ void main() {
       clip.depthFirstIterateChildren().whereType<PictureLayer>(),
       isNotEmpty,
     );
+
+    // A longer Cover fade starts the band higher up the cover.
+    final long = (await mask(
+      (item, showArtwork) => MaterialPlayerBackdrop(
+        mediaItem: item,
+        colorScheme: _scheme,
+        showArtwork: showArtwork,
+        fadeStart: 0.608,
+      ),
+    )).maskRect!;
+    expect(long.bottom, box.bottom);
+    expect(
+      long.top * dpr,
+      inInclusiveRange(
+        box.height * 0.608 * dpr - 2,
+        box.height * 0.608 * dpr - 1,
+      ),
+    );
   });
 
   testWidgets('a skip fades the sharp cover in without growing it', (
