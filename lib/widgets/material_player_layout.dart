@@ -11,6 +11,7 @@ import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/player_artwork.dart';
+import 'package:mornye/widgets/enlarged_album_art_viewer.dart';
 import 'package:mornye/widgets/player_compact_bar.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
 import 'package:mornye/widgets/player_lyric_preview.dart';
@@ -82,6 +83,13 @@ class MaterialPlayerLayout extends StatelessWidget {
               )
             : Center(
                 child: PlayerArtworkDragRegion(
+                  onTap: () => showEnlargedAlbumArt(
+                    context,
+                    artUri: mediaItem.artUri?.toString(),
+                    title: mediaItem.title,
+                    artist: mediaItem.artist,
+                    heroTag: kNowPlayingArtworkHeroTag,
+                  ),
                   child: Hero(
                     tag: kNowPlayingArtworkHeroTag,
                     child: Consumer(

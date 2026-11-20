@@ -45,6 +45,19 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   headphoneResume: readHeadphoneResume(json, 'headphoneResume') == null
       ? 'off'
       : headphoneResumeFromJson(readHeadphoneResume(json, 'headphoneResume')),
+  headsetTimeoutMs: json['headsetTimeoutMs'] == null
+      ? defaultHeadsetTimeoutMs
+      : headsetTimeoutMsFromJson(json['headsetTimeoutMs']),
+  headsetSingleClickAction: json['headsetSingleClickAction'] == null
+      ? 'play_pause'
+      : headsetSingleClickActionFromJson(json['headsetSingleClickAction']),
+  headsetDoubleClickAction: json['headsetDoubleClickAction'] == null
+      ? 'next'
+      : headsetDoubleClickActionFromJson(json['headsetDoubleClickAction']),
+  headsetTripleClickAction: json['headsetTripleClickAction'] == null
+      ? 'previous'
+      : headsetTripleClickActionFromJson(json['headsetTripleClickAction']),
+  headsetVibrateOnClick: json['headsetVibrateOnClick'] as bool? ?? true,
   gaplessPlayback: json['gaplessPlayback'] as bool? ?? true,
   autoMix: json['autoMix'] as bool? ?? false,
   autoMixDuration: json['autoMixDuration'] == null
@@ -282,6 +295,11 @@ Map<String, dynamic> _$AppSettingsToJson(
   'loudVolumeLevel': instance.loudVolumeLevel,
   'pauseOnMute': instance.pauseOnMute,
   'headphoneResume': instance.headphoneResume,
+  'headsetTimeoutMs': instance.headsetTimeoutMs,
+  'headsetSingleClickAction': instance.headsetSingleClickAction,
+  'headsetDoubleClickAction': instance.headsetDoubleClickAction,
+  'headsetTripleClickAction': instance.headsetTripleClickAction,
+  'headsetVibrateOnClick': instance.headsetVibrateOnClick,
   'gaplessPlayback': instance.gaplessPlayback,
   'autoMix': instance.autoMix,
   'autoMixDuration': instance.autoMixDuration,

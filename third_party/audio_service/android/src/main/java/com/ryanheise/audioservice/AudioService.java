@@ -1056,10 +1056,24 @@ public class AudioService extends MediaBrowserServiceCompat {
         @Override
         public boolean onMediaButtonEvent(Intent mediaButtonEvent) {
             if (listener == null) return false;
+            if (wakeLock != null) {
+                wakeLock.acquireTemporary(5000);
+            }
             // TODO: use typesafe version once SDK 33 is released.
             @SuppressWarnings("deprecation")
             final KeyEvent event = (KeyEvent)mediaButtonEvent.getExtras().getParcelable(Intent.EXTRA_KEY_EVENT);
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                if (event.getRepeatCount() > 0) {
+                    // Detect long press on the first repeat (Android sends repeatCount == 1 after long press timeout)
+                    if (event.getRepeatCount() == 1) {
+                        int code = event.getKeyCode();
+                        if (code == KeyEvent.KEYCODE_HEADSETHOOK || code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
+                            onFastForward();
+                        }
+                    }
+                    // Consume key repeats so they are not treated as multiple rapid clicks
+                    return true;
+                }
                 switch (event.getKeyCode()) {
                 case KEYCODE_BYPASS_PLAY:
                     onPlay();

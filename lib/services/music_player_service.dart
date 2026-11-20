@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart' show compute, visibleForTesting;
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter/widgets.dart'
     show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
 import 'package:mornye/services/playback_notification.dart';
@@ -2460,15 +2461,84 @@ class MusicPlayerHandler extends BaseAudioHandler
     });
   }
 
-  @override
-  Future<void> click([MediaButton button = MediaButton.media]) async {
-    switch (button) {
-      case MediaButton.media:
+  int _headsetClickCount = 0;
+  Timer? _headsetClickTimer;
+
+  /// Cancels any pending headset multi-click debouncing timer.
+  void _cancelHeadsetTimer() {
+    _headsetClickTimer?.cancel();
+    _headsetClickTimer = null;
+    _headsetClickCount = 0;
+  }
+
+  /// Dispatches an action configured for headset button clicks.
+  Future<void> _dispatchHeadsetAction(String action) async {
+    switch (action) {
+      case 'play_pause':
         if (playbackState.value.playing) {
           await pause();
         } else {
           await play();
         }
+        break;
+      case 'next':
+        await skipToNext();
+        break;
+      case 'previous':
+        await skipToPrevious();
+        break;
+      case 'fast_forward':
+        await fastForward();
+        break;
+      case 'rewind':
+        await rewind();
+        break;
+      case 'none':
+        break;
+      default:
+        if (playbackState.value.playing) {
+          await pause();
+        } else {
+          await play();
+        }
+    }
+  }
+
+  @override
+  Future<void> click([MediaButton button = MediaButton.media]) async {
+    switch (button) {
+      case MediaButton.media:
+        if (_settings.headsetVibrateOnClick) {
+          unawaited(HapticFeedback.selectionClick());
+        }
+        _headsetClickCount++;
+        _headsetClickTimer?.cancel();
+
+        // 3 Taps (Triple Press) -> immediately execute without waiting
+        if (_headsetClickCount >= 3) {
+          final action = _settings.headsetTripleClickAction;
+          _headsetClickCount = 0;
+          _headsetClickTimer?.cancel();
+          _headsetClickTimer = null;
+          await _dispatchHeadsetAction(action);
+          return;
+        }
+
+        // 1 or 2 Taps: wait for detection timeout window
+        final timeoutMs = _settings.headsetTimeoutMs.clamp(
+          minHeadsetTimeoutMs,
+          maxHeadsetTimeoutMs,
+        );
+        _headsetClickTimer = Timer(Duration(milliseconds: timeoutMs), () async {
+          final count = _headsetClickCount;
+          _headsetClickCount = 0;
+          _headsetClickTimer = null;
+          if (count == 1) {
+            await _dispatchHeadsetAction(_settings.headsetSingleClickAction);
+          } else if (count == 2) {
+            await _dispatchHeadsetAction(_settings.headsetDoubleClickAction);
+          }
+        });
         break;
       case MediaButton.next:
         await skipToNext();
@@ -2477,6 +2547,27 @@ class MusicPlayerHandler extends BaseAudioHandler
         await skipToPrevious();
         break;
     }
+  }
+
+  @override
+  Future<void> fastForward() async {
+    _cancelHeadsetTimer();
+    final current = playbackState.value.position;
+    final total = mediaItem.value?.duration;
+    final target = current + const Duration(seconds: 15);
+    if (total != null && target > total) {
+      await seek(total);
+    } else {
+      await seek(target);
+    }
+  }
+
+  @override
+  Future<void> rewind() async {
+    _cancelHeadsetTimer();
+    final current = playbackState.value.position;
+    final target = current - const Duration(seconds: 15);
+    await seek(target < Duration.zero ? Duration.zero : target);
   }
 
   @override
@@ -3001,6 +3092,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       _cast.adjustVolume(direction);
 
   Future<void> _dispose() async {
+    _cancelHeadsetTimer();
     _autoplay.reset();
     _prefetch.stop();
     _disposed = true;

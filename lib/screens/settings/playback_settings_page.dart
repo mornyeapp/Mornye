@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart'
-    show headphoneResumeModes, loudVolumeLevels;
+    show AppSettings, headphoneResumeModes, loudVolumeLevels;
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/alsa_output_devices.dart';
@@ -28,6 +28,7 @@ import 'package:mornye/utils/exclusive_output_labels.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/utils/usb_output_status_label.dart';
 import 'package:mornye/widgets/animation_utils.dart';
+import 'package:mornye/widgets/app_slider.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -477,6 +478,29 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                 ),
               ],
             ),
+          ...settingsSectionSlivers(
+            title: 'Headset & Remote Controls',
+            children: [
+              _HeadsetRemoteControlsGroup(
+                settings: settings,
+                onTimeoutChanged: (timeout) => ref
+                    .read(settingsProvider.notifier)
+                    .setHeadsetTimeoutMs(timeout),
+                onSingleClickActionChanged: (action) => ref
+                    .read(settingsProvider.notifier)
+                    .setHeadsetSingleClickAction(action),
+                onDoubleClickActionChanged: (action) => ref
+                    .read(settingsProvider.notifier)
+                    .setHeadsetDoubleClickAction(action),
+                onTripleClickActionChanged: (action) => ref
+                    .read(settingsProvider.notifier)
+                    .setHeadsetTripleClickAction(action),
+                onVibrateChanged: (vibrate) => ref
+                    .read(settingsProvider.notifier)
+                    .setHeadsetVibrateOnClick(vibrate),
+              ),
+            ],
+          ),
           ...settingsSectionSlivers(
             title: context.l10n.playerCoverStyle,
             children: [
@@ -1123,6 +1147,174 @@ class _SpatialAudioItemState extends ConsumerState<_SpatialAudioItem>
           showDivider: widget.showDivider,
         );
       },
+    );
+  }
+}
+
+class _HeadsetRemoteControlsGroup extends StatelessWidget {
+  const _HeadsetRemoteControlsGroup({
+    required this.settings,
+    required this.onTimeoutChanged,
+    required this.onSingleClickActionChanged,
+    required this.onDoubleClickActionChanged,
+    required this.onTripleClickActionChanged,
+    required this.onVibrateChanged,
+  });
+
+  final AppSettings settings;
+  final ValueChanged<int> onTimeoutChanged;
+  final ValueChanged<String> onSingleClickActionChanged;
+  final ValueChanged<String> onDoubleClickActionChanged;
+  final ValueChanged<String> onTripleClickActionChanged;
+  final ValueChanged<bool> onVibrateChanged;
+
+  static String actionLabel(String action) {
+    switch (action) {
+      case 'play_pause':
+        return 'Play / Pause';
+      case 'next':
+        return 'Next Track';
+      case 'previous':
+        return 'Previous Track';
+      case 'fast_forward':
+        return 'Fast Forward';
+      case 'rewind':
+        return 'Rewind';
+      case 'none':
+        return 'None';
+      default:
+        return 'Play / Pause';
+    }
+  }
+
+  static Future<void> _showActionPicker(
+    BuildContext context, {
+    required String title,
+    required String current,
+    required ValueChanged<String> onSelected,
+  }) async {
+    const actions = ['play_pause', 'next', 'previous', 'none'];
+    final colorScheme = Theme.of(context).colorScheme;
+    final action = await showAppBottomSheet<String>(
+      context: context,
+      title: title,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: SettingsGroup(
+          children: [
+            for (final act in actions)
+              SettingsItem(
+                title: actionLabel(act),
+                selected: act == current,
+                trailing: act == current
+                    ? AppIcon(Icons.check, color: colorScheme.primary)
+                    : null,
+                showDivider: act != actions.last,
+                onTap: () => Navigator.pop(sheetContext, act),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (action != null) onSelected(action);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return SettingsGroup(
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: context.tokens.rowPaddingH,
+            vertical: context.tokens.rowPaddingVCompact,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Multi-click Detection Window',
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    '${settings.headsetTimeoutMs} ms',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Detection timeout for double and triple clicks',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              AppSlider(
+                value: settings.headsetTimeoutMs.toDouble(),
+                min: 200,
+                max: 600,
+                divisions: 8,
+                label: '${settings.headsetTimeoutMs} ms',
+                onChanged: (val) => onTimeoutChanged(val.round()),
+              ),
+            ],
+          ),
+        ),
+        SettingsItem(
+          title: 'Single Tap Action',
+          subtitle: actionLabel(settings.headsetSingleClickAction),
+          trailing: const AppIcon(Icons.chevron_right),
+          showDivider: true,
+          onTap: () => _showActionPicker(
+            context,
+            title: 'Single Tap Action',
+            current: settings.headsetSingleClickAction,
+            onSelected: onSingleClickActionChanged,
+          ),
+        ),
+        SettingsItem(
+          title: 'Double Tap Action',
+          subtitle: actionLabel(settings.headsetDoubleClickAction),
+          trailing: const AppIcon(Icons.chevron_right),
+          showDivider: true,
+          onTap: () => _showActionPicker(
+            context,
+            title: 'Double Tap Action',
+            current: settings.headsetDoubleClickAction,
+            onSelected: onDoubleClickActionChanged,
+          ),
+        ),
+        SettingsItem(
+          title: 'Triple Tap Action',
+          subtitle: actionLabel(settings.headsetTripleClickAction),
+          trailing: const AppIcon(Icons.chevron_right),
+          showDivider: true,
+          onTap: () => _showActionPicker(
+            context,
+            title: 'Triple Tap Action',
+            current: settings.headsetTripleClickAction,
+            onSelected: onTripleClickActionChanged,
+          ),
+        ),
+        SettingsSwitchItem(
+          title: 'Vibrate on Click',
+          subtitle: 'Subtle haptic feedback when a headset click is registered',
+          value: settings.headsetVibrateOnClick,
+          showDivider: false,
+          onChanged: onVibrateChanged,
+        ),
+      ],
     );
   }
 }

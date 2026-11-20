@@ -44,6 +44,34 @@ Object? readHeadphoneResume(Map<dynamic, dynamic> json, String key) {
 String headphoneResumeFromJson(Object? value) =>
     headphoneResumeModes.contains(value) ? value! as String : 'off';
 
+/// Headset multi-click detection window boundaries and default (ms).
+const int minHeadsetTimeoutMs = 200;
+const int maxHeadsetTimeoutMs = 600;
+const int defaultHeadsetTimeoutMs = 350;
+
+int headsetTimeoutMsFromJson(Object? value) => value is num && value.isFinite
+    ? value.toInt().clamp(minHeadsetTimeoutMs, maxHeadsetTimeoutMs)
+    : defaultHeadsetTimeoutMs;
+
+/// Headset button remapping action options.
+const headsetButtonActions = [
+  'play_pause',
+  'next',
+  'previous',
+  'fast_forward',
+  'rewind',
+  'none',
+];
+
+String headsetSingleClickActionFromJson(Object? value) =>
+    headsetButtonActions.contains(value) ? value! as String : 'play_pause';
+
+String headsetDoubleClickActionFromJson(Object? value) =>
+    headsetButtonActions.contains(value) ? value! as String : 'next';
+
+String headsetTripleClickActionFromJson(Object? value) =>
+    headsetButtonActions.contains(value) ? value! as String : 'previous';
+
 double musicHapticsLevelFromJson(Object? value) =>
     value is num && value.isFinite ? value.toDouble().clamp(0, 1) : 0.5;
 
@@ -178,6 +206,15 @@ class AppSettings {
   // One of [headphoneResumeModes].
   @JsonKey(readValue: readHeadphoneResume, fromJson: headphoneResumeFromJson)
   final String headphoneResume;
+  @JsonKey(fromJson: headsetTimeoutMsFromJson)
+  final int headsetTimeoutMs;
+  @JsonKey(fromJson: headsetSingleClickActionFromJson)
+  final String headsetSingleClickAction;
+  @JsonKey(fromJson: headsetDoubleClickActionFromJson)
+  final String headsetDoubleClickAction;
+  @JsonKey(fromJson: headsetTripleClickActionFromJson)
+  final String headsetTripleClickAction;
+  final bool headsetVibrateOnClick;
   // Start the next song the moment one ends; AutoMix replaces it while on.
   final bool gaplessPlayback;
   final bool autoMix;
@@ -542,6 +579,11 @@ class AppSettings {
     this.loudVolumeLevel = 80,
     this.pauseOnMute = true,
     this.headphoneResume = 'off',
+    this.headsetTimeoutMs = defaultHeadsetTimeoutMs,
+    this.headsetSingleClickAction = 'play_pause',
+    this.headsetDoubleClickAction = 'next',
+    this.headsetTripleClickAction = 'previous',
+    this.headsetVibrateOnClick = true,
     this.gaplessPlayback = true,
     this.autoMix = false,
     this.autoMixDuration = 0,
@@ -742,6 +784,11 @@ class AppSettings {
     int? loudVolumeLevel,
     bool? pauseOnMute,
     String? headphoneResume,
+    int? headsetTimeoutMs,
+    String? headsetSingleClickAction,
+    String? headsetDoubleClickAction,
+    String? headsetTripleClickAction,
+    bool? headsetVibrateOnClick,
     bool? gaplessPlayback,
     bool? autoMix,
     int? autoMixDuration,
@@ -916,6 +963,15 @@ class AppSettings {
       loudVolumeLevel: loudVolumeLevel ?? this.loudVolumeLevel,
       pauseOnMute: pauseOnMute ?? this.pauseOnMute,
       headphoneResume: headphoneResume ?? this.headphoneResume,
+      headsetTimeoutMs: headsetTimeoutMs ?? this.headsetTimeoutMs,
+      headsetSingleClickAction:
+          headsetSingleClickAction ?? this.headsetSingleClickAction,
+      headsetDoubleClickAction:
+          headsetDoubleClickAction ?? this.headsetDoubleClickAction,
+      headsetTripleClickAction:
+          headsetTripleClickAction ?? this.headsetTripleClickAction,
+      headsetVibrateOnClick:
+          headsetVibrateOnClick ?? this.headsetVibrateOnClick,
       gaplessPlayback: gaplessPlayback ?? this.gaplessPlayback,
       autoMix: autoMix ?? this.autoMix,
       autoMixDuration: autoMixDuration ?? this.autoMixDuration,

@@ -33,6 +33,12 @@ final class PlaybackWakeLock {
         acquireIfActive();
     }
 
+    void acquireTemporary(long durationMs) {
+        if (!lock.isHeld()) {
+            lock.acquire(durationMs);
+        }
+    }
+
     private void acquireIfActive() {
         if (!active) return;
         lock.acquire(timeoutMs);

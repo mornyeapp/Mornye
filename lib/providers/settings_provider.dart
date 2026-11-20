@@ -661,6 +661,30 @@ class SettingsNotifier extends Notifier<AppSettings> {
     _commit(state.copyWith(headphoneResume: mode));
   }
 
+  void setHeadsetTimeoutMs(int ms) => _commit(
+    state.copyWith(
+      headsetTimeoutMs: ms.clamp(minHeadsetTimeoutMs, maxHeadsetTimeoutMs),
+    ),
+  );
+
+  void setHeadsetSingleClickAction(String action) {
+    if (!headsetButtonActions.contains(action)) return;
+    _commit(state.copyWith(headsetSingleClickAction: action));
+  }
+
+  void setHeadsetDoubleClickAction(String action) {
+    if (!headsetButtonActions.contains(action)) return;
+    _commit(state.copyWith(headsetDoubleClickAction: action));
+  }
+
+  void setHeadsetTripleClickAction(String action) {
+    if (!headsetButtonActions.contains(action)) return;
+    _commit(state.copyWith(headsetTripleClickAction: action));
+  }
+
+  void setHeadsetVibrateOnClick(bool enabled) =>
+      _commit(state.copyWith(headsetVibrateOnClick: enabled));
+
   void setGaplessPlayback(bool enabled) =>
       _commit(state.copyWith(gaplessPlayback: enabled));
 
