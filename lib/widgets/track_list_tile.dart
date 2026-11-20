@@ -28,6 +28,8 @@ class TrackListTile extends ConsumerWidget {
   final bool isSelectionMode;
   final bool isSelected;
   final VoidCallback? onToggleSelection;
+
+  /// A long press, which selects the row; called in selection mode too.
   final VoidCallback? onEnterSelectionMode;
 
   /// [leading] is cover art. See [TrackCard.leadingArtwork].
@@ -128,15 +130,16 @@ class TrackListTile extends ConsumerWidget {
               isQueued: isQueued,
               isInLocalLibrary: isInLocalLibrary,
             ),
-      onLongPress: isSelectionMode
-          ? null
-          : onEnterSelectionMode ??
-                () => TrackCollectionQuickActions.showTrackOptionsSheet(
+      onLongPress:
+          onEnterSelectionMode ??
+          (isSelectionMode
+              ? null
+              : () => TrackCollectionQuickActions.showTrackOptionsSheet(
                   context,
                   ref,
                   track,
                   hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
-                ),
+                )),
     );
   }
 

@@ -190,6 +190,47 @@ void main() {
     expect(find.byType(LibraryDirectoryView), findsOneWidget);
   });
 
+  testWidgets('a held finger slides over songs to select them', (tester) async {
+    await _pump(tester);
+    await tester.tap(find.widgetWithText(TrackCard, 'Artist A'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TrackCard, 'Album A'));
+    await tester.pumpAndSettle();
+    bool selected(String title) => tester
+        .widget<TrackCard>(find.widgetWithText(TrackCard, title))
+        .isSelected;
+
+    final rows = find.byType(TrackCard);
+    final gesture = await tester.startGesture(tester.getCenter(rows.at(0)));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(
+      [for (var i = 0; i < 3; i++) i].where((i) {
+        return tester.widget<TrackCard>(rows.at(i)).isSelected;
+      }),
+      [0],
+    );
+
+    await gesture.moveTo(tester.getCenter(rows.at(2)));
+    await tester.pump();
+    expect(selected('Song a1'), isTrue);
+    expect(selected('Song a2'), isTrue);
+    expect(selected('Song cue'), isTrue);
+
+    // Sliding back releases the songs it had passed.
+    await gesture.moveTo(tester.getCenter(rows.at(1)));
+    await tester.pump();
+    expect(
+      [
+        for (var i = 0; i < 3; i++) tester.widget<TrackCard>(rows.at(i)),
+      ].where((row) => row.isSelected).length,
+      2,
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.byType(LibraryTrackSelectionBar), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('lists each volume by its path', (tester) async {
     await _pump(
       tester,

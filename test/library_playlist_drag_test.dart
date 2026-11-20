@@ -2,6 +2,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/app_theme.dart';
+import 'package:mornye/utils/ordered_range_selection.dart';
+import 'package:mornye/widgets/drag_select.dart';
 import 'package:mornye/widgets/library_playlist_drag_source.dart';
 import 'package:mornye/widgets/track_card.dart';
 
@@ -115,4 +117,130 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('once selecting, a hold on another song slides to select', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const ids = ['a', 'b', 'c', 'd', 'e'];
+    final selected = <String>{};
+    Set<String>? base;
+    var drags = 0;
+    late StateSetter rebuild;
+    final slide = DragSelectController(
+      onUpdate: (anchor, current) => rebuild(
+        () => applySlideSelection(
+          selected: selected,
+          base: base!,
+          visibleItems: ids,
+          anchor: anchor as String,
+          target: current as String,
+        ),
+      ),
+    );
+    addTearDown(slide.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return ListView(
+                children: [
+                  for (final id in ids)
+                    SizedBox(
+                      key: ValueKey(id),
+                      height: 100,
+                      child: Builder(
+                        builder: (context) {
+                          // The Library Songs list: the first hold, and a
+                          // hold on a selected song, drag to a playlist.
+                          final drag =
+                              selected.isEmpty || selected.contains(id);
+                          return DragSelectItem(
+                            controller: slide,
+                            id: id,
+                            child: LibraryPlaylistDragSource<String>(
+                              data: id,
+                              enabled: drag,
+                              onSelect: () => setState(() => selected.add(id)),
+                              onDragStarted: () => drags++,
+                              onDragEnd: () {},
+                              feedbackBuilder: (_) =>
+                                  const Material(child: Text('Dragging')),
+                              child: TrackCard(
+                                leading: const SizedBox.square(dimension: 56),
+                                title: 'Song $id',
+                                isSelectionMode: selected.isNotEmpty,
+                                isSelected: selected.contains(id),
+                                onTap: () {},
+                                onLongPress: drag
+                                    ? null
+                                    : () {
+                                        base = {...selected};
+                                        setState(() => selected.add(id));
+                                        slide.begin(id);
+                                      },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    // The first hold drags, and sliding it selects nothing more.
+    var gesture = await tester.startGesture(
+      tester.getCenter(find.text('Song a')),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(drags, 1);
+    expect(find.text('Dragging'), findsOneWidget);
+    await gesture.moveBy(const Offset(0, 200));
+    await tester.pump();
+    expect(selected, {'a'});
+    expect(slide.isActive, isFalse);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    // A hold on another song selects along the finger instead of dragging,
+    // although that song turns into a playlist drag source once selected.
+    gesture = await tester.startGesture(tester.getCenter(find.text('Song c')));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(selected, {'a', 'c'});
+    expect(slide.isActive, isTrue);
+    await gesture.moveBy(const Offset(0, 200));
+    await tester.pump();
+    expect(selected, {'a', 'c', 'd', 'e'});
+    await gesture.moveBy(const Offset(0, -100));
+    await tester.pump();
+    expect(selected, {'a', 'c', 'd'});
+    expect(drags, 1);
+    expect(find.text('Dragging'), findsNothing);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(slide.isActive, isFalse);
+
+    // A hold on a selected song drags the batch again.
+    gesture = await tester.startGesture(tester.getCenter(find.text('Song d')));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(drags, 2);
+    expect(find.text('Dragging'), findsOneWidget);
+    expect(slide.isActive, isFalse);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(selected, {'a', 'c', 'd'});
+    expect(tester.takeException(), isNull);
+  });
 }

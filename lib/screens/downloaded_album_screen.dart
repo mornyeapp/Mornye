@@ -294,7 +294,8 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
     }
 
     final tracks = order.tracks;
-    pruneSelection(tracks.map((t) => t.id).toSet());
+    slideSelectIds = [for (final track in tracks) track.id];
+    pruneSelection(slideSelectIds.toSet());
 
     if (context.isMornye) {
       return MornyeArtistSurface(
@@ -842,29 +843,32 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
     );
-    return _TrackPlaybackBuilder(
-      playbackKey: _playbackKey(track),
-      builder: (context, playback, toggle) => AlbumTrackTile(
-        trackNumber: track.trackNumber,
-        trackName: track.trackName,
-        subtitle: subtitle,
-        isSelectionMode: isSelectionMode,
-        isSelected: selectedIds.contains(track.id),
-        isCurrent: playback.isCurrent,
-        isPlaying: playback.isPlaying,
-        onToggleSelection: () => toggleSelection(track.id),
-        onOpen: () => _navigateToMetadataScreen(
-          track,
-          navigationItems: navigationItems,
-          navigationIndex: navigationIndex,
-        ),
-        onEnterSelectionMode: () => enterSelectionMode(track.id),
-        onPlay: playback.isCurrent
-            ? toggle
-            : () => _openFile(track, queueItems: navigationItems),
-        queueSwipe: libraryItemQueueSwipe(
-          ref,
-          UnifiedLibraryItem.fromDownloadHistory(track),
+    return slideSelectRow(
+      track.id,
+      _TrackPlaybackBuilder(
+        playbackKey: _playbackKey(track),
+        builder: (context, playback, toggle) => AlbumTrackTile(
+          trackNumber: track.trackNumber,
+          trackName: track.trackName,
+          subtitle: subtitle,
+          isSelectionMode: isSelectionMode,
+          isSelected: selectedIds.contains(track.id),
+          isCurrent: playback.isCurrent,
+          isPlaying: playback.isPlaying,
+          onToggleSelection: () => toggleSelection(track.id),
+          onOpen: () => _navigateToMetadataScreen(
+            track,
+            navigationItems: navigationItems,
+            navigationIndex: navigationIndex,
+          ),
+          onEnterSelectionMode: () => holdToSelect(track.id),
+          onPlay: playback.isCurrent
+              ? toggle
+              : () => _openFile(track, queueItems: navigationItems),
+          queueSwipe: libraryItemQueueSwipe(
+            ref,
+            UnifiedLibraryItem.fromDownloadHistory(track),
+          ),
         ),
       ),
     );

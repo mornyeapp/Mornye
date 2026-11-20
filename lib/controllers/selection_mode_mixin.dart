@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:mornye/utils/ordered_range_selection.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
+import 'package:mornye/widgets/drag_select.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 
 /// Shared multi-select state for list screens: enter/exit selection mode,
@@ -41,6 +43,55 @@ mixin SelectionModeMixin<T extends StatefulWidget> on State<T> {
       selectedIds.clear();
       selectionAnchorId = null;
     });
+  }
+
+  /// Marks [child] as the row of [itemId] for a finger sliding over the list.
+  Widget slideSelectRow(String itemId, Widget child) =>
+      DragSelectItem(controller: slideSelect, id: itemId, child: child);
+
+  /// Follows a finger that slides on after a long press. Rows are wrapped
+  /// with [slideSelectRow] and call [holdToSelect].
+  late final slideSelect = DragSelectController(
+    onUpdate: (anchor, current) {
+      final base = _slideSelectBase ??= {...selectedIds};
+      setState(
+        () => applySlideSelection(
+          selected: selectedIds,
+          base: base,
+          visibleItems: slideSelectIds,
+          anchor: anchor as String,
+          target: current as String,
+        ),
+      );
+    },
+    onEnd: () => _slideSelectBase = null,
+  );
+
+  /// The selectable rows in display order; set from build().
+  List<String> slideSelectIds = const [];
+
+  /// The selection a slide began with; null while no finger slides.
+  Set<String>? _slideSelectBase;
+
+  @override
+  void dispose() {
+    slideSelect.dispose();
+    super.dispose();
+  }
+
+  /// A long press on row [itemId]: selects it, entering selection mode when
+  /// needed, and lets the finger slide over more rows to select them too.
+  void holdToSelect(String itemId) {
+    if (isSelectionMode) {
+      HapticFeedback.selectionClick();
+      setState(() {
+        selectedIds.add(itemId);
+        selectionAnchorId = itemId;
+      });
+    } else {
+      enterSelectionMode(itemId);
+    }
+    slideSelect.begin(itemId);
   }
 
   /// Applies a desktop click of [kind] on [itemId]. [orderedIds] lists the

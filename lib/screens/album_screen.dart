@@ -458,6 +458,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
       for (var index = 0; index < tracks.length; index++)
         _trackSelectionId(tracks[index], index),
     ];
+    slideSelectIds = ids;
     pruneSelection(ids.toSet());
 
     final scaffold = CollectionScaffold(
@@ -777,37 +778,40 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
             key: ValueKey(selectionId),
             first: index == 0 || startsDisc,
             last: index == tracks.length - 1 || endsDisc,
-            child: StaggeredListItem(
-              index: index,
-              child: TrackListTile(
-                track: track,
-                isInHistory: isInHistory,
-                onDownload: ({bool forceQualityPicker = false}) =>
-                    _downloadTrack(
-                      context,
-                      track,
-                      forceQualityPicker: forceQualityPicker,
-                    ),
-                clickableArtist: true,
-                showQualityBadges: context.isMornye
-                    ? !_audioTraits.any(
-                        (trait) => trait.toLowerCase().contains('lossless'),
-                      )
-                    : commonQualityTrack == null ||
-                          _qualitySignature(track) !=
-                              _qualitySignature(commonQualityTrack),
-                isSelectionMode: isSelectionMode,
-                isSelected: selectedIds.contains(selectionId),
-                onToggleSelection: () => toggleSelection(selectionId),
-                onEnterSelectionMode: () => enterSelectionMode(selectionId),
-                leading: SizedBox(
-                  width: 32,
-                  child: Center(
-                    child: Text(
-                      '${track.trackNumber ?? 0}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
+            child: slideSelectRow(
+              selectionId,
+              StaggeredListItem(
+                index: index,
+                child: TrackListTile(
+                  track: track,
+                  isInHistory: isInHistory,
+                  onDownload: ({bool forceQualityPicker = false}) =>
+                      _downloadTrack(
+                        context,
+                        track,
+                        forceQualityPicker: forceQualityPicker,
+                      ),
+                  clickableArtist: true,
+                  showQualityBadges: context.isMornye
+                      ? !_audioTraits.any(
+                          (trait) => trait.toLowerCase().contains('lossless'),
+                        )
+                      : commonQualityTrack == null ||
+                            _qualitySignature(track) !=
+                                _qualitySignature(commonQualityTrack),
+                  isSelectionMode: isSelectionMode,
+                  isSelected: selectedIds.contains(selectionId),
+                  onToggleSelection: () => toggleSelection(selectionId),
+                  onEnterSelectionMode: () => holdToSelect(selectionId),
+                  leading: SizedBox(
+                    width: 32,
+                    child: Center(
+                      child: Text(
+                        '${track.trackNumber ?? 0}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ),

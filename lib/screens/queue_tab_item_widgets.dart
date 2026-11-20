@@ -1117,7 +1117,8 @@ extension _QueueTabItemWidgets on _QueueTabState {
     required List<LocalLibraryItem> localNavigationItems,
     required int? localNavigationIndex,
     required List<UnifiedLibraryItem> libraryItems,
-    bool playlistDragEnabled = false,
+    // Null where the playlist drag around the song takes the long press.
+    required VoidCallback? onLongPress,
   }) {
     final fileExistsListenable = _fileExistsListenable(item.filePath);
     final isSelected = _selectedIds.contains(item.id);
@@ -1281,11 +1282,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
         position,
         onOpenDetails: open,
       ),
-      onLongPress: playlistDragEnabled
-          ? null
-          : _isSelectionMode
-          ? () => _selectRangeTo(item.id, libraryItems)
-          : () => _enterSelectionMode(item.id),
+      onLongPress: onLongPress,
       leading: leading,
       title: item.trackName,
       subtitle: subtitle,
@@ -1316,7 +1313,8 @@ extension _QueueTabItemWidgets on _QueueTabState {
     required List<LocalLibraryItem> localNavigationItems,
     required int? localNavigationIndex,
     required List<UnifiedLibraryItem> libraryItems,
-    bool playlistDragEnabled = false,
+    // Null where the playlist drag around the song takes the long press.
+    required VoidCallback? onLongPress,
   }) {
     final fileExistsListenable = _fileExistsListenable(item.filePath);
     final isSelected = _selectedIds.contains(item.id);
@@ -1360,11 +1358,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
         position,
         onOpenDetails: open,
       ),
-      onLongPress: playlistDragEnabled
-          ? null
-          : _isSelectionMode
-          ? () => _selectRangeTo(item.id, libraryItems)
-          : () => _enterSelectionMode(item.id),
+      onLongPress: onLongPress,
       cover: Hero(
         tag: 'cover_lib_${item.id}',
         child: _buildUnifiedCoverImage(item, colorScheme),

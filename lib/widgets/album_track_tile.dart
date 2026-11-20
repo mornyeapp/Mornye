@@ -67,7 +67,7 @@ class AlbumTrackTile extends ConsumerWidget {
       onTap: isSelectionMode
           ? onToggleSelection
           : songRowTap(ref, path: filePath, openDetails: onOpen, play: onPlay),
-      onLongPress: isSelectionMode ? null : onEnterSelectionMode,
+      onLongPress: onEnterSelectionMode,
       leading: SizedBox(
         width: 24,
         // Takes the row's supporting colour, which follows a current fill.

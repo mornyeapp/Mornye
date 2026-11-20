@@ -197,6 +197,7 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
 
   Widget _buildPage(BuildContext context) {
     final ids = [for (final item in _items) item.id];
+    slideSelectIds = ids;
     pruneSelection(ids.toSet());
     return DesktopListScope(
       onSelectAll: ids.isEmpty ? null : () => selectAll(ids),
@@ -449,45 +450,46 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
             key: ValueKey(item.id),
             index: index,
             count: _items.length,
-            child: Consumer(
-              builder: (context, ref, _) {
-                final playback = ref.watch(
-                  mediaItemPlaybackUiProvider(_rowKey(item)),
-                );
-                return TrackCard(
-                  style: collectionTrackCardStyle(context),
-                  leadingArtwork: true,
-                  leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(tokens.radiusThumb),
-                    child: LibraryItemArtwork(
-                      item: item,
-                      size: tokens.coverCompact,
+            child: slideSelectRow(
+              item.id,
+              Consumer(
+                builder: (context, ref, _) {
+                  final playback = ref.watch(
+                    mediaItemPlaybackUiProvider(_rowKey(item)),
+                  );
+                  return TrackCard(
+                    style: collectionTrackCardStyle(context),
+                    leadingArtwork: true,
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(tokens.radiusThumb),
+                      child: LibraryItemArtwork(
+                        item: item,
+                        size: tokens.coverCompact,
+                      ),
                     ),
-                  ),
-                  title: item.trackName,
-                  subtitle: Text(
-                    item.artistName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  isCurrent: playback.isCurrent,
-                  isPlaying: playback.isPlaying,
-                  isSelectionMode: isSelectionMode,
-                  isSelected: selectedIds.contains(item.id),
-                  // A long press selects, as on the album pages.
-                  onTap: isSelectionMode
-                      ? () => toggleSelection(item.id)
-                      : playback.isCurrent
-                      ? () => ref
-                            .read(musicPlayerControllerProvider)
-                            .togglePlayPause(playback.isPlaying)
-                      : () => _play(index),
-                  onLongPress: isSelectionMode
-                      ? null
-                      : () => enterSelectionMode(item.id),
-                  queueSwipe: libraryItemQueueSwipe(ref, item),
-                );
-              },
+                    title: item.trackName,
+                    subtitle: Text(
+                      item.artistName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    isCurrent: playback.isCurrent,
+                    isPlaying: playback.isPlaying,
+                    isSelectionMode: isSelectionMode,
+                    isSelected: selectedIds.contains(item.id),
+                    // A long press selects, as on the album pages.
+                    onTap: isSelectionMode
+                        ? () => toggleSelection(item.id)
+                        : playback.isCurrent
+                        ? () => ref
+                              .read(musicPlayerControllerProvider)
+                              .togglePlayPause(playback.isPlaying)
+                        : () => _play(index),
+                    onLongPress: () => holdToSelect(item.id),
+                    queueSwipe: libraryItemQueueSwipe(ref, item),
+                  );
+                },
+              ),
             ),
           );
         },

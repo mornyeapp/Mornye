@@ -591,6 +591,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
     final items = songsValue?.value ?? const <UnifiedLibraryItem>[];
     if (songsValue == null || songsValue.hasValue) {
       _items = items;
+      slideSelectIds = [for (final item in items) item.id];
       pruneSelection(_idsOf(items));
     }
     final details = Column(
@@ -717,7 +718,10 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
               key: ValueKey(items[index].id),
               index: index,
               count: items.length,
-              child: _songRow(context, items, items[index]),
+              child: slideSelectRow(
+                items[index].id,
+                _songRow(context, items, items[index]),
+              ),
             ),
           ),
         ),
@@ -893,9 +897,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
                   openDetails: openDetails,
                   play: play,
                 ),
-          onLongPress: isSelectionMode
-              ? () => toggleSelection(item.id)
-              : () => enterSelectionMode(item.id),
+          onLongPress: () => holdToSelect(item.id),
           onContextMenu: (position) =>
               showSelectionMenu(item.id, () => _showSongMenu(item, position)),
           queueSwipe: libraryItemQueueSwipe(ref, item),

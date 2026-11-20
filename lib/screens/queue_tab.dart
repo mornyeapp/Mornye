@@ -37,6 +37,7 @@ import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/library_view_toggle.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
+import 'package:mornye/widgets/drag_select.dart';
 import 'package:mornye/widgets/library_playlist_drag_source.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/create_playlist_sheet.dart';
@@ -160,6 +161,22 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   bool _isDraggingLibraryTrack = false;
   final Set<String> _selectedIds = {};
   String? _selectionAnchorId;
+
+  /// Follows a finger that slides over songs after a long press.
+  late final _slideSelect = DragSelectController(
+    onUpdate: _applySlideSelection,
+    onEnd: () {
+      _slideSelectBase = null;
+      _slideSelectFilter = null;
+      _slideSelectItems = const [];
+    },
+  );
+
+  /// The filter page and song order a slide runs over, and the selection it
+  /// began with.
+  String? _slideSelectFilter;
+  List<UnifiedLibraryItem> _slideSelectItems = const [];
+  Set<String>? _slideSelectBase;
   final SelectionOverlayController _selectionOverlay =
       SelectionOverlayController();
   List<UnifiedLibraryItem> _selectionOverlayItems = const [];
@@ -418,6 +435,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     DownloadedEmbeddedCoverResolver.previewsCleared.removeListener(
       _onEmbeddedCoverChanged,
     );
+    _slideSelect.dispose();
     _hideSelectionOverlay();
     _hidePlaylistSelectionOverlay();
     _fileExistsCache.dispose();

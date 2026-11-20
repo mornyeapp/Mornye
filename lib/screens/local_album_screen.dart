@@ -310,7 +310,8 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
       );
     }
 
-    pruneSelection(tracks.map((t) => t.id).toSet());
+    slideSelectIds = [for (final track in tracks) track.id];
+    pruneSelection(slideSelectIds.toSet());
 
     final scaffold = CollectionScaffold(
       scrollController: scrollController,
@@ -863,54 +864,57 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
   }
 
   Widget _buildTrackItem(BuildContext context, LocalLibraryItem track) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final isCurrent = ref.watch(
-          currentMediaItemProvider.select(
-            (state) => _isCurrentTrack(state.value, track),
-          ),
-        );
-        final isPlaying = isCurrent && ref.watch(playbackPlayingProvider);
-        return AlbumTrackTile(
-          filePath: track.filePath,
-          isCurrent: isCurrent,
-          isPlaying: isPlaying,
-          trackNumber: track.trackNumber,
-          trackName: track.trackName,
-          subtitle: Row(
-            children: [
-              Flexible(
-                child: Text(
-                  track.artistName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+    return slideSelectRow(
+      track.id,
+      Consumer(
+        builder: (context, ref, _) {
+          final isCurrent = ref.watch(
+            currentMediaItemProvider.select(
+              (state) => _isCurrentTrack(state.value, track),
+            ),
+          );
+          final isPlaying = isCurrent && ref.watch(playbackPlayingProvider);
+          return AlbumTrackTile(
+            filePath: track.filePath,
+            isCurrent: isCurrent,
+            isPlaying: isPlaying,
+            trackNumber: track.trackNumber,
+            trackName: track.trackName,
+            subtitle: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    track.artistName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              if (track.format != null) ...[
-                const Text(' • ', style: TextStyle(fontSize: 12)),
-                Text(
-                  track.format!.toUpperCase(),
-                  style: const TextStyle(fontSize: 12),
-                ),
+                if (track.format != null) ...[
+                  const Text(' • ', style: TextStyle(fontSize: 12)),
+                  Text(
+                    track.format!.toUpperCase(),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
               ],
-            ],
-          ),
-          isSelectionMode: isSelectionMode,
-          isSelected: selectedIds.contains(track.id),
-          onToggleSelection: () => toggleSelection(track.id),
-          onOpen: () => _openMetadata(track),
-          onEnterSelectionMode: () => enterSelectionMode(track.id),
-          onPlay: isCurrent
-              ? () => ref
-                    .read(musicPlayerControllerProvider)
-                    .togglePlayPause(isPlaying)
-              : () => _openFile(track),
-          queueSwipe: libraryItemQueueSwipe(
-            ref,
-            UnifiedLibraryItem.fromLocalLibrary(track),
-          ),
-        );
-      },
+            ),
+            isSelectionMode: isSelectionMode,
+            isSelected: selectedIds.contains(track.id),
+            onToggleSelection: () => toggleSelection(track.id),
+            onOpen: () => _openMetadata(track),
+            onEnterSelectionMode: () => holdToSelect(track.id),
+            onPlay: isCurrent
+                ? () => ref
+                      .read(musicPlayerControllerProvider)
+                      .togglePlayPause(isPlaying)
+                : () => _openFile(track),
+            queueSwipe: libraryItemQueueSwipe(
+              ref,
+              UnifiedLibraryItem.fromLocalLibrary(track),
+            ),
+          );
+        },
+      ),
     );
   }
 

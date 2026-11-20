@@ -441,6 +441,7 @@ class _LibraryTracksFolderScreenState
 
     final inHistory = _folderData.inHistory(existingHistoryKeys);
     final ids = [for (final entry in entries) entry.key];
+    slideSelectIds = ids;
     // The desktop table builds every row at once, so one lookup answers the
     // covers the rows cannot load from their own stored path.
     if (isDesktopPlatform &&
@@ -550,22 +551,23 @@ class _LibraryTracksFolderScreenState
                   key: ValueKey(entry.key),
                   index: index,
                   count: entries.length,
-                  child: StaggeredListItem(
-                    index: index,
-                    child: _CollectionTrackTile(
-                      entry: entry,
-                      mode: widget.mode,
-                      folderTracks: folderTracks,
-                      trackIndex: index,
-                      isInHistory: isInHistory,
-                      isSelectionMode: isSelectionMode,
-                      isSelected: isSelected,
-                      onTap: isSelectionMode
-                          ? () => toggleSelection(entry.key)
-                          : null,
-                      onLongPress: isSelectionMode
-                          ? null
-                          : () => enterSelectionMode(entry.key),
+                  child: slideSelectRow(
+                    entry.key,
+                    StaggeredListItem(
+                      index: index,
+                      child: _CollectionTrackTile(
+                        entry: entry,
+                        mode: widget.mode,
+                        folderTracks: folderTracks,
+                        trackIndex: index,
+                        isInHistory: isInHistory,
+                        isSelectionMode: isSelectionMode,
+                        isSelected: isSelected,
+                        onTap: isSelectionMode
+                            ? () => toggleSelection(entry.key)
+                            : null,
+                        onLongPress: () => holdToSelect(entry.key),
+                      ),
                     ),
                   ),
                 );
@@ -1525,7 +1527,7 @@ class _CollectionTrackTile extends ConsumerWidget {
           : hasFile
           ? songRowTap(ref, openDetails: openDetails, play: play)
           : openDetails,
-      onLongPress: isSelectionMode ? onTap : onLongPress,
+      onLongPress: onLongPress,
     );
   }
 

@@ -314,7 +314,18 @@ extension _QueueTabFilterWidgets on _QueueTabState {
 
     // Songs drag onto playlists; singles do not.
     final playlistDrag = filterMode == 'all';
+    // A slide keeps up with songs that load while it scrolls.
+    if (_slideSelect.isActive && _slideSelectFilter == filterMode) {
+      _slideSelectItems = filteredUnifiedItems;
+    }
     Widget trackTile(UnifiedLibraryItem item, {required bool grid}) {
+      // The first hold, and a hold on a selected song, drags to a playlist;
+      // any other hold selects and follows the finger over more songs.
+      final dragsToPlaylist =
+          playlistDrag &&
+          (isDesktopPlatform ||
+              !_isSelectionMode ||
+              _selectedIds.contains(item.id));
       final tile = (grid ? _buildUnifiedGridItem : _buildUnifiedLibraryItem)(
         context,
         item,
@@ -325,17 +336,25 @@ extension _QueueTabFilterWidgets on _QueueTabState {
         localNavigationItems: localNavigationItems,
         localNavigationIndex: localNavigationIndexByUnifiedId[item.id],
         libraryItems: filteredUnifiedItems,
-        playlistDragEnabled: playlistDrag,
+        onLongPress: dragsToPlaylist
+            ? null
+            : () => _holdToSelect(filterMode, item, filteredUnifiedItems),
       );
-      if (!playlistDrag) return tile;
-      return LibraryPlaylistDragSource<UnifiedLibraryItem>(
-        data: item,
-        onSelect: () => _selectDraggedTrack(item, filteredUnifiedItems),
-        onDragStarted: _startLibraryTrackDrag,
-        onDragEnd: _endLibraryTrackDrag,
-        feedbackBuilder: (context) =>
-            _buildDragFeedback(context, item, colorScheme),
-        child: tile,
+      return DragSelectItem(
+        controller: _slideSelect,
+        id: item.id,
+        child: !playlistDrag
+            ? tile
+            : LibraryPlaylistDragSource<UnifiedLibraryItem>(
+                data: item,
+                enabled: dragsToPlaylist,
+                onSelect: () => _selectDraggedTrack(item, filteredUnifiedItems),
+                onDragStarted: _startLibraryTrackDrag,
+                onDragEnd: _endLibraryTrackDrag,
+                feedbackBuilder: (context) =>
+                    _buildDragFeedback(context, item, colorScheme),
+                child: tile,
+              ),
       );
     }
 
