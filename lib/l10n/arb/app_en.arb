@@ -10177,6 +10177,43 @@
   "lyricsShareBackgroundColor": "Cover color",
   "lyricsShareBackgroundDark": "Dark",
   "lyricsShareBackgroundLight": "Light",
+  "lyricsSharePaneLines": "Lyrics",
+  "@lyricsSharePaneLines": {
+    "description": "Share lyrics screen: shows the lines to pick for the card"
+  },
+  "lyricsSharePaneStyle": "Style",
+  "@lyricsSharePaneStyle": {
+    "description": "Share lyrics screen: shows the choices for how the card looks"
+  },
+  "lyricsShareBackground": "Background",
+  "lyricsShareShape": "Shape",
+  "@lyricsShareShape": {
+    "description": "Share lyrics screen: the proportions of the card"
+  },
+  "lyricsShareShapeStory": "Story",
+  "@lyricsShareShapeStory": {
+    "description": "Lyrics card shape: tall, for a story"
+  },
+  "lyricsShareShapeSquare": "Square",
+  "lyricsShareShapeWide": "Wide",
+  "lyricsShareTextSize": "Text size",
+  "lyricsShareTextSmall": "Small",
+  "lyricsShareTextAuto": "Auto",
+  "@lyricsShareTextAuto": {
+    "description": "Lyrics card text size: chosen from the length of the quote"
+  },
+  "lyricsShareTextLarge": "Large",
+  "lyricsShareAlign": "Alignment",
+  "lyricsShareAlignSide": "Side",
+  "@lyricsShareAlignSide": {
+    "description": "Lyrics card alignment: lines start at the side they read from (left for left-to-right text)"
+  },
+  "lyricsShareAlignCenter": "Center",
+  "lyricsShareSave": "Save",
+  "@lyricsShareSave": {
+    "description": "Button that saves the lyrics card as an image file"
+  },
+  "lyricsShareSaved": "Lyrics card saved",
   "audioInfoTitle": "Audio info",
   "@audioInfoTitle": {
     "description": "Sheet with technical details of the playing track, opened from the quality badge"

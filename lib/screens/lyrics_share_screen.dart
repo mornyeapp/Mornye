@@ -1,10 +1,15 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
 import 'package:audio_service/audio_service.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart'
     show M3EShapeKind;
 import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
@@ -18,15 +23,117 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_shape.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/player_artwork.dart';
+import 'package:mornye/widgets/settings_group.dart';
 
 /// Story-sized lyric cards stay short, like quoting a song rather than
 /// reproducing its lyrics.
 const lyricsShareMaxLines = 5;
 
-/// The logical size of the shared card; captured at 3× for 1080×1920.
-const lyricsShareCardSize = Size(360, 640);
-
 typedef LyricsShareLine = ({String text, bool background});
+
+enum LyricsCardBackground { artwork, color, dark, light }
+
+/// The card's logical size and the scale it is captured at, so the image is
+/// 1080 wide (1920 for the wide card) on every device.
+enum LyricsCardShape {
+  story(Size(360, 640), 3),
+  square(Size(360, 360), 3),
+  wide(Size(480, 270), 4);
+
+  const LyricsCardShape(this.size, this.pixelRatio);
+
+  final Size size;
+  final double pixelRatio;
+}
+
+/// Scales the type the card picks for the length of its quote.
+enum LyricsCardTextSize {
+  small(0.82),
+  auto(1),
+  large(1.22);
+
+  const LyricsCardTextSize(this.scale);
+
+  final double scale;
+}
+
+/// Lines start at the side they read from, or sit centered.
+enum LyricsCardAlign { start, center }
+
+/// How the card looks. The last look used is kept for the next share.
+class LyricsCardStyle {
+  const LyricsCardStyle({
+    this.background = LyricsCardBackground.artwork,
+    this.shape = LyricsCardShape.story,
+    this.textSize = LyricsCardTextSize.auto,
+    this.align = LyricsCardAlign.start,
+  });
+
+  final LyricsCardBackground background;
+  final LyricsCardShape shape;
+  final LyricsCardTextSize textSize;
+  final LyricsCardAlign align;
+
+  static const _key = 'lyrics_card_style';
+
+  LyricsCardStyle copyWith({
+    LyricsCardBackground? background,
+    LyricsCardShape? shape,
+    LyricsCardTextSize? textSize,
+    LyricsCardAlign? align,
+  }) => LyricsCardStyle(
+    background: background ?? this.background,
+    shape: shape ?? this.shape,
+    textSize: textSize ?? this.textSize,
+    align: align ?? this.align,
+  );
+
+  String encode() =>
+      [background.name, shape.name, textSize.name, align.name].join(',');
+
+  /// Unknown or missing parts fall back to the default look.
+  factory LyricsCardStyle.decode(String? saved) {
+    final parts = (saved ?? '').split(',');
+    String? part(int index) => index < parts.length ? parts[index] : null;
+    const fallback = LyricsCardStyle();
+    return LyricsCardStyle(
+      background:
+          LyricsCardBackground.values.asNameMap()[part(0)] ??
+          fallback.background,
+      shape: LyricsCardShape.values.asNameMap()[part(1)] ?? fallback.shape,
+      textSize:
+          LyricsCardTextSize.values.asNameMap()[part(2)] ?? fallback.textSize,
+      align: LyricsCardAlign.values.asNameMap()[part(3)] ?? fallback.align,
+    );
+  }
+
+  static Future<LyricsCardStyle> load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return LyricsCardStyle.decode(prefs.getString(_key));
+    } catch (_) {
+      return const LyricsCardStyle();
+    }
+  }
+
+  Future<void> save() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_key, encode());
+    } catch (_) {}
+  }
+}
+
+/// Writes the card's PNG where the user chooses. False when they cancel.
+typedef LyricsCardSaver = Future<bool> Function(String fileName, Uint8List png);
+
+Future<bool> _saveWithSystemDialog(String fileName, Uint8List png) async =>
+    await FilePicker.saveFile(
+      fileName: fileName,
+      bytes: png,
+      mimeType: 'image/png',
+    ) !=
+    null;
 
 /// Reduced motion: the pickers change at once.
 const _still = AppMotionSpec(Duration.zero, Curves.linear);
@@ -85,7 +192,9 @@ Future<void> openLyricsShare(
   LyricLine? initial,
   Duration? position,
   Duration offset = Duration.zero,
-}) {
+}) async {
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final style = await LyricsCardStyle.load();
   final lines = lyricsShareLines(lyrics);
   var selected = initial == null && position != null
       ? lyricsShareRowAt(lyrics, position, offset: offset)
@@ -102,19 +211,19 @@ Future<void> openLyricsShare(
       row++;
     }
   }
-  return Navigator.of(context, rootNavigator: true).push(
+  if (!navigator.mounted) return;
+  await navigator.push(
     MaterialPageRoute<void>(
       fullscreenDialog: true,
       builder: (_) => LyricsShareScreen(
         mediaItem: mediaItem,
         lines: lines,
         initialSelection: {if (selected >= 0) selected},
+        style: style,
       ),
     ),
   );
 }
-
-enum LyricsCardBackground { artwork, color, dark, light }
 
 class LyricsShareScreen extends StatefulWidget {
   const LyricsShareScreen({
@@ -122,11 +231,17 @@ class LyricsShareScreen extends StatefulWidget {
     required this.mediaItem,
     required this.lines,
     this.initialSelection = const {},
+    this.style = const LyricsCardStyle(),
+    this.saveImage = _saveWithSystemDialog,
   });
 
   final MediaItem mediaItem;
   final List<LyricsShareLine> lines;
   final Set<int> initialSelection;
+
+  /// The look the card opens with.
+  final LyricsCardStyle style;
+  final LyricsCardSaver saveImage;
 
   @override
   State<LyricsShareScreen> createState() => _LyricsShareScreenState();
@@ -141,7 +256,10 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
   /// Made at the list's first layout, which gives the viewport height the
   /// preselected line is centered in.
   ScrollController? _list;
-  LyricsCardBackground _background = LyricsCardBackground.artwork;
+  late LyricsCardStyle _style = widget.style;
+
+  /// The lower pane shows the style choices in place of the lines.
+  bool _styling = false;
   bool _sharing = false;
 
   /// A one-line row: 56dp tall with a 2dp gap below.
@@ -197,6 +315,51 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
     for (final index in _selected.toList()..sort()) widget.lines[index],
   ];
 
+  void _restyle(LyricsCardStyle style) {
+    setState(() => _style = style);
+    unawaited(style.save());
+  }
+
+  /// The card as a PNG file, or null when the screen closed meanwhile.
+  Future<File?> _capture() async {
+    // A selection or style change can still be waiting for paint when a
+    // button is tapped. Capture the current card after that frame finishes.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return null;
+    final file = await captureBoundaryToPngFile(
+      _cardKey,
+      pixelRatio: _style.shape.pixelRatio,
+      fileName: 'mornye_lyrics.png',
+    );
+    if (file == null) throw StateError('Card could not be captured');
+    return file;
+  }
+
+  Future<void> _save() async {
+    if (_sharing || _selected.isEmpty) return;
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final name = widget.mediaItem.title
+        .replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1f]'), '_')
+        .trim();
+    setState(() => _sharing = true);
+    try {
+      final file = await _capture();
+      if (file == null) return;
+      final saved = await widget.saveImage(
+        '${name.isEmpty ? 'lyrics' : '$name lyrics'}.png',
+        await file.readAsBytes(),
+      );
+      if (saved) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.lyricsShareSaved)));
+      }
+    } catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.lyricsShareError)));
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
+
   Future<void> _share() async {
     if (_sharing || _selected.isEmpty) return;
     final l10n = context.l10n;
@@ -204,16 +367,8 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
     final origin = _originOf(_shareButtonKey.currentContext);
     setState(() => _sharing = true);
     try {
-      // A selection/background change can still be waiting for paint when
-      // Share is tapped. Capture the current card after that frame finishes.
-      await WidgetsBinding.instance.endOfFrame;
-      if (!mounted) return;
-      final file = await captureBoundaryToPngFile(
-        _cardKey,
-        pixelRatio: 3,
-        fileName: 'mornye_lyrics.png',
-      );
-      if (file == null) throw StateError('Card could not be captured');
+      final file = await _capture();
+      if (file == null) return;
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'image/png')],
@@ -260,11 +415,14 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
             Expanded(
               flex: 6,
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: tokens.gapSm),
+                // The wide card is limited by the width: keep it off the edges.
+                padding: EdgeInsets.symmetric(
+                  vertical: tokens.gapSm,
+                  horizontal: tokens.gapMd,
+                ),
                 child: Center(
                   child: AspectRatio(
-                    aspectRatio:
-                        lyricsShareCardSize.width / lyricsShareCardSize.height,
+                    aspectRatio: _style.shape.size.aspectRatio,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(28),
@@ -288,7 +446,10 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
                                 artist: widget.mediaItem.artist ?? '',
                                 artUri: widget.mediaItem.artUri?.toString(),
                                 lines: _quoted,
-                                background: _background,
+                                background: _style.background,
+                                shape: _style.shape,
+                                textSize: _style.textSize,
+                                align: _style.align,
                                 coverColor: coverColor,
                                 placeholder: l10n.lyricsShareSelectHint(
                                   lyricsShareMaxLines,
@@ -313,37 +474,38 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      l10n.lyricsShareSelectHint(lyricsShareMaxLines),
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
+                    child: SettingsSegmentedChoice<bool>(
+                      options: [
+                        SettingsSegmentOption(
+                          value: false,
+                          label: l10n.lyricsSharePaneLines,
+                          icon: Icons.lyrics_outlined,
+                        ),
+                        SettingsSegmentOption(
+                          value: true,
+                          label: l10n.lyricsSharePaneStyle,
+                          icon: Icons.palette_outlined,
+                        ),
+                      ],
+                      selected: _styling,
+                      onChanged: (styling) =>
+                          setState(() => _styling = styling),
                     ),
                   ),
+                  SizedBox(width: tokens.gapMd),
                   _SelectionCount(count: _selected.length),
                 ],
               ),
             ),
             Expanded(
               flex: 4,
-              child: LayoutBuilder(
-                builder: (context, constraints) => ListView.builder(
-                  controller: _list ??= ScrollController(
-                    initialScrollOffset: _initialOffset(constraints.maxHeight),
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: tokens.gapMd),
-                  itemCount: widget.lines.length,
-                  itemBuilder: (context, index) => _LineChoice(
-                    key: index == widget.initialSelection.firstOrNull
-                        ? _initialRow
-                        : null,
-                    line: widget.lines[index],
-                    selected: _selected.contains(index),
-                    first: index == 0,
-                    last: index == widget.lines.length - 1,
-                    onTap: () => _toggle(index),
-                  ),
-                ),
+              // The list keeps its scroll position while the style shows.
+              child: IndexedStack(
+                index: _styling ? 1 : 0,
+                children: [
+                  _lineList(tokens),
+                  _StylePane(style: _style, onChanged: _restyle),
+                ],
               ),
             ),
             Padding(
@@ -356,26 +518,23 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: _BackgroundPicker(
-                      value: _background,
-                      onChanged: (value) => setState(() => _background = value),
+                    child: ExpressiveButton(
+                      tonal: true,
+                      icon: const AppIcon(Icons.download_outlined),
+                      style: _actionStyle(theme),
+                      onPressed: _selected.isEmpty || _sharing ? null : _save,
+                      child: Text(l10n.lyricsShareSave),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  ExpressiveButton(
-                    key: _shareButtonKey,
-                    icon: const AppIcon(Icons.ios_share),
-                    style: ButtonStyle(
-                      minimumSize: const WidgetStatePropertyAll(Size(64, 64)),
-                      padding: const WidgetStatePropertyAll(
-                        EdgeInsets.symmetric(horizontal: 24),
-                      ),
-                      textStyle: WidgetStatePropertyAll(
-                        theme.textTheme.titleMedium,
-                      ),
+                  Expanded(
+                    child: ExpressiveButton(
+                      key: _shareButtonKey,
+                      icon: const AppIcon(Icons.ios_share),
+                      style: _actionStyle(theme),
+                      onPressed: _selected.isEmpty || _sharing ? null : _share,
+                      child: Text(l10n.lyricsShareAction),
                     ),
-                    onPressed: _selected.isEmpty || _sharing ? null : _share,
-                    child: Text(l10n.lyricsShareAction),
                   ),
                 ],
               ),
@@ -383,6 +542,138 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  static ButtonStyle _actionStyle(ThemeData theme) => ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(Size(64, 56)),
+    textStyle: WidgetStatePropertyAll(theme.textTheme.titleMedium),
+  );
+
+  Widget _lineList(AppTokens tokens) => LayoutBuilder(
+    builder: (context, constraints) => ListView.builder(
+      controller: _list ??= ScrollController(
+        initialScrollOffset: _initialOffset(constraints.maxHeight),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: tokens.gapMd),
+      itemCount: widget.lines.length,
+      itemBuilder: (context, index) => _LineChoice(
+        key: index == widget.initialSelection.firstOrNull ? _initialRow : null,
+        line: widget.lines[index],
+        selected: _selected.contains(index),
+        first: index == 0,
+        last: index == widget.lines.length - 1,
+        onTap: () => _toggle(index),
+      ),
+    ),
+  );
+}
+
+/// The card's look: background, shape, text size and alignment.
+class _StylePane extends StatelessWidget {
+  const _StylePane({required this.style, required this.onChanged});
+
+  final LyricsCardStyle style;
+  final ValueChanged<LyricsCardStyle> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final tokens = context.tokens;
+    final label = Theme.of(context).textTheme.titleSmall?.copyWith(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+    Widget group(String title, Widget choice) => Padding(
+      padding: EdgeInsets.only(bottom: tokens.gapMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 8, bottom: 8),
+            child: Text(title, style: label),
+          ),
+          choice,
+        ],
+      ),
+    );
+    return ListView(
+      padding: EdgeInsets.symmetric(horizontal: tokens.gapMd),
+      children: [
+        group(
+          l10n.lyricsShareBackground,
+          _BackgroundPicker(
+            value: style.background,
+            onChanged: (value) => onChanged(style.copyWith(background: value)),
+          ),
+        ),
+        group(
+          l10n.lyricsShareShape,
+          SettingsSegmentedChoice<LyricsCardShape>(
+            semanticLabel: l10n.lyricsShareShape,
+            options: [
+              SettingsSegmentOption(
+                value: LyricsCardShape.story,
+                label: l10n.lyricsShareShapeStory,
+                icon: Icons.crop_portrait,
+              ),
+              SettingsSegmentOption(
+                value: LyricsCardShape.square,
+                label: l10n.lyricsShareShapeSquare,
+                icon: Icons.crop_square,
+              ),
+              SettingsSegmentOption(
+                value: LyricsCardShape.wide,
+                label: l10n.lyricsShareShapeWide,
+                icon: Icons.crop_landscape,
+              ),
+            ],
+            selected: style.shape,
+            onChanged: (value) => onChanged(style.copyWith(shape: value)),
+          ),
+        ),
+        group(
+          l10n.lyricsShareTextSize,
+          SettingsSegmentedChoice<LyricsCardTextSize>(
+            semanticLabel: l10n.lyricsShareTextSize,
+            options: [
+              SettingsSegmentOption(
+                value: LyricsCardTextSize.small,
+                label: l10n.lyricsShareTextSmall,
+              ),
+              SettingsSegmentOption(
+                value: LyricsCardTextSize.auto,
+                label: l10n.lyricsShareTextAuto,
+              ),
+              SettingsSegmentOption(
+                value: LyricsCardTextSize.large,
+                label: l10n.lyricsShareTextLarge,
+              ),
+            ],
+            selected: style.textSize,
+            onChanged: (value) => onChanged(style.copyWith(textSize: value)),
+          ),
+        ),
+        group(
+          l10n.lyricsShareAlign,
+          SettingsSegmentedChoice<LyricsCardAlign>(
+            semanticLabel: l10n.lyricsShareAlign,
+            options: [
+              SettingsSegmentOption(
+                value: LyricsCardAlign.start,
+                label: l10n.lyricsShareAlignSide,
+                icon: Icons.format_align_left,
+              ),
+              SettingsSegmentOption(
+                value: LyricsCardAlign.center,
+                label: l10n.lyricsShareAlignCenter,
+                icon: Icons.format_align_center,
+              ),
+            ],
+            selected: style.align,
+            onChanged: (value) => onChanged(style.copyWith(align: value)),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -676,6 +967,9 @@ class LyricsShareCard extends StatelessWidget {
     required this.artUri,
     required this.lines,
     required this.background,
+    this.shape = LyricsCardShape.story,
+    this.textSize = LyricsCardTextSize.auto,
+    this.align = LyricsCardAlign.start,
     this.coverColor,
     this.placeholder,
   });
@@ -685,6 +979,9 @@ class LyricsShareCard extends StatelessWidget {
   final String? artUri;
   final List<LyricsShareLine> lines;
   final LyricsCardBackground background;
+  final LyricsCardShape shape;
+  final LyricsCardTextSize textSize;
+  final LyricsCardAlign align;
 
   /// Average cover color for [LyricsCardBackground.color].
   final Color? coverColor;
@@ -707,7 +1004,6 @@ class LyricsShareCard extends StatelessWidget {
     final light = background == LyricsCardBackground.light;
     final foreground = light ? const Color(0xFF111111) : Colors.white;
     final secondary = foreground.withValues(alpha: 0.7);
-    final fontSize = fontSizeFor(lines);
     final scheme = Theme.of(context).colorScheme;
     // A card shrunk to fit keeps the side its first line reads from. Each
     // line reads in its own direction.
@@ -717,184 +1013,270 @@ class LyricsShareCard extends StatelessWidget {
             .nonNulls
             .firstOrNull ??
         Directionality.of(context);
+    final song = _song(scheme, foreground, secondary);
+    final brand = _brand(context, foreground, light);
+    // Centered lines sit in the middle; others at the side they read from.
+    final side = align == LyricsCardAlign.center
+        ? Alignment.center
+        : AlignmentDirectional.centerStart.resolve(cardDirection);
     return MediaQuery.withNoTextScaling(
       child: SizedBox.fromSize(
-        size: lyricsShareCardSize,
+        size: shape.size,
         child: Stack(
           fit: StackFit.expand,
           children: [
             _background(scheme),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 40, 28, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Spacer(),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      color: foreground.withValues(alpha: light ? 0.06 : 0.12),
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+            if (shape != LyricsCardShape.story)
+              // The square and wide cards have no room for the story's inner
+              // panel: the quote takes what the song and the mark leave.
+              Padding(
+                padding: EdgeInsets.all(
+                  shape == LyricsCardShape.wide ? 22 : 26,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            AppShapeClip(
-                              kind: M3EShapeKind.cookie4Sided,
-                              fallbackRadius: BorderRadius.circular(10),
-                              child: SizedBox.square(
-                                dimension: 52,
-                                child: PlayerArtwork(
-                                  artUri: artUri,
-                                  colorScheme: scheme,
-                                  iconSize: 24,
-                                  cacheWidth: 156,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: foreground,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  if (artist.isNotEmpty)
-                                    Text(
-                                      artist,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: secondary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 22),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 380),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: AlignmentDirectional.topStart.resolve(
-                              cardDirection,
-                            ),
-                            child: SizedBox(
-                              width: lyricsShareCardSize.width - 100,
-                              child: lines.isEmpty
-                                  ? Text(
-                                      placeholder ?? '',
-                                      style: TextStyle(
-                                        color: foreground.withValues(
-                                          alpha: 0.4,
-                                        ),
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    )
-                                  : Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        for (final line in lines)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 6,
-                                            ),
-                                            child: Text(
-                                              line.text,
-                                              textDirection:
-                                                  strongTextDirection(
-                                                    line.text,
-                                                  ) ??
-                                                  cardDirection,
-                                              style: TextStyle(
-                                                color: line.background
-                                                    ? secondary
-                                                    : foreground,
-                                                fontSize: line.background
-                                                    ? fontSize * 0.72
-                                                    : fontSize,
-                                                height: 1.2,
-                                                fontWeight: line.background
-                                                    ? FontWeight.w400
-                                                    : FontWeight.w500,
-                                                letterSpacing: -0.2,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                            ),
-                          ),
-                        ),
+                        Expanded(child: song),
+                        if (shape == LyricsCardShape.wide) ...[
+                          const SizedBox(width: 12),
+                          brand,
+                        ],
                       ],
                     ),
-                  ),
-                  const Spacer(),
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsetsDirectional.fromSTEB(
-                        6,
-                        6,
-                        14,
-                        6,
-                      ),
-                      decoration: ShapeDecoration(
-                        color: foreground.withValues(
-                          alpha: light ? 0.06 : 0.14,
+                    const SizedBox(height: 14),
+                    Expanded(
+                      child: Align(
+                        alignment: side,
+                        child: _quote(
+                          foreground,
+                          secondary,
+                          cardDirection,
+                          width:
+                              shape.size.width -
+                              (shape == LyricsCardShape.wide ? 44 : 52),
+                          alignment: side,
                         ),
-                        shape: const StadiumBorder(),
                       ),
-                      child: Row(
+                    ),
+                    if (shape == LyricsCardShape.square) ...[
+                      const SizedBox(height: 12),
+                      Align(alignment: side, child: brand),
+                    ],
+                  ],
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(28, 40, 28, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Spacer(),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        color: foreground.withValues(
+                          alpha: light ? 0.06 : 0.12,
+                        ),
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // The asset is the bare mark, so it only needs the
-                          // card's text color.
-                          Image.asset(
-                            'assets/images/logo-transparent.png',
-                            width: 26,
-                            height: 26,
-                            color: foreground,
-                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            context.l10n.appName,
-                            style: TextStyle(
-                              color: foreground,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0.1,
+                          song,
+                          const SizedBox(height: 22),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 380),
+                            child: _quote(
+                              foreground,
+                              secondary,
+                              cardDirection,
+                              width: shape.size.width - 100,
+                              alignment: align == LyricsCardAlign.center
+                                  ? Alignment.topCenter
+                                  : AlignmentDirectional.topStart.resolve(
+                                      cardDirection,
+                                    ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                    const Spacer(),
+                    Center(child: brand),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
     );
   }
+
+  /// The cover with the song's title and artist.
+  Widget _song(ColorScheme scheme, Color foreground, Color secondary) {
+    final cover = shape == LyricsCardShape.story ? 52.0 : 44.0;
+    return Row(
+      children: [
+        AppShapeClip(
+          kind: M3EShapeKind.cookie4Sided,
+          fallbackRadius: BorderRadius.circular(10),
+          child: SizedBox.square(
+            dimension: cover,
+            child: PlayerArtwork(
+              artUri: artUri,
+              colorScheme: scheme,
+              iconSize: 24,
+              cacheWidth: 156,
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (artist.isNotEmpty)
+                Text(
+                  artist,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: secondary, fontSize: 13),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The quoted lines, [width] wide and shrunk to fit the room they get.
+  Widget _quote(
+    Color foreground,
+    Color secondary,
+    TextDirection cardDirection, {
+    required double width,
+    required Alignment alignment,
+  }) {
+    final wanted = fontSizeFor(lines) * textSize.scale;
+    final textAlign = align == LyricsCardAlign.center ? TextAlign.center : null;
+    TextStyle style(LyricsShareLine line, double size) => TextStyle(
+      color: line.background ? secondary : foreground,
+      fontSize: line.background ? size * 0.72 : size,
+      height: 1.2,
+      fontWeight: line.background ? FontWeight.w400 : FontWeight.w500,
+      letterSpacing: -0.2,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final base = DefaultTextStyle.of(context).style;
+        double heightAt(double size) {
+          var height = 0.0;
+          for (final line in lines) {
+            final painter = TextPainter(
+              text: TextSpan(
+                text: line.text,
+                style: base.merge(style(line, size)),
+              ),
+              textDirection: strongTextDirection(line.text) ?? cardDirection,
+            )..layout(maxWidth: width);
+            height += painter.height + 6;
+            painter.dispose();
+          }
+          return height;
+        }
+
+        // A long quote takes smaller type before the block is shrunk as a
+        // whole, so its lines keep the card's full width.
+        var fontSize = wanted;
+        while (fontSize > wanted * 0.5 &&
+            heightAt(fontSize) > constraints.maxHeight) {
+          fontSize -= 1;
+        }
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: alignment,
+          child: SizedBox(
+            width: width,
+            child: lines.isEmpty
+                ? Text(
+                    placeholder ?? '',
+                    textAlign: textAlign,
+                    style: TextStyle(
+                      color: foreground.withValues(alpha: 0.4),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final line in lines)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            line.text,
+                            textAlign: textAlign,
+                            textDirection:
+                                strongTextDirection(line.text) ?? cardDirection,
+                            style: style(line, fontSize),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// The app's mark and name.
+  Widget _brand(BuildContext context, Color foreground, bool light) =>
+      Container(
+        padding: const EdgeInsetsDirectional.fromSTEB(6, 6, 14, 6),
+        decoration: ShapeDecoration(
+          color: foreground.withValues(alpha: light ? 0.06 : 0.14),
+          shape: const StadiumBorder(),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // The asset is the bare mark, so it only needs the card's text
+            // color.
+            Image.asset(
+              'assets/images/logo-transparent.png',
+              width: 26,
+              height: 26,
+              color: foreground,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              context.l10n.appName,
+              style: TextStyle(
+                color: foreground,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ],
+        ),
+      );
 
   Widget _background(ColorScheme scheme) {
     switch (background) {
