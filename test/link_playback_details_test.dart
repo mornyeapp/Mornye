@@ -23,7 +23,7 @@ import 'support/link_fakes.dart';
 
 class _SnapshotHandler extends BaseAudioHandler implements MusicPlayerHandler {
   @override
-  Future<void> stop({bool keepResume = false}) => super.stop();
+  Future<void> stop({bool keepResume = true}) => super.stop();
 
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError(

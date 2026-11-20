@@ -100,7 +100,7 @@ class _MusicFailures {
     final Future<void> reaction;
     if (count == 0 ||
         (next >= count && handler._repeatMode != AudioServiceRepeatMode.all)) {
-      reaction = handler.stop();
+      reaction = handler.stop(keepResume: false);
     } else {
       reaction = handler._playIndex(
         next < count

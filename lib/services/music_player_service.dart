@@ -2612,8 +2612,10 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
   }
 
+  /// The system stops without arguments, as when the playback notification
+  /// or media card is dismissed: the queue then stays for Home's Resume.
   @override
-  Future<void> stop({bool keepResume = false}) async {
+  Future<void> stop({bool keepResume = true}) async {
     _runtime.personalization.finish();
     unawaited(_runtime.personalization.flush());
     unawaited(_runtime.taste.flush());
@@ -2979,7 +2981,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
     Future<void>? reaction;
     if (_media.isEmpty) {
-      reaction = stop();
+      reaction = stop(keepResume: false);
     } else if (removed.wasCurrent) {
       reaction = _playIndex(removed.nextIndex.clamp(0, _media.length - 1));
     } else {

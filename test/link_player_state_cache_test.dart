@@ -15,7 +15,7 @@ import 'support/link_desktop_fakes.dart';
 
 class _Handler extends BaseAudioHandler implements MusicPlayerHandler {
   @override
-  Future<void> stop({bool keepResume = false}) async {}
+  Future<void> stop({bool keepResume = true}) async {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

@@ -1701,6 +1701,28 @@ void main() {
     },
   );
 
+  for (final dismissed in [false, true]) {
+    test('a ${dismissed ? 'dismissed notification' : 'stop from the system'} '
+        'keeps the queue for Home to resume', () async {
+      final store = _ResumeSessionStore();
+      final decks = <_Deck>[];
+      final runtime = _runtime(sessionDatabase: store, decks: decks);
+      final handler = await runtime.initialize();
+      await handler.setQueueAndPlay([_track]);
+      decks.single.position = const Duration(seconds: 23);
+      await handler.pause();
+
+      // Both arrive from the system session without arguments.
+      await (dismissed ? handler.onNotificationDeleted() : handler.stop());
+
+      expect(decks.single.state, PlaybackDeckState.stopped);
+      expect(handler.mediaItem.value, isNull);
+      expect(store.active, isNull);
+      expect(store.archived?['positionMs'], 23000);
+      expect(store.preview?['media'], containsPair('id', _track.id));
+    });
+  }
+
   test(
     'external startup does not initialize the internal player or restore a session',
     () async {
