@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -385,3 +386,21 @@ jobs:
           path: |
             build/symbols/android/
             build/app/outputs/mapping/release/mapping.txt
+
+      - name: Package APK with (headphone) label
+        run: |
+          mkdir -p build/app/outputs/flutter-apk/labeled
+          if [ -f "build/app/outputs/flutter-apk/app-arm64-v8a-release.apk" ]; then
+            cp "build/app/outputs/flutter-apk/app-arm64-v8a-release.apk" "build/app/outputs/flutter-apk/labeled/Mornye-arm64(headphone).apk"
+          fi
+          if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
+            cp "build/app/outputs/flutter-apk/app-release.apk" "build/app/outputs/flutter-apk/labeled/Mornye-universal(headphone).apk"
+          fi
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Mornye(headphone)
+          if-no-files-found: error
+          retention-days: 14
+          path: build/app/outputs/flutter-apk/labeled/*.apk

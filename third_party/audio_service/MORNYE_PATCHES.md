@@ -155,6 +155,13 @@ from the upstream package are not vendored.
   views see the window (owner-approved). The app's queue-platform test covers
   mapping, mutations, pending sends, codec size and platform scope;
   `QueueItemIndexTest.java` covers native and legacy ID handling.
+- Android: interpret rapid presses of a headset's single multifunction button
+  (`HEADSETHOOK` or the Android-rerouted `MEDIA_PLAY_PAUSE`) as transport
+  gestures. One press toggles play/pause after Android's 300 ms multi-click
+  window, two presses skip forward and three or more skip back. Dedicated
+  next/previous keys still dispatch immediately, and a pending gesture is
+  discarded when the media session is released. `HeadsetClickTrackerTest.java`
+  covers the gesture mapping.
 
 Android 13+ still chooses the positions and built-in transport icons in System
 UI. We preserve real play/pause/previous/next semantics for headsets, lock screen
@@ -169,12 +176,14 @@ Compared against the pub.dev 0.18.19 package in the local pub cache:
 - `android/src/main/java/com/ryanheise/audioservice/AudioServicePlugin.java`
 - `android/src/main/java/com/ryanheise/audioservice/MediaArtwork.java` (new)
 - `android/src/main/java/com/ryanheise/audioservice/MediaButtonReceiver.java`
+- `android/src/main/java/com/ryanheise/audioservice/HeadsetClickTracker.java` (new)
 - `android/src/main/java/com/ryanheise/audioservice/PinnedMetadataCache.java` (new)
 - `android/src/main/java/com/ryanheise/audioservice/RecentArtCache.java` (new)
 - `android/src/main/java/com/ryanheise/audioservice/QueueItemIndex.java` (new)
 - `android/src/test/java/com/ryanheise/audioservice/PinnedMetadataCacheTest.java` (new)
 - `android/src/test/java/com/ryanheise/audioservice/RecentArtCacheTest.java` (new)
 - `android/src/test/java/com/ryanheise/audioservice/QueueItemIndexTest.java` (new)
+- `android/src/test/java/com/ryanheise/audioservice/HeadsetClickTrackerTest.java`
 - `darwin/audio_service/Sources/audio_service/AudioServicePlugin.m`
 - `lib/audio_service.dart`
 - `lib/src/android_queue_window.dart` (new)
