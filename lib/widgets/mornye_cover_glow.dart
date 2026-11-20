@@ -284,11 +284,13 @@ class _MornyeCoverGlowState extends State<MornyeCoverGlow>
       width.toDouble(),
       artworkHeight * scale,
     );
+    // Whole pixels: a last row the box covered in part would keep part of
+    // the soft copy under the mask and show as a line at the cover's edge.
     final soft = Rect.fromLTWH(
       0,
       0,
       width.toDouble(),
-      (artworkHeight - fadeTop) * scale,
+      math.max(1, ((artworkHeight - fadeTop) * scale).roundToDouble()),
     );
     // Starts under the part of the soft copy that hides the cover, so its
     // upper edge is never seen.

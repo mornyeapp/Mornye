@@ -65,6 +65,7 @@ void main() {
     required String? artUri,
     bool visible = true,
     bool reducedMotion = false,
+    double fadeStart = 0.72,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -76,7 +77,7 @@ void main() {
             child: MornyeCoverGlow(
               artUri: artUri,
               visible: visible,
-              fadeStart: 0.72,
+              fadeStart: fadeStart,
             ),
           ),
         ),
@@ -162,6 +163,27 @@ void main() {
     ).computeLuminance();
     expect(dimmed, lessThanOrEqualTo(mornyeLabelBackgroundLuminance + 0.01));
     expect(dimmed, greaterThan(mornyeLabelBackgroundLuminance - 0.03));
+  });
+
+  testWidgets('no line is left where the soft copy ends', (tester) async {
+    final white = await _cover(tester, directory, const Color(0xffffffff));
+    // The fade is 114 dp, 28.5 pixels of the drawn image: its last row is
+    // covered in half.
+    await pumpGlow(tester, artUri: white, fadeStart: 0.715);
+
+    final drawn = await pixels(tester);
+    final colour = pixel(drawn, 50, drawn.$1.height - 1);
+    // The soft copy is all but gone in its last row, and gone after it.
+    for (var y = 28; y < 32; y++) {
+      final row = pixel(drawn, 50, y);
+      for (var channel = 0; channel < 3; channel++) {
+        expect(
+          row[channel],
+          closeTo(colour[channel], y == 28 ? 3 : 1),
+          reason: 'row $y',
+        );
+      }
+    }
   });
 
   test('the one colour is the lower edge as the page shows it', () {
