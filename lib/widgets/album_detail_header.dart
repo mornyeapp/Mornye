@@ -27,6 +27,9 @@ import 'package:mornye/widgets/desktop/detail_header.dart';
 import 'package:mornye/widgets/settled_blur.dart';
 import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
+/// Corner of the sheet the list under a Material header rises as.
+const materialHeaderSheetEdge = 28.0;
+
 /// Collapsing album-detail header shared by the album, local-album, and
 /// downloaded-album screens: full-bleed [background] (optionally blurred and
 /// scrimmed), bottom gradient, centered square cover, title, optional
@@ -351,6 +354,10 @@ class AlbumDetailHeader extends StatelessWidget {
   Widget _buildAppBar(BuildContext context, ColorScheme headerScheme) {
     final tokens = context.tokens;
     final plainArtworkHeader = context.isMornye && coverBuilder != null;
+    // Material: the list below comes forward as a sheet over the backdrop.
+    final sheetEdge = context.isMornye ? 0.0 : materialHeaderSheetEdge;
+    final contentBottom = sheetEdge == 0 ? 40.0 : sheetEdge + 24;
+    final sheetColor = Theme.of(context).colorScheme.surface;
     // iOS does not add horizontal safe-area padding in portrait. Give toolbar
     // controls and header content an explicit inset so circular actions do not
     // sit against the glass edge on either iPhone or iPad. Android uses a
@@ -426,7 +433,7 @@ class AlbumDetailHeader extends StatelessWidget {
                     final toolbarBottom =
                         MediaQuery.paddingOf(context).top + kToolbarHeight;
                     final detailsHeight =
-                        40 +
+                        contentBottom +
                         20 +
                         58 +
                         (subtitle == null ? 0 : 28) +
@@ -488,7 +495,31 @@ class AlbumDetailHeader extends StatelessWidget {
             ],
           );
 
-          return FlexibleSpaceBar(
+          // The sheet's rounded top edge covers the backdrop's end and
+          // flattens as the header docks under the toolbar.
+          final rise =
+              (constraints.maxHeight -
+                      MediaQuery.paddingOf(context).top -
+                      kToolbarHeight)
+                  .clamp(0.0, sheetEdge);
+          final sheet = Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: rise,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                key: const ValueKey('header-sheet-edge'),
+                decoration: BoxDecoration(
+                  color: sheetColor,
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(rise),
+                  ),
+                ),
+              ),
+            ),
+          );
+          final bar = FlexibleSpaceBar(
             collapseMode: CollapseMode.pin,
             background: Stack(
               fit: StackFit.expand,
@@ -523,7 +554,7 @@ class AlbumDetailHeader extends StatelessWidget {
                 Positioned(
                   left: 20 + iosEdgeInset,
                   right: 20 + iosEdgeInset,
-                  bottom: 40,
+                  bottom: contentBottom,
                   child: expressive
                       ? IgnorePointer(
                           ignoring: contentProgress == 0,
@@ -547,6 +578,8 @@ class AlbumDetailHeader extends StatelessWidget {
             ),
             stretchModes: const [StretchMode.zoomBackground],
           );
+          if (rise == 0) return bar;
+          return Stack(fit: StackFit.expand, children: [bar, sheet]);
         },
       ),
       leadingWidth: kToolbarHeight + iosEdgeInset,

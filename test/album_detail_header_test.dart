@@ -120,6 +120,39 @@ void main() {
     expect(images.single!.debugDisposed, isFalse);
   });
 
+  testWidgets('the list under a Material header rises as a rounded sheet '
+      'that flattens when the header docks', (tester) async {
+    _phone(tester);
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(_collection(controller));
+    final edge = find.byKey(const ValueKey('header-sheet-edge'));
+    final box = tester.widget<DecoratedBox>(edge).decoration as BoxDecoration;
+    expect(box.color, AppTheme.light().colorScheme.surface);
+    expect(
+      box.borderRadius,
+      const BorderRadius.vertical(
+        top: Radius.circular(materialHeaderSheetEdge),
+      ),
+    );
+    // It spans the page and ends where the header does.
+    expect(tester.getRect(edge).height, materialHeaderSheetEdge);
+    expect(tester.getRect(edge).bottom, 534);
+    expect(tester.getRect(edge).left, 0);
+    expect(tester.getRect(edge).width, closeTo(411, 0.1));
+
+    // It travels with the list.
+    controller.jumpTo(100);
+    await tester.pump();
+    expect(tester.getRect(edge).bottom, 434);
+    expect(tester.getRect(edge).height, materialHeaderSheetEdge);
+
+    // Docked, the toolbar is flat.
+    controller.jumpTo(600);
+    await tester.pump();
+    expect(edge, findsNothing);
+  });
+
   testWidgets('a loading header can leave the shadow off its cover', (
     tester,
   ) async {
