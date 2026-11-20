@@ -229,7 +229,7 @@ jobs:
         run: dart scripts/prepare_flutter_sdk.dart
 
       - name: Prepare pinned Discord SDK
-        if: ${{ secrets.DISCORD_MOBILE_SDK_PASSPHRASE != '' }}
+        if: github.repository == 'mornyeapp/Mornye'
         uses: ./.github/actions/discord-sdk
         with:
           passphrase: ${{ secrets.DISCORD_MOBILE_SDK_PASSPHRASE }}
@@ -309,7 +309,7 @@ jobs:
 
       # Fork builds cannot access repository secrets and exercise the Lite build.
       - name: Prepare pinned Discord SDK
-        if: ${{ secrets.DISCORD_MOBILE_SDK_PASSPHRASE != '' }}
+        if: github.repository == 'mornyeapp/Mornye'
         uses: ./.github/actions/discord-sdk
         with:
           passphrase: ${{ secrets.DISCORD_MOBILE_SDK_PASSPHRASE }}
