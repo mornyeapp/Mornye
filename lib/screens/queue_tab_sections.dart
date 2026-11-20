@@ -727,6 +727,7 @@ class _BrowseRow extends StatelessWidget {
               colorScheme: colors,
               cacheWidth: (52 * MediaQuery.devicePixelRatioOf(context)).ceil(),
               iconSize: 24,
+              songFile: entry.samplePath,
             ),
     );
     return Padding(

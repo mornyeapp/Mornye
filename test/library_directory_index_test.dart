@@ -161,6 +161,12 @@ void main() {
       expect(b.trackCount, 1);
       expect(_names(b), ['Album']);
       expect(b.folders.single.cover, 'b');
+      // Offline, a folder whose cover cannot load reads this song's art.
+      expect(
+        b.folders.single.coverFile,
+        '/storage/emulated/0/Music/B/Album/1.flac',
+      );
+      expect(root.coverFile, isNull);
       expect(identical(index[b.key], b), isTrue);
       expect(root.folders[2].tracks.single.itemId, 'local_l1');
     });

@@ -24,10 +24,11 @@ import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
-import 'package:mornye/models/library_database_models.dart'
-    show LocalLibraryItem;
 import 'package:mornye/services/m3u_playlist_service.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/track_file_resolver.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/collection_track_files_provider.dart';
@@ -1456,7 +1457,13 @@ class _CollectionTrackTile extends ConsumerWidget {
             final cover = ClipRRect(
               borderRadius: context.tokens.borderRadiusThumb,
               child: effectiveCoverUrl != null && effectiveCoverUrl.isNotEmpty
-                  ? _buildTrackCover(context, effectiveCoverUrl, size)
+                  ? _buildTrackCover(
+                      context,
+                      effectiveCoverUrl,
+                      size,
+                      songFile: inMemoryHistoryItem?.filePath,
+                      hasFile: hasFile,
+                    )
                   : TrackCoverPlaceholder(size: size),
             );
             return heroTag != null ? Hero(tag: heroTag, child: cover) : cover;
@@ -1533,7 +1540,13 @@ class _CollectionTrackTile extends ConsumerWidget {
     }
   }
 
-  Widget _buildTrackCover(BuildContext context, String coverUrl, double size) {
+  Widget _buildTrackCover(
+    BuildContext context,
+    String coverUrl,
+    double size, {
+    String? songFile,
+    required bool hasFile,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     Widget placeholder() => Container(
       width: size,
@@ -1550,6 +1563,16 @@ class _CollectionTrackTile extends ConsumerWidget {
       fadeInDuration: const Duration(milliseconds: 180),
       fadeOutDuration: const Duration(milliseconds: 90),
       placeholder: (_) => placeholder(),
+      songFile: songFile,
+      // A file outside the recent History in memory is read only once the
+      // cover fails.
+      findSongFile: songFile == null && hasFile
+          ? () => firstTrackSongFile(
+              [entry.track],
+              library: LibraryDatabase.instance,
+              history: HistoryDatabase.instance,
+            )
+          : null,
     );
   }
 

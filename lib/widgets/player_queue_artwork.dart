@@ -44,16 +44,17 @@ class PlayerQueueArtwork extends StatelessWidget {
     final artwork =
         item.artUri?.toString() ?? item.extras?['artworkRef']?.toString();
     final source = _localSource;
-    Widget image(String? uri) => PlayerArtwork(
+    Widget image(String? uri, {String? songFile}) => PlayerArtwork(
       artUri: uri,
       colorScheme: colorScheme,
       cacheWidth: cacheWidth,
       iconSize: iconSize,
+      songFile: songFile,
     );
     if (source == null ||
         isHttpCoverUrl(artwork) ||
         CoverStore.fetches(artwork)) {
-      return image(artwork);
+      return image(artwork, songFile: isHttpCoverUrl(artwork) ? source : null);
     }
     return LocalLibraryArtworkBuilder(
       coverPath: artwork,

@@ -31,6 +31,10 @@ class PlayerArtwork extends StatelessWidget {
   /// while it fades in.
   final AppMotionSpec? crossfadeScale;
 
+  /// A song file on this device whose own artwork shows when [artUri]
+  /// cannot load. Not read with [crossfade].
+  final String? songFile;
+
   const PlayerArtwork({
     super.key,
     required this.artUri,
@@ -39,6 +43,7 @@ class PlayerArtwork extends StatelessWidget {
     this.iconSize = 40,
     this.crossfade,
     this.crossfadeScale,
+    this.songFile,
   });
 
   /// Share one full-size decode while artwork moves between player panels.
@@ -55,6 +60,23 @@ class PlayerArtwork extends StatelessWidget {
       color: colorScheme.onSurfaceVariant,
     ),
   );
+
+  /// What shows when the cover cannot load: the artwork inside [songFile]
+  /// when there is one, otherwise the placeholder.
+  Widget _unavailable(Widget placeholder) {
+    if (songFile == null) return placeholder;
+    return EmbeddedCoverFallback(
+      key: ValueKey(artUri),
+      songFile: songFile,
+      placeholder: placeholder,
+      builder: (_, preview) => Image(
+        image: coverImageProvider(preview, cacheWidth: cacheWidth)!,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => placeholder,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +104,7 @@ class PlayerArtwork extends StatelessWidget {
         fadeOutDuration: const Duration(milliseconds: 0),
         useOldImageOnUrlChange: true,
         placeholder: (_, _) => placeholder,
-        errorWidget: (_, _, _) => placeholder,
+        errorWidget: (_, _, _) => _unavailable(placeholder),
       );
     }
     final image = coverImageProvider(uri, cacheWidth: cacheWidth);
@@ -93,7 +115,7 @@ class PlayerArtwork extends StatelessWidget {
       image: image,
       fit: BoxFit.cover,
       gaplessPlayback: true,
-      errorBuilder: (_, _, _) => placeholder,
+      errorBuilder: (_, _, _) => _unavailable(placeholder),
     );
   }
 

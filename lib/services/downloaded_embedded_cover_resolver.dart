@@ -116,6 +116,14 @@ class DownloadedEmbeddedCoverResolver {
     return filePath;
   }
 
+  /// Whether [filePath] names a song on this device to read artwork from:
+  /// a plain path or a SAF document, not network storage.
+  static bool isLocalSource(String? filePath) {
+    final cleanPath = cleanFilePath(filePath);
+    return cleanPath.isNotEmpty &&
+        (isContentUri(cleanPath) || p.isAbsolute(cleanPath));
+  }
+
   static Future<int?> readFileModTimeMillis(String? filePath) async {
     final cleanPath = cleanFilePath(filePath);
     if (cleanPath.isEmpty) return null;

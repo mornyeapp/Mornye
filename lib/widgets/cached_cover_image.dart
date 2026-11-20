@@ -179,6 +179,13 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
   final String Function(String)? urlTransform;
   final Widget Function(BuildContext) placeholder;
 
+  /// A song file on this device whose own artwork shows when [url] cannot
+  /// load, as a web cover that is not cached while offline.
+  final String? songFile;
+
+  /// Looks up [songFile] when the cover cannot load and none was given.
+  final Future<String?> Function()? findSongFile;
+
   const LocalOrNetworkCoverImage({
     super.key,
     required this.url,
@@ -192,7 +199,30 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
     this.fadeOutDuration = Duration.zero,
     this.urlTransform,
     required this.placeholder,
+    this.songFile,
+    this.findSongFile,
   });
+
+  /// What shows when the cover cannot load: the song file's artwork when
+  /// there is a song file, otherwise [placeholder].
+  Widget _unavailable(BuildContext context) {
+    if (songFile == null && findSongFile == null) return placeholder(context);
+    return EmbeddedCoverFallback(
+      key: ValueKey(url),
+      songFile: songFile,
+      findSongFile: findSongFile,
+      placeholder: placeholder(context),
+      builder: (_, preview) => LocalOrNetworkCoverImage(
+        url: preview,
+        width: width,
+        height: height,
+        fit: fit,
+        localCacheWidth: localCacheWidth ?? networkCacheWidth,
+        fadeInDuration: fadeInDuration ?? Duration.zero,
+        placeholder: placeholder,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +237,7 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
         fadeInDuration: fadeInDuration,
         fadeOutDuration: fadeOutDuration,
         placeholder: (_, _) => placeholder(context),
-        errorWidget: (_, _, _) => placeholder(context),
+        errorWidget: (_, _, _) => _unavailable(context),
       );
     }
 
@@ -288,7 +318,7 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
                 ],
               );
             },
-      errorBuilder: (_, _, _) => placeholder(context),
+      errorBuilder: (_, _, _) => _unavailable(context),
     );
     return _clip(image);
   }
@@ -296,6 +326,72 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
   static int? _localDecodeExtent(BuildContext context, double? size) {
     if (size == null || !size.isFinite || size <= 0) return null;
     return (size * MediaQuery.devicePixelRatioOf(context)).ceil();
+  }
+}
+
+/// The artwork inside a song file on this device, for a cover whose own
+/// image cannot load. [placeholder] shows until it is read, and when the
+/// file has none or is not on this device.
+class EmbeddedCoverFallback extends StatefulWidget {
+  const EmbeddedCoverFallback({
+    super.key,
+    this.songFile,
+    this.findSongFile,
+    required this.placeholder,
+    required this.builder,
+  });
+
+  /// The song file; [findSongFile] looks it up once when this is null.
+  final String? songFile;
+  final Future<String?> Function()? findSongFile;
+  final Widget placeholder;
+
+  /// Shows the artwork read from the song, a file at [preview].
+  final Widget Function(BuildContext context, String preview) builder;
+
+  @override
+  State<EmbeddedCoverFallback> createState() => _EmbeddedCoverFallbackState();
+}
+
+class _EmbeddedCoverFallbackState extends State<EmbeddedCoverFallback> {
+  String? _found;
+
+  @override
+  void initState() {
+    super.initState();
+    DownloadedEmbeddedCoverResolver.previewsCleared.addListener(_changed);
+    unawaited(_find());
+  }
+
+  @override
+  void dispose() {
+    DownloadedEmbeddedCoverResolver.previewsCleared.removeListener(_changed);
+    super.dispose();
+  }
+
+  Future<void> _find() async {
+    final find = widget.findSongFile;
+    if (widget.songFile != null || find == null) return;
+    String? found;
+    try {
+      found = await find();
+    } catch (_) {}
+    if (found != null && mounted) setState(() => _found = found);
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final file = widget.songFile ?? _found;
+    final preview = DownloadedEmbeddedCoverResolver.isLocalSource(file)
+        ? DownloadedEmbeddedCoverResolver.resolve(file, onChanged: _changed)
+        : null;
+    return preview == null
+        ? widget.placeholder
+        : widget.builder(context, preview);
   }
 }
 

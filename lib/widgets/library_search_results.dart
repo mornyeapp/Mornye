@@ -482,7 +482,11 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
         child: SizedBox.square(
           dimension: 52,
           child: hit.cover?.isNotEmpty == true
-              ? LocalOrNetworkCoverImage(url: hit.cover!, placeholder: fallback)
+              ? LocalOrNetworkCoverImage(
+                  url: hit.cover!,
+                  placeholder: fallback,
+                  songFile: hit.samplePath,
+                )
               : fallback(context),
         ),
       ),
@@ -672,6 +676,7 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
                           ? LocalOrNetworkCoverImage(
                               url: hit.cover!,
                               placeholder: fallback,
+                              songFile: hit.samplePath,
                             )
                           : fallback(context),
                     ),

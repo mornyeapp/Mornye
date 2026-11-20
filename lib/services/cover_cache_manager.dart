@@ -5,6 +5,7 @@ import 'dart:ui' show AppExitResponse;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_cache_manager/file.dart' as cache_file;
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:http/io_client.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:mornye/services/cache_maintenance_service.dart';
@@ -217,7 +218,13 @@ class CoverCacheManager {
         maxNrOfCacheObjects: _maxCacheObjects,
         repo: repository,
         fileSystem: _CoverCacheFileSystem(_resolveCachePath),
-        fileService: HttpFileService(),
+        // A network without internet gives up in seconds, so a cover's
+        // fallback shows without waiting out the system's connect timeout.
+        fileService: HttpFileService(
+          httpClient: IOClient(
+            HttpClient()..connectionTimeout = const Duration(seconds: 10),
+          ),
+        ),
       ),
     );
   }

@@ -878,15 +878,20 @@ class _LibraryBrowseArtworkState extends State<_LibraryBrowseArtwork> {
             : LocalOrNetworkCoverImage(url: cover, placeholder: fallback),
       );
     }
-    final embedded = entry.cover?.isNotEmpty == true
+    final stored = entry.cover?.isNotEmpty == true;
+    final embedded = stored
         ? null
         : DownloadedEmbeddedCoverResolver.resolve(
             entry.samplePath,
             onChanged: _resolveAgain,
           );
-    final cover = entry.cover?.isNotEmpty == true ? entry.cover! : embedded;
+    final cover = stored ? entry.cover! : embedded;
     return cover == null
         ? fallback(context)
-        : LocalOrNetworkCoverImage(url: cover, placeholder: fallback);
+        : LocalOrNetworkCoverImage(
+            url: cover,
+            placeholder: fallback,
+            songFile: stored ? entry.samplePath : null,
+          );
   }
 }

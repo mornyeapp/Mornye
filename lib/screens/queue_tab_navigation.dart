@@ -445,6 +445,17 @@ extension _QueueTabNavigation on _QueueTabState {
                   .firstOrNull ??
               playlist.previewCover;
 
+    // Offline, a web cover not cached shows the art of a song file instead.
+    Future<String?> findSongFile() async => firstTrackSongFile(
+      playlist.tracks.isNotEmpty
+          ? [for (final entry in playlist.tracks.take(16)) entry.track]
+          : await LibraryCollectionsDatabase.instance
+                .playlistTrackPages(playlist.id, firstPage: 16)
+                .first,
+      library: LibraryDatabase.instance,
+      history: HistoryDatabase.instance,
+    );
+
     Widget image(String? cover) => cover == null
         ? placeholder
         : LocalOrNetworkCoverImage(
@@ -456,6 +467,11 @@ extension _QueueTabNavigation on _QueueTabState {
             networkCacheWidth: cacheExtent,
             fadeInDuration: Duration.zero,
             placeholder: (_) => placeholder,
+            findSongFile:
+                (customCoverPath == null || customCoverPath.isEmpty) &&
+                    playlist.trackCount > 0
+                ? findSongFile
+                : null,
           );
 
     if ((customCoverPath != null && customCoverPath.isNotEmpty) ||

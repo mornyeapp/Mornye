@@ -1011,14 +1011,15 @@ class _FolderArtwork extends StatelessWidget {
                 localCacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
                     .round(),
                 placeholder: glyph,
+                songFile: folder.coverFile,
               ),
       ),
     );
   }
 }
 
-/// A song's artwork: the download's cover, or the scanned file's thumbnail
-/// with its embedded artwork recovered when the thumbnail is gone.
+/// A song's artwork: the download's cover, or the scanned file's thumbnail,
+/// with its embedded artwork recovered when either cannot load.
 class _SongArtwork extends StatelessWidget {
   const _SongArtwork({required this.item, required this.size});
 
@@ -1038,13 +1039,15 @@ class _SongArtwork extends StatelessWidget {
         ),
       ),
     );
-    Widget image(String? cover) => cover == null || cover.isEmpty
+    Widget image(String? cover, {String? songFile}) =>
+        cover == null || cover.isEmpty
         ? placeholder(context)
         : LocalOrNetworkCoverImage(
             url: cover,
             localCacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
                 .round(),
             placeholder: placeholder,
+            songFile: songFile,
           );
     final local = item.localItem;
     return ClipRRect(
@@ -1052,7 +1055,7 @@ class _SongArtwork extends StatelessWidget {
       child: SizedBox.square(
         dimension: size,
         child: local == null
-            ? image(item.coverUrl)
+            ? image(item.coverUrl, songFile: item.filePath)
             : LocalLibraryArtworkBuilder(
                 coverPath: local.coverPath,
                 filePath: local.filePath,

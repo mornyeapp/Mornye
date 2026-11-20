@@ -1,9 +1,46 @@
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/download_file_recovery.dart';
+import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/file_access.dart';
+
+/// The first song file on this device that one of [tracks] has, a download
+/// before a scanned file, without checking it still exists. A cover that
+/// cannot load shows the artwork inside it.
+Future<String?> firstTrackSongFile(
+  List<Track> tracks, {
+  required LibraryDatabase library,
+  required HistoryDatabase history,
+}) async {
+  if (tracks.isEmpty) return null;
+  final downloads = await history.findExistingTracks([
+    for (final track in tracks)
+      HistoryLookupRequest(
+        spotifyId: track.id,
+        isrc: track.isrc,
+        trackName: track.name,
+        artistName: track.artistName,
+      ),
+  ]);
+  final scanned = await library.findExistingBatch([
+    for (final track in tracks)
+      LocalLibraryBatchLookupRequest(
+        id: (track.source ?? '').toLowerCase() == 'local' ? track.id : null,
+        isrc: track.isrc,
+        trackName: track.name,
+        artistName: track.artistName,
+      ),
+  ]);
+  for (var index = 0; index < tracks.length; index++) {
+    for (final row in [downloads[index], scanned[index]]) {
+      final path = row?['filePath']?.toString();
+      if (DownloadedEmbeddedCoverResolver.isLocalSource(path)) return path;
+    }
+  }
+  return null;
+}
 
 /// The file each of [tracks] plays from, or null when it has none: a scanned
 /// Library file first when [includeLocal] (Local Library is on), then a

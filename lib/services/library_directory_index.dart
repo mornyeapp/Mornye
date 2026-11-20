@@ -266,6 +266,7 @@ class LibraryDirectoryTrack {
     this.cover,
     this.discNumber,
     this.trackNumber,
+    this.filePath = '',
   });
 
   /// `downloaded` for a download, `local` for a scanned file.
@@ -275,6 +276,9 @@ class LibraryDirectoryTrack {
   final String? cover;
   final int? discNumber;
   final int? trackNumber;
+
+  /// The stored path of the song file.
+  final String filePath;
 
   String get itemId => source == 'local' ? 'local_$id' : 'dl_$id';
 }
@@ -303,6 +307,9 @@ class LibraryDirectory {
 
   /// Artwork of the first song directly in this folder that has any.
   String? cover;
+
+  /// The song file [cover] belongs to.
+  String? coverFile;
 
   /// The songs of this folder, then of each folder below it, in order.
   Iterable<LibraryDirectoryTrack> get allTracks sync* {
@@ -364,6 +371,7 @@ class LibraryDirectoryIndex {
           cover: entry.cover?.isNotEmpty == true ? entry.cover : null,
           discNumber: entry.discNumber,
           trackNumber: entry.trackNumber,
+          filePath: entry.path,
         ),
       );
     }
@@ -402,9 +410,11 @@ class LibraryDirectoryIndex {
   static void _arrange(LibraryDirectory folder) {
     folder.folders.sort((a, b) => compareNaturally(a.name, b.name));
     folder.tracks.sort(_compareTracks);
-    folder.cover = folder.tracks
-        .map((track) => track.cover)
-        .firstWhere((cover) => cover != null, orElse: () => null);
+    final coverTrack = folder.tracks
+        .where((track) => track.cover != null)
+        .firstOrNull;
+    folder.cover = coverTrack?.cover;
+    folder.coverFile = coverTrack?.filePath;
     var count = folder.tracks.length;
     for (final child in folder.folders) {
       _arrange(child);
