@@ -13,6 +13,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/settings_group.dart';
 
 class DownloadServicePicker extends ConsumerStatefulWidget {
   final String? trackName;
@@ -265,7 +266,7 @@ class _DownloadServicePickerState extends ConsumerState<DownloadServicePicker> {
                   ),
                 )
               else
-                ...qualityRows,
+                SettingsGroup(connected: true, children: qualityRows),
             ],
 
             const SizedBox(height: 16),
@@ -374,23 +375,11 @@ class _QualityOption extends StatelessWidget {
         ),
       );
     }
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: colorScheme.onPrimaryContainer, size: 20),
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      subtitle: subtitle.isNotEmpty
-          ? Text(
-              subtitle,
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            )
-          : null,
+    // A row of the sheet's connected group, like the other menus.
+    return SettingsItem(
+      icon: icon,
+      title: title,
+      subtitle: subtitle.isEmpty ? null : subtitle,
       onTap: onTap,
     );
   }

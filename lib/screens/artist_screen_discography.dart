@@ -50,55 +50,57 @@ extension _ArtistScreenDiscography on _ArtistScreenState {
             ),
             // Material sheets separate the header by space; dividers are Mornye's.
             if (context.isMornye) const Divider(height: 1),
-            if (albums.isNotEmpty)
-              _DiscographyOptionTile(
-                icon: Icons.library_music,
-                title: context.l10n.discographyDownloadAll,
-                subtitle: context.l10n.discographyDownloadAllSubtitle(
-                  totalTracks,
-                  albums.length,
+            ..._discographyOptions(context, [
+              if (albums.isNotEmpty)
+                _DiscographyOptionTile(
+                  icon: Icons.library_music,
+                  title: context.l10n.discographyDownloadAll,
+                  subtitle: context.l10n.discographyDownloadAllSubtitle(
+                    totalTracks,
+                    albums.length,
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _downloadAlbums(pageContext, albums);
+                  },
                 ),
+              if (albumsOnly.isNotEmpty)
+                _DiscographyOptionTile(
+                  icon: Icons.album,
+                  title: context.l10n.discographyAlbumsOnly,
+                  subtitle: context.l10n.discographyAlbumsOnlySubtitle(
+                    albumTracks,
+                    albumsOnly.length,
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _downloadAlbums(pageContext, albumsOnly);
+                  },
+                ),
+              if (singles.isNotEmpty)
+                _DiscographyOptionTile(
+                  icon: Icons.music_note,
+                  title: context.l10n.discographySinglesOnly,
+                  subtitle: context.l10n.discographySinglesOnlySubtitle(
+                    singleTracks,
+                    singles.length,
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _downloadAlbums(pageContext, singles);
+                  },
+                ),
+              _DiscographyOptionTile(
+                icon: Icons.checklist,
+                title: context.l10n.discographySelectAlbums,
+                subtitle: context.l10n.discographySelectAlbumsSubtitle,
+                showDivider: false,
                 onTap: () {
                   Navigator.pop(context);
-                  _downloadAlbums(pageContext, albums);
+                  enterSelectionMode(albums.first.id);
                 },
               ),
-            if (albumsOnly.isNotEmpty)
-              _DiscographyOptionTile(
-                icon: Icons.album,
-                title: context.l10n.discographyAlbumsOnly,
-                subtitle: context.l10n.discographyAlbumsOnlySubtitle(
-                  albumTracks,
-                  albumsOnly.length,
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _downloadAlbums(pageContext, albumsOnly);
-                },
-              ),
-            if (singles.isNotEmpty)
-              _DiscographyOptionTile(
-                icon: Icons.music_note,
-                title: context.l10n.discographySinglesOnly,
-                subtitle: context.l10n.discographySinglesOnlySubtitle(
-                  singleTracks,
-                  singles.length,
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _downloadAlbums(pageContext, singles);
-                },
-              ),
-            _DiscographyOptionTile(
-              icon: Icons.checklist,
-              title: context.l10n.discographySelectAlbums,
-              subtitle: context.l10n.discographySelectAlbumsSubtitle,
-              showDivider: false,
-              onTap: () {
-                Navigator.pop(context);
-                enterSelectionMode(albums.first.id);
-              },
-            ),
+            ]),
             const SizedBox(height: 8),
           ],
         ),
@@ -354,6 +356,10 @@ extension _ArtistScreenDiscography on _ArtistScreenState {
   }
 }
 
+/// The options as Mornye's plain list or as one Material connected group.
+List<Widget> _discographyOptions(BuildContext context, List<Widget> rows) =>
+    context.isMornye ? rows : [SettingsGroup(connected: true, children: rows)];
+
 class _DiscographyOptionTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -415,22 +421,11 @@ class _DiscographyOptionTile extends StatelessWidget {
         ),
       );
     }
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: colorScheme.onSecondaryContainer, size: 24),
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
-      ),
-      trailing: Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+    // A row of the sheet's connected group, like the other menus.
+    return SettingsItem(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
       onTap: onTap,
     );
   }
