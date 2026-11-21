@@ -170,7 +170,7 @@ void main() {
         yield LicenseEntryWithLineBreaks(const [
           'FFmpeg',
           'FFmpegKit',
-        ], await rootBundle.loadString('assets/licenses/lgpl-3.0.txt'));
+        ], await rootBundle.loadString('LICENSE'));
         if (Platform.isAndroid) {
           yield LicenseEntryWithLineBreaks(const [
             'libusb',
