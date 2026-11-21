@@ -293,6 +293,10 @@ class _AppHeaderCard extends StatelessWidget {
                 padding: EdgeInsets.all(logoSize * 0.24),
                 child: Image.asset(
                   'assets/images/logo-transparent.png',
+                  cacheWidth:
+                      (logoSize * MediaQuery.devicePixelRatioOf(context))
+                          .ceil()
+                          .clamp(64, 512),
                   color: colorScheme.onPrimary,
                   fit: BoxFit.contain,
                   errorBuilder: (_, _, _) => ClipRRect(
@@ -301,6 +305,10 @@ class _AppHeaderCard extends StatelessWidget {
                       'assets/images/logo.png',
                       width: logoSize,
                       height: logoSize,
+                      cacheWidth:
+                          (logoSize * MediaQuery.devicePixelRatioOf(context))
+                              .ceil()
+                              .clamp(64, 512),
                       fit: BoxFit.cover,
                     ),
                   ),

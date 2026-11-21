@@ -128,6 +128,10 @@ class RewindShareCard extends StatelessWidget {
                         'assets/images/logo-transparent.png',
                         width: 22,
                         height: 22,
+                        cacheWidth:
+                            (22 * MediaQuery.devicePixelRatioOf(context))
+                                .ceil()
+                                .clamp(22, 128),
                         color: Colors.white,
                         errorBuilder: (_, _, _) => const SizedBox.shrink(),
                       ),

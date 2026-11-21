@@ -34,10 +34,12 @@ final _log = AppLogger('LibraryMixes');
 // same day.
 const _cacheKey = 'home_library_mixes_v3';
 
+final _releaseYearPattern = RegExp(r'^\s*(\d{4})');
+
 /// The year a release date such as `2019-05-10` or `2019` names, or null.
 int? libraryMixReleaseYear(Object? releaseDate) {
   if (releaseDate is! String) return null;
-  final match = RegExp(r'^\s*(\d{4})').firstMatch(releaseDate);
+  final match = _releaseYearPattern.firstMatch(releaseDate);
   final year = match == null ? null : int.parse(match.group(1)!);
   return year != null && year > 0 ? year : null;
 }

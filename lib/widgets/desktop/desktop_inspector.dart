@@ -143,6 +143,11 @@ class DesktopInspector extends ConsumerWidget {
   final DesktopInspectorPanel panel;
   final bool overlay;
 
+  static final _overlayBackdropBlur = ui.ImageFilter.blur(
+    sigmaX: 60,
+    sigmaY: 60,
+  );
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mornye = context.isMornye;
@@ -240,7 +245,7 @@ class DesktopInspector extends ConsumerWidget {
             if (overlay) ...[
               if (blur)
                 BackdropFilter(
-                  filter: ui.ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+                  filter: _overlayBackdropBlur,
                   child: const SizedBox.expand(),
                 ),
               ColoredBox(

@@ -54,6 +54,10 @@ extension _SetupScreenSteps on _SetupScreenState {
                     'assets/images/logo-transparent.png',
                     width: logoSize,
                     height: logoSize,
+                    cacheWidth:
+                        (logoSize * MediaQuery.devicePixelRatioOf(context))
+                            .ceil()
+                            .clamp(64, 512),
                     color: colorScheme.primary,
                     fit: BoxFit.contain,
                   ),

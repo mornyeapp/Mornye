@@ -21,10 +21,16 @@ final RegExp _primaryArtistSeparator = RegExp(
   caseSensitive: false,
 );
 final RegExp _metadataKeyPunctuation = RegExp(r'[^A-Z0-9]');
+final RegExp _artistAndSeparator = RegExp(r'\s+and\s+', caseSensitive: false);
+final _splitArtistCache = <(String, int?), List<String>>{};
+const _maxSplitArtistCacheEntries = 512;
 
 List<String> splitArtistNames(String rawArtists, {int? creditedArtistCount}) {
   final raw = rawArtists.trim();
   if (raw.isEmpty) return const [];
+  final cacheKey = (raw, creditedArtistCount);
+  final cached = _splitArtistCache[cacheKey];
+  if (cached != null) return cached;
 
   final names = raw
       .split(_artistNameSplitPattern)
@@ -33,17 +39,20 @@ List<String> splitArtistNames(String rawArtists, {int? creditedArtistCount}) {
       .toList(growable: false);
   // "and" can be part of a band's name. Only treat it as a separator when
   // the provider's separate artist IDs confirm that many credited artists.
+  var result = names;
   if (creditedArtistCount != null && creditedArtistCount > names.length) {
     final expanded = names
-        .expand(
-          (name) => name.split(RegExp(r'\s+and\s+', caseSensitive: false)),
-        )
+        .expand((name) => name.split(_artistAndSeparator))
         .map((name) => name.trim())
         .where((name) => name.isNotEmpty)
         .toList(growable: false);
-    if (expanded.length == creditedArtistCount) return expanded;
+    if (expanded.length == creditedArtistCount) result = expanded;
   }
-  return names;
+  if (_splitArtistCache.length >= _maxSplitArtistCacheEntries) {
+    _splitArtistCache.remove(_splitArtistCache.keys.first);
+  }
+  _splitArtistCache[cacheKey] = result;
+  return result;
 }
 
 String primaryArtistName(String artists, {String? albumArtist}) {
