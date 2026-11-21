@@ -3089,6 +3089,10 @@
   "@appearanceContinueListeningSubtitle": {
     "description": "Subtitle of the switch that shows or hides Home's Continue listening card"
   },
+  "appearanceRecommendationsSubtitle": "Show songs like the ones you play and download on Home",
+  "@appearanceRecommendationsSubtitle": {
+    "description": "Subtitle of the switch that shows or hides Home's Recommended for you shelf"
+  },
   "appearanceInterfaceSize": "Interface size",
   "@appearanceInterfaceSize": {
     "description": "Title of the slider that scales the whole app"
@@ -9741,6 +9745,10 @@
   "homeContinueListening": "Continue listening",
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"
+  },
+  "homeRecommendedForYou": "Recommended for you",
+  "@homeRecommendedForYou": {
+    "description": "Home section header for songs outside the Library that resemble the ones the user plays and downloads"
   },
   "homeRecentlyPlayed": "Recently Played",
   "@homeRecentlyPlayed": {

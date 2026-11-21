@@ -5,10 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
+import 'package:mornye/providers/home_recommendations_provider.dart';
 import 'package:mornye/providers/home_top_picks_provider.dart';
 import 'package:mornye/providers/library_mixes_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -20,19 +22,23 @@ import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/services/weekly_releases.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/error_card.dart';
+import 'package:mornye/widgets/preview_button.dart';
 
 import 'support/fixed_settings.dart';
 
 const _title = 'Nothing here yet';
 
 /// Home without extensions, a feed or a song in the player, with [added] as
-/// its Recently added shelf.
+/// its Recently added shelf and [recommended] as its recommendations.
 Widget _home({
   required bool mornye,
   List<UnifiedLibraryItem> added = const [],
+  List<Track> recommended = const [],
 }) => ProviderScope(
   overrides: [
+    homeRecommendationsProvider.overrideWith((ref) async => recommended),
     homeNewReleasesProvider.overrideWith(
       (ref) => Stream.value(const <WeeklyRelease>[]),
     ),
@@ -167,6 +173,50 @@ void main() {
     expect(find.text('Recently added'), findsOneWidget);
     expect(find.text(_title), findsNothing);
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets('Home recommends songs outside the Library '
+        '(${mornye ? 'Mornye' : 'Material'})', (tester) async {
+      await _open(
+        tester,
+        _home(
+          mornye: mornye,
+          recommended: const [
+            Track(
+              id: 'one',
+              name: 'Example song',
+              artistName: 'Example artist',
+              albumName: 'Album',
+              duration: 200,
+              previewUrl: 'https://example.test/preview.mp3',
+            ),
+            Track(
+              id: 'two',
+              name: 'Another song',
+              artistName: 'Someone',
+              albumName: 'Album',
+              duration: 200,
+            ),
+          ],
+        ),
+      );
+      expect(tester.takeException(), isNull);
+
+      expect(find.text('Recommended for you'), findsOneWidget);
+      expect(find.text(_title), findsNothing);
+      expect(find.text('Example song'), findsOneWidget);
+      expect(find.text('Example artist'), findsOneWidget);
+      // Only a song with a preview offers one.
+      expect(find.byType(PreviewButton), findsNWidgets(2));
+      expect(
+        find.descendant(
+          of: find.byType(PreviewButton),
+          matching: find.byType(AppIconButton),
+        ),
+        findsOneWidget,
+      );
+    });
+  }
 }
 
 class _Extensions extends ExtensionNotifier {

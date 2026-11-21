@@ -260,6 +260,16 @@ class AppearanceSettingsPage extends ConsumerWidget {
                       .read(settingsProvider.notifier)
                       .setHomeContinueListening,
                 ),
+                SettingsSwitchItem(
+                  key: const ValueKey('home-recommendations'),
+                  icon: Icons.auto_awesome_outlined,
+                  title: context.l10n.homeRecommendedForYou,
+                  subtitle: context.l10n.appearanceRecommendationsSubtitle,
+                  value: settings.homeRecommendations,
+                  onChanged: ref
+                      .read(settingsProvider.notifier)
+                      .setHomeRecommendations,
+                ),
               ],
             ),
 

@@ -8325,6 +8325,14 @@
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"
   },
+  "homeRecommendedForYou": "Rekomendasi untukmu",
+  "@homeRecommendedForYou": {
+    "description": "Home section header for songs outside the Library that resemble the ones the user plays and downloads"
+  },
+  "appearanceRecommendationsSubtitle": "Tampilkan lagu yang mirip dengan yang kamu putar dan unduh di Beranda",
+  "@appearanceRecommendationsSubtitle": {
+    "description": "Subtitle of the switch that shows or hides Home's Recommended for you shelf"
+  },
   "homeRecentlyAdded": "Baru ditambahkan",
   "@homeRecentlyAdded": {
     "description": "Home section header for the newest downloaded and scanned tracks"

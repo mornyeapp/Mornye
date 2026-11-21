@@ -367,6 +367,10 @@ class AppSettings {
 
   /// Whether Home offers the last song again ("Continue listening").
   final bool homeContinueListening;
+
+  /// Whether Home recommends songs outside the Library, asked from an
+  /// extension with a few Library songs as the example.
+  final bool homeRecommendations;
   final bool separateSingles;
   final String singleFilenameFormat;
   final String albumFolderStructure;
@@ -646,6 +650,7 @@ class AppSettings {
       'networkStorage',
     ],
     this.homeContinueListening = true,
+    this.homeRecommendations = true,
     this.separateSingles = false,
     this.singleFilenameFormat = '{title} - {artist}',
     this.albumFolderStructure = 'artist_album',
@@ -848,6 +853,7 @@ class AppSettings {
     bool clearHomeFeedProvider = false,
     List<String>? homeShortcuts,
     bool? homeContinueListening,
+    bool? homeRecommendations,
     bool? separateSingles,
     String? singleFilenameFormat,
     String? albumFolderStructure,
@@ -1046,6 +1052,7 @@ class AppSettings {
       homeShortcuts: homeShortcuts ?? this.homeShortcuts,
       homeContinueListening:
           homeContinueListening ?? this.homeContinueListening,
+      homeRecommendations: homeRecommendations ?? this.homeRecommendations,
       separateSingles: separateSingles ?? this.separateSingles,
       singleFilenameFormat: singleFilenameFormat ?? this.singleFilenameFormat,
       albumFolderStructure: albumFolderStructure ?? this.albumFolderStructure,

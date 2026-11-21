@@ -1067,6 +1067,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setHomeContinueListening(bool enabled) =>
       _commit(state.copyWith(homeContinueListening: enabled));
 
+  void setHomeRecommendations(bool enabled) =>
+      _commit(state.copyWith(homeRecommendations: enabled));
+
   void setDefaultLibraryView(String view) => _commit(
     state.copyWith(defaultLibraryView: _normalizeDefaultLibraryView(view)),
   );

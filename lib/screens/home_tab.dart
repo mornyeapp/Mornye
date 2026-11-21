@@ -46,6 +46,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/explore_provider.dart';
+import 'package:mornye/providers/home_recommendations_provider.dart';
 import 'package:mornye/providers/home_top_picks_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/providers/weekly_releases_provider.dart';

@@ -226,7 +226,7 @@ List<String> collectionSuggestionArtists(List<Track> seeds) {
 
 /// Loads suggestions for [tracks] (most important first) from [source].
 /// [related] asks an extension for songs like the seeds; [search] finds
-/// songs by an artist.
+/// songs by an artist. At most [limit] come back.
 Future<CollectionSuggestions> loadCollectionSuggestions({
   required List<Track> tracks,
   required CollectionSuggestionSource source,
@@ -242,11 +242,12 @@ Future<CollectionSuggestions> loadCollectionSuggestions({
     String query,
   )
   search,
+  int limit = collectionSuggestionCount,
 }) async {
   final seeds = collectionSuggestionSeeds(tracks, round: round);
   if (seeds.isEmpty) return CollectionSuggestions.empty;
   // Ask for more than shown: some are already in the collection.
-  const asked = collectionSuggestionCount * 3;
+  final asked = limit * 3;
   if (source.related) {
     final results = await related(source.extensionId, [
       for (final seed in seeds) collectionSuggestionSeedJson(seed),
@@ -255,6 +256,7 @@ Future<CollectionSuggestions> loadCollectionSuggestions({
       tracks: filterCollectionSuggestions(
         results.map((map) => Track.fromBackendMap(map)),
         tracks,
+        limit: limit,
       ),
       related: true,
     );
@@ -275,7 +277,11 @@ Future<CollectionSuggestions> loadCollectionSuggestions({
       ),
   ]);
   return CollectionSuggestions(
-    tracks: filterCollectionSuggestions(interleaveSuggestions(lists), tracks),
+    tracks: filterCollectionSuggestions(
+      interleaveSuggestions(lists),
+      tracks,
+      limit: limit,
+    ),
     related: false,
   );
 }

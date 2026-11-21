@@ -167,6 +167,12 @@ class SettingsSearchCatalog {
           keywords: const ['home', 'resume', 'last song', 'hide'],
         ),
         SettingsSearchEntry(
+          icon: Icons.auto_awesome_outlined,
+          title: l10n.homeRecommendedForYou,
+          subtitle: l10n.appearanceRecommendationsSubtitle,
+          keywords: const ['home', 'suggestions', 'discover', 'rekomendasi'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.language,
           title: l10n.appearanceLanguage,
           keywords: const ['locale', 'translation'],

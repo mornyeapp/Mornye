@@ -467,6 +467,9 @@ class _HomeSections extends ConsumerWidget {
         ref.watch(libraryMixesProvider.select((s) => s.value)) ?? const [];
     final newReleases =
         ref.watch(homeNewReleasesProvider.select((s) => s.value)) ?? const [];
+    final recommended =
+        ref.watch(homeRecommendationsProvider.select((s) => s.value)) ??
+        const <Track>[];
 
     final showContinue =
         (hasMediaItem || hasResume) &&
@@ -535,6 +538,16 @@ class _HomeSections extends ConsumerWidget {
           child: _HomeRecentlyAddedShelf(
             items: recentlyAdded.items,
             trackCount: recentlyAdded.trackCount,
+            inset: mornye ? inset + 8 : inset,
+          ),
+        ),
+      if (recommended.isNotEmpty)
+        _HomeSection(
+          title: l10n.homeRecommendedForYou,
+          inset: inset,
+          shelf: true,
+          child: _HomeRecommendationsShelf(
+            tracks: recommended,
             inset: mornye ? inset + 8 : inset,
           ),
         ),
@@ -1131,6 +1144,8 @@ class _HomeShelfTile extends StatelessWidget {
     required this.subtitle,
     required this.semanticLabel,
     required this.onTap,
+    this.onLongPress,
+    this.coverAction,
     this.size,
   });
 
@@ -1139,6 +1154,11 @@ class _HomeShelfTile extends StatelessWidget {
   final String subtitle;
   final String semanticLabel;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  /// A button in the cover's bottom start corner, its own target beside
+  /// the tile's.
+  final Widget? coverAction;
 
   /// Null for the platform's shelf cover size.
   final double? size;
@@ -1150,12 +1170,13 @@ class _HomeShelfTile extends StatelessWidget {
     final size = this.size ?? _homeShelfCoverSizeOf(context);
     final radius = _homeShelfRadiusOf(context);
     final compactText = _homeCompactText(context);
-    return Semantics(
+    final tile = Semantics(
       button: true,
       label: semanticLabel,
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(radius),
         child: SizedBox(
           width: size,
@@ -1189,6 +1210,91 @@ class _HomeShelfTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+    final coverAction = this.coverAction;
+    if (coverAction == null) return tile;
+    return Stack(
+      children: [
+        tile,
+        PositionedDirectional(
+          start: 0,
+          top: 0,
+          width: size,
+          height: size,
+          child: Align(
+            alignment: AlignmentDirectional.bottomStart,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: coverAction,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Songs outside the Library like the person's own.
+class _HomeRecommendationsShelf extends StatelessWidget {
+  const _HomeRecommendationsShelf({required this.tracks, required this.inset});
+
+  final List<Track> tracks;
+  final double inset;
+
+  @override
+  Widget build(BuildContext context) => _HomeShelfSize(
+    inset: inset,
+    builder: (context, coverSize) => _HomeShelf(
+      inset: inset,
+      coverSize: coverSize,
+      itemCount: tracks.length,
+      itemBuilder: (context, index) =>
+          _HomeRecommendationTile(track: tracks[index], size: coverSize),
+    ),
+  );
+}
+
+/// A recommended song. A tap downloads it and a long press opens its
+/// actions, as on search results; the button on the cover plays its preview.
+class _HomeRecommendationTile extends ConsumerWidget {
+  const _HomeRecommendationTile({required this.track, required this.size});
+
+  final Track track;
+  final double size;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    void showOptions({Offset? position}) =>
+        TrackCollectionQuickActions.showTrackOptionsSheet(
+          context,
+          ref,
+          track,
+          position: position,
+        );
+    return DesktopContextMenuRegion(
+      onContextMenu: (position) => showOptions(position: position),
+      child: _HomeShelfTile(
+        size: size,
+        title: track.name,
+        subtitle: track.artistName,
+        semanticLabel:
+            '${context.l10n.dialogDownload}: '
+            '${track.name}, ${track.artistName}',
+        cover: PlayerArtwork(
+          artUri: track.coverUrl,
+          colorScheme: Theme.of(context).colorScheme,
+          cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+          iconSize: 32,
+        ),
+        coverAction: PreviewButton(
+          track: track,
+          size: 28,
+          dense: true,
+          overArtwork: true,
+        ),
+        onTap: () => downloadSingleTrack(context, ref, track),
+        onLongPress: showOptions,
       ),
     );
   }
