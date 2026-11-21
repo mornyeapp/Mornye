@@ -626,20 +626,37 @@ class _SelectionPanelDragState extends State<_SelectionPanelDrag>
   }
 
   /// Moves the panel back to its place on the slow spring, from the drag's
-  /// [velocity] when one hands over, or off the screen when closing: a
-  /// short eased exit, faster than any drag that ends it.
+  /// [velocity] when one hands over, or off the screen when closing: Apple's
+  /// fast spring in Mornye (preserving velocity), or M3's standard accelerate
+  /// exit in Material.
   Future<void> _animateToRest(double target, {double? velocity}) async {
     try {
-      if (_closing) {
-        await _offset
-            .animateTo(
-              target,
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-            )
-            .orCancel;
-      } else if (MediaQuery.disableAnimationsOf(context)) {
+      if (MediaQuery.disableAnimationsOf(context)) {
         _offset.value = target;
+      } else if (_closing) {
+        if (context.isMornye) {
+          await _offset
+              .animateWith(
+                SpringSimulation(
+                  MornyeMotion.fastSpring,
+                  _offset.value,
+                  target,
+                  velocity ?? _offset.velocity,
+                  snapToEnd: true,
+                ),
+              )
+              .orCancel;
+        } else {
+          await _offset
+              .animateTo(
+                target,
+                duration: MotionPace.duration(
+                  const Duration(milliseconds: 180),
+                ),
+                curve: Easing.standardAccelerate,
+              )
+              .orCancel;
+        }
       } else {
         await _offset
             .animateWith(

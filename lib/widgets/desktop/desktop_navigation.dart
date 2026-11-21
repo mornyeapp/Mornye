@@ -396,6 +396,7 @@ class _NowPlayingTransitionState extends State<_NowPlayingTransition>
   double _exitFrom = 1;
   double _exitOpacity = 1;
   double _exitOffset = 0;
+  Curve _exitCurve = Easing.standardAccelerate;
 
   @override
   void didUpdateWidget(_NowPlayingTransition oldWidget) {
@@ -420,9 +421,14 @@ class _NowPlayingTransitionState extends State<_NowPlayingTransition>
       _exitFrom = _controller.value;
       _exitOpacity = _entranceOpacity(_exitFrom);
       _exitOffset = _entranceOffset(_exitFrom);
-      _controller.reverseDuration = context.isMornye
-          ? const Duration(milliseconds: 160)
-          : const Duration(milliseconds: 200);
+      _exitCurve = context.isMornye
+          ? MornyeMotion.effectsFast.curve
+          : Easing.standardAccelerate;
+      _controller.reverseDuration = MotionPace.duration(
+        context.isMornye
+            ? const Duration(milliseconds: 160)
+            : const Duration(milliseconds: 200),
+      );
       _controller.reverse();
     }
   }
@@ -448,8 +454,7 @@ class _NowPlayingTransitionState extends State<_NowPlayingTransition>
       final opacity = exiting
           ? _exitFrom <= 0
                 ? 0.0
-                : _exitOpacity *
-                      (1 - Curves.easeInCubic.transform(1 - t / _exitFrom))
+                : _exitOpacity * (1 - _exitCurve.transform(1 - t / _exitFrom))
           : _entranceOpacity(t);
       final offset = exiting ? _exitOffset : _entranceOffset(t);
       final covered = widget.open && _controller.isCompleted;

@@ -162,9 +162,10 @@ class DesktopCupertinoPageTransitionsBuilder extends PageTransitionsBuilder {
 }
 
 /// The Material desktop push: the new page slides 32dp in from the trailing
-/// side on the fast spatial spring and fades in on the fast effects spring,
-/// over the page it covers, which stays still. A pop slides and fades the
-/// page out in a shorter eased exit.
+/// side on the standard spatial spring (no visible page-edge overshoot) and
+/// fades in on the fast effects spring, over the page it covers, which stays
+/// still. A pop slides and fades the page out on M3's standard accelerate
+/// curve in a shorter exit.
 ///
 /// It uses only a [FadeTransition] and a translation: no snapshot (the Zoom
 /// builder's cost), and the one opacity layer lasts as long as the fade, not
@@ -175,9 +176,7 @@ class DesktopPageTransitionsBuilder extends PageTransitionsBuilder {
 
   static const double _distance = 32;
 
-  static final SpringCurve _slide = SpringCurve(
-    M3EMotion.expressiveSpatialFast,
-  );
+  static final SpringCurve _slide = SpringCurve(M3EMotion.spatialDefault);
   static final SpringCurve _fade = SpringCurve(M3EMotion.effectsFast);
 
   static final Duration _duration = _slide.duration > _fade.duration
@@ -201,13 +200,15 @@ class DesktopPageTransitionsBuilder extends PageTransitionsBuilder {
   );
 
   static final Animatable<double> _slideOut = CurveTween(
-    curve: Curves.easeInCubic,
+    curve: Easing.standardAccelerate,
   );
 
-  static final Animatable<double> _fadeOut = Tween<double>(
-    begin: 1,
-    end: 0,
-  ).chain(CurveTween(curve: const Interval(0, 0.75, curve: Curves.easeIn)));
+  static final Animatable<double> _fadeOut = Tween<double>(begin: 1, end: 0)
+      .chain(
+        CurveTween(
+          curve: const Interval(0, 0.75, curve: Easing.standardAccelerate),
+        ),
+      );
 
   @override
   Duration get transitionDuration => _duration;

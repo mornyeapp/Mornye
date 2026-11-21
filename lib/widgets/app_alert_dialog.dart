@@ -3,7 +3,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
-import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -29,23 +28,15 @@ Future<T?> showAppDialog<T>({
       ),
     );
   }
-  if (materialExpressiveEnabled(context)) {
-    final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
-    final themes = InheritedTheme.capture(from: context, to: navigator.context);
-    return navigator.push<T>(
-      _MaterialDialogRoute<T>(
-        context: context,
-        builder: (context) =>
-            themes.wrap(SafeArea(child: Builder(builder: builder))),
-        barrierDismissible: barrierDismissible,
-      ),
-    );
-  }
-  return showDialog<T>(
-    context: context,
-    builder: builder,
-    barrierDismissible: barrierDismissible,
-    useRootNavigator: useRootNavigator,
+  final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
+  final themes = InheritedTheme.capture(from: context, to: navigator.context);
+  return navigator.push<T>(
+    _MaterialDialogRoute<T>(
+      context: context,
+      builder: (context) =>
+          themes.wrap(SafeArea(child: Builder(builder: builder))),
+      barrierDismissible: barrierDismissible,
+    ),
   );
 }
 
@@ -174,10 +165,12 @@ class _MaterialDialogRoute<T> extends RawDialogRoute<T> {
   static final Animatable<double> _exitFade = Tween<double>(
     begin: 1,
     end: 0,
-  ).chain(CurveTween(curve: Curves.easeIn));
+  ).chain(CurveTween(curve: Easing.standardAccelerate));
 
   @override
-  Duration get reverseTransitionDuration => const Duration(milliseconds: 150);
+  Duration get reverseTransitionDuration => _scale.duration == Duration.zero
+      ? Duration.zero
+      : MotionPace.duration(const Duration(milliseconds: 150));
 
   @override
   Widget buildTransitions(
@@ -185,24 +178,37 @@ class _MaterialDialogRoute<T> extends RawDialogRoute<T> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
     Widget child,
-  ) => DualTransitionBuilder(
-    animation: animation,
-    forwardBuilder: (context, animation, child) => FadeTransition(
-      opacity: animation.drive(CurveTween(curve: _fade.curve)),
-      child: ScaleTransition(
-        scale: animation.drive(
-          Tween<double>(
-            begin: 0.85,
-            end: 1,
-          ).chain(CurveTween(curve: _scale.curve)),
+  ) {
+    if (_scale.duration == Duration.zero ||
+        MediaQuery.disableAnimationsOf(context)) {
+      return child;
+    }
+    final fadeShare =
+        (_fade.duration.inMicroseconds / _scale.duration.inMicroseconds).clamp(
+          0.0,
+          1.0,
+        );
+    return DualTransitionBuilder(
+      animation: animation,
+      forwardBuilder: (context, animation, child) => FadeTransition(
+        opacity: animation.drive(
+          CurveTween(curve: Interval(0, fadeShare, curve: _fade.curve)),
         ),
-        child: child,
+        child: ScaleTransition(
+          scale: animation.drive(
+            Tween<double>(
+              begin: 0.85,
+              end: 1,
+            ).chain(CurveTween(curve: _scale.curve)),
+          ),
+          child: child,
+        ),
       ),
-    ),
-    reverseBuilder: (context, animation, child) =>
-        FadeTransition(opacity: _exitFade.animate(animation), child: child),
-    child: child,
-  );
+      reverseBuilder: (context, animation, child) =>
+          FadeTransition(opacity: _exitFade.animate(animation), child: child),
+      child: child,
+    );
+  }
 }
 
 class _MornyeDialogRoute<T> extends RawDialogRoute<T> {
@@ -229,7 +235,7 @@ class _MornyeDialogRoute<T> extends RawDialogRoute<T> {
   @override
   Duration get reverseTransitionDuration => transitionDuration == Duration.zero
       ? Duration.zero
-      : const Duration(milliseconds: 160);
+      : MotionPace.duration(const Duration(milliseconds: 160));
 
   CurvedAnimation? _scaleAnimation;
 
@@ -243,12 +249,12 @@ class _MornyeDialogRoute<T> extends RawDialogRoute<T> {
     if (MediaQuery.disableAnimationsOf(context)) return child;
     // Keep the backdrop in the page's compositing context. A fading dialog
     // creates an opacity layer that hides the page from its BackdropFilter.
-    // It grows on the fast spring. A dismissal during the entrance keeps
-    // that curve and plays it back from where the dialog is.
+    // It grows on the fast spring and retreats fastest-first on the same
+    // spring's leaving curve.
     final scaleAnimation = _scaleAnimation ??= CurvedAnimation(
       parent: animation,
       curve: MornyeMotion.fast.curve,
-      reverseCurve: Curves.easeInCubic,
+      reverseCurve: MornyeMotion.fast.leaving,
     );
     return ScaleTransition(
       scale: scaleAnimation.drive(Tween<double>(begin: 0.96, end: 1)),

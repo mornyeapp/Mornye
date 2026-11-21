@@ -18,6 +18,7 @@ import 'package:mornye/services/link/sync/link_sound_sync_runner.dart';
 import 'package:mornye/services/link/sync/link_sync_runner.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/dynamic_color_wrapper.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/l10n/supported_locales.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
@@ -293,6 +294,13 @@ class MornyeApp extends ConsumerWidget {
 
     return DynamicColorWrapper(
       builder: (lightTheme, darkTheme, themeMode) {
+        final isMornye = lightTheme.extension<MornyeTheme>() != null;
+        final themeMotion = isMornye
+            ? MornyeMotion.effects
+            : AppMotionSpec(
+                MotionPace.duration(const Duration(milliseconds: 250)),
+                Easing.standard,
+              );
         return MaterialApp.router(
           title: AppInfo.appName,
           debugShowCheckedModeBanner: false,
@@ -300,8 +308,8 @@ class MornyeApp extends ConsumerWidget {
           darkTheme: darkTheme,
           themeMode: themeMode,
           scrollBehavior: scrollBehavior,
-          themeAnimationDuration: const Duration(milliseconds: 300),
-          themeAnimationCurve: Curves.easeInOut,
+          themeAnimationDuration: themeMotion.duration,
+          themeAnimationCurve: themeMotion.curve,
           builder: (context, child) => buildAppContent(
             context,
             child,

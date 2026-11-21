@@ -391,21 +391,39 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
         );
       }
     } else {
-      // Leaving uses a short ease without overshoot, so the pane never
-      // grows again on its way out.
-      _controller
-          .animateBack(
-            0,
-            duration: reduce
-                ? Duration.zero
-                : const Duration(milliseconds: 220),
-            curve: Curves.easeInCubic,
-          )
-          .whenCompleteOrCancel(() {
-            if (mounted && widget.panel == null && _controller.value == 0) {
-              setState(() => _shown = null);
-            }
-          });
+      void finish() {
+        if (mounted && widget.panel == null && _controller.value == 0) {
+          setState(() => _shown = null);
+        }
+      }
+
+      if (reduce) {
+        _controller.value = 0;
+        finish();
+      } else if (context.isMornye) {
+        // Mornye retreats on Apple's critically damped fast spring from the
+        // panel's current velocity, with no bounce back into the content.
+        _controller
+            .animateWith(
+              SpringSimulation(
+                MornyeMotion.fastSpring,
+                _controller.value,
+                0,
+                _controller.velocity,
+                snapToEnd: true,
+              ),
+            )
+            .whenCompleteOrCancel(finish);
+      } else {
+        // Material exits on M3's standard accelerate curve with no overshoot.
+        _controller
+            .animateBack(
+              0,
+              duration: MotionPace.duration(const Duration(milliseconds: 220)),
+              curve: Easing.standardAccelerate,
+            )
+            .whenCompleteOrCancel(finish);
+      }
     }
   }
 

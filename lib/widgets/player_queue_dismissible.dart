@@ -3,6 +3,7 @@ import 'package:cupertino_ui/cupertino_ui.dart'
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
@@ -42,18 +43,20 @@ class _PlayerQueueDismissibleState extends State<PlayerQueueDismissible>
   final _haptic = SwipeCommitHaptic();
 
   // Closes the row's gap before the song leaves, so the rows below follow
-  // instead of jumping. An exit, so it is short and accelerates.
+  // instead of jumping. Configured per style and pace when removal runs.
   late final _collapse = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 200),
   );
-  late final _height = Tween<double>(
-    begin: 1,
-    end: 0,
-  ).animate(CurvedAnimation(parent: _collapse, curve: Curves.easeIn));
+  late final _heightCurve = CurvedAnimation(
+    parent: _collapse,
+    curve: Easing.standardAccelerate,
+  );
+  late final _height = Tween<double>(begin: 1, end: 0).animate(_heightCurve);
 
   @override
   void dispose() {
+    _heightCurve.dispose();
     _collapse.dispose();
     _progress.dispose();
     super.dispose();
@@ -66,6 +69,16 @@ class _PlayerQueueDismissibleState extends State<PlayerQueueDismissible>
   // disposed before it can remove anything.
   Future<bool> _confirmRemove() async {
     if (!MediaQuery.disableAnimationsOf(context)) {
+      if (context.isMornye) {
+        final motion = MornyeMotion.fast;
+        _collapse.duration = motion.duration;
+        _heightCurve.curve = motion.curve;
+      } else {
+        _collapse.duration = MotionPace.duration(
+          const Duration(milliseconds: 200),
+        );
+        _heightCurve.curve = Easing.standardAccelerate;
+      }
       try {
         await _collapse.forward().orCancel;
       } on TickerCanceled {

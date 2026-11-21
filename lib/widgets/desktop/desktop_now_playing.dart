@@ -258,11 +258,16 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
   ) {
     if (panel != null) _lastPanel = panel;
     final reduce = MediaQuery.disableAnimationsOf(context);
-    // Opening follows the panel motion; closing eases out without
-    // overshoot.
+    // Opening follows the inspector's spring; closing matches its exit
+    // (Apple's fast critically damped spring in Mornye, M3 accelerate in Material).
     final motion = panel != null
         ? desktopInspectorMotion(context)
-        : const AppMotionSpec(Duration(milliseconds: 260), Curves.easeInCubic);
+        : context.isMornye
+        ? MornyeMotion.fast
+        : AppMotionSpec(
+            MotionPace.duration(const Duration(milliseconds: 220)),
+            Easing.standardAccelerate,
+          );
     final panels = _panels(
       context,
       colorScheme,

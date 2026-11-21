@@ -137,6 +137,7 @@ class _MusicRecognitionScreenState
               child: AnimatedSwitcher(
                 duration: motion.duration,
                 switchInCurve: motion.curve,
+                switchOutCurve: motion.leaving,
                 // Listening turns into searching in place.
                 child: KeyedSubtree(
                   key: ValueKey((
