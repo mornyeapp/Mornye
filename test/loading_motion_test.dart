@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/theme/app_theme.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/loaded_sliver_fade_in.dart';
@@ -159,6 +160,21 @@ void main() {
         ),
       );
       expect(itemOpacities(tester), isEmpty);
+    });
+
+    testWidgets('Mornye skips list stagger and shows rows at once', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MornyeTheme.build(Brightness.light),
+          home: const Scaffold(
+            body: StaggeredListItem(index: 2, child: Text('row')),
+          ),
+        ),
+      );
+      expect(itemOpacities(tester), isEmpty);
+      expect(find.text('row'), findsOneWidget);
     });
   });
 

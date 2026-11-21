@@ -52,6 +52,7 @@ class StaggeredListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!animate ||
         index >= _maxAnimatedItems ||
+        context.isMornye ||
         MediaQuery.disableAnimationsOf(context)) {
       return child;
     }
@@ -64,7 +65,7 @@ class StaggeredListItem extends StatelessWidget {
       return child;
     }
     final cappedIndex = index.clamp(0, _maxAnimatedItems - 1);
-    final delay = staggerDelay * cappedIndex;
+    final delay = MotionPace.duration(staggerDelay) * cappedIndex;
     // Expressive: each item springs up after its own delay and may
     // overshoot slightly, while its opacity follows the effects spring.
     final rise = AppMotion.spatial(
