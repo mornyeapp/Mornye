@@ -20,13 +20,18 @@ class AppScaffoldMessenger extends ScaffoldMessenger {
 }
 
 class _AppScaffoldMessengerState extends ScaffoldMessengerState {
-  /// Flutter's entrance with a shorter exit. The messenger rebuilds its
-  /// controller whenever the style differs, so the default entrance length
-  /// is spelled out to keep the style stable.
-  static const _animationStyle = AnimationStyle(
-    duration: Duration(milliseconds: 250),
-    reverseDuration: Duration(milliseconds: 150),
-  );
+  AnimationStyle _animationStyle({required bool reduced}) {
+    if (reduced) {
+      return const AnimationStyle(
+        duration: Duration.zero,
+        reverseDuration: Duration.zero,
+      );
+    }
+    return AnimationStyle(
+      duration: MotionPace.duration(const Duration(milliseconds: 250)),
+      reverseDuration: MotionPace.duration(const Duration(milliseconds: 150)),
+    );
+  }
 
   /// The message on screen (entering, shown or leaving) and the one queued
   /// behind its exit. Both follow the controllers' `closed` futures, which
@@ -50,7 +55,8 @@ class _AppScaffoldMessengerState extends ScaffoldMessengerState {
     }
     final controller = super.showSnackBar(
       _TransientSnackBar(snackBar),
-      snackBarAnimationStyle: snackBarAnimationStyle ?? _animationStyle,
+      snackBarAnimationStyle:
+          snackBarAnimationStyle ?? _animationStyle(reduced: reduced),
     );
     if (queue) {
       _waiting = controller;
@@ -162,13 +168,12 @@ class _TransientSnackBar extends SnackBar {
   }
 }
 
-/// Reports a failure to open a local file with a plain Material snackbar.
+/// Reports a failure to open a local file using the active theme's snackbar.
 void showCannotOpenFileSnackBar(BuildContext context, Object error) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
-        context.l10n.snackbarCannotOpenFile(context.friendlyError(error)),
-      ),
+  showAppSnackBar(
+    context,
+    content: Text(
+      context.l10n.snackbarCannotOpenFile(context.friendlyError(error)),
     ),
   );
 }
@@ -227,7 +232,7 @@ ScaffoldFeatureController<SnackBar, SnackBarClosedReason> showAppSnackBar(
                       ).closeButtonTooltip,
                       color: theme.colorScheme.onSurface,
                       onPressed: messenger.hideCurrentSnackBar,
-                      icon: const AppIcon(Icons.close, size: 20),
+                      icon: const AppIcon.adaptive(Icons.close, size: 20),
                     ),
                   ],
                 );

@@ -210,14 +210,16 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
 
   @override
   Widget build(BuildContext context) {
-    if (!ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled))) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (reduceMotion ||
+        !ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled))) {
       return widget.fallback;
     }
     final controller = _controller;
     final showVideo = _ready && !_failed && controller != null;
     final explicit = widget.fadeDuration;
     final fade = explicit != null
-        ? AppMotionSpec(explicit, Curves.linear)
+        ? AppMotionSpec(MotionPace.duration(explicit), Curves.linear)
         : AppMotion.effects(
             context,
             const AppMotionSpec(Duration(milliseconds: 400), Curves.linear),

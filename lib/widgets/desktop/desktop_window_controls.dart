@@ -7,6 +7,7 @@ import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
@@ -22,26 +23,25 @@ String desktopWindowModeLabel(BuildContext context, DesktopWindowMode mode) =>
 Future<void> _chooseMode(BuildContext context) async {
   final selected = await showAppBottomSheet<DesktopWindowMode>(
     context: context,
-    builder: (context) => AppBottomSheet(
-      title: context.l10n.desktopWindowMode,
-      child: SettingsGroup(
-        children: [
-          for (final mode in DesktopWindowMode.values)
-            SettingsItem(
-              title: desktopWindowModeLabel(context, mode),
-              selected: desktopWindowMode.value == mode,
-              showDivider: mode != DesktopWindowMode.values.last,
-              onTap: () => Navigator.pop(context, mode),
-            ),
-        ],
-      ),
+    title: context.l10n.desktopWindowMode,
+    builder: (context) => SettingsGroup(
+      children: [
+        for (final mode in DesktopWindowMode.values)
+          SettingsItem(
+            title: desktopWindowModeLabel(context, mode),
+            selected: desktopWindowMode.value == mode,
+            showDivider: mode != DesktopWindowMode.values.last,
+            onTap: () => Navigator.pop(context, mode),
+          ),
+      ],
     ),
   );
   if (selected == null || !context.mounted) return;
   final changed = await setDesktopWindowMode(selected);
   if (!changed && context.mounted) {
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(content: Text(context.l10n.desktopWindowModeUnavailable)),
+    showAppSnackBar(
+      context,
+      content: Text(context.l10n.desktopWindowModeUnavailable),
     );
   }
 }

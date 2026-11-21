@@ -1372,7 +1372,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 duration: Duration(milliseconds: timed ? 160 : 320),
                 reverseDuration: const Duration(milliseconds: 260),
                 switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
+                switchOutCurve: Curves.easeOutCubic.flipped,
                 transitionBuilder: mornye
                     ? LyricBlur.fadeTransition
                     : AnimatedSwitcher.defaultTransitionBuilder,

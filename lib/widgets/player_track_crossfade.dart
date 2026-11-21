@@ -33,13 +33,14 @@ class PlayerTrackCrossfade extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final motion = playerTrackChangeMotion(context);
-    // Each half runs the curve: the outgoing lines over the first half, the
-    // incoming ones over the second.
-    final half = CurveTween(curve: Interval(0.5, 1, curve: motion.curve));
+    // Each half runs its curve: the outgoing lines fade out on the leaving
+    // curve over the first half, and the incoming ones fade in over the second.
     return AnimatedSwitcher(
       duration: motion.duration,
+      switchInCurve: Interval(0.5, 1, curve: motion.curve),
+      switchOutCurve: Interval(0.5, 1, curve: motion.leaving),
       transitionBuilder: (child, animation) =>
-          FadeTransition(opacity: animation.drive(half), child: child),
+          FadeTransition(opacity: animation, child: child),
       layoutBuilder: (current, previous) => Stack(
         alignment: alignment,
         fit: StackFit.passthrough,

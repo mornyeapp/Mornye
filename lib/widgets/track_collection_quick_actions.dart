@@ -22,6 +22,7 @@ import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/track_card.dart';
@@ -132,9 +133,7 @@ String trackAndArtistText(Track track) => '${track.name} - ${track.artistName}';
 void copyTrackText(BuildContext context, String text) {
   Clipboard.setData(ClipboardData(text: text));
   if (!context.mounted) return;
-  ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(context.l10n.trackCopiedToClipboard)));
+  showAppSnackBar(context, content: Text(context.l10n.trackCopiedToClipboard));
 }
 
 /// The track options as desktop context menu groups: playback and download,
@@ -158,7 +157,7 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
 
   void notify(String message) {
     if (!root.mounted) return;
-    ScaffoldMessenger.of(root).showSnackBar(SnackBar(content: Text(message)));
+    showAppSnackBar(root, content: Text(message));
   }
 
   Future<void> toggle({required bool wishlist}) async {
