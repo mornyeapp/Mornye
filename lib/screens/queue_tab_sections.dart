@@ -431,7 +431,14 @@ extension _QueueTabSections on _QueueTabState {
       builder: (context, ref, _) {
         final state = ref.watch(libraryBrowseProvider(request));
         final entries = state.value?.entries ?? const <LibraryBrowseEntry>[];
-        final sections = _initialSections(entries);
+        final cached = _artistSectionsCache;
+        final List<_LibrarySection> sections;
+        if (cached != null && identical(cached.$1, entries)) {
+          sections = cached.$2;
+        } else {
+          sections = _initialSections(entries);
+          _artistSectionsCache = (entries, sections);
+        }
         void openArtist(String artist) =>
             pushPage<void>(context, (_) => LibraryArtistScreen(artist: artist));
         final content = CustomScrollView(
@@ -525,7 +532,14 @@ extension _QueueTabSections on _QueueTabState {
       builder: (context, ref, _) {
         final state = ref.watch(libraryGenresProvider);
         final entries = state.value ?? const <LibraryBrowseEntry>[];
-        final sections = _initialSections(entries);
+        final cached = _genreSectionsCache;
+        final List<_LibrarySection> sections;
+        if (cached != null && identical(cached.$1, entries)) {
+          sections = cached.$2;
+        } else {
+          sections = _initialSections(entries);
+          _genreSectionsCache = (entries, sections);
+        }
         final content = CustomScrollView(
           slivers: [
             if (state.isLoading && entries.isEmpty)

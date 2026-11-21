@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -25,12 +26,47 @@ class LocalLibraryArtworkBuilder extends StatefulWidget {
 
 class _LocalLibraryArtworkBuilderState
     extends State<LocalLibraryArtworkBuilder> {
+  static const int _maxVerifiedCacheEntries = 2000;
+  static const Duration _verifiedTtl = Duration(seconds: 30);
+  static final LinkedHashMap<String, DateTime> _verifiedPaths =
+      LinkedHashMap<String, DateTime>();
+  static bool _clearListenerAttached = false;
+
   String? _coverPath;
   int _generation = 0;
+
+  static void _ensureClearListener() {
+    if (_clearListenerAttached) return;
+    _clearListenerAttached = true;
+    DownloadedEmbeddedCoverResolver.previewsCleared.addListener(
+      _verifiedPaths.clear,
+    );
+  }
+
+  static bool _isRecentlyVerified(String path) {
+    final verifiedAt = _verifiedPaths[path];
+    if (verifiedAt == null) return false;
+    if (DateTime.now().difference(verifiedAt) >= _verifiedTtl) {
+      _verifiedPaths.remove(path);
+      return false;
+    }
+    _verifiedPaths.remove(path);
+    _verifiedPaths[path] = verifiedAt;
+    return true;
+  }
+
+  static void _markVerified(String path) {
+    _verifiedPaths.remove(path);
+    _verifiedPaths[path] = DateTime.now();
+    while (_verifiedPaths.length > _maxVerifiedCacheEntries) {
+      _verifiedPaths.remove(_verifiedPaths.keys.first);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _ensureClearListener();
     _checkCover();
     DownloadedEmbeddedCoverResolver.previewsCleared.addListener(
       _onCoverChanged,
@@ -60,15 +96,20 @@ class _LocalLibraryArtworkBuilderState
     _coverPath = candidate == null || candidate.isEmpty
         ? null
         : coverFilePath(candidate) ?? candidate;
-    if (_coverPath == null) return;
+    final path = _coverPath;
+    if (path == null || _isRecentlyVerified(path)) return;
     var available = false;
     try {
-      final stat = await File(_coverPath!).stat();
+      final stat = await File(path).stat();
       available = stat.type == FileSystemEntityType.file && stat.size > 0;
     } catch (_) {
       // An expired scan path must not hide recoverable embedded artwork.
     }
-    if (available || !mounted || generation != _generation) return;
+    if (available) {
+      _markVerified(path);
+      return;
+    }
+    if (!mounted || generation != _generation) return;
     setState(() => _coverPath = null);
   }
 

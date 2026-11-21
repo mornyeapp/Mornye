@@ -145,7 +145,6 @@ extension _QueueTabFilterWidgets on _QueueTabState {
                   context,
                   embeddedPath,
                   cacheWidth: targetSize,
-                  cacheHeight: targetSize,
                 );
               }
               if (coverUrl != null && coverUrl.isNotEmpty) {
@@ -153,7 +152,6 @@ extension _QueueTabFilterWidgets on _QueueTabState {
                   ResizeImage(
                     cachedCoverImageProvider(coverUrl),
                     width: targetSize,
-                    height: targetSize,
                   ),
                   context,
                 );
@@ -224,29 +222,43 @@ extension _QueueTabFilterWidgets on _QueueTabState {
 
     // Indexes into collectionState.playlists, name-filtered by the search
     // query, for the 'playlists' view.
-    final playlistIndexes = <int>[];
+    final List<int> playlistIndexes;
     if (filterMode == 'playlists') {
       final query = _searchQuery.trim().toLowerCase();
-      for (var i = 0; i < collectionState.playlists.length; i++) {
-        if (query.isEmpty ||
-            collectionState.playlists[i].name.toLowerCase().contains(query)) {
-          playlistIndexes.add(i);
+      if (identical(_playlistIndexesSource, collectionState.playlists) &&
+          _playlistIndexesQuery == query &&
+          _playlistIndexesSort == _sortMode) {
+        playlistIndexes = _playlistIndexesCache;
+      } else {
+        final built = <int>[];
+        for (var i = 0; i < collectionState.playlists.length; i++) {
+          if (query.isEmpty ||
+              collectionState.playlists[i].name.toLowerCase().contains(query)) {
+            built.add(i);
+          }
         }
+        built.sort((a, b) {
+          final first = collectionState.playlists[a];
+          final second = collectionState.playlists[b];
+          return switch (_sortMode) {
+            'a-z' => first.name.toLowerCase().compareTo(
+              second.name.toLowerCase(),
+            ),
+            'z-a' => second.name.toLowerCase().compareTo(
+              first.name.toLowerCase(),
+            ),
+            'oldest' => first.createdAt.compareTo(second.createdAt),
+            _ => second.updatedAt.compareTo(first.updatedAt),
+          };
+        });
+        _playlistIndexesSource = collectionState.playlists;
+        _playlistIndexesQuery = query;
+        _playlistIndexesSort = _sortMode;
+        _playlistIndexesCache = built;
+        playlistIndexes = built;
       }
-      playlistIndexes.sort((a, b) {
-        final first = collectionState.playlists[a];
-        final second = collectionState.playlists[b];
-        return switch (_sortMode) {
-          'a-z' => first.name.toLowerCase().compareTo(
-            second.name.toLowerCase(),
-          ),
-          'z-a' => second.name.toLowerCase().compareTo(
-            first.name.toLowerCase(),
-          ),
-          'oldest' => first.createdAt.compareTo(second.createdAt),
-          _ => second.updatedAt.compareTo(first.updatedAt),
-        };
-      });
+    } else {
+      playlistIndexes = const <int>[];
     }
 
     Widget leadGridCell(int index) {
@@ -920,7 +932,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
     ColorScheme colorScheme,
   ) {
     return ValueListenableBuilder<int>(
-      valueListenable: _embeddedCoverVersion,
+      valueListenable: _embeddedCoverListenable(album.sampleFilePath),
       builder: (context, _, child) {
         final embeddedCoverPath = _resolveDownloadedEmbeddedCoverPath(
           album.sampleFilePath,
@@ -1192,17 +1204,18 @@ extension _QueueTabFilterWidgets on _QueueTabState {
   List<UnifiedLibraryItem> _selectedItemsFromAll(
     List<UnifiedLibraryItem> allItems,
   ) {
-    final itemsById = {for (final item in allItems) item.id: item};
+    Map<String, UnifiedLibraryItem>? itemsById;
+    for (final loaded in _loadedSongsByMode.values) {
+      if (identical(loaded.items, allItems)) {
+        itemsById = loaded.byId;
+        break;
+      }
+    }
+    itemsById ??= {for (final item in allItems) item.id: item};
     return _selectedIds
-        .map((id) => itemsById[id])
+        .map((id) => itemsById![id])
         .whereType<UnifiedLibraryItem>()
         .toList(growable: false);
-  }
-
-  bool _isLocalOnlySelection(List<UnifiedLibraryItem> allItems) {
-    final selectedItems = _selectedItemsFromAll(allItems);
-    return selectedItems.isNotEmpty &&
-        selectedItems.every((item) => item.localItem != null);
   }
 }
 
@@ -1211,7 +1224,10 @@ class _LoadedSongs {
   _LoadedSongs(this.items);
 
   final List<UnifiedLibraryItem> items;
-  late final Set<String> ids = {for (final item in items) item.id};
+  late final Map<String, UnifiedLibraryItem> byId = {
+    for (final item in items) item.id: item,
+  };
+  late final Set<String> ids = byId.keys.toSet();
 
   /// The songs without the pinned download rows, by the pinned row ids.
   (Set<String>, List<UnifiedLibraryItem>)? unpinned;

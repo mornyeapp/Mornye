@@ -95,6 +95,7 @@ import 'package:mornye/screens/local_album_screen.dart';
 import 'package:mornye/screens/mornye_library_screen.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/completion_bridge_tracker.dart';
+import 'package:mornye/controllers/embedded_cover_versions.dart';
 import 'package:mornye/controllers/extension_auth_launcher.dart'
     show extensionVerificationName;
 import 'package:mornye/controllers/local_track_batch_actions.dart';
@@ -156,9 +157,11 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   static double get _libraryGridDefaultExtent => isDesktopPlatform ? 180 : 126;
   static double get _libraryGridMaxExtent => isDesktopPlatform ? 260 : 190;
   bool _embeddedCoverRefreshScheduled = false;
-  // Version counter to trigger targeted cover image rebuilds
-  // without rebuilding the entire widget tree via setState.
-  final ValueNotifier<int> _embeddedCoverVersion = ValueNotifier<int>(0);
+  // One extracted embedded cover rebuilds only the rows showing that file,
+  // not every visible cover in the tab.
+  final _embeddedCoverVersions = EmbeddedCoverVersions();
+  final Set<String> _dirtyEmbeddedCoverPaths = {};
+  bool _embeddedCoverBroadcastAll = false;
 
   bool _isSelectionMode = false;
   bool _isDraggingLibraryTrack = false;
@@ -286,6 +289,12 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   String? _sectionSort;
   String? _sectionLocale;
   List<_LibrarySection> _cachedTrackSections = const [];
+  List<UserPlaylistCollection>? _playlistIndexesSource;
+  String? _playlistIndexesQuery;
+  String? _playlistIndexesSort;
+  List<int> _playlistIndexesCache = const [];
+  (List<LibraryBrowseEntry>, List<_LibrarySection>)? _artistSectionsCache;
+  (List<LibraryBrowseEntry>, List<_LibrarySection>)? _genreSectionsCache;
 
   /// In-memory History snapshots and counts, regrouped only when the
   /// (immutable) History list changes.
@@ -443,7 +452,6 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     _hidePlaylistSelectionOverlay();
     _fileExistsCache.dispose();
     _completionBridgePlayableProbe.dispose();
-    _embeddedCoverVersion.dispose();
     _libraryGridExtent.dispose();
     _filterPageController?.dispose();
     _searchController.dispose();
@@ -620,16 +628,39 @@ class _QueueTabState extends ConsumerState<QueueTab> {
         .setHistoryFilterMode(singles ? 'singles' : 'albums');
   }
 
-  void _onEmbeddedCoverChanged() {
-    if (!mounted || _embeddedCoverRefreshScheduled) return;
+  ValueListenable<int> _embeddedCoverListenable(String? filePath) {
+    return _embeddedCoverVersions.of(
+      DownloadedEmbeddedCoverResolver.cleanFilePath(filePath),
+    );
+  }
+
+  void _onEmbeddedCoverChanged([String? filePath]) {
+    if (!mounted) return;
+    final cleanPath = DownloadedEmbeddedCoverResolver.cleanFilePath(filePath);
+    if (cleanPath.isEmpty) {
+      _embeddedCoverBroadcastAll = true;
+    } else {
+      _dirtyEmbeddedCoverPaths.add(cleanPath);
+    }
+    if (_embeddedCoverRefreshScheduled) return;
     _embeddedCoverRefreshScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _embeddedCoverRefreshScheduled = false;
-      if (mounted) {
-        _embeddedCoverVersion.value++;
-      }
+      final all = _embeddedCoverBroadcastAll;
+      final dirty = _dirtyEmbeddedCoverPaths.toList(growable: false);
+      _embeddedCoverBroadcastAll = false;
+      _dirtyEmbeddedCoverPaths.clear();
+      if (mounted) _embeddedCoverVersions.bump(all ? null : dirty);
     });
   }
+
+  /// The same callback object for a file on every build: the resolver keeps
+  /// its callbacks in a set.
+  VoidCallback _embeddedCoverChangedCallback(String? filePath) =>
+      _embeddedCoverVersions.callbackFor(
+        DownloadedEmbeddedCoverResolver.cleanFilePath(filePath),
+        _onEmbeddedCoverChanged,
+      );
 
   Future<void> _scheduleDownloadedEmbeddedCoverRefreshForPath(
     String? filePath, {
@@ -640,14 +671,14 @@ class _QueueTabState extends ConsumerState<QueueTab> {
       filePath,
       beforeModTime: beforeModTime,
       force: force,
-      onChanged: _onEmbeddedCoverChanged,
+      onChanged: _embeddedCoverChangedCallback(filePath),
     );
   }
 
   String? _resolveDownloadedEmbeddedCoverPath(String? filePath) {
     return DownloadedEmbeddedCoverResolver.resolve(
       filePath,
-      onChanged: _onEmbeddedCoverChanged,
+      onChanged: _embeddedCoverChangedCallback(filePath),
     );
   }
 

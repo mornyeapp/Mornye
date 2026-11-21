@@ -10,11 +10,23 @@ extension _QueueTabItemWidgets on _QueueTabState {
     final selectedCount = _selectedIds.length;
     final allSelected =
         selectedCount == unifiedItems.length && unifiedItems.isNotEmpty;
-    final localOnlySelection = _isLocalOnlySelection(unifiedItems);
+    final selectedItems = _selectedItemsFromAll(unifiedItems);
+    final localOnlySelection =
+        selectedItems.isNotEmpty &&
+        selectedItems.every((item) => item.localItem != null);
+    final flacEligibleCount = localOnlySelection
+        ? selectedItems
+              .where(
+                (item) => LocalTrackRedownloadService.isFlacUpgradeEligible(
+                  item.localItem!,
+                ),
+              )
+              .length
+        : 0;
 
     return LibraryTrackSelectionBar(
       playbackActions: LibrarySelectionPlaybackActions(
-        items: _selectedItemsFromAll(unifiedItems),
+        items: selectedItems,
         onClose: _exitSelectionMode,
       ),
       selectedCount: selectedCount,
@@ -28,9 +40,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
         }
       },
       bottomPadding: bottomPadding,
-      flacEligibleCount: localOnlySelection
-          ? _selectedFlacEligibleLocalItems(unifiedItems).length
-          : 0,
+      flacEligibleCount: flacEligibleCount,
       onQueueFlac: () => _queueSelectedLocalAsFlac(unifiedItems),
       onReEnrich: () => _reEnrichSelectedFromQueue(unifiedItems),
       onConvert: () => _showBatchConvertSheet(context, unifiedItems),
@@ -735,7 +745,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
         item: item,
         inset: badgeInset,
         child: ValueListenableBuilder<int>(
-          valueListenable: _embeddedCoverVersion,
+          valueListenable: _embeddedCoverListenable(item.filePath),
           builder: (context, _, child) => _buildUnifiedCoverImageInner(
             item,
             colorScheme,
@@ -829,17 +839,10 @@ extension _QueueTabItemWidgets on _QueueTabState {
           recoverDocument: false,
         );
       }
-      final animated = Stack(
-        fit: StackFit.expand,
-        children: [
-          backdrop,
-          AnimatedOpacity(
-            opacity: frame == null ? 0.0 : 1.0,
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-            child: child,
-          ),
-        ],
+      final animated = _LocalCoverFade(
+        loaded: frame != null,
+        backdrop: backdrop,
+        child: child,
       );
       if (size == null) return animated;
       return SizedBox(width: size, height: size, child: animated);
@@ -1638,4 +1641,57 @@ class _LibrarySongTableRows {
   /// Opens a song's details with the latest build's navigation lists, for
   /// the details buttons of rows kept from an earlier build.
   VoidCallback Function(UnifiedLibraryItem item) openAction;
+}
+
+/// Fades a decoded local cover in over [backdrop], then drops the backdrop
+/// and the stack, so a settled row paints the cover alone.
+class _LocalCoverFade extends StatefulWidget {
+  const _LocalCoverFade({
+    required this.loaded,
+    required this.backdrop,
+    required this.child,
+  });
+
+  final bool loaded;
+  final Widget backdrop;
+  final Widget child;
+
+  @override
+  State<_LocalCoverFade> createState() => _LocalCoverFadeState();
+}
+
+class _LocalCoverFadeState extends State<_LocalCoverFade> {
+  final GlobalKey _childKey = GlobalKey();
+  late bool _settled = widget.loaded;
+
+  @override
+  void didUpdateWidget(_LocalCoverFade oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.loaded) {
+      _settled = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keyedChild = KeyedSubtree(key: _childKey, child: widget.child);
+    if (_settled && widget.loaded) return keyedChild;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        widget.backdrop,
+        AnimatedOpacity(
+          opacity: widget.loaded ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          onEnd: () {
+            if (mounted && widget.loaded && !_settled) {
+              setState(() => _settled = true);
+            }
+          },
+          child: keyedChild,
+        ),
+      ],
+    );
+  }
 }
