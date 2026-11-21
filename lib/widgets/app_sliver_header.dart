@@ -68,6 +68,8 @@ class AppSliverHeader extends StatelessWidget {
   /// Square slot for [titleTrailing]: a 44pt avatar in a 56pt touch target.
   static const double _titleTrailingExtent = 56;
 
+  static final _titleLineHeightCache = <Object, double>{};
+
   /// Height of the title's line, which [titleTrailing] centers on. The title
   /// inherits the style [FlexibleSpaceBar] gives it under Material 3.
   static double _titleLineHeight(
@@ -75,18 +77,26 @@ class AppSliverHeader extends StatelessWidget {
     String text,
     TextStyle style,
   ) {
+    final resolvedStyle = Theme.of(context).textTheme.titleLarge!.merge(style);
+    final direction = Directionality.of(context);
+    final scaler = MediaQuery.textScalerOf(context);
+    final locale = Localizations.maybeLocaleOf(context);
+    final key = (text, resolvedStyle, direction, scaler, locale);
+    final cached = _titleLineHeightCache[key];
+    if (cached != null) return cached;
     final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: Theme.of(context).textTheme.titleLarge!.merge(style),
-      ),
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-      locale: Localizations.maybeLocaleOf(context),
+      text: TextSpan(text: text, style: resolvedStyle),
+      textDirection: direction,
+      textScaler: scaler,
+      locale: locale,
       maxLines: 1,
     )..layout();
     final height = painter.height;
     painter.dispose();
+    if (_titleLineHeightCache.length >= 32) {
+      _titleLineHeightCache.remove(_titleLineHeightCache.keys.first);
+    }
+    _titleLineHeightCache[key] = height;
     return height;
   }
 

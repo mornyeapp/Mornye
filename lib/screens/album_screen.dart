@@ -39,6 +39,7 @@ import 'package:mornye/widgets/desktop/detail_header.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
@@ -107,6 +108,8 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
   String? _headerImageUrl;
   List<String> _audioTraits = const [];
   String? _description;
+  List<Track>? _commonQualitySource;
+  Track? _commonQualityCache;
 
   /// Double click and Enter actions of the desktop table rows, by row id.
   final Map<String, VoidCallback> _desktopActivations = {};
@@ -297,6 +300,9 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
   );
 
   Track? _commonQualityTrack(List<Track> tracks) {
+    if (identical(_commonQualitySource, tracks)) {
+      return _commonQualityCache;
+    }
     final counts = <(String, bool?), int>{};
     for (final track in tracks) {
       final signature = _qualitySignature(track);
@@ -305,12 +311,16 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
     }
     // A strict majority avoids choosing an arbitrary baseline for mixed albums.
     // Unknown metadata counts towards the total, but never implies a quality.
+    Track? result;
     for (final track in tracks) {
       if ((counts[_qualitySignature(track)] ?? 0) > tracks.length / 2) {
-        return track;
+        result = track;
+        break;
       }
     }
-    return null;
+    _commonQualitySource = tracks;
+    _commonQualityCache = result;
+    return result;
   }
 
   List<Widget> _audioTraitInline({Track? commonQualityTrack}) {
@@ -558,13 +568,16 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
     final showSquareCover = context.isMornye || !hasMotion;
     final expandedHeight = calculateExpandedHeight(context);
     final cacheWidth = coverCacheWidthForViewport(context);
+    final bgCacheWidth = !context.isMornye && showSquareCover
+        ? metadataBackdropCacheExtent(context)
+        : cacheWidth;
     final headerBgUrl =
         _headerImageUrl ?? widget.headerImageUrl ?? widget.coverUrl;
     Widget headerBgImage() => headerBgUrl != null
         ? CachedNetworkImage(
             imageUrl: highResCoverUrl(headerBgUrl) ?? headerBgUrl,
             fit: BoxFit.cover,
-            memCacheWidth: cacheWidth,
+            memCacheWidth: bgCacheWidth,
             cacheManager: CoverCacheManager.instance,
             placeholder: (_, _) => Container(color: colorScheme.surface),
             errorWidget: (_, _, _) => Container(color: colorScheme.surface),

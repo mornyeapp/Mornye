@@ -408,17 +408,20 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
         : null;
 
     final cacheWidth = coverCacheWidthForViewport(context);
+    final bgCacheWidth = !context.isMornye
+        ? metadataBackdropCacheExtent(context)
+        : cacheWidth;
     final Widget background = embeddedCoverPath != null
         ? LocalOrNetworkCoverImage(
             url: embeddedCoverPath,
-            localCacheWidth: cacheWidth,
+            localCacheWidth: bgCacheWidth,
             placeholder: (_) => Container(color: colorScheme.surface),
           )
         : widget.coverUrl != null
         ? CachedNetworkImage(
             imageUrl: highResCoverUrl(widget.coverUrl) ?? widget.coverUrl!,
             fit: BoxFit.cover,
-            memCacheWidth: cacheWidth,
+            memCacheWidth: bgCacheWidth,
             cacheManager: CoverCacheManager.instance,
             placeholder: (_, _) => Container(color: colorScheme.surface),
             errorWidget: (_, _, _) => Container(color: colorScheme.surface),

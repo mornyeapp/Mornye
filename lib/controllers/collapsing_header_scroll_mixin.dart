@@ -13,11 +13,18 @@ double collectionHeaderExpandedHeight(BuildContext context) {
 mixin CollapsingHeaderScrollMixin<T extends StatefulWidget> on State<T> {
   final ScrollController scrollController = ScrollController();
   final ValueNotifier<bool> showTitleNotifier = ValueNotifier(false);
+  double? _cachedExpandedHeight;
 
   @override
   void initState() {
     super.initState();
     scrollController.addListener(_onHeaderScroll);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _cachedExpandedHeight = calculateExpandedHeight(context);
   }
 
   @override
@@ -32,7 +39,8 @@ mixin CollapsingHeaderScrollMixin<T extends StatefulWidget> on State<T> {
       collectionHeaderExpandedHeight(context);
 
   void _onHeaderScroll() {
-    final expandedHeight = calculateExpandedHeight(context);
+    final expandedHeight =
+        _cachedExpandedHeight ?? calculateExpandedHeight(context);
     showTitleNotifier.value =
         scrollController.offset > (expandedHeight - kToolbarHeight - 20);
   }

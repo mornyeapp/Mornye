@@ -317,6 +317,9 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         motionUrl != null &&
         motionUrl.trim().isNotEmpty &&
         Uri.tryParse(motionUrl)?.hasAuthority == true;
+    final bgCacheWidth = !context.isMornye && !hasMotion
+        ? metadataBackdropCacheExtent(context)
+        : cacheWidth;
     Widget playlistPlaceholder({double? size}) {
       return Container(
         color: colorScheme.surfaceContainerHighest,
@@ -332,7 +335,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ? CachedCoverImage(
             imageUrl: highResCoverUrl(_coverUrl) ?? _coverUrl!,
             fit: BoxFit.cover,
-            memCacheWidth: cacheWidth,
+            memCacheWidth: bgCacheWidth,
             placeholder: (_, _) => Container(color: colorScheme.surface),
             errorWidget: (_, _, _) => Container(color: colorScheme.surface),
           )
@@ -500,7 +503,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
           final isInHistory = existingHistoryKeys.contains(historyKeys[index]);
           // Material joins the rows into one connected list.
           return TrackCardSegment.at(
-            key: ValueKey(track.id),
+            key: ValueKey(selectionId),
             index: index,
             count: _tracks.length,
             child: slideSelectRow(

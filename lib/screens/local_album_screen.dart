@@ -409,10 +409,13 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
         : null;
 
     final cacheWidth = coverCacheWidthForViewport(context);
+    final bgCacheWidth = !context.isMornye
+        ? metadataBackdropCacheExtent(context)
+        : cacheWidth;
     final Widget background = coverPath != null
         ? LocalOrNetworkCoverImage(
             url: coverPath,
-            localCacheWidth: cacheWidth,
+            localCacheWidth: bgCacheWidth,
             placeholder: (_) => Container(color: colorScheme.surface),
           )
         : Container(
@@ -972,6 +975,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
   ) {
     final allSelected =
         selectedIds.length == tracks.length && tracks.isNotEmpty;
+    final selectedUnified = _selectedUnifiedItems(tracks);
 
     return LibraryTrackSelectionBar(
       selectedCount: selectedIds.length,
@@ -983,7 +987,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
       bottomPadding: bottomPadding,
       albumDelete: true,
       playbackActions: LibrarySelectionPlaybackActions(
-        items: _selectedUnifiedItems(tracks),
+        items: selectedUnified,
         onClose: exitSelectionMode,
       ),
       flacEligibleCount: _selectedFlacEligibleItems(tracks).length,
@@ -992,12 +996,12 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
       onConvert: () => showBatchConvertSheet(
         context,
         ref,
-        _selectedUnifiedItems(tracks),
+        selectedUnified,
         onExitSelectionMode: exitSelectionMode,
       ),
       onReplayGain: ({required remove}) => runBatchReplayGain(
         context,
-        _selectedUnifiedItems(tracks),
+        selectedUnified,
         onExitSelectionMode: exitSelectionMode,
         remove: remove,
       ),

@@ -655,40 +655,74 @@ class MornyeActionCapsule extends ConsumerWidget {
   }
 }
 
-class _AlbumStretchArtwork extends StatelessWidget {
+class _AlbumStretchArtwork extends StatefulWidget {
   const _AlbumStretchArtwork({required this.child});
 
   final Widget child;
 
   @override
+  State<_AlbumStretchArtwork> createState() => _AlbumStretchArtworkState();
+}
+
+class _AlbumStretchArtworkState extends State<_AlbumStretchArtwork> {
+  final GlobalKey _artworkKey = GlobalKey();
+  ScrollPosition? _position;
+  double _overscroll = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = MediaQuery.disableAnimationsOf(context)
+        ? null
+        : Scrollable.maybeOf(context)?.position;
+    if (next == _position) return;
+    _position?.removeListener(_onScroll);
+    _position = next;
+    _position?.addListener(_onScroll);
+    _overscroll = _readOverscroll();
+  }
+
+  double _readOverscroll() {
+    final position = _position;
+    if (position == null || !position.hasContentDimensions) return 0;
+    return (position.minScrollExtent - position.pixels).clamp(
+      0.0,
+      double.infinity,
+    );
+  }
+
+  void _onScroll() {
+    final next = _readOverscroll();
+    if (next != _overscroll && mounted) {
+      setState(() => _overscroll = next);
+    }
+  }
+
+  @override
+  void dispose() {
+    _position?.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) return child;
-    final position = Scrollable.of(context).position;
+    final artwork = RepaintBoundary(key: _artworkKey, child: widget.child);
+    if (_position == null || _overscroll <= 0) return artwork;
     return LayoutBuilder(
-      builder: (context, constraints) => AnimatedBuilder(
-        animation: position,
-        child: RepaintBoundary(child: child),
-        builder: (context, artwork) {
-          final overscroll = position.hasContentDimensions
-              ? (position.minScrollExtent - position.pixels).clamp(
-                  0.0,
-                  double.infinity,
-                )
-              : 0.0;
-          final height = constraints.maxHeight;
-          final scale = height > 0 ? 1 + overscroll / height : 1.0;
-          // The viewport moves the details down during a pull. Keep the image
-          // at the top and enlarge it without changing the scrollable layout.
-          return Transform.translate(
-            offset: Offset(0, -overscroll),
-            child: Transform.scale(
-              scale: scale,
-              alignment: Alignment.topCenter,
-              child: artwork,
-            ),
-          );
-        },
-      ),
+      builder: (context, constraints) {
+        final height = constraints.maxHeight;
+        final scale = height > 0 ? 1 + _overscroll / height : 1.0;
+        // The viewport moves the details down during a pull. Keep the image
+        // at the top and enlarge it without changing the scrollable layout.
+        return Transform.translate(
+          offset: Offset(0, -_overscroll),
+          child: Transform.scale(
+            scale: scale,
+            alignment: Alignment.topCenter,
+            child: artwork,
+          ),
+        );
+      },
     );
   }
 }
