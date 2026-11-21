@@ -272,7 +272,7 @@ class PlayerLyricsSection extends ConsumerWidget {
           lyrics.plainText,
           textDirection: first ?? ambientDirection,
           style: style,
-          textAlign: TextAlign.center,
+          textAlign: TextAlign.start,
         );
       }
       return Column(
@@ -283,7 +283,7 @@ class PlayerLyricsSection extends ConsumerWidget {
               line,
               textDirection: directions.text[index] ?? ambientDirection,
               style: style,
-              textAlign: TextAlign.center,
+              textAlign: TextAlign.start,
             ),
         ],
       );
@@ -305,7 +305,7 @@ class PlayerLyricsSection extends ConsumerWidget {
                   line.text,
                   textDirection: directions.lines[index] ?? ambientDirection,
                   style: style,
-                  textAlign: TextAlign.center,
+                  textAlign: TextAlign.start,
                 ),
                 for (final supplement in [
                   shown(line.romanization, visibility.$1),
@@ -319,7 +319,7 @@ class PlayerLyricsSection extends ConsumerWidget {
                           directions.lines[index] ??
                           ambientDirection,
                       style: supplementStyle,
-                      textAlign: TextAlign.center,
+                      textAlign: TextAlign.start,
                     ),
               ],
             ),
