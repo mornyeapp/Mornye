@@ -230,6 +230,8 @@ void main() {
           final key = widget.key;
           return key is ValueKey<String> &&
               key.value.startsWith('settings-category:') &&
+              // The profile page spins until its overview has loaded.
+              key.value != 'settings-category:profile' &&
               key.value != 'settings-category:Appearance';
         }).first;
         await tester.tap(other);
