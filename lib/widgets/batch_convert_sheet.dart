@@ -242,7 +242,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                     decoration: context.isMornye
                         ? null
                         : BoxDecoration(
-                            color: cs.primaryContainer.withValues(alpha: 0.4),
+                            color: cs.primaryContainer,
                             borderRadius: BorderRadius.circular(14),
                           ),
                     child: Row(
@@ -252,7 +252,9 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                               ? CupertinoIcons.checkmark_seal
                               : Icons.verified,
                           size: 18,
-                          color: cs.primary,
+                          color: context.isMornye
+                              ? cs.primary
+                              : cs.onPrimaryContainer,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -273,9 +275,12 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                                               labels.originalQuality,
                                         ),
                                       ),
-                            style: Theme.of(
-                              context,
-                            ).textTheme.bodySmall?.copyWith(color: cs.primary),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: context.isMornye
+                                      ? cs.primary
+                                      : cs.onPrimaryContainer,
+                                ),
                           ),
                         ),
                       ],
@@ -284,6 +289,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
 
                 _card(
                   cs,
+                  showDivider: false,
                   child: AppSwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(context.l10n.trackConvertKeepOriginal),
@@ -317,9 +323,6 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                     icon: const Icon(Icons.swap_horiz),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
                     ),
                     label: Text(
                       widget.confirmLabelBuilder?.call(
@@ -438,7 +441,11 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
     );
   }
 
-  Widget _card(ColorScheme cs, {required Widget child}) {
+  Widget _card(
+    ColorScheme cs, {
+    required Widget child,
+    bool showDivider = true,
+  }) {
     if (context.isMornye) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 20),
@@ -446,8 +453,10 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             child,
-            const SizedBox(height: 20),
-            const Divider(height: 1),
+            if (showDivider) ...[
+              const SizedBox(height: 20),
+              const Divider(height: 1),
+            ],
           ],
         ),
       );

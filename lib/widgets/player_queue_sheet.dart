@@ -11,6 +11,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
+import 'package:mornye/widgets/now_playing_indicator.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_queue_artwork.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
@@ -260,13 +261,12 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
                   child: ListTile(
                     key: i == 0 ? _firstRowKey : null,
                     selected: isCurrent,
-                    selectedTileColor: colorScheme.secondaryContainer
-                        .withValues(alpha: 0.55),
-                    shape: expressive
-                        ? RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(_rowRadius),
-                          )
-                        : null,
+                    selectedTileColor: colorScheme.primaryContainer,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        isCurrent ? 28 : _rowRadius,
+                      ),
+                    ),
                     contentPadding: const EdgeInsetsDirectional.only(
                       start: 16,
                       end: 4,
@@ -283,11 +283,33 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
                       ),
                       child: SizedBox.square(
                         dimension: 44,
-                        child: PlayerQueueArtwork(
-                          item: item,
-                          colorScheme: colorScheme,
-                          cacheWidth: 132,
-                          iconSize: 22,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            PlayerQueueArtwork(
+                              item: item,
+                              colorScheme: colorScheme,
+                              cacheWidth: 132,
+                              iconSize: 22,
+                            ),
+                            if (isCurrent)
+                              ColoredBox(
+                                color: Colors.black.withValues(alpha: 0.45),
+                                child: Center(
+                                  // Rows build after the sheet's build, so
+                                  // the playing state is watched here.
+                                  child: Consumer(
+                                    builder: (context, ref, _) =>
+                                        NowPlayingIndicator(
+                                          color: Colors.white,
+                                          playing: ref.watch(
+                                            playbackPlayingProvider,
+                                          ),
+                                        ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
@@ -297,10 +319,10 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodyLarge?.copyWith(
                         fontWeight: isCurrent
-                            ? FontWeight.bold
+                            ? FontWeight.w600
                             : FontWeight.normal,
                         color: isCurrent
-                            ? colorScheme.primary
+                            ? colorScheme.onPrimaryContainer
                             : colorScheme.onSurface,
                       ),
                     ),
@@ -309,7 +331,9 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                        color: isCurrent
+                            ? colorScheme.onPrimaryContainer
+                            : colorScheme.onSurfaceVariant,
                       ),
                     ),
                     trailing: locked

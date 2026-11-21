@@ -800,6 +800,7 @@ class AlbumPlayActions extends StatelessWidget {
             HeaderCircleButton(
               icon: Icons.download_for_offline_outlined,
               tooltip: context.l10n.offlineSave,
+              tonal: true,
               onPressed: onDownload,
             ),
             const SizedBox(width: 12),
@@ -851,7 +852,7 @@ class AlbumPlayActions extends StatelessWidget {
           onPressed: onShuffle,
           icon: const AppIcon(Icons.shuffle),
           size: tokens.minTouchTarget,
-          backgroundColor: scheme.secondaryContainer.withValues(alpha: 0.8),
+          backgroundColor: scheme.secondaryContainer,
           foregroundColor: scheme.onSecondaryContainer,
         ),
       ],
@@ -872,6 +873,7 @@ class AlbumPlayActions extends StatelessWidget {
             HeaderCircleButton(
               icon: Icons.download_for_offline_outlined,
               tooltip: context.l10n.offlineSave,
+              tonal: true,
               onPressed: onDownload,
             ),
           HeaderCircleButton(

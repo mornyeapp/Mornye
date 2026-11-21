@@ -130,10 +130,7 @@ class _HiResCheckCardState extends State<HiResCheckCard> {
     return AppContentCard(
       elevation: 0,
       color: settingsGroupColor(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: EdgeInsets.all(mornye ? 20 : 16),
         child: Column(
@@ -144,20 +141,17 @@ class _HiResCheckCardState extends State<HiResCheckCard> {
                 Expanded(
                   child: Text(
                     l10n.hiResCheckTitle,
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: cs.onSurface,
                       fontWeight: FontWeight.w600,
-                      fontSize: 17,
                     ),
                   ),
                 ),
                 if (_checking)
-                  SizedBox(
+                  const SizedBox(
                     width: 20,
                     height: 20,
-                    child: mornye
-                        ? const CupertinoActivityIndicator()
-                        : const AppLoadingIndicator(size: 20, strokeWidth: 2.5),
+                    child: AppLoadingIndicator(size: 20, strokeWidth: 2.5),
                   )
                 else if (mornye && (result != null || _error != null)) ...[
                   if (onShare != null)

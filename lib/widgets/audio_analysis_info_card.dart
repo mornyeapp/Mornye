@@ -17,10 +17,7 @@ class _AudioInfoCard extends StatelessWidget {
     return AppContentCard(
       elevation: 0,
       color: settingsGroupColor(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

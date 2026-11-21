@@ -551,24 +551,23 @@ extension _QueueTabItemWidgets on _QueueTabState {
               onPressed: () => ref
                   .read(downloadQueueProvider.notifier)
                   .downloadNext(item.id),
-              icon: Icon(Icons.skip_next, color: colorScheme.primary),
+              icon: Icon(
+                Icons.skip_next,
+                color: colorScheme.onPrimaryContainer,
+              ),
               tooltip: context.l10n.queueDownloadNext,
               style: IconButton.styleFrom(
-                backgroundColor: colorScheme.primaryContainer.withValues(
-                  alpha: 0.3,
-                ),
+                backgroundColor: colorScheme.primaryContainer,
               ),
             ),
             const SizedBox(width: 4),
             AppIconButton(
               onPressed: () =>
                   ref.read(downloadQueueProvider.notifier).cancelItem(item.id),
-              icon: Icon(Icons.close, color: colorScheme.error),
+              icon: Icon(Icons.close, color: colorScheme.onErrorContainer),
               tooltip: context.l10n.dialogCancel,
               style: IconButton.styleFrom(
-                backgroundColor: colorScheme.errorContainer.withValues(
-                  alpha: 0.3,
-                ),
+                backgroundColor: colorScheme.errorContainer,
               ),
             ),
           ],
@@ -577,10 +576,10 @@ extension _QueueTabItemWidgets on _QueueTabState {
         return AppIconButton(
           onPressed: () =>
               ref.read(downloadQueueProvider.notifier).cancelItem(item.id),
-          icon: Icon(Icons.stop, color: colorScheme.error),
+          icon: Icon(Icons.stop, color: colorScheme.onErrorContainer),
           tooltip: context.l10n.actionStop,
           style: IconButton.styleFrom(
-            backgroundColor: colorScheme.errorContainer.withValues(alpha: 0.3),
+            backgroundColor: colorScheme.errorContainer,
           ),
         );
       case DownloadStatus.finalizing:
@@ -676,15 +675,13 @@ extension _QueueTabItemWidgets on _QueueTabState {
                         .retryItem(item.id),
               icon: Icon(
                 requiresFolderReselection ? Icons.folder_open : Icons.refresh,
-                color: colorScheme.primary,
+                color: colorScheme.onPrimaryContainer,
               ),
               tooltip: requiresFolderReselection
                   ? context.l10n.downloadFolderReselect
                   : context.l10n.dialogRetry,
               style: IconButton.styleFrom(
-                backgroundColor: colorScheme.primaryContainer.withValues(
-                  alpha: 0.3,
-                ),
+                backgroundColor: colorScheme.primaryContainer,
               ),
             ),
             const SizedBox(width: 4),
@@ -694,15 +691,13 @@ extension _QueueTabItemWidgets on _QueueTabState {
               icon: Icon(
                 Icons.close,
                 color: item.status == DownloadStatus.failed
-                    ? colorScheme.error
+                    ? colorScheme.onErrorContainer
                     : colorScheme.onSurfaceVariant,
               ),
               tooltip: context.l10n.dialogRemove,
               style: item.status == DownloadStatus.failed
                   ? IconButton.styleFrom(
-                      backgroundColor: colorScheme.errorContainer.withValues(
-                        alpha: 0.3,
-                      ),
+                      backgroundColor: colorScheme.errorContainer,
                     )
                   : null,
             ),
@@ -1612,7 +1607,7 @@ class _LibraryPlaybackButton extends ConsumerWidget {
         minimumSize: Size.square(context.tokens.minTouchTarget),
         backgroundColor: material
             ? colorScheme.secondaryContainer
-            : colorScheme.primaryContainer.withValues(alpha: 0.3),
+            : colorScheme.primaryContainer,
       ),
     );
   }
@@ -1675,15 +1670,23 @@ class _LocalCoverFadeState extends State<_LocalCoverFade> {
   @override
   Widget build(BuildContext context) {
     final keyedChild = KeyedSubtree(key: _childKey, child: widget.child);
-    if (_settled && widget.loaded) return keyedChild;
+    if (widget.loaded &&
+        (_settled || MediaQuery.disableAnimationsOf(context))) {
+      _settled = true;
+      return keyedChild;
+    }
+    final motion = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 180), Curves.easeOutCubic),
+    );
     return Stack(
       fit: StackFit.expand,
       children: [
         widget.backdrop,
         AnimatedOpacity(
           opacity: widget.loaded ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
+          duration: motion.duration,
+          curve: motion.curve,
           onEnd: () {
             if (mounted && widget.loaded && !_settled) {
               setState(() => _settled = true);

@@ -473,9 +473,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
                             onPressed: () => Navigator.pop(context),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
                             ),
                             child: Text(context.l10n.dialogCancel),
                           ),
@@ -508,9 +505,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
                           }),
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
                           ),
                         ),
                       ),
@@ -527,9 +521,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
                                 style: TextButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
                                 child: Text(
@@ -551,9 +542,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
                                 style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
                                 child: Text(context.l10n.updateLater),
