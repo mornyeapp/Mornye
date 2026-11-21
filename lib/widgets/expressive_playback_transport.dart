@@ -166,12 +166,13 @@ class _ExpressivePlaybackTransportState
             onPressed: widget.onNext,
           ),
         ];
+        final motion = pressMotion;
         // Spring only the press proportions. Resizing follows the parent
         // directly instead of restarting a width spring on every frame.
         return TweenAnimationBuilder<_SlotWidths>(
           tween: _SlotWidthsTween(end: (factors[0], factors[1], factors[2])),
-          duration: pressSpring.duration,
-          curve: pressSpring,
+          duration: motion.duration,
+          curve: motion.curve,
           builder: (context, slots, _) {
             var previous = widths[0] * slots.$1;
             var play = widths[1] * slots.$2;

@@ -513,12 +513,13 @@ class _PlayerPlaybackModeToolbarState extends State<PlayerPlaybackModeToolbar>
           ? _segmentWidth
           : _segmentWidth *
                 (pressed == index ? 1 + squishRatio : 1 - squishRatio);
+      final motion = pressMotion;
       return pressSlot(
         index,
         TweenAnimationBuilder<double>(
           tween: Tween(end: width),
-          duration: pressSpring.duration,
-          curve: pressSpring,
+          duration: motion.duration,
+          curve: motion.curve,
           builder: (context, width, segment) =>
               SizedBox(width: width, height: height, child: segment),
           child: _PlaybackModeSegment(

@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:material_3_expressive/components/sliders/components/m3e_slider_track_painter.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/widgets/decorative_phase.dart';
 
 /// Expressive track motion around the native slider's seeking and accessibility.
@@ -28,14 +29,18 @@ class _ExpressiveSeekTrackState extends State<ExpressiveSeekTrack>
   late final _amplitude =
       AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 250),
       )..addStatusListener((status) {
         if (status == AnimationStatus.dismissed) _phase.stop();
       });
+  late final _amplitudeCurve = CurvedAnimation(
+    parent: _amplitude,
+    curve: Curves.easeInOutCubic,
+  );
   late final _animation = Listenable.merge([_phase, _amplitude]);
   late final _trackShape = ExpressiveSeekTrackShape(
     phase: _phase,
-    amplitude: _amplitude,
+    amplitude: _amplitudeCurve,
   );
   bool _motionEnabled = false;
 
@@ -45,6 +50,13 @@ class _ExpressiveSeekTrackState extends State<ExpressiveSeekTrack>
     _motionEnabled =
         !MediaQuery.disableAnimationsOf(context) &&
         TickerMode.valuesOf(context).enabled;
+    final motion = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 250), Curves.easeInOutCubic),
+    );
+    _amplitude.duration = motion.duration;
+    _amplitudeCurve.curve = motion.curve;
+    _amplitudeCurve.reverseCurve = motion.leaving;
     _syncAnimation();
   }
 
@@ -69,6 +81,7 @@ class _ExpressiveSeekTrackState extends State<ExpressiveSeekTrack>
 
   @override
   void dispose() {
+    _amplitudeCurve.dispose();
     _amplitude.dispose();
     _phase.dispose();
     super.dispose();
@@ -147,7 +160,7 @@ class ExpressiveSeekTrackShape extends RoundedRectSliderTrackShape {
   final Animation<double> _amplitude;
 
   double get phase => _phase.value * 2 * math.pi;
-  double get amplitude => Curves.easeInOutCubic.transform(_amplitude.value);
+  double get amplitude => _amplitude.value;
 
   @override
   void paint(

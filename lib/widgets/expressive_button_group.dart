@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
-import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 
@@ -52,12 +51,15 @@ class ExpressiveButtonGroupSlot extends InheritedWidget {
 }
 
 /// Tracks which slot of an expressive group is pressed, so it can widen by
-/// [squishRatio] on [pressSpring] while its neighbours give way.
+/// [squishRatio] on [pressMotion] while its neighbours give way.
 mixin ExpressivePressSquish<T extends StatefulWidget> on State<T> {
-  static final _pressSpring = SpringCurve(M3EMotion.expressiveSpatialPress);
+  static const _still = AppMotionSpec(Duration.zero, Curves.linear);
 
   double get squishRatio => 0.15;
-  SpringCurve get pressSpring => _pressSpring;
+
+  /// M3 Expressive fast spatial spring, paced by [MotionPace].
+  AppMotionSpec get pressMotion => AppMotion.spatialFast(context, _still);
+
   int? pressedIndex;
 
   Widget pressSlot(int index, Widget child) => Listener(
@@ -98,6 +100,7 @@ class _ExpressiveButtonGroupState extends State<ExpressiveButtonGroup>
     final pressed = pressedIndex;
     final neighbour = pressed != null && (index - pressed).abs() == 1;
     final child = pressSlot(index, widget.children[index]);
+    final motion = pressMotion;
     if (widget.flexible.contains(index)) {
       // A flexible action grows into whatever its fixed neighbours yield; it
       // only trades weight with another flexible action.
@@ -108,8 +111,8 @@ class _ExpressiveButtonGroupState extends State<ExpressiveButtonGroup>
           : 1.0;
       return TweenAnimationBuilder<double>(
         tween: Tween(end: weight),
-        duration: pressSpring.duration,
-        curve: pressSpring,
+        duration: motion.duration,
+        curve: motion.curve,
         builder: (context, weight, child) =>
             Expanded(flex: math.max(1, (weight * 1000).round()), child: child!),
         child: child,
@@ -124,8 +127,8 @@ class _ExpressiveButtonGroupState extends State<ExpressiveButtonGroup>
             : 1.0);
     return TweenAnimationBuilder<double>(
       tween: Tween(end: width),
-      duration: pressSpring.duration,
-      curve: pressSpring,
+      duration: motion.duration,
+      curve: motion.curve,
       builder: (context, width, child) {
         final slot = math.max(0.0, width);
         return SizedBox(
