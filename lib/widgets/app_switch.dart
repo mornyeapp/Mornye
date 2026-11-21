@@ -36,9 +36,7 @@ class AppSwitch extends StatelessWidget {
       );
     }
     if (!context.isMornye) {
-      return adaptive
-          ? Switch.adaptive(value: value, onChanged: onChanged)
-          : Switch(value: value, onChanged: onChanged);
+      return Switch(value: value, onChanged: onChanged);
     }
 
     return _MornyeSwitch(
@@ -268,21 +266,13 @@ class AppSwitchListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!context.isMornye && !materialExpressiveEnabled(context)) {
-      return adaptive
-          ? SwitchListTile.adaptive(
-              value: value,
-              onChanged: onChanged,
-              title: title,
-              subtitle: subtitle,
-              contentPadding: contentPadding,
-            )
-          : SwitchListTile(
-              value: value,
-              onChanged: onChanged,
-              title: title,
-              subtitle: subtitle,
-              contentPadding: contentPadding,
-            );
+      return SwitchListTile(
+        value: value,
+        onChanged: onChanged,
+        title: title,
+        subtitle: subtitle,
+        contentPadding: contentPadding,
+      );
     }
     return MergeSemantics(
       child: ListTile(

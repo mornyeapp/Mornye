@@ -1,4 +1,3 @@
-import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/unified_library_item.dart';
@@ -343,14 +342,10 @@ class _HiResBatchCheckState extends State<HiResBatchCheck> {
         statusColor = cs.error;
       }
     } else if (reading) {
-      leading = SizedBox(
+      leading = const SizedBox(
         width: 24,
         height: 24,
-        child: Center(
-          child: context.isMornye
-              ? const CupertinoActivityIndicator()
-              : const AppLoadingIndicator(size: 20, strokeWidth: 2.5),
-        ),
+        child: Center(child: AppLoadingIndicator(size: 20, strokeWidth: 2.5)),
       );
       status = l10n.hiResBatchReading;
     } else if (waiting) {

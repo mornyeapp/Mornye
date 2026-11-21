@@ -5,6 +5,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 
@@ -52,6 +53,7 @@ Future<T?> showMornyeContextMenu<T>({
               anchor: target,
               preferAbove: preferAbove,
               maxWidth: maxWidth,
+              textDirection: Directionality.of(context),
               padding: media.padding.copyWith(
                 bottom: math.max(media.padding.bottom, media.viewInsets.bottom),
               ),
@@ -446,12 +448,14 @@ class _MenuLayout extends SingleChildLayoutDelegate {
     required this.padding,
     required this.preferAbove,
     required this.maxWidth,
+    required this.textDirection,
   });
 
   final Rect? anchor;
   final EdgeInsets padding;
   final bool preferAbove;
   final double maxWidth;
+  final TextDirection textDirection;
   static const double _margin = 16;
 
   @override
@@ -483,6 +487,8 @@ class _MenuLayout extends SingleChildLayoutDelegate {
     );
     final x = anchor == null
         ? (size.width - childSize.width) / 2
+        : textDirection == TextDirection.rtl
+        ? anchor!.left
         : anchor!.right - childSize.width;
     var y = size.height * 0.18;
     if (anchor != null) {
@@ -510,7 +516,8 @@ class _MenuLayout extends SingleChildLayoutDelegate {
       anchor != oldDelegate.anchor ||
       padding != oldDelegate.padding ||
       maxWidth != oldDelegate.maxWidth ||
-      preferAbove != oldDelegate.preferAbove;
+      preferAbove != oldDelegate.preferAbove ||
+      textDirection != oldDelegate.textDirection;
 }
 
 /// The material and rows stay mounted while the route moves the menu.
@@ -666,14 +673,23 @@ class MornyeContextMenu extends StatelessWidget {
     MornyeMenuAction action, {
     bool compact = false,
   }) {
+    final destructiveColor = theme.brightness == Brightness.dark
+        ? CupertinoColors.systemRed.darkColor
+        : CupertinoColors.systemRed.highContrastColor;
     final color = action.onPressed == null
         ? theme.colorScheme.onSurfaceVariant
-        : action.destructive || action.selected
+        : action.destructive
+        ? destructiveColor
+        : action.selected
         ? theme.colorScheme.primary
         : theme.colorScheme.onSurface;
     final icon = action.icon == null
         ? null
-        : Icon(action.icon, size: compact ? 24 : 22, color: color);
+        : Icon(
+            mornyeIconFor(action.icon!),
+            size: compact ? 24 : 22,
+            color: color,
+          );
     final label = Text(
       action.label,
       textAlign: compact ? TextAlign.center : TextAlign.start,

@@ -20,6 +20,7 @@ import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/app_menu_button.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/lyrics_editor_sheet.dart';
@@ -290,7 +291,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
                 ),
               )
             : language
-            ? const AppIcon(Icons.translate_rounded)
+            ? const AppIcon.adaptive(Icons.translate_rounded)
             : const AppIcon.adaptive(Icons.tune_rounded),
         style: IconButton.styleFrom(
           foregroundColor: foreground,
@@ -430,46 +431,41 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
         if (painter.width + 80 > menuWidth) menuWidth = painter.width + 80;
         painter.dispose();
       }
-      action = context.isMornye
-          ? await showMornyeContextMenu<String>(
-              context: buttonContext,
-              anchor: anchor,
-              preferAbove: true,
-              maxWidth: menuWidth,
-              builder: (menuContext) => MornyeContextMenu(
-                dense: true,
-                groups: [
-                  [
-                    for (final (value, label, icon) in actions)
-                      MornyeMenuAction(
-                        icon: icon,
-                        label: label,
-                        onPressed: () => Navigator.of(menuContext).pop(value),
-                      ),
-                  ],
-                ],
-              ),
-            )
-          : await showMenu<String>(
-              context: buttonContext,
-              position: RelativeRect.fromRect(
-                anchor ?? Rect.zero,
-                Offset.zero & MediaQuery.sizeOf(context),
-              ),
-              items: [
+      if (context.isMornye) {
+        action = await showMornyeContextMenu<String>(
+          context: buttonContext,
+          anchor: anchor,
+          preferAbove: true,
+          maxWidth: menuWidth,
+          builder: (menuContext) => MornyeContextMenu(
+            dense: true,
+            groups: [
+              [
                 for (final (value, label, icon) in actions)
-                  PopupMenuItem(
-                    value: value,
-                    child: Row(
-                      children: [
-                        AppIcon(icon),
-                        const SizedBox(width: 12),
-                        Flexible(child: Text(label)),
-                      ],
-                    ),
+                  MornyeMenuAction(
+                    icon: icon,
+                    label: label,
+                    onPressed: () => Navigator.of(menuContext).pop(value),
                   ),
               ],
-            );
+            ],
+          ),
+        );
+      } else {
+        action = await showAppMenuPopup<String>(
+          context: buttonContext,
+          preferAbove: true,
+          fallbackAnchor: anchor,
+          items: [
+            for (final (value, label, icon) in actions)
+              AppMenuItem(
+                value: value,
+                label: label,
+                leading: AppIcon(icon, size: 20),
+              ),
+          ],
+        );
+      }
       if (!mounted) return;
       final notifier = ref.read(settingsProvider.notifier);
       switch (action) {

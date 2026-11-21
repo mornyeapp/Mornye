@@ -532,25 +532,30 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Text(
-                  formatClock(active ? position.inSeconds : 0),
-                  style: timeStyle,
-                ),
-                Expanded(
-                  child: PlaybackSeekSlider(
-                    key: ValueKey(widget.item.id),
-                    position: active ? position : Duration.zero,
-                    duration: active ? duration : Duration.zero,
-                    onSeek: (position) async {
-                      if (_editingCurrentTrack) await controller.seek(position);
-                    },
-                    playing: playing,
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: Row(
+                children: [
+                  Text(
+                    formatClock(active ? position.inSeconds : 0),
+                    style: timeStyle,
                   ),
-                ),
-                Text(formatClock(duration.inSeconds), style: timeStyle),
-              ],
+                  Expanded(
+                    child: PlaybackSeekSlider(
+                      key: ValueKey(widget.item.id),
+                      position: active ? position : Duration.zero,
+                      duration: active ? duration : Duration.zero,
+                      onSeek: (position) async {
+                        if (_editingCurrentTrack) {
+                          await controller.seek(position);
+                        }
+                      },
+                      playing: playing,
+                    ),
+                  ),
+                  Text(formatClock(duration.inSeconds), style: timeStyle),
+                ],
+              ),
             ),
             const SizedBox(height: 4),
             if (mornye)
@@ -592,12 +597,10 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
                   icon: _saving
                       ? SizedBox.square(
                           dimension: 18,
-                          child: mornye
-                              ? const CupertinoActivityIndicator()
-                              : AppLoadingIndicator(
-                                  size: 18,
-                                  color: scheme.onPrimary,
-                                ),
+                          child: AppLoadingIndicator(
+                            size: 18,
+                            color: scheme.onPrimary,
+                          ),
                         )
                       : const AppIcon(Icons.check),
                   label: Text(l10n.dialogSave),

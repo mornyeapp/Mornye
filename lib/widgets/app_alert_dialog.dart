@@ -83,6 +83,7 @@ Future<bool> showAppConfirmDialog(
               : filled
               ? FilledButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
                 )
               : TextButton.styleFrom(
                   foregroundColor: Theme.of(context).colorScheme.error,
@@ -408,14 +409,20 @@ class AppDialogAction extends StatelessWidget {
     if (context.isMornye) {
       final theme = Theme.of(context);
       final scheme = theme.colorScheme;
+      final destructiveColor = theme.brightness == Brightness.dark
+          ? CupertinoColors.systemRed.darkColor
+          : CupertinoColors.systemRed.highContrastColor;
+      final emphasized = filled && !isDestructive && onPressed != null;
       final color = onPressed == null
           ? scheme.onSurfaceVariant
           : isDestructive
-          ? scheme.primary
+          ? destructiveColor
+          : emphasized
+          ? scheme.onPrimary
           : scheme.onSurface;
       return CupertinoButton(
         onPressed: onPressed,
-        color: MornyeTheme.controlFill(context),
+        color: emphasized ? scheme.primary : MornyeTheme.controlFill(context),
         disabledColor: MornyeTheme.controlFill(context, enabled: false),
         borderRadius: BorderRadius.circular(28),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -435,9 +442,25 @@ class AppDialogAction extends StatelessWidget {
         ),
       );
     }
+    final scheme = Theme.of(context).colorScheme;
+    final resolvedStyle =
+        style ??
+        (!isDestructive
+            ? null
+            : filled
+            ? FilledButton.styleFrom(
+                backgroundColor: scheme.error,
+                foregroundColor: scheme.onError,
+              )
+            : outlined
+            ? OutlinedButton.styleFrom(
+                foregroundColor: scheme.error,
+                side: BorderSide(color: scheme.error),
+              )
+            : TextButton.styleFrom(foregroundColor: scheme.error));
     return ExpressiveButton(
       onPressed: onPressed,
-      style: style,
+      style: resolvedStyle,
       outlined: !filled && outlined,
       text: !filled && !outlined,
       child: child,

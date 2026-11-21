@@ -33,27 +33,47 @@ class AppActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     if (!context.isMornye) {
+      final resolvedStyle =
+          style ??
+          (!isDestructive
+              ? null
+              : outlined
+              ? OutlinedButton.styleFrom(
+                  foregroundColor: scheme.error,
+                  side: BorderSide(color: scheme.error),
+                )
+              : FilledButton.styleFrom(
+                  backgroundColor: scheme.error,
+                  foregroundColor: scheme.onError,
+                ));
       return ExpressiveButton(
         onPressed: onPressed,
         icon: icon,
-        style: style,
+        style: resolvedStyle,
         outlined: outlined,
-        tonal: tonal,
+        tonal: tonal && !isDestructive,
         child: label,
       );
     }
-    final scheme = Theme.of(context).colorScheme;
+    final destructiveColor = Theme.of(context).brightness == Brightness.dark
+        ? CupertinoColors.systemRed.darkColor
+        : CupertinoColors.systemRed.highContrastColor;
     final prominent = isDestructive || !outlined;
     final foreground = onPressed == null
         ? scheme.onSurfaceVariant.withValues(alpha: 0.5)
+        : isDestructive
+        ? Colors.white
         : prominent
         ? scheme.onPrimary
         : scheme.primary;
     final action = CupertinoButton(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       borderRadius: BorderRadius.circular(28),
-      color: prominent
+      color: isDestructive
+          ? destructiveColor
+          : prominent
           ? scheme.primary
           : tonal
           ? MornyeTheme.controlFill(context)

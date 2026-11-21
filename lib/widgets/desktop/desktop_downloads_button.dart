@@ -9,6 +9,8 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
+import 'package:mornye/widgets/expressive_button.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 
 /// How many of [items] are active and their overall progress: waiting items
@@ -82,17 +84,24 @@ class _DesktopDownloadsButtonState
       style: MenuStyle(
         padding: const WidgetStatePropertyAll(EdgeInsets.zero),
         backgroundColor: WidgetStatePropertyAll(
-          mornye
-              ? colorScheme.surfaceContainerHigh
-              : colorScheme.surfaceContainer,
+          mornye ? Colors.transparent : colorScheme.surfaceContainer,
         ),
+        elevation: mornye ? const WidgetStatePropertyAll(0) : null,
+        shadowColor: mornye
+            ? const WidgetStatePropertyAll(Colors.transparent)
+            : null,
         shape: WidgetStatePropertyAll(
           RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(mornye ? 14 : 16),
           ),
         ),
       ),
-      menuChildren: [_popover],
+      menuChildren: [
+        if (mornye)
+          MornyeGlassPanel.overlay(radius: 14, child: _popover)
+        else
+          _popover,
+      ],
       child: Semantics(
         value: idle ? null : '$count',
         child: AppIconButton(
@@ -206,8 +215,9 @@ class DesktopDownloadsPopover extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: TextButton(
+              child: ExpressiveButton(
                 key: const ValueKey('desktop-downloads-show-all'),
+                text: true,
                 onPressed: onShowAll,
                 child: Text(l10n.desktopDownloadsShowAll),
               ),

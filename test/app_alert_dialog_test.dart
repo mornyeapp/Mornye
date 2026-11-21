@@ -156,7 +156,7 @@ void main() {
             DefaultTextStyle.of(
               tester.element(find.text('Remove')),
             ).style.color,
-            MornyeTheme.build(Brightness.dark).colorScheme.primary,
+            CupertinoColors.systemRed.darkColor,
           );
           expect(find.byType(CupertinoAlertDialog), findsNothing);
           expect(find.byType(FilledButton), findsNothing);

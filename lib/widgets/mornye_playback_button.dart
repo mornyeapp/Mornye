@@ -2,6 +2,7 @@ import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:flutter/physics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/widgets/app_loading_indicator.dart';
 
 /// How far the pointer press disc grows: from 32 to 38 on the capsule.
 const _pressDiscGrowth = 6 / 32;
@@ -235,10 +236,7 @@ class _MornyePlaybackButtonState extends State<MornyePlaybackButton>
                   switchOutCurve: crossfade.leaving,
                   child: widget.loading
                       ? const Center(
-                          child: SizedBox.square(
-                            dimension: 32,
-                            child: CircularProgressIndicator(strokeWidth: 3),
-                          ),
+                          child: AppLoadingIndicator(size: 32, strokeWidth: 3),
                         )
                       : KeyedSubtree(
                           key: ValueKey(widget.icon),

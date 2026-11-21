@@ -7,10 +7,13 @@ import 'package:material_3_expressive/material_3_expressive.dart'
         M3EButtonStyle;
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/material_expressive.dart';
+import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
 
 /// A switch between the views of a Library page, such as Albums | Singles:
-/// a connected button group, or a segmented button where the expressive
-/// components are off.
+/// a connected button group on Material, a Mornye segmented control on Mornye,
+/// or a segmented button where Material expressive components are off.
 class LibraryViewToggle extends StatelessWidget {
   const LibraryViewToggle({
     super.key,
@@ -25,6 +28,42 @@ class LibraryViewToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (context.isMornye) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final control = MornyeSegmentedControl(
+            labels: labels,
+            selectedIndex: selected,
+            onChanged: onChanged,
+            compact: isDesktopPlatform,
+          );
+          if (constraints.hasBoundedWidth) return control;
+          final textStyle = isDesktopPlatform
+              ? Theme.of(context).textTheme.bodyMedium
+              : Theme.of(context).textTheme.labelLarge;
+          final scaler = MediaQuery.textScalerOf(context);
+          var widest = 0.0;
+          for (final label in labels) {
+            final painter = TextPainter(
+              text: TextSpan(text: label, style: textStyle),
+              textDirection: Directionality.of(context),
+              textScaler: scaler,
+              maxLines: 1,
+            )..layout();
+            if (painter.width > widest) widest = painter.width;
+            painter.dispose();
+          }
+          final segmentWidth = (widest + (isDesktopPlatform ? 24 : 28)).clamp(
+            isDesktopPlatform ? 64.0 : 72.0,
+            180.0,
+          );
+          return SizedBox(
+            width: segmentWidth * labels.length + 8,
+            child: control,
+          );
+        },
+      );
+    }
     if (materialExpressiveEnabled(context)) {
       return MaterialExpressiveScope(
         skipAutofocus: true,

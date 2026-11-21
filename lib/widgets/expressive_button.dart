@@ -1,6 +1,9 @@
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoButton;
 import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
+import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/material_expressive.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
 
 /// Expressive actions retain caller colors, disabled states and flexible labels.
@@ -46,6 +49,9 @@ class ExpressiveButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final icon = this.icon == null ? null : symbolIconWidget(this.icon!);
     final style = _inThemeFont(context, this.style);
+    if (context.isMornye) {
+      return _buildMornye(context, icon: icon, style: style);
+    }
     if (!materialExpressiveEnabled(context)) {
       if (icon != null) {
         // Keep the standard icon spacing and asymmetric padding.
@@ -130,5 +136,113 @@ class ExpressiveButton extends StatelessWidget {
         child: content,
       ),
     );
+  }
+
+  Widget _buildMornye(
+    BuildContext context, {
+    required Widget? icon,
+    required ButtonStyle? style,
+  }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final states = <WidgetState>{if (onPressed == null) WidgetState.disabled};
+    final customBg = style?.backgroundColor?.resolve(states);
+    final customFg = style?.foregroundColor?.resolve(states);
+    final Color background;
+    final Color foreground;
+    if (text) {
+      background = customBg ?? Colors.transparent;
+      foreground =
+          customFg ??
+          (onPressed == null
+              ? scheme.onSurfaceVariant.withValues(alpha: 0.5)
+              : scheme.primary);
+    } else if (outlined) {
+      background = customBg ?? Colors.transparent;
+      foreground =
+          customFg ??
+          (onPressed == null
+              ? scheme.onSurfaceVariant.withValues(alpha: 0.5)
+              : scheme.primary);
+    } else if (tonal) {
+      background =
+          customBg ??
+          MornyeTheme.controlFill(context, enabled: onPressed != null);
+      foreground =
+          customFg ??
+          (onPressed == null
+              ? scheme.onSurfaceVariant.withValues(alpha: 0.5)
+              : scheme.onSurface);
+    } else {
+      background =
+          customBg ??
+          (onPressed == null
+              ? MornyeTheme.controlFill(context, enabled: false)
+              : scheme.primary);
+      foreground =
+          customFg ??
+          (onPressed == null
+              ? scheme.onSurfaceVariant.withValues(alpha: 0.5)
+              : scheme.onPrimary);
+    }
+    final radius = context.tokens.radiusControl;
+    final minSize = style?.minimumSize?.resolve(states);
+    final padding =
+        style?.padding?.resolve(states) ??
+        EdgeInsets.symmetric(
+          horizontal: text ? 12 : 18,
+          vertical: text ? 10 : 12,
+        );
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (icon != null) ...[icon, const SizedBox(width: 8)],
+        Flexible(child: child),
+      ],
+    );
+    Widget button = CupertinoButton(
+      onPressed: onPressed,
+      color: background == Colors.transparent ? null : background,
+      disabledColor: text || outlined
+          ? Colors.transparent
+          : MornyeTheme.controlFill(context, enabled: false),
+      padding: padding,
+      borderRadius: BorderRadius.circular(radius),
+      minimumSize: minSize == null || minSize == Size.zero
+          ? const Size(44, 44)
+          : minSize,
+      child: DefaultTextStyle(
+        style:
+            (style?.textStyle?.resolve(states) ?? theme.textTheme.labelLarge!)
+                .copyWith(color: foreground, fontWeight: FontWeight.w600),
+        child: IconTheme(
+          data: IconThemeData(color: foreground, size: 20),
+          child: row,
+        ),
+      ),
+    );
+    if (outlined) {
+      final side =
+          style?.side?.resolve(states) ??
+          BorderSide(color: scheme.outlineVariant);
+      button = DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.fromBorderSide(side),
+        ),
+        child: button,
+      );
+    }
+    if (minSize != null && (minSize.width > 0 || minSize.height > 0)) {
+      button = ConstrainedBox(
+        constraints: BoxConstraints(
+          minWidth: minSize.width,
+          minHeight: minSize.height,
+        ),
+        child: button,
+      );
+    }
+    return button;
   }
 }

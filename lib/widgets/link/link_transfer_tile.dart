@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:cupertino_ui/cupertino_ui.dart'
-    show CupertinoActivityIndicator, CupertinoButton, CupertinoIcons;
+    show CupertinoButton, CupertinoIcons;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +14,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/track_card.dart' show TrackCoverPlaceholder;
@@ -694,9 +695,7 @@ class _TransferSongRow extends StatelessWidget {
         dimension: glyph,
         child: fraction != null
             ? LinkTransferRing(value: fraction, strokeWidth: 2.5)
-            : mornye
-            ? const CupertinoActivityIndicator(radius: glyph / 2)
-            : const AppProgressIndicator.circular(strokeWidth: 2.5),
+            : const AppLoadingIndicator(size: glyph, strokeWidth: 2.5),
       ),
       LinkTransferEntryState.pending => null,
     };

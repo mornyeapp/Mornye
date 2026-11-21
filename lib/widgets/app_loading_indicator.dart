@@ -1,3 +1,4 @@
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoActivityIndicator;
 import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/material_expressive.dart';
@@ -17,7 +18,7 @@ class AppLoadingIndicator extends StatelessWidget {
   final Color? color;
   final String? semanticLabel;
 
-  /// Stroke of the Mornye circular indicator.
+  /// Stroke of the fallback circular indicator.
   final double strokeWidth;
 
   @override
@@ -38,12 +39,12 @@ class AppLoadingIndicator extends StatelessWidget {
                 ),
               ),
             )
-          : TickerMode(
-              enabled: animate,
-              child: CircularProgressIndicator(
+          : Semantics(
+              label: semanticLabel,
+              child: CupertinoActivityIndicator(
+                radius: (size / 2).clamp(5.0, 20.0),
                 color: color,
-                strokeWidth: strokeWidth,
-                semanticsLabel: semanticLabel,
+                animating: animate,
               ),
             ),
     );
