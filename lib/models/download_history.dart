@@ -1,3 +1,4 @@
+import 'package:mornye/utils/path_match_keys.dart';
 import 'package:mornye/utils/string_utils.dart';
 
 /// Another transfer published the same origin while this one was fetching.
@@ -297,6 +298,8 @@ class DownloadHistoryState {
   final Map<String, DownloadHistoryItem> _bySpotifyId;
   final Map<String, DownloadHistoryItem> _byIsrc;
   final Map<String, DownloadHistoryItem> _byTrackArtistKey;
+  Map<String, DownloadHistoryItem>? _byId;
+  Map<String, DownloadHistoryItem>? _byPathKey;
 
   DownloadHistoryState({
     this.items = const [],
@@ -325,7 +328,9 @@ class DownloadHistoryState {
   }) : _lookupItems = source._lookupItems,
        _bySpotifyId = source._bySpotifyId,
        _byIsrc = source._byIsrc,
-       _byTrackArtistKey = source._byTrackArtistKey;
+       _byTrackArtistKey = source._byTrackArtistKey,
+       _byId = source._byId,
+       _byPathKey = source._byPathKey;
 
   DownloadHistoryState._withPrependedLookup({
     required DownloadHistoryState source,
@@ -344,7 +349,55 @@ class DownloadHistoryState {
          source._byTrackArtistKey,
          trackArtistKey(item.trackName, item.artistName),
          item,
-       );
+       ),
+       _byId = source._byId == null
+           ? null
+           : _indexWithNewest(source._byId!, item.id, item),
+       _byPathKey = source._byPathKey == null
+           ? null
+           : _indexPathKeysWithNewest(source._byPathKey!, item);
+
+  static Map<String, DownloadHistoryItem> _indexPathKeysWithNewest(
+    Map<String, DownloadHistoryItem> index,
+    DownloadHistoryItem item,
+  ) {
+    final keys = buildPathMatchKeys(item.filePath);
+    if (keys.isEmpty) return index;
+    final next = Map<String, DownloadHistoryItem>.of(index);
+    for (final key in keys) {
+      next[key] = item;
+    }
+    return next;
+  }
+
+  DownloadHistoryItem? getById(String id) {
+    if (id.isEmpty) return null;
+    final byId = _byId ??= _indexRecentHistoryItems(
+      _lookupItems,
+      (item) => item.id,
+    );
+    return byId[id];
+  }
+
+  DownloadHistoryItem? getByFilePath(String filePath) {
+    final targetKeys = buildPathMatchKeys(filePath);
+    if (targetKeys.isEmpty) return null;
+    var byPath = _byPathKey;
+    if (byPath == null) {
+      byPath = <String, DownloadHistoryItem>{};
+      for (final item in _lookupItems) {
+        for (final key in buildPathMatchKeys(item.filePath)) {
+          byPath.putIfAbsent(key, () => item);
+        }
+      }
+      _byPathKey = byPath;
+    }
+    for (final key in targetKeys) {
+      final hit = byPath[key];
+      if (hit != null) return hit;
+    }
+    return null;
+  }
 
   /// The key [findByTrackArtistKey] reads; '' for an empty track name.
   static String trackArtistKey(String trackName, String artistName) {

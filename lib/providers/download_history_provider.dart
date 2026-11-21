@@ -291,13 +291,8 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
   Future<({DownloadHistoryItem item, String? existingId})> _resolveHistoryItem(
     DownloadHistoryItem item,
   ) async {
-    DownloadHistoryItem? existing;
-    for (final candidate in state.lookupItems) {
-      if (historyItemsReferToSameStoredFile(candidate, item)) {
-        existing = candidate;
-        break;
-      }
-    }
+    DownloadHistoryItem? existing =
+        state.getById(item.id) ?? state.getByFilePath(item.filePath);
 
     if (existing == null) {
       final json = await _db.getById(item.id);
@@ -629,14 +624,8 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
   }
 
   Future<DownloadHistoryItem?> getByFilePathAsync(String filePath) async {
-    final targetKeys = buildPathMatchKeys(filePath);
-    if (targetKeys.isEmpty) return null;
-
-    for (final item in state.lookupItems) {
-      if (buildPathMatchKeys(item.filePath).any(targetKeys.contains)) {
-        return item;
-      }
-    }
+    final inMemory = state.getByFilePath(filePath);
+    if (inMemory != null) return inMemory;
 
     final json = await _db.findByFilePath(filePath);
     if (json == null) return null;
