@@ -87,6 +87,17 @@ post_install do |installer|
       unless definitions.include?('PERMISSION_NOTIFICATIONS=1')
         definitions << 'PERMISSION_NOTIFICATIONS=1'
       end
+      if config.name == 'Release'
+        config.build_settings['DEAD_CODE_STRIPPING'] = 'YES'
+        config.build_settings['DEPLOYMENT_POSTPROCESSING'] = 'YES'
+        config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'YES'
+        config.build_settings['STRIP_STYLE'] = 'non-global'
+        config.build_settings['STRIP_SWIFT_SYMBOLS'] = 'YES'
+        config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
+        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Osize'
+        config.build_settings['GCC_OPTIMIZATION_LEVEL'] = 's'
+        config.build_settings['LLVM_LTO'] = 'YES_THIN'
+      end
     end
   end
 end
