@@ -152,7 +152,12 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Custom Folder Structure'));
+        // On a phone the row is below the part of the list that is built.
+        await tester.scrollUntilVisible(
+          find.text('Custom Folder Structure'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.text('Custom Folder Structure'));
         await tester.pumpAndSettle();
