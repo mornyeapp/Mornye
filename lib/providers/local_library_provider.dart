@@ -374,6 +374,21 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
     }
   }
 
+  /// Tells listeners one track's metadata or artwork changed. For edits that
+  /// keep its name, ISRC and folder, so the lookup index is still right.
+  void notifyTrackMetadataChanged() {
+    if (!ref.mounted) return;
+    if (!_hasLoadedFromDatabase) {
+      unawaited(reloadFromStorage());
+      return;
+    }
+    state = state.copyWith(loadedIndexVersion: state.loadedIndexVersion + 1);
+    ref.read(localLibraryIndexRevisionProvider.notifier)._bump();
+  }
+
+  /// Lightweight revision bump after album/track cover files change in storage.
+  void notifyArtworkChanged() => notifyTrackMetadataChanged();
+
   Future<void> reloadFromStorage() async {
     final loading = _loadFuture;
     if (loading != null) {

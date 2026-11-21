@@ -1323,7 +1323,7 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
             );
           });
         }
-        await ref.read(localLibraryProvider.notifier).reloadFromStorage();
+        ref.read(localLibraryProvider.notifier).notifyTrackMetadataChanged();
       } catch (e) {
         _log.w('Failed to sync local library explicit metadata: $e');
       }

@@ -724,7 +724,7 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
             );
           });
         }
-        await ref.read(localLibraryProvider.notifier).reloadFromStorage();
+        ref.read(localLibraryProvider.notifier).notifyTrackMetadataChanged();
       }
     } catch (e) {
       _log.w('Failed to resolve audio metadata from file: $e');

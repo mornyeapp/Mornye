@@ -251,7 +251,7 @@ class LibraryAlbumArtworkNotifier extends Notifier<LibraryAlbumArtworkState> {
     ref.invalidate(libraryAlbumArtworkForSongProvider);
     if (motion) ref.invalidate(playerMotionArtworkProvider);
     if (covers) {
-      await ref.read(localLibraryProvider.notifier).reloadFromStorage();
+      ref.read(localLibraryProvider.notifier).notifyArtworkChanged();
     }
   }
 }
