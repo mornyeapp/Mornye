@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/preview_player_provider.dart';
 import 'package:mornye/services/music_player_service.dart';
@@ -159,14 +160,138 @@ void main() {
       );
       expect(decks, isEmpty);
       expect(container.read(previewPlayerProvider).isActive, isFalse);
+      // The extension has no preview for it: the button is not offered again.
+      expect(container.read(previewUnavailableLinksProvider), {link});
 
       container.dispose();
       await runtime.dispose();
     });
   });
+
+  group('a link that expired', () {
+    const old = 'https://example.com/old.mp3';
+    const current = 'https://example.com/current.mp3';
+
+    (ProviderContainer, List<_PreviewDeck>, MusicPlayerRuntime) expired() {
+      final decks = <_PreviewDeck>[];
+      final runtime = MusicPlayerRuntime(
+        dependencies: PlaybackDependencies(
+          createPreviewDeck: (_) {
+            final deck = _PreviewDeck(dead: {old});
+            decks.add(deck);
+            return deck;
+          },
+        ),
+      );
+      return (previews(runtime), decks, runtime);
+    }
+
+    test('plays the link its extension has now', () async {
+      final (container, decks, runtime) = expired();
+      final controller = container.read(previewPlayerProvider.notifier);
+      var reads = 0;
+      Future<String?> refresh() async {
+        reads++;
+        return current;
+      }
+
+      await controller.play(old, refresh: refresh);
+      expect(reads, 1);
+      expect(decks, hasLength(2));
+      expect(decks.last.calls, contains('network $current'));
+      // The button of the song still owns the preview.
+      expect(container.read(previewPlayerProvider).isActiveUrl(old), isTrue);
+      expect(container.read(previewUnavailableLinksProvider), isEmpty);
+
+      // The next play starts from the link that works.
+      await controller.stop();
+      await controller.play(old, refresh: refresh);
+      expect(reads, 1);
+      expect(decks, hasLength(2));
+      expect(decks.last.calls.where((call) => call == 'network $old'), isEmpty);
+
+      container.dispose();
+      await Future<void>.delayed(Duration.zero);
+      await runtime.dispose();
+    });
+
+    test('is not offered again when nothing newer plays', () async {
+      final (container, decks, runtime) = expired();
+
+      await expectLater(
+        container
+            .read(previewPlayerProvider.notifier)
+            .play(old, refresh: () async => old),
+        throwsStateError,
+      );
+      expect(decks, hasLength(2));
+      expect(container.read(previewPlayerProvider).isActive, isFalse);
+      expect(container.read(previewUnavailableLinksProvider), {old});
+
+      container.dispose();
+      await Future<void>.delayed(Duration.zero);
+      await runtime.dispose();
+    });
+
+    test('stays offered when its extension could not be asked', () async {
+      final (container, _, runtime) = expired();
+
+      await expectLater(
+        container
+            .read(previewPlayerProvider.notifier)
+            .play(old, refresh: () async => throw Exception('offline')),
+        throwsStateError,
+      );
+      expect(container.read(previewUnavailableLinksProvider), isEmpty);
+
+      container.dispose();
+      await Future<void>.delayed(Duration.zero);
+      await runtime.dispose();
+    });
+  });
+
+  test('a preview link is read again from the song\'s extension', () async {
+    const backend = MethodChannel('com.zarz.mornye/backend');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final searches = <Map<dynamic, dynamic>>[];
+    messenger.setMockMethodCallHandler(backend, (call) async {
+      if (call.method != 'searchTracksWithMetadataProvider') return null;
+      searches.add(call.arguments as Map);
+      return jsonEncode([
+        {'id': 'other', 'name': 'Song', 'preview_url': 'https://e.test/a.mp3'},
+        {'id': 'song-1', 'name': 'Song', 'preview_url': 'https://e.test/b.mp3'},
+      ]);
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(backend, null));
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final refresh = container.read(previewLinkRefreshProvider);
+
+    const song = Track(
+      id: 'song-1',
+      name: 'Song',
+      artistName: 'Artist',
+      albumName: 'Album',
+      duration: 180,
+      source: 'example-provider',
+      previewUrl: 'https://e.test/old.mp3',
+    );
+    expect(await refresh(song), 'https://e.test/b.mp3');
+    expect(searches.single['extension_id'], 'example-provider');
+    expect(searches.single['query'], 'Song Artist');
+
+    // A song without an extension to ask has nothing to read again.
+    expect(await refresh(song.copyWith(source: '')), isNull);
+    expect(searches, hasLength(1));
+  });
 }
 
 class _PreviewDeck implements PlaybackDeck {
+  _PreviewDeck({this.dead = const {}});
+
+  /// Links whose server no longer serves them.
+  final Set<String> dead;
   final calls = <String>[];
   final states = StreamController<PlaybackDeckState>.broadcast();
   final durations = StreamController<Duration>.broadcast();
@@ -199,8 +324,11 @@ class _PreviewDeck implements PlaybackDeck {
   @override
   Future<void> setPlaybackRate(double rate) async => calls.add('rate $rate');
   @override
-  Future<void> setNetworkSource(String url, {bool arriving = false}) async =>
-      calls.add('network $url');
+  Future<void> setNetworkSource(String url, {bool arriving = false}) async {
+    calls.add('network $url');
+    if (dead.contains(url)) throw StateError('HTTP 403');
+  }
+
   @override
   Future<void> setFileSource(
     String path, {

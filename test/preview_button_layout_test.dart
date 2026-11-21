@@ -111,6 +111,17 @@ void main() {
     expectCenteredHitbox(tester, Icons.play_circle_outline_rounded);
   });
 
+  testWidgets('a link that did not play is not offered again', (tester) async {
+    await pumpButton(tester);
+    expect(findAppIcon(Icons.play_circle_outline_rounded), findsOneWidget);
+
+    ProviderScope.containerOf(
+      tester.element(find.byType(PreviewButton)),
+    ).read(previewUnavailableLinksProvider.notifier).add(track.previewUrl!);
+    await tester.pump();
+    expect(findAppIcon(Icons.play_circle_outline_rounded), findsNothing);
+  });
+
   testWidgets('current-track play icon uses the same centered hitbox', (
     tester,
   ) async {

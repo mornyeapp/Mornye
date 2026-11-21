@@ -40,7 +40,12 @@ class PreviewButton extends ConsumerWidget {
 
   Future<void> _onPressed(BuildContext context, WidgetRef ref) async {
     try {
-      await ref.read(previewPlayerProvider.notifier).toggle(track.previewUrl);
+      await ref
+          .read(previewPlayerProvider.notifier)
+          .toggle(
+            track.previewUrl,
+            refresh: () => ref.read(previewLinkRefreshProvider)(track),
+          );
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
@@ -108,6 +113,13 @@ class PreviewButton extends ConsumerWidget {
         isDesktopPlatform &&
         ref.watch(settingsProvider.select((s) => s.exclusiveOutput));
     if (!track.hasPreview || exclusive) return const SizedBox.shrink();
+    // A link that did not play is not offered a second time.
+    final unavailable = ref.watch(
+      previewUnavailableLinksProvider.select(
+        (links) => links.contains(track.previewUrl?.trim()),
+      ),
+    );
+    if (unavailable) return const SizedBox.shrink();
 
     final status = ref.watch(
       previewPlayerProvider.select(
