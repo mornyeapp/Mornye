@@ -55,7 +55,8 @@ dependencies:
   flutter_cache_manager: ^3.5.0
   liquid_glass_easy: 5.2.0
   cupertino_icons: ^2.0.0
-  material_symbols_icons: ^4.2960.0
+  mornye_symbols:
+    path: third_party/mornye_symbols
   volume_controller: ^3.7.1
 
   # Material Expressive 3 / Dynamic Color

@@ -1000,14 +1000,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
-  material_symbols_icons:
-    dependency: "direct main"
-    description:
-      name: material_symbols_icons
-      sha256: bd513edc2bc9b034108d5518c48cf5cebbb67d0653728cc452368cb27ca80bb0
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.2960.0"
   material_ui:
     dependency: "direct main"
     description:
@@ -1070,6 +1062,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  mornye_symbols:
+    dependency: "direct main"
+    description:
+      path: "third_party/mornye_symbols"
+      relative: true
+    source: path
+    version: "1.0.0"
   motor:
     dependency: transitive
     description:

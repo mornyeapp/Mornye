@@ -2,7 +2,7 @@ import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
-import 'package:material_symbols_icons/symbols.dart';
+import 'package:mornye_symbols/symbols.dart';
 import 'package:mornye/theme/material_symbols.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
