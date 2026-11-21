@@ -37,18 +37,36 @@ const List<String> manualBatchMetadataFields = [
   'copyright',
 ];
 
+/// The metadata editor key each [manualBatchMetadataFields] entry saves to.
+const manualBatchEditorKeys = <String, String>{
+  'artist_name': 'artist',
+  'album_name': 'album',
+  'album_artist': 'album_artist',
+  'release_date': 'date',
+  'genre': 'genre',
+  'composer': 'composer',
+  'label': 'label',
+  'copyright': 'copyright',
+};
+
 class ReEnrichFieldSelection {
   final ReEnrichBatchMode mode;
   final List<String> fields;
   final Map<String, String> manualValues;
 
+  /// A local image to embed as the cover of every song, with [manualValues].
+  final String? manualCoverPath;
+
   const ReEnrichFieldSelection({
     required this.mode,
     this.fields = const [],
     this.manualValues = const {},
+    this.manualCoverPath,
   });
 
   bool get usesManualValues => mode == ReEnrichBatchMode.manualValues;
+
+  bool get _hasManualCover => manualCoverPath?.trim().isNotEmpty ?? false;
 
   List<String> updateFieldsFor(LocalLibraryItem item) {
     switch (mode) {
@@ -59,14 +77,16 @@ class ReEnrichFieldSelection {
       case ReEnrichBatchMode.missingOnly:
         return missingReEnrichFields(item);
       case ReEnrichBatchMode.manualValues:
-        return manualValues.entries
-            .where(
-              (entry) =>
-                  manualBatchMetadataFields.contains(entry.key) &&
-                  entry.value.trim().isNotEmpty,
-            )
-            .map((entry) => entry.key)
-            .toList(growable: false);
+        return [
+          ...manualValues.entries
+              .where(
+                (entry) =>
+                    manualBatchMetadataFields.contains(entry.key) &&
+                    entry.value.trim().isNotEmpty,
+              )
+              .map((entry) => entry.key),
+          if (_hasManualCover) ReEnrichFields.cover,
+        ];
     }
   }
 }
@@ -292,6 +312,10 @@ class BatchReEnrichPreview {
   /// The result picked by hand, if any.
   final Map<String, dynamic>? chosen;
 
+  /// A local image picked as the cover. Such a preview is written through
+  /// the metadata editor's save, since the re-enrich write embeds only URLs.
+  final String? coverFile;
+
   const BatchReEnrichPreview({
     required this.item,
     required this.updateFields,
@@ -300,6 +324,7 @@ class BatchReEnrichPreview {
     this.match = ReEnrichMatch.exact,
     this.candidates = const [],
     this.chosen,
+    this.coverFile,
   });
 
   /// No result fitted well enough to apply on its own, but one could be
@@ -347,6 +372,7 @@ class BatchReEnrichPreview {
       match: match,
       candidates: candidates,
       chosen: chosen,
+      coverFile: keptFields.contains('cover_url') ? coverFile : null,
     );
   }
 }
@@ -357,13 +383,23 @@ BatchReEnrichPreview? buildManualBatchReEnrichPreview(
 ) {
   if (!selection.usesManualValues) return null;
 
-  final enrichedMetadata = <String, dynamic>{
+  final textValues = <String, dynamic>{
     for (final entry in selection.manualValues.entries)
       if (manualBatchMetadataFields.contains(entry.key) &&
           entry.value.trim().isNotEmpty)
         entry.key: entry.value.trim(),
   };
-  final updateFields = enrichedMetadata.keys.toList(growable: false);
+  final cover = selection._hasManualCover
+      ? selection.manualCoverPath!.trim()
+      : null;
+  final enrichedMetadata = <String, dynamic>{
+    ...textValues,
+    'cover_url': ?cover,
+  };
+  final updateFields = [
+    ...textValues.keys,
+    if (cover != null) ReEnrichFields.cover,
+  ];
   if (updateFields.isEmpty) return null;
 
   final changes = buildReEnrichMetadataChanges(
@@ -378,6 +414,7 @@ BatchReEnrichPreview? buildManualBatchReEnrichPreview(
     updateFields: updateFields,
     enrichedMetadata: enrichedMetadata,
     changes: changes,
+    coverFile: cover,
   );
 }
 

@@ -113,6 +113,44 @@ void main() {
     expect(preview, isNull);
   });
 
+  test('a picked cover joins the manual values as a cover change', () {
+    const selection = ReEnrichFieldSelection(
+      mode: ReEnrichBatchMode.manualValues,
+      manualValues: {'genre': 'Jazz'},
+      manualCoverPath: '/picked/cover.png',
+    );
+    expect(selection.updateFieldsFor(_item()), ['genre', ReEnrichFields.cover]);
+    final preview = buildManualBatchReEnrichPreview(_item(), selection)!;
+    expect(preview.coverFile, '/picked/cover.png');
+    expect(preview.updateFields, ['genre', ReEnrichFields.cover]);
+    expect(preview.changes.map((change) => change.field), [
+      'genre',
+      'cover_url',
+    ]);
+
+    // Turning the cover off in a review drops the picked file too.
+    final textOnly = preview.selecting({'genre'});
+    expect(textOnly.coverFile, isNull);
+    expect(textOnly.updateFields, ['genre']);
+    final coverOnly = preview.selecting({'cover_url'});
+    expect(coverOnly.coverFile, '/picked/cover.png');
+    expect(coverOnly.updateFields, [ReEnrichFields.cover]);
+  });
+
+  test('a cover alone makes a manual preview, even for an unchanged tag', () {
+    final preview = buildManualBatchReEnrichPreview(
+      _item(genre: 'Rock', coverPath: null),
+      const ReEnrichFieldSelection(
+        mode: ReEnrichBatchMode.manualValues,
+        manualValues: {'genre': 'Rock'},
+        manualCoverPath: '/picked/cover.png',
+      ),
+    )!;
+    expect(preview.changes.single.field, 'cover_url');
+    expect(preview.changes.single.oldValue, isEmpty);
+    expect(preview.coverFile, '/picked/cover.png');
+  });
+
   test('manual mode rejects unsafe per-track identifiers', () {
     final selection = const ReEnrichFieldSelection(
       mode: ReEnrichBatchMode.manualValues,

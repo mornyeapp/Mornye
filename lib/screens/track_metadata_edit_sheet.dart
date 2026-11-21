@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/controllers/metadata_editor_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -14,6 +12,7 @@ import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/batch_metadata_re_enrich.dart';
+import 'package:mornye/services/cover_image_picker.dart';
 import 'package:mornye/services/metadata_cover_resources.dart';
 import 'package:mornye/services/metadata_autofill_service.dart';
 import 'package:mornye/services/metadata_persistence_service.dart';

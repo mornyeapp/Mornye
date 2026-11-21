@@ -18,6 +18,7 @@ import 'package:mornye/services/batch_metadata_re_enrich.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/metadata_cover_resources.dart';
+import 'package:mornye/services/metadata_persistence_service.dart';
 import 'package:mornye/services/network_file_editor.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
@@ -285,6 +286,40 @@ Future<void> reEnrichLocalTracks(
   /// Where the songs' previous states are kept; app storage by default.
   ReEnrichUndo? undo,
 }) async {
+  // A cover picked in the dialog stays until every write has finished.
+  final pickedCovers = MetadataCoverResources();
+  try {
+    await _reEnrichLocalTracks(
+      context,
+      ref,
+      selected,
+      isActive: isActive,
+      onSelectionHide: onSelectionHide,
+      onSelectionRestore: onSelectionRestore,
+      onComplete: onComplete,
+      refreshLibrary: refreshLibrary,
+      sourceTrackIds: sourceTrackIds,
+      undo: undo,
+      pickedCovers: pickedCovers,
+    );
+  } finally {
+    await pickedCovers.dispose();
+  }
+}
+
+Future<void> _reEnrichLocalTracks(
+  BuildContext context,
+  WidgetRef ref,
+  List<LocalLibraryItem> selected, {
+  required bool Function() isActive,
+  required Future<void> Function() onSelectionHide,
+  required VoidCallback onSelectionRestore,
+  required VoidCallback onComplete,
+  required Future<void> Function(Set<String> written)? refreshLibrary,
+  required Map<String, String> sourceTrackIds,
+  required ReEnrichUndo? undo,
+  required MetadataCoverResources pickedCovers,
+}) async {
   if (selected.isEmpty) return;
   final container = ProviderScope.containerOf(context, listen: false);
   final items = [
@@ -315,6 +350,7 @@ Future<void> reEnrichLocalTracks(
   final selection = await showReEnrichFieldDialog(
     context,
     selectedCount: selected.length,
+    covers: pickedCovers,
   );
 
   if (selection == null || !context.mounted || !isActive()) {
@@ -603,6 +639,10 @@ class BatchReEnrichRunner {
   )?
   saveMotionArtwork;
 
+  /// The metadata editor's save, which writes a preview with a picked cover.
+  final Future<MetadataSaveResult> Function(MetadataSaveRequest request)
+  saveMetadata;
+
   /// Saves what each write replaces, so a song can be restored later.
   final ReEnrichUndo undo;
 
@@ -621,9 +661,21 @@ class BatchReEnrichRunner {
     this.writeSidecar = writeReEnrichSidecarLrc,
     this.applyFfmpeg = applyFfmpegReEnrichResult,
     this.saveMotionArtwork,
+    this.saveMetadata = _saveWithEditor,
     ReEnrichUndo? undo,
   }) : undo = undo ?? ReEnrichUndo.instance,
        undoBatch = 'reenrich-${DateTime.now().microsecondsSinceEpoch}';
+
+  static Future<MetadataSaveResult> _saveWithEditor(
+    MetadataSaveRequest request,
+  ) async {
+    final covers = MetadataCoverResources();
+    try {
+      return await MetadataPersistenceService(covers: covers).save(request);
+    } finally {
+      await covers.dispose();
+    }
+  }
 
   /// The settings of the last preview, which picks reuse.
   AppSettings? _previewSettings;
@@ -818,6 +870,9 @@ class BatchReEnrichRunner {
     AppSettings settings,
     LocalLibraryItem target,
   ) async {
+    if (preview.coverFile case final cover?) {
+      return _writeWithCover(preview, settings, target, cover);
+    }
     final result = await reEnrich({
       ...buildBatchReEnrichRequest(
         item: preview.item,
@@ -852,6 +907,45 @@ class BatchReEnrichRunner {
         );
         return (written: false, result: result);
     }
+  }
+
+  /// Saves the typed values and the picked [cover] in one write, as the
+  /// metadata editor does, so other tags stay as the song has them.
+  Future<({bool written, Map<String, dynamic> result})> _writeWithCover(
+    BatchReEnrichPreview preview,
+    AppSettings settings,
+    LocalLibraryItem target,
+    String cover,
+  ) async {
+    final saved = await saveMetadata(
+      MetadataSaveRequest(
+        filePath: target.filePath,
+        metadata: {
+          for (final entry in preview.enrichedMetadata.entries)
+            ?manualBatchEditorKeys[entry.key]: entry.value.toString(),
+        },
+        // Typed artist names are saved as entered, as in the editor.
+        artistTagMode: artistTagModeForExistingTags(settings.artistTagMode),
+        selectedCoverPath: cover,
+        preserveUnspecifiedTags: true,
+      ),
+    );
+    if (saved.failure == null) {
+      return (
+        written: true,
+        result: const <String, dynamic>{'method': 'editor'},
+      );
+    }
+    _reEnrichLog.w(
+      'Cover write failed for ${preview.item.id}: ${saved.failure!.name}',
+    );
+    return (
+      written: false,
+      result: <String, dynamic>{
+        'method': 'editor',
+        'error': saved.error ?? saved.failure!.name,
+      },
+    );
   }
 
   Future<void> _saveMotionArtwork(

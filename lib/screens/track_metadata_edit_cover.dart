@@ -56,39 +56,6 @@ extension _EditMetadataSheetCover on _EditMetadataSheetState {
     });
   }
 
-  String _resolveImageExtension(String? ext, Uint8List? bytes) {
-    final normalized = (ext ?? '').toLowerCase();
-    if (normalized == 'png' ||
-        normalized == 'jpg' ||
-        normalized == 'jpeg' ||
-        normalized == 'webp') {
-      return normalized == 'jpeg' ? 'jpg' : normalized;
-    }
-    if (bytes != null && bytes.length >= 8) {
-      if (bytes[0] == 0x89 &&
-          bytes[1] == 0x50 &&
-          bytes[2] == 0x4E &&
-          bytes[3] == 0x47) {
-        return 'png';
-      }
-      if (bytes[0] == 0xFF && bytes[1] == 0xD8) {
-        return 'jpg';
-      }
-      if (bytes.length >= 12 &&
-          bytes[0] == 0x52 &&
-          bytes[1] == 0x49 &&
-          bytes[2] == 0x46 &&
-          bytes[3] == 0x46 &&
-          bytes[8] == 0x57 &&
-          bytes[9] == 0x45 &&
-          bytes[10] == 0x42 &&
-          bytes[11] == 0x50) {
-        return 'webp';
-      }
-    }
-    return 'jpg';
-  }
-
   Future<void> _cleanupSelectedCoverTemp() async {
     final directory = _selectedCoverTempDir;
     final path = _selectedCoverPath;
@@ -122,21 +89,9 @@ extension _EditMetadataSheetCover on _EditMetadataSheetState {
 
   Future<void> _pickCoverImage() async {
     try {
-      final picked = await FilePicker.pickFile(type: FileType.image);
+      final picked = await pickCoverImage(_covers);
       if (picked == null || !mounted) return;
-      final sourcePath = picked.path;
-      final bytes = _hasValue(sourcePath) ? null : await picked.readAsBytes();
-      if (!mounted) return;
-      final extension = _resolveImageExtension(
-        p.extension(picked.name).replaceFirst('.', ''),
-        bytes,
-      );
-      final preview = await _covers.copyPicked(
-        extension: extension,
-        sourcePath: sourcePath,
-        bytes: bytes,
-      );
-      if (!mounted) return;
+      final preview = picked.preview;
       await _cleanupSelectedCoverTemp();
       if (!mounted) return;
       _setState(() {

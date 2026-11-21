@@ -74,9 +74,21 @@ Future<ReEnrichReviewCovers?> loadReEnrichReviewCovers(
       .where((change) => change.field == 'cover_url')
       .firstOrNull;
   if (change == null) return null;
+  final file = preview.coverFile;
   final (current, proposed) = await (
     covers.extract(preview.item.filePath),
-    covers.download(change.newValue, maxDimension: maxDimension),
+    // A picked image is embedded as it is; the caller owns its file.
+    file != null
+        ? covers
+              .readDetails(file)
+              .then(
+                (details) => MetadataCoverPreview(
+                  path: file,
+                  tempDir: '',
+                  details: details,
+                ),
+              )
+        : covers.download(change.newValue, maxDimension: maxDimension),
   ).wait;
   return ReEnrichReviewCovers(current: current, proposed: proposed);
 }
@@ -201,6 +213,8 @@ class _ReEnrichReviewContentState extends State<_ReEnrichReviewContent> {
   }
 
   bool _downgrade(BatchReEnrichPreview preview, ReEnrichMetadataChange change) {
+    // A cover picked by hand is wanted whatever its size.
+    if (change.field == 'cover_url' && preview.coverFile != null) return false;
     final covers = _covers[preview.item.id];
     return reEnrichChangeIsDowngrade(
       change,

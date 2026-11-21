@@ -14,6 +14,7 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/services/batch_metadata_re_enrich.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
+import 'package:mornye/services/metadata_persistence_service.dart';
 import 'package:mornye/services/re_enrich_undo.dart';
 import 'package:mornye/services/re_enrich_undo_store.dart';
 
@@ -329,6 +330,112 @@ void main() {
       expect(phases, 1);
     },
   );
+
+  ReEnrichUndo offlineUndo() => ReEnrichUndo(
+    store: ReEnrichUndoStore(
+      directory: () async => throw const FileSystemException('No storage'),
+    ),
+    readTags: (_) async => {},
+    extractCover: (_, _) async => false,
+  );
+
+  test(
+    'a picked cover is saved with the typed values in one editor write per song, past a failing one',
+    () async {
+      final saves = <MetadataSaveRequest>[];
+      final failed = <String>[];
+      final written = <String>[];
+      var reEnrichCalls = 0;
+      final runner = BatchReEnrichRunner(
+        beginPhase: () async => const AppSettings(artistTagMode: 'split'),
+        undo: offlineUndo(),
+        reEnrich: (_) async {
+          reEnrichCalls++;
+          return {'method': 'native'};
+        },
+        saveMetadata: (request) async {
+          saves.add(request);
+          return request.filePath == '/music/2.flac'
+              ? const MetadataSaveResult.failed(
+                  MetadataSaveFailure.backend,
+                  'format cannot hold a cover',
+                )
+              : const MetadataSaveResult.saved();
+        },
+      );
+      final previews = await runner.preview(
+        [item('1'), item('2'), item('3')],
+        const ReEnrichFieldSelection(
+          mode: ReEnrichBatchMode.manualValues,
+          manualValues: {'genre': 'Jazz', 'album_name': 'Live'},
+          manualCoverPath: '/picked/cover.png',
+        ),
+        shouldStop: running,
+        onProgress: progress,
+      );
+      expect(previews, hasLength(3));
+      final successes = await runner.apply(
+        previews,
+        shouldStop: running,
+        onProgress: progress,
+        onWritten: (item) => written.add(item.id),
+        onFailed: (item, error) {
+          failed.add(item.id);
+          expect(error, 'format cannot hold a cover');
+        },
+      );
+      expect(successes, 2);
+      expect(written, ['1', '3']);
+      expect(failed, ['2']);
+      expect(reEnrichCalls, 0);
+      expect(saves.map((request) => request.filePath), [
+        '/music/1.flac',
+        '/music/2.flac',
+        '/music/3.flac',
+      ]);
+      for (final request in saves) {
+        expect(request.selectedCoverPath, '/picked/cover.png');
+        expect(request.metadata, {'genre': 'Jazz', 'album': 'Live'});
+        expect(request.preserveUnspecifiedTags, isTrue);
+        expect(request.coverMaxDimension, isNull);
+      }
+    },
+  );
+
+  test('a cover alone is a valid manual apply', () async {
+    final saves = <MetadataSaveRequest>[];
+    final runner = BatchReEnrichRunner(
+      beginPhase: () async => const AppSettings(),
+      undo: offlineUndo(),
+      reEnrich: (_) async => throw StateError('no re-enrich write expected'),
+      saveMetadata: (request) async {
+        saves.add(request);
+        return const MetadataSaveResult.saved();
+      },
+    );
+    final previews = await runner.preview(
+      [item('1'), item('2')],
+      const ReEnrichFieldSelection(
+        mode: ReEnrichBatchMode.manualValues,
+        manualCoverPath: '/picked/cover.png',
+      ),
+      shouldStop: running,
+      onProgress: progress,
+    );
+    expect(previews.map((preview) => preview.updateFields), [
+      [ReEnrichFields.cover],
+      [ReEnrichFields.cover],
+    ]);
+    expect(
+      await runner.apply(previews, shouldStop: running, onProgress: progress),
+      2,
+    );
+    expect(saves.map((request) => request.metadata), [isEmpty, isEmpty]);
+    expect(
+      saves.map((request) => request.selectedCoverPath),
+      everyElement('/picked/cover.png'),
+    );
+  });
 
   test(
     'lookup failures do not discard useful previews and cancellation stops subsequent tracks',
