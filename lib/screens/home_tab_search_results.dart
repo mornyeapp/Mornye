@@ -175,83 +175,28 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
   }
 
   void _showSortOptions(ColorScheme colorScheme) {
-    var tempSort = _searchSortOption;
-    final mornye = context.isMornye;
-    showAppModalBottomSheet<void>(
+    showAppBottomSheet<void>(
       context: context,
       useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: mornye ? null : colorScheme.surfaceContainerLow,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          final content = SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const AppSheetHandle(),
-                  Row(
-                    children: [
-                      Text(
-                        context.l10n.searchSortTitle,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      ExpressiveButton(
-                        text: true,
-                        onPressed: () => setSheetState(
-                          () => tempSort = HomeSearchSortOption.defaultOrder,
-                        ),
-                        child: Text(context.l10n.libraryFilterReset),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: HomeSearchSortOption.values.map((option) {
-                      if (context.isMornye) {
-                        return MornyeFilterChip(
-                          label: _sortOptionLabel(option),
-                          selected: tempSort == option,
-                          onTap: () => setSheetState(() => tempSort = option),
-                        );
-                      }
-                      return AppChoiceChip(
-                        label: Text(_sortOptionLabel(option)),
-                        selected: tempSort == option,
-                        singleChoice: true,
-                        onSelected: (_) =>
-                            setSheetState(() => tempSort = option),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ExpressiveButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        if (_searchSortOption != tempSort) {
-                          setState(() {
-                            _searchSortOption = tempSort;
-                          });
-                        }
-                      },
-                      child: Text(context.l10n.libraryFilterApply),
-                    ),
-                  ),
-                ],
+      title: context.l10n.searchSortTitle,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: SettingsGroup(
+          children: [
+            for (final option in HomeSearchSortOption.values)
+              SettingsItem(
+                title: _sortOptionLabel(option),
+                selected: _searchSortOption == option,
+                showDivider: option != HomeSearchSortOption.values.last,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  if (_searchSortOption != option) {
+                    setState(() => _searchSortOption = option);
+                  }
+                },
               ),
-            ),
-          );
-          return content;
-        },
+          ],
+        ),
       ),
     );
   }
@@ -508,11 +453,17 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
             if (mornye) {
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: MornyeGlassPanel.overlay(
-                  blurEnabled: false,
-                  radius: 24,
-                  firstInGroup: isFirst,
-                  lastInGroup: isLast,
+                child: Material(
+                  color: colorScheme.surfaceContainer,
+                  borderRadius: BorderRadius.vertical(
+                    top: isFirst
+                        ? Radius.circular(context.tokens.radiusCard)
+                        : Radius.zero,
+                    bottom: isLast
+                        ? Radius.circular(context.tokens.radiusCard)
+                        : Radius.zero,
+                  ),
+                  clipBehavior: Clip.antiAlias,
                   child: itemBuilder(index, !isLast),
                 ),
               );
@@ -646,8 +597,8 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
                               ),
                         ),
                       ),
-                      Icon(
-                        CupertinoIcons.chevron_forward,
+                      AppIcon.adaptive(
+                        Icons.chevron_right,
                         size: 14,
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -853,15 +804,11 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
       void select() => _selectSearchFilter(id);
 
       return context.isMornye
-          ? MornyeGlassPanel.overlay(
-              radius: 24,
-              child: MornyeFilterChip(
-                label: label,
-                selected: selectedFilter == id,
-                icon: icon == null ? null : mornyeIconFor(icon),
-                tonal: selectedFilter == id,
-                onTap: select,
-              ),
+          ? MornyeFilterChip(
+              label: label,
+              selected: selectedFilter == id,
+              icon: icon == null ? null : mornyeIconFor(icon),
+              onTap: select,
             )
           : AppChoiceChip(
               label: Text(label),

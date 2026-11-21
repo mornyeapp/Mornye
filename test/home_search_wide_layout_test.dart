@@ -271,7 +271,6 @@ void main() {
         await tester.tap(find.text('Sort').hitTestable());
         await tester.pumpAndSettle();
         await tester.tap(find.text('Title (Z-A)'));
-        await tester.tap(find.text('Apply'));
         await tester.pumpAndSettle();
         expect(
           tester.getRect(find.byKey(const ValueKey('album-album-5'))).left,

@@ -627,8 +627,8 @@ class _SearchTopCollectionCard extends StatelessWidget {
       ),
       trailing: Padding(
         padding: const EdgeInsetsDirectional.only(end: 12),
-        child: Icon(
-          CupertinoIcons.chevron_forward,
+        child: AppIcon.adaptive(
+          Icons.chevron_right,
           size: 14,
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
@@ -769,7 +769,7 @@ class _SearchSongCoverCell extends ConsumerWidget {
                       child: PreviewButton(
                         track: track,
                         size: 28,
-                        dense: true,
+                        dense: isDesktopPlatform,
                         overArtwork: true,
                       ),
                     ),

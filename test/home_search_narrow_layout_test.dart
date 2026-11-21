@@ -53,20 +53,21 @@ String _paintFingerprint(WidgetTester tester) {
 /// before search results gained cover grids and shelves on wide screens, with
 /// the Material values re-recorded when sort and view became a grouped
 /// toolbar, the Material desktop value when Home took M3's 24dp window
-/// margin, and the Mornye values when blue became the default accent and the
-/// filter chips gained their glass press layer. A narrow layout must paint
+/// margin, the Mornye values when blue became the default accent, and all
+/// values after Search became its own tab and Mornye search rows and filter
+/// chips dropped content-layer Liquid Glass. A narrow layout must paint
 /// exactly these.
 /// A deliberate change to
 /// the phone rows records new values; the failure prints the fingerprint.
 const _baseFingerprints = {
-  'phone Material': 'c975d61edc1fef90079a8ac06bf1a8c5307ac43b',
-  'phone Mornye': 'd72fe45a3f9638e3ebe47b549dee17232cd13e4f',
-  'landscape phone Material': '88fd46463538cd4b3d728743a1174612da7a9731',
-  'landscape phone Mornye': 'ad2081a7237deca37d087111c28546cdec9f1781',
-  'portrait tablet Material': '94d41e2ff5146d50d53d7b50f33ec371b88fc11f',
-  'portrait tablet Mornye': 'c4d77afbdcda7e4fbd3b90b586068aa134b1b30b',
-  'narrow desktop window Material': '74198bcea5c9b07d7e5a90075abcb974b99f876e',
-  'narrow desktop window Mornye': '481b5d5c69fc3a5b171e0124a6244c306b9489c0',
+  'phone Material': '204a86619c8ca221608ac2b91683b7c6058df265',
+  'phone Mornye': 'ef2c73eedb07c1a280e65fa4bf2c24240551fa8f',
+  'landscape phone Material': 'e77f8703f41dae3c3f99aebb584e0be139e06278',
+  'landscape phone Mornye': 'c21d1b43e558a2a0f3ad09c0a37aeb0d8f573bb1',
+  'portrait tablet Material': '748e753957c7b4d253afdd6e2ba6e97310b05640',
+  'portrait tablet Mornye': '6d63c676d43e71d0bc3660d7ccce31f12b64f19a',
+  'narrow desktop window Material': 'c8382dbf1a9de137e68eb17799561f71ddcb3045',
+  'narrow desktop window Mornye': '27e8e8751f82f03a3685b320a202febecbbb5771',
 };
 
 void main() {
