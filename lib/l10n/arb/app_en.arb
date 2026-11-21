@@ -2270,6 +2270,14 @@
   "@lyricsLockScreenSubtitleIos": {
     "description": "Subtitle of the Lyrics on lock screen switch on iOS, where it also shows in Control Center. Keep 'Mornye' as is: it is the app name"
   },
+  "lyricsLockScreenKeepTitle": "Keep the song title",
+  "@lyricsLockScreenKeepTitle": {
+    "description": "Switch under Lyrics on lock screen: the line being sung replaces the artist's name instead of the song title"
+  },
+  "lyricsLockScreenKeepTitleSubtitle": "The line takes the artist's place instead",
+  "@lyricsLockScreenKeepTitleSubtitle": {
+    "description": "Subtitle of the Keep the song title switch"
+  },
   "lyricsPlayerPreview": "Lyric line in player",
   "@lyricsPlayerPreview": {
     "description": "Lyrics setting that shows the synced line being sung under the song title on the Now Playing screen"

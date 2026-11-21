@@ -397,6 +397,9 @@ class AppSettings {
 
   /// Show the line being sung in place of the song title on the lock screen.
   final bool lockScreenLyrics;
+
+  /// The lock screen line takes the artist's place and the title stays.
+  final bool lockScreenLyricsKeepTitle;
   final bool motionArtworkEnabled;
 
   /// Copy a download's animated cover into its album folder as `cover.mp4`.
@@ -651,6 +654,7 @@ class AppSettings {
     this.lyricsMode = 'embed',
     this.keepScreenOnLyrics = true,
     this.lockScreenLyrics = false,
+    this.lockScreenLyricsKeepTitle = false,
     this.motionArtworkEnabled = true,
     this.saveMotionArtworkFile = false,
     this.saveFolderCover = false,
@@ -851,6 +855,7 @@ class AppSettings {
     String? lyricsMode,
     bool? keepScreenOnLyrics,
     bool? lockScreenLyrics,
+    bool? lockScreenLyricsKeepTitle,
     bool? motionArtworkEnabled,
     bool? saveMotionArtworkFile,
     bool? saveFolderCover,
@@ -1050,6 +1055,8 @@ class AppSettings {
       lyricsMode: lyricsMode ?? this.lyricsMode,
       keepScreenOnLyrics: keepScreenOnLyrics ?? this.keepScreenOnLyrics,
       lockScreenLyrics: lockScreenLyrics ?? this.lockScreenLyrics,
+      lockScreenLyricsKeepTitle:
+          lockScreenLyricsKeepTitle ?? this.lockScreenLyricsKeepTitle,
       motionArtworkEnabled: motionArtworkEnabled ?? this.motionArtworkEnabled,
       saveMotionArtworkFile:
           saveMotionArtworkFile ?? this.saveMotionArtworkFile,

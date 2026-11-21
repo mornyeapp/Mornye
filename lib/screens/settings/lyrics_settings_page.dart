@@ -75,6 +75,18 @@ class LyricsSettingsPage extends ConsumerWidget {
                         .read(settingsProvider.notifier)
                         .setLockScreenLyrics(value),
                   ),
+                if (Platform.isAndroid || Platform.isIOS)
+                  SettingsSwitchItem(
+                    key: const ValueKey('lock-screen-lyrics-keep-title'),
+                    icon: Icons.title_rounded,
+                    title: context.l10n.lyricsLockScreenKeepTitle,
+                    subtitle: context.l10n.lyricsLockScreenKeepTitleSubtitle,
+                    value: settings.lockScreenLyricsKeepTitle,
+                    enabled: settings.lockScreenLyrics,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setLockScreenLyricsKeepTitle(value),
+                  ),
                 SettingsSwitchItem(
                   key: const ValueKey('lyric-snippet-preview'),
                   icon: Icons.lyrics_outlined,

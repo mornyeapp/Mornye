@@ -337,7 +337,7 @@ Future<Duration> _storedLyricsOffset(MediaItemMessage item) async {
 }
 
 /// Shows the line being sung in place of the song's title on the lock
-/// screen, while the listener has it on.
+/// screen, or of its artist with [keepTitle], while the listener has it on.
 ///
 /// It sits right before the system media session, under
 /// `MediaSessionFilter`, so only the system sees the line. The app's own
@@ -378,6 +378,7 @@ class LockScreenLyrics extends AudioServicePlatform {
   final DateTime Function() _now;
 
   bool _enabled = false;
+  bool _keepTitle = false;
   bool _showing = false;
   StreamSubscription<bool>? _lockScreenStates;
   PlayerMetadataController? _metadata;
@@ -394,7 +395,7 @@ class LockScreenLyrics extends AudioServicePlatform {
   ParsedLyrics? _timelineLyrics;
   String? _timelineId;
 
-  /// The line the system shows in place of the title, or null for the title.
+  /// The line the system shows, or null for the song's own title and artist.
   String? _line;
   Timer? _nextLine;
   Timer? _publishing;
@@ -421,6 +422,16 @@ class LockScreenLyrics extends AudioServicePlatform {
     _metadata = null;
     _loadedId = null;
     _clearTimeline();
+  }
+
+  /// Whether the line takes the artist's place and the title stays.
+  bool get keepTitle => _keepTitle;
+
+  set keepTitle(bool value) {
+    if (value == _keepTitle) return;
+    _keepTitle = value;
+    // A line on show moves to its new place.
+    if (_line != null && _publishing == null) _publish();
   }
 
   bool get _active => _enabled && _showing;
@@ -582,18 +593,24 @@ class LockScreenLyrics extends AudioServicePlatform {
     final line = _line;
     if (line == null) return request;
     final item = request.mediaItem;
+    // The system shows the display fields first where an item has them.
+    final keep = _keepTitle;
     return SetMediaItemRequest(
       mediaItem: MediaItemMessage(
         id: item.id,
-        title: line,
+        title: keep ? item.title : line,
         album: item.album,
-        artist: item.artist,
+        artist: keep ? line : item.artist,
         genre: item.genre,
         duration: item.duration,
         artUri: item.artUri,
         playable: item.playable,
-        displayTitle: item.displayTitle == null ? null : line,
-        displaySubtitle: item.displaySubtitle,
+        displayTitle: keep || item.displayTitle == null
+            ? item.displayTitle
+            : line,
+        displaySubtitle: keep && item.displaySubtitle != null
+            ? line
+            : item.displaySubtitle,
         displayDescription: item.displayDescription,
         rating: item.rating,
         isLive: item.isLive,
@@ -694,6 +711,7 @@ class LockScreenLyrics extends AudioServicePlatform {
 
 LockScreenLyrics? _installed;
 bool _enabled = false;
+bool _keepTitle = false;
 
 /// Installs [LockScreenLyrics] before `installMediaSessionFilter` and
 /// `AudioService.init`, which reads the platform instance once. Android and
@@ -707,11 +725,20 @@ void installLockScreenLyrics() {
     restatePosition: ios,
   );
   AudioServicePlatform.instance = installed;
-  installed.enabled = _enabled;
+  installed
+    ..keepTitle = _keepTitle
+    ..enabled = _enabled;
 }
 
-/// Turns lyrics on the lock screen on or off, before or after installing.
-void configureLockScreenLyrics({required bool enabled}) {
+/// Turns lyrics on the lock screen on or off, and sets whether the line
+/// takes the artist's place ([keepTitle]), before or after installing.
+void configureLockScreenLyrics({
+  required bool enabled,
+  bool keepTitle = false,
+}) {
   _enabled = enabled;
-  _installed?.enabled = enabled;
+  _keepTitle = keepTitle;
+  _installed
+    ?..keepTitle = keepTitle
+    ..enabled = enabled;
 }

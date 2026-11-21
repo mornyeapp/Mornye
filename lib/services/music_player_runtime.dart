@@ -471,7 +471,10 @@ class MusicPlayerRuntime {
       semitones: settings.playbackPitch,
       followsRate: !settings.playbackKeepPitch,
     );
-    configureLockScreenLyrics(enabled: settings.lockScreenLyrics);
+    configureLockScreenLyrics(
+      enabled: settings.lockScreenLyrics,
+      keepTitle: settings.lockScreenLyricsKeepTitle,
+    );
     _songAnalysis?.configure(settings);
     _handler?.applySettings(previous);
     if (previous.playerMode == 'internal' &&

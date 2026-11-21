@@ -180,6 +180,8 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   lyricsMode: json['lyricsMode'] as String? ?? 'embed',
   keepScreenOnLyrics: json['keepScreenOnLyrics'] as bool? ?? true,
   lockScreenLyrics: json['lockScreenLyrics'] as bool? ?? false,
+  lockScreenLyricsKeepTitle:
+      json['lockScreenLyricsKeepTitle'] as bool? ?? false,
   motionArtworkEnabled: json['motionArtworkEnabled'] as bool? ?? true,
   saveMotionArtworkFile: json['saveMotionArtworkFile'] as bool? ?? false,
   saveFolderCover: json['saveFolderCover'] as bool? ?? false,
@@ -371,6 +373,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'lyricsMode': instance.lyricsMode,
   'keepScreenOnLyrics': instance.keepScreenOnLyrics,
   'lockScreenLyrics': instance.lockScreenLyrics,
+  'lockScreenLyricsKeepTitle': instance.lockScreenLyricsKeepTitle,
   'motionArtworkEnabled': instance.motionArtworkEnabled,
   'saveMotionArtworkFile': instance.saveMotionArtworkFile,
   'saveFolderCover': instance.saveFolderCover,

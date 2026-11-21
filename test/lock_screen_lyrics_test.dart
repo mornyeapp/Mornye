@@ -31,6 +31,12 @@ class _Os extends AudioServicePlatform {
       if (request case SetMediaItemRequest(:final mediaItem)) mediaItem.title,
   ];
 
+  /// The artists the system was given, in order.
+  List<String?> get artists => [
+    for (final request in requests)
+      if (request case SetMediaItemRequest(:final mediaItem)) mediaItem.artist,
+  ];
+
   @override
   Future<void> setState(SetStateRequest request) async => requests.add(request);
 
@@ -282,6 +288,33 @@ void main() {
       await h.lock(false);
       await h.elapse(0.5);
       expect(h.os.titles.last, 'Song');
+      await h.close();
+    });
+
+    testWidgets('with the title kept, the line takes the artist\'s place', (
+      tester,
+    ) async {
+      final h = _Harness(tester);
+      h.session
+        ..keepTitle = true
+        ..enabled = true;
+      await h.play('a', 'Song');
+      await h.lock(true);
+      await h.elapse(1);
+      expect(h.os.titles.last, 'Song');
+      expect(h.os.artists.last, 'First line');
+      // In a break the artist is back.
+      await h.elapse(20);
+      expect(h.os.artists.last, 'Artist');
+      expect(h.os.titles.toSet(), {'Song'});
+
+      // Changing the place moves a line on show.
+      await h.elapse(9);
+      expect(h.os.artists.last, 'Third line');
+      h.session.keepTitle = false;
+      await h.flush();
+      expect(h.os.titles.last, 'Third line');
+      expect(h.os.artists.last, 'Artist');
       await h.close();
     });
 

@@ -835,6 +835,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLockScreenLyrics(bool enabled) =>
       _commit(state.copyWith(lockScreenLyrics: enabled));
 
+  void setLockScreenLyricsKeepTitle(bool keep) =>
+      _commit(state.copyWith(lockScreenLyricsKeepTitle: keep));
+
   void setMotionArtworkEnabled(bool enabled) =>
       _commit(state.copyWith(motionArtworkEnabled: enabled));
 

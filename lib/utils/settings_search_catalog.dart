@@ -671,6 +671,13 @@ class SettingsSearchCatalog {
             title: l10n.lyricsLockScreen,
             keywords: const ['lockscreen', 'notification', 'media controls'],
           ),
+        if (!isDesktopPlatform)
+          SettingsSearchEntry(
+            icon: Icons.title_rounded,
+            title: l10n.lyricsLockScreenKeepTitle,
+            subtitle: l10n.lyricsLockScreenKeepTitleSubtitle,
+            keywords: const ['lockscreen', 'lyrics', 'artist', 'track name'],
+          ),
         SettingsSearchEntry(
           icon: Icons.lyrics_outlined,
           title: l10n.lyricsPlayerPreview,
