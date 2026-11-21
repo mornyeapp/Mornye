@@ -125,6 +125,18 @@ class TrackCollectionQuickActions extends ConsumerWidget {
   }
 }
 
+/// The text "Copy track and artist" puts on the clipboard.
+String trackAndArtistText(Track track) => '${track.name} - ${track.artistName}';
+
+/// Copies [text] and confirms it on [context]'s messenger.
+void copyTrackText(BuildContext context, String text) {
+  Clipboard.setData(ClipboardData(text: text));
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(context.l10n.trackCopiedToClipboard)));
+}
+
 /// The track options as desktop context menu groups: playback and download,
 /// collections, navigation, then copying.
 List<List<ContextMenuAction>> trackOptionMenuGroups(
@@ -167,10 +179,7 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
     );
   }
 
-  void copy(String text) {
-    Clipboard.setData(ClipboardData(text: text));
-    if (root.mounted) notify(root.l10n.trackCopiedToClipboard);
-  }
+  void copy(String text) => copyTrackText(root, text);
 
   return [
     [
@@ -243,7 +252,7 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
       ContextMenuAction(
         icon: Icons.copy_all_rounded,
         label: l10n.trackOptionCopyTrackAndArtist,
-        onSelected: () => copy('${track.name} - ${track.artistName}'),
+        onSelected: () => copy(trackAndArtistText(track)),
       ),
       if (link != null)
         ContextMenuAction(
@@ -403,8 +412,7 @@ class _TrackOptionsSheet extends ConsumerWidget {
             MornyeMenuAction(
               icon: CupertinoIcons.doc_on_doc,
               label: l10n.trackOptionCopyTrackAndArtist,
-              onPressed: () =>
-                  _copyText(context, '${track.name} - ${track.artistName}'),
+              onPressed: () => _copyText(context, trackAndArtistText(track)),
             ),
             if (link != null)
               MornyeMenuAction(
@@ -534,10 +542,7 @@ class _TrackOptionsSheet extends ConsumerWidget {
                   SettingsItem(
                     icon: Icons.copy_all_rounded,
                     title: context.l10n.trackOptionCopyTrackAndArtist,
-                    onTap: () => _copyText(
-                      context,
-                      '${track.name} - ${track.artistName}',
-                    ),
+                    onTap: () => _copyText(context, trackAndArtistText(track)),
                   ),
                   if (link != null)
                     SettingsItem(
@@ -667,10 +672,7 @@ class _TrackOptionsSheet extends ConsumerWidget {
   void _copyText(BuildContext context, String text) {
     final rootContext = Navigator.of(context, rootNavigator: true).context;
     Navigator.pop(context);
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(rootContext).showSnackBar(
-      SnackBar(content: Text(rootContext.l10n.trackCopiedToClipboard)),
-    );
+    copyTrackText(rootContext, text);
   }
 
   void _copyLink(BuildContext context, ServiceTrackLink link) {

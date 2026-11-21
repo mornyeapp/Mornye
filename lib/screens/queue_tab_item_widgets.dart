@@ -95,13 +95,9 @@ extension _QueueTabItemWidgets on _QueueTabState {
                     item.status == DownloadStatus.skipped
               ? () => _showDownloadErrorDialog(context, item)
               : null,
-          onLongPress: item.status == DownloadStatus.queued
-              ? () => _showQueuedItemMenu(context, item)
-              : null,
-          onContextMenu: item.status == DownloadStatus.queued
-              ? (position) =>
-                    _showQueuedItemMenu(context, item, position: position)
-              : null,
+          onLongPress: () => _showDownloadItemMenu(context, item),
+          onContextMenu: (position) =>
+              _showDownloadItemMenu(context, item, position: position),
           background: item.status == DownloadStatus.downloading
               ? SmoothedProgressBuilder(
                   builder: (context, progress, child) => Align(
@@ -390,44 +386,61 @@ extension _QueueTabItemWidgets on _QueueTabState {
     );
   }
 
-  /// The queued download's actions: a menu at [position] on desktop, a
-  /// sheet elsewhere.
-  Future<void> _showQueuedItemMenu(
+  /// A download's actions: a menu at [position] on desktop, a sheet
+  /// elsewhere. Only a queued download is reordered or cancelled here.
+  Future<void> _showDownloadItemMenu(
     BuildContext context,
     DownloadItem item, {
     Offset? position,
   }) {
     final notifier = ref.read(downloadQueueProvider.notifier);
+    final track = item.track;
+    final root = Navigator.of(context, rootNavigator: true).context;
+    final isQueued = item.status == DownloadStatus.queued;
     if (position != null && isDesktopPlatform) {
       return showContextMenu(
         context,
         position: position,
         groups: [
+          if (isQueued)
+            [
+              ContextMenuAction(
+                icon: Icons.skip_next,
+                label: context.l10n.queueDownloadNext,
+                onSelected: () => notifier.downloadNext(item.id),
+              ),
+              ContextMenuAction(
+                icon: Icons.arrow_upward,
+                label: context.l10n.queueMoveUp,
+                onSelected: () => notifier.moveQueuedItem(item.id, -1),
+              ),
+              ContextMenuAction(
+                icon: Icons.arrow_downward,
+                label: context.l10n.queueMoveDown,
+                onSelected: () => notifier.moveQueuedItem(item.id, 1),
+              ),
+            ],
           [
             ContextMenuAction(
-              icon: Icons.skip_next,
-              label: context.l10n.queueDownloadNext,
-              onSelected: () => notifier.downloadNext(item.id),
+              icon: Icons.album_outlined,
+              label: context.l10n.homeGoToAlbum,
+              onSelected: () => navigateToTrackAlbum(root, track),
             ),
             ContextMenuAction(
-              icon: Icons.arrow_upward,
-              label: context.l10n.queueMoveUp,
-              onSelected: () => notifier.moveQueuedItem(item.id, -1),
-            ),
-            ContextMenuAction(
-              icon: Icons.arrow_downward,
-              label: context.l10n.queueMoveDown,
-              onSelected: () => notifier.moveQueuedItem(item.id, 1),
+              icon: Icons.copy_all_rounded,
+              label: context.l10n.trackOptionCopyTrackAndArtist,
+              onSelected: () => copyTrackText(root, trackAndArtistText(track)),
             ),
           ],
-          [
-            ContextMenuAction(
-              icon: Icons.close,
-              label: context.l10n.dialogCancel,
-              destructive: true,
-              onSelected: () => notifier.cancelItem(item.id),
-            ),
-          ],
+          if (isQueued)
+            [
+              ContextMenuAction(
+                icon: Icons.close,
+                label: context.l10n.dialogCancel,
+                destructive: true,
+                onSelected: () => notifier.cancelItem(item.id),
+              ),
+            ],
         ],
       );
     }
@@ -438,32 +451,52 @@ extension _QueueTabItemWidgets on _QueueTabState {
         padding: EdgeInsets.only(bottom: ctx.tokens.gapLg),
         child: SettingsGroup(
           children: [
+            if (isQueued) ...[
+              SettingsItem(
+                icon: Icons.skip_next,
+                showIconInMornye: true,
+                title: context.l10n.queueDownloadNext,
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  notifier.downloadNext(item.id);
+                },
+              ),
+              SettingsItem(
+                icon: Icons.arrow_upward,
+                showIconInMornye: true,
+                title: context.l10n.queueMoveUp,
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  notifier.moveQueuedItem(item.id, -1);
+                },
+              ),
+              SettingsItem(
+                icon: Icons.arrow_downward,
+                showIconInMornye: true,
+                title: context.l10n.queueMoveDown,
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  notifier.moveQueuedItem(item.id, 1);
+                },
+              ),
+            ],
             SettingsItem(
-              icon: Icons.skip_next,
+              icon: Icons.album_outlined,
               showIconInMornye: true,
-              title: context.l10n.queueDownloadNext,
+              title: context.l10n.homeGoToAlbum,
               onTap: () {
                 Navigator.of(ctx).pop();
-                notifier.downloadNext(item.id);
+                navigateToTrackAlbum(root, track);
               },
             ),
             SettingsItem(
-              icon: Icons.arrow_upward,
+              icon: Icons.copy_all_rounded,
               showIconInMornye: true,
-              title: context.l10n.queueMoveUp,
-              onTap: () {
-                Navigator.of(ctx).pop();
-                notifier.moveQueuedItem(item.id, -1);
-              },
-            ),
-            SettingsItem(
-              icon: Icons.arrow_downward,
-              showIconInMornye: true,
-              title: context.l10n.queueMoveDown,
+              title: context.l10n.trackOptionCopyTrackAndArtist,
               showDivider: false,
               onTap: () {
                 Navigator.of(ctx).pop();
-                notifier.moveQueuedItem(item.id, 1);
+                copyTrackText(root, trackAndArtistText(track));
               },
             ),
           ],

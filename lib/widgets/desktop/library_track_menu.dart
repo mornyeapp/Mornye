@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -7,6 +8,7 @@ import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/desktop_link_transfer_actions.dart';
 import 'package:mornye/widgets/hires_batch_check_sheet.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
+import 'package:mornye/widgets/track_collection_quick_actions.dart';
 import 'package:mornye/services/network_offline_saver.dart';
 import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/providers/network_upload_provider.dart';
@@ -19,8 +21,9 @@ import 'package:mornye/widgets/network_upload_actions.dart';
 /// the screen passes its own selection-bar callbacks for the rest, and omits
 /// those it does not offer. Mornye Link adds "Send to (phone)" and "Save to
 /// this computer" while a phone is connected. Actions that finish with the
-/// menu (play, queue, playlist, transfers, details) call [onDone] to end the
-/// selection; the bulk actions keep it and end it themselves.
+/// menu (play, queue, playlist, transfers, album, copy, details) call
+/// [onDone] to end the selection; the bulk actions keep it and end it
+/// themselves.
 List<List<ContextMenuAction>> libraryTrackMenuGroups(
   BuildContext context,
   WidgetRef ref, {
@@ -104,6 +107,27 @@ List<List<ContextMenuAction>> libraryTrackMenuGroups(
           },
         ),
     ],
+    // One song row (rows end a selection; collection headers pass no onDone).
+    if (count == 1 && onDone != null)
+      [
+        // The service's album, like the song details' Go to album.
+        ContextMenuAction(
+          icon: Icons.album_outlined,
+          label: l10n.homeGoToAlbum,
+          onSelected: () {
+            onDone();
+            navigateToTrackAlbum(root, items.single.toTrack());
+          },
+        ),
+        ContextMenuAction(
+          icon: Icons.copy_all_rounded,
+          label: l10n.trackOptionCopyTrackAndArtist,
+          onSelected: () {
+            onDone();
+            copyTrackText(root, trackAndArtistText(items.single.toTrack()));
+          },
+        ),
+      ],
     [
       if (onOpenDetails != null && count == 1)
         ContextMenuAction(

@@ -30,6 +30,9 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
       animate: _shouldAnimateDownloadProgress(context, item),
       child: TrackGridCard(
         onTap: onTap,
+        onLongPress: () => _showDownloadItemMenu(context, item),
+        onContextMenu: (position) =>
+            _showDownloadItemMenu(context, item, position: position),
         semanticLabel: context.l10n.a11yTrackByArtist(
           item.track.name,
           item.track.artistName,
