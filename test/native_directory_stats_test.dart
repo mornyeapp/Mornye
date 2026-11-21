@@ -244,9 +244,10 @@ void main() {
         await checkParity(contents);
         await checkParity(Directory('${root.path}/root-link'));
       },
+      // Null keeps the group's skip; false would run without the library.
       skip: Platform.isWindows
           ? 'Creating symlinks requires Windows developer permissions'
-          : false,
+          : null,
     );
   }, skip: !enabled);
 }
