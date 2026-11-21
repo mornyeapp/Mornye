@@ -712,6 +712,27 @@ void main() {
       expect(await service.resolve(back), startsWith('http://127.0.0.1:'));
     });
 
+    test('a proxy whose listener the system closed is bound again', () async {
+      await service.save(connection('$origin/music/'));
+      final song = NetworkStorageService.source('server', 'A B.flac');
+      final before = Uri.parse(await service.resolve(song));
+
+      await service.debugCloseProxyListener();
+      await expectLater(
+        Socket.connect(InternetAddress.loopbackIPv4, before.port),
+        throwsA(isA<SocketException>()),
+      );
+
+      final after = Uri.parse(await service.resolve(song));
+      final socket = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        after.port,
+      );
+      socket.destroy();
+      // A proxy that still listens is kept.
+      expect(Uri.parse(await service.resolve(song)).port, after.port);
+    });
+
     test('covers are read over the connection, up to 16 MiB', () async {
       final c = connection('$origin/art/', user: 'test', password: 'secret');
       await service.save(c);

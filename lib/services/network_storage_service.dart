@@ -1629,6 +1629,14 @@ class NetworkStorageService {
     checkpoint: checkpoint,
   );
 
+  /// Closes the playback proxy's listener but keeps it as the proxy, as iOS
+  /// does to a suspended app.
+  @visibleForTesting
+  Future<void> debugCloseProxyListener() async {
+    final server = _server;
+    if (server != null) await (await server).close(force: true);
+  }
+
   Future<void> dispose() async {
     final server = _server;
     _server = null;
