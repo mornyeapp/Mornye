@@ -149,7 +149,7 @@ Future<PlayableMedia?> readLinkPlaybackDetails({
             final key =
                 'network://${client.server.connectionId}/link-player/'
                 '${sha256.convert(bytes)}';
-            var cached = covers.cachedFile(key);
+            var cached = await covers.cachedFileAsync(key);
             if (cached == null) {
               final temp = await Directory.systemTemp.createTemp(
                 'mornye-link-cover-',

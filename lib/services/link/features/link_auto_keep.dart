@@ -328,16 +328,14 @@ final linkAutoKeepProvider = Provider<LinkAutoKeeper>((ref) {
     },
     debounce: ref.watch(linkAutoKeepDebounceProvider),
   );
-  ref.listen(
-    linkPhoneClientProvider,
-    (_, client) => keeper.attach(client),
-    fireImmediately: true,
-  );
-
   // Compared per collection kept both times, so keeping or loading one is
   // not a change of its songs.
   var membership = <String, int>{};
   var loaded = false;
+  LinkClientApi? currentClient;
+  var currentKept = const <String>{};
+  ProviderSubscription<LibraryCollectionsState>? collectionsSub;
+
   void collectionsChanged() {
     final state = ref.read(libraryCollectionsProvider);
     final kept = ref.read(linkKeptCollectionsProvider).value ?? const {};
@@ -357,17 +355,41 @@ final linkAutoKeepProvider = Provider<LinkAutoKeeper>((ref) {
     loaded = state.isLoaded;
   }
 
-  ref.listen(
-    libraryCollectionsProvider,
-    (_, _) => collectionsChanged(),
-    fireImmediately: true,
-  );
+  void syncCollectionsSubscription() {
+    final shouldWatch = currentClient != null && currentKept.isNotEmpty;
+    if (shouldWatch && collectionsSub == null) {
+      collectionsSub = ref.listen(
+        libraryCollectionsProvider,
+        (_, _) => collectionsChanged(),
+        fireImmediately: true,
+      );
+    } else if (!shouldWatch && collectionsSub != null) {
+      collectionsSub?.close();
+      collectionsSub = null;
+      membership = <String, int>{};
+      loaded = false;
+    }
+  }
+
+  ref.listen(linkPhoneClientProvider, (_, client) {
+    currentClient = client;
+    keeper.attach(client);
+    syncCollectionsSubscription();
+  }, fireImmediately: true);
   ref.listen(linkKeptCollectionsProvider, (previous, next) {
     final before = previous?.value ?? const <String>{};
     final after = next.value ?? const <String>{};
-    collectionsChanged();
+    currentKept = after;
+    final hadSub = collectionsSub != null;
+    syncCollectionsSubscription();
+    if (hadSub && collectionsSub != null) {
+      collectionsChanged();
+    }
     if (after.difference(before).isNotEmpty) keeper.marked();
+  }, fireImmediately: true);
+  ref.onDispose(() {
+    collectionsSub?.close();
+    keeper.dispose();
   });
-  ref.onDispose(keeper.dispose);
   return keeper;
 });

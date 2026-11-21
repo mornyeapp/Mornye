@@ -123,6 +123,7 @@ String _prefsKey(String serverId, String name) => 'link_sync_${serverId}_$name';
 /// App-lifetime on phones: the app root keeps it alive.
 class LinkSyncRunner extends Notifier<LinkSyncStatus> {
   LinkClientApi? _client;
+  ProviderSubscription<LibraryCollectionsState>? _collections;
   StreamSubscription<LinkConnectionState>? _states;
   StreamSubscription<Map<String, dynamic>>? _messages;
   Timer? _debounce;
@@ -136,13 +137,6 @@ class LinkSyncRunner extends Notifier<LinkSyncStatus> {
   LinkSyncStatus build() {
     ref.onDispose(_detach);
     ref.listen(linkActiveClientProvider, (_, client) => _attach(client));
-    ref.listen(
-      libraryCollectionsProvider,
-      (_, _) => _schedule(
-        const _SyncRequest(collections: true),
-        ref.read(linkSyncSettingsProvider).localDebounce,
-      ),
-    );
     final client = ref.read(linkActiveClientProvider);
     _attach(client, building: true);
     return LinkSyncStatus(serverId: client?.server.serverId);
@@ -159,6 +153,13 @@ class LinkSyncRunner extends Notifier<LinkSyncStatus> {
       state = LinkSyncStatus(serverId: client?.server.serverId);
     }
     if (client == null) return;
+    _collections = ref.listen(
+      libraryCollectionsProvider,
+      (_, _) => _schedule(
+        const _SyncRequest(collections: true),
+        ref.read(linkSyncSettingsProvider).localDebounce,
+      ),
+    );
     _states = client.connectionStates.listen((connection) {
       if (connection == LinkConnectionState.connected) {
         _connected();
@@ -204,6 +205,8 @@ class LinkSyncRunner extends Notifier<LinkSyncStatus> {
     _debounce?.cancel();
     _historyTimer?.cancel();
     _debounced = null;
+    _collections?.close();
+    _collections = null;
     unawaited(_states?.cancel());
     unawaited(_messages?.cancel());
     _states = null;

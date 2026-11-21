@@ -138,6 +138,14 @@ class CoverStore {
     return path != null && File(path).existsSync() ? path : null;
   }
 
+  /// Asynchronous counterpart of [cachedFile] for background/async callers so
+  /// they avoid synchronous `existsSync()` I/O on the UI isolate.
+  Future<String?> cachedFileAsync(String? ref) async {
+    if (ref == null || ref.isEmpty) return null;
+    final path = fetches(ref) ? indexedFile(ref) : _localPath(ref);
+    return path != null && await File(path).exists() ? path : null;
+  }
+
   /// The file the store names for the network cover [ref], read from memory
   /// without any file IO, so it is safe while building widgets. Null for
   /// other references, for covers not stored, and for covers of earlier
