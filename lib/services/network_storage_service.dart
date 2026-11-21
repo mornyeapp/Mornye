@@ -685,16 +685,22 @@ class NetworkStorageService {
       return virtual.resolve(host, path);
     }
     final c = await _readyConnection(host, path);
-    _server ??= HttpServer.bind(InternetAddress.loopbackIPv4, 0).then((server) {
-      server.listen((request) => unawaited(_serve(request)));
-      return server;
-    });
-    final HttpServer server;
+    final pending = _server ??= _bindProxy();
+    HttpServer server;
     try {
-      server = await _server!;
+      server = await pending;
     } catch (_) {
-      _server = null;
+      if (identical(_server, pending)) _server = null;
       rethrow;
+    }
+    // iOS closes a suspended app's listening socket without telling Dart.
+    if (!await _accepts(server)) {
+      if (identical(_server, pending)) {
+        _log.w('Loopback proxy stopped accepting; binding it again');
+        unawaited(server.close().catchError((Object _) {}));
+        _server = _bindProxy();
+      }
+      server = await _server!;
     }
     final name = _networkFileName(c, path);
     final dot = name.lastIndexOf('.');
@@ -709,6 +715,26 @@ class NetworkStorageService {
     }
     _routes[token] = (id: host, path: path);
     return 'http://127.0.0.1:${server.port}/$token';
+  }
+
+  Future<HttpServer> _bindProxy() =>
+      HttpServer.bind(InternetAddress.loopbackIPv4, 0).then((server) {
+        server.listen((request) => unawaited(_serve(request)));
+        return server;
+      });
+
+  static Future<bool> _accepts(HttpServer server) async {
+    try {
+      final socket = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        server.port,
+        timeout: const Duration(seconds: 1),
+      );
+      socket.destroy();
+      return true;
+    } on IOException {
+      return false;
+    }
   }
 
   /// Marks connection [id] out of reach, as a paired Mornye Link desktop
