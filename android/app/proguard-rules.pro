@@ -9,9 +9,13 @@
 # The FFmpeg plugin ships its JNI keep rules in its AAR.
 
 # UniFFI/JNA resolves FFI methods and structure fields by their generated names.
-# Preserve the generated Rust bindings used by JNA.
+# Preserve JNA runtime internals and the generated Rust FFI bridge surface.
 -keep class com.sun.jna.** { *; }
--keep class com.mornye.backend.** { *; }
+-keep class com.mornye.backend.UniffiLib { *; }
+-keep class com.mornye.backend.UniffiLib$* { *; }
+-keep class com.mornye.backend.* implements com.sun.jna.Structure$ByValue { *; }
+-keep class com.mornye.backend.* extends com.sun.jna.Structure { *; }
+-keep class com.mornye.backend.* implements com.sun.jna.Callback { *; }
 # JNA's desktop AWT helpers are unavailable and unused on Android.
 # https://github.com/java-native-access/jna/blob/master/www/FrequentlyAskedQuestions.md#jna-on-android
 -dontwarn java.awt.Component
@@ -56,7 +60,6 @@
     public <init>();
 }
 
--keepattributes *Annotation*
 -keepattributes SourceFile,LineNumberTable
 -keepattributes Signature
 -keepattributes Exceptions

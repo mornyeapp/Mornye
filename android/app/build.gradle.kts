@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 import java.io.FileInputStream
 
@@ -8,8 +9,9 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Direct Flutter builds also need the revision displayed in About.
-val buildDartDefines = providers.exec {
+// Direct Flutter builds also need the revision displayed in About, plus the
+// mobile compile-time flag so Dart AOT tree-shakes desktop-only code.
+val rawDartDefines = providers.exec {
     workingDir(rootProject.projectDir.parentFile)
     commandLine(
         "bash",
@@ -17,6 +19,14 @@ val buildDartDefines = providers.exec {
         project.findProperty("dart-defines")?.toString().orEmpty(),
     )
 }.standardOutput.asText.get().trim()
+val mobileDefine = Base64.getEncoder().encodeToString("MORNYE_MOBILE=true".toByteArray())
+val existingDefines = rawDartDefines.split(",").filter { it.isNotBlank() }
+val hasMobileDefine = existingDefines.any { entry ->
+    runCatching { String(Base64.getDecoder().decode(entry)) }.getOrNull()
+        ?.startsWith("MORNYE_MOBILE=") == true
+}
+val buildDartDefines = (if (hasMobileDefine) existingDefines else existingDefines + mobileDefine)
+    .joinToString(",")
 project.extensions.extraProperties["dart-defines"] = buildDartDefines
 
 // Flutter reads this when configuring variant tasks, after this build script.
@@ -51,11 +61,50 @@ android {
     compileSdk = 37
     ndkVersion = "30.0.16248370"
 
+    androidResources {
+        // Keep only Android resources for Mornye's active UI locales.
+        localeFilters += listOf(
+            "en",
+            "ko",
+            "fr",
+            "es",
+            "es-rES",
+            "de",
+            "uk",
+            "ru",
+            "tr",
+            "id",
+            "in",
+            "pt",
+            "pt-rPT",
+            "ja",
+            "vi",
+            "zh",
+            "zh-rCN",
+        )
+        // AGP's default list, then Flutter assets Android never loads: desktop
+        // and merged-surface glass shaders and media_kit's web player script.
+        ignoreAssetsPattern =
+            "!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~" +
+                ":!metaball_*:!liquid_glass_desktop.frag:!liquid_glass_border.frag" +
+                ":!hls1.4.10.js"
+    }
+
     buildFeatures {
         buildConfig = true
     }
     packaging {
         if (discordSdkEnabled) jniLibs.pickFirsts += "**/libdiscord_partner_sdk.so"
+        resources {
+            excludes += setOf(
+                "DebugProbesKt.bin",
+                "kotlin-tooling-metadata.json",
+                "kotlin/**/*.kotlin_builtins",
+                "META-INF/*.version",
+                "META-INF/version-control-info.textproto",
+                "META-INF/com/android/build/gradle/app-metadata.properties",
+            )
+        }
     }
 
     externalNativeBuild {
@@ -161,7 +210,10 @@ android {
 
     splits {
         abi {
-            isEnable = true
+            // ABI splits apply to APK builds only; AAB handles splits natively.
+            isEnable = !gradle.startParameter.taskNames.any {
+                it.contains("bundle", ignoreCase = true)
+            }
             reset()
             include(*rustAndroidAbis.toTypedArray())
             isUniversalApk = true // Also generate universal APK
@@ -188,17 +240,6 @@ val buildRustBackend = tasks.register<Exec>("buildRustBackend") {
     outputs.dir(rustBackendDir.resolve("target/android/jniLibs"))
 }
 tasks.named("preBuild").configure { dependsOn(buildRustBackend) }
-
-// Filter Android's copy only; keep shared bundles and mobile glass shaders intact.
-tasks.withType<org.gradle.api.tasks.Copy>().configureEach {
-    if (name.startsWith("copyFlutterAssets")) {
-        exclude(
-            "flutter_assets/packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_desktop.frag",
-            "flutter_assets/packages/liquid_glass_easy/lib/assets/shaders/metaball_glass_desktop.frag",
-            "flutter_assets/packages/flutter_local_notifications_web/web/notifications_service_worker.js",
-        )
-    }
-}
 
 flutter {
     source = "../.."
