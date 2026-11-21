@@ -142,8 +142,9 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
 
   bool _replacePlaylistById(
     String playlistId,
-    UserPlaylistCollection Function(UserPlaylistCollection playlist) update,
-  ) {
+    UserPlaylistCollection Function(UserPlaylistCollection playlist) update, {
+    Set<String>? allPlaylistTrackKeys,
+  }) {
     if (!ref.mounted) return false;
     final playlist = state.playlistById(playlistId);
     if (playlist == null) return false;
@@ -156,7 +157,10 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
 
     final updatedPlaylists = [...state.playlists];
     updatedPlaylists[playlistIndex] = nextPlaylist;
-    state = state.copyWith(playlists: updatedPlaylists);
+    state = state.copyWith(
+      playlists: updatedPlaylists,
+      allPlaylistTrackKeys: allPlaylistTrackKeys,
+    );
     return true;
   }
 
@@ -256,10 +260,13 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
       final keys = selected.map(trackCollectionKey).toSet();
       await _db.deleteLovedTracks(keys.toList(growable: false));
       if (ref.mounted) {
+        final nextLovedKeys = Set<String>.of(state.lovedKeysView)
+          ..removeAll(keys);
         state = state.copyWith(
           loved: state.loved
               .where((entry) => !keys.contains(entry.key))
               .toList(growable: false),
+          lovedKeys: nextLovedKeys,
         );
       }
       return (removed: true, count: keys.length);
@@ -268,7 +275,7 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
     final now = DateTime.now();
     final prepared = await prepareCollectionTrackBatch(
       tracks: selected,
-      existingKeys: state.loved.map((entry) => entry.key).toSet(),
+      existingKeys: state.lovedKeysView,
       addedAt: now,
     );
     try {
@@ -288,8 +295,11 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
       if (ref.mounted) {
         // The latest added track appears first, matching the original
         // per-track inserts and the database's DESC rowid tie-breaker.
+        final nextLovedKeys = Set<String>.of(state.lovedKeysView)
+          ..addAll(prepared.entries.map((entry) => entry.key));
         state = state.copyWith(
           loved: [...prepared.entries.reversed, ...state.loved],
+          lovedKeys: nextLovedKeys,
         );
       }
       return (removed: false, count: prepared.entries.length);
@@ -481,15 +491,11 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
 
   Future<bool> addTrackToPlaylist(String playlistId, Track track) => _mutate(
     () async {
-      var playlist = state.playlistById(playlistId);
+      final playlist = state.playlistById(playlistId);
       if (playlist == null) return false;
 
       final key = trackCollectionKey(track);
       if (playlist.containsTrackKey(key)) return false;
-      await ensurePlaylistLoaded(playlistId);
-      if (!ref.mounted) return false;
-      playlist = state.playlistById(playlistId);
-      if (playlist == null) return false;
 
       final now = DateTime.now();
       final entry = CollectionTrackEntry(key: key, track: track, addedAt: now);
@@ -500,13 +506,26 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
         addedAt: entry.addedAt.toIso8601String(),
         playlistUpdatedAt: now.toIso8601String(),
       );
-      final changed = _replacePlaylistById(playlistId, (playlist) {
-        if (playlist.containsTrackKey(key)) return playlist;
-        return playlist.copyWith(
-          tracks: [...playlist.tracks, entry],
+      final nextAllKeys = Set<String>.of(state.allPlaylistTrackKeysView)
+        ..add(key);
+      final changed = _replacePlaylistById(playlistId, (current) {
+        if (current.containsTrackKey(key)) return current;
+        final nextKeys = Set<String>.of(current.trackKeys)..add(key);
+        if (!current.tracksLoaded && current.trackKeys.isNotEmpty) {
+          return current.copyWith(
+            updatedAt: now,
+            tracksLoaded: false,
+            trackKeys: nextKeys,
+            previewCover: current.previewCover ?? track.coverUrl,
+          );
+        }
+        return current.copyWith(
+          tracks: [...current.tracks, entry],
+          tracksLoaded: true,
+          trackKeys: nextKeys,
           updatedAt: now,
         );
-      });
+      }, allPlaylistTrackKeys: nextAllKeys);
       if (!changed) return false;
       _invalidatePlaylistPickerSummaries();
       _endorse([track], AutoplayFeedbackKind.playlisted);
@@ -519,13 +538,6 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
     Iterable<Track> tracks, {
     bool preserveOccurrences = false,
   }) => _mutate(() async {
-    await ensurePlaylistLoaded(playlistId);
-    if (!ref.mounted) {
-      return const PlaylistAddBatchResult(
-        addedCount: 0,
-        alreadyInPlaylistCount: 0,
-      );
-    }
     final playlist = state.playlistById(playlistId);
     if (playlist == null) {
       return const PlaylistAddBatchResult(
@@ -563,13 +575,37 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
           tracks: prepared.rows,
         );
       }
+      final addedKeys = [for (final entry in prepared.entries) entry.key];
+      final nextAllKeys = Set<String>.of(state.allPlaylistTrackKeysView)
+        ..addAll(addedKeys);
       final changed = _replacePlaylistById(playlistId, (current) {
+        final nextKeys = Set<String>.of(current.trackKeys)..addAll(addedKeys);
+        if (!current.tracksLoaded && current.trackKeys.isNotEmpty) {
+          String? fallbackCover;
+          if (current.previewCover == null) {
+            for (final entry in prepared.entries) {
+              final cover = entry.track.coverUrl;
+              if (cover != null && cover.isNotEmpty) {
+                fallbackCover = cover;
+                break;
+              }
+            }
+          }
+          return current.copyWith(
+            updatedAt: now,
+            tracksLoaded: false,
+            trackKeys: nextKeys,
+            previewCover: current.previewCover ?? fallbackCover,
+          );
+        }
         return current.copyWith(
           // Append in playlist order, matching the ASC snapshot ordering.
           tracks: [...current.tracks, ...prepared.entries],
+          tracksLoaded: true,
+          trackKeys: nextKeys,
           updatedAt: now,
         );
-      });
+      }, allPlaylistTrackKeys: nextAllKeys);
       if (changed) {
         _invalidatePlaylistPickerSummaries();
         _endorse([
@@ -674,7 +710,11 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
     );
     final changed = _replacePlaylistById(
       playlistId,
-      (current) => current.copyWith(tracks: reordered, updatedAt: now),
+      (current) => current.copyWith(
+        tracks: reordered,
+        updatedAt: now,
+        keepTrackKeys: true,
+      ),
     );
     if (changed) _invalidatePlaylistPickerSummaries();
     return changed;

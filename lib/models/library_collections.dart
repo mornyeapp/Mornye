@@ -156,9 +156,11 @@ class UserPlaylistCollection {
     List<CollectionTrackEntry>? tracks,
     String? previewCover,
     bool? tracksLoaded,
+    Set<String>? trackKeys,
+    bool keepTrackKeys = false,
   }) {
     final nextTracks = tracks ?? this.tracks;
-    final keepTrackIndex = identical(nextTracks, this.tracks);
+    final keepTrackIndex = keepTrackKeys || identical(nextTracks, this.tracks);
     return UserPlaylistCollection(
       id: id ?? this.id,
       name: name ?? this.name,
@@ -172,7 +174,7 @@ class UserPlaylistCollection {
       tracksLoaded:
           tracksLoaded ??
           (identical(nextTracks, this.tracks) ? this.tracksLoaded : true),
-      trackKeys: keepTrackIndex ? _trackKeys : null,
+      trackKeys: trackKeys ?? (keepTrackIndex ? _trackKeys : null),
     );
   }
 
@@ -352,6 +354,10 @@ class LibraryCollectionsState {
     List<UserPlaylistCollection>? playlists,
     List<CollectionArtistEntry>? favoriteArtists,
     bool? isLoaded,
+    Set<String>? wishlistKeys,
+    Set<String>? lovedKeys,
+    Set<String>? favoriteArtistKeys,
+    Set<String>? allPlaylistTrackKeys,
   }) {
     final nextWishlist = wishlist ?? this.wishlist;
     final nextLoved = loved ?? this.loved;
@@ -371,16 +377,26 @@ class LibraryCollectionsState {
       playlists: nextPlaylists,
       favoriteArtists: nextFavoriteArtists,
       isLoaded: isLoaded ?? this.isLoaded,
-      wishlistKeys: keepWishlistIndex ? _wishlistKeys : null,
-      lovedKeys: keepLovedIndex ? _lovedKeys : null,
-      favoriteArtistKeys: keepFavoriteArtistIndex ? _favoriteArtistKeys : null,
+      wishlistKeys: wishlistKeys ?? (keepWishlistIndex ? _wishlistKeys : null),
+      lovedKeys: lovedKeys ?? (keepLovedIndex ? _lovedKeys : null),
+      favoriteArtistKeys:
+          favoriteArtistKeys ??
+          (keepFavoriteArtistIndex ? _favoriteArtistKeys : null),
       playlistsById: keepPlaylistIndex ? _playlistsById : null,
       allPlaylistTrackKeys:
-          keepPlaylistIndex || _hasSamePlaylistMembership(nextPlaylists)
-          ? _allPlaylistTrackKeys
-          : null,
+          allPlaylistTrackKeys ??
+          (keepPlaylistIndex || _hasSamePlaylistMembership(nextPlaylists)
+              ? _allPlaylistTrackKeys
+              : null),
     );
   }
+
+  /// Exposes the loved key set for incremental updates without rescanning.
+  Set<String> get lovedKeysView => UnmodifiableSetView(_lovedKeys);
+
+  /// Exposes all playlist track keys for incremental updates.
+  Set<String> get allPlaylistTrackKeysView =>
+      UnmodifiableSetView(_allPlaylistTrackKeys);
 
   bool _hasSamePlaylistMembership(List<UserPlaylistCollection> nextPlaylists) {
     if (nextPlaylists.length != playlists.length ||

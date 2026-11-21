@@ -159,6 +159,7 @@ class LibraryCollectionsDatabase {
       },
       onCreate: _createDb,
       onUpgrade: _upgradeDb,
+      onOpen: _onOpenDb,
     ),
   );
 
@@ -172,7 +173,18 @@ class LibraryCollectionsDatabase {
         foreignKeys: true,
         onCreate: _createDb,
         onUpgrade: _upgradeDb,
+        onOpen: _onOpenDb,
       ),
+    );
+  }
+
+  static Future<void> _onOpenDb(Database db) async {
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_${_tablePlaylistTracks}_playlist_added '
+      'ON $_tablePlaylistTracks(playlist_id, added_at)',
+    );
+    await db.execute(
+      'DROP INDEX IF EXISTS idx_${_tablePlaylistTracks}_playlist_id',
     );
   }
 
@@ -233,7 +245,8 @@ class LibraryCollectionsDatabase {
       'CREATE INDEX idx_${_tablePlaylists}_created_at ON $_tablePlaylists(created_at DESC)',
     );
     await db.execute(
-      'CREATE INDEX idx_${_tablePlaylistTracks}_playlist_id ON $_tablePlaylistTracks(playlist_id)',
+      'CREATE INDEX IF NOT EXISTS idx_${_tablePlaylistTracks}_playlist_added '
+      'ON $_tablePlaylistTracks(playlist_id, added_at)',
     );
     await db.execute(
       'CREATE INDEX idx_${_tablePlaylistTracks}_added_at ON $_tablePlaylistTracks(added_at DESC)',
