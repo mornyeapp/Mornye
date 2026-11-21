@@ -6,8 +6,10 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <unistd.h>
+#include <vector>
 
 namespace {
 void check(bool value, const char *message) {
@@ -126,6 +128,15 @@ void retainsDescriptor() {
     check(source.seek(5001, &error), error.c_str());
     compare(source, fixture, 5001, 24);
 }
+
+void reportsFailedAllocation() {
+    PcmBuffer<int32_t> buffer;
+    check(buffer.resize(8), "allocate buffer");
+    buffer[7] = 42;
+    const size_t impossible = std::numeric_limits<size_t>::max() / sizeof(int32_t);
+    check(!buffer.resize(impossible), "accepted an impossible size");
+    check(buffer.size() == 8 && buffer[7] == 42, "failed growth changed the buffer");
+}
 }
 
 int main() {
@@ -137,6 +148,7 @@ int main() {
         }
         rejectsTruncatedData();
         retainsDescriptor();
+        reportsFailedAllocation();
         std::cout << "FLAC integer precision, padding, seek, EOF and truncation checks passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception &error) {

@@ -1,12 +1,12 @@
 #pragma once
 
 #include <FLAC/stream_decoder.h>
+#include "pcm_buffer.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <vector>
 
 // Owns its file descriptor, decodes one FLAC block at a time, and never passes
 // samples through Android's extractor (which may silently emit 16-bit PCM).
@@ -15,7 +15,7 @@ class FlacPcmSource final {
         void operator()(FLAC__StreamDecoder *decoder) const;
     };
     std::unique_ptr<FLAC__StreamDecoder, DeleteDecoder> decoder;
-    std::vector<int32_t> block;
+    PcmBuffer<int32_t> block;
     size_t offset = 0;
     uint64_t position = 0;
     bool end = false;

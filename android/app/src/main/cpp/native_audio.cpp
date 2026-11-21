@@ -2,6 +2,7 @@
 #include <oboe/Oboe.h>
 #include <wavpack.h>
 #include "flac_pcm_source.h"
+#include "pcm_buffer.h"
 
 #include <algorithm>
 #include <atomic>
@@ -76,7 +77,7 @@ public:
 class ExclusiveOutput final : public oboe::AudioStreamDataCallback {
     std::shared_ptr<oboe::AudioStream> stream;
     // Single producer (Kotlin worker), single consumer (audio callback).
-    std::vector<uint8_t> ring;
+    PcmBuffer<uint8_t> ring;
     std::atomic<uint64_t> read{0}, written{0}, musicFrames{0};
     std::atomic<int64_t> lastMusicEnd{0};
     int64_t callbackFrames = 0;
@@ -130,7 +131,9 @@ public:
                 floatOutput = format == oboe::AudioFormat::Float;
                 bits = format == oboe::AudioFormat::I16 ? 16 : format == oboe::AudioFormat::I24 ? 24 : 32;
                 frameBytes = channels * (bits / 8);
-                ring.resize(static_cast<size_t>(rate / 4) * frameBytes);
+                if (!ring.resize(static_cast<size_t>(rate / 4) * frameBytes)) {
+                    return fail(errorOut, "Cannot allocate output buffer");
+                }
                 return true;
             }
             appendFmt(attempts, " actual=%s/%dHz/%dch/%s, api=%s, device=%d",
@@ -353,7 +356,12 @@ JNIEXPORT jbyteArray JNICALL JNI_AUDIO(readWavPack)(JNIEnv *env, jobject, jlong 
     std::string error;
     auto d = decoders.get(handle, &error);
     if (!d) { report(env, error); return nullptr; }
-    std::vector<int32_t> data(static_cast<size_t>(frames) * d->channels);
+    PcmBuffer<int32_t> data;
+    PcmBuffer<jbyte> bytes;
+    if (!data.resize(static_cast<size_t>(frames) * d->channels) || !bytes.resize(data.size())) {
+        report(env, "Cannot allocate DSD buffer");
+        return nullptr;
+    }
     auto count = WavpackUnpackSamples(d->context, data.data(), frames);
     if (WavpackGetNumErrors(d->context) != 0) {
         report(env, "Corrupt WavPack DSD data");
@@ -363,7 +371,7 @@ JNIEXPORT jbyteArray JNICALL JNI_AUDIO(readWavPack)(JNIEnv *env, jobject, jlong 
         report(env, "Truncated WavPack DSD data");
         return nullptr;
     }
-    std::vector<jbyte> bytes(static_cast<size_t>(count) * d->channels);
+    bytes.resize(static_cast<size_t>(count) * d->channels);
     // OPEN_DSD_NATIVE returns interleaved, MSB-first DSD bytes regardless
     // of the wrapper's original DSF bit-order/blocking flags.
     for (size_t i = 0; i < bytes.size(); ++i) bytes[i] = static_cast<jbyte>(data[i]);

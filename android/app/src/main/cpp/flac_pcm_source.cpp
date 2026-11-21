@@ -54,7 +54,10 @@ FLAC__StreamDecoderWriteStatus FlacPcmSource::write(
         source.failure = "FLAC format changed during decoding";
         return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
     }
-    source.block.resize(static_cast<size_t>(header.blocksize) * source.channels);
+    if (!source.block.resize(static_cast<size_t>(header.blocksize) * source.channels)) {
+        source.failure = "Cannot allocate FLAC block";
+        return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+    }
     source.offset = 0;
     for (size_t i = 0; i < header.blocksize; ++i) {
         for (int channel = 0; channel < source.channels; ++channel) {
