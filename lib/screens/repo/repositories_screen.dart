@@ -33,74 +33,76 @@ class RepositoriesScreen extends ConsumerWidget {
       return null;
     }
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          AppSliverHeader.page(title: l10n.storeRepositoriesTitle),
-          if (urls.isNotEmpty)
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            AppSliverHeader.page(title: l10n.storeRepositoriesTitle),
+            if (urls.isNotEmpty)
+              SliverToBoxAdapter(
+                child: SettingsGroup(
+                  children: [
+                    for (final (index, url) in urls.indexed)
+                      Builder(
+                        builder: (context) {
+                          final source = sourceFor(url);
+                          final name = source?.name ?? url;
+                          return SettingsItem(
+                            key: ValueKey('repository-$url'),
+                            title: name,
+                            subtitle: url,
+                            showDivider: index < urls.length - 1,
+                            footer: source == null
+                                ? null
+                                : Text(
+                                    source.hasError
+                                        ? context.friendlyError(source.error)
+                                        : l10n.storeExtensionsCount(
+                                            source.extensionCount,
+                                          ),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: source.hasError
+                                              ? colorScheme.error
+                                              : colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                            trailing: AppIconButton(
+                              tooltip: l10n.storeRemoveRepoTooltip,
+                              icon: Icon(
+                                context.isMornye
+                                    ? CupertinoIcons.minus_circle
+                                    : Icons.remove_circle_outline,
+                                color: colorScheme.error,
+                              ),
+                              onPressed: () =>
+                                  _confirmRemove(context, ref, url, name),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
             SliverToBoxAdapter(
               child: SettingsGroup(
                 children: [
-                  for (final (index, url) in urls.indexed)
-                    Builder(
-                      builder: (context) {
-                        final source = sourceFor(url);
-                        final name = source?.name ?? url;
-                        return SettingsItem(
-                          key: ValueKey('repository-$url'),
-                          title: name,
-                          subtitle: url,
-                          showDivider: index < urls.length - 1,
-                          footer: source == null
-                              ? null
-                              : Text(
-                                  source.hasError
-                                      ? context.friendlyError(source.error)
-                                      : l10n.storeExtensionsCount(
-                                          source.extensionCount,
-                                        ),
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: source.hasError
-                                            ? colorScheme.error
-                                            : colorScheme.onSurfaceVariant,
-                                      ),
-                                ),
-                          trailing: AppIconButton(
-                            tooltip: l10n.storeRemoveRepoTooltip,
-                            icon: Icon(
-                              context.isMornye
-                                  ? CupertinoIcons.minus_circle
-                                  : Icons.remove_circle_outline,
-                              color: colorScheme.error,
-                            ),
-                            onPressed: () =>
-                                _confirmRemove(context, ref, url, name),
-                          ),
-                        );
-                      },
-                    ),
+                  SettingsItem(
+                    key: const ValueKey('repository-add'),
+                    icon: Icons.add,
+                    showIconInMornye: true,
+                    iconColor: colorScheme.primary,
+                    title: l10n.storeAddRepoButton,
+                    trailing: const SizedBox.shrink(),
+                    showDivider: false,
+                    onTap: () => showAddRepositoryDialog(context),
+                  ),
                 ],
               ),
             ),
-          SliverToBoxAdapter(
-            child: SettingsGroup(
-              children: [
-                SettingsItem(
-                  key: const ValueKey('repository-add'),
-                  icon: Icons.add,
-                  showIconInMornye: true,
-                  iconColor: colorScheme.primary,
-                  title: l10n.storeAddRepoButton,
-                  trailing: const SizedBox.shrink(),
-                  showDivider: false,
-                  onTap: () => showAddRepositoryDialog(context),
-                ),
-              ],
-            ),
-          ),
-          const NavBarSliverSpacer(),
-        ],
+            const NavBarSliverSpacer(),
+          ],
+        ),
       ),
     );
   }

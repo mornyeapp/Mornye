@@ -18,10 +18,12 @@ import 'package:mornye/screens/settings/metadata_provider_priority_page.dart';
 import 'package:mornye/screens/settings/provider_priority_page.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
+import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/home_feed_region_setting.dart';
@@ -70,182 +72,163 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       glass: false,
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
 
-    return PopScope(
-      canPop: true,
-      child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            AppSliverHeader.page(title: context.l10n.extensionsTitle),
+    return MornyeSettingsTheme(
+      child: PopScope(
+        canPop: true,
+        child: Scaffold(
+          body: CustomScrollView(
+            slivers: [
+              AppSliverHeader.page(title: context.l10n.extensionsTitle),
 
-            const SliverToBoxAdapter(child: ExtensionStorageRecoveryNotice()),
-            const SliverToBoxAdapter(child: ExtensionStorageSetting()),
+              const SliverToBoxAdapter(child: ExtensionStorageRecoveryNotice()),
+              const SliverToBoxAdapter(child: ExtensionStorageSetting()),
 
-            if (extState.isLoading)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: AppLoadingIndicator()),
+              if (extState.isLoading)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: AppLoadingIndicator()),
+                  ),
                 ),
-              ),
 
-            if (extState.error != null)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        AppIcon(
-                          Icons.error_outline,
-                          color: colorScheme.onErrorContainer,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            context.friendlyError(extState.error),
-                            style: TextStyle(
-                              color: colorScheme.onErrorContainer,
+              if (extState.error != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          AppIcon(
+                            Icons.error_outline,
+                            color: colorScheme.onErrorContainer,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              context.friendlyError(extState.error),
+                              style: TextStyle(
+                                color: colorScheme.onErrorContainer,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(
-                title: context.l10n.extensionsProviderPrioritySection,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                connected: true,
-                children: [
-                  _ExtensionPriorityLink(_PriorityLink.download),
-                  _ExtensionPriorityLink(_PriorityLink.fallback),
-                  _ExtensionPriorityLink(_PriorityLink.metadata),
-                  _SearchProviderSelector(),
-                  _HomeFeedProviderSelector(),
-                  HomeFeedRegionSetting(),
-                ],
-              ),
-            ),
-
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(
-                title: context.l10n.extensionsInstalledSection,
-              ),
-            ),
-
-            if (extState.extensions.isEmpty && !extState.isLoading)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 16 + wideListInset(context),
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.3,
+                        ],
                       ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: [
-                        AppIcon(
-                          Icons.extension_outlined,
-                          size: 48,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          context.l10n.extensionsNoExtensions,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          context.l10n.extensionsNoExtensionsSubtitle,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
                     ),
                   ),
                 ),
-              ),
 
-            if (extState.extensions.isNotEmpty)
+              SliverToBoxAdapter(
+                child: SettingsSectionHeader(
+                  title: context.l10n.extensionsProviderPrioritySection,
+                ),
+              ),
               SliverToBoxAdapter(
                 child: SettingsGroup(
                   connected: true,
-                  children: extState.extensions.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final ext = entry.value;
-                    return _ExtensionItem(
-                      extension: ext,
-                      healthStatus: extState.healthStatuses[ext.id],
-                      showDivider: index < extState.extensions.length - 1,
-                      onTap: () => pushPage<void>(
+                  children: [
+                    _ExtensionPriorityLink(_PriorityLink.download),
+                    _ExtensionPriorityLink(_PriorityLink.fallback),
+                    _ExtensionPriorityLink(_PriorityLink.metadata),
+                    _SearchProviderSelector(),
+                    _HomeFeedProviderSelector(),
+                    HomeFeedRegionSetting(),
+                  ],
+                ),
+              ),
+
+              SliverToBoxAdapter(
+                child: SettingsSectionHeader(
+                  title: context.l10n.extensionsInstalledSection,
+                ),
+              ),
+
+              if (extState.extensions.isEmpty && !extState.isLoading)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16 + wideListInset(context),
+                    ),
+                    child: EmptyState(
+                      icon: Icons.extension_outlined,
+                      title: context.l10n.extensionsNoExtensions,
+                      message: context.l10n.extensionsNoExtensionsSubtitle,
+                    ),
+                  ),
+                ),
+
+              if (extState.extensions.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: SettingsGroup(
+                    connected: true,
+                    children: extState.extensions.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final ext = entry.value;
+                      return _ExtensionItem(
+                        extension: ext,
+                        healthStatus: extState.healthStatuses[ext.id],
+                        showDivider: index < extState.extensions.length - 1,
+                        onTap: () => pushPage<void>(
+                          context,
+                          (_) => ExtensionDetailPage(extensionId: ext.id),
+                        ),
+                        onToggle: (enabled) => ref
+                            .read(extensionProvider.notifier)
+                            .setExtensionEnabled(ext.id, enabled),
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+              SliverToBoxAdapter(
+                child: SettingsSearchTarget(
+                  label: context.l10n.extensionsInstallButton,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Same edges as the extension group above.
+                      final inset = settingsHorizontalInset(
                         context,
-                        (_) => ExtensionDetailPage(extensionId: ext.id),
-                      ),
-                      onToggle: (enabled) => ref
-                          .read(extensionProvider.notifier)
-                          .setExtensionEnabled(ext.id, enabled),
-                    );
-                  }).toList(),
+                        constraints.maxWidth,
+                      );
+                      return Padding(
+                        padding: EdgeInsets.fromLTRB(inset, 16, inset, 16),
+                        child: context.isMornye
+                            ? MornyeGlassPanel.overlay(
+                                radius: 28,
+                                samplesBackdrop: false,
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: installButton,
+                                ),
+                              )
+                            : SizedBox(
+                                width: double.infinity,
+                                child: installButton,
+                              ),
+                      );
+                    },
+                  ),
                 ),
               ),
 
-            SliverToBoxAdapter(
-              child: SettingsSearchTarget(
-                label: context.l10n.extensionsInstallButton,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    // Same edges as the extension group above.
-                    final inset = settingsHorizontalInset(
-                      context,
-                      constraints.maxWidth,
-                    );
-                    return Padding(
-                      padding: EdgeInsets.fromLTRB(inset, 16, inset, 16),
-                      child: context.isMornye
-                          ? MornyeGlassPanel.overlay(
-                              radius: 28,
-                              samplesBackdrop: false,
-                              child: installButton,
-                            )
-                          : installButton,
-                    );
-                  },
+              SliverToBoxAdapter(
+                child: SettingsInfoCard(
+                  icon: Icons.info_outline,
+                  tone: SettingsInfoTone.warning,
+                  message: context.l10n.extensionsInfoTip,
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 ),
               ),
-            ),
-
-            SliverToBoxAdapter(
-              child: SettingsInfoCard(
-                glass: true,
-                icon: Icons.info_outline,
-                tone: SettingsInfoTone.warning,
-                message: context.l10n.extensionsInfoTip,
-                margin: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-              ),
-            ),
-          ],
+              const NavBarSliverSpacer(),
+            ],
+          ),
         ),
       ),
     );

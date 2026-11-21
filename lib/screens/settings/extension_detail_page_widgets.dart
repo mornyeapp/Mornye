@@ -149,9 +149,7 @@ class _CapabilityItem extends StatelessWidget {
             children: [
               AppIcon(
                 context.adaptiveIcon(icon),
-                color: context.isMornye || enabled
-                    ? colorScheme.primary
-                    : colorScheme.outline,
+                color: enabled ? colorScheme.primary : colorScheme.outline,
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -177,9 +175,7 @@ class _CapabilityItem extends StatelessWidget {
                           ? CupertinoIcons.check_mark_circled_solid
                           : CupertinoIcons.xmark_circle)
                     : (enabled ? Icons.check_circle : Icons.cancel_outlined),
-                color: context.isMornye || enabled
-                    ? colorScheme.primary
-                    : colorScheme.outline,
+                color: enabled ? colorScheme.primary : colorScheme.outline,
               ),
             ],
           ),
@@ -925,31 +921,24 @@ class _URLHandlerInfo extends StatelessWidget {
               );
             }).toList(),
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                AppIcon(
-                  Icons.info_outline,
-                  size: 20,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    context.l10n.extensionCustomUrlHandlingShareHint,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              AppIcon.adaptive(
+                Icons.info_outline,
+                size: 20,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  context.l10n.extensionCustomUrlHandlingShareHint,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),

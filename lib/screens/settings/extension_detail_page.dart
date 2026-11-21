@@ -19,6 +19,7 @@ import 'package:mornye/controllers/extension_action_forms.dart';
 import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/utils/extension_country_name.dart';
+import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
@@ -103,398 +104,408 @@ class _ExtensionDetailPageState extends ConsumerState<ExtensionDetailPage> {
     final hasError = extension.status == 'error';
     final healthStatus = extState.healthStatuses[extension.id];
 
-    return PopScope(
-      canPop: true,
-      child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            AppSliverHeader.page(title: extension.displayName),
+    return MornyeSettingsTheme(
+      child: PopScope(
+        canPop: true,
+        child: Scaffold(
+          body: CustomScrollView(
+            slivers: [
+              AppSliverHeader.page(title: extension.displayName),
 
-            SliverLayoutInfoBuilder(
-              select: (constraints) => constraints.crossAxisExtent,
-              builder: (context, width) => SliverToBoxAdapter(
-                child: Padding(
-                  // Same column as the settings groups below on wide panes.
-                  padding: EdgeInsets.symmetric(
-                    horizontal: settingsHorizontalInset(context, width),
-                    vertical: 16,
-                  ),
-                  child: _ExtensionOverviewSurface(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: context.isMornye
-                                    ? MornyeTheme.controlFill(context)
-                                    : hasError
-                                    ? colorScheme.errorContainer
-                                    : colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child:
-                                  extension.iconPath != null &&
-                                      extension.iconPath!.isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: Image(
-                                        image: ExtensionIconImage(
-                                          FileImage(File(extension.iconPath!)),
-                                          extent:
-                                              (56 *
-                                                      MediaQuery.devicePixelRatioOf(
-                                                        context,
-                                                      ))
-                                                  .ceil(),
-                                        ),
-                                        width: 56,
-                                        height: 56,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (
-                                              context,
-                                              error,
-                                              stackTrace,
-                                            ) => AppIcon(
-                                              context.isMornye
-                                                  ? (hasError
-                                                        ? CupertinoIcons
-                                                              .exclamationmark_circle
-                                                        : CupertinoIcons
-                                                              .square_grid_2x2)
-                                                  : hasError
-                                                  ? Icons.error_outline
-                                                  : Icons.extension,
-                                              size: 28,
-                                              color: hasError
-                                                  ? colorScheme.error
-                                                  : colorScheme
-                                                        .onPrimaryContainer,
+              SliverLayoutInfoBuilder(
+                select: (constraints) => constraints.crossAxisExtent,
+                builder: (context, width) => SliverToBoxAdapter(
+                  child: Padding(
+                    // Same column as the settings groups below on wide panes.
+                    padding: EdgeInsets.symmetric(
+                      horizontal: settingsHorizontalInset(context, width),
+                      vertical: 16,
+                    ),
+                    child: _ExtensionOverviewSurface(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: context.isMornye
+                                      ? MornyeTheme.controlFill(context)
+                                      : hasError
+                                      ? colorScheme.errorContainer
+                                      : colorScheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child:
+                                    extension.iconPath != null &&
+                                        extension.iconPath!.isNotEmpty
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Image(
+                                          image: ExtensionIconImage(
+                                            FileImage(
+                                              File(extension.iconPath!),
                                             ),
+                                            extent:
+                                                (56 *
+                                                        MediaQuery.devicePixelRatioOf(
+                                                          context,
+                                                        ))
+                                                    .ceil(),
+                                          ),
+                                          width: 56,
+                                          height: 56,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (
+                                                context,
+                                                error,
+                                                stackTrace,
+                                              ) => AppIcon(
+                                                context.isMornye
+                                                    ? (hasError
+                                                          ? CupertinoIcons
+                                                                .exclamationmark_circle
+                                                          : CupertinoIcons
+                                                                .square_grid_2x2)
+                                                    : hasError
+                                                    ? Icons.error_outline
+                                                    : Icons.extension,
+                                                size: 28,
+                                                color: hasError
+                                                    ? colorScheme.error
+                                                    : colorScheme
+                                                          .onPrimaryContainer,
+                                              ),
+                                        ),
+                                      )
+                                    : AppIcon(
+                                        context.isMornye
+                                            ? (hasError
+                                                  ? CupertinoIcons
+                                                        .exclamationmark_circle
+                                                  : CupertinoIcons
+                                                        .square_grid_2x2)
+                                            : hasError
+                                            ? Icons.error_outline
+                                            : Icons.extension,
+                                        size: 28,
+                                        color: hasError
+                                            ? colorScheme.error
+                                            : colorScheme.onPrimaryContainer,
                                       ),
-                                    )
-                                  : AppIcon(
-                                      context.isMornye
-                                          ? (hasError
-                                                ? CupertinoIcons
-                                                      .exclamationmark_circle
-                                                : CupertinoIcons
-                                                      .square_grid_2x2)
-                                          : hasError
-                                          ? Icons.error_outline
-                                          : Icons.extension,
-                                      size: 28,
-                                      color: hasError
-                                          ? colorScheme.error
-                                          : colorScheme.onPrimaryContainer,
-                                    ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    extension.displayName,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleLarge
-                                        ?.copyWith(fontWeight: FontWeight.bold),
-                                  ),
-                                  Text(
-                                    'v${extension.version}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: colorScheme.onSurfaceVariant,
-                                        ),
-                                  ),
-                                ],
                               ),
-                            ),
-                            AppSwitch(
-                              value: extension.enabled,
-                              semanticLabel: extension.displayName,
-                              onChanged: hasError
-                                  ? null
-                                  : (enabled) => ref
-                                        .read(extensionProvider.notifier)
-                                        .setExtensionEnabled(
-                                          widget.extensionId,
-                                          enabled,
-                                        ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      extension.displayName,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                    Text(
+                                      'v${extension.version}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              AppSwitch(
+                                value: extension.enabled,
+                                semanticLabel: extension.displayName,
+                                onChanged: hasError
+                                    ? null
+                                    : (enabled) => ref
+                                          .read(extensionProvider.notifier)
+                                          .setExtensionEnabled(
+                                            widget.extensionId,
+                                            enabled,
+                                          ),
+                              ),
+                            ],
+                          ),
+                          if (extension.description.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              extension.description,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
                             ),
                           ],
-                        ),
-                        if (extension.description.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          Text(
-                            extension.description,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: colorScheme.onSurfaceVariant),
+                          if (context.isMornye)
+                            Divider(
+                              color: MornyeTheme.metadataDividerColor(context),
+                            ),
+                          _InfoRow(
+                            label: context.l10n.extensionId,
+                            value: extension.id,
                           ),
+                          if (!context.isMornye)
+                            _InfoRow(
+                              label: context.l10n.extensionsVersion(
+                                extension.version,
+                              ),
+                              value: '',
+                            ),
+                          if (hasError && extension.errorMessage != null)
+                            _InfoRow(
+                              label: context.l10n.extensionError,
+                              value: context.friendlyError(
+                                extension.errorMessage,
+                                fallback: context.l10n.extensionsErrorLoading,
+                              ),
+                              isError: true,
+                            ),
                         ],
-                        const SizedBox(height: 16),
-                        if (context.isMornye)
-                          Divider(
-                            color: MornyeTheme.metadataDividerColor(context),
-                          ),
-                        _InfoRow(
-                          label: context.l10n.extensionId,
-                          value: extension.id,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              if (extension.settings.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: SettingsSectionHeader(
+                    title: context.l10n.extensionSettings,
+                  ),
+                ),
+                if (_isLoadingSettings)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(child: AppLoadingIndicator()),
+                    ),
+                  )
+                else
+                  SliverToBoxAdapter(
+                    child: SettingsGroup(
+                      glass: true,
+                      connected: true,
+                      children: extension.settings.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final setting = entry.value;
+                        return _SettingItem(
+                          key: ValueKey(setting.key),
+                          countryOptions:
+                              setting.key ==
+                              extension.homeFeedRegionSetting?.key,
+                          setting: setting,
+                          value: _settings[setting.key] ?? setting.defaultValue,
+                          showDivider: index < extension.settings.length - 1,
+                          onChanged: (value) =>
+                              _updateSetting(setting.key, value),
+                          extensionId: widget.extensionId,
+                          onActionPayload: _handleExtensionActionPayload,
+                        );
+                      }).toList(),
+                    ),
+                  ),
+              ],
+
+              if (extension.hasServiceHealth)
+                ...settingsSectionSlivers(
+                  title: context.l10n.extensionServiceStatus,
+                  glass: true,
+                  connected: true,
+                  children: [
+                    _HealthSummaryItem(
+                      status: healthStatus,
+                      isRefreshing: _isRefreshingHealth,
+                      onRefresh: () => _refreshHealth(force: true),
+                    ),
+                    if (healthStatus != null)
+                      ...healthStatus.checks.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final check = entry.value;
+                        return _HealthCheckItem(
+                          check: check,
+                          showDivider: index < healthStatus.checks.length - 1,
+                        );
+                      }),
+                  ],
+                ),
+
+              if (extension.hasURLHandler &&
+                  extension.urlHandler!.patterns.isNotEmpty)
+                ...settingsSectionSlivers(
+                  title: context.l10n.extensionUrlHandler,
+                  glass: true,
+                  children: [
+                    _URLHandlerInfo(patterns: extension.urlHandler!.patterns),
+                  ],
+                ),
+
+              if (extension.hasDownloadProvider &&
+                  extension.qualityOptions.isNotEmpty)
+                ...settingsSectionSlivers(
+                  title: context.l10n.extensionQualityOptions,
+                  glass: true,
+                  connected: true,
+                  children: extension.qualityOptions.asMap().entries.map((
+                    entry,
+                  ) {
+                    final index = entry.key;
+                    final quality = entry.value;
+                    return _QualityOptionItem(
+                      quality: quality,
+                      showDivider: index < extension.qualityOptions.length - 1,
+                    );
+                  }).toList(),
+                ),
+
+              if (extension.hasPostProcessing &&
+                  extension.postProcessing!.hooks.isNotEmpty)
+                ...settingsSectionSlivers(
+                  title: context.l10n.extensionPostProcessingHooks,
+                  glass: true,
+                  connected: true,
+                  children: extension.postProcessing!.hooks.asMap().entries.map(
+                    (entry) {
+                      final index = entry.key;
+                      final hook = entry.value;
+                      return _PostProcessingHookItem(
+                        hook: hook,
+                        showDivider:
+                            index < extension.postProcessing!.hooks.length - 1,
+                      );
+                    },
+                  ).toList(),
+                ),
+
+              if (extension.permissions.isNotEmpty)
+                ...settingsSectionSlivers(
+                  title: context.l10n.extensionPermissions,
+                  glass: true,
+                  connected: true,
+                  children: extension.permissions.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final permission = entry.value;
+                    return _PermissionItem(
+                      permission: permission,
+                      showDivider: index < extension.permissions.length - 1,
+                    );
+                  }).toList(),
+                ),
+
+              ...settingsSectionSlivers(
+                title: context.l10n.extensionCapabilities,
+                glass: true,
+                connected: true,
+                children: [
+                  _CapabilityItem(
+                    icon: Icons.search,
+                    title: context.l10n.extensionMetadataProvider,
+                    enabled: extension.hasMetadataProvider,
+                  ),
+                  _CapabilityItem(
+                    icon: Icons.download,
+                    title: context.l10n.extensionDownloadProvider,
+                    enabled: extension.hasDownloadProvider,
+                  ),
+                  _CapabilityItem(
+                    icon: Icons.lyrics,
+                    title: context.l10n.extensionLyricsProvider,
+                    enabled: extension.hasLyricsProvider,
+                  ),
+                  _CapabilityItem(
+                    icon: Icons.manage_search,
+                    title: context.l10n.extensionsSearchProvider,
+                    enabled: extension.hasCustomSearch,
+                    subtitle: extension.searchBehavior?.placeholder,
+                  ),
+                  _CapabilityItem(
+                    icon: Icons.compare_arrows,
+                    title: context.l10n.extensionCustomTrackMatching,
+                    enabled: extension.hasCustomMatching,
+                    subtitle: extension.trackMatching?.strategy != null
+                        ? context.l10n.extensionStrategy(
+                            extension.trackMatching!.strategy!,
+                          )
+                        : null,
+                  ),
+                  _CapabilityItem(
+                    icon: Icons.auto_fix_high,
+                    title: context.l10n.extensionPostProcessing,
+                    enabled: extension.hasPostProcessing,
+                    subtitle: extension.postProcessing?.hooks.isNotEmpty == true
+                        ? context.l10n.extensionHooksAvailable(
+                            extension.postProcessing!.hooks.length,
+                          )
+                        : null,
+                  ),
+                  _CapabilityItem(
+                    icon: Icons.link,
+                    title: context.l10n.extensionUrlHandler,
+                    enabled: extension.hasURLHandler,
+                    subtitle: extension.urlHandler?.patterns.isNotEmpty == true
+                        ? context.l10n.extensionPatternsCount(
+                            extension.urlHandler!.patterns.length,
+                          )
+                        : null,
+                  ),
+                  _CapabilityItem(
+                    icon: Icons.monitor_heart_outlined,
+                    title: context.l10n.extensionServiceHealth,
+                    enabled: extension.hasServiceHealth,
+                    subtitle: extension.hasServiceHealth
+                        ? context.l10n.extensionHealthChecksConfigured(
+                            extension.serviceHealth.length,
+                          )
+                        : null,
+                    showDivider: false,
+                  ),
+                ],
+              ),
+
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: AppDialogAction(
+                    onPressed: () => _confirmRemove(context),
+                    isDestructive: true,
+                    outlined: true,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colorScheme.error,
+                      side: BorderSide(color: colorScheme.error),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AppIcon(
+                          context.isMornye
+                              ? CupertinoIcons.trash
+                              : Icons.delete_outline,
                         ),
-                        if (!context.isMornye)
-                          _InfoRow(
-                            label: context.l10n.extensionsVersion(
-                              extension.version,
-                            ),
-                            value: '',
-                          ),
-                        if (hasError && extension.errorMessage != null)
-                          _InfoRow(
-                            label: context.l10n.extensionError,
-                            value: context.friendlyError(
-                              extension.errorMessage,
-                              fallback: context.l10n.extensionsErrorLoading,
-                            ),
-                            isError: true,
-                          ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(context.l10n.extensionRemoveButton),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ),
-            ),
 
-            if (extension.settings.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: SettingsSectionHeader(
-                  title: context.l10n.extensionSettings,
-                ),
-              ),
-              if (_isLoadingSettings)
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(child: AppLoadingIndicator()),
-                  ),
-                )
-              else
-                SliverToBoxAdapter(
-                  child: SettingsGroup(
-                    glass: true,
-                    connected: true,
-                    children: extension.settings.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final setting = entry.value;
-                      return _SettingItem(
-                        key: ValueKey(setting.key),
-                        countryOptions:
-                            setting.key == extension.homeFeedRegionSetting?.key,
-                        setting: setting,
-                        value: _settings[setting.key] ?? setting.defaultValue,
-                        showDivider: index < extension.settings.length - 1,
-                        onChanged: (value) =>
-                            _updateSetting(setting.key, value),
-                        extensionId: widget.extensionId,
-                        onActionPayload: _handleExtensionActionPayload,
-                      );
-                    }).toList(),
-                  ),
-                ),
+              const NavBarSliverSpacer(),
             ],
-
-            if (extension.hasServiceHealth)
-              ...settingsSectionSlivers(
-                title: context.l10n.extensionServiceStatus,
-                glass: true,
-                connected: true,
-                children: [
-                  _HealthSummaryItem(
-                    status: healthStatus,
-                    isRefreshing: _isRefreshingHealth,
-                    onRefresh: () => _refreshHealth(force: true),
-                  ),
-                  if (healthStatus != null)
-                    ...healthStatus.checks.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final check = entry.value;
-                      return _HealthCheckItem(
-                        check: check,
-                        showDivider: index < healthStatus.checks.length - 1,
-                      );
-                    }),
-                ],
-              ),
-
-            if (extension.hasURLHandler &&
-                extension.urlHandler!.patterns.isNotEmpty)
-              ...settingsSectionSlivers(
-                title: context.l10n.extensionUrlHandler,
-                glass: true,
-                children: [
-                  _URLHandlerInfo(patterns: extension.urlHandler!.patterns),
-                ],
-              ),
-
-            if (extension.hasDownloadProvider &&
-                extension.qualityOptions.isNotEmpty)
-              ...settingsSectionSlivers(
-                title: context.l10n.extensionQualityOptions,
-                glass: true,
-                connected: true,
-                children: extension.qualityOptions.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final quality = entry.value;
-                  return _QualityOptionItem(
-                    quality: quality,
-                    showDivider: index < extension.qualityOptions.length - 1,
-                  );
-                }).toList(),
-              ),
-
-            if (extension.hasPostProcessing &&
-                extension.postProcessing!.hooks.isNotEmpty)
-              ...settingsSectionSlivers(
-                title: context.l10n.extensionPostProcessingHooks,
-                glass: true,
-                connected: true,
-                children: extension.postProcessing!.hooks.asMap().entries.map((
-                  entry,
-                ) {
-                  final index = entry.key;
-                  final hook = entry.value;
-                  return _PostProcessingHookItem(
-                    hook: hook,
-                    showDivider:
-                        index < extension.postProcessing!.hooks.length - 1,
-                  );
-                }).toList(),
-              ),
-
-            if (extension.permissions.isNotEmpty)
-              ...settingsSectionSlivers(
-                title: context.l10n.extensionPermissions,
-                glass: true,
-                connected: true,
-                children: extension.permissions.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final permission = entry.value;
-                  return _PermissionItem(
-                    permission: permission,
-                    showDivider: index < extension.permissions.length - 1,
-                  );
-                }).toList(),
-              ),
-
-            ...settingsSectionSlivers(
-              title: context.l10n.extensionCapabilities,
-              glass: true,
-              connected: true,
-              children: [
-                _CapabilityItem(
-                  icon: Icons.search,
-                  title: context.l10n.extensionMetadataProvider,
-                  enabled: extension.hasMetadataProvider,
-                ),
-                _CapabilityItem(
-                  icon: Icons.download,
-                  title: context.l10n.extensionDownloadProvider,
-                  enabled: extension.hasDownloadProvider,
-                ),
-                _CapabilityItem(
-                  icon: Icons.lyrics,
-                  title: context.l10n.extensionLyricsProvider,
-                  enabled: extension.hasLyricsProvider,
-                ),
-                _CapabilityItem(
-                  icon: Icons.manage_search,
-                  title: context.l10n.extensionsSearchProvider,
-                  enabled: extension.hasCustomSearch,
-                  subtitle: extension.searchBehavior?.placeholder,
-                ),
-                _CapabilityItem(
-                  icon: Icons.compare_arrows,
-                  title: context.l10n.extensionCustomTrackMatching,
-                  enabled: extension.hasCustomMatching,
-                  subtitle: extension.trackMatching?.strategy != null
-                      ? context.l10n.extensionStrategy(
-                          extension.trackMatching!.strategy!,
-                        )
-                      : null,
-                ),
-                _CapabilityItem(
-                  icon: Icons.auto_fix_high,
-                  title: context.l10n.extensionPostProcessing,
-                  enabled: extension.hasPostProcessing,
-                  subtitle: extension.postProcessing?.hooks.isNotEmpty == true
-                      ? context.l10n.extensionHooksAvailable(
-                          extension.postProcessing!.hooks.length,
-                        )
-                      : null,
-                ),
-                _CapabilityItem(
-                  icon: Icons.link,
-                  title: context.l10n.extensionUrlHandler,
-                  enabled: extension.hasURLHandler,
-                  subtitle: extension.urlHandler?.patterns.isNotEmpty == true
-                      ? context.l10n.extensionPatternsCount(
-                          extension.urlHandler!.patterns.length,
-                        )
-                      : null,
-                ),
-                _CapabilityItem(
-                  icon: Icons.monitor_heart_outlined,
-                  title: context.l10n.extensionServiceHealth,
-                  enabled: extension.hasServiceHealth,
-                  subtitle: extension.hasServiceHealth
-                      ? context.l10n.extensionHealthChecksConfigured(
-                          extension.serviceHealth.length,
-                        )
-                      : null,
-                  showDivider: false,
-                ),
-              ],
-            ),
-
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: AppDialogAction(
-                  onPressed: () => _confirmRemove(context),
-                  isDestructive: true,
-                  outlined: true,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: colorScheme.error,
-                    side: BorderSide(color: colorScheme.error),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      AppIcon(
-                        context.isMornye
-                            ? CupertinoIcons.trash
-                            : Icons.delete_outline,
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(child: Text(context.l10n.extensionRemoveButton)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
-          ],
+          ),
         ),
       ),
     );

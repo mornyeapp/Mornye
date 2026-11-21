@@ -57,72 +57,72 @@ class _ExtensionDetailsScreenState
     final isDownloading = storeState.downloadingId == liveExtension.id;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          _buildAppBar(context, liveExtension, colorScheme),
-          _buildInfoCard(context, liveExtension, colorScheme, isDownloading),
-          if (merged.sourceMissing)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(16, 0, 16, 16) +
-                    EdgeInsets.symmetric(horizontal: wideListInset(context)),
-                child: ErrorCard(
-                  key: const ValueKey('store-source-missing'),
-                  error: canChangeSource
-                      ? context.l10n.storeSourceMissing
-                      : context.l10n.storeSourceMissingNoOther,
-                  colorScheme: colorScheme,
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            _buildAppBar(context, liveExtension, colorScheme),
+            _buildInfoCard(context, liveExtension, colorScheme, isDownloading),
+            if (merged.sourceMissing)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.fromLTRB(16, 0, 16, 16) +
+                      EdgeInsets.symmetric(horizontal: wideListInset(context)),
+                  child: ErrorCard(
+                    key: const ValueKey('store-source-missing'),
+                    error: canChangeSource
+                        ? context.l10n.storeSourceMissing
+                        : context.l10n.storeSourceMissingNoOther,
+                    colorScheme: colorScheme,
+                  ),
                 ),
               ),
-            ),
-          _buildSectionHeader(
-            context,
-            context.l10n.aboutTitle,
-            Icons.info_outline,
-            colorScheme,
-          ),
-          _buildDescription(context, liveExtension, colorScheme),
-
-          if (liveExtension.tags.isNotEmpty) ...[
             _buildSectionHeader(
               context,
-              context.l10n.extensionDetailsTags,
-              Icons.tag,
+              context.l10n.aboutTitle,
+              Icons.info_outline,
               colorScheme,
             ),
-            _buildTags(context, liveExtension, colorScheme),
+            _buildDescription(context, liveExtension, colorScheme),
+
+            if (liveExtension.tags.isNotEmpty) ...[
+              _buildSectionHeader(
+                context,
+                context.l10n.extensionDetailsTags,
+                Icons.tag,
+                colorScheme,
+              ),
+              _buildTags(context, liveExtension, colorScheme),
+            ],
+
+            _buildSectionHeader(
+              context,
+              context.l10n.extensionDetailsInformation,
+              Icons.table_chart_outlined,
+              colorScheme,
+            ),
+            _buildMetadataTable(
+              context,
+              liveExtension,
+              colorScheme,
+              showRepository: showRepository,
+              onChangeRepository: canChangeSource
+                  ? () => _changeRepository(liveExtension)
+                  : null,
+            ),
+
+            _buildSectionHeader(
+              context,
+              context.l10n.extensionCapabilities,
+              Icons.extension_outlined,
+              colorScheme,
+            ),
+            _buildCapabilities(context, liveExtension, colorScheme),
+
+            const NavBarSliverSpacer(),
           ],
-
-          _buildSectionHeader(
-            context,
-            context.l10n.extensionDetailsInformation,
-            Icons.table_chart_outlined,
-            colorScheme,
-          ),
-          _buildMetadataTable(
-            context,
-            liveExtension,
-            colorScheme,
-            showRepository: showRepository,
-            onChangeRepository: canChangeSource
-                ? () => _changeRepository(liveExtension)
-                : null,
-          ),
-
-          _buildSectionHeader(
-            context,
-            context.l10n.extensionCapabilities,
-            Icons.extension_outlined,
-            colorScheme,
-          ),
-          _buildCapabilities(context, liveExtension, colorScheme),
-
-          SliverToBoxAdapter(
-            child: SizedBox(height: 32 + context.navBarBottomInset),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -285,9 +285,6 @@ class _ExtensionDetailsScreenState
                       ),
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(52),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
                       ),
                       child: Text(
                         '${context.l10n.storeUpdate} v${ext.version}',
@@ -307,9 +304,6 @@ class _ExtensionDetailsScreenState
                             ),
                             style: OutlinedButton.styleFrom(
                               minimumSize: const Size(0, 52),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
                             ),
                             child: Text(context.l10n.storeInstalled),
                           ),
@@ -326,9 +320,6 @@ class _ExtensionDetailsScreenState
                             backgroundColor: colorScheme.errorContainer,
                             foregroundColor: colorScheme.onErrorContainer,
                             minimumSize: const Size(52, 52),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
                           ),
                           tooltip: context.l10n.extensionsUninstall,
                         ),
@@ -344,9 +335,6 @@ class _ExtensionDetailsScreenState
                       ),
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(52),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
                       ),
                       child: Text(context.l10n.storeInstall),
                     ),
