@@ -6,7 +6,6 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/providers/theme_provider.dart';
-import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_slider.dart';
@@ -34,25 +33,11 @@ class LyricsSizeSetting extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (context.isMornye)
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    context.l10n.lyricsTextSize,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                Text(percent),
-                reset,
-              ],
-            )
-          else
-            SliderValueHeader(
-              title: context.l10n.lyricsTextSize,
-              value: percent,
-              trailing: reset,
-            ),
+          SliderValueHeader(
+            title: context.l10n.lyricsTextSize,
+            value: percent,
+            trailing: reset,
+          ),
           LyricsTextScale(
             child: Text(
               context.l10n.lyricsTextPreview,
@@ -181,21 +166,7 @@ class _LyricsOffsetSlider extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (context.isMornye)
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                Text(value),
-                reset,
-              ],
-            )
-          else
-            SliderValueHeader(title: title, value: value, trailing: reset),
+          SliderValueHeader(title: title, value: value, trailing: reset),
           if (subtitle != null)
             Text(
               subtitle!,
@@ -207,12 +178,14 @@ class _LyricsOffsetSlider extends StatelessWidget {
             value: offsetMs.toDouble(),
             min: -kMaxLyricsOffsetMs.toDouble(),
             max: kMaxLyricsOffsetMs.toDouble(),
-            divisions: kMaxLyricsOffsetMs * 2 ~/ 100,
+            centered: true,
             label: value,
             semanticLabel: semanticLabel,
             semanticFormatterCallback: format,
-            onChanged: (value) => onChanged(value.round(), persist: false),
-            onChangeEnd: (value) => onChanged(value.round(), persist: true),
+            onChanged: (value) =>
+                onChanged((value / 100).round() * 100, persist: false),
+            onChangeEnd: (value) =>
+                onChanged((value / 100).round() * 100, persist: true),
           ),
         ],
       ),
@@ -274,23 +247,14 @@ class LyricsBlurSetting extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  context.l10n.lyricsBlur,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              Text(format(strength)),
-              AppIconButton(
-                tooltip: context.l10n.libraryFilterReset,
-                onPressed: strength == 1
-                    ? null
-                    : () => notifier.setLyricsBlur(1),
-                icon: const Icon(Icons.restart_alt),
-              ),
-            ],
+          SliderValueHeader(
+            title: context.l10n.lyricsBlur,
+            value: format(strength),
+            trailing: AppIconButton(
+              tooltip: context.l10n.libraryFilterReset,
+              onPressed: strength == 1 ? null : () => notifier.setLyricsBlur(1),
+              icon: const Icon(Icons.restart_alt),
+            ),
           ),
           Text(
             context.l10n.lyricsBlurSubtitle,

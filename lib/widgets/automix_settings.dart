@@ -125,7 +125,7 @@ class _AutoMixSettingsState extends ConsumerState<AutoMixSettings> {
       double value,
       double min,
       double max,
-      int divisions,
+      int? divisions,
       ValueChanged<double> draft,
       ValueChanged<double> save,
     ) {
@@ -147,7 +147,7 @@ class _AutoMixSettingsState extends ConsumerState<AutoMixSettings> {
               min: min,
               max: max,
               divisions: divisions,
-              label: value.toStringAsFixed(2),
+              label: valueLabel,
               semanticLabel: '$label: $valueLabel',
               onChanged: enabled ? draft : null,
               onChangeEnd: enabled ? save : null,
@@ -175,8 +175,8 @@ class _AutoMixSettingsState extends ConsumerState<AutoMixSettings> {
             _duration ?? settings.autoMixDuration.toDouble(),
             3,
             60,
-            57,
-            (value) => setState(() => _duration = value),
+            null,
+            (value) => setState(() => _duration = value.roundToDouble()),
             (value) {
               notifier.setAutoMixDuration(value.round());
               setState(() => _duration = null);
@@ -225,10 +225,10 @@ class _AutoMixSettingsState extends ConsumerState<AutoMixSettings> {
             _speed ?? settings.autoMixSpeed,
             0.8,
             1.2,
-            40,
-            (value) => setState(() => _speed = value),
+            null,
+            (value) => setState(() => _speed = (value * 100).round() / 100),
             (value) {
-              notifier.setAutoMixSpeed(value);
+              notifier.setAutoMixSpeed((value * 100).round() / 100);
               setState(() => _speed = null);
             },
           ),

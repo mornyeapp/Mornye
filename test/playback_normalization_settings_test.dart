@@ -56,7 +56,8 @@ void main() {
     await tester.pump();
     expect(container.read(settingsProvider).playbackNormalizationPreamp, -7);
 
-    await tester.tap(find.text('Album'));
+    // The expressive segmented group also lays out a measuring copy.
+    await tester.tap(find.text('Album').first);
     await tester.pump();
     expect(container.read(settingsProvider).playbackNormalizationMode, 'album');
   });
