@@ -98,6 +98,17 @@ class LyricsSettingsPage extends ConsumerWidget {
                       .setPlayerShowLyricSnippet(value),
                 ),
                 SettingsSwitchItem(
+                  key: const ValueKey('lyric-snippet-translation'),
+                  icon: Icons.translate_rounded,
+                  title: context.l10n.lyricsPlayerPreviewTranslation,
+                  subtitle: context.l10n.lyricsPlayerPreviewTranslationSubtitle,
+                  value: settings.playerLyricSnippetTranslation,
+                  enabled: settings.playerShowLyricSnippet,
+                  onChanged: (value) => ref
+                      .read(settingsProvider.notifier)
+                      .setPlayerLyricSnippetTranslation(value),
+                ),
+                SettingsSwitchItem(
                   key: const ValueKey('lyrics-romanize'),
                   icon: Icons.record_voice_over_outlined,
                   title: context.l10n.lyricsRomanize,

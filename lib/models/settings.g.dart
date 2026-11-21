@@ -268,6 +268,8 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   playerShowTranslation: json['playerShowTranslation'] as bool? ?? true,
   playerShowVolume: json['playerShowVolume'] as bool? ?? true,
   playerShowLyricSnippet: json['playerShowLyricSnippet'] as bool? ?? false,
+  playerLyricSnippetTranslation:
+      json['playerLyricSnippetTranslation'] as bool? ?? false,
 );
 
 Map<String, dynamic> _$AppSettingsToJson(
@@ -443,6 +445,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'playerShowTranslation': instance.playerShowTranslation,
   'playerShowVolume': instance.playerShowVolume,
   'playerShowLyricSnippet': instance.playerShowLyricSnippet,
+  'playerLyricSnippetTranslation': instance.playerLyricSnippetTranslation,
 };
 
 const _$AutoMixEffectEnumMap = {

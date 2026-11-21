@@ -500,6 +500,106 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  group('translation', () {
+    List<LyricWord> timed(List<String> words) => [
+      for (final (index, word) in words.indexed)
+        LyricWord(
+          time: Duration(milliseconds: 4000 + index * 1000),
+          end: Duration(milliseconds: 5000 + index * 1000),
+          text: word,
+        ),
+    ];
+
+    ParsedLyrics translated({required bool timedTranslation}) => ParsedLyrics(
+      synced: true,
+      wordSynced: true,
+      plainText: 'sung words',
+      lines: [
+        LyricLine(
+          time: const Duration(seconds: 4),
+          end: const Duration(seconds: 8),
+          text: 'sung words',
+          words: timed(['sung ', 'words']),
+          translation: 'translated words',
+          translationWords: timedTranslation
+              ? timed(['translated ', 'words'])
+              : const [],
+        ),
+      ],
+    );
+
+    String sweptText(WidgetTester tester) => tester
+        .widget<WordTimedLyricLine>(find.byType(WordTimedLyricLine))
+        .line
+        .text;
+
+    testWidgets('the line reads as sung even with translations shown', (
+      tester,
+    ) async {
+      final view = await pumpPreview(
+        tester,
+        metadata: await _metadata(translated(timedTranslation: true)),
+        settings: const AppSettings(
+          playerShowLyricSnippet: true,
+          playerShowTranslation: true,
+        ),
+      );
+      view.playback.add(_at(const Duration(seconds: 5)));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sweptText(tester), 'sung words');
+
+      view.playback.add(_at(const Duration(seconds: 5), playing: false));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('its own setting shows the translation, swept by word', (
+      tester,
+    ) async {
+      final view = await pumpPreview(
+        tester,
+        metadata: await _metadata(translated(timedTranslation: true)),
+        settings: const AppSettings(
+          playerShowLyricSnippet: true,
+          playerLyricSnippetTranslation: true,
+        ),
+      );
+      view.playback.add(_at(const Duration(seconds: 5)));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sweptText(tester), 'translated words');
+      expect(
+        tester
+            .widget<WordTimedLyricLine>(find.byType(WordTimedLyricLine))
+            .line
+            .words
+            .map((word) => word.text),
+        ['translated ', 'words'],
+      );
+
+      view.playback.add(_at(const Duration(seconds: 5), playing: false));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a translation without word timing shows as plain text', (
+      tester,
+    ) async {
+      final view = await pumpPreview(
+        tester,
+        metadata: await _metadata(translated(timedTranslation: false)),
+        settings: const AppSettings(
+          playerShowLyricSnippet: true,
+          playerLyricSnippetTranslation: true,
+        ),
+      );
+      view.playback.add(_at(const Duration(seconds: 5)));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(WordTimedLyricLine), findsNothing);
+      expect(find.text('translated words'), findsOneWidget);
+
+      view.playback.add(_at(const Duration(seconds: 5), playing: false));
+      await tester.pumpAndSettle();
+    });
+  });
+
   group('song change', () {
     MediaItem song(String id, {String? resolved}) => MediaItem(
       id: id,

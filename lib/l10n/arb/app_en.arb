@@ -2290,6 +2290,14 @@
   "@lyricsPlayerPreviewSubtitle": {
     "description": "Subtitle of the Lyric line in player switch"
   },
+  "lyricsPlayerPreviewTranslation": "Translation in lyric line",
+  "@lyricsPlayerPreviewTranslation": {
+    "description": "Lyrics setting that makes the lyric line in the player show the translation instead of the sung line"
+  },
+  "lyricsPlayerPreviewTranslationSubtitle": "Show the translation instead of the original line when the song has one.",
+  "@lyricsPlayerPreviewTranslationSubtitle": {
+    "description": "Subtitle of the Translation in lyric line switch"
+  },
   "lyricsRomanize": "Romanize lyrics",
   "@lyricsRomanize": {
     "description": "Lyrics setting that shows lyrics written in other alphabets in Latin letters, worked out offline on the device"

@@ -1967,6 +1967,8 @@
   "lyricsKeepScreenOnSubtitle": "Mencegah layar mati saat sedang membuka layar lirik, berlaku saat pemutaran dijeda.",
   "lyricsPlayerPreview": "Baris lirik di pemutar",
   "lyricsPlayerPreviewSubtitle": "Tampilkan baris yang sedang dinyanyikan di bawah judul lagu. Ketuk untuk membuka lirik lengkap.",
+  "lyricsPlayerPreviewTranslation": "Terjemahan di baris lirik",
+  "lyricsPlayerPreviewTranslationSubtitle": "Tampilkan terjemahan, bukan baris aslinya, jika lagu punya terjemahan.",
   "lyricsRomanize": "Romanisasi lirik",
   "lyricsRomanizeSubtitle": "Tampilkan cara lirik bahasa Korea, Sirilik, Hindi, Punjabi, Mandarin, dan kana Jepang dinyanyikan, diolah di perangkat ini. Terjemahan AI dapat meromanisasi sisanya.",
   "lyricsRomanizedMainLine": "Romanisasi sebagai baris utama",

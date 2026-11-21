@@ -551,6 +551,10 @@ class AppSettings {
   /// the track title. Off by default; Lyrics settings turns it on.
   final bool playerShowLyricSnippet;
 
+  /// Whether that line shows the song's translation instead of the sung
+  /// line. Off by default, so the line reads as sung.
+  final bool playerLyricSnippetTranslation;
+
   const AppSettings({
     this.defaultService = '',
     this.audioQuality = 'LOSSLESS',
@@ -731,6 +735,7 @@ class AppSettings {
     this.playerShowTranslation = true,
     this.playerShowVolume = true,
     this.playerShowLyricSnippet = false,
+    this.playerLyricSnippetTranslation = false,
   });
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -928,6 +933,7 @@ class AppSettings {
     bool? playerShowTranslation,
     bool? playerShowVolume,
     bool? playerShowLyricSnippet,
+    bool? playerLyricSnippetTranslation,
   }) {
     return AppSettings(
       defaultService: defaultService ?? this.defaultService,
@@ -1160,6 +1166,8 @@ class AppSettings {
       playerShowVolume: playerShowVolume ?? this.playerShowVolume,
       playerShowLyricSnippet:
           playerShowLyricSnippet ?? this.playerShowLyricSnippet,
+      playerLyricSnippetTranslation:
+          playerLyricSnippetTranslation ?? this.playerLyricSnippetTranslation,
     );
   }
 
