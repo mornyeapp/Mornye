@@ -166,6 +166,51 @@ void main() {
     });
   }
 
+  testWidgets('the backdrop prewarm starts a file cover at the header size', (
+    tester,
+  ) async {
+    final cache = PaintingBinding.instance.imageCache;
+    cache.clear();
+    cache.clearLiveImages();
+    final directory = await tester.runAsync(() async {
+      final directory = await Directory.systemTemp.createTemp('cover-head-');
+      await _writeCover(directory, const Size(64, 64));
+      return directory;
+    });
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(size: Size(393, 852), devicePixelRatio: 2),
+          child: Builder(
+            builder: (value) {
+              context = value;
+              return const SizedBox();
+            },
+          ),
+        ),
+      ),
+    );
+    final path = '${directory!.path}/cover.png';
+    try {
+      // What the header draws: the file at the viewport's width.
+      final header = ResizeImage(
+        FileImage(File(path)),
+        width: coverCacheWidthForViewport(context),
+      );
+      final key = await header.obtainKey(ImageConfiguration.empty);
+      expect(cache.statusForKey(key).tracked, isFalse);
+      await tester.runAsync(() => precacheMetadataBackdrop(context, path));
+      expect(cache.statusForKey(key).tracked, isTrue);
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.pumpWidget(const SizedBox());
+      cache.clear();
+      cache.clearLiveImages();
+      await tester.runAsync(() => directory.delete(recursive: true));
+    }
+  });
+
   for (final explicit in [false, true]) {
     testWidgets(
       'grid decode follows constraints, explicit override=$explicit',

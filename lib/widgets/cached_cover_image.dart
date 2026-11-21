@@ -619,6 +619,10 @@ Future<void> precacheMetadataBackdrop(
   final normalized = source?.trim();
   if (normalized == null || normalized.isEmpty) return;
 
+  // A cover in a file starts decoding at the header's size now instead of
+  // when the page is built. Not waited for: the row's picture flies in until
+  // it is there. Openers warm a web cover themselves.
+  if (!isHttpCoverUrl(normalized)) precacheCoverImage(context, normalized);
   final extent = metadataBackdropCacheExtent(context);
   final provider = coverImageProvider(
     normalized,
@@ -664,8 +668,12 @@ Future<void> prepareTrackDetailsCover(
   String? fallback,
 }) async {
   final embedded = await trackDetailsEmbeddedCover(filePath);
+  if (!context.mounted) return;
   // Only Material's header has the blurred backdrop.
-  if (!context.mounted || context.isMornye) return;
+  if (context.isMornye) {
+    precacheCoverImage(context, embedded ?? fallback);
+    return;
+  }
   await precacheMetadataBackdrop(context, embedded ?? fallback);
 }
 

@@ -46,7 +46,17 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
         borderRadius: corners.value ?? BorderRadius.zero,
         child: cover,
       ),
-      child: (header.widget as Hero).child,
+      // Opening, this page's cover may still be decoding and would fly as
+      // nothing: the row's own picture flies under it until it is there.
+      child: direction == HeroFlightDirection.push
+          ? Stack(
+              fit: StackFit.expand,
+              children: [
+                (from.widget as Hero).child,
+                (header.widget as Hero).child,
+              ],
+            )
+          : (header.widget as Hero).child,
     );
   }
 

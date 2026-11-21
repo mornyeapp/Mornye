@@ -199,5 +199,82 @@ void main() {
       expect(play(), isNull);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('the row picture flies under the cover while the page opens '
+        '(Mornye=$mornye)', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
+        channel,
+        (call) async => call.method == 'safStat' ? {'exists': false} : null,
+      );
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      const row = Key('row');
+      const rowCover = Key('row-cover');
+      final item = DownloadHistoryItem(
+        id: 'flying-track',
+        trackName: 'Track',
+        artistName: 'Artist',
+        albumName: 'Album',
+        filePath: 'content://provider/music/flying.flac',
+        service: 'provider-a',
+        downloadedAt: DateTime(2026),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: GestureDetector(
+                    key: row,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => TrackMetadataScreen(
+                          item: item,
+                          coverHeroTag: 'row',
+                        ),
+                      ),
+                    ),
+                    child: const SizedBox.square(
+                      dimension: 56,
+                      child: Hero(
+                        tag: 'row',
+                        child: ColoredBox(
+                          key: rowCover,
+                          color: Color(0xFF336699),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      Finder inRow() =>
+          find.descendant(of: find.byKey(row), matching: find.byKey(rowCover));
+      expect(inRow(), findsOneWidget);
+
+      await tester.tap(find.byKey(row));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
+      // The row gave its picture to the flight, which shows it until the
+      // page's own cover is decoded.
+      expect(inRow(), findsNothing);
+      expect(find.byKey(rowCover), findsOneWidget);
+      expect(tester.getSize(find.byKey(rowCover)).width, greaterThan(56));
+
+      await tester.pumpAndSettle();
+      expect(find.byKey(rowCover), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
   }
 }
