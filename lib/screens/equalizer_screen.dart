@@ -26,6 +26,7 @@ import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/app_switch.dart';
 import 'package:mornye/widgets/app_text_field.dart';
 import 'package:mornye/widgets/beta_badge.dart';
+import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
@@ -239,7 +240,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                   message: message,
                   icon: Icons.error_outline,
                   tone: SettingsInfoTone.error,
-                  glass: true,
                 );
         },
       ),

@@ -48,7 +48,7 @@ class _DetailValue extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        AppIcon(Icons.chevron_right, size: 20, color: secondary),
+        AppIcon.adaptive(Icons.chevron_right, size: 20, color: secondary),
       ],
     );
   }
@@ -500,12 +500,16 @@ class _BandEditor extends ConsumerWidget {
                     ),
                   ),
                   scrolls
-                      ? SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: tokens.gapSm,
-                          ),
-                          child: faders,
+                      ? DesktopScrollArrows(
+                          builder: (context, controller) =>
+                              SingleChildScrollView(
+                                controller: controller,
+                                scrollDirection: Axis.horizontal,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: tokens.gapSm,
+                                ),
+                                child: faders,
+                              ),
                         )
                       : Padding(
                           padding: EdgeInsets.symmetric(
