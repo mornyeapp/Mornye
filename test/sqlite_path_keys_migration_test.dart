@@ -194,7 +194,8 @@ void main() {
         id TEXT PRIMARY KEY, file_path TEXT,
         source_id TEXT NOT NULL DEFAULT 'legacy', isrc TEXT,
         format TEXT, audio_metadata_scan_version INTEGER NOT NULL DEFAULT 0,
-        match_key TEXT DEFAULT 'song|artist'
+        match_key TEXT DEFAULT 'song|artist', album_key TEXT,
+        album_artist_norm TEXT
       )
     ''');
     await createPathKeyTable(db, 'library_path_keys');
