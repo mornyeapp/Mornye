@@ -6,8 +6,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
-import 'package:cupertino_ui/cupertino_ui.dart'
-    show CupertinoButton, CupertinoIcons;
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/theme/app_motion.dart';
@@ -111,6 +110,7 @@ import 'package:mornye/widgets/open_on_platform_sheet.dart';
 import 'package:mornye/widgets/metadata_barcode.dart';
 import 'package:mornye/widgets/scroll_edge_fade.dart';
 import 'package:mornye/widgets/settings_group.dart';
+import 'package:mornye/widgets/track_card.dart' show connectedRunTitleInset;
 import 'package:mornye/constants/music_services.dart';
 import 'package:mornye/controllers/batch_track_actions.dart'
     show convertLibraryTrack;
@@ -881,68 +881,4 @@ class _MetadataOption {
     this.destructive = false,
     this.dividerAbove = false,
   });
-}
-
-class _MetadataOptionTile extends StatelessWidget {
-  final _MetadataOption option;
-  final ColorScheme colorScheme;
-  final VoidCallback onTap;
-
-  const _MetadataOptionTile({
-    required this.option,
-    required this.colorScheme,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final iconColor = option.destructive
-        ? colorScheme.error
-        : colorScheme.onSurfaceVariant;
-    final titleColor = option.destructive ? colorScheme.error : null;
-
-    if (context.isMornye) {
-      return CupertinoButton(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        onPressed: onTap,
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                option.label,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: titleColor ?? colorScheme.onSurface,
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Icon(mornyeIconFor(option.icon), color: iconColor, size: 22),
-          ],
-        ),
-      );
-    }
-
-    return InkWell(
-      onTap: onTap,
-      splashColor: colorScheme.primary.withValues(alpha: 0.12),
-      highlightColor: Colors.transparent,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Row(
-          children: [
-            Icon(option.icon, color: iconColor, size: 24),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                option.label,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: titleColor),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

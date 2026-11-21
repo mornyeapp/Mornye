@@ -821,11 +821,16 @@ class _ModelSheetState extends State<_ModelSheet> {
                 ),
               ),
             ),
-          for (final model in _models ?? const <String>[])
-            AppSheetOption.choice(
-              title: Text(model),
-              selected: model == current,
-              onTap: () => Navigator.pop(context, model),
+          if (_models?.isNotEmpty ?? false)
+            AppSheetOptions(
+              children: [
+                for (final model in _models!)
+                  AppSheetOption.choice(
+                    title: Text(model),
+                    selected: model == current,
+                    onTap: () => Navigator.pop(context, model),
+                  ),
+              ],
             ),
         ],
       ),

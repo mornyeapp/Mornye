@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
+import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_switch.dart';
@@ -606,33 +607,40 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppSheetOption.choice(
-              leading: AppIcon(
-                Icons.folder_special,
-                color: colorScheme.primary,
-              ),
-              title: Text(context.l10n.storageAutomaticFolder),
-              subtitle: Text(context.l10n.storageAutomaticDownloadFolder),
-              selected: !isSafMode,
-              onTap: () async {
-                Navigator.pop(ctx);
-                final defaultDir = await _getDefaultAndroidDirectory();
-                final notifier = ref.read(settingsProvider.notifier);
-                notifier.setStorageMode('app');
-                notifier.setDownloadDirectory(defaultDir);
-                notifier.setDownloadTreeUri('');
-              },
-            ),
-            AppSheetOption.choice(
-              leading: AppIcon(Icons.folder_open, color: colorScheme.primary),
-              title: Text(context.l10n.storageSafRecommended),
-              subtitle: Text(context.l10n.storageDownloadFolderHint),
-              selected: isSafMode,
-              onTap: () async {
-                Navigator.pop(ctx);
-                await _pickSafTreeAndSave();
-                await _checkSafAccess();
-              },
+            AppSheetOptions(
+              children: [
+                AppSheetOption.choice(
+                  leading: AppIcon(
+                    Icons.folder_special,
+                    color: colorScheme.primary,
+                  ),
+                  title: Text(context.l10n.storageAutomaticFolder),
+                  subtitle: Text(context.l10n.storageAutomaticDownloadFolder),
+                  selected: !isSafMode,
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final defaultDir = await _getDefaultAndroidDirectory();
+                    final notifier = ref.read(settingsProvider.notifier);
+                    notifier.setStorageMode('app');
+                    notifier.setDownloadDirectory(defaultDir);
+                    notifier.setDownloadTreeUri('');
+                  },
+                ),
+                AppSheetOption.choice(
+                  leading: AppIcon(
+                    Icons.folder_open,
+                    color: colorScheme.primary,
+                  ),
+                  title: Text(context.l10n.storageSafRecommended),
+                  subtitle: Text(context.l10n.storageDownloadFolderHint),
+                  selected: isSafMode,
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _pickSafTreeAndSave();
+                    await _checkSafAccess();
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 8),
           ],
@@ -653,82 +661,95 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppSheetOption(
-              leading: AppIcon(
-                Icons.folder_special,
-                color: colorScheme.primary,
-              ),
-              title: Text(context.l10n.setupAppDocumentsFolder),
-              subtitle: Text(context.l10n.setupAppDocumentsFolderSubtitle),
-              trailing: AppIcon(Icons.check_circle, color: colorScheme.primary),
-              onTap: () async {
-                final dir = await getApplicationDocumentsDirectory();
-                ref
-                    .read(settingsProvider.notifier)
-                    .setDownloadDirectory(dir.path);
-                if (ctx.mounted) Navigator.pop(ctx);
-              },
-            ),
-            AppSheetOption(
-              leading: AppIcon(
-                Icons.cloud,
-                color: context.isMornye
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
-              ),
-              title: Text(context.l10n.setupChooseFromFiles),
-              subtitle: Text(context.l10n.setupChooseFromFilesSubtitle),
-              onTap: () async {
-                Navigator.pop(ctx);
-                await Future<void>.delayed(const Duration(milliseconds: 250));
-                IosPickedDirectory? picked;
-                try {
-                  picked = await PlatformBridge.pickIosDirectory();
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          context.l10n.snackbarFolderPickerFailed(
-                            context.friendlyError(e),
+            AppSheetOptions(
+              children: [
+                AppSheetOption(
+                  leading: AppIcon(
+                    Icons.folder_special,
+                    color: colorScheme.primary,
+                  ),
+                  title: Text(context.l10n.setupAppDocumentsFolder),
+                  subtitle: Text(context.l10n.setupAppDocumentsFolderSubtitle),
+                  trailing: AppIcon(
+                    Icons.check_circle,
+                    color: colorScheme.primary,
+                  ),
+                  onTap: () async {
+                    final dir = await getApplicationDocumentsDirectory();
+                    ref
+                        .read(settingsProvider.notifier)
+                        .setDownloadDirectory(dir.path);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                ),
+                AppSheetOption(
+                  leading: AppIcon(
+                    Icons.cloud,
+                    color: context.isMornye
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                  title: Text(context.l10n.setupChooseFromFiles),
+                  subtitle: Text(context.l10n.setupChooseFromFilesSubtitle),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await Future<void>.delayed(
+                      const Duration(milliseconds: 250),
+                    );
+                    IosPickedDirectory? picked;
+                    try {
+                      picked = await PlatformBridge.pickIosDirectory();
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              context.l10n.snackbarFolderPickerFailed(
+                                context.friendlyError(e),
+                              ),
+                            ),
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.error,
+                            duration: const Duration(seconds: 4),
                           ),
-                        ),
-                        backgroundColor: Theme.of(context).colorScheme.error,
-                        duration: const Duration(seconds: 4),
-                      ),
-                    );
-                  }
-                  return;
-                }
-                if (picked == null || !context.mounted) return;
+                        );
+                      }
+                      return;
+                    }
+                    if (picked == null || !context.mounted) return;
 
-                final validation = validateIosPath(
-                  picked.path,
-                  bookmark: picked.bookmark,
-                );
-                if (!validation.isValid) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          validation.errorReason ??
-                              context.l10n.setupIcloudNotSupported,
-                        ),
-                        backgroundColor: Theme.of(context).colorScheme.error,
-                        duration: const Duration(seconds: 4),
-                      ),
-                    );
-                  }
-                  return;
-                }
-
-                ref
-                    .read(settingsProvider.notifier)
-                    .setDownloadDirectory(
+                    final validation = validateIosPath(
                       picked.path,
-                      iosBookmark: picked.bookmark,
+                      bookmark: picked.bookmark,
                     );
-              },
+                    if (!validation.isValid) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              validation.errorReason ??
+                                  context.l10n.setupIcloudNotSupported,
+                            ),
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.error,
+                            duration: const Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    ref
+                        .read(settingsProvider.notifier)
+                        .setDownloadDirectory(
+                          picked.path,
+                          iosBookmark: picked.bookmark,
+                        );
+                  },
+                ),
+              ],
             ),
             SettingsInfoCard(
               icon: Icons.info_outline,
@@ -882,61 +903,66 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final option in [
-              (
-                'none',
-                context.l10n.folderOrganizationNone,
-                context.l10n.folderOrganizationNoneSubtitle,
-                'Mornye/Track.flac',
-              ),
-              (
-                'playlist',
-                context.l10n.folderOrganizationByPlaylist,
-                context.l10n.folderOrganizationByPlaylistSubtitle,
-                'Mornye/Playlist Name/Track.flac',
-              ),
-              (
-                'artist',
-                context.l10n.folderOrganizationByArtist,
-                context.l10n.folderOrganizationByArtistSubtitle,
-                'Mornye/Artist Name/Track.flac',
-              ),
-              (
-                'album',
-                context.l10n.folderOrganizationByAlbum,
-                context.l10n.folderOrganizationByAlbumSubtitle,
-                'Mornye/Album Name/Track.flac',
-              ),
-              (
-                'artist_album',
-                context.l10n.folderOrganizationByArtistAlbum,
-                context.l10n.folderOrganizationByArtistAlbumSubtitle,
-                'Mornye/Artist/Album/Track.flac',
-              ),
-              (
-                'custom',
-                context.l10n.folderOrganizationCustom,
-                context.l10n.downloadFolderTemplateDescription,
-                ref.read(settingsProvider).folderPathTemplate,
-              ),
-            ])
-              _FolderOption(
-                title: option.$2,
-                subtitle: option.$3,
-                example: option.$4,
-                isSelected: current == option.$1,
-                onTap: () {
-                  if (option.$1 == 'custom') {
-                    Navigator.pop(context);
-                    _showFolderTemplateEditor(this.context, ref);
-                    return;
-                  }
-                  ref
-                      .read(settingsProvider.notifier)
-                      .setFolderOrganization(option.$1);
-                  Navigator.pop(context);
-                },
-              ),
+            AppSheetOptions(
+              children: [
+                for (final option in [
+                  (
+                    'none',
+                    context.l10n.folderOrganizationNone,
+                    context.l10n.folderOrganizationNoneSubtitle,
+                    'Mornye/Track.flac',
+                  ),
+                  (
+                    'playlist',
+                    context.l10n.folderOrganizationByPlaylist,
+                    context.l10n.folderOrganizationByPlaylistSubtitle,
+                    'Mornye/Playlist Name/Track.flac',
+                  ),
+                  (
+                    'artist',
+                    context.l10n.folderOrganizationByArtist,
+                    context.l10n.folderOrganizationByArtistSubtitle,
+                    'Mornye/Artist Name/Track.flac',
+                  ),
+                  (
+                    'album',
+                    context.l10n.folderOrganizationByAlbum,
+                    context.l10n.folderOrganizationByAlbumSubtitle,
+                    'Mornye/Album Name/Track.flac',
+                  ),
+                  (
+                    'artist_album',
+                    context.l10n.folderOrganizationByArtistAlbum,
+                    context.l10n.folderOrganizationByArtistAlbumSubtitle,
+                    'Mornye/Artist/Album/Track.flac',
+                  ),
+                  (
+                    'custom',
+                    context.l10n.folderOrganizationCustom,
+                    context.l10n.downloadFolderTemplateDescription,
+                    ref.read(settingsProvider).folderPathTemplate,
+                  ),
+                ])
+                  _FolderOption(
+                    title: option.$2,
+                    subtitle: option.$3,
+                    example: option.$4,
+                    isSelected: current == option.$1,
+                    onTap: () {
+                      if (option.$1 == 'custom') {
+                        Navigator.pop(context);
+                        _showFolderTemplateEditor(this.context, ref);
+                        return;
+                      }
+                      ref
+                          .read(settingsProvider.notifier)
+                          .setFolderOrganization(option.$1);
+                      Navigator.pop(context);
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

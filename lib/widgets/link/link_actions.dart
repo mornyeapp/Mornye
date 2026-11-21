@@ -203,24 +203,28 @@ Future<void> showLinkSharedUrlSheet(
     builder: (sheetContext) => Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (client.server.supports(LinkHostFeatures.open))
-          AppSheetOption(
-            leading: const AppIcon.adaptive(Icons.open_in_new),
-            title: Text(sheetContext.l10n.linkOpenOnDesktop(name)),
-            onTap: () {
-              Navigator.pop(sheetContext);
-              linkOpenUrlOnDesktop(root, ref, url);
-            },
-          ),
-        if (client.server.supports(LinkHostFeatures.downloads))
-          AppSheetOption(
-            leading: const AppIcon.adaptive(Icons.download),
-            title: Text(sheetContext.l10n.linkDownloadOnDesktop(name)),
-            onTap: () {
-              Navigator.pop(sheetContext);
-              linkDownloadOnDesktop(root, ref, linkDownloadUrlBody(url));
-            },
-          ),
+        AppSheetOptions(
+          children: [
+            if (client.server.supports(LinkHostFeatures.open))
+              AppSheetOption(
+                leading: const AppIcon.adaptive(Icons.open_in_new),
+                title: Text(sheetContext.l10n.linkOpenOnDesktop(name)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  linkOpenUrlOnDesktop(root, ref, url);
+                },
+              ),
+            if (client.server.supports(LinkHostFeatures.downloads))
+              AppSheetOption(
+                leading: const AppIcon.adaptive(Icons.download),
+                title: Text(sheetContext.l10n.linkDownloadOnDesktop(name)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  linkDownloadOnDesktop(root, ref, linkDownloadUrlBody(url));
+                },
+              ),
+          ],
+        ),
         const SizedBox(height: 8),
       ],
     ),
@@ -450,31 +454,37 @@ Future<void> _showTrackTransferSheet(
     builder: (sheetContext) => Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AppSheetOption(
-          leading: AppIcon.adaptive(linkSendToHostIcon(client)),
-          title: Text(sheetContext.l10n.linkSendToDesktop(name)),
-          onTap: () async {
-            Navigator.pop(sheetContext);
-            final found = await items();
-            if (root.mounted) await linkSendSongsToDesktop(root, ref, found);
-          },
-        ),
-        AppSheetOption(
-          leading: const AppIcon.adaptive(Icons.phone_android),
-          title: Text(sheetContext.l10n.linkSaveToPhone),
-          onTap: () async {
-            Navigator.pop(sheetContext);
-            final found = await items();
-            if (!root.mounted) return;
-            final songs = linkOfflineSongs([
-              for (final item in found) ?item.localItem,
-            ], client.server);
-            if (songs.isEmpty) {
-              _notify(root, root.l10n.linkTransferPhoneNothing(name));
-            } else {
-              linkSaveSongsToPhone(root, ref, songs);
-            }
-          },
+        AppSheetOptions(
+          children: [
+            AppSheetOption(
+              leading: AppIcon.adaptive(linkSendToHostIcon(client)),
+              title: Text(sheetContext.l10n.linkSendToDesktop(name)),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final found = await items();
+                if (root.mounted) {
+                  await linkSendSongsToDesktop(root, ref, found);
+                }
+              },
+            ),
+            AppSheetOption(
+              leading: const AppIcon.adaptive(Icons.phone_android),
+              title: Text(sheetContext.l10n.linkSaveToPhone),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final found = await items();
+                if (!root.mounted) return;
+                final songs = linkOfflineSongs([
+                  for (final item in found) ?item.localItem,
+                ], client.server);
+                if (songs.isEmpty) {
+                  _notify(root, root.l10n.linkTransferPhoneNothing(name));
+                } else {
+                  linkSaveSongsToPhone(root, ref, songs);
+                }
+              },
+            ),
+          ],
         ),
         const SizedBox(height: 8),
       ],

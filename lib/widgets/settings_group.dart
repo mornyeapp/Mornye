@@ -367,6 +367,43 @@ class SettingsGroup extends StatelessWidget {
   }
 }
 
+/// One row of a connected run that a list builds as it scrolls: its own
+/// surface, 2dp under the row before it. Mornye shows [child] as it is.
+class ConnectedGroupRow extends StatelessWidget {
+  const ConnectedGroupRow({
+    super.key,
+    required this.index,
+    required this.count,
+    required this.child,
+  });
+
+  final int index;
+  final int count;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (context.isMornye) return child;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, index == 0 ? 4 : 2, 16, 0),
+      child: _ConnectedRowsScope(
+        child: Material(
+          color: settingsGroupColor(context),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: connectedRowRadius(
+              context,
+              first: index == 0,
+              last: index == count - 1,
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 /// A [SettingsSectionHeader] sliver followed by its [SettingsGroup] sliver.
 List<Widget> settingsSectionSlivers({
   required String title,
@@ -436,6 +473,9 @@ class SettingsItem extends StatelessWidget {
   /// Show category icons in Mornye's top-level settings and search results.
   final bool showIconInMornye;
   final String title;
+
+  /// Overrides the title's colour, for a destructive action.
+  final Color? titleColor;
   final Widget? titleTrailing;
   final String? subtitle;
   final Widget? footer;
@@ -453,6 +493,7 @@ class SettingsItem extends StatelessWidget {
     this.iconColor,
     this.showIconInMornye = false,
     required this.title,
+    this.titleColor,
     this.titleTrailing,
     this.subtitle,
     this.footer,
@@ -508,7 +549,8 @@ class SettingsItem extends StatelessWidget {
                               Flexible(
                                 child: Text(
                                   title,
-                                  style: Theme.of(context).textTheme.bodyLarge,
+                                  style: Theme.of(context).textTheme.bodyLarge
+                                      ?.copyWith(color: titleColor),
                                 ),
                               ),
                               if (titleTrailing != null) ...[

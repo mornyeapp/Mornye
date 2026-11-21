@@ -18,6 +18,7 @@ import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_menu_button.dart';
@@ -64,28 +65,39 @@ Future<String?> showLyricsLanguagePicker(
   context: context,
   title: title,
   subtitle: subtitle,
-  builder: (sheetContext, controller) => ListView(
-    controller: controller,
-    padding: const EdgeInsets.only(bottom: 16),
-    children: [
-      if (appDefaultLabel != null)
-        AppSheetOption.choice(
-          title: Text(appDefaultLabel),
-          selected: selected.isEmpty,
-          onTap: () => Navigator.pop(sheetContext, ''),
-        ),
-      for (final language in lyricsTranslationLanguages)
-        AppSheetOption.choice(
-          key: ValueKey('lyrics-language-${language.code}'),
-          title: Text(language.nativeName),
-          subtitle: language.nativeName == language.englishName
-              ? null
-              : Text(language.englishName),
-          selected: language.code == selected,
-          onTap: () => Navigator.pop(sheetContext, language.code),
-        ),
-    ],
-  ),
+  builder: (sheetContext, controller) {
+    final offset = appDefaultLabel == null ? 0 : 1;
+    final count = lyricsTranslationLanguages.length + offset;
+    return ListView.builder(
+      controller: controller,
+      padding: const EdgeInsets.only(bottom: 16),
+      itemCount: count,
+      itemBuilder: (context, index) {
+        final language = index < offset
+            ? null
+            : lyricsTranslationLanguages[index - offset];
+        return ConnectedGroupRow(
+          index: index,
+          count: count,
+          child: language == null
+              ? AppSheetOption.choice(
+                  title: Text(appDefaultLabel!),
+                  selected: selected.isEmpty,
+                  onTap: () => Navigator.pop(sheetContext, ''),
+                )
+              : AppSheetOption.choice(
+                  key: ValueKey('lyrics-language-${language.code}'),
+                  title: Text(language.nativeName),
+                  subtitle: language.nativeName == language.englishName
+                      ? null
+                      : Text(language.englishName),
+                  selected: language.code == selected,
+                  onTap: () => Navigator.pop(sheetContext, language.code),
+                ),
+        );
+      },
+    );
+  },
 );
 
 /// The player's lyrics menu: pronunciation and translation toggles, AI

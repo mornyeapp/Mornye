@@ -21,10 +21,15 @@ class PlayerQueueDismissible extends StatefulWidget {
     required this.child,
     this.enabled = true,
     this.playNext,
+    this.materialRadius = const BorderRadius.all(Radius.circular(16)),
   });
 
   final VoidCallback onRemove;
   final Widget child;
+
+  /// Corners of the row in the Material style, which the strips under a
+  /// swipe follow.
+  final BorderRadius materialRadius;
 
   /// False (the current song, a locked queue) turns both swipes off.
   final bool enabled;
@@ -128,8 +133,7 @@ class _PlayerQueueDismissibleState extends State<PlayerQueueDismissible>
             padding: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.error,
-              // Matches the queue sheet's row corners.
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: widget.materialRadius,
             ),
             child: AppIcon(
               Icons.delete_outline,
@@ -150,8 +154,10 @@ class _PlayerQueueDismissibleState extends State<PlayerQueueDismissible>
     return QueueSwipe(
       actions: actions,
       enabled: widget.enabled,
-      // Matches the queue sheet's row corners, as the removal strip does.
-      borderRadius: BorderRadius.circular(context.isMornye ? 12 : 16),
+      // Matches the row's corners, as the removal strip does.
+      borderRadius: context.isMornye
+          ? BorderRadius.circular(12)
+          : widget.materialRadius,
       // One node, so screen readers find Play next on the row itself.
       child: MergeSemantics(
         child: Stack(

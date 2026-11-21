@@ -68,37 +68,43 @@ class _LibrarySourceSettingsItem extends StatelessWidget {
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppSheetOption(
-            enabled: canScan,
-            leading: const AppIcon(Icons.refresh_rounded),
-            title: Text(context.l10n.libraryScan),
-            subtitle: Text(context.l10n.libraryScanSubtitle),
-            onTap: canScan ? () => Navigator.pop(context, 'scan') : null,
-          ),
-          AppSheetOption(
-            enabled: canScan,
-            leading: const AppIcon(Icons.sync_rounded),
-            title: Text(context.l10n.libraryForceFullScan),
-            subtitle: Text(context.l10n.libraryForceFullScanSubtitle),
-            onTap: canScan ? () => Navigator.pop(context, 'full_scan') : null,
-          ),
-          if (hasFailures)
-            AppSheetOption(
-              leading: const AppIcon(Icons.report_outlined),
-              title: Text(context.l10n.libraryUnreadableFilesTitle),
-              subtitle: Text(context.l10n.libraryUnreadableFilesAction),
-              onTap: () => Navigator.pop(context, 'failures'),
-            ),
-          AppSheetOption(
-            leading: AppIcon(
-              Icons.delete_outline,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            title: Text(
-              context.l10n.libraryRemoveFolder,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-            onTap: () => Navigator.pop(context, 'remove'),
+          AppSheetOptions(
+            children: [
+              AppSheetOption(
+                enabled: canScan,
+                leading: const AppIcon(Icons.refresh_rounded),
+                title: Text(context.l10n.libraryScan),
+                subtitle: Text(context.l10n.libraryScanSubtitle),
+                onTap: canScan ? () => Navigator.pop(context, 'scan') : null,
+              ),
+              AppSheetOption(
+                enabled: canScan,
+                leading: const AppIcon(Icons.sync_rounded),
+                title: Text(context.l10n.libraryForceFullScan),
+                subtitle: Text(context.l10n.libraryForceFullScanSubtitle),
+                onTap: canScan
+                    ? () => Navigator.pop(context, 'full_scan')
+                    : null,
+              ),
+              if (hasFailures)
+                AppSheetOption(
+                  leading: const AppIcon(Icons.report_outlined),
+                  title: Text(context.l10n.libraryUnreadableFilesTitle),
+                  subtitle: Text(context.l10n.libraryUnreadableFilesAction),
+                  onTap: () => Navigator.pop(context, 'failures'),
+                ),
+              AppSheetOption(
+                leading: AppIcon(
+                  Icons.delete_outline,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                title: Text(
+                  context.l10n.libraryRemoveFolder,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                onTap: () => Navigator.pop(context, 'remove'),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
         ],

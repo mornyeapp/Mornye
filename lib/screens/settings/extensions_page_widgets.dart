@@ -210,26 +210,38 @@ class _SearchProviderSelector extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ...searchProviders.map(
-              (ext) => AppSheetOption(
-                leading: AppIcon(Icons.extension, color: colorScheme.secondary),
-                title: Text(ext.displayName),
-                subtitle: Text(
-                  ext.searchBehavior?.placeholder ??
-                      ctx.l10n.extensionsCustomSearch,
+            AppSheetOptions(
+              children: [
+                ...searchProviders.map(
+                  (ext) => AppSheetOption(
+                    leading: AppIcon(
+                      Icons.extension,
+                      color: colorScheme.secondary,
+                    ),
+                    title: Text(ext.displayName),
+                    subtitle: Text(
+                      ext.searchBehavior?.placeholder ??
+                          ctx.l10n.extensionsCustomSearch,
+                    ),
+                    selected: settings.searchProvider == ext.id,
+                    trailing: settings.searchProvider == ext.id
+                        ? AppIcon(
+                            Icons.check_circle,
+                            color: colorScheme.primary,
+                          )
+                        : AppIcon(
+                            Icons.circle_outlined,
+                            color: colorScheme.outline,
+                          ),
+                    onTap: () {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .setSearchProvider(ext.id);
+                      Navigator.pop(ctx);
+                    },
+                  ),
                 ),
-                selected: settings.searchProvider == ext.id,
-                trailing: settings.searchProvider == ext.id
-                    ? AppIcon(Icons.check_circle, color: colorScheme.primary)
-                    : AppIcon(
-                        Icons.circle_outlined,
-                        color: colorScheme.outline,
-                      ),
-                onTap: () {
-                  ref.read(settingsProvider.notifier).setSearchProvider(ext.id);
-                  Navigator.pop(ctx);
-                },
-              ),
+              ],
             ),
             const SizedBox(height: 16),
           ],
@@ -300,68 +312,93 @@ class _HomeFeedProviderSelector extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppSheetOption(
-              leading: AppIcon(Icons.auto_awesome, color: colorScheme.primary),
-              title: Text(ctx.l10n.extensionsHomeFeedAuto),
-              subtitle: Text(ctx.l10n.extensionsHomeFeedAutoSubtitle),
-              trailing:
-                  (settings.homeFeedProvider == null ||
-                      settings.homeFeedProvider!.isEmpty)
-                  ? AppIcon(Icons.check_circle, color: colorScheme.primary)
-                  : AppIcon(Icons.circle_outlined, color: colorScheme.outline),
-              onTap: () {
-                ref.read(settingsProvider.notifier).setHomeFeedProvider(null);
-                ref.read(exploreProvider.notifier).refresh();
-                Navigator.pop(ctx);
-              },
-            ),
-            AppSheetOption(
-              leading: AppIcon(Icons.block, color: colorScheme.error),
-              title: Text(ctx.l10n.extensionsHomeFeedOff),
-              subtitle: Text(ctx.l10n.extensionsHomeFeedOffSubtitle),
-              selected:
-                  settings.homeFeedProvider == AppSettings.homeFeedProviderOff,
-              trailing:
-                  settings.homeFeedProvider == AppSettings.homeFeedProviderOff
-                  ? AppIcon(Icons.check_circle, color: colorScheme.primary)
-                  : AppIcon(Icons.circle_outlined, color: colorScheme.outline),
-              onTap: () {
-                ref
-                    .read(settingsProvider.notifier)
-                    .setHomeFeedProvider(AppSettings.homeFeedProviderOff);
-                ref.read(exploreProvider.notifier).clear();
-                Navigator.pop(ctx);
-              },
-            ),
-            if (homeFeedProviders.isEmpty)
-              AppSheetOption(
-                enabled: false,
-                leading: AppIcon(
-                  Icons.extension_off,
-                  color: colorScheme.outline,
+            AppSheetOptions(
+              children: [
+                AppSheetOption(
+                  leading: AppIcon(
+                    Icons.auto_awesome,
+                    color: colorScheme.primary,
+                  ),
+                  title: Text(ctx.l10n.extensionsHomeFeedAuto),
+                  subtitle: Text(ctx.l10n.extensionsHomeFeedAutoSubtitle),
+                  trailing:
+                      (settings.homeFeedProvider == null ||
+                          settings.homeFeedProvider!.isEmpty)
+                      ? AppIcon(Icons.check_circle, color: colorScheme.primary)
+                      : AppIcon(
+                          Icons.circle_outlined,
+                          color: colorScheme.outline,
+                        ),
+                  onTap: () {
+                    ref
+                        .read(settingsProvider.notifier)
+                        .setHomeFeedProvider(null);
+                    ref.read(exploreProvider.notifier).refresh();
+                    Navigator.pop(ctx);
+                  },
                 ),
-                title: Text(ctx.l10n.extensionsNoHomeFeedExtensions),
-              ),
-            ...homeFeedProviders.map(
-              (ext) => AppSheetOption(
-                leading: AppIcon(Icons.extension, color: colorScheme.secondary),
-                title: Text(ext.displayName),
-                subtitle: Text(ctx.l10n.extensionsHomeFeedUse(ext.displayName)),
-                selected: settings.homeFeedProvider == ext.id,
-                trailing: settings.homeFeedProvider == ext.id
-                    ? AppIcon(Icons.check_circle, color: colorScheme.primary)
-                    : AppIcon(
-                        Icons.circle_outlined,
-                        color: colorScheme.outline,
-                      ),
-                onTap: () {
-                  ref
-                      .read(settingsProvider.notifier)
-                      .setHomeFeedProvider(ext.id);
-                  ref.read(exploreProvider.notifier).refresh();
-                  Navigator.pop(ctx);
-                },
-              ),
+                AppSheetOption(
+                  leading: AppIcon(Icons.block, color: colorScheme.error),
+                  title: Text(ctx.l10n.extensionsHomeFeedOff),
+                  subtitle: Text(ctx.l10n.extensionsHomeFeedOffSubtitle),
+                  selected:
+                      settings.homeFeedProvider ==
+                      AppSettings.homeFeedProviderOff,
+                  trailing:
+                      settings.homeFeedProvider ==
+                          AppSettings.homeFeedProviderOff
+                      ? AppIcon(Icons.check_circle, color: colorScheme.primary)
+                      : AppIcon(
+                          Icons.circle_outlined,
+                          color: colorScheme.outline,
+                        ),
+                  onTap: () {
+                    ref
+                        .read(settingsProvider.notifier)
+                        .setHomeFeedProvider(AppSettings.homeFeedProviderOff);
+                    ref.read(exploreProvider.notifier).clear();
+                    Navigator.pop(ctx);
+                  },
+                ),
+                if (homeFeedProviders.isEmpty)
+                  AppSheetOption(
+                    enabled: false,
+                    leading: AppIcon(
+                      Icons.extension_off,
+                      color: colorScheme.outline,
+                    ),
+                    title: Text(ctx.l10n.extensionsNoHomeFeedExtensions),
+                  ),
+                ...homeFeedProviders.map(
+                  (ext) => AppSheetOption(
+                    leading: AppIcon(
+                      Icons.extension,
+                      color: colorScheme.secondary,
+                    ),
+                    title: Text(ext.displayName),
+                    subtitle: Text(
+                      ctx.l10n.extensionsHomeFeedUse(ext.displayName),
+                    ),
+                    selected: settings.homeFeedProvider == ext.id,
+                    trailing: settings.homeFeedProvider == ext.id
+                        ? AppIcon(
+                            Icons.check_circle,
+                            color: colorScheme.primary,
+                          )
+                        : AppIcon(
+                            Icons.circle_outlined,
+                            color: colorScheme.outline,
+                          ),
+                    onTap: () {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .setHomeFeedProvider(ext.id);
+                      ref.read(exploreProvider.notifier).refresh();
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
           ],

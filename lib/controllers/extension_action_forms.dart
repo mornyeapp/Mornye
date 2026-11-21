@@ -215,12 +215,17 @@ class _AccountFormDialogState extends State<_AccountFormDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final option in (field['options'] as List).cast<String>())
-              AppSheetOption.choice(
-                title: Text(option),
-                selected: option == _choices[key],
-                onTap: () => Navigator.pop(sheetContext, option),
-              ),
+            AppSheetOptions(
+              children: [
+                for (final option in (field['options'] as List).cast<String>())
+                  AppSheetOption.choice(
+                    title: Text(option),
+                    selected: option == _choices[key],
+                    onTap: () => Navigator.pop(sheetContext, option),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

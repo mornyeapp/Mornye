@@ -18,7 +18,11 @@ class _FolderOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return AppSheetOption(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      // In line with the other rows of the connected group.
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: context.isMornye ? 24 : context.tokens.rowPaddingH,
+        vertical: 4,
+      ),
       title: Text(title),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

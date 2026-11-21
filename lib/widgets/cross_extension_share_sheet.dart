@@ -10,6 +10,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/services/cross_extension_share_service.dart';
 import 'package:mornye/services/share_intent_service.dart';
+import 'package:mornye/widgets/settings_group.dart';
 
 /// [results] with the services that found the item first, each group in
 /// the Metadata Priority order ([priority]), then by name.
@@ -144,9 +145,13 @@ class _CrossExtensionShareSheetState
           padding: const EdgeInsets.only(bottom: 16, top: 4),
           itemBuilder: (context, index) {
             final result = results[index];
-            return _CrossExtensionShareTile(
-              result: result,
-              iconPath: _iconPathFor(result.extensionId),
+            return ConnectedGroupRow(
+              index: index,
+              count: results.length,
+              child: _CrossExtensionShareTile(
+                result: result,
+                iconPath: _iconPathFor(result.extensionId),
+              ),
             );
           },
           itemCount: results.length,

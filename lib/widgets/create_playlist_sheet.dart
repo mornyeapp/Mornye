@@ -9,6 +9,7 @@ import 'package:mornye/services/playlist_sources.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/animation_utils.dart';
@@ -35,32 +36,36 @@ Future<void> showCreatePlaylistSheet(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (final (source, icon, title, subtitle) in [
-            (
-              _PlaylistSource.empty,
-              Icons.playlist_add,
-              l10n.playlistCreateEmpty,
-              l10n.playlistCreateEmptySubtitle,
-            ),
-            (
-              _PlaylistSource.folder,
-              Icons.folder_outlined,
-              l10n.playlistCreateFromFolder,
-              l10n.playlistCreateFromFolderSubtitle,
-            ),
-            (
-              _PlaylistSource.file,
-              Icons.file_open_outlined,
-              l10n.playlistImportFile,
-              l10n.playlistImportFileSubtitle,
-            ),
-          ])
-            AppSheetOption(
-              leading: AppIcon(icon),
-              title: Text(title),
-              subtitle: Text(subtitle),
-              onTap: () => Navigator.pop(sheetContext, source),
-            ),
+          AppSheetOptions(
+            children: [
+              for (final (source, icon, title, subtitle) in [
+                (
+                  _PlaylistSource.empty,
+                  Icons.playlist_add,
+                  l10n.playlistCreateEmpty,
+                  l10n.playlistCreateEmptySubtitle,
+                ),
+                (
+                  _PlaylistSource.folder,
+                  Icons.folder_outlined,
+                  l10n.playlistCreateFromFolder,
+                  l10n.playlistCreateFromFolderSubtitle,
+                ),
+                (
+                  _PlaylistSource.file,
+                  Icons.file_open_outlined,
+                  l10n.playlistImportFile,
+                  l10n.playlistImportFileSubtitle,
+                ),
+              ])
+                AppSheetOption(
+                  leading: AppIcon(icon),
+                  title: Text(title),
+                  subtitle: Text(subtitle),
+                  onTap: () => Navigator.pop(sheetContext, source),
+                ),
+            ],
+          ),
           const SizedBox(height: 16),
         ],
       ),
@@ -289,7 +294,7 @@ class _FolderListState extends State<_FolderList> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ?browse,
+                if (browse != null) AppSheetOptions(children: [browse]),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 24),
                   child: EmptyState(
@@ -308,22 +313,29 @@ class _FolderListState extends State<_FolderList> {
           padding: const EdgeInsets.only(bottom: 16),
           itemCount: folders.length + offset,
           itemBuilder: (context, index) {
-            if (browse != null && index == 0) return browse;
+            Widget row(Widget option) => ConnectedGroupRow(
+              index: index,
+              count: folders.length + offset,
+              child: option,
+            );
+            if (browse != null && index == 0) return row(browse);
             final folder = folders[index - offset];
             final count = context.l10n.tracksCount(folder.ids.length);
-            return AppSheetOption(
-              leading: const AppIcon(Icons.folder_outlined),
-              title: Text(
-                folder.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            return row(
+              AppSheetOption(
+                leading: const AppIcon(Icons.folder_outlined),
+                title: Text(
+                  folder.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  folder.path.isEmpty ? count : '$count · ${folder.path}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () => Navigator.pop(context, folder),
               ),
-              subtitle: Text(
-                folder.path.isEmpty ? count : '$count · ${folder.path}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              onTap: () => Navigator.pop(context, folder),
             );
           },
         );

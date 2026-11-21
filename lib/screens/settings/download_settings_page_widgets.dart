@@ -77,16 +77,21 @@ class _RegionPickerSheetState extends State<_RegionPickerSheet> {
               : ListView.builder(
                   controller: widget.scrollController,
                   shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 16),
                   itemCount: matches.length,
                   itemBuilder: (context, index) {
                     final code = matches[index];
                     final isSelected = code == widget.selected;
                     final countryName = widget.countryNameOf(context, code);
-                    return AppSheetOption.choice(
-                      title: Text(countryName != code ? countryName : code),
-                      subtitle: countryName != code ? Text(code) : null,
-                      selected: isSelected,
-                      onTap: () => widget.onSelected(code),
+                    return ConnectedGroupRow(
+                      index: index,
+                      count: matches.length,
+                      child: AppSheetOption.choice(
+                        title: Text(countryName != code ? countryName : code),
+                        subtitle: countryName != code ? Text(code) : null,
+                        selected: isSelected,
+                        onTap: () => widget.onSelected(code),
+                      ),
                     );
                   },
                 ),

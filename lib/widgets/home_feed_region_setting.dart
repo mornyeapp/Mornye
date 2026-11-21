@@ -52,14 +52,21 @@ class _HomeFeedRegionSettingState extends ConsumerState<HomeFeedRegionSetting> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      for (final code in setting.options!)
-                        AppSheetOption.choice(
-                          title: Text(extensionCountryName(sheetContext, code)),
-                          subtitle: Text(code.toUpperCase()),
-                          selected:
-                              code.toUpperCase() == selected?.toUpperCase(),
-                          onTap: () => Navigator.pop(sheetContext, code),
-                        ),
+                      AppSheetOptions(
+                        children: [
+                          for (final code in setting.options!)
+                            AppSheetOption.choice(
+                              title: Text(
+                                extensionCountryName(sheetContext, code),
+                              ),
+                              subtitle: Text(code.toUpperCase()),
+                              selected:
+                                  code.toUpperCase() == selected?.toUpperCase(),
+                              onTap: () => Navigator.pop(sheetContext, code),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),

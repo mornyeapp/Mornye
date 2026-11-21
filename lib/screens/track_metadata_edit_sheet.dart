@@ -178,7 +178,9 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
                                 onTap: () =>
                                     Navigator.pop(sheetContext, items[index]),
                               ),
-                              if (index != items.length - 1)
+                              // Material rows are set apart by their gaps.
+                              if (sheetContext.isMornye &&
+                                  index != items.length - 1)
                                 Divider(
                                   height: 1,
                                   indent: 60,

@@ -139,16 +139,20 @@ class _OpenOnPlatformSheetState extends State<OpenOnPlatformSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final entry in entries)
-                AppSheetOption(
-                  title: Text(_displayName(entry.key)),
-                  trailing: AppIcon.adaptive(
-                    Icons.open_in_new,
-                    size: 18,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  onTap: () => _openLink(context, entry.value),
-                ),
+              AppSheetOptions(
+                children: [
+                  for (final entry in entries)
+                    AppSheetOption(
+                      title: Text(_displayName(entry.key)),
+                      trailing: AppIcon.adaptive(
+                        Icons.open_in_new,
+                        size: 18,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      onTap: () => _openLink(context, entry.value),
+                    ),
+                ],
+              ),
               const SizedBox(height: 16),
             ],
           ),

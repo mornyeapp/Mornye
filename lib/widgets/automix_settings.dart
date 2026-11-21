@@ -36,32 +36,36 @@ class _AutoMixSettingsState extends ConsumerState<AutoMixSettings> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final effect in AutoMixEffect.values)
-              Semantics(
-                selected: effect == current,
-                child: AppSheetOption(
-                  leading: Icon(switch (effect) {
-                    AutoMixEffect.auto => Icons.auto_awesome,
-                    AutoMixEffect.crossfade => Icons.compare_arrows,
-                    AutoMixEffect.muffled => Icons.graphic_eq,
-                    AutoMixEffect.echo => Icons.surround_sound,
-                    AutoMixEffect.pitch => Icons.music_note,
-                    AutoMixEffect.custom => Icons.tune,
-                  }),
-                  title: Text(names[effect]!),
-                  selected: effect == current,
-                  trailing: effect == current
-                      ? Icon(
-                          Icons.check,
-                          color: Theme.of(sheetContext).colorScheme.primary,
-                        )
-                      : null,
-                  onTap: () {
-                    notifier.setAutoMixEffect(effect);
-                    Navigator.pop(sheetContext);
-                  },
-                ),
-              ),
+            AppSheetOptions(
+              children: [
+                for (final effect in AutoMixEffect.values)
+                  Semantics(
+                    selected: effect == current,
+                    child: AppSheetOption(
+                      leading: Icon(switch (effect) {
+                        AutoMixEffect.auto => Icons.auto_awesome,
+                        AutoMixEffect.crossfade => Icons.compare_arrows,
+                        AutoMixEffect.muffled => Icons.graphic_eq,
+                        AutoMixEffect.echo => Icons.surround_sound,
+                        AutoMixEffect.pitch => Icons.music_note,
+                        AutoMixEffect.custom => Icons.tune,
+                      }),
+                      title: Text(names[effect]!),
+                      selected: effect == current,
+                      trailing: effect == current
+                          ? Icon(
+                              Icons.check,
+                              color: Theme.of(sheetContext).colorScheme.primary,
+                            )
+                          : null,
+                      onTap: () {
+                        notifier.setAutoMixEffect(effect);
+                        Navigator.pop(sheetContext);
+                      },
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 8),
           ],
         ),

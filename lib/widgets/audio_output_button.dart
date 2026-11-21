@@ -65,31 +65,39 @@ class _AudioOutputButtonState extends State<AudioOutputButton> {
           builder: (context, _) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AppSheetOption(
-                title: Text(
-                  _ios
-                      ? context.l10n.audioOutputAirPlay
-                      : context.l10n.audioOutputSystem,
-                ),
-                leading: Icon(
-                  _ios ? Icons.airplay : Icons.speaker_group_outlined,
-                ),
-                onTap: () => Navigator.pop(context, _OutputChoice.system),
+              AppSheetOptions(
+                children: [
+                  AppSheetOption(
+                    title: Text(
+                      _ios
+                          ? context.l10n.audioOutputAirPlay
+                          : context.l10n.audioOutputSystem,
+                    ),
+                    leading: Icon(
+                      _ios ? Icons.airplay : Icons.speaker_group_outlined,
+                    ),
+                    onTap: () => Navigator.pop(context, _OutputChoice.system),
+                  ),
+                  AppSheetOption(
+                    title: Text(
+                      output.deviceName ?? context.l10n.audioOutputCast,
+                    ),
+                    subtitle: Text(context.l10n.audioOutputCastDescription),
+                    leading: Icon(
+                      output.connected ? Icons.cast_connected : Icons.cast,
+                    ),
+                    onTap: () => Navigator.pop(context, _OutputChoice.cast),
+                  ),
+                  if (output.connected)
+                    AppSheetOption(
+                      title: Text(context.l10n.audioOutputStopCasting),
+                      leading: const Icon(Icons.stop_circle_outlined),
+                      onTap: () =>
+                          Navigator.pop(context, _OutputChoice.disconnect),
+                    ),
+                ],
               ),
-              AppSheetOption(
-                title: Text(output.deviceName ?? context.l10n.audioOutputCast),
-                subtitle: Text(context.l10n.audioOutputCastDescription),
-                leading: Icon(
-                  output.connected ? Icons.cast_connected : Icons.cast,
-                ),
-                onTap: () => Navigator.pop(context, _OutputChoice.cast),
-              ),
-              if (output.connected)
-                AppSheetOption(
-                  title: Text(context.l10n.audioOutputStopCasting),
-                  leading: const Icon(Icons.stop_circle_outlined),
-                  onTap: () => Navigator.pop(context, _OutputChoice.disconnect),
-                ),
+              const SizedBox(height: 8),
             ],
           ),
         ),

@@ -163,13 +163,18 @@ Future<void> navigateToArtistCredits(
           maxHeightFactor: 0.6,
           builder: (context) => ListView(
             shrinkWrap: true,
+            padding: const EdgeInsets.only(bottom: 16),
             children: [
-              for (final artist in artists)
-                AppSheetOption(
-                  leading: const Icon(Icons.person_outline),
-                  title: Text(artist.name),
-                  onTap: () => Navigator.pop(context, artist),
-                ),
+              AppSheetOptions(
+                children: [
+                  for (final artist in artists)
+                    AppSheetOption(
+                      leading: const Icon(Icons.person_outline),
+                      title: Text(artist.name),
+                      onTap: () => Navigator.pop(context, artist),
+                    ),
+                ],
+              ),
             ],
           ),
         );

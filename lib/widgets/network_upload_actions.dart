@@ -147,21 +147,25 @@ Future<String?> chooseNetworkUploadFolder(
     builder: (sheetContext) => Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (destination != null)
-          AppSheetOption(
-            leading: const AppIcon.adaptive(Icons.download_outlined),
-            title: Text(settings.networkDownloadLabel),
-            subtitle: Text(sheetContext.l10n.networkDownloadDestination),
-            onTap: () => Navigator.pop(sheetContext, destination),
-          ),
-        for (final connection in connections)
-          AppSheetOption(
-            leading: const AppIcon.adaptive(Icons.dns_outlined),
-            title: Text(connection.name),
-            subtitle: Text(sheetContext.l10n.networkUploadChooseFolder),
-            trailing: const AppIcon.adaptive(Icons.chevron_right),
-            onTap: () => Navigator.pop(sheetContext, connection),
-          ),
+        AppSheetOptions(
+          children: [
+            if (destination != null)
+              AppSheetOption(
+                leading: const AppIcon.adaptive(Icons.download_outlined),
+                title: Text(settings.networkDownloadLabel),
+                subtitle: Text(sheetContext.l10n.networkDownloadDestination),
+                onTap: () => Navigator.pop(sheetContext, destination),
+              ),
+            for (final connection in connections)
+              AppSheetOption(
+                leading: const AppIcon.adaptive(Icons.dns_outlined),
+                title: Text(connection.name),
+                subtitle: Text(sheetContext.l10n.networkUploadChooseFolder),
+                trailing: const AppIcon.adaptive(Icons.chevron_right),
+                onTap: () => Navigator.pop(sheetContext, connection),
+              ),
+          ],
+        ),
         const SizedBox(height: 8),
       ],
     ),

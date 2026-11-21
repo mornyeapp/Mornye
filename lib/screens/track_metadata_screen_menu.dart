@@ -272,7 +272,10 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
       _showDesktopOptionsMenu(screenContext, ref, colorScheme, anchor: anchor);
       return;
     }
-    Widget buildMenu(BuildContext sheetContext) {
+    Widget buildMenu(
+      BuildContext sheetContext, [
+      ScrollController? controller,
+    ]) {
       final l10n = sheetContext.l10n;
       final options = _menuOptions(screenContext, ref, colorScheme, l10n);
 
@@ -321,90 +324,79 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         );
       }
 
-      Widget buildContent({ScrollController? controller}) => SafeArea(
+      // The song stays in place above the rows, which are one connected
+      // group like the other menus.
+      return SafeArea(
         top: false,
-        child: SingleChildScrollView(
-          controller: controller,
-          primary: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const AppSheetHandle(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const AppSheetHandle(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                connectedRunTitleInset,
+                12,
+                connectedRunTitleInset,
+                8,
+              ),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _buildOptionsHeaderCover(colorScheme),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          trackName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(sheetContext).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          artistName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(sheetContext).textTheme.bodyMedium
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                controller: controller,
+                padding: EdgeInsets.only(bottom: sheetContext.tokens.gapLg),
+                child: SettingsGroup(
+                  connected: true,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: _buildOptionsHeaderCover(colorScheme),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            trackName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(sheetContext).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            artistName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(sheetContext).textTheme.bodyMedium
-                                ?.copyWith(color: colorScheme.onSurfaceVariant),
-                          ),
-                        ],
+                    for (final option in options)
+                      SettingsItem(
+                        icon: option.icon,
+                        iconColor: option.destructive
+                            ? colorScheme.error
+                            : null,
+                        title: option.label,
+                        titleColor: option.destructive
+                            ? colorScheme.error
+                            : null,
+                        onTap: () =>
+                            _closeOptionsMenuAndRun(sheetContext, option.onTap),
                       ),
-                    ),
                   ],
                 ),
               ),
-              Divider(
-                height: 1,
-                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-              ),
-              const SizedBox(height: 8),
-              Builder(
-                builder: (context) {
-                  // One menu surface; groups are set apart by a divider.
-                  final items = <Widget>[
-                    for (int i = 0; i < options.length; i++) ...[
-                      if (options[i].dividerAbove && i != 0)
-                        Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: colorScheme.outlineVariant.withValues(
-                            alpha: 0.3,
-                          ),
-                        ),
-                      _MetadataOptionTile(
-                        option: options[i],
-                        colorScheme: colorScheme,
-                        onTap: () => _closeOptionsMenuAndRun(
-                          sheetContext,
-                          options[i].onTap,
-                        ),
-                      ),
-                    ],
-                  ];
-                  return SettingsGroup(children: items);
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
-      return ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.85,
-        ),
-        child: buildContent(),
       );
     }
 
@@ -420,7 +412,8 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
       context: screenContext,
       useRootNavigator: true,
       isScrollControlled: true,
-      builder: buildMenu,
+      // The sheet owns the scrolling, so a pull down at the top closes it.
+      builder: (_) => AppScrollableSheet(builder: buildMenu),
     );
   }
 

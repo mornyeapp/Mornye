@@ -825,32 +825,39 @@ class _LanguageSelector extends StatelessWidget {
       builder: (context, controller) => ListView.builder(
         controller: controller,
         shrinkWrap: true,
+        padding: const EdgeInsets.only(bottom: 16),
         itemCount: supportedLanguageChoices.length,
         itemBuilder: (context, index) {
           final lang = supportedLanguageChoices[index];
           final isSelected = currentLocale == lang.$1;
-          return AppSheetOption(
-            leading: AppIcon(
-              lang.$3,
-              color: isSelected
-                  ? colorScheme.primary
-                  : colorScheme.onSurfaceVariant,
-            ),
-            title: Text(
-              lang.$2,
-              style: TextStyle(
-                color: isSelected ? colorScheme.primary : colorScheme.onSurface,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          return ConnectedGroupRow(
+            index: index,
+            count: supportedLanguageChoices.length,
+            child: AppSheetOption(
+              leading: AppIcon(
+                lang.$3,
+                color: isSelected
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
               ),
+              title: Text(
+                lang.$2,
+                style: TextStyle(
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurface,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+              selected: isSelected,
+              trailing: isSelected
+                  ? AppIcon(Icons.check, color: colorScheme.primary)
+                  : null,
+              onTap: () {
+                onChanged(lang.$1);
+                Navigator.pop(context);
+              },
             ),
-            selected: isSelected,
-            trailing: isSelected
-                ? AppIcon(Icons.check, color: colorScheme.primary)
-                : null,
-            onTap: () {
-              onChanged(lang.$1);
-              Navigator.pop(context);
-            },
           );
         },
       ),

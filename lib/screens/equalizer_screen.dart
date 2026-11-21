@@ -130,46 +130,55 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final preset in [
-                ...EqualizerPreset.builtIn,
-                ...state.presets,
-              ])
-                AppSheetOption(
-                  title: Text(preset.name),
-                  selected: preset == selected,
-                  // iOS lists mark the choice with a trailing checkmark.
-                  leading: mornye
-                      ? null
-                      : preset == selected
-                      ? const AppIcon(Icons.check)
-                      : const AppIcon(Icons.graphic_eq),
-                  trailing:
-                      (mornye && preset == selected) ||
-                          state.presets.contains(preset)
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (mornye && preset == selected)
-                              AppIcon(
-                                Icons.check,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            if (state.presets.contains(preset))
-                              IconButton(
-                                tooltip: context.l10n.equalizerDeletePreset,
-                                icon: const AppIcon(Icons.delete_outline),
-                                onPressed: () => ref
-                                    .read(equalizerProvider.notifier)
-                                    .deletePreset(preset.name),
-                              ),
-                          ],
-                        )
-                      : null,
-                  onTap: () {
-                    ref.read(equalizerProvider.notifier).applyPreset(preset);
-                    Navigator.pop(sheetContext);
-                  },
-                ),
+              AppSheetOptions(
+                children: [
+                  for (final preset in [
+                    ...EqualizerPreset.builtIn,
+                    ...state.presets,
+                  ])
+                    AppSheetOption(
+                      title: Text(preset.name),
+                      selected: preset == selected,
+                      // iOS lists mark the choice with a trailing checkmark.
+                      leading: mornye
+                          ? null
+                          : preset == selected
+                          ? const AppIcon(Icons.check)
+                          : const AppIcon(Icons.graphic_eq),
+                      trailing:
+                          (mornye && preset == selected) ||
+                              state.presets.contains(preset)
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (mornye && preset == selected)
+                                  AppIcon(
+                                    Icons.check,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
+                                if (state.presets.contains(preset))
+                                  IconButton(
+                                    tooltip: context.l10n.equalizerDeletePreset,
+                                    icon: const AppIcon(Icons.delete_outline),
+                                    onPressed: () => ref
+                                        .read(equalizerProvider.notifier)
+                                        .deletePreset(preset.name),
+                                  ),
+                              ],
+                            )
+                          : null,
+                      onTap: () {
+                        ref
+                            .read(equalizerProvider.notifier)
+                            .applyPreset(preset);
+                        Navigator.pop(sheetContext);
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
             ],
           ),
         );

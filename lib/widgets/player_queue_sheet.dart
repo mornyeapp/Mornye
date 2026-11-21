@@ -7,6 +7,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/expressive_button.dart';
@@ -67,6 +68,10 @@ class PlayerQueueSheet extends ConsumerStatefulWidget {
 
 class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
   static const _rowRadius = 16.0;
+
+  /// The songs are one connected group: each row its own surface, this far
+  /// from the next.
+  static const _rowGap = 2.0;
   static final _liftSpring = SpringCurve(M3EMotion.expressiveSpatialFast);
 
   /// Measures the first row until the list has opened at the playing song.
@@ -86,7 +91,8 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
     _openScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final rowHeight = _firstRowKey?.currentContext?.size?.height;
+      final tileHeight = _firstRowKey?.currentContext?.size?.height;
+      final rowHeight = tileHeight == null ? null : tileHeight + _rowGap;
       final index = ref.read(currentQueueIndexProvider);
       final scroll = widget.scrollController;
       if (rowHeight != null && index > 1 && scroll.hasClients) {
@@ -131,6 +137,7 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
     final swipeToPlayNext = queueEntrySwipeEnabled(ref);
     final textTheme = Theme.of(context).textTheme;
     final expressive = materialExpressiveEnabled(context);
+    final rowColor = settingsGroupColor(context);
     final artworkMotion = AppMotion.spatial(
       context,
       const AppMotionSpec(Duration.zero, Curves.linear),
@@ -213,7 +220,8 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
           Expanded(
             child: ReorderableListView.builder(
               scrollController: widget.scrollController,
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
+              // The last row's own gap is part of the 24 below the songs.
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24 - _rowGap),
               itemCount: queue.length,
               buildDefaultDragHandles: !locked,
               onReorderItem: (oldIndex, newIndex) {
@@ -224,7 +232,7 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
                 child: !expressive
                     ? Material(
                         elevation: 4,
-                        color: colorScheme.surfaceContainerHighest,
+                        color: rowColor,
                         borderRadius: BorderRadius.circular(12),
                         child: child,
                       )
@@ -237,7 +245,7 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
                             scale: 1 + 0.03 * t,
                             child: Material(
                               elevation: 6 * t.clamp(0.0, 1.0),
-                              color: colorScheme.surfaceContainerHighest,
+                              color: rowColor,
                               borderRadius: BorderRadius.circular(
                                 _rowRadius + 8 * t,
                               ),
@@ -257,105 +265,115 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
                   );
                 }
                 final isCurrent = current?.id == item.id;
-                return PlayerQueueDismissible(
+                final radius = connectedRowRadius(
+                  context,
+                  first: i == 0,
+                  last: i == queue.length - 1,
+                );
+                return Padding(
                   key: ObjectKey(item),
-                  enabled: !isCurrent && !locked,
-                  onRemove: () => controller.removeQueuedItem(item),
-                  playNext: swipeToPlayNext
-                      ? queueEntrySwipe(controller, item)
-                      : null,
-                  child: ListTile(
-                    key: i == 0 ? _firstRowKey : null,
-                    selected: isCurrent,
-                    selectedTileColor: colorScheme.primaryContainer,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        isCurrent ? 28 : _rowRadius,
-                      ),
-                    ),
-                    contentPadding: const EdgeInsetsDirectional.only(
-                      start: 16,
-                      end: 4,
-                    ),
-                    leading: TweenAnimationBuilder<double>(
-                      tween: Tween(end: expressive && isCurrent ? 22 : 8),
-                      duration: artworkMotion.duration,
-                      curve: artworkMotion.curve,
-                      builder: (context, radius, child) => ClipRRect(
-                        borderRadius: BorderRadius.circular(
-                          radius.clamp(0.0, 22.0),
+                  padding: const EdgeInsets.only(bottom: _rowGap),
+                  child: PlayerQueueDismissible(
+                    enabled: !isCurrent && !locked,
+                    onRemove: () => controller.removeQueuedItem(item),
+                    playNext: swipeToPlayNext
+                        ? queueEntrySwipe(controller, item)
+                        : null,
+                    materialRadius: radius,
+                    child: Material(
+                      color: isCurrent
+                          ? colorScheme.primaryContainer
+                          : rowColor,
+                      shape: RoundedRectangleBorder(borderRadius: radius),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                        key: i == 0 ? _firstRowKey : null,
+                        selected: isCurrent,
+                        contentPadding: const EdgeInsetsDirectional.only(
+                          start: 16,
+                          end: 4,
                         ),
-                        child: child,
-                      ),
-                      child: SizedBox.square(
-                        dimension: 44,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            PlayerQueueArtwork(
-                              item: item,
-                              colorScheme: colorScheme,
-                              cacheWidth: 132,
-                              iconSize: 22,
+                        leading: TweenAnimationBuilder<double>(
+                          tween: Tween(end: expressive && isCurrent ? 22 : 8),
+                          duration: artworkMotion.duration,
+                          curve: artworkMotion.curve,
+                          builder: (context, radius, child) => ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              radius.clamp(0.0, 22.0),
                             ),
-                            if (isCurrent)
-                              ColoredBox(
-                                color: Colors.black.withValues(alpha: 0.45),
-                                child: Center(
-                                  // Rows build after the sheet's build, so
-                                  // the playing state is watched here.
-                                  child: Consumer(
-                                    builder: (context, ref, _) =>
-                                        NowPlayingIndicator(
-                                          color: Colors.white,
-                                          playing: ref.watch(
-                                            playbackPlayingProvider,
-                                          ),
-                                        ),
+                            child: child,
+                          ),
+                          child: SizedBox.square(
+                            dimension: 44,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                PlayerQueueArtwork(
+                                  item: item,
+                                  colorScheme: colorScheme,
+                                  cacheWidth: 132,
+                                  iconSize: 22,
+                                ),
+                                if (isCurrent)
+                                  ColoredBox(
+                                    color: Colors.black.withValues(alpha: 0.45),
+                                    child: Center(
+                                      // Rows build after the sheet's build, so
+                                      // the playing state is watched here.
+                                      child: Consumer(
+                                        builder: (context, ref, _) =>
+                                            NowPlayingIndicator(
+                                              color: Colors.white,
+                                              playing: ref.watch(
+                                                playbackPlayingProvider,
+                                              ),
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodyLarge?.copyWith(
+                            fontWeight: isCurrent
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: isCurrent
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onSurface,
+                          ),
+                        ),
+                        subtitle: Text(
+                          item.artist ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: isCurrent
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        trailing: locked
+                            ? null
+                            : ReorderableDragStartListener(
+                                index: i,
+                                // 24dp glyph plus padding gives a 48dp drag target.
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: AppIcon(
+                                    Icons.drag_handle,
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ),
-                          ],
-                        ),
+                        onTap: () => controller.jumpTo(i),
                       ),
                     ),
-                    title: Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodyLarge?.copyWith(
-                        fontWeight: isCurrent
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                        color: isCurrent
-                            ? colorScheme.onPrimaryContainer
-                            : colorScheme.onSurface,
-                      ),
-                    ),
-                    subtitle: Text(
-                      item.artist ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: isCurrent
-                            ? colorScheme.onPrimaryContainer
-                            : colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    trailing: locked
-                        ? null
-                        : ReorderableDragStartListener(
-                            index: i,
-                            // 24dp glyph plus padding gives a 48dp drag target.
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: AppIcon(
-                                Icons.drag_handle,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                    onTap: () => controller.jumpTo(i),
                   ),
                 );
               },

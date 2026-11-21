@@ -492,21 +492,28 @@ extension _HomeTabExploreUI on _HomeTabState {
             ),
             // Material sheets separate the header by space alone.
             if (context.isMornye) const Divider(height: 1),
-            ListTile(
-              leading: Icon(Icons.download, color: colorScheme.primary),
-              title: Text(context.l10n.downloadTitle),
-              onTap: () {
-                Navigator.pop(context);
-                _handleExploreTrackPrimaryAction(item);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.album, color: colorScheme.onSurfaceVariant),
-              title: Text(context.l10n.homeGoToAlbum),
-              onTap: () {
-                Navigator.pop(context);
-                _navigateToTrackAlbum(item);
-              },
+            AppSheetOptions(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.download, color: colorScheme.primary),
+                  title: Text(context.l10n.downloadTitle),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _handleExploreTrackPrimaryAction(item);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.album,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  title: Text(context.l10n.homeGoToAlbum),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _navigateToTrackAlbum(item);
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 8),
           ],

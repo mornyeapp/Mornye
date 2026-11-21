@@ -19,18 +19,23 @@ Future<IosPickedDirectory?> showIosLibraryFolderSheet(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppSheetOption(
-              leading: const Icon(Icons.folder_special_outlined),
-              title: Text(context.l10n.setupAppDocumentsFolder),
-              subtitle: Text(context.l10n.setupAppDocumentsFolderSubtitle),
-              onTap: () =>
-                  Navigator.pop(context, _LibraryFolderLocation.documents),
-            ),
-            AppSheetOption(
-              leading: const Icon(Icons.folder_open_outlined),
-              title: Text(context.l10n.setupChooseFromFiles),
-              subtitle: Text(context.l10n.setupChooseFromFilesSubtitle),
-              onTap: () => Navigator.pop(context, _LibraryFolderLocation.files),
+            AppSheetOptions(
+              children: [
+                AppSheetOption(
+                  leading: const Icon(Icons.folder_special_outlined),
+                  title: Text(context.l10n.setupAppDocumentsFolder),
+                  subtitle: Text(context.l10n.setupAppDocumentsFolderSubtitle),
+                  onTap: () =>
+                      Navigator.pop(context, _LibraryFolderLocation.documents),
+                ),
+                AppSheetOption(
+                  leading: const Icon(Icons.folder_open_outlined),
+                  title: Text(context.l10n.setupChooseFromFiles),
+                  subtitle: Text(context.l10n.setupChooseFromFilesSubtitle),
+                  onTap: () =>
+                      Navigator.pop(context, _LibraryFolderLocation.files),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
           ],

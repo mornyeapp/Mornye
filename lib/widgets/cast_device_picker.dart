@@ -101,20 +101,31 @@ class _CastDeviceListState extends State<CastDeviceList> {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final device in devices)
-              AppSheetOption.choice(
-                key: ValueKey('cast-device-${device.id}'),
-                title: Text(device.name),
-                subtitle: device.model.isEmpty ? null : Text(device.model),
-                leading: _connecting == device.id
-                    ? const AppLoadingIndicator(size: 24, strokeWidth: 2.5)
-                    : AppIcon(
-                        output.connected && output.deviceId == device.id
-                            ? Icons.cast_connected
-                            : Icons.cast,
-                      ),
-                selected: output.connected && output.deviceId == device.id,
-                onTap: () => _connect(device),
+            if (devices.isNotEmpty)
+              AppSheetOptions(
+                children: [
+                  for (final device in devices)
+                    AppSheetOption.choice(
+                      key: ValueKey('cast-device-${device.id}'),
+                      title: Text(device.name),
+                      subtitle: device.model.isEmpty
+                          ? null
+                          : Text(device.model),
+                      leading: _connecting == device.id
+                          ? const AppLoadingIndicator(
+                              size: 24,
+                              strokeWidth: 2.5,
+                            )
+                          : AppIcon(
+                              output.connected && output.deviceId == device.id
+                                  ? Icons.cast_connected
+                                  : Icons.cast,
+                            ),
+                      selected:
+                          output.connected && output.deviceId == device.id,
+                      onTap: () => _connect(device),
+                    ),
+                ],
               ),
             if (devices.isEmpty)
               Padding(
@@ -132,12 +143,17 @@ class _CastDeviceListState extends State<CastDeviceList> {
                 ),
               ),
             if (output.connected)
-              AppSheetOption(
-                key: const ValueKey('cast-stop'),
-                title: Text(l10n.audioOutputStopCasting),
-                leading: const AppIcon(Icons.stop_circle_outlined),
-                onTap: _stop,
+              AppSheetOptions(
+                children: [
+                  AppSheetOption(
+                    key: const ValueKey('cast-stop'),
+                    title: Text(l10n.audioOutputStopCasting),
+                    leading: const AppIcon(Icons.stop_circle_outlined),
+                    onTap: _stop,
+                  ),
+                ],
               ),
+            const SizedBox(height: 8),
           ],
         );
       },

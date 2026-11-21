@@ -516,16 +516,21 @@ class _SettingItemState extends State<_SettingItem> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final option in widget.setting.options ?? <String>[])
-              AppSheetOption.choice(
-                title: Text(
-                  widget.countryOptions
-                      ? extensionCountryName(sheetContext, option)
-                      : option,
-                ),
-                selected: option == widget.value,
-                onTap: () => Navigator.pop(sheetContext, option),
-              ),
+            AppSheetOptions(
+              children: [
+                for (final option in widget.setting.options ?? <String>[])
+                  AppSheetOption.choice(
+                    title: Text(
+                      widget.countryOptions
+                          ? extensionCountryName(sheetContext, option)
+                          : option,
+                    ),
+                    selected: option == widget.value,
+                    onTap: () => Navigator.pop(sheetContext, option),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

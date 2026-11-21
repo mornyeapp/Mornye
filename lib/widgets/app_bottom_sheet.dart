@@ -11,6 +11,7 @@ import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 
 /// The drag handle shown at the top of every modal sheet.
@@ -409,17 +410,23 @@ Future<void> showAppChoiceSheet<T>({
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final choice in choices)
-          AppSheetOption.choice(
-            leading: AppIcon(choice.icon),
-            title: Text(choice.title),
-            subtitle: choice.subtitle == null ? null : Text(choice.subtitle!),
-            selected: choice.value == selected,
-            onTap: () {
-              onSelected(choice.value);
-              Navigator.pop(sheetContext);
-            },
-          ),
+        AppSheetOptions(
+          children: [
+            for (final choice in choices)
+              AppSheetOption.choice(
+                leading: AppIcon(choice.icon),
+                title: Text(choice.title),
+                subtitle: choice.subtitle == null
+                    ? null
+                    : Text(choice.subtitle!),
+                selected: choice.value == selected,
+                onTap: () {
+                  onSelected(choice.value);
+                  Navigator.pop(sheetContext);
+                },
+              ),
+          ],
+        ),
         if (bottomSpacing > 0) SizedBox(height: bottomSpacing),
       ],
     ),
@@ -616,7 +623,25 @@ class AppSheetDialog extends StatelessWidget {
   }
 }
 
-/// Flat rows sit directly on a sheet's glass; Material keeps its ListTile.
+/// The options of a sheet as one group: Material joins them as connected
+/// rows, Mornye lists them on the sheet's glass.
+class AppSheetOptions extends StatelessWidget {
+  const AppSheetOptions({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => context.isMornye
+      ? Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        )
+      : SettingsGroup(connected: true, children: children);
+}
+
+/// Flat rows sit directly on a sheet's glass; Material keeps its ListTile,
+/// a row of the connected group when it sits in [AppSheetOptions].
 class AppSheetOption extends StatelessWidget {
   const AppSheetOption({
     super.key,
@@ -672,7 +697,12 @@ class AppSheetOption extends StatelessWidget {
         leading: leading == null ? null : symbolIconWidget(leading!),
         trailing: trailing == null ? null : symbolIconWidget(trailing),
         onTap: onTap,
-        contentPadding: contentPadding,
+        // In a group the row starts where a settings row does.
+        contentPadding:
+            contentPadding ??
+            (settingsRowsConnected(context)
+                ? EdgeInsets.symmetric(horizontal: context.tokens.rowPaddingH)
+                : null),
         enabled: enabled,
         // The checkmark already shows the choice; selection only feeds
         // screen readers, so the row keeps its ordinary text color.
