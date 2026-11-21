@@ -371,6 +371,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
               const SizedBox(height: 8),
               Builder(
                 builder: (context) {
+                  // One menu surface; groups are set apart by a divider.
                   final items = <Widget>[
                     for (int i = 0; i < options.length; i++) ...[
                       if (options[i].dividerAbove && i != 0)

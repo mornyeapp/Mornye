@@ -390,17 +390,15 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
                         ),
                       ),
                       if (_saving)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
                           child: SizedBox(
                             width: 22,
                             height: 22,
-                            child: context.isMornye
-                                ? const CupertinoActivityIndicator()
-                                : const AppLoadingIndicator(
-                                    size: 22,
-                                    strokeWidth: 2,
-                                  ),
+                            child: AppLoadingIndicator(
+                              size: 22,
+                              strokeWidth: 2,
+                            ),
                           ),
                         )
                       else
@@ -415,18 +413,16 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
                               horizontal: 18,
                               vertical: 12,
                             ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
                           ),
                         ),
                     ],
                   ),
                 ),
-                Divider(
-                  height: 1,
-                  color: cs.outlineVariant.withValues(alpha: 0.5),
-                ),
+                if (context.isMornye)
+                  Divider(
+                    height: 1,
+                    color: cs.outlineVariant.withValues(alpha: 0.5),
+                  ),
                 Expanded(
                   child: ListView(
                     controller: scrollController,

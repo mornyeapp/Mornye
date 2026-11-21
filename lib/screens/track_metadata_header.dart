@@ -288,9 +288,6 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
   ) {
     return RoundedRectangleBorder(
       borderRadius: context.tokens.borderRadiusCard,
-      side: BorderSide(
-        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-      ),
     );
   }
 
@@ -303,7 +300,6 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
     if (context.isMornye) {
       return Material(
         color: MornyeTheme.controlFill(context),
-        // The radius of Mornye's grouped lists (see SettingsGroup).
         borderRadius: BorderRadius.circular(28),
         clipBehavior: Clip.antiAlias,
         child: DividerTheme(
@@ -314,7 +310,7 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
         ),
       );
     }
-    return Card(
+    return AppContentCard(
       elevation: 0,
       color: settingsGroupColor(context),
       shape: _sectionCardShape(context, scheme),
