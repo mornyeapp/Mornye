@@ -199,6 +199,9 @@ class _HomeTabState extends ConsumerState<HomeTab>
   HomeSearchSortOption? _sortedTracksMode;
   List<Track>? _sortedTracksCache;
   List<int>? _sortedTrackIndexesCache;
+  HomeSearchSortOption? _sortedCollectionsMode;
+  final Map<List<Track>, List<Track>> _sortedCollectionsCache =
+      Map<List<Track>, List<Track>>.identity();
 
   double _exploreCardSize(BuildContext context) {
     // Six phone-sized cards across an iPad made the feed look like a desktop

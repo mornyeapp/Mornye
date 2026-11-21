@@ -84,6 +84,7 @@ extension _HomeTabExploreUI on _HomeTabState {
             builder: (context, controller) => ListView.builder(
               controller: controller,
               scrollDirection: Axis.horizontal,
+              itemExtent: _exploreCardSize(context),
               padding: EdgeInsets.symmetric(horizontal: 12 + inset),
               itemCount: section.items.length,
               itemBuilder: (context, index) {
@@ -125,6 +126,7 @@ extension _HomeTabExploreUI on _HomeTabState {
           height: _exploreSectionHeight(context),
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
+            itemExtent: cardSize,
             physics: const NeverScrollableScrollPhysics(),
             padding: EdgeInsets.symmetric(horizontal: 12 + inset),
             itemCount: 6,

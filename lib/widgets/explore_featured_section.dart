@@ -53,12 +53,17 @@ class ExploreFeaturedSection extends StatelessWidget {
                   descriptionHeight +
                   24,
               child: DesktopScrollArrows(
-                builder: (context, controller) => ListView.separated(
+                builder: (context, controller) => ListView.builder(
                   controller: controller,
                   scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: inset),
+                  itemExtent: width + 12,
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    inset,
+                    0,
+                    inset > 12 ? inset - 12 : 0,
+                    0,
+                  ),
                   itemCount: section.items.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 12),
                   itemBuilder: (context, index) {
                     final item = section.items[index];
                     final image = item.featuredCoverUrl?.isNotEmpty == true
@@ -74,94 +79,98 @@ class ExploreFeaturedSection extends StatelessWidget {
                         ),
                       ),
                     );
-                    return Builder(
-                      builder: (itemContext) => Semantics(
-                        button: true,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => onItemTap(item, itemContext),
-                          child: SizedBox(
-                            width: width,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SizedBox(
-                                  height: headingHeight,
-                                  child: Text(
-                                    item.heading ?? '',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      height: 1.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: colors.primary,
+                    return Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 12),
+                      child: Builder(
+                        builder: (itemContext) => Semantics(
+                          button: true,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => onItemTap(item, itemContext),
+                            child: SizedBox(
+                              width: width,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    height: headingHeight,
+                                    child: Text(
+                                      item.heading ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        height: 1.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: colors.primary,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                SizedBox(
-                                  height: titleHeight,
-                                  child: ExplicitTrackTitle(
-                                    title: item.name,
-                                    explicit: item.explicit == true,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      height: 1.4,
+                                  SizedBox(
+                                    height: titleHeight,
+                                    child: ExplicitTrackTitle(
+                                      title: item.name,
+                                      explicit: item.explicit == true,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        height: 1.4,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                SizedBox(
-                                  height: artistHeight,
-                                  child: Text(
-                                    item.artists,
-                                    maxLines: 1,
+                                  SizedBox(
+                                    height: artistHeight,
+                                    child: Text(
+                                      item.artists,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        height: 1.5,
+                                        color: colors.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: SizedBox(
+                                      width: width,
+                                      height: imageHeight,
+                                      child: image == null || image.isEmpty
+                                          ? fallback
+                                          : CachedCoverImage(
+                                              imageUrl: image,
+                                              // Decode one axis so wide editorial art
+                                              // keeps its ratio on high-density screens.
+                                              memCacheWidth:
+                                                  (width *
+                                                          MediaQuery.devicePixelRatioOf(
+                                                            context,
+                                                          ))
+                                                      .ceil()
+                                                      .clamp(320, 960),
+                                              fit: BoxFit.cover,
+                                              placeholder: (_, _) => fallback,
+                                              errorWidget: (_, _, _) =>
+                                                  fallback,
+                                            ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    item.description ?? '',
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: 14,
                                       height: 1.5,
                                       color: colors.onSurfaceVariant,
                                     ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: SizedBox(
-                                    width: width,
-                                    height: imageHeight,
-                                    child: image == null || image.isEmpty
-                                        ? fallback
-                                        : CachedCoverImage(
-                                            imageUrl: image,
-                                            // Decode one axis so wide editorial art
-                                            // keeps its ratio on high-density screens.
-                                            memCacheWidth:
-                                                (width *
-                                                        MediaQuery.devicePixelRatioOf(
-                                                          context,
-                                                        ))
-                                                    .ceil()
-                                                    .clamp(320, 960),
-                                            fit: BoxFit.cover,
-                                            placeholder: (_, _) => fallback,
-                                            errorWidget: (_, _, _) => fallback,
-                                          ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  item.description ?? '',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    height: 1.5,
-                                    color: colors.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),

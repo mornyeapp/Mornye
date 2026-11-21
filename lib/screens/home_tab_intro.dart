@@ -1021,8 +1021,12 @@ class _HomeContinueListeningProgress extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final neutral = context.isMornye;
     final durationMs = duration.inMilliseconds;
+    final visible = TickerMode.valuesOf(context).enabled;
     final Duration position =
-        savedPosition ?? ref.watch(playbackPositionProvider);
+        savedPosition ??
+        (visible
+            ? ref.watch(playbackPositionProvider)
+            : ref.read(playbackPositionProvider));
     final positionMs = position.inMilliseconds;
     final progress = durationMs > 0
         ? (positionMs / durationMs).clamp(0.0, 1.0)

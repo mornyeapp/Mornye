@@ -308,7 +308,16 @@ extension _HomeTabSearchWideUI on _HomeTabState {
         option == HomeSearchSortOption.durationDesc) {
       return items;
     }
-    return sortHomeSearchItems<Track>(
+    if (_sortedCollectionsMode != option) {
+      _sortedCollectionsMode = option;
+      _sortedCollectionsCache.clear();
+    }
+    final cached = _sortedCollectionsCache[items];
+    if (cached != null) return cached;
+    if (_sortedCollectionsCache.length >= 8) {
+      _sortedCollectionsCache.clear();
+    }
+    final sorted = sortHomeSearchItems<Track>(
       items: items,
       option: option,
       nameOf: (item) => item.name,
@@ -316,6 +325,8 @@ extension _HomeTabSearchWideUI on _HomeTabState {
       durationOf: (item) => item.duration,
       dateOf: (item) => item.releaseDate,
     );
+    _sortedCollectionsCache[items] = sorted;
+    return sorted;
   }
 
   /// A filtered kind: [count] covers from [cell] in as many columns as the
