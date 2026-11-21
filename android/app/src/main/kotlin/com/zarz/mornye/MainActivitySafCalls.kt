@@ -187,9 +187,11 @@ internal suspend fun Context.handleSafOpenPlaybackLease(call: MethodCall, result
     result.success(lease)
 }
 
-internal fun handleSafClosePlaybackLease(call: MethodCall, result: MethodChannel.Result) {
+internal suspend fun handleSafClosePlaybackLease(call: MethodCall, result: MethodChannel.Result) {
     val token = call.argument<String>("token") ?: ""
-    SafPlaybackLeases.close(token)
+    withContext(Dispatchers.IO) {
+        SafPlaybackLeases.close(token)
+    }
     result.success(null)
 }
 
@@ -318,12 +320,16 @@ internal suspend fun MainActivity.handleSafCreateCollisionAwareFromPath(call: Me
     result.success(response)
 }
 
-internal fun MainActivity.handleOpenContentUri(call: MethodCall, result: MethodChannel.Result) {
+internal suspend fun MainActivity.handleOpenContentUri(call: MethodCall, result: MethodChannel.Result) {
     val uriStr = call.argument<String>("uri") ?: ""
     val mimeType = call.argument<String>("mime_type") ?: ""
     try {
         val uri = Uri.parse(uriStr)
-        val type = if (mimeType.isNotBlank()) mimeType else contentResolver.getType(uri) ?: "*/*"
+        val type = if (mimeType.isNotBlank()) {
+            mimeType
+        } else {
+            withContext(Dispatchers.IO) { contentResolver.getType(uri) } ?: "*/*"
+        }
         val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, type)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         startActivity(intent)
@@ -333,12 +339,12 @@ internal fun MainActivity.handleOpenContentUri(call: MethodCall, result: MethodC
     }
 }
 
-internal fun MainActivity.handleShareContentUri(call: MethodCall, result: MethodChannel.Result) {
+internal suspend fun MainActivity.handleShareContentUri(call: MethodCall, result: MethodChannel.Result) {
     val uriStr = call.argument<String>("uri") ?: ""
     val title = call.argument<String>("title") ?: ""
     try {
         val uri = Uri.parse(uriStr)
-        val type = contentResolver.getType(uri) ?: "audio/*"
+        val type = withContext(Dispatchers.IO) { contentResolver.getType(uri) } ?: "audio/*"
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             putExtra(Intent.EXTRA_STREAM, uri)
             setType(type)

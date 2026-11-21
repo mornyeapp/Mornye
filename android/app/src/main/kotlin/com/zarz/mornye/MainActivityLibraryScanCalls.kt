@@ -64,14 +64,15 @@ internal suspend fun MainActivity.handleScanSafTreeIncremental(call: MethodCall,
 }
 
 internal suspend fun MainActivity.handleGetLibraryScanProgress(call: MethodCall, result: MethodChannel.Result) {
-    val response = withContext(Dispatchers.IO) {
-        if (safScanActive) {
+    val parsed = withContext(Dispatchers.IO) {
+        val response = if (safScanActive) {
             safProgressToJson()
         } else {
             coreBackend.getLibraryScanProgress()
         }
+        parseJsonPayload(response)
     }
-    result.success(parseJsonPayload(response))
+    result.success(parsed)
 }
 
 internal suspend fun MainActivity.handleGetLibraryScanExitInfo(call: MethodCall, result: MethodChannel.Result) {

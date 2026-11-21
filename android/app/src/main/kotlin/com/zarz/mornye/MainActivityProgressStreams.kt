@@ -125,12 +125,13 @@ private fun MainActivity.startLibraryScanProgressStream(sink: EventChannel.Event
     lastLibraryScanProgressPayload = null
     libraryScanProgressStreamJob = scope.launch {
         try {
-            val initialPayload = withContext(Dispatchers.IO) {
-                readLibraryScanProgressJsonForStream()
+            val (initialPayload, parsedInitial) = withContext(Dispatchers.IO) {
+                val raw = readLibraryScanProgressJsonForStream()
+                raw to parseJsonPayload(raw)
             }
             if (!isActive || libraryScanProgressEventSink !== sink) return@launch
             lastLibraryScanProgressPayload = initialPayload
-            sink.success(parseJsonPayload(initialPayload))
+            sink.success(parsedInitial)
         } catch (e: Exception) {
             android.util.Log.w(
                 "Mornye",
@@ -139,13 +140,15 @@ private fun MainActivity.startLibraryScanProgressStream(sink: EventChannel.Event
         }
         while (isActive && libraryScanProgressEventSink === sink) {
             try {
-                val payload = withContext(Dispatchers.IO) {
-                    readLibraryScanProgressJsonForStream()
+                val previous = lastLibraryScanProgressPayload
+                val update = withContext(Dispatchers.IO) {
+                    val raw = readLibraryScanProgressJsonForStream()
+                    if (raw == previous) null else raw to parseJsonPayload(raw)
                 }
                 if (!isActive || libraryScanProgressEventSink !== sink) break
-                if (payload != lastLibraryScanProgressPayload) {
-                    lastLibraryScanProgressPayload = payload
-                    sink.success(parseJsonPayload(payload))
+                if (update != null) {
+                    lastLibraryScanProgressPayload = update.first
+                    sink.success(update.second)
                 }
             } catch (e: Exception) {
                 android.util.Log.w(
