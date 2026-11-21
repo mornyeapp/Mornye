@@ -5,22 +5,40 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdarg>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
-#include <memory>
 #include <limits>
+#include <memory>
 #include <mutex>
-#include <sstream>
-#include <stdexcept>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace {
-void require(bool condition, const char *message) {
-    if (!condition) throw std::runtime_error(message);
+bool fail(std::string *errorOut, const char *message) {
+    if (errorOut) *errorOut = message;
+    return false;
 }
-void report(JNIEnv *env, const std::exception &error) {
-    env->ThrowNew(env->FindClass("java/lang/IllegalStateException"), error.what());
+void appendFmt(std::string &out, const char *fmt, ...) {
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    const int written = std::vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    if (written > 0) {
+        const size_t len = static_cast<size_t>(written) < sizeof(buf)
+            ? static_cast<size_t>(written)
+            : sizeof(buf) - 1;
+        out.append(buf, len);
+    }
+}
+void report(JNIEnv *env, const std::string &message) {
+    env->ThrowNew(env->FindClass("java/lang/IllegalStateException"), message.c_str());
+}
+void report(JNIEnv *env, const char *message) {
+    env->ThrowNew(env->FindClass("java/lang/IllegalStateException"), message);
 }
 
 // Handles never expose raw pointers. A stale/double-close cannot dereference a
@@ -36,10 +54,13 @@ public:
         values.emplace(id, std::move(value));
         return id;
     }
-    std::shared_ptr<T> get(jlong id) {
+    std::shared_ptr<T> get(jlong id, std::string *errorOut) {
         std::lock_guard<std::mutex> lock(mutex);
         auto it = values.find(id);
-        require(it != values.end(), "Native audio handle closed");
+        if (it == values.end()) {
+            fail(errorOut, "Native audio handle closed");
+            return nullptr;
+        }
         return it->second;
     }
     void remove(jlong id) {
@@ -65,18 +86,23 @@ class ExclusiveOutput final : public oboe::AudioStreamDataCallback {
 public:
     int bits = 0;
     int deviceId() const { return stream->getDeviceId(); }
-    ExclusiveOutput(int rate, int channels, int precision, int device) {
-        require(rate >= 8000 && rate <= 768000 && channels >= 1 && channels <= 2,
-                "Unsupported hi-res format");
-        require(precision == 16 || precision == 24 || precision == 32, "Unsupported PCM precision");
+    ExclusiveOutput() = default;
+    bool open(int rate, int channels, int precision, int device, std::string *errorOut) {
+        if (rate < 8000 || rate > 768000 || channels < 1 || channels > 2) {
+            return fail(errorOut, "Unsupported hi-res format");
+        }
+        if (precision != 16 && precision != 24 && precision != 32) {
+            return fail(errorOut, "Unsupported PCM precision");
+        }
         std::vector<oboe::AudioFormat> formats;
         if (precision == 16) formats.push_back(oboe::AudioFormat::I16);
         if (precision <= 24) formats.push_back(oboe::AudioFormat::I24);
         formats.push_back(oboe::AudioFormat::I32);
         if (precision <= 24) formats.push_back(oboe::AudioFormat::Float);
-        std::ostringstream attempts;
-        attempts << "requested=" << rate << "Hz/" << channels << "ch/" << precision
-                 << "bit, device=" << device;
+        std::string attempts;
+        attempts.reserve(256);
+        appendFmt(attempts, "Exact-rate AAudio exclusive output unavailable: requested=%dHz/%dch/%dbit, device=%d",
+                  rate, channels, precision, device);
         for (auto format : formats) {
             oboe::AudioStreamBuilder builder;
             builder.setDirection(oboe::Direction::Output)
@@ -90,9 +116,9 @@ public:
                 ->setChannelConversionAllowed(false)->setFormatConversionAllowed(false)
                 ->setSampleRateConversionQuality(oboe::SampleRateConversionQuality::None);
             const auto result = builder.openStream(stream);
-            attempts << "; format=" << oboe::convertToText(format);
+            appendFmt(attempts, "; format=%s", oboe::convertToText(format));
             if (result != oboe::Result::OK) {
-                attempts << " open=" << oboe::convertToText(result);
+                appendFmt(attempts, " open=%s", oboe::convertToText(result));
                 continue;
             }
             // Exclusive is a request: Android can silently return Shared. Reject
@@ -105,17 +131,20 @@ public:
                 bits = format == oboe::AudioFormat::I16 ? 16 : format == oboe::AudioFormat::I24 ? 24 : 32;
                 frameBytes = channels * (bits / 8);
                 ring.resize(static_cast<size_t>(rate / 4) * frameBytes);
-                return;
+                return true;
             }
-            attempts << " actual=" << oboe::convertToText(stream->getSharingMode())
-                     << "/" << stream->getSampleRate() << "Hz/" << stream->getChannelCount()
-                     << "ch/" << oboe::convertToText(stream->getFormat())
-                     << ", api=" << oboe::convertToText(stream->getAudioApi())
-                     << ", device=" << stream->getDeviceId();
+            appendFmt(attempts, " actual=%s/%dHz/%dch/%s, api=%s, device=%d",
+                      oboe::convertToText(stream->getSharingMode()),
+                      stream->getSampleRate(),
+                      stream->getChannelCount(),
+                      oboe::convertToText(stream->getFormat()),
+                      oboe::convertToText(stream->getAudioApi()),
+                      stream->getDeviceId());
             stream->close();
             stream.reset();
         }
-        throw std::runtime_error("Exact-rate AAudio exclusive output unavailable: " + attempts.str());
+        if (errorOut) *errorOut = std::move(attempts);
+        return false;
     }
     ~ExclusiveOutput() override { if (stream) stream->close(); }
 
@@ -136,13 +165,16 @@ public:
         callbackFrames += frames;
         return oboe::DataCallbackResult::Continue;
     }
-    void check() {
-        require(stream && stream->getState() != oboe::StreamState::Disconnected &&
-                stream->getState() != oboe::StreamState::Closed, "AAudio output disconnected");
+    bool check(std::string *errorOut) {
+        if (!stream || stream->getState() == oboe::StreamState::Disconnected ||
+            stream->getState() == oboe::StreamState::Closed) {
+            return fail(errorOut, "AAudio output disconnected");
+        }
+        return true;
     }
-    int write(const uint8_t *data, size_t size) {
-        check();
-        require(size % frameBytes == 0, "Unaligned PCM buffer");
+    bool write(const uint8_t *data, size_t size, int *writtenOut, std::string *errorOut) {
+        if (!check(errorOut)) return false;
+        if (size % frameBytes != 0) return fail(errorOut, "Unaligned PCM buffer");
         auto w = written.load(std::memory_order_relaxed);
         auto r = read.load(std::memory_order_acquire);
         size = std::min<uint64_t>(size, ring.size() - (w - r)) / frameBytes * frameBytes;
@@ -162,32 +194,46 @@ public:
             offset += count;
         }
         written.store(w + size, std::memory_order_release);
-        return static_cast<int>(size);
+        if (writtenOut) *writtenOut = static_cast<int>(size);
+        return true;
     }
-    void start() { check(); require(stream->requestStart() == oboe::Result::OK, "AAudio start failed"); }
-    void flush() {
-        check();
+    bool start(std::string *errorOut) {
+        if (!check(errorOut)) return false;
+        if (stream->requestStart() != oboe::Result::OK) {
+            return fail(errorOut, "AAudio start failed");
+        }
+        return true;
+    }
+    bool flush(std::string *errorOut) {
+        if (!check(errorOut)) return false;
         // Wait for the callback to stop before resetting its ring/counters.
         const auto state = stream->getState();
         if (state != oboe::StreamState::Open && state != oboe::StreamState::Flushed) {
-            require(stream->pause(2000000000LL) == oboe::Result::OK, "AAudio pause failed");
-            require(stream->flush(2000000000LL) == oboe::Result::OK, "AAudio flush failed");
+            if (stream->pause(2000000000LL) != oboe::Result::OK) {
+                return fail(errorOut, "AAudio pause failed");
+            }
+            if (stream->flush(2000000000LL) != oboe::Result::OK) {
+                return fail(errorOut, "AAudio flush failed");
+            }
         }
         read.store(0); written.store(0); musicFrames.store(0);
         frameBase = stream->getFramesWritten();
         callbackFrames = 0;
         lastMusicEnd.store(frameBase);
+        return true;
     }
-    int64_t frames() {
-        check();
+    bool frames(int64_t *framesOut, std::string *errorOut) {
+        if (!check(errorOut)) return false;
         int64_t presented = 0, nanos = 0;
         auto music = static_cast<int64_t>(musicFrames.load(std::memory_order_relaxed));
         if (stream->getTimestamp(CLOCK_MONOTONIC, &presented, &nanos) == oboe::Result::OK) {
             const auto pending = std::max<int64_t>(0, lastMusicEnd.load(std::memory_order_acquire) - presented);
-            return std::max<int64_t>(0, music - pending);
+            if (framesOut) *framesOut = std::max<int64_t>(0, music - pending);
+            return true;
         }
         // A timestamp may not exist until the first hardware burst completes.
-        return 0;
+        if (framesOut) *framesOut = 0;
+        return true;
     }
 };
 
@@ -197,13 +243,15 @@ public:
     int channels = 0;
     int rate = 0;
     int64_t samples = 0;
-    explicit DsdDecoder(const char *path) {
+    DsdDecoder() = default;
+    bool open(const char *path, std::string *errorOut) {
         char error[80]{};
         context = WavpackOpenFileInput(path, error, OPEN_DSD_NATIVE | OPEN_ALT_TYPES, 0);
-        require(context != nullptr, "Cannot open WavPack file");
+        if (!context) return fail(errorOut, "Cannot open WavPack file");
         channels = WavpackGetNumChannels(context);
         rate = static_cast<int>(WavpackGetNativeSampleRate(context));
         samples = WavpackGetNumSamples64(context);
+        return true;
     }
     ~DsdDecoder() { if (context) WavpackCloseFile(context); }
     bool isDsd() const { return (WavpackGetQualifyMode(context) & QMODE_DSD_AUDIO) != 0; }
@@ -216,119 +264,165 @@ Handles<FlacPcmSource> flacSources;
 #define JNI_AUDIO(name) Java_com_zarz_mornye_NativeAudio_##name
 extern "C" {
 JNIEXPORT jlong JNICALL JNI_AUDIO(openOboe)(JNIEnv *env, jobject, jint rate, jint channels, jint bits, jint device) {
-    try { return outputs.add(std::make_shared<ExclusiveOutput>(rate, channels, bits, device)); }
-    catch (const std::exception &e) { report(env, e); return 0; }
+    auto output = std::make_shared<ExclusiveOutput>();
+    std::string error;
+    if (!output->open(rate, channels, bits, device, &error)) {
+        report(env, error);
+        return 0;
+    }
+    return outputs.add(std::move(output));
 }
 JNIEXPORT jint JNICALL JNI_AUDIO(bitsOboe)(JNIEnv *env, jobject, jlong handle) {
-    try { return outputs.get(handle)->bits; } catch (const std::exception &e) { report(env, e); return 0; }
+    std::string error;
+    auto output = outputs.get(handle, &error);
+    if (!output) { report(env, error); return 0; }
+    return output->bits;
 }
 JNIEXPORT jint JNICALL JNI_AUDIO(deviceOboe)(JNIEnv *env, jobject, jlong handle) {
-    try { return outputs.get(handle)->deviceId(); } catch (const std::exception &e) { report(env, e); return 0; }
+    std::string error;
+    auto output = outputs.get(handle, &error);
+    if (!output) { report(env, error); return 0; }
+    return output->deviceId();
 }
 JNIEXPORT jint JNICALL JNI_AUDIO(writeOboe)(JNIEnv *env, jobject, jlong handle, jobject buffer, jint offset, jint count) {
-    try {
-        auto *data = static_cast<uint8_t *>(env->GetDirectBufferAddress(buffer));
-        auto size = env->GetDirectBufferCapacity(buffer);
-        require(data && offset >= 0 && count >= 0 && count <= 262144 && offset <= size && count <= size - offset, "Invalid PCM buffer");
-        return outputs.get(handle)->write(data + offset, count);
-    } catch (const std::exception &e) { report(env, e); return 0; }
+    auto *data = static_cast<uint8_t *>(env->GetDirectBufferAddress(buffer));
+    auto size = env->GetDirectBufferCapacity(buffer);
+    if (!data || offset < 0 || count < 0 || count > 262144 || offset > size || count > size - offset) {
+        report(env, "Invalid PCM buffer");
+        return 0;
+    }
+    std::string error;
+    auto output = outputs.get(handle, &error);
+    if (!output) { report(env, error); return 0; }
+    int written = 0;
+    if (!output->write(data + offset, static_cast<size_t>(count), &written, &error)) {
+        report(env, error);
+        return 0;
+    }
+    return written;
 }
 JNIEXPORT void JNICALL JNI_AUDIO(startOboe)(JNIEnv *env, jobject, jlong handle) {
-    try { outputs.get(handle)->start(); } catch (const std::exception &e) { report(env, e); }
+    std::string error;
+    auto output = outputs.get(handle, &error);
+    if (!output || !output->start(&error)) report(env, error);
 }
 JNIEXPORT void JNICALL JNI_AUDIO(flushOboe)(JNIEnv *env, jobject, jlong handle) {
-    try { outputs.get(handle)->flush(); } catch (const std::exception &e) { report(env, e); }
+    std::string error;
+    auto output = outputs.get(handle, &error);
+    if (!output || !output->flush(&error)) report(env, error);
 }
 JNIEXPORT jlong JNICALL JNI_AUDIO(framesOboe)(JNIEnv *env, jobject, jlong handle) {
-    try { return outputs.get(handle)->frames(); } catch (const std::exception &e) { report(env, e); return 0; }
+    std::string error;
+    auto output = outputs.get(handle, &error);
+    int64_t count = 0;
+    if (!output || !output->frames(&count, &error)) { report(env, error); return 0; }
+    return count;
 }
 JNIEXPORT void JNICALL JNI_AUDIO(closeOboe)(JNIEnv *, jobject, jlong handle) { outputs.remove(handle); }
 JNIEXPORT jlong JNICALL JNI_AUDIO(openWavPack)(JNIEnv *env, jobject, jstring path) {
     const char *text = env->GetStringUTFChars(path, nullptr);
     if (!text) return 0;
-    try {
-        auto decoder = std::make_shared<DsdDecoder>(text);
-        env->ReleaseStringUTFChars(path, text);
-        text = nullptr;
-        if (!decoder->isDsd()) return 0; // PCM WavPack uses ordinary playback.
-        require(decoder->channels >= 1 && decoder->channels <= 2 && decoder->samples > 0 &&
-                decoder->samples <= std::numeric_limits<int64_t>::max() / 8000000 &&
-                (decoder->rate == 2822400 || decoder->rate == 5644800 || decoder->rate == 11289600 || decoder->rate == 22579200),
-                "Unsupported WavPack DSD format");
-        return decoders.add(std::move(decoder));
-    } catch (const std::exception &e) {
-        if (text) env->ReleaseStringUTFChars(path, text);
-        report(env, e); return 0;
+    auto decoder = std::make_shared<DsdDecoder>();
+    std::string error;
+    const bool opened = decoder->open(text, &error);
+    env->ReleaseStringUTFChars(path, text);
+    if (!opened) { report(env, error); return 0; }
+    if (!decoder->isDsd()) return 0; // PCM WavPack uses ordinary playback.
+    if (decoder->channels < 1 || decoder->channels > 2 || decoder->samples <= 0 ||
+        decoder->samples > std::numeric_limits<int64_t>::max() / 8000000 ||
+        (decoder->rate != 2822400 && decoder->rate != 5644800 && decoder->rate != 11289600 && decoder->rate != 22579200)) {
+        report(env, "Unsupported WavPack DSD format");
+        return 0;
     }
+    return decoders.add(std::move(decoder));
 }
 JNIEXPORT jlongArray JNICALL JNI_AUDIO(infoWavPack)(JNIEnv *env, jobject, jlong handle) {
-    try {
-        auto d = decoders.get(handle);
-        jlong data[]{d->rate, d->channels, d->samples};
-        auto result = env->NewLongArray(3);
-        if (result) env->SetLongArrayRegion(result, 0, 3, data);
-        return result;
-    } catch (const std::exception &e) { report(env, e); return nullptr; }
+    std::string error;
+    auto d = decoders.get(handle, &error);
+    if (!d) { report(env, error); return nullptr; }
+    jlong data[]{d->rate, d->channels, d->samples};
+    auto result = env->NewLongArray(3);
+    if (result) env->SetLongArrayRegion(result, 0, 3, data);
+    return result;
 }
 JNIEXPORT jbyteArray JNICALL JNI_AUDIO(readWavPack)(JNIEnv *env, jobject, jlong handle, jint frames) {
-    try {
-        require(frames > 0 && frames <= 16384, "Invalid DSD read size");
-        auto d = decoders.get(handle);
-        std::vector<int32_t> data(static_cast<size_t>(frames) * d->channels);
-        auto count = WavpackUnpackSamples(d->context, data.data(), frames);
-        require(WavpackGetNumErrors(d->context) == 0, "Corrupt WavPack DSD data");
-        require(count > 0 || WavpackGetSampleIndex64(d->context) >= d->samples, "Truncated WavPack DSD data");
-        std::vector<jbyte> bytes(static_cast<size_t>(count) * d->channels);
-        // OPEN_DSD_NATIVE returns interleaved, MSB-first DSD bytes regardless
-        // of the wrapper's original DSF bit-order/blocking flags.
-        for (size_t i = 0; i < bytes.size(); ++i) bytes[i] = static_cast<jbyte>(data[i]);
-        auto result = env->NewByteArray(static_cast<jsize>(bytes.size()));
-        if (result) env->SetByteArrayRegion(result, 0, static_cast<jsize>(bytes.size()), bytes.data());
-        return result;
-    } catch (const std::exception &e) { report(env, e); return nullptr; }
+    if (frames <= 0 || frames > 16384) {
+        report(env, "Invalid DSD read size");
+        return nullptr;
+    }
+    std::string error;
+    auto d = decoders.get(handle, &error);
+    if (!d) { report(env, error); return nullptr; }
+    std::vector<int32_t> data(static_cast<size_t>(frames) * d->channels);
+    auto count = WavpackUnpackSamples(d->context, data.data(), frames);
+    if (WavpackGetNumErrors(d->context) != 0) {
+        report(env, "Corrupt WavPack DSD data");
+        return nullptr;
+    }
+    if (count == 0 && WavpackGetSampleIndex64(d->context) < d->samples) {
+        report(env, "Truncated WavPack DSD data");
+        return nullptr;
+    }
+    std::vector<jbyte> bytes(static_cast<size_t>(count) * d->channels);
+    // OPEN_DSD_NATIVE returns interleaved, MSB-first DSD bytes regardless
+    // of the wrapper's original DSF bit-order/blocking flags.
+    for (size_t i = 0; i < bytes.size(); ++i) bytes[i] = static_cast<jbyte>(data[i]);
+    auto result = env->NewByteArray(static_cast<jsize>(bytes.size()));
+    if (result) env->SetByteArrayRegion(result, 0, static_cast<jsize>(bytes.size()), bytes.data());
+    return result;
 }
 JNIEXPORT void JNICALL JNI_AUDIO(seekWavPack)(JNIEnv *env, jobject, jlong handle, jlong sample) {
-    try {
-        auto d = decoders.get(handle);
-        require(sample >= 0 && sample < d->samples && WavpackSeekSample64(d->context, sample), "WavPack DSD seek failed");
-    } catch (const std::exception &e) { report(env, e); }
+    std::string error;
+    auto d = decoders.get(handle, &error);
+    if (!d) { report(env, error); return; }
+    if (sample < 0 || sample >= d->samples || !WavpackSeekSample64(d->context, sample)) {
+        report(env, "WavPack DSD seek failed");
+    }
 }
 JNIEXPORT void JNICALL JNI_AUDIO(closeWavPack)(JNIEnv *, jobject, jlong handle) { decoders.remove(handle); }
 JNIEXPORT jlong JNICALL JNI_AUDIO(openFlac)(JNIEnv *env, jobject, jstring path) {
     const char *text = env->GetStringUTFChars(path, nullptr);
     if (!text) return 0;
-    try {
-        auto source = std::make_shared<FlacPcmSource>(text);
-        env->ReleaseStringUTFChars(path, text);
-        text = nullptr;
-        return flacSources.add(std::move(source));
-    } catch (const std::exception &e) {
-        if (text) env->ReleaseStringUTFChars(path, text);
-        report(env, e); return 0;
-    }
+    auto source = std::make_shared<FlacPcmSource>();
+    std::string error;
+    const bool opened = source->open(text, &error);
+    env->ReleaseStringUTFChars(path, text);
+    if (!opened) { report(env, error); return 0; }
+    return flacSources.add(std::move(source));
 }
 JNIEXPORT jlongArray JNICALL JNI_AUDIO(infoFlac)(JNIEnv *env, jobject, jlong handle) {
-    try {
-        auto source = flacSources.get(handle);
-        jlong data[]{source->rate, source->channels, source->bits, static_cast<jlong>(source->samples)};
-        auto result = env->NewLongArray(4);
-        if (result) env->SetLongArrayRegion(result, 0, 4, data);
-        return result;
-    } catch (const std::exception &e) { report(env, e); return nullptr; }
+    std::string error;
+    auto source = flacSources.get(handle, &error);
+    if (!source) { report(env, error); return nullptr; }
+    jlong data[]{source->rate, source->channels, source->bits, static_cast<jlong>(source->samples)};
+    auto result = env->NewLongArray(4);
+    if (result) env->SetLongArrayRegion(result, 0, 4, data);
+    return result;
 }
 JNIEXPORT jint JNICALL JNI_AUDIO(readFlac)(JNIEnv *env, jobject, jlong handle, jobject buffer, jint bits) {
-    try {
-        auto *data = static_cast<uint8_t *>(env->GetDirectBufferAddress(buffer));
-        const auto capacity = env->GetDirectBufferCapacity(buffer);
-        require(data && capacity > 0 && capacity <= 262144, "Invalid FLAC PCM buffer");
-        return static_cast<jint>(flacSources.get(handle)->read(data, static_cast<size_t>(capacity), bits));
-    } catch (const std::exception &e) { report(env, e); return 0; }
+    auto *data = static_cast<uint8_t *>(env->GetDirectBufferAddress(buffer));
+    const auto capacity = env->GetDirectBufferCapacity(buffer);
+    if (!data || capacity <= 0 || capacity > 262144) {
+        report(env, "Invalid FLAC PCM buffer");
+        return 0;
+    }
+    std::string error;
+    auto source = flacSources.get(handle, &error);
+    if (!source) { report(env, error); return 0; }
+    size_t readBytes = 0;
+    if (!source->read(data, static_cast<size_t>(capacity), bits, &readBytes, &error)) {
+        report(env, error);
+        return 0;
+    }
+    return static_cast<jint>(readBytes);
 }
 JNIEXPORT void JNICALL JNI_AUDIO(seekFlac)(JNIEnv *env, jobject, jlong handle, jlong sample) {
-    try {
-        require(sample >= 0, "Invalid FLAC seek position");
-        flacSources.get(handle)->seek(static_cast<uint64_t>(sample));
-    } catch (const std::exception &e) { report(env, e); }
+    if (sample < 0) { report(env, "Invalid FLAC seek position"); return; }
+    std::string error;
+    auto source = flacSources.get(handle, &error);
+    if (!source || !source->seek(static_cast<uint64_t>(sample), &error)) {
+        report(env, error);
+    }
 }
 JNIEXPORT void JNICALL JNI_AUDIO(closeFlac)(JNIEnv *, jobject, jlong handle) { flacSources.remove(handle); }
 }

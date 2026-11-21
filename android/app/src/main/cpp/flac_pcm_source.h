@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 // Owns its file descriptor, decodes one FLAC block at a time, and never passes
@@ -30,7 +31,8 @@ public:
     int bits = 0;
     uint64_t samples = 0;
 
-    explicit FlacPcmSource(const char *path);
-    size_t read(uint8_t *output, size_t capacity, int outputBits);
-    void seek(uint64_t sample);
+    FlacPcmSource() = default;
+    bool open(const char *path, std::string *errorOut);
+    bool read(uint8_t *output, size_t capacity, int outputBits, size_t *bytesRead, std::string *errorOut);
+    bool seek(uint64_t sample, std::string *errorOut);
 };

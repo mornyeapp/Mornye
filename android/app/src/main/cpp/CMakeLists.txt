@@ -3,6 +3,24 @@ project(mornye_audio LANGUAGES C CXX)
 
 include(FetchContent)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_C_VISIBILITY_PRESET hidden)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+if(ANDROID)
+    # Optimize static audio decoders and Oboe for size and strip unused C++
+    # exception/RTTI/section overhead; JNI entry points remain visible via
+    # native_audio.map.
+    add_compile_options(
+        -Os
+        -ffunction-sections
+        -fdata-sections
+        $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
+        $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
+    )
+    if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+        add_compile_options(-flto=thin)
+    endif()
+endif()
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(BUILD_CXXLIBS OFF CACHE BOOL "" FORCE)
@@ -67,9 +85,11 @@ target_link_libraries(mornye_audio PRIVATE oboe WavPack::WavPack mornye_flac log
 # Only JNI is public; static Oboe/WavPack/C++ implementation symbols must not
 # keep otherwise unused code alive. APS2 is supported by our minimum API 24.
 target_link_options(mornye_audio PRIVATE
+    "-Wl,--gc-sections"
     "-Wl,-z,max-page-size=16384"
     "-Wl,--version-script,${CMAKE_CURRENT_SOURCE_DIR}/native_audio.map"
     "-Wl,--icf=safe"
-    "-Wl,--pack-dyn-relocs=android")
+    "-Wl,--pack-dyn-relocs=android"
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-flto=thin>)
 set_property(TARGET mornye_audio APPEND PROPERTY LINK_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/native_audio.map")

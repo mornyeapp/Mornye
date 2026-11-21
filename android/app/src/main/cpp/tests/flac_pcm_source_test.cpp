@@ -47,8 +47,11 @@ void compare(FlacPcmSource &source, const Fixture &fixture, uint64_t first, int 
     // Deliberately split decoded blocks across many small, unaligned buffers.
     std::array<uint8_t, 269> data{};
     size_t sample = static_cast<size_t>(first) * source.channels;
-    size_t count;
-    while ((count = source.read(data.data(), data.size(), outputBits)) != 0) {
+    size_t count = 0;
+    std::string error;
+    while (true) {
+        check(source.read(data.data(), data.size(), outputBits, &count, &error), error.c_str());
+        if (count == 0) break;
         const size_t bytes = outputBits / 8;
         check(count % (bytes * source.channels) == 0, "unaligned output");
         for (size_t offset = 0; offset < count; offset += bytes, ++sample) {
@@ -65,35 +68,44 @@ void compare(FlacPcmSource &source, const Fixture &fixture, uint64_t first, int 
 
 void preservesPrecisionAndSeeks(unsigned bits, unsigned rate, unsigned channels) {
     Fixture fixture(bits, rate, channels);
-    FlacPcmSource source(fixture.path.c_str());
+    FlacPcmSource source;
+    std::string error;
+    check(source.open(fixture.path.c_str(), &error), error.c_str());
     check(source.bits == static_cast<int>(bits) && source.rate == static_cast<int>(rate) &&
           source.channels == static_cast<int>(channels) && source.samples == fixture.frames,
           "source format changed");
     for (int output : {16, 24, 32}) {
         if (output < static_cast<int>(bits)) continue;
         for (uint64_t first : {0u, 5001u, 14999u, 15000u, 17u, 4096u, 4097u}) {
-            source.seek(first);
+            check(source.seek(first, &error), error.c_str());
             compare(source, fixture, first, output);
         }
     }
     if (bits > 16) {
-        bool rejected = false;
         std::array<uint8_t, 256> data{};
-        try { source.read(data.data(), data.size(), 16); }
-        catch (const std::exception &) { rejected = true; }
-        check(rejected, "silently reduced output precision");
+        size_t count = 0;
+        const bool ok = source.read(data.data(), data.size(), 16, &count, &error);
+        check(!ok, "silently reduced output precision");
     }
 }
 
 void rejectsTruncatedData() {
     Fixture fixture(24, 96000, 2);
     std::filesystem::resize_file(fixture.path, std::filesystem::file_size(fixture.path) / 2);
-    bool rejected = false;
-    try {
-        FlacPcmSource source(fixture.path.c_str());
+    FlacPcmSource source;
+    std::string error;
+    bool rejected = !source.open(fixture.path.c_str(), &error);
+    if (!rejected) {
         std::array<uint8_t, 256> data{};
-        while (source.read(data.data(), data.size(), 24) != 0) {}
-    } catch (const std::exception &) { rejected = true; }
+        size_t count = 0;
+        while (true) {
+            if (!source.read(data.data(), data.size(), 24, &count, &error)) {
+                rejected = true;
+                break;
+            }
+            if (count == 0) break;
+        }
+    }
     check(rejected, "accepted truncated audio");
 }
 
@@ -106,10 +118,12 @@ void retainsDescriptor() {
 #else
     const auto path = "/dev/fd/" + std::to_string(fileno(file));
 #endif
-    FlacPcmSource source(path.c_str());
+    FlacPcmSource source;
+    std::string error;
+    check(source.open(path.c_str(), &error), error.c_str());
     std::fclose(file);
     compare(source, fixture, 0, 32);
-    source.seek(5001);
+    check(source.seek(5001, &error), error.c_str());
     compare(source, fixture, 5001, 24);
 }
 }
