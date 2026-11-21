@@ -213,7 +213,8 @@ class PlaybackDependencies {
   // AVPlayer and moves to libmpv for exclusive output (hog mode). Android
   // moves ordinary sources to media3 while its beta engine is on.
   static PlaybackDeck _createDeck(String playerId) {
-    if (playbackEngine == PlaybackEngine.mediaKit &&
+    if (!kMornyeMobileBuild &&
+        playbackEngine == PlaybackEngine.mediaKit &&
         MediaKitPlaybackDeck.isAvailable) {
       return MediaKitPlaybackDeck(playerId: playerId);
     }

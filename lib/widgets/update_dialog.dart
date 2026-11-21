@@ -11,6 +11,7 @@ import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/notification_service.dart';
 import 'package:mornye/services/update_progress_notifications.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_action_button.dart';
@@ -244,8 +245,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
   /// `exit` asks nobody, so the audio device is given back here.
   Future<Never> _quitForUpdate() async {
-    await MediaKitPlaybackDeck.releaseOutputs();
-    DesktopDiagnostics.instance?.endSession();
+    if (isDesktopPlatform) {
+      await MediaKitPlaybackDeck.releaseOutputs();
+      DesktopDiagnostics.instance?.endSession();
+    }
     exit(0);
   }
 
