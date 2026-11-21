@@ -165,17 +165,32 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
   Widget build(BuildContext context) {
     final job = ref.watch(lyricsTranslationProvider.select((s) => s.job));
     ref.watch(lyricsTranslationProvider.select((s) => s.results));
-    final settings = ref.watch(settingsProvider);
+    final selectedSettings = ref.watch(
+      settingsProvider.select(
+        (s) => (
+          provider: s.lyricsAiProvider,
+          model: lyricsAiModelFor(s),
+          baseUrl: s.lyricsAiBaseUrl,
+          autoHideA11y: s.autoHideLyricsControlsWithAccessibility,
+          autoSave: s.lyricsTranslationAutoSave,
+          romanize: s.lyricsRomanize,
+          romanizeMain: s.lyricsRomanizedMainLine,
+          locale: s.locale,
+          translationLang: s.lyricsTranslationLanguage,
+          secondLang: s.lyricsTranslationSecondLanguage,
+        ),
+      ),
+    );
     final apiKey =
-        ref.watch(lyricsAiKeyProvider(settings.lyricsAiProvider)).value ?? '';
-    final ready = lyricsAiReady(settings, apiKey);
+        ref.watch(lyricsAiKeyProvider(selectedSettings.provider)).value ?? '';
+    final ready = lyricsAiReady(ref.read(settingsProvider), apiKey);
     // The button sits over lyric text, so it fades whether or not the
     // player's own controls stay. Accessible navigation keeps it unless
     // hiding was chosen there.
     final autoHide =
         !isAndroidTv &&
         (!MediaQuery.accessibleNavigationOf(context) ||
-            settings.autoHideLyricsControlsWithAccessibility);
+            selectedSettings.autoHideA11y);
     return ListenableBuilder(
       listenable: widget.metadata,
       builder: (context, _) {

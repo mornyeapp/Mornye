@@ -223,10 +223,13 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
         ),
       ),
     );
-    final state = ref.watch(playbackStateProvider).value;
-    final translation = ref.read(lyricsTranslationProvider.notifier);
-    // An offstage or covered player keeps no line timer running.
+    // An offstage or covered player keeps no line timer running and avoids
+    // 2 Hz position-tick rebuilds while hidden.
     final visible = TickerMode.valuesOf(context).enabled;
+    final state = visible
+        ? ref.watch(playbackStateProvider).value
+        : ref.read(playbackStateProvider).value;
+    final translation = ref.read(lyricsTranslationProvider.notifier);
     return ListenableBuilder(
       listenable: widget.metadata,
       builder: (context, _) {
@@ -364,26 +367,29 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
       );
     } else if (text == line.text.trim() && line.hasWordTiming) {
       // A long line slides to keep the sung words in view.
-      child = Directionality(
+      child = RepaintBoundary(
         key: ValueKey('word-${line.time.inMilliseconds}'),
-        textDirection: strongTextDirection(text) ?? Directionality.of(context),
-        child: ClipRect(
-          child: LyricLineScroller(
-            text: line.words.map((word) => word.text).join(),
-            words: line.words,
-            style: style,
-            start: line.time,
-            end: line.end,
-            nextStart: nextStart,
-            position: position,
-            advancing: advancing,
-            speed: speed,
-            child: WordTimedLyricLine(
-              line: line,
-              initialPosition: position,
-              seekPreview: widget.seekPreview,
+        child: Directionality(
+          textDirection:
+              strongTextDirection(text) ?? Directionality.of(context),
+          child: ClipRect(
+            child: LyricLineScroller(
+              text: line.words.map((word) => word.text).join(),
+              words: line.words,
               style: style,
-              maxLines: 1,
+              start: line.time,
+              end: line.end,
+              nextStart: nextStart,
+              position: position,
+              advancing: advancing,
+              speed: speed,
+              child: WordTimedLyricLine(
+                line: line,
+                initialPosition: position,
+                seekPreview: widget.seekPreview,
+                style: style,
+                maxLines: 1,
+              ),
             ),
           ),
         ),
@@ -391,24 +397,27 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
     } else {
       // The line reads, and a long one slides, in its own direction: a
       // right-to-left line starts at its right edge and moves rightwards.
-      child = Directionality(
+      child = RepaintBoundary(
         key: ValueKey('line-${line.time.inMilliseconds}-$text'),
-        textDirection: strongTextDirection(text) ?? Directionality.of(context),
-        child: LyricLineScroller(
-          text: text,
-          style: style,
-          start: line.time,
-          end: line.end,
-          nextStart: nextStart,
-          position: position,
-          advancing: advancing,
-          speed: speed,
-          child: Text(
-            text,
-            maxLines: 1,
-            softWrap: false,
-            overflow: TextOverflow.ellipsis,
+        child: Directionality(
+          textDirection:
+              strongTextDirection(text) ?? Directionality.of(context),
+          child: LyricLineScroller(
+            text: text,
             style: style,
+            start: line.time,
+            end: line.end,
+            nextStart: nextStart,
+            position: position,
+            advancing: advancing,
+            speed: speed,
+            child: Text(
+              text,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            ),
           ),
         ),
       );

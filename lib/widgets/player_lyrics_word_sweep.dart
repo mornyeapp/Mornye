@@ -655,26 +655,28 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
           maxWidth,
         );
 
-        return Semantics(
-          label: widget.semanticsLabel,
-          child: CustomPaint(
-            size: Size(width, height),
-            painter: _TimedLyricSweepPainter(
-              segmentBoxes: segmentBoxes,
-              segmentDirections: segmentDirections,
-              starts: widget.starts,
-              ends: widget.ends,
-              currentPosition: widget.currentPosition,
-              repaint: widget.repaint,
-              pendingPainter: pendingPainter,
-              highlightedPainter: highlightedPainter,
-              highlightLift: widget.liftEnabled
-                  ? (textScaler.scale(widget.style.fontSize ?? 24) * 0.05)
-                        .clamp(0.0, 2.0)
-                  : 0,
-              glowSigma: widget.liftEnabled && widget.glowEnabled
-                  ? textScaler.scale(widget.style.fontSize ?? 24) * 0.2
-                  : 0,
+        return RepaintBoundary(
+          child: Semantics(
+            label: widget.semanticsLabel,
+            child: CustomPaint(
+              size: Size(width, height),
+              painter: _TimedLyricSweepPainter(
+                segmentBoxes: segmentBoxes,
+                segmentDirections: segmentDirections,
+                starts: widget.starts,
+                ends: widget.ends,
+                currentPosition: widget.currentPosition,
+                repaint: widget.repaint,
+                pendingPainter: pendingPainter,
+                highlightedPainter: highlightedPainter,
+                highlightLift: widget.liftEnabled
+                    ? (textScaler.scale(widget.style.fontSize ?? 24) * 0.05)
+                          .clamp(0.0, 2.0)
+                    : 0,
+                glowSigma: widget.liftEnabled && widget.glowEnabled
+                    ? textScaler.scale(widget.style.fontSize ?? 24) * 0.2
+                    : 0,
+              ),
             ),
           ),
         );
@@ -695,6 +697,9 @@ class _TimedLyricSweepPainter extends CustomPainter {
 
   /// Blur radius of the glow behind held words; 0 disables it.
   final double glowSigma;
+  late final ImageFilter? _glowFilter = glowSigma > 0
+      ? ImageFilter.blur(sigmaX: glowSigma, sigmaY: glowSigma)
+      : null;
 
   _TimedLyricSweepPainter({
     required this.segmentBoxes,
@@ -805,23 +810,23 @@ class _TimedLyricSweepPainter extends CustomPainter {
 
     // A blurred copy of the sung letters behind them. Usually at most one
     // held word glows, so the extra layer stays cheap.
-    for (final (clip, lift, glow) in glows) {
-      final bounds = clip.getBounds().inflate(glowSigma * 3);
-      canvas.save();
-      canvas.translate(0, -lift);
-      canvas.saveLayer(
-        bounds,
-        Paint()
-          ..color = Color.fromRGBO(0, 0, 0, 0.55 * glow)
-          ..imageFilter = ImageFilter.blur(
-            sigmaX: glowSigma,
-            sigmaY: glowSigma,
-          ),
-      );
-      canvas.clipPath(clip, doAntiAlias: false);
-      highlightedPainter.paint(canvas, Offset.zero);
-      canvas.restore();
-      canvas.restore();
+    final glowFilter = _glowFilter;
+    if (glowFilter != null) {
+      for (final (clip, lift, glow) in glows) {
+        final bounds = clip.getBounds().inflate(glowSigma * 3);
+        canvas.save();
+        canvas.translate(0, -lift);
+        canvas.saveLayer(
+          bounds,
+          Paint()
+            ..color = Color.fromRGBO(0, 0, 0, 0.55 * glow)
+            ..imageFilter = glowFilter,
+        );
+        canvas.clipPath(clip, doAntiAlias: false);
+        highlightedPainter.paint(canvas, Offset.zero);
+        canvas.restore();
+        canvas.restore();
+      }
     }
     for (final entry in completedPaths.entries) {
       _paintLiftedText(canvas, highlightedPainter, entry.value, entry.key);

@@ -171,14 +171,19 @@ class PlayerCompactBar extends ConsumerWidget {
                     ),
                   ),
                   child: Consumer(
-                    builder: (context, ref, _) => PlaybackSeekSlider(
-                      key: ValueKey(mediaItem.id),
-                      position: ref.watch(playbackPositionProvider),
-                      duration: duration,
-                      onSeek: controller.seek,
-                      preview: seekPreview,
-                      playing: playing && !loading,
-                    ),
+                    builder: (context, ref, _) {
+                      final visible = TickerMode.valuesOf(context).enabled;
+                      return PlaybackSeekSlider(
+                        key: ValueKey(mediaItem.id),
+                        position: visible
+                            ? ref.watch(playbackPositionProvider)
+                            : ref.read(playbackPositionProvider),
+                        duration: duration,
+                        onSeek: controller.seek,
+                        preview: seekPreview,
+                        playing: playing && !loading,
+                      );
+                    },
                   ),
                 ),
               ),
@@ -195,9 +200,12 @@ class PlayerCompactBar extends ConsumerWidget {
                           valueListenable: seekPreview,
                           builder: (context, preview, _) => Consumer(
                             builder: (context, ref, _) {
-                              final position = ref.watch(
-                                playbackPositionProvider,
-                              );
+                              final visible = TickerMode.valuesOf(
+                                context,
+                              ).enabled;
+                              final position = visible
+                                  ? ref.watch(playbackPositionProvider)
+                                  : ref.read(playbackPositionProvider);
                               return Text(
                                 formatClock((preview ?? position).inSeconds),
                                 style: timeStyle,

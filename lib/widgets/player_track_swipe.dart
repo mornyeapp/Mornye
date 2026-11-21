@@ -270,7 +270,7 @@ class _SwipeScope extends InheritedWidget {
   final _PlayerTrackSwipeState state;
 
   @override
-  bool updateShouldNotify(_SwipeScope oldWidget) => true;
+  bool updateShouldNotify(_SwipeScope oldWidget) => state != oldWidget.state;
 }
 
 /// Multiple hit regions can drive the same titles without moving their child.

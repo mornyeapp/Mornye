@@ -94,8 +94,13 @@ class PlayerPlaybackControls extends ConsumerWidget {
               valueListenable: seekPreview,
               builder: (context, preview, _) => Consumer(
                 builder: (context, ref, quality) {
-                  final position = ref.watch(playbackPositionProvider);
-                  final playback = ref.watch(playbackStateProvider).value;
+                  final visible = TickerMode.valuesOf(context).enabled;
+                  final position = visible
+                      ? ref.watch(playbackPositionProvider)
+                      : ref.read(playbackPositionProvider);
+                  final playback = visible
+                      ? ref.watch(playbackStateProvider).value
+                      : ref.read(playbackStateProvider).value;
                   return Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: edgeAligned

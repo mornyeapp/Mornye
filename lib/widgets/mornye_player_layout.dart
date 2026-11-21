@@ -387,30 +387,47 @@ class MornyePlayerLayout extends ConsumerWidget {
         );
 
         if (landscape) {
+          final landscapeArtwork = stage(artworkOnly: true);
+          final landscapeHeader = _trackHeader(
+            context,
+            colorScheme,
+            compact: true,
+          );
+          final landscapeLyrics = lyricsBuilder(true);
+          final landscapeLyricsOptions = showLyrics ? lyricsOptions : null;
+          final landscapeQueue = MornyePlayerQueue(colorScheme: colorScheme);
+          final landscapeControls = controls();
+          final landscapeVolume = showVolume
+              ? const PlayerVolumeControl()
+              : null;
+          final autoHideLyricsControls = ref.watch(
+            settingsProvider.select(
+              (settings) => settings.autoHideLyricsControls,
+            ),
+          );
+          final autoHideLyricsControlsWithAccessibility = ref.watch(
+            settingsProvider.select(
+              (settings) => settings.autoHideLyricsControlsWithAccessibility,
+            ),
+          );
           return RepaintBoundary(
-            child: MornyeLandscapePlayer(
-              page: page,
-              isPlaying: ref.watch(playbackPlayingProvider),
-              autoHideLyricsControls: ref.watch(
-                settingsProvider.select(
-                  (settings) => settings.autoHideLyricsControls,
-                ),
+            child: Consumer(
+              builder: (context, ref, _) => MornyeLandscapePlayer(
+                page: page,
+                isPlaying: ref.watch(playbackPlayingProvider),
+                autoHideLyricsControls: autoHideLyricsControls,
+                autoHideLyricsControlsWithAccessibility:
+                    autoHideLyricsControlsWithAccessibility,
+                controlsHeldOpen: lyricsOptionsOpen,
+                onPageChanged: onPageChanged,
+                artwork: landscapeArtwork,
+                header: landscapeHeader,
+                lyrics: landscapeLyrics,
+                lyricsOptions: landscapeLyricsOptions,
+                queue: landscapeQueue,
+                controls: landscapeControls,
+                volume: landscapeVolume,
               ),
-              autoHideLyricsControlsWithAccessibility: ref.watch(
-                settingsProvider.select(
-                  (settings) =>
-                      settings.autoHideLyricsControlsWithAccessibility,
-                ),
-              ),
-              controlsHeldOpen: lyricsOptionsOpen,
-              onPageChanged: onPageChanged,
-              artwork: stage(artworkOnly: true),
-              header: _trackHeader(context, colorScheme, compact: true),
-              lyrics: lyricsBuilder(true),
-              lyricsOptions: showLyrics ? lyricsOptions : null,
-              queue: MornyePlayerQueue(colorScheme: colorScheme),
-              controls: controls(),
-              volume: showVolume ? const PlayerVolumeControl() : null,
             ),
           );
         }

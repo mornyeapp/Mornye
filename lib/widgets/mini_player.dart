@@ -306,30 +306,9 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     final mornye = context.isMornye;
     final expressive = materialExpressiveEnabled(context);
     final compact = mornye && widget.compact;
-    // Frosted and flat glass levels run on constrained Android hardware. They
-    // skip keeping a paused video decoder for the full player's motion cover.
-    final fullEffects = !mornye || ref.watch(mornyeLiquidGlassProvider);
     // Every marquee frame re-filters the glass chrome around it, so Mornye
     // stops the title after a few passes on every glass level.
     final marqueeCycles = mornye ? 2 : null;
-    if (mornye &&
-        fullEffects &&
-        ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) &&
-        !MediaQuery.disableAnimationsOf(context)) {
-      final artwork = ref
-          .watch(
-            songMotionArtworkProvider((
-              album: mediaItem.album ?? '',
-              artist: mediaItem.artist ?? '',
-              source: mediaItem.extras?['source']?.toString() ?? '',
-            )),
-          )
-          .value;
-      if (artwork != null) {
-        ref.watch(playerArtworkVideoProvider(artwork.source));
-      }
-    }
-
     final surface = DecoratedBox(
       key: _surfaceKey,
       position: DecorationPosition.foreground,
@@ -497,21 +476,57 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     return mornye
         ? Padding(
             padding: EdgeInsets.only(bottom: widget.bottomPadding),
-            child: MornyeGlassPress(
-              radius: 32,
-              child: MornyeGlass.navigation(
-                strongTint: true,
-                tintOpacity: MornyeTheme.chromeOpacity(context),
-                blurEnabled: ref.watch(mornyeBlurEnabledProvider),
-                child: swipeable,
-              ),
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                _MiniPlayerMotionArtworkPrewarmer(mediaItem: mediaItem),
+                MornyeGlassPress(
+                  radius: 32,
+                  child: MornyeGlass.navigation(
+                    strongTint: true,
+                    tintOpacity: MornyeTheme.chromeOpacity(context),
+                    blurEnabled: ref.watch(mornyeBlurEnabledProvider),
+                    child: swipeable,
+                  ),
+                ),
+              ],
             ),
           )
         : swipeable;
   }
 }
 
-class _MiniPlayerProgress extends ConsumerWidget {
+/// Pre-warms motion artwork video in its own leaf Consumer so resolving the
+/// motion clip does not rebuild the mini player body.
+class _MiniPlayerMotionArtworkPrewarmer extends ConsumerWidget {
+  const _MiniPlayerMotionArtworkPrewarmer({required this.mediaItem});
+
+  final MediaItem mediaItem;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(mornyeLiquidGlassProvider) ||
+        !ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) ||
+        MediaQuery.disableAnimationsOf(context)) {
+      return const SizedBox.shrink();
+    }
+    final artwork = ref
+        .watch(
+          songMotionArtworkProvider((
+            album: mediaItem.album ?? '',
+            artist: mediaItem.artist ?? '',
+            source: mediaItem.extras?['source']?.toString() ?? '',
+          )),
+        )
+        .value;
+    if (artwork != null) {
+      ref.watch(playerArtworkVideoProvider(artwork.source));
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+class _MiniPlayerProgress extends StatelessWidget {
   final Duration duration;
   final Color backgroundColor;
   final bool playing;
@@ -522,24 +537,36 @@ class _MiniPlayerProgress extends ConsumerWidget {
     required this.playing,
   });
 
+  static double _progressFor(Duration position, Duration duration) {
+    final durationMs = duration.inMilliseconds;
+    return durationMs > 0
+        ? (position.inMilliseconds / durationMs).clamp(0.0, 1.0)
+        : 0.0;
+  }
+
   // Playback progress fills left to right in right-to-left layouts too.
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Directionality(
-    textDirection: TextDirection.ltr,
-    child: _buildProgress(context, ref),
-  );
+  Widget build(BuildContext context) {
+    final visible = TickerMode.valuesOf(context).enabled;
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: _buildProgress(context, visible),
+    );
+  }
 
-  Widget _buildProgress(BuildContext context, WidgetRef ref) {
-    final durationMs = duration.inMilliseconds;
-    final positionMs = ref.watch(playbackPositionProvider).inMilliseconds;
-    final progress = durationMs > 0
-        ? (positionMs / durationMs).clamp(0.0, 1.0)
-        : 0.0;
+  Widget _buildProgress(BuildContext context, bool visible) {
     if (!materialExpressiveEnabled(context)) {
-      return LinearProgressIndicator(
-        value: progress,
-        minHeight: 2,
-        backgroundColor: backgroundColor,
+      return Consumer(
+        builder: (context, ref, _) {
+          final position = visible
+              ? ref.watch(playbackPositionProvider)
+              : ref.read(playbackPositionProvider);
+          return LinearProgressIndicator(
+            value: _progressFor(position, duration),
+            minHeight: 2,
+            backgroundColor: backgroundColor,
+          );
+        },
       );
     }
     final motion = AppMotion.effects(
@@ -549,15 +576,22 @@ class _MiniPlayerProgress extends ConsumerWidget {
     // The wave settles flat while paused and stops moving once flat.
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(end: playing ? 1 : 0),
-        duration: motion.duration,
-        curve: motion.curve,
-        builder: (context, amplitude, _) => MaterialExpressiveScope(
-          child: _MiniPlayerWave(
-            progress: progress,
-            trackColor: backgroundColor,
-            amplitude: amplitude,
+      child: MaterialExpressiveScope(
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(end: playing ? 1 : 0),
+          duration: motion.duration,
+          curve: motion.curve,
+          builder: (context, amplitude, _) => Consumer(
+            builder: (context, ref, _) {
+              final position = visible
+                  ? ref.watch(playbackPositionProvider)
+                  : ref.read(playbackPositionProvider);
+              return _MiniPlayerWave(
+                progress: _progressFor(position, duration),
+                trackColor: backgroundColor,
+                amplitude: amplitude,
+              );
+            },
           ),
         ),
       ),
