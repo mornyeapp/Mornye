@@ -216,15 +216,17 @@ class _EqualizerOverview extends ConsumerWidget {
                 tween: ColorTween(end: curveColor),
                 duration: recolor.duration,
                 curve: recolor.curve,
-                builder: (context, color, _) => CustomPaint(
-                  size: Size.infinite,
-                  painter: _EqualizerCurve(
-                    settings: settings,
-                    color: color ?? curveColor,
-                    grid: colors.outlineVariant,
-                    label: colors.onSurfaceVariant,
-                    labelStyle: theme.textTheme.labelSmall!,
-                    textScaler: MediaQuery.textScalerOf(context),
+                builder: (context, color, _) => RepaintBoundary(
+                  child: CustomPaint(
+                    size: Size.infinite,
+                    painter: _EqualizerCurve(
+                      settings: settings,
+                      color: color ?? curveColor,
+                      grid: colors.outlineVariant,
+                      label: colors.onSurfaceVariant,
+                      labelStyle: theme.textTheme.labelSmall!,
+                      textScaler: MediaQuery.textScalerOf(context),
+                    ),
                   ),
                 ),
               ),

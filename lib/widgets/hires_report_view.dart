@@ -344,7 +344,11 @@ class _SpectrumPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
         textScaler: textScaler,
       )..layout();
-      text.paint(canvas, Offset(x(hz) - text.width / 2, plot.height + 6));
+      try {
+        text.paint(canvas, Offset(x(hz) - text.width / 2, plot.height + 6));
+      } finally {
+        text.dispose();
+      }
     }
 
     // Last to first, so the first songs, which have a color of their own,

@@ -277,19 +277,23 @@ class _SpectrogramPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    double dx = anchor.dx;
-    double dy = anchor.dy;
-    switch (align) {
-      case _TextAlignV.rightCenter:
-        dx = anchor.dx - tp.width;
-        dy = anchor.dy - tp.height / 2;
-        break;
-      case _TextAlignV.topCenter:
-        dx = anchor.dx - tp.width / 2;
-        dy = anchor.dy;
-        break;
+    try {
+      double dx = anchor.dx;
+      double dy = anchor.dy;
+      switch (align) {
+        case _TextAlignV.rightCenter:
+          dx = anchor.dx - tp.width;
+          dy = anchor.dy - tp.height / 2;
+          break;
+        case _TextAlignV.topCenter:
+          dx = anchor.dx - tp.width / 2;
+          dy = anchor.dy;
+          break;
+      }
+      tp.paint(canvas, Offset(dx, dy));
+    } finally {
+      tp.dispose();
     }
-    tp.paint(canvas, Offset(dx, dy));
   }
 
   static double _niceStepKHz(double maxKHz) {
@@ -312,7 +316,9 @@ class _SpectrogramPainter extends CustomPainter {
   bool shouldRepaint(covariant _SpectrogramPainter old) =>
       old.image != image ||
       old.maxFreqHz != maxFreqHz ||
-      old.durationSec != durationSec;
+      old.durationSec != durationSec ||
+      old.labelColor != labelColor ||
+      old.gridColor != gridColor;
 }
 
 enum _TextAlignV { rightCenter, topCenter }

@@ -46,103 +46,119 @@ class _EqualizerCurve extends CustomPainter {
       for (final hz in const [100.0, 1000.0, 10000.0])
         (hz, _text(_frequency(hz))),
     ];
-    final bottom = size.height - freqLabels.first.$2.height - 6;
-    final gutter = _text('+12').width + 8;
-    final plot = Rect.fromLTRB(gutter, 4, size.width, bottom);
-    double x(double hz) =>
-        plot.left +
-        math.log(hz / _minHz) / math.log(_maxHz / _minHz) * plot.width;
-    double y(double gain) =>
-        plot.center.dy - gain.clamp(-_range, _range) / _range * plot.height / 2;
+    final gainLabels = [
+      for (final entry in const [(12.0, '+12'), (0.0, '0'), (-12.0, '−12')])
+        (entry.$1, _text(entry.$2)),
+    ];
+    try {
+      final bottom = size.height - freqLabels.first.$2.height - 6;
+      final gutter = gainLabels.first.$2.width + 8;
+      final plot = Rect.fromLTRB(gutter, 4, size.width, bottom);
+      double x(double hz) =>
+          plot.left +
+          math.log(hz / _minHz) / math.log(_maxHz / _minHz) * plot.width;
+      double y(double gain) =>
+          plot.center.dy -
+          gain.clamp(-_range, _range) / _range * plot.height / 2;
 
-    final guide = Paint()
-      ..color = grid.withValues(alpha: 0.5)
-      ..strokeWidth = 1;
-    for (final gain in const [12.0, -12.0]) {
-      canvas.drawLine(
-        Offset(plot.left, y(gain)),
-        Offset(plot.right, y(gain)),
-        guide,
-      );
-    }
-    for (final (hz, _) in freqLabels) {
-      canvas.drawLine(
-        Offset(x(hz), plot.top),
-        Offset(x(hz), plot.bottom),
-        guide,
-      );
-    }
-    // Dashed 0 dB baseline.
-    final baseline = Paint()
-      ..color = grid
-      ..strokeWidth = 1.5;
-    for (var dx = plot.left; dx < plot.right; dx += 8) {
-      canvas.drawLine(
-        Offset(dx, plot.center.dy),
-        Offset(math.min(dx + 4, plot.right), plot.center.dy),
-        baseline,
-      );
-    }
-    for (final (gain, text) in [(12.0, '+12'), (0.0, '0'), (-12.0, '−12')]) {
-      final painter = _text(text);
-      painter.paint(
-        canvas,
-        Offset(gutter - 8 - painter.width, y(gain) - painter.height / 2),
-      );
-    }
-    for (final (hz, painter) in freqLabels) {
-      painter.paint(canvas, Offset(x(hz) - painter.width / 2, bottom + 6));
-    }
-
-    final curve = settings.copyWith(gains: settings.effectiveGains);
-    final points = <Offset>[Offset(plot.left, y(curve.gains.first))];
-    for (var i = 0; i < curve.gains.length; i++) {
-      final point = Offset(x(settings.frequencies[i]), y(curve.gains[i]));
-      if (point.dx > points.last.dx + 0.5 && point.dx < plot.right - 0.5) {
-        points.add(point);
+      final guide = Paint()
+        ..color = grid.withValues(alpha: 0.5)
+        ..strokeWidth = 1;
+      for (final gain in const [12.0, -12.0]) {
+        canvas.drawLine(
+          Offset(plot.left, y(gain)),
+          Offset(plot.right, y(gain)),
+          guide,
+        );
       }
-    }
-    points.add(Offset(plot.right, y(curve.gains.last)));
-    final line = _monotoneSpline(points);
-    final area = Path.from(line)
-      ..lineTo(plot.right, plot.center.dy)
-      ..lineTo(plot.left, plot.center.dy)
-      ..close();
-    canvas.save();
-    canvas.clipRect(plot);
-    canvas.drawPath(
-      area,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            color.withValues(alpha: 0.42),
-            color.withValues(alpha: 0.12),
-            color.withValues(alpha: 0.42),
-          ],
-        ).createShader(plot),
-    );
-    canvas.restore();
-    canvas.drawPath(
-      line,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..strokeJoin = StrokeJoin.round
-        ..strokeCap = StrokeCap.round,
-    );
-    final dot = Paint()..color = color;
-    final effective = curve.gains;
-    for (var i = 0; i < effective.length; i++) {
-      final hz = settings.frequencies[i];
-      if (hz < _minHz || hz > _maxHz) continue;
-      canvas.drawCircle(
-        Offset(x(hz), y(effective[i])),
-        effective.length > 15 ? 2.5 : 4,
-        dot,
+      for (final (hz, _) in freqLabels) {
+        canvas.drawLine(
+          Offset(x(hz), plot.top),
+          Offset(x(hz), plot.bottom),
+          guide,
+        );
+      }
+      // Dashed 0 dB baseline as a single path.
+      final baselinePath = Path();
+      for (var dx = plot.left; dx < plot.right; dx += 8) {
+        baselinePath
+          ..moveTo(dx, plot.center.dy)
+          ..lineTo(math.min(dx + 4, plot.right), plot.center.dy);
+      }
+      canvas.drawPath(
+        baselinePath,
+        Paint()
+          ..color = grid
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
       );
+      for (final (gain, painter) in gainLabels) {
+        painter.paint(
+          canvas,
+          Offset(gutter - 8 - painter.width, y(gain) - painter.height / 2),
+        );
+      }
+      for (final (hz, painter) in freqLabels) {
+        painter.paint(canvas, Offset(x(hz) - painter.width / 2, bottom + 6));
+      }
+
+      final curve = settings.copyWith(gains: settings.effectiveGains);
+      final points = <Offset>[Offset(plot.left, y(curve.gains.first))];
+      for (var i = 0; i < curve.gains.length; i++) {
+        final point = Offset(x(settings.frequencies[i]), y(curve.gains[i]));
+        if (point.dx > points.last.dx + 0.5 && point.dx < plot.right - 0.5) {
+          points.add(point);
+        }
+      }
+      points.add(Offset(plot.right, y(curve.gains.last)));
+      final line = _monotoneSpline(points);
+      final area = Path.from(line)
+        ..lineTo(plot.right, plot.center.dy)
+        ..lineTo(plot.left, plot.center.dy)
+        ..close();
+      canvas.save();
+      canvas.clipRect(plot);
+      canvas.drawPath(
+        area,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              color.withValues(alpha: 0.42),
+              color.withValues(alpha: 0.12),
+              color.withValues(alpha: 0.42),
+            ],
+          ).createShader(plot),
+      );
+      canvas.restore();
+      canvas.drawPath(
+        line,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3
+          ..strokeJoin = StrokeJoin.round
+          ..strokeCap = StrokeCap.round,
+      );
+      final dot = Paint()..color = color;
+      final effective = curve.gains;
+      for (var i = 0; i < effective.length; i++) {
+        final hz = settings.frequencies[i];
+        if (hz < _minHz || hz > _maxHz) continue;
+        canvas.drawCircle(
+          Offset(x(hz), y(effective[i])),
+          effective.length > 15 ? 2.5 : 4,
+          dot,
+        );
+      }
+    } finally {
+      for (final (_, painter) in freqLabels) {
+        painter.dispose();
+      }
+      for (final (_, painter) in gainLabels) {
+        painter.dispose();
+      }
     }
   }
 

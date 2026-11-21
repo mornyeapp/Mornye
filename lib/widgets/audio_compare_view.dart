@@ -1014,21 +1014,23 @@ class _ResidualTimelineState extends State<_ResidualTimeline> {
                     _select(details.localPosition, width),
                 onHorizontalDragUpdate: (details) =>
                     _select(details.localPosition, width),
-                child: CustomPaint(
-                  size: Size(width, height),
-                  painter: _ResidualTimelinePainter(
-                    values: values,
-                    duration: result.durationSeconds,
-                    minDb: range.$1,
-                    maxDb: range.$2,
-                    selected: selected,
-                    accent: cs.primary,
-                    muted: cs.outlineVariant,
-                    grid: cs.outlineVariant.withValues(alpha: 0.5),
-                    label: cs.onSurfaceVariant,
-                    labelStyle:
-                        theme.textTheme.labelSmall ??
-                        const TextStyle(fontSize: 10),
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    size: Size(width, height),
+                    painter: _ResidualTimelinePainter(
+                      values: values,
+                      duration: result.durationSeconds,
+                      minDb: range.$1,
+                      maxDb: range.$2,
+                      selected: selected,
+                      accent: cs.primary,
+                      muted: cs.outlineVariant,
+                      grid: cs.outlineVariant.withValues(alpha: 0.5),
+                      label: cs.onSurfaceVariant,
+                      labelStyle:
+                          theme.textTheme.labelSmall ??
+                          const TextStyle(fontSize: 10),
+                    ),
                   ),
                 ),
               ),
@@ -1253,11 +1255,15 @@ class _ResidualTimelinePainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    final dx = rightAlign
-        ? anchor.dx - painter.width
-        : anchor.dx - painter.width / 2;
-    final dy = top ? anchor.dy : anchor.dy - painter.height / 2;
-    painter.paint(canvas, Offset(dx, dy));
+    try {
+      final dx = rightAlign
+          ? anchor.dx - painter.width
+          : anchor.dx - painter.width / 2;
+      final dy = top ? anchor.dy : anchor.dy - painter.height / 2;
+      painter.paint(canvas, Offset(dx, dy));
+    } finally {
+      painter.dispose();
+    }
   }
 
   @override
