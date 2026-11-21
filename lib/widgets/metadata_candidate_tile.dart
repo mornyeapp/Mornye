@@ -157,7 +157,7 @@ class _MetadataCandidateArtworkState extends State<_MetadataCandidateArtwork> {
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: colorScheme.primary,
-                fontSize: 9,
+                fontSize: 11,
                 height: 1.1,
               ),
             ),

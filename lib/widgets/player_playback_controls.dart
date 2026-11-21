@@ -654,15 +654,15 @@ class _QualityBadge extends ConsumerWidget {
       decoration: mornye
           ? null
           : BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              color: colorScheme.surfaceContainerHigh,
               borderRadius: radius,
             ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppIcon(
+          AppIcon.adaptive(
             Icons.graphic_eq,
-            size: mornye ? 11 : 14,
+            size: mornye ? 12 : 14,
             color: colorScheme.onSurfaceVariant,
           ),
           SizedBox(width: mornye ? 5 : 6),
@@ -672,7 +672,7 @@ class _QualityBadge extends ConsumerWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                fontSize: mornye ? 10.5 : 12,
+                fontSize: mornye ? 11 : 12,
                 color: colorScheme.onSurfaceVariant,
                 letterSpacing: 0.2,
               ),
@@ -700,7 +700,13 @@ class _QualityBadge extends ConsumerWidget {
                 listen: false,
               ).read(linkSourceNamesProvider),
             ),
-            child: badge,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: mornye ? 44 : 48,
+                minWidth: mornye ? 44 : 48,
+              ),
+              child: Center(widthFactor: 1, child: badge),
+            ),
           ),
         ),
       ),

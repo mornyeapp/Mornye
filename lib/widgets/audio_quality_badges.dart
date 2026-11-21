@@ -17,7 +17,7 @@ class AudioQualityBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.6),
+        color: colorScheme.primaryContainer,
         borderRadius: context.tokens.borderRadiusBadge,
       ),
       child: Text(
@@ -47,21 +47,28 @@ class ExplicitBadge extends StatelessWidget {
       child: Semantics(
         label: label,
         child: ExcludeSemantics(
-          child: Container(
-            width: 18,
-            height: 18,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
-              borderRadius: context.tokens.borderRadiusBadge,
-            ),
-            child: Text(
-              'E',
-              style: TextStyle(
-                fontSize: context.tokens.badgeFontSize,
-                fontWeight: FontWeight.w700,
-                color: colorScheme.surface,
-                height: 1.0,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
+                borderRadius: context.tokens.borderRadiusBadge,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Center(
+                  widthFactor: 1,
+                  heightFactor: 1,
+                  child: Text(
+                    'E',
+                    style: TextStyle(
+                      fontSize: context.tokens.badgeFontSize,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.surface,
+                      height: 1.0,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

@@ -5,6 +5,7 @@ import 'package:mornye/services/app_remote_config_service.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
 
 class AppAnnouncementDialog extends StatelessWidget {
   final RemoteAnnouncement announcement;
@@ -52,8 +53,9 @@ class AppAnnouncementDialog extends StatelessWidget {
 
   void _showCtaOpenFailed(BuildContext context) {
     if (!context.mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(content: Text(context.l10n.announcementUnableToOpenLink)),
+    showAppSnackBar(
+      context,
+      content: Text(context.l10n.announcementUnableToOpenLink),
     );
   }
 
@@ -84,7 +86,7 @@ class AppAnnouncementDialog extends StatelessWidget {
         title: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppIcon(
+            AppIcon.adaptive(
               isUrgent ? Icons.priority_high_rounded : Icons.campaign_rounded,
               color: isUrgent ? colorScheme.error : colorScheme.primary,
             ),
@@ -97,9 +99,9 @@ class AppAnnouncementDialog extends StatelessWidget {
             ),
             if (showCloseButton)
               AppIconButton(
-                icon: const AppIcon(Icons.close_rounded),
+                icon: const AppIcon.adaptive(Icons.close_rounded),
                 tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                 onPressed: () => _close(context),
               ),
           ],

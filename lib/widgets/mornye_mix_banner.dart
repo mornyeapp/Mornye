@@ -94,11 +94,10 @@ double mornyeBannerTitleSize(String title, double width) {
       .split(RegExp(r'\s+'))
       .fold<int>(1, (length, word) => math.max(length, word.length));
   final line = (width - 40) / 0.58;
-  return [
-    width * 0.17,
-    line / longest,
-    line * 2.4 / title.length,
-  ].reduce(math.min);
+  return math.max(
+    11.0,
+    [width * 0.17, line / longest, line * 2.4 / title.length].reduce(math.min),
+  );
 }
 
 /// The art of a Top Pick: a soft color field, the mix's name set large, and

@@ -1029,7 +1029,7 @@ class _ResidualTimelineState extends State<_ResidualTimeline> {
                       label: cs.onSurfaceVariant,
                       labelStyle:
                           theme.textTheme.labelSmall ??
-                          const TextStyle(fontSize: 10),
+                          const TextStyle(fontSize: 11),
                     ),
                   ),
                 ),

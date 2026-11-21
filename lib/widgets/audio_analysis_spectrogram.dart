@@ -134,7 +134,7 @@ class _SpectrogramView extends StatelessWidget {
               children: [
                 const Text(
                   '-120 dBFS',
-                  style: TextStyle(color: labelColor, fontSize: 10),
+                  style: TextStyle(color: labelColor, fontSize: 11),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -149,7 +149,7 @@ class _SpectrogramView extends StatelessWidget {
                 const SizedBox(width: 8),
                 const Text(
                   '0 dBFS',
-                  style: TextStyle(color: labelColor, fontSize: 10),
+                  style: TextStyle(color: labelColor, fontSize: 11),
                 ),
               ],
             ),
@@ -273,7 +273,7 @@ class _SpectrogramPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(color: labelColor, fontSize: 10),
+        style: TextStyle(color: labelColor, fontSize: 11),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -387,7 +387,7 @@ Future<Uint8List> renderAudioSpectrogramPng({
     details.join('   '),
     const TextStyle(color: labelColor, fontSize: 11),
   );
-  const legendStyle = TextStyle(color: labelColor, fontSize: 10);
+  const legendStyle = TextStyle(color: labelColor, fontSize: 11);
   final minLabel = text('-120 dBFS', legendStyle);
   final maxLabel = text('0 dBFS', legendStyle);
 

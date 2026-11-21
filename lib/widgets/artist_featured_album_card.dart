@@ -2,6 +2,7 @@ import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/track_provider.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/editorial_notes.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
@@ -144,7 +145,7 @@ class _ArtistFeaturedAlbumCardState extends State<ArtistFeaturedAlbumCard> {
                 const SizedBox(width: 12),
                 HeaderCircleButton(
                   icon: CupertinoIcons.arrow_down,
-                  buttonSize: 32,
+                  buttonSize: isDesktopPlatform ? 32 : 44,
                   iconSize: 16,
                   tonal: true,
                   tooltip: l10n.dialogDownload,
