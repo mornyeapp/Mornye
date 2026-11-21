@@ -11,7 +11,7 @@ folder's `pubspec.yaml` (2.5.8, unchanged).
 
 ## Patches
 
-### Windows: omit the unused in-process plugin
+### Desktop (Windows, macOS, Linux): omit the unused in-process plugins
 
 The Windows plugin loads `libffmpegkit.dll` at engine registration, even
 when Dart never calls it. The native library starts a callback thread,
@@ -21,13 +21,19 @@ its MinGW runtime while those threads are alive is unsafe. A reported
 5.3.0 crash names `libwinpthread-1.dll_unloaded` with an access violation;
 without a crash dump, that report cannot establish which caller unloaded it.
 
-This fork no longer declares a Windows native plugin. Flutter therefore
-does not register, link or bundle it and its FFmpegKit DLL dependencies.
-Mornye already routes desktop conversion, probing, analysis and cancellation
-through `FFmpegExecution` to the standalone `ffmpeg.exe` and `ffprobe.exe`
-processes. The package's pure Dart argument parser and media information
-models remain available. Mobile plugins and Windows libmpv playback are
-unchanged. The Windows upstream source is retained for reference.
+On macOS and Linux, the native plugins similarly linked and bundled
+`ffmpegkit.xcframework` / `libffmpegkit.so` (along with duplicate FFmpeg
+codec libraries) even though desktop builds never invoke the FFmpegKit
+method channel.
+
+This fork no longer declares Windows, macOS, or Linux native plugins in
+`pubspec.yaml`. Flutter therefore does not register, link, or bundle any
+desktop FFmpegKit native libraries. Mornye already routes desktop conversion,
+probing, analysis, and cancellation through `FFmpegExecution` to the
+standalone `ffmpeg` and `ffprobe` processes. The package's pure Dart argument
+parser and media information models remain available. Mobile plugins
+(Android and iOS) and desktop libmpv playback are unchanged. Upstream desktop
+plugin sources are retained for reference.
 
 Validation: regenerate plugins with `flutter pub get --offline`, then run
 `flutter test --no-pub test/ffmpeg_desktop_test.dart --timeout 120s`.
