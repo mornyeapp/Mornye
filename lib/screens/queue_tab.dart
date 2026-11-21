@@ -95,6 +95,8 @@ import 'package:mornye/screens/local_album_screen.dart';
 import 'package:mornye/screens/mornye_library_screen.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/completion_bridge_tracker.dart';
+import 'package:mornye/controllers/extension_auth_launcher.dart'
+    show extensionVerificationName;
 import 'package:mornye/controllers/local_track_batch_actions.dart';
 import 'package:mornye/controllers/queue_library_pager.dart';
 import 'package:mornye/controllers/queue_library_refresh_policy.dart';
