@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
@@ -42,7 +43,7 @@ class _RenderPinnedSectionList extends RenderSliverList
   double? _pinnedOffset;
 
   set headerIndexes(List<int> value) {
-    if (identical(value, _headerIndexes)) return;
+    if (listEquals(value, _headerIndexes)) return;
     _headerIndexes = value;
     markNeedsLayout();
   }
@@ -121,7 +122,9 @@ class _RenderPinnedSectionList extends RenderSliverList
     if (header != null) {
       final data = header!.parentData! as SliverMultiBoxAdaptorParentData;
       data.keepAlive = true;
-      header!.layout(constraints.asBoxConstraints(), parentUsesSize: true);
+      if (data.keptAlive || !header!.hasSize) {
+        header!.layout(constraints.asBoxConstraints(), parentUsesSize: true);
+      }
       final natural = data.keptAlive
           ? -header!.size.height
           : childScrollOffset(header!)! - constraints.scrollOffset;

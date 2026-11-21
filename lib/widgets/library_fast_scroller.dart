@@ -46,6 +46,7 @@ class _LibraryFastScrollerState extends State<LibraryFastScroller> {
 
   ScrollPosition? _position;
   ScrollPosition? _outerPosition;
+  final ValueNotifier<int> _thumbTick = ValueNotifier<int>(0);
   double _pixels = 0;
   double _maxExtent = 0;
   double _viewport = 0;
@@ -73,7 +74,7 @@ class _LibraryFastScrollerState extends State<LibraryFastScroller> {
   }
 
   void _onOuterPositionChanged() {
-    if (mounted && _long && widget.topPadding > 0) setState(() {});
+    if (mounted && _long && widget.topPadding > 0) _thumbTick.value++;
   }
 
   @override
@@ -81,6 +82,7 @@ class _LibraryFastScrollerState extends State<LibraryFastScroller> {
     _hideTimer?.cancel();
     _position?.removeListener(_onPositionChanged);
     _outerPosition?.removeListener(_onOuterPositionChanged);
+    _thumbTick.dispose();
     super.dispose();
   }
 
@@ -114,8 +116,10 @@ class _LibraryFastScrollerState extends State<LibraryFastScroller> {
       _visible = false;
       _hideTimer?.cancel();
     }
-    if ((changed && (wasLong || _long)) || wasVisible != _visible) {
+    if (wasLong != _long || wasVisible != _visible) {
       setState(() {});
+    } else if (changed && _long) {
+      _thumbTick.value++;
     }
   }
 
@@ -224,15 +228,7 @@ class _LibraryFastScrollerState extends State<LibraryFastScroller> {
       context,
       const AppMotionSpec(Duration(milliseconds: 200), Curves.linear),
     );
-    // NestedScrollView's body slides behind its pinned header. Reserve only
-    // the part of that header currently overlapping this body's viewport.
-    final remainingHeader = _outerPosition?.hasContentDimensions == true
-        ? _outerPosition!.extentAfter
-        : 0.0;
-    final topPadding = (widget.topPadding - remainingHeader).clamp(
-      0.0,
-      widget.topPadding,
-    );
+    final direction = Directionality.of(context);
     return NotificationListener<ScrollMetricsNotification>(
       onNotification: _onMetricsNotification,
       child: NotificationListener<ScrollNotification>(
@@ -246,90 +242,129 @@ class _LibraryFastScrollerState extends State<LibraryFastScroller> {
               child: widget.child,
             ),
             if (_long)
-              PositionedDirectional(
-                top: topPadding,
-                bottom: widget.bottomPadding,
-                end: 0,
-                width: 240,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final track = constraints.maxHeight;
-                    final top = _fraction * math.max(0, track - _thumbHeight);
-                    final label = _dragging ? widget.labelAt(_fraction) : null;
-                    return Stack(
-                      clipBehavior: Clip.hardEdge,
-                      children: [
-                        PositionedDirectional(
-                          top: top,
-                          end: 0,
-                          width: _hitWidth,
-                          height: _thumbHeight,
-                          child: Semantics(
-                            // Screen readers scroll the list itself.
-                            excludeSemantics: true,
-                            child: IgnorePointer(
-                              // A hidden thumb must not catch edge swipes.
-                              ignoring: !_visible && !_dragging,
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onVerticalDragStart: _startDrag,
-                                onVerticalDragUpdate: (details) =>
-                                    _updateDrag(details, track),
-                                onVerticalDragEnd: (_) => _endDrag(),
-                                onVerticalDragCancel: _endDrag,
-                                child: AnimatedOpacity(
-                                  opacity: _visible || _dragging ? 1 : 0,
-                                  duration: fade.duration,
-                                  curve: fade.curve,
-                                  child: Align(
-                                    alignment: AlignmentDirectional.centerEnd,
-                                    child: AnimatedContainer(
-                                      duration: motion.duration,
-                                      curve: motion.curve,
-                                      margin: const EdgeInsetsDirectional.only(
-                                        end: 4,
-                                      ),
-                                      width: _dragging ? 10 : 6,
+              Positioned.fill(
+                child: RepaintBoundary(
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _thumbTick,
+                    builder: (context, _, _) {
+                      // NestedScrollView's body slides behind its pinned
+                      // header. Reserve only the part currently overlapping.
+                      final remainingHeader =
+                          _outerPosition?.hasContentDimensions == true
+                          ? _outerPosition!.extentAfter
+                          : 0.0;
+                      final topPadding = (widget.topPadding - remainingHeader)
+                          .clamp(0.0, widget.topPadding);
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          top: topPadding,
+                          bottom: widget.bottomPadding,
+                        ),
+                        child: Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: SizedBox(
+                            width: 240,
+                            height: double.infinity,
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final track = constraints.maxHeight;
+                                final top =
+                                    _fraction *
+                                    math.max(0, track - _thumbHeight);
+                                final label = _dragging
+                                    ? widget.labelAt(_fraction)
+                                    : null;
+                                return Stack(
+                                  clipBehavior: Clip.hardEdge,
+                                  children: [
+                                    PositionedDirectional(
+                                      top: top,
+                                      end: 0,
+                                      width: _hitWidth,
                                       height: _thumbHeight,
-                                      decoration: ShapeDecoration(
-                                        color: _dragging
-                                            ? colors.primary
-                                            : colors.onSurfaceVariant
-                                                  .withValues(
-                                                    alpha: mornye ? 0.45 : 0.6,
+                                      child: Semantics(
+                                        // Screen readers scroll the list itself.
+                                        excludeSemantics: true,
+                                        child: IgnorePointer(
+                                          // A hidden thumb must not catch edge swipes.
+                                          ignoring: !_visible && !_dragging,
+                                          child: GestureDetector(
+                                            behavior: HitTestBehavior.opaque,
+                                            onVerticalDragStart: _startDrag,
+                                            onVerticalDragUpdate: (details) =>
+                                                _updateDrag(details, track),
+                                            onVerticalDragEnd: (_) =>
+                                                _endDrag(),
+                                            onVerticalDragCancel: _endDrag,
+                                            child: AnimatedOpacity(
+                                              opacity: _visible || _dragging
+                                                  ? 1
+                                                  : 0,
+                                              duration: fade.duration,
+                                              curve: fade.curve,
+                                              child: Align(
+                                                alignment: AlignmentDirectional
+                                                    .centerEnd,
+                                                child: AnimatedContainer(
+                                                  duration: motion.duration,
+                                                  curve: motion.curve,
+                                                  margin:
+                                                      const EdgeInsetsDirectional.only(
+                                                        end: 4,
+                                                      ),
+                                                  width: _dragging ? 10 : 6,
+                                                  height: _thumbHeight,
+                                                  decoration: ShapeDecoration(
+                                                    color: _dragging
+                                                        ? colors.primary
+                                                        : colors
+                                                              .onSurfaceVariant
+                                                              .withValues(
+                                                                alpha: mornye
+                                                                    ? 0.45
+                                                                    : 0.6,
+                                                              ),
+                                                    shape:
+                                                        const StadiumBorder(),
                                                   ),
-                                        shape: const StadiumBorder(),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                              ),
+                                    if (label != null)
+                                      Positioned.fill(
+                                        child: IgnorePointer(
+                                          child: CustomSingleChildLayout(
+                                            delegate: _BubbleLayout(
+                                              center: top + _thumbHeight / 2,
+                                              right: _hitWidth + 8,
+                                              rtl:
+                                                  direction ==
+                                                  TextDirection.rtl,
+                                            ),
+                                            child: _Bubble(
+                                              key: const ValueKey(
+                                                'library-scroll-bubble',
+                                              ),
+                                              label: label,
+                                              mornye: mornye,
+                                              motion: motion,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
                             ),
                           ),
                         ),
-                        if (label != null)
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: CustomSingleChildLayout(
-                                delegate: _BubbleLayout(
-                                  center: top + _thumbHeight / 2,
-                                  right: _hitWidth + 8,
-                                  rtl:
-                                      Directionality.of(context) ==
-                                      TextDirection.rtl,
-                                ),
-                                child: _Bubble(
-                                  key: const ValueKey('library-scroll-bubble'),
-                                  label: label,
-                                  mornye: mornye,
-                                  motion: motion,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
           ],

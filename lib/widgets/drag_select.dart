@@ -49,7 +49,7 @@ class DragSelectController {
     _current = id;
     _lastTick = Duration.zero;
     GestureBinding.instance.pointerRouter.addGlobalRoute(_onPointer);
-    _ticker = Ticker(_autoScroll)..start();
+    _syncAutoScrollTicker();
   }
 
   void dispose() {
@@ -73,12 +73,44 @@ class DragSelectController {
     if (event is PointerMoveEvent) {
       _position = event.position;
       _retarget();
+      _syncAutoScrollTicker();
     } else if (event is PointerUpEvent || event is PointerCancelEvent) {
       _finish();
     }
   }
 
+  double _edgeDepth(Rect rect) {
+    final up = clampDouble(
+      (rect.top + _edgeZone - _position.dy) / _edgeZone,
+      0,
+      1,
+    );
+    final down = clampDouble(
+      (_position.dy - (rect.bottom - _edgeZone)) / _edgeZone,
+      0,
+      1,
+    );
+    return down - up;
+  }
+
+  void _syncAutoScrollTicker() {
+    final viewport = _viewport();
+    final needsScroll = viewport != null && _edgeDepth(viewport.$2) != 0;
+    if (needsScroll) {
+      if (_ticker == null) {
+        _lastTick = Duration.zero;
+        _ticker = Ticker(_autoScroll)..start();
+      } else if (!_ticker!.isActive) {
+        _lastTick = Duration.zero;
+        _ticker!.start();
+      }
+    } else if (_ticker?.isActive ?? false) {
+      _ticker!.stop();
+    }
+  }
+
   /// The list the rows scroll in, and the part of it a finger can reach.
+  /// Measured each time: a collapsing header moves the list mid gesture.
   (ScrollPosition, Rect)? _viewport() {
     final row = _items[_anchor] ?? _items.values.firstOrNull;
     if (row == null) return null;
@@ -147,18 +179,11 @@ class DragSelectController {
     if (viewport == null || dt <= 0) return;
     final (position, rect) = viewport;
     // How far into a band the finger rests: 0 where it starts, 1 at the edge.
-    final up = clampDouble(
-      (rect.top + _edgeZone - _position.dy) / _edgeZone,
-      0,
-      1,
-    );
-    final down = clampDouble(
-      (_position.dy - (rect.bottom - _edgeZone)) / _edgeZone,
-      0,
-      1,
-    );
-    final depth = down - up;
-    if (depth == 0) return;
+    final depth = _edgeDepth(rect);
+    if (depth == 0) {
+      _ticker?.stop();
+      return;
+    }
     final speed = _minSpeed + (_maxSpeed - _minSpeed) * depth.abs();
     final target = clampDouble(
       position.pixels + depth.sign * speed * dt,

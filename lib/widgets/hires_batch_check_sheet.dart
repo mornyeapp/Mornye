@@ -229,82 +229,94 @@ class _HiResBatchCheckState extends State<HiResBatchCheck> {
       fontSize: 15,
       height: 1.35,
     );
-    return ListView(
+    return CustomScrollView(
       controller: widget.controller,
       shrinkWrap: true,
-      padding: EdgeInsets.only(bottom: tokens.gapLg),
-      children: [
-        Padding(
-          // In line with the sheet title and the rows below.
-          padding: EdgeInsets.fromLTRB(tokens.gapXl, 0, tokens.gapXl, 8),
-          child: _done
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final line in _summary())
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(line, style: secondary),
-                      ),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.hiResBatchProgress(_current + 1, total),
-                      style: secondary,
-                    ),
-                    const SizedBox(height: 10),
-                    AppProgressIndicator.linear(value: _current / total),
-                  ],
-                ),
-        ),
-        if (_showsChart)
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              tokens.gapXl,
-              tokens.gapSm,
-              tokens.gapXl,
-              tokens.gapSm,
-            ),
-            child: HiResSpectrumOverlay(
-              lines: [
-                for (final entry in _entries)
-                  if (entry.slot case final slot?)
-                    (
-                      db: entry.result!.report!.spectrumDb,
-                      stepHz: entry.result!.report!.spectrumStepHz,
-                      color: HiResSongColors.of(context, slot),
-                    ),
-              ],
-            ),
-          ),
-        for (final (index, entry) in _entries.indexed)
-          ..._row(context, index, entry),
-        if (_done && _entries.any((entry) => entry.result != null))
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              tokens.gapXl,
-              tokens.gapMd,
-              tokens.gapXl,
-              0,
-            ),
-            child: mornye
-                ? AppActionButton(
-                    outlined: true,
-                    tonal: true,
-                    onPressed: _share,
-                    icon: const Icon(Icons.share_outlined),
-                    label: Text(l10n.hiResReportShare),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            // In line with the sheet title and the rows below.
+            padding: EdgeInsets.fromLTRB(tokens.gapXl, 0, tokens.gapXl, 8),
+            child: _done
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final line in _summary())
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(line, style: secondary),
+                        ),
+                    ],
                   )
-                : ExpressiveButton(
-                    tonal: true,
-                    onPressed: _share,
-                    icon: const Icon(Icons.share_outlined, size: 20),
-                    child: Text(l10n.hiResReportShare),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.hiResBatchProgress(_current + 1, total),
+                        style: secondary,
+                      ),
+                      const SizedBox(height: 10),
+                      AppProgressIndicator.linear(value: _current / total),
+                    ],
                   ),
           ),
+        ),
+        if (_showsChart)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                tokens.gapXl,
+                tokens.gapSm,
+                tokens.gapXl,
+                tokens.gapSm,
+              ),
+              child: HiResSpectrumOverlay(
+                lines: [
+                  for (final entry in _entries)
+                    if (entry.slot case final slot?)
+                      (
+                        db: entry.result!.report!.spectrumDb,
+                        stepHz: entry.result!.report!.spectrumStepHz,
+                        color: HiResSongColors.of(context, slot),
+                      ),
+                ],
+              ),
+            ),
+          ),
+        SliverList.builder(
+          itemCount: _entries.length,
+          itemBuilder: (context, index) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: _row(context, index, _entries[index]),
+          ),
+        ),
+        if (_done && _entries.any((entry) => entry.result != null))
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                tokens.gapXl,
+                tokens.gapMd,
+                tokens.gapXl,
+                0,
+              ),
+              child: mornye
+                  ? AppActionButton(
+                      outlined: true,
+                      tonal: true,
+                      onPressed: _share,
+                      icon: const Icon(Icons.share_outlined),
+                      label: Text(l10n.hiResReportShare),
+                    )
+                  : ExpressiveButton(
+                      tonal: true,
+                      onPressed: _share,
+                      icon: const Icon(Icons.share_outlined, size: 20),
+                      child: Text(l10n.hiResReportShare),
+                    ),
+            ),
+          ),
+        SliverToBoxAdapter(child: SizedBox(height: tokens.gapLg)),
       ],
     );
   }

@@ -50,15 +50,17 @@ class StaggeredListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!animate ||
+        index >= _maxAnimatedItems ||
+        MediaQuery.disableAnimationsOf(context)) {
+      return child;
+    }
     // A shelf scrolls sideways inside a page that builds its shelves lazily
     // while it scrolls down, so a moved page skips the reveal as well.
     final scrolled =
         _hasScrolled(Scrollable.maybeOf(context)) ||
         _hasScrolled(Scrollable.maybeOf(context, axis: Axis.vertical));
-    if (!animate ||
-        scrolled ||
-        index >= _maxAnimatedItems ||
-        MediaQuery.disableAnimationsOf(context)) {
+    if (scrolled) {
       return child;
     }
     final cappedIndex = index.clamp(0, _maxAnimatedItems - 1);
