@@ -721,10 +721,9 @@ class LibraryShadowSnapshot {
                 )
                 ..execute('DROP TABLE IF EXISTS $libraryShadowTable')
                 ..execute(
-                  'CREATE TEMP TABLE library_shadowed AS '
-                  'SELECT * FROM temp.library_shadowed_next',
+                  'ALTER TABLE temp.library_shadowed_next '
+                  'RENAME TO library_shadowed',
                 )
-                ..execute('DROP TABLE temp.library_shadowed_next')
                 ..execute(
                   'CREATE INDEX temp.library_shadowed_item '
                   'ON library_shadowed(item_id)',
@@ -735,7 +734,7 @@ class LibraryShadowSnapshot {
                 )
                 ..rawQuery('SELECT total_changes()'))
               .apply();
-      final built = _writeStamp(results, const [0, 1, 9]);
+      final built = _writeStamp(results, const [0, 1, 8]);
       if (built == null) {
         return _buildFailed(db, stamp, 'no write stamp after the build');
       }

@@ -277,32 +277,43 @@ abstract final class LibrarySchema {
     // Keep alias records addressable by old playlist IDs. Only suppress a
     // Windows physical-file alias while another available record represents
     // it. The dedicated keys keep converted formats and CUE tracks distinct.
+    // The uncorrelated NOT EXISTS guards let SQLite short-circuit both checks
+    // once per query on non-Windows libraries and libraries without split CUEs.
     await db.execute('DROP VIEW IF EXISTS $visibleView');
     await db.execute('''
       CREATE VIEW $visibleView AS
       SELECT l.* FROM library l
       JOIN library_sources s ON s.id = l.source_id
       WHERE s.enabled = 1 AND s.available = 1
-        AND NOT EXISTS (
-          SELECT 1 FROM library_path_keys own
-          JOIN library_path_keys other ON other.path_key = own.path_key
-          JOIN library duplicate ON duplicate.id = other.item_id
-          JOIN library_sources ds ON ds.id = duplicate.source_id
-          WHERE own.item_id = l.id
-            AND own.path_key GLOB 'windows-file:*'
-            AND duplicate.id < l.id
-            AND ds.enabled = 1 AND ds.available = 1
+        AND (
+          NOT EXISTS (
+            SELECT 1 FROM library_path_keys
+            WHERE path_key GLOB 'windows-file:*'
+          )
+          OR NOT EXISTS (
+            SELECT 1 FROM library_path_keys own
+            CROSS JOIN library_path_keys other ON other.path_key = own.path_key
+            CROSS JOIN library duplicate ON duplicate.id = other.item_id
+            CROSS JOIN library_sources ds ON ds.id = duplicate.source_id
+            WHERE own.item_id = l.id
+              AND own.path_key GLOB 'windows-file:*'
+              AND duplicate.id < l.id
+              AND ds.enabled = 1 AND ds.available = 1
+          )
         )
-        AND l.file_path NOT IN (
-          SELECT c.file_path FROM library_cue_split_sources c
-          JOIN (
-            SELECT o.cue_path FROM library_cue_split_outputs o
-            LEFT JOIN library t ON t.file_path = o.file_path
-            LEFT JOIN library_sources ts ON ts.id = t.source_id
-              AND ts.enabled = 1 AND ts.available = 1
-            GROUP BY o.cue_path
-            HAVING COUNT(*) = COUNT(ts.id)
-          ) complete ON complete.cue_path = c.cue_path
+        AND (
+          NOT EXISTS (SELECT 1 FROM library_cue_split_sources)
+          OR l.file_path NOT IN (
+            SELECT c.file_path FROM library_cue_split_sources c
+            JOIN (
+              SELECT o.cue_path FROM library_cue_split_outputs o
+              LEFT JOIN library t ON t.file_path = o.file_path
+              LEFT JOIN library_sources ts ON ts.id = t.source_id
+                AND ts.enabled = 1 AND ts.available = 1
+              GROUP BY o.cue_path
+              HAVING COUNT(*) = COUNT(ts.id)
+            ) complete ON complete.cue_path = c.cue_path
+          )
         )
     ''');
   }
@@ -468,6 +479,14 @@ abstract final class LibrarySchema {
   static const _containerPathsPage = 256;
 
   static Future<void> onOpen(Database db) async {
+    final views = await db.rawQuery(
+      "SELECT sql FROM sqlite_master WHERE type = 'view' AND name = ?",
+      [visibleView],
+    );
+    final viewSql = views.isEmpty ? null : views.first['sql'] as String?;
+    if (viewSql == null || !viewSql.contains('CROSS JOIN library_path_keys')) {
+      await _createVisibleView(db);
+    }
     await migrateIosContainerPaths(db);
     if (Platform.isWindows) {
       await sqlite.repairWindowsPathKeysOnOpen(

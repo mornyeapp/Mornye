@@ -296,6 +296,7 @@ class ListeningStatisticsStore {
       version: _version,
       onCreate: _create,
       onUpgrade: _upgrade,
+      onOpen: _onOpen,
     ),
   );
 
@@ -313,8 +314,16 @@ class ListeningStatisticsStore {
         PRIMARY KEY (day, track_key)
       )
     ''');
+    await _ensureIndexes(db);
     await createLinkHistorySyncSchema(db);
   }
+
+  static Future<void> _onOpen(Database db) => _ensureIndexes(db);
+
+  static Future<void> _ensureIndexes(Database db) => db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_listening_album '
+    'ON listening(album COLLATE NOCASE, track_key)',
+  );
 
   static Future<void> _upgrade(Database db, int oldVersion, int _) async {
     if (oldVersion < 2) await createLinkHistorySyncSchema(db);
@@ -332,6 +341,7 @@ class ListeningStatisticsStore {
       version: _version,
       onCreate: _create,
       onUpgrade: _upgrade,
+      onOpen: _onOpen,
     ),
   );
 
