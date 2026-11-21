@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -148,12 +150,37 @@ Future<bool> openPendingExtensionVerification(
   }
 }
 
+/// The name [extensionId] shows in the app, or the id while it is unknown.
+String extensionVerificationName(String extensionId, [BuildContext? context]) {
+  final id = extensionId.trim();
+  final scope = context ?? AppNavigationService.rootNavigatorKey.currentContext;
+  if (scope == null || !scope.mounted) return id;
+  try {
+    final extensions = ProviderScope.containerOf(
+      scope,
+      listen: false,
+    ).read(extensionProvider).extensions;
+    for (final extension in extensions) {
+      if (extension.id != id) continue;
+      final name = extension.displayName.trim();
+      return name.isEmpty ? id : name;
+    }
+  } on StateError {
+    // No provider scope above this context.
+  }
+  return id;
+}
+
 void showExtensionVerificationUnavailable(String extensionId) {
   final context = AppNavigationService.rootNavigatorKey.currentContext;
   if (context == null || !context.mounted) return;
   ScaffoldMessenger.maybeOf(context)?.showSnackBar(
     SnackBar(
-      content: Text(context.l10n.extensionVerificationUnavailable(extensionId)),
+      content: Text(
+        context.l10n.extensionVerificationUnavailable(
+          extensionVerificationName(extensionId, context),
+        ),
+      ),
       duration: const Duration(seconds: 8),
     ),
   );
@@ -187,8 +214,8 @@ Timer? scheduleExtensionVerificationHelpDialog(
 /// [cancellationSignal] completes, all local waiting resources are released
 /// and the method returns false without waiting for the timeout.
 ///
-/// [awaitForeground], if given, is awaited first — passed the trimmed
-/// [extensionId] — before opening the challenge; used by callers that must
+/// [awaitForeground], if given, is awaited first (passed the trimmed
+/// [extensionId]) before opening the challenge; used by callers that must
 /// defer verification until the app is foregrounded (launching a browser
 /// from the background is blocked by the OS).
 Future<bool> openVerificationAndAwaitGrant(
@@ -308,6 +335,9 @@ Future<bool> showExtensionVerificationHelpDialog(
       ? l10n.extensionVerificationHelpMessageManual
       : l10n.extensionVerificationHelpMessageWaiting;
   final normalizedExtensionId = extensionId.trim();
+  final requestedBy = l10n.extensionVerificationRequestedBy(
+    extensionVerificationName(normalizedExtensionId, context),
+  );
   BuildContext? activeDialogContext;
   var closeRequested = false;
   void closeDialog() {
@@ -359,6 +389,11 @@ Future<bool> showExtensionVerificationHelpDialog(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Text(
+                  requestedBy,
+                  style: Theme.of(dialogContext).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
                 Text(message),
                 const SizedBox(height: 16),
                 DecoratedBox(

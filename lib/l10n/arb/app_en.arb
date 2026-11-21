@@ -6745,6 +6745,15 @@
   "@notifVerificationRequiredBody": {
     "description": "Notification body prompting the user to return to the app to solve a verification challenge"
   },
+  "notifVerificationRequiredBodyNamed": "Open the app to complete the {extension} verification and resume downloads",
+  "@notifVerificationRequiredBodyNamed": {
+    "description": "Notification body prompting the user to return to the app to solve a verification challenge, naming the extension that asked for it",
+    "placeholders": {
+      "extension": {
+        "type": "String"
+      }
+    }
+  },
   "notifAllDownloadsComplete": "All Downloads Complete",
   "@notifAllDownloadsComplete": {
     "description": "Notification title when all downloads finish successfully"
@@ -7533,6 +7542,15 @@
   "queueResolvingDownloadMetadata": "Resolving track metadata...",
   "queueResolvingDownloadStream": "Preparing audio stream...",
   "queueWaitingForVerification": "Waiting for verification...",
+  "queueWaitingForVerificationNamed": "Waiting for {extension} verification...",
+  "@queueWaitingForVerificationNamed": {
+    "description": "Queue status while a download waits for the user to complete a verification challenge, naming the extension that asked for it",
+    "placeholders": {
+      "extension": {
+        "type": "String"
+      }
+    }
+  },
   "queueResumingAfterVerification": "Resuming after verification...",
   "@queueDownloadStarting": {
     "description": "Queue status before download progress is available"
@@ -9209,6 +9227,15 @@
   "extensionVerificationUnavailable": "No verification page is available for {extension}. Retry the download to request a new challenge.",
   "@extensionVerificationUnavailable": {
     "description": "Shown when the app cannot retrieve a pending verification challenge",
+    "placeholders": {
+      "extension": {
+        "type": "String"
+      }
+    }
+  },
+  "extensionVerificationRequestedBy": "Requested by {extension}",
+  "@extensionVerificationRequestedBy": {
+    "description": "Line in the verification help dialog naming the extension that asked for verification",
     "placeholders": {
       "extension": {
         "type": "String"

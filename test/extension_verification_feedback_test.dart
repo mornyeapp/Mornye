@@ -2,12 +2,31 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
+
+class _NamedExtensions extends ExtensionNotifier {
+  @override
+  ExtensionState build() => const ExtensionState(
+    extensions: [
+      Extension(
+        id: 'provider-a',
+        name: 'provider-a',
+        displayName: 'Provider A',
+        version: '1.0.0',
+        description: '',
+        enabled: true,
+        status: 'loaded',
+      ),
+    ],
+  );
+}
 
 void main() {
   const channel = MethodChannel('com.zarz.mornye/backend');
@@ -161,6 +180,48 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  testWidgets('the help dialog and the missing page message name the '
+      'extension that asked', (tester) async {
+    final messenger = tester.binding.defaultBinaryMessenger;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [extensionProvider.overrideWith(_NamedExtensions.new)],
+        child: MaterialApp(
+          navigatorKey: AppNavigationService.rootNavigatorKey,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: Text('Library')),
+        ),
+      ),
+    );
+    expect(extensionVerificationName('provider-a'), 'Provider A');
+    // An extension the app does not know keeps its id.
+    expect(extensionVerificationName('provider-b'), 'provider-b');
+
+    messenger.setMockMethodCallHandler(channel, (_) async => null);
+    expect(await openPendingExtensionVerification('provider-a'), isFalse);
+    await tester.pump();
+    expect(
+      find.textContaining('No verification page is available for Provider A.'),
+      findsOneWidget,
+    );
+
+    final cancellation = Completer<void>();
+    unawaited(
+      showExtensionVerificationHelpDialog(
+        'provider-a',
+        Uri.parse('https://example.invalid/verify?state=sample'),
+        cancellationSignal: cancellation.future,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Requested by Provider A'), findsOneWidget);
+    cancellation.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(AppAlertDialog), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('cancelling a wait dismisses its already-visible help dialog', (
     tester,

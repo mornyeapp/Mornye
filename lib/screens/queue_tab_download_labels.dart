@@ -44,8 +44,15 @@ String _formatDownloadProgressLabel(
     );
   }
 
-  if (item.error == 'Waiting for verification') {
-    return context.l10n.queueWaitingForVerification;
+  // The marker carries the id of the extension that asked, after a colon.
+  const waiting = 'Waiting for verification';
+  final marker = item.error;
+  if (marker != null && marker.startsWith(waiting)) {
+    final id = marker.substring(waiting.length).replaceFirst(':', '').trim();
+    if (id.isEmpty) return context.l10n.queueWaitingForVerification;
+    return context.l10n.queueWaitingForVerificationNamed(
+      extensionVerificationName(id, context),
+    );
   }
   switch (item.preparationStage) {
     case 'checking_session':

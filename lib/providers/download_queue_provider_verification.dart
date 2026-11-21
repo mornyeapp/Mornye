@@ -134,13 +134,20 @@ extension _DownloadQueueVerificationGate on DownloadQueueNotifier {
     updateItemStatus(
       item.id,
       DownloadStatus.downloading,
-      error: 'Waiting for verification',
+      // The queue row names the extension from the id after the colon.
+      error: 'Waiting for verification: $targetService',
       errorType: DownloadErrorType.verificationRequired,
     );
 
     try {
       await _notificationService.showVerificationRequired(
         extensionId: targetService,
+        extensionName: ref
+            .read(extensionProvider)
+            .extensions
+            .where((extension) => extension.id == targetService)
+            .firstOrNull
+            ?.displayName,
         itemId: item.id,
       );
     } catch (error) {

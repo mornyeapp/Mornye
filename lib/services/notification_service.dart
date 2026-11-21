@@ -487,6 +487,7 @@ class NotificationService {
 
   Future<void> showVerificationRequired({
     required String extensionId,
+    String? extensionName,
     required String itemId,
   }) async {
     if (!_isInitialized) await initialize();
@@ -494,9 +495,13 @@ class NotificationService {
 
     final title =
         _l10n?.notifVerificationRequiredTitle ?? 'Verification required';
-    final body =
-        _l10n?.notifVerificationRequiredBody ??
-        'Open the app to complete verification and resume downloads';
+    final name = extensionName?.trim() ?? '';
+    final body = name.isEmpty
+        ? _l10n?.notifVerificationRequiredBody ??
+              'Open the app to complete verification and resume downloads'
+        : _l10n?.notifVerificationRequiredBodyNamed(name) ??
+              'Open the app to complete the $name verification and resume '
+                  'downloads';
 
     await _showSafely(
       id: verificationRequiredId,
