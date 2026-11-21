@@ -242,9 +242,13 @@ class _MusicAutoMix {
       final outro = await analyzer.analyzeTransition(
         currentPath,
         offset: offset,
+        matching: options.matching,
       );
       if (!_current(generation)) return;
-      final intro = await analyzer.analyzeTransition(nextPath);
+      final intro = await analyzer.analyzeTransition(
+        nextPath,
+        matching: options.matching,
+      );
       if (!_current(generation)) return;
       final plan = AutoMixPlan.create(
         outgoingDuration: duration,

@@ -9,6 +9,7 @@ class AutoMixBeatGrid {
     required this.phase,
     required this.confidence,
     required this.firstSound,
+    this.confirmed = false,
   });
 
   final double bpm;
@@ -16,7 +17,22 @@ class AutoMixBeatGrid {
   final double confidence;
   final double firstSound;
 
-  bool get reliable => confidence >= 0.55 && bpm >= 60 && bpm <= 180;
+  /// A second window of the song repeated this tempo and these beats.
+  final bool confirmed;
+
+  bool get _inRange => bpm >= 60 && bpm <= 180;
+
+  /// Certain enough on its own to mix on its beats.
+  bool get reliable => confidence >= 0.55 && _inRange;
+
+  /// Certain enough at [matching] to back up another window of the song.
+  bool confirms(AutoMixMatching matching) =>
+      confidence >= matching.confirmedConfidence && _inRange;
+
+  /// Certain enough at [matching], which also takes a less certain grid
+  /// that is [confirmed].
+  bool reliableFor(AutoMixMatching matching) =>
+      reliable || confirmed && confirms(matching);
   double get period => 60 / bpm;
   double beatAtOrAfter(double seconds) =>
       phase + ((seconds - phase) / period).ceil() * period;
@@ -265,7 +281,8 @@ class AutoMixPlan {
       fallbackReason = AutoMixFallbackReason.effectTempo;
     } else if (outro == null || intro == null) {
       fallbackReason = AutoMixFallbackReason.analysisUnavailable;
-    } else if (!outro.reliable || !intro.reliable) {
+    } else if (!outro.reliableFor(options.matching) ||
+        !intro.reliableFor(options.matching)) {
       fallbackReason = AutoMixFallbackReason.unreliableBeats;
     } else {
       final outgoing = outro;
@@ -282,7 +299,7 @@ class AutoMixPlan {
       // The detector measures leading silence, not the length of a musical
       // intro. A quiet lead-in should not disable an otherwise reliable mix.
       // Bound the trim so an uncertain/very late onset still uses crossfade.
-      if ((candidate - 1).abs() > 0.08) {
+      if ((candidate - 1).abs() > options.matching.maxTempoChange) {
         fallbackReason = AutoMixFallbackReason.incompatibleTempo;
       } else if (firstBeat > math.min(12, nextLength * 0.1)) {
         fallbackReason = AutoMixFallbackReason.longIntro;

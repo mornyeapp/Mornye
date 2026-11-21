@@ -456,6 +456,11 @@ class LinkSoundProviderAccess implements LinkSoundSettingsAccess {
     if (value<bool>(LinkSoundSettingKeys.autoMixLowPass) case final low?) {
       notifier.setAutoMixLowPass(low);
     }
+    if (value<String>(LinkSoundSettingKeys.autoMixMatching) case final name?) {
+      for (final level in AutoMixMatching.values) {
+        if (level.name == name) notifier.setAutoMixMatching(level);
+      }
+    }
   }
 }
 

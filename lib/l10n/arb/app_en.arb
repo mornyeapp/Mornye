@@ -10113,6 +10113,16 @@
   "autoMixPitch": "Pitch (semitones)",
   "autoMixEcho": "Echo",
   "autoMixLowPass": "Muffled filter",
+  "autoMixMatching": "Beat matching",
+  "@autoMixMatching": {
+    "description": "AutoMix setting: how readily two songs are mixed on their beats instead of crossfaded"
+  },
+  "autoMixMatchingStandard": "Standard",
+  "autoMixMatchingStandardHint": "Only songs with a clear beat",
+  "autoMixMatchingMore": "More often",
+  "autoMixMatchingMoreHint": "Also songs with a less clear beat",
+  "autoMixMatchingMost": "Most often",
+  "autoMixMatchingMostHint": "As many songs as possible. A mix can sometimes sound off.",
   "autoMixMixing": "Mixing",
   "autoMixCrossfading": "Crossfade",
   "playbackAutomation": "Automatic playback",

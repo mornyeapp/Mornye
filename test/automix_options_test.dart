@@ -13,7 +13,9 @@ void main() {
         'autoMixEffect': 'unknown',
         'autoMixSpeed': -9,
         'autoMixPitch': 88,
+        'autoMixMatching': 'unknown',
       });
+      expect(restored.autoMixMatching, AutoMixMatching.standard);
       expect(restored.autoMixDuration, 60);
       expect(restored.autoMixEffect, AutoMixEffect.auto);
       expect(restored.autoMixSpeed, 0.8);
@@ -27,7 +29,9 @@ void main() {
         autoMixPitch: 2,
         autoMixEcho: true,
         autoMixLowPass: true,
+        autoMixMatching: AutoMixMatching.most,
       );
+      expect(selected.autoMixOptions.matching, AutoMixMatching.most);
       expect(
         AppSettings.fromJson(selected.toJson()).autoMixOptions,
         selected.autoMixOptions,

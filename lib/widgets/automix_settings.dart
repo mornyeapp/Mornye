@@ -69,6 +69,37 @@ class _AutoMixSettingsState extends ConsumerState<AutoMixSettings> {
     );
   }
 
+  void _showMatchingPicker(
+    BuildContext context,
+    AutoMixMatching current,
+    Map<AutoMixMatching, String> names,
+  ) {
+    final l10n = context.l10n;
+    showAppChoiceSheet<AutoMixMatching>(
+      context: context,
+      title: l10n.autoMixMatching,
+      selected: current,
+      choices: [
+        for (final matching in AutoMixMatching.values)
+          AppChoice(
+            matching,
+            switch (matching) {
+              AutoMixMatching.standard => Icons.looks_one_outlined,
+              AutoMixMatching.more => Icons.looks_two_outlined,
+              AutoMixMatching.most => Icons.looks_3_outlined,
+            },
+            names[matching]!,
+            subtitle: switch (matching) {
+              AutoMixMatching.standard => l10n.autoMixMatchingStandardHint,
+              AutoMixMatching.more => l10n.autoMixMatchingMoreHint,
+              AutoMixMatching.most => l10n.autoMixMatchingMostHint,
+            },
+          ),
+      ],
+      onSelected: ref.read(settingsProvider.notifier).setAutoMixMatching,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
@@ -82,6 +113,11 @@ class _AutoMixSettingsState extends ConsumerState<AutoMixSettings> {
       AutoMixEffect.echo: l10n.autoMixEffectEcho,
       AutoMixEffect.pitch: l10n.autoMixEffectPitch,
       AutoMixEffect.custom: l10n.autoMixEffectCustom,
+    };
+    final matchingNames = {
+      AutoMixMatching.standard: l10n.autoMixMatchingStandard,
+      AutoMixMatching.more: l10n.autoMixMatchingMore,
+      AutoMixMatching.most: l10n.autoMixMatchingMost,
     };
     Widget slider(
       String label,
@@ -146,6 +182,19 @@ class _AutoMixSettingsState extends ConsumerState<AutoMixSettings> {
               setState(() => _duration = null);
             },
           ),
+        // A Crossfade transition never mixes on the beat.
+        SettingsItem(
+          icon: Icons.join_inner,
+          title: l10n.autoMixMatching,
+          subtitle: matchingNames[settings.autoMixMatching],
+          onTap: enabled && settings.autoMixEffect != AutoMixEffect.crossfade
+              ? () => _showMatchingPicker(
+                  context,
+                  settings.autoMixMatching,
+                  matchingNames,
+                )
+              : null,
+        ),
         SettingsItem(
           icon: Icons.tune,
           title: l10n.autoMixEffect,

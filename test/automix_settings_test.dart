@@ -64,6 +64,51 @@ void main() {
     },
   );
 
+  testWidgets('beat matching saves the level and rests under Crossfade', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final container = ProviderContainer(
+      overrides: [
+        initialSettingsProvider.overrideWithValue(
+          const AppSettings(autoMix: true),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: SingleChildScrollView(child: AutoMixSettings())),
+        ),
+      ),
+    );
+    expect(find.text('Standard'), findsOneWidget);
+    await tester.tap(find.text('Beat matching'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppSheetOption), findsNWidgets(3));
+    await tester.tap(find.text('Most often'));
+    await tester.pumpAndSettle();
+    expect(
+      container.read(settingsProvider).autoMixMatching,
+      AutoMixMatching.most,
+    );
+    expect(find.byType(AppBottomSheet), findsNothing);
+    expect(find.text('Most often'), findsOneWidget);
+    // A Crossfade transition never mixes on the beat.
+    container
+        .read(settingsProvider.notifier)
+        .setAutoMixEffect(AutoMixEffect.crossfade);
+    await tester.pump();
+    await tester.tap(find.text('Beat matching'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppBottomSheet), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final mornye in [false, true]) {
     testWidgets(
       'effect picker follows app theme and saves selection ($mornye)',

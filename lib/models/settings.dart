@@ -209,6 +209,10 @@ class AppSettings {
   final bool autoMixEcho;
   final bool autoMixLowPass;
 
+  /// How readily AutoMix mixes two songs on their beats.
+  @JsonKey(unknownEnumValue: AutoMixMatching.standard)
+  final AutoMixMatching autoMixMatching;
+
   /// Playback speed for every song, from [minPlaybackSpeed] to
   /// [maxPlaybackSpeed]; 1 is normal.
   @JsonKey(fromJson: playbackSpeedFromJson)
@@ -229,6 +233,7 @@ class AppSettings {
     pitchSemitones: autoMixPitch,
     echo: autoMixEcho,
     lowPass: autoMixLowPass,
+    matching: autoMixMatching,
   );
   final bool discordRichPresenceEnabled;
   final bool usbBitPerfect;
@@ -574,6 +579,7 @@ class AppSettings {
     this.autoMixPitch = 0,
     this.autoMixEcho = false,
     this.autoMixLowPass = false,
+    this.autoMixMatching = AutoMixMatching.standard,
     this.playbackSpeed = 1,
     this.playbackKeepPitch = true,
     this.playbackPitch = 0,
@@ -777,6 +783,7 @@ class AppSettings {
     double? autoMixPitch,
     bool? autoMixEcho,
     bool? autoMixLowPass,
+    AutoMixMatching? autoMixMatching,
     double? playbackSpeed,
     bool? playbackKeepPitch,
     double? playbackPitch,
@@ -954,6 +961,7 @@ class AppSettings {
       autoMixPitch: autoMixPitch ?? this.autoMixPitch,
       autoMixEcho: autoMixEcho ?? this.autoMixEcho,
       autoMixLowPass: autoMixLowPass ?? this.autoMixLowPass,
+      autoMixMatching: autoMixMatching ?? this.autoMixMatching,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       playbackKeepPitch: playbackKeepPitch ?? this.playbackKeepPitch,
       playbackPitch: playbackPitch ?? this.playbackPitch,

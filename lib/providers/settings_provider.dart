@@ -691,6 +691,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setAutoMixLowPass(bool enabled) =>
       _commit(state.copyWith(autoMixLowPass: enabled));
 
+  void setAutoMixMatching(AutoMixMatching matching) =>
+      _commit(state.copyWith(autoMixMatching: matching));
+
   void setPlaybackSpeed(double speed) =>
       _commit(state.copyWith(playbackSpeed: playbackSpeedFromJson(speed)));
 

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:mornye/models/automix_options.dart';
 import 'package:mornye/services/audio_analysis_jobs.dart';
 import 'package:mornye/services/automix_analysis.dart';
 import 'package:mornye/services/ffmpeg_support.dart';
@@ -65,9 +66,11 @@ class AutoMixAnalyzer {
   /// Retry nearby windows only when the first grid is uncertain. Agreement
   /// with its tempo and phase is required before extrapolating back into the
   /// actual transition window, so a later tempo change cannot move its cue.
+  /// [matching] sets how uncertain the nearby window itself may be.
   Future<AutoMixBeatGrid?> analyzeTransition(
     String path, {
     double offset = 0,
+    AutoMixMatching matching = AutoMixMatching.standard,
   }) async {
     final generation = _generation;
     final first = await analyze(path, offset: offset);
@@ -84,7 +87,7 @@ class AutoMixAnalyzer {
       if (!attempted.add(nearby)) continue;
       final candidate = await analyze(path, offset: nearby);
       if (generation != _generation) return null;
-      if (candidate == null || !candidate.reliable) continue;
+      if (candidate == null || !candidate.confirms(matching)) continue;
       if ((candidate.bpm / first.bpm - 1).abs() > 0.02) continue;
       final phase = candidate.phase + nearby - offset;
       // Check both edges. A coincident first beat with a drifting tempo must
@@ -111,6 +114,7 @@ class AutoMixAnalyzer {
         phase: phase,
         confidence: candidate.confidence,
         firstSound: first.firstSound,
+        confirmed: true,
       );
     }
     return first;

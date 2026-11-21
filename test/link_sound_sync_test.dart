@@ -637,8 +637,8 @@ void main() {
             .setEnabled(true);
         await _eventually(() => phone.access.presets.containsKey('Desk'));
         expect(desk.access.presets.keys, unorderedEquals(['Phone', 'Desk']));
-        // One preset and the eight settings.
-        expect(client.posts.single['items'], hasLength(9));
+        // One preset and the nine settings.
+        expect(client.posts.single['items'], hasLength(10));
         expect(desk.container.read(_notified), greaterThan(0));
 
         // A desktop edit arrives after its notice.
@@ -779,6 +779,7 @@ void main() {
         setting(LinkSoundSettingKeys.autoMixPitch, -1.0),
         setting(LinkSoundSettingKeys.autoMixDuration, 12),
         setting(LinkSoundSettingKeys.autoMixLowPass, true),
+        setting(LinkSoundSettingKeys.autoMixMatching, 'more'),
       ]);
       final presets = container.read(equalizerProvider).presets;
       expect(presets.map((preset) => preset.name), ['Second', 'Third']);
@@ -791,6 +792,7 @@ void main() {
       expect(settings.autoMixPitch, -1);
       expect(settings.autoMixDuration, 12);
       expect(settings.autoMixLowPass, isTrue);
+      expect(settings.autoMixMatching, AutoMixMatching.more);
       // The curve playing now is not touched.
       expect(container.read(equalizerProvider).settings.gains, everyElement(0));
 

@@ -125,6 +125,66 @@ void main() {
     expect(late.incomingStart, Duration.zero);
   });
 
+  test('a looser matching level takes confirmed beats and a wider tempo', () {
+    AutoMixPlan at(
+      AutoMixMatching matching, {
+      double confidence = 0.9,
+      bool confirmed = false,
+      double to = 124,
+    }) => AutoMixPlan.create(
+      outgoingDuration: const Duration(seconds: 180),
+      incomingDuration: const Duration(seconds: 200),
+      outro: grid(120),
+      intro: AutoMixBeatGrid(
+        bpm: to,
+        phase: 0.17,
+        confidence: confidence,
+        firstSound: 0.1,
+        confirmed: confirmed,
+      ),
+      outroOffset: 156,
+      options: AutoMixOptions(matching: matching),
+    )!;
+    // A beat one window is sure of mixes at every level.
+    for (final matching in AutoMixMatching.values) {
+      expect(at(matching).beatMatched, isTrue);
+    }
+    // A less certain one needs a second window, and a level that takes it.
+    for (final (confidence, levels) in [
+      (0.45, [AutoMixMatching.more, AutoMixMatching.most]),
+      (0.32, [AutoMixMatching.most]),
+      (0.28, <AutoMixMatching>[]),
+    ]) {
+      for (final matching in AutoMixMatching.values) {
+        expect(
+          at(matching, confidence: confidence, confirmed: true).beatMatched,
+          levels.contains(matching),
+          reason: '$confidence at ${matching.name}',
+        );
+        expect(
+          at(matching, confidence: confidence).fallbackReason,
+          AutoMixFallbackReason.unreliableBeats,
+        );
+      }
+    }
+    // Slowing 131, 135 and 138 BPM to 120 changes them 8.4%, 11.1% and 13%.
+    for (final (to, levels) in [
+      (131.0, [AutoMixMatching.more, AutoMixMatching.most]),
+      (135.0, [AutoMixMatching.most]),
+      (138.0, <AutoMixMatching>[]),
+    ]) {
+      for (final matching in AutoMixMatching.values) {
+        expect(
+          at(matching, to: to).fallbackReason,
+          levels.contains(matching)
+              ? isNull
+              : AutoMixFallbackReason.incompatibleTempo,
+          reason: '$to at ${matching.name}',
+        );
+      }
+    }
+  });
+
   test('incompatible or uncertain beats use unstretched crossfade', () {
     for (final transition in [
       plan(120, 160),

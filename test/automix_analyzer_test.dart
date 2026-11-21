@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/models/automix_options.dart';
 import 'package:mornye/services/automix_analysis.dart';
 import 'package:mornye/services/automix_analyzer.dart';
 
@@ -56,6 +57,28 @@ void main() {
       analyzer.dispose();
     },
   );
+
+  test('the matching level sets how sure the nearby window must be', () async {
+    for (final (matching, recovers) in [
+      (AutoMixMatching.standard, false),
+      (AutoMixMatching.more, true),
+      (AutoMixMatching.most, true),
+    ]) {
+      final original = grid(0.35);
+      final analyzer = WindowAnalyzer()
+        ..windows.addAll({0: original, 6: grid(0.45), 12: grid(0.45)});
+      final result = await analyzer.analyzeTransition(
+        'track',
+        matching: matching,
+      );
+      expect(result!.reliableFor(matching), recovers, reason: matching.name);
+      expect(result.confirmed, recovers);
+      // Alone, neither window is sure enough.
+      expect(result.reliable, isFalse);
+      if (!recovers) expect(result, same(original));
+      analyzer.dispose();
+    }
+  });
 
   test(
     'different tempo or phase cannot lend confidence to the transition',

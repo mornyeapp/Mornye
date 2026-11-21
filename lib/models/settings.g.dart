@@ -65,6 +65,13 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       : autoMixPitchFromJson(json['autoMixPitch']),
   autoMixEcho: json['autoMixEcho'] as bool? ?? false,
   autoMixLowPass: json['autoMixLowPass'] as bool? ?? false,
+  autoMixMatching:
+      $enumDecodeNullable(
+        _$AutoMixMatchingEnumMap,
+        json['autoMixMatching'],
+        unknownValue: AutoMixMatching.standard,
+      ) ??
+      AutoMixMatching.standard,
   playbackSpeed: json['playbackSpeed'] == null
       ? 1
       : playbackSpeedFromJson(json['playbackSpeed']),
@@ -296,6 +303,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'autoMixPitch': instance.autoMixPitch,
   'autoMixEcho': instance.autoMixEcho,
   'autoMixLowPass': instance.autoMixLowPass,
+  'autoMixMatching': _$AutoMixMatchingEnumMap[instance.autoMixMatching]!,
   'playbackSpeed': instance.playbackSpeed,
   'playbackKeepPitch': instance.playbackKeepPitch,
   'playbackPitch': instance.playbackPitch,
@@ -442,4 +450,10 @@ const _$AutoMixEffectEnumMap = {
   AutoMixEffect.echo: 'echo',
   AutoMixEffect.pitch: 'pitch',
   AutoMixEffect.custom: 'custom',
+};
+
+const _$AutoMixMatchingEnumMap = {
+  AutoMixMatching.standard: 'standard',
+  AutoMixMatching.more: 'more',
+  AutoMixMatching.most: 'most',
 };

@@ -320,6 +320,7 @@ void setAutoMixOptions(AutoMixOptions options) => musicPlayerRuntime.configure(
     autoMixPitch: options.pitchSemitones,
     autoMixEcho: options.echo,
     autoMixLowPass: options.lowPass,
+    autoMixMatching: options.matching,
   ),
 );
 

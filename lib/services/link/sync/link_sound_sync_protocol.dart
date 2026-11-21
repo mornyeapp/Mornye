@@ -75,6 +75,7 @@ abstract final class LinkSoundSettingKeys {
   static const autoMixPitch = 'autoMixPitch';
   static const autoMixEcho = 'autoMixEcho';
   static const autoMixLowPass = 'autoMixLowPass';
+  static const autoMixMatching = 'autoMixMatching';
 
   static const all = {
     normalizationPreamp,
@@ -85,6 +86,7 @@ abstract final class LinkSoundSettingKeys {
     autoMixPitch,
     autoMixEcho,
     autoMixLowPass,
+    autoMixMatching,
   };
 }
 
@@ -109,6 +111,7 @@ Map<String, Object> linkSoundSettingValues(AppSettings settings) => {
   LinkSoundSettingKeys.autoMixPitch: settings.autoMixPitch,
   LinkSoundSettingKeys.autoMixEcho: settings.autoMixEcho,
   LinkSoundSettingKeys.autoMixLowPass: settings.autoMixLowPass,
+  LinkSoundSettingKeys.autoMixMatching: settings.autoMixMatching.name,
 };
 
 /// [value] for setting [key] as this app stores it, or null when it is not
@@ -130,6 +133,8 @@ Object? linkSoundSettingValue(String key, Object? value) => switch (key) {
   ),
   LinkSoundSettingKeys.autoMixEcho ||
   LinkSoundSettingKeys.autoMixLowPass when value is bool => value,
+  LinkSoundSettingKeys.autoMixMatching when value is String =>
+    AutoMixMatching.values.any((level) => level.name == value) ? value : null,
   _ => null,
 };
 
