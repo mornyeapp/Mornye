@@ -74,7 +74,9 @@ void main() {
           expect(find.text('Edit Metadata'), findsNothing);
           expect(find.text('Save Cover Art'), findsNothing);
           expect(find.text('Save Lyrics (.lrc)'), findsNothing);
+          expect(find.text('Re-download'), findsNothing);
         } else {
+          expect(find.text('Re-download'), findsWidgets);
           expect(find.text('Delete'), findsWidgets);
           expect(find.text('Edit Metadata'), findsWidgets);
           // The sidecar saves write beside the song on the NAS.

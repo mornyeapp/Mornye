@@ -757,6 +757,9 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
     String? qualityOverride,
     String? playlistName,
     int? playlistPosition,
+
+    /// Saves beside an existing file of the same name instead of skipping.
+    bool keepBoth = false,
   }) {
     final settings = ref.read(settingsProvider);
     updateSettings(settings);
@@ -771,7 +774,7 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
       qualityOverride: qualityOverride,
       playlistName: playlistName,
       playlistPosition: playlistPosition,
-      preserveQualityVariant: settings.allowQualityVariants,
+      preserveQualityVariant: keepBoth || settings.allowQualityVariants,
       networkDownloadFolder: settings.networkDownloadFolder,
     );
 

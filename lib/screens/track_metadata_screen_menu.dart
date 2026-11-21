@@ -46,6 +46,16 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
             else if (downloadItem != null)
               UnifiedLibraryItem.fromDownloadHistory(downloadItem),
           ]);
+    final redownloadSource = _redownloadSource;
+    // The new file goes to the download folder, so a missing file qualifies.
+    final canRedownload =
+        _canSaveSidecarFiles &&
+        !remoteFile &&
+        !LocalTrackRedownloadService.isQueued(
+          redownloadSource,
+          ref.read(downloadQueueProvider).items,
+          sourceTrackId: _spotifyId,
+        );
     final uploadItems = [
       if (_fileExists && !_isNetworkItem)
         if (localItem != null)
@@ -121,6 +131,12 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         dividerAbove: _fileExists,
         onTap: () => _copyToClipboard(screenContext, cleanFilePath),
       ),
+      _MetadataOption(
+        icon: Icons.copy_all_rounded,
+        label: l10n.trackOptionCopyTrackAndArtist,
+        onTap: () =>
+            _copyToClipboard(screenContext, '$trackName - $artistName'),
+      ),
       if (_canEditMetadataFile)
         _MetadataOption(
           icon: Icons.edit_outlined,
@@ -161,6 +177,17 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
           icon: Icons.undo,
           label: l10n.trackReEnrichUndo,
           onTap: _undoReEnrich,
+        ),
+      if (canRedownload)
+        _MetadataOption(
+          icon: Icons.download_outlined,
+          label: l10n.trackRedownload,
+          onTap: () => redownloadTrack(
+            screenContext,
+            ref,
+            redownloadSource,
+            sourceTrackId: _spotifyId,
+          ),
         ),
       if (canEditFile && _isConvertibleFormat)
         _MetadataOption(
@@ -433,6 +460,23 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
       groups: groups,
     );
   }
+
+  /// The song as Re-download searches for it, with the tags the page read.
+  LocalLibraryItem get _redownloadSource => LocalLibraryItem(
+    id: _itemId,
+    trackName: trackName,
+    artistName: artistName,
+    albumName: albumName,
+    albumArtist: albumArtist,
+    filePath: cleanFilePath,
+    scannedAt: _addedAt,
+    isrc: isrc,
+    trackNumber: trackNumber,
+    discNumber: discNumber,
+    duration: duration,
+    releaseDate: releaseDate,
+    format: _storedAudioFormat,
+  );
 
   Widget _buildOptionsHeaderCover(ColorScheme colorScheme) {
     const size = 56.0;

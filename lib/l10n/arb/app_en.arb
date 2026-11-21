@@ -4376,6 +4376,22 @@
   "@trackReEnrich": {
     "description": "Menu action - re-embed metadata into audio file"
   },
+  "trackRedownload": "Re-download",
+  "@trackRedownload": {
+    "description": "Track details menu action and dialog title: find the song online again from its metadata and queue a new download"
+  },
+  "trackRedownloadConfirmMessage": "Finds this song online and downloads it again with your download settings.\n\nThe current file is kept. The new one is saved in your download folder.\n\nOnly a confident match is queued.",
+  "@trackRedownloadConfirmMessage": {
+    "description": "Confirmation dialog body before re-downloading one song from track details"
+  },
+  "trackRedownloadNoMatch": "No reliable online match found for this song",
+  "@trackRedownloadNoMatch": {
+    "description": "Snackbar when re-download found no high-confidence online match"
+  },
+  "trackRedownloadAlreadyQueued": "This song is already in the download queue",
+  "@trackRedownloadAlreadyQueued": {
+    "description": "Snackbar when re-download finds the song already waiting in the download queue"
+  },
   "trackReEnrichBatchSubtitle": "Choose an online or manual update, then review every change before writing",
   "@trackReEnrichBatchSubtitle": {
     "description": "Subtitle for batch metadata update choices"

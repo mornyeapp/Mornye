@@ -199,6 +199,8 @@ void main() {
         // The same words as the actions on this phone's songs.
         expect(find.text(label), findsOneWidget);
       }
+      // A download would land on this phone, not beside the computer's file.
+      expect(find.text('Re-download'), findsNothing);
       expect(find.textContaining('on Studio PC'), findsNothing);
       expect(client.posts, isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());

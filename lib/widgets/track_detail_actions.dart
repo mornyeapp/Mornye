@@ -28,6 +28,9 @@ void downloadSingleTrack(
   String? playlistName,
   int? playlistPosition,
   bool forceQualityPicker = false,
+
+  /// Saves beside an existing file of the same name instead of skipping.
+  bool keepBoth = false,
 }) {
   final settings = ref.read(settingsProvider);
 
@@ -54,6 +57,7 @@ void downloadSingleTrack(
               qualityOverride: quality,
               playlistName: playlistName,
               playlistPosition: playlistPosition,
+              keepBoth: keepBoth,
             );
         notifyQueued();
       },
@@ -78,6 +82,7 @@ void downloadSingleTrack(
           service,
           playlistName: playlistName,
           playlistPosition: playlistPosition,
+          keepBoth: keepBoth,
         );
     notifyQueued();
   }

@@ -116,6 +116,8 @@ import 'package:mornye/controllers/batch_track_actions.dart'
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart'
     show BatchReEnrichRunner;
+import 'package:mornye/controllers/track_redownload.dart';
+import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/services/re_enrich_undo.dart'
     show ReEnrichUndo, ReEnrichUndoOutcome;
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';

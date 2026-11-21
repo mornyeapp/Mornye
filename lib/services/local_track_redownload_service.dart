@@ -1,3 +1,4 @@
+import 'package:mornye/models/download_item.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/models/extension.dart';
@@ -10,6 +11,17 @@ class LocalTrackRedownloadResolution {
   const LocalTrackRedownloadResolution({required this.match});
 
   bool get canQueue => match != null;
+}
+
+enum TrackRedownloadStatus { matched, noMatch, alreadyQueued, noService }
+
+/// What a single-song re-download found: the match and the service to use.
+class TrackRedownloadPlan {
+  final TrackRedownloadStatus status;
+  final Track? match;
+  final String service;
+
+  const TrackRedownloadPlan(this.status, {this.match, this.service = ''});
 }
 
 class LocalTrackRedownloadService {
@@ -74,6 +86,87 @@ class LocalTrackRedownloadService {
     return LocalTrackRedownloadResolution(match: best.track);
   }
 
+  /// Finds [item] online again for the default download service. The file
+  /// itself is never touched; [resolve] keeps the confidence threshold.
+  static Future<TrackRedownloadPlan> planRedownload(
+    LocalLibraryItem item, {
+    required AppSettings settings,
+    required ExtensionState extensionState,
+    Iterable<DownloadItem> queue = const [],
+    String? sourceTrackId,
+    Future<LocalTrackRedownloadResolution> Function(
+          LocalLibraryItem item, {
+          required bool includeExtensions,
+        })
+        resolve =
+        resolveBestMatch,
+  }) async {
+    final service = resolveEffectiveDownloadService(
+      settings.defaultService,
+      extensionState,
+    );
+    if (service.isEmpty) {
+      return const TrackRedownloadPlan(TrackRedownloadStatus.noService);
+    }
+    if (isQueued(item, queue, sourceTrackId: sourceTrackId)) {
+      return const TrackRedownloadPlan(TrackRedownloadStatus.alreadyQueued);
+    }
+    final includeExtensions =
+        settings.useExtensionProviders &&
+        extensionState.extensions.any(
+          (ext) => ext.enabled && ext.hasMetadataProvider,
+        );
+    final match = (await resolve(
+      item,
+      includeExtensions: includeExtensions,
+    )).match;
+    if (match == null) {
+      return const TrackRedownloadPlan(TrackRedownloadStatus.noMatch);
+    }
+    if (queue.any(
+      (queued) => _isUnfinished(queued) && queued.track.id == match.id,
+    )) {
+      return const TrackRedownloadPlan(TrackRedownloadStatus.alreadyQueued);
+    }
+    return TrackRedownloadPlan(
+      TrackRedownloadStatus.matched,
+      match: match,
+      service: service,
+    );
+  }
+
+  /// Whether [queue] still has to download [item], found by the download's
+  /// track id, its ISRC, or its title and artist.
+  static bool isQueued(
+    LocalLibraryItem item,
+    Iterable<DownloadItem> queue, {
+    String? sourceTrackId,
+  }) {
+    final trackId = sourceTrackId?.trim() ?? '';
+    final isrc = _normalizedIsrc(item.isrc);
+    final title = _normalizedTitle(item.trackName);
+    final artist = _normalizedArtistGroup(item.artistName);
+    for (final queued in queue) {
+      if (!_isUnfinished(queued)) continue;
+      final track = queued.track;
+      if (trackId.isNotEmpty && track.id == trackId) return true;
+      if (isrc != null && isrc == _normalizedIsrc(track.isrc)) return true;
+      if (_hasText(title) &&
+          title == _normalizedTitle(track.name) &&
+          artist == _normalizedArtistGroup(track.artistName)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static bool _isUnfinished(DownloadItem item) => switch (item.status) {
+    DownloadStatus.queued ||
+    DownloadStatus.downloading ||
+    DownloadStatus.finalizing => true,
+    _ => false,
+  };
+
   static String preferredFlacService(
     AppSettings settings,
     ExtensionState extensionState,
@@ -117,23 +210,28 @@ class LocalTrackRedownloadService {
 
     final localTitle = _normalizedTitle(item.trackName);
     final candidateTitle = _normalizedTitle(track.name);
-    if (localTitle == candidateTitle) {
-      score += 45;
-    } else if (_tokenOverlap(localTitle, candidateTitle) >= 0.75) {
-      score += 24;
-    } else {
-      score -= 25;
+    // Two values of only symbols are no evidence, never a match.
+    if (_hasText(localTitle) || _hasText(candidateTitle)) {
+      if (localTitle == candidateTitle) {
+        score += 45;
+      } else if (_tokenOverlap(localTitle, candidateTitle) >= 0.75) {
+        score += 24;
+      } else {
+        score -= 25;
+      }
     }
 
     final localArtist = _normalizedArtistGroup(item.artistName);
     final candidateArtist = _normalizedArtistGroup(track.artistName);
-    final artistOverlap = _tokenOverlap(localArtist, candidateArtist);
-    if (localArtist == candidateArtist) {
-      score += 30;
-    } else if (artistOverlap >= 0.6) {
-      score += 16;
-    } else {
-      score -= 20;
+    if (_hasText(localArtist) || _hasText(candidateArtist)) {
+      final artistOverlap = _tokenOverlap(localArtist, candidateArtist);
+      if (localArtist == candidateArtist) {
+        score += 30;
+      } else if (artistOverlap >= 0.6) {
+        score += 16;
+      } else {
+        score -= 20;
+      }
     }
 
     final localAlbum = _normalizedText(item.albumName);
@@ -216,14 +314,23 @@ class LocalTrackRedownloadService {
     return parts.isEmpty ? value.trim() : parts.first;
   }
 
+  // Letters and digits of any script count, so non-Latin tags compare.
+  static final _nonTextPattern = RegExp(
+    r'[^\p{L}\p{M}\p{N}, ]+',
+    unicode: true,
+  );
+
   static String _normalizedText(String value) {
     return value
         .toLowerCase()
         .replaceAll(RegExp(r'[\(\)\[\]\{\}]'), ' ')
-        .replaceAll(RegExp(r'[^a-z0-9, ]+'), ' ')
+        .replaceAll(_nonTextPattern, ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
   }
+
+  static bool _hasText(String normalized) =>
+      normalized.replaceAll(RegExp(r'[\s,]'), '').isNotEmpty;
 
   static double _tokenOverlap(String left, String right) {
     final leftTokens = left

@@ -9,7 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/l10n/l10n.dart';
-import 'package:mornye/providers/download_history_provider.dart';
+import 'package:mornye/models/download_item.dart';
+import 'package:mornye/models/track.dart';
+import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/screens/track_metadata_edit_sheet.dart';
@@ -171,6 +173,8 @@ void main() {
         // desktop backend library is absent under flutter test.
         expect(find.text('Copy file path'), findsOneWidget);
         expect(find.text('Go to Artist'), findsOneWidget);
+        expect(find.text('Copy track and artist'), findsOneWidget);
+        expect(find.text('Re-download'), findsOneWidget);
         if (desktop) {
           final menu = find.byType(M3EMenuPopup<int>);
           expect(menu, findsOneWidget);
@@ -188,4 +192,76 @@ void main() {
       },
     );
   }
+
+  testWidgets('a song waiting in the download queue offers no Re-download', (
+    tester,
+  ) async {
+    debugDesktopPlatformOverride = false;
+    tester.view.physicalSize = const Size(900, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    String? copied;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          extensionProvider.overrideWith(_Extensions.new),
+          downloadQueueProvider.overrideWith(_WaitingQueue.new),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: TrackMetadataScreen(
+            item: DownloadHistoryItem(
+              id: 'local-song',
+              trackName: 'Song',
+              artistName: 'Artist',
+              albumName: 'Album',
+              filePath: 'content://library/document/song.flac',
+              service: 'example-provider',
+              downloadedAt: DateTime(2026),
+              format: 'flac',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(findAppIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    expect(find.text('Re-download'), findsNothing);
+    await tester.ensureVisible(find.text('Copy track and artist'));
+    await tester.tap(find.text('Copy track and artist'));
+    await tester.pumpAndSettle();
+    expect(copied, 'Song - Artist');
+  });
+}
+
+class _WaitingQueue extends DownloadQueueNotifier {
+  @override
+  DownloadQueueState build() => DownloadQueueState(
+    items: [
+      DownloadItem(
+        id: 'waiting',
+        track: const Track(
+          id: 'catalog:1',
+          name: 'Song',
+          artistName: 'Artist',
+          albumName: 'Album',
+          duration: 240,
+        ),
+        service: 'example-provider',
+        createdAt: DateTime(2026),
+      ),
+    ],
+  );
 }
