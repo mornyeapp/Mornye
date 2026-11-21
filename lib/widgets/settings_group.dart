@@ -10,7 +10,6 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_switch.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
-import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 
@@ -477,7 +476,9 @@ class SettingsItem extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             splashColor: colorScheme.primary.withValues(alpha: 0.12),
-            highlightColor: Colors.transparent,
+            highlightColor: context.isMornye
+                ? MornyeTheme.controlFill(context)
+                : Colors.transparent,
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: context.tokens.rowPaddingH,
@@ -614,7 +615,9 @@ class SettingsSwitchItem extends StatelessWidget {
             child: InkWell(
               onTap: isDisabled ? null : () => onChanged!(!value),
               splashColor: colorScheme.primary.withValues(alpha: 0.12),
-              highlightColor: Colors.transparent,
+              highlightColor: context.isMornye
+                  ? MornyeTheme.controlFill(context)
+                  : Colors.transparent,
               child: Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: context.tokens.rowPaddingH,
@@ -1061,8 +1064,8 @@ class SettingsInfoCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (icon != null) ...[
-            AppIcon(
-              useGlass ? mornyeIconFor(icon!) : icon,
+            AppIcon.adaptive(
+              icon!,
               size: 20,
               color: useGlass ? colorScheme.primary : foreground,
             ),

@@ -11,6 +11,7 @@ import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/mornye_glass_press.dart';
 
 /// Deliberate vertical drags minimize the chrome until the page returns to its
 /// top. Horizontal rows, programmatic scrolling and bounce must not minimize it.
@@ -323,57 +324,60 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
                   ignoring: amount < 0.5,
                   child: ExcludeSemantics(
                     excluding: amount < 0.5,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Positioned.fill(
-                          child: Offstage(
-                            // The tab bar's own glass becomes the leading
-                            // circle and hands over only once it is one.
-                            offstage: leading ? amount < 1 : amount == 0,
-                            child: Transform(
-                              alignment: Alignment.center,
-                              transform: drop,
-                              transformHitTests: false,
-                              // While folding, a capsule crosses the tab bar
-                              // and needs a backdrop sample of its own.
-                              child: amount == 1
-                                  ? surface
-                                  : LiquidGlassBatch(child: surface),
+                    child: MornyeGlassPress(
+                      radius: size / 2,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned.fill(
+                            child: Offstage(
+                              // The tab bar's own glass becomes the leading
+                              // circle and hands over only once it is one.
+                              offstage: leading ? amount < 1 : amount == 0,
+                              child: Transform(
+                                alignment: Alignment.center,
+                                transform: drop,
+                                transformHitTests: false,
+                                // While folding, a capsule crosses the tab bar
+                                // and needs a backdrop sample of its own.
+                                child: amount == 1
+                                    ? surface
+                                    : LiquidGlassBatch(child: surface),
+                              ),
                             ),
                           ),
-                        ),
-                        Material(
-                          color: Colors.transparent,
-                          child: IconButton(
-                            key: ValueKey(
-                              leading
-                                  ? 'mornye-compact-leading'
-                                  : 'mornye-compact-search',
+                          Material(
+                            color: Colors.transparent,
+                            child: IconButton(
+                              key: ValueKey(
+                                leading
+                                    ? 'mornye-compact-leading'
+                                    : 'mornye-compact-search',
+                              ),
+                              tooltip: leading
+                                  ? destinations[leadingIndex].label
+                                  : context.l10n.mornyeSearch,
+                              iconSize: 25,
+                              constraints: BoxConstraints.tightFor(
+                                width: size,
+                                height: size,
+                              ),
+                              color: index == selectedIndex
+                                  ? scheme.primary
+                                  : inactiveIconColor,
+                              icon: Opacity(
+                                opacity: amount == 0 ? 0 : 1,
+                                child: destinations[index].icon,
+                              ),
+                              onPressed: leading
+                                  ? leadingIndex == 0
+                                        ? onHome
+                                        : () => onSelected(leadingIndex)
+                                  : onSearch,
                             ),
-                            tooltip: leading
-                                ? destinations[leadingIndex].label
-                                : context.l10n.mornyeSearch,
-                            iconSize: 25,
-                            constraints: BoxConstraints.tightFor(
-                              width: size,
-                              height: size,
-                            ),
-                            color: index == selectedIndex
-                                ? scheme.primary
-                                : inactiveIconColor,
-                            icon: Opacity(
-                              opacity: amount == 0 ? 0 : 1,
-                              child: destinations[index].icon,
-                            ),
-                            onPressed: leading
-                                ? leadingIndex == 0
-                                      ? onHome
-                                      : () => onSelected(leadingIndex)
-                                : onSearch,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

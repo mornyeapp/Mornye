@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
@@ -21,6 +20,7 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart'
     show desktopWindowFullScreen;
 import 'package:mornye/widgets/lyrics_options_button.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
 import 'package:mornye/widgets/mornye_player_queue.dart';
 import 'package:mornye/widgets/player_lyrics_section.dart';
@@ -143,11 +143,6 @@ class DesktopInspector extends ConsumerWidget {
   final DesktopInspectorPanel panel;
   final bool overlay;
 
-  static final _overlayBackdropBlur = ui.ImageFilter.blur(
-    sigmaX: 60,
-    sigmaY: 60,
-  );
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mornye = context.isMornye;
@@ -235,32 +230,27 @@ class DesktopInspector extends ConsumerWidget {
         brightness: Brightness.dark,
       );
       final blur = ref.watch(mornyeBlurEnabledProvider);
+      final overlayContent = Material(
+        type: MaterialType.transparency,
+        child: Builder(builder: content),
+      );
       panelSurface = Theme(
         data: theme,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // The floating panel samples the content beneath it; the full
-            // screen panel keeps the artwork backdrop.
-            if (overlay) ...[
-              if (blur)
-                BackdropFilter(
-                  filter: _overlayBackdropBlur,
-                  child: const SizedBox.expand(),
-                ),
-              ColoredBox(
-                color: const Color(
-                  0xff363636,
-                ).withValues(alpha: blur ? 0.74 : 0.97),
+        child: overlay
+            ? MornyeGlassPanel.overlay(
+                radius: 0,
+                blurEnabled: blur,
+                tintColor: const Color(0xff363636),
+                tintOpacity: blur ? 0.74 : 0.97,
+                child: overlayContent,
+              )
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  MornyePlayerBackground(artUri: mediaItem?.artUri),
+                  overlayContent,
+                ],
               ),
-            ] else
-              MornyePlayerBackground(artUri: mediaItem?.artUri),
-            Material(
-              type: MaterialType.transparency,
-              child: Builder(builder: content),
-            ),
-          ],
-        ),
       );
     } else {
       final colorScheme = Theme.of(context).colorScheme;
@@ -291,8 +281,9 @@ class DesktopInspector extends ConsumerWidget {
                       ? BorderSide(color: Colors.white.withValues(alpha: 0.1))
                       : divider,
                 ),
-          // The shadow falls toward the content the pane floats over.
-          boxShadow: overlay
+          // The shadow falls toward the content the Mornye glass pane floats
+          // over; Material relies on its container tier.
+          boxShadow: overlay && mornye
               ? [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.18),

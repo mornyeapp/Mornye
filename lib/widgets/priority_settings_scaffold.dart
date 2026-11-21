@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/expressive_button.dart';
@@ -44,66 +46,68 @@ class PrioritySettingsScaffold extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final wideInset = wideListInset(context);
 
-    return PopScope(
-      canPop: !hasChanges,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        final shouldPop = await onConfirmDiscard(context);
-        if (shouldPop && context.mounted) {
-          Navigator.pop(context);
-        }
-      },
-      child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            AppSliverHeader.page(
-              title: title,
-              leading: AppIconButton(
-                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => _handleBack(context),
-              ),
-              actions: [
-                if (hasChanges)
-                  ExpressiveButton(
-                    text: true,
-                    onPressed: onSave,
-                    child: Text(context.l10n.dialogSave),
-                  ),
-              ],
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: descriptionPadding.add(
-                  EdgeInsets.symmetric(horizontal: wideInset),
+    return MornyeSettingsTheme(
+      child: PopScope(
+        canPop: !hasChanges,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop) return;
+          final shouldPop = await onConfirmDiscard(context);
+          if (shouldPop && context.mounted) {
+            Navigator.pop(context);
+          }
+        },
+        child: Scaffold(
+          body: CustomScrollView(
+            slivers: [
+              AppSliverHeader.page(
+                title: title,
+                leading: AppIconButton(
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => _handleBack(context),
                 ),
-                child: Text(
-                  description,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
+                actions: [
+                  if (hasChanges)
+                    ExpressiveButton(
+                      text: true,
+                      onPressed: onSave,
+                      child: Text(context.l10n.dialogSave),
+                    ),
+                ],
               ),
-            ),
-            ...slivers,
-            if (infoText case final infoText?)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16 + wideInset,
-                    16,
-                    16 + wideInset,
-                    16,
+                  padding: descriptionPadding.add(
+                    EdgeInsets.symmetric(horizontal: wideInset),
                   ),
-                  child: SettingsInfoCard(
-                    icon: Icons.info_outline,
-                    message: infoText,
-                    margin: EdgeInsets.zero,
+                  child: Text(
+                    description,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
-          ],
+              ...slivers,
+              if (infoText case final infoText?)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      16 + wideInset,
+                      16,
+                      16 + wideInset,
+                      16,
+                    ),
+                    child: SettingsInfoCard(
+                      icon: Icons.info_outline,
+                      message: infoText,
+                      margin: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+              const NavBarSliverSpacer(),
+            ],
+          ),
         ),
       ),
     );

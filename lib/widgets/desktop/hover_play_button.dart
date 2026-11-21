@@ -184,11 +184,14 @@ class _DesktopCoverHoverState extends State<DesktopCoverHover> {
   Widget _playButton(BuildContext context, bool visible) {
     final colorScheme = Theme.of(context).colorScheme;
     final mornye = context.isMornye;
-    // Mornye uses a light disc; Material uses its primary FAB colors.
+    // Mornye emphasizes primary actions with accent color; Material uses its
+    // primary container.
     final background = mornye
-        ? Colors.white.withValues(alpha: 0.92)
+        ? colorScheme.primary
         : colorScheme.primaryContainer;
-    final foreground = mornye ? Colors.black : colorScheme.onPrimaryContainer;
+    final foreground = mornye
+        ? colorScheme.onPrimary
+        : colorScheme.onPrimaryContainer;
     final diameter = mornye
         ? DesktopCoverHover._mornyeDiameter
         : DesktopCoverHover._diameter;

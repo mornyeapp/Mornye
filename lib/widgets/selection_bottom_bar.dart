@@ -240,10 +240,13 @@ class _AnimatedSelectionBottomBarState extends State<AnimatedSelectionBottomBar>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SlideTransition(position: _slideAnimation, child: widget.child),
+    final slide = SlideTransition(
+      position: _slideAnimation,
+      child: widget.child,
     );
+    // An opacity layer isolates Mornye's glass BackdropFilter during entrance.
+    if (context.isMornye) return slide;
+    return FadeTransition(opacity: _fadeAnimation, child: slide);
   }
 }
 
@@ -373,7 +376,23 @@ class SelectionBottomBar extends StatelessWidget {
     const floatingMargin = 12.0;
     Widget surface(Widget content) {
       if (context.isMornye) {
-        return MornyeGlassPanel.overlay(child: content);
+        final glass = MornyeGlassPanel.overlay(
+          child: MediaQuery.removePadding(
+            context: context,
+            removeBottom: !isDesktopPlatform,
+            child: content,
+          ),
+        );
+        if (isDesktopPlatform) return glass;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            floatingMargin,
+            0,
+            floatingMargin,
+            floatingMargin + MediaQuery.viewPaddingOf(context).bottom,
+          ),
+          child: glass,
+        );
       }
       final toolbar = Material(
         color: colorScheme.surfaceContainerHigh,
@@ -431,7 +450,7 @@ class SelectionBottomBar extends StatelessWidget {
         onClose: onClose,
         header: header,
         bottomPadding: bottomPadding,
-        floatingMargin: context.isMornye ? 0 : floatingMargin,
+        floatingMargin: floatingMargin,
         surfaceBuilder: surface,
         children: children,
       );

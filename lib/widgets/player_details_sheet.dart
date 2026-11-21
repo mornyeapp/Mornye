@@ -2,7 +2,6 @@ import 'package:audio_service/audio_service.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
-import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -46,30 +45,16 @@ Future<void> showPlayerDetailsSheet(
     );
   }
   // The Mornye details draw their own glass, handle and header.
-  if (isDesktopPlatform) {
-    return showAppSheetDialog<void>(
-      context: context,
-      isScrollControlled: true,
-      mornyeGlass: false,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 1,
-        minChildSize: 1,
-        builder: (context, scrollController) => details(scrollController),
-      ),
-    );
-  }
-  return showModalBottomSheet<void>(
+  return showAppModalBottomSheet<void>(
     context: context,
-    sheetAnimationStyle: AppMotion.surfaceEntrance(context),
     isScrollControlled: true,
     useRootNavigator: true,
-    backgroundColor: Colors.transparent,
+    mornyeGlass: false,
     builder: (context) => DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.75,
-      maxChildSize: 0.9,
-      minChildSize: 0.4,
+      initialChildSize: isDesktopPlatform ? 1 : 0.75,
+      maxChildSize: isDesktopPlatform ? 1 : 0.9,
+      minChildSize: isDesktopPlatform ? 1 : 0.4,
       builder: (context, scrollController) => details(scrollController),
     ),
   );
