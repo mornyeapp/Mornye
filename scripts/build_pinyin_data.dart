@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-/// Builds `assets/romanization/pinyin.txt.gz`, the data of offline Hanyu
-/// Pinyin for lyrics:
+/// Builds `assets/romanization/pinyin.bin`, the gzipped data of offline Hanyu
+/// Pinyin for lyrics. The name must not end in `.gz`: the Android build
+/// unpacks such assets and drops the extension, so the app cannot find them.
+/// It holds:
 ///
 /// - one reading for each character, the first `kMandarin` value of the
 ///   Unicode Han Database (Unihan, Unicode License v3), with the overrides
@@ -25,7 +27,7 @@ import 'dart:typed_data';
 /// https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip and
 /// https://github.com/mozillazg/phrase-pinyin-data/blob/master/pinyin.txt
 Future<void> main(List<String> args) async {
-  const outputPath = 'assets/romanization/pinyin.txt.gz';
+  const outputPath = 'assets/romanization/pinyin.bin';
   if (args.length == 1 && args[0] == '--repack') {
     final existing = File(outputPath);
     final raw = gzip.decode(existing.readAsBytesSync());

@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 /// Hanyu Pinyin with tone marks, one syllable per character, read from
-/// `assets/romanization/pinyin.txt.gz` (see `scripts/build_pinyin_data.dart`):
+/// `assets/romanization/pinyin.bin` (see `scripts/build_pinyin_data.dart`):
 /// each character's usual reading, and the phrases in which a character
 /// reads otherwise, matched longest first.
 class PinyinData {

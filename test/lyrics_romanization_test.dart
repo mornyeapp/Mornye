@@ -11,9 +11,7 @@ import 'package:mornye/utils/lyrics_parser.dart';
 
 // Every sample line below was written for these tests.
 
-final _pinyin = PinyinData.decode(
-  File('assets/romanization/pinyin.txt.gz').readAsBytesSync(),
-);
+final _pinyin = PinyinData.decode(File(pinyinDataAsset).readAsBytesSync());
 
 /// Each line of [song] romanized with what the whole song tells.
 List<String?> _romanize(List<String> song, {PinyinData? pinyin}) {

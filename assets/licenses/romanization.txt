@@ -1,5 +1,5 @@
 Offline lyrics romanization uses the data below, in
-assets/romanization/pinyin.txt.gz (built by scripts/build_pinyin_data.dart).
+assets/romanization/pinyin.bin (built by scripts/build_pinyin_data.dart).
 
 Unicode Han Database (Unihan), Unicode 18.0.0: the kMandarin readings and
 the kSimplifiedVariant mappings.
