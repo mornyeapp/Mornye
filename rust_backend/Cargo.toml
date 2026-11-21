@@ -120,3 +120,8 @@ opt-level = 3
 
 [profile.release.package.png]
 opt-level = 3
+
+# The JavaScript engine of extensions runs 17 percent slower at "s". Costs
+# 0.33 MB on Android.
+[profile.release.package.rquickjs-sys]
+opt-level = 3

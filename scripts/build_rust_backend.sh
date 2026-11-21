@@ -175,8 +175,9 @@ if [[ "$PLATFORM" == "android" ]]; then
   done
 
   rustup target add "${ANDROID_TARGETS[@]}"
-  export CFLAGS_aarch64_linux_android="${CFLAGS_aarch64_linux_android:-} -Os -fvisibility=hidden -ffunction-sections -fdata-sections"
-  export CFLAGS_armv7_linux_androideabi="${CFLAGS_armv7_linux_androideabi:-} -Os -fvisibility=hidden -ffunction-sections -fdata-sections"
+  # No -O flag here: C code takes its level from the Cargo profile of its crate.
+  export CFLAGS_aarch64_linux_android="${CFLAGS_aarch64_linux_android:-} -fvisibility=hidden -ffunction-sections -fdata-sections"
+  export CFLAGS_armv7_linux_androideabi="${CFLAGS_armv7_linux_androideabi:-} -fvisibility=hidden -ffunction-sections -fdata-sections"
   # Align ELF segments for 16 KB pages, pack relocations (Android API 23+),
   # and fold identical functions whose addresses are not significant.
   # Keep APS2 rather than RELR, which requires API 28; our minimum is API 24.
