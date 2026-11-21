@@ -118,6 +118,7 @@ import 'package:mornye/widgets/view_queue_snackbar_action.dart';
 import 'package:mornye/widgets/profile_avatar.dart';
 import 'package:mornye/widgets/downloadable_cover.dart';
 import 'package:mornye/widgets/app_crash_banner.dart';
+import 'package:mornye/widgets/search_moved_hint.dart';
 
 export 'package:mornye/screens/extension_collection_screens.dart';
 
@@ -1544,12 +1545,20 @@ class _HomeTabState extends ConsumerState<HomeTab>
     // in the content area.
     if (context.isMornye) return const SizedBox.shrink();
 
-    // The header carries the greeting; prompts take turns beneath it.
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24 + homeContentInset(context)),
-      child: const Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: _HomeTagline(),
+    // The header carries the greeting; prompts take turns beneath it. The
+    // search field sat here before Search had its own tab, so a tap here
+    // points at that tab.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: SearchMovedHint.request,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: 24 + homeContentInset(context),
+        ),
+        child: const Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: _HomeTagline(),
+        ),
       ),
     );
   }

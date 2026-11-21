@@ -8080,6 +8080,7 @@
     "description": "Metadata menu action that copies the selected key and value"
   },
   "mornyeSearch": "Telusuri",
+  "searchMovedHint": "Pencarian sekarang ada di sini",
   "mornyeContinuePlaying": "Lanjut Memutar",
   "metadataCopyAll": "Salin semua metadata",
   "@metadataCopyAll": {

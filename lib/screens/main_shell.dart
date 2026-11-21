@@ -63,6 +63,7 @@ import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
+import 'package:mornye/widgets/search_moved_hint.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_link_transfer_actions.dart';
@@ -1353,7 +1354,8 @@ class _MainShellState extends ConsumerState<MainShell>
         )
       else ...[
         NavigationDestination(
-          icon: const AppIcon(Icons.search),
+          // Home's search field moved here; a tap where it was points here.
+          icon: const SearchMovedHintAnchor(child: AppIcon(Icons.search)),
           selectedIcon: BouncingIcon(child: const AppIcon(Icons.search)),
           label: l10n.mornyeSearch,
         ),
