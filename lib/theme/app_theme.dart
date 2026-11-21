@@ -11,7 +11,7 @@ class AppTheme {
   /// Shared surfaces use one radius scale; actions use round Material shapes.
   static const AppTokens _tokens = AppTokens.standard;
 
-  /// The bundled variable face; its wght, wdth and ROND axes stay variable.
+  /// The bundled variable face; its wght and ROND axes stay variable.
   static const String bundledFontFamily = 'Google Sans Flex';
 
   /// Full ROND for the Expressive brand roles of [bundledFontFamily].
