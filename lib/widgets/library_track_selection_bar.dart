@@ -47,11 +47,15 @@ class LibraryTrackSelectionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final inlineDelete = isDesktopPlatform && !albumDelete;
+    final inlineDelete = isDesktopPlatform;
     final hasSelection = selectedCount > 0;
-    final deleteLabel = hasSelection
-        ? context.l10n.selectionDeleteTracksCount(selectedCount)
-        : context.l10n.selectionSelectToDelete;
+    final deleteLabel = albumDelete
+        ? (hasSelection
+              ? context.l10n.downloadedAlbumDeleteCount(selectedCount)
+              : context.l10n.downloadedAlbumSelectToDelete)
+        : (hasSelection
+              ? context.l10n.selectionDeleteTracksCount(selectedCount)
+              : context.l10n.selectionSelectToDelete);
     Widget replayGain({required bool remove}) => SelectionActionButton(
       icon: remove ? Icons.remove_circle_outline : Icons.graphic_eq,
       label: remove
