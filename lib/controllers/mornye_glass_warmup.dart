@@ -31,8 +31,11 @@ class MornyeGlassWarmup {
   static Future<void> _prepare(ui.FlutterView view) async {
     // GLES needs the view's initialized graphics context. A first-frame
     // callback only means painting was submitted, not that rasterization ran.
+    // Mornye only mounts LiquidGlassLens (never LiquidGlassBlender/Morph), so
+    // warm only the lens shader pipeline and skip unused metaball shaders.
     await Future.wait<void>([
-      LiquidGlassShaders.ensureLoaded(),
+      // ignore: invalid_use_of_internal_member
+      LiquidGlassShaders.ensureLensLoaded(),
       WidgetsBinding.instance.waitUntilFirstFrameRasterized,
     ]);
     // Do not compete with an entrance, theme switch or scrolling animation.
