@@ -165,15 +165,18 @@ class NowPlayingRoute extends PageRoute<void> {
   /// judges the app's other springs.
   static const _exitTolerance = Tolerance(distance: 0.002, velocity: 0.02);
 
-  /// Mornye moves the page on its own springs, which shape the motion
-  /// themselves: the controller's value is then the page's position, as it
-  /// is while a finger moves the page. Material's slide keeps its curve.
-  bool _mornyeSprings(BuildContext? context) =>
-      morph == null && context != null && context.isMornye;
+  /// Full-screen slides run directly on a spring simulation in both styles
+  /// (Mornye's slow spring or Material's critically damped full-screen spring),
+  /// so the controller's value is the page's position.
+  bool get _usesSpringSlide => morph == null;
+
+  SpringDescription _slideSpring(BuildContext? context) =>
+      context != null && context.isMornye
+      ? MornyeMotion.slowSpring
+      : MotionPace.spring(_exitSpring);
 
   /// Where the page sits for a controller [value].
-  double _slideAt(double value) =>
-      _interactiveTransition || _mornyeSprings(navigator?.context)
+  double _slideAt(double value) => _interactiveTransition || _usesSpringSlide
       ? value
       : Easing.emphasizedDecelerate.transform(value);
 
@@ -190,25 +193,28 @@ class NowPlayingRoute extends PageRoute<void> {
     snapToEnd: true,
   );
 
-  /// Mornye opens and closes on its full-screen spring, as a system sheet
-  /// does. The Material shrink runs on [_exitSpring], and so does a
-  /// Material slide a finger let go. Each starts from wherever the page is
-  /// and from the finger's velocity, so a released drag or back gesture
-  /// carries on without a seam.
+  /// Full-screen slides (Mornye, or Material opened without a mini player)
+  /// open and close on the style's critically damped full-screen spring. The
+  /// Material shrink and released drags run on [_exitSpring]. Each starts from
+  /// wherever the page is and from the finger's velocity, so a released drag
+  /// or back gesture carries on without a seam.
   @override
   Simulation? createSimulation({required bool forward}) {
     final velocity = _takeReleaseVelocity();
     if (_reduceMotion) return null;
-    final mornye = _mornyeSprings(navigator?.context);
+    final context = navigator?.context;
+    final spring = _slideSpring(context);
     if (forward) {
-      return mornye ? _spring(MornyeMotion.slowSpring, 1, velocity) : null;
+      return _usesSpringSlide ? _spring(spring, 1, velocity) : null;
     }
-    if (mornye) return _spring(MornyeMotion.slowSpring, 0, velocity);
+    if (context != null && context.isMornye) {
+      return _spring(spring, 0, velocity);
+    }
     final shrinks =
         _dismissTarget != null &&
         (morph?.duration ?? Duration.zero) > Duration.zero;
-    if (!shrinks && !_interactiveTransition) return null;
-    return _spring(MotionPace.spring(_exitSpring), 0, velocity);
+    if (!shrinks && !_interactiveTransition && !_usesSpringSlide) return null;
+    return _spring(spring, 0, velocity);
   }
 
   Rect _openRect(Size size, double value) => Rect.lerp(
@@ -407,22 +413,21 @@ class NowPlayingRoute extends PageRoute<void> {
     navigator?.didStopUserGesture();
     if (!isActive) return;
     final generation = _dragGeneration;
-    const fallback = AppMotionSpec(
-      Duration(milliseconds: 220),
-      Curves.easeOutCubic,
-    );
-    final context = subtreeContext;
-    final settle = context == null
-        ? fallback
-        : AppMotion.spatialSlow(context, fallback);
+    void finish() {
+      if (generation != _dragGeneration || !isCurrent) return;
+      _clearDismiss();
+      _interactiveTransition = false;
+      changedInternalState();
+    }
+
+    if (_reduceMotion) {
+      controller?.value = 1;
+      finish();
+      return;
+    }
     controller
-        ?.animateTo(1, duration: settle.duration, curve: settle.curve)
-        .whenCompleteOrCancel(() {
-          if (generation != _dragGeneration || !isCurrent) return;
-          _clearDismiss();
-          _interactiveTransition = false;
-          changedInternalState();
-        });
+        ?.animateWith(_spring(_slideSpring(subtreeContext), 1, 0))
+        .whenCompleteOrCancel(finish);
   }
 
   @override
@@ -540,7 +545,7 @@ class NowPlayingRoute extends PageRoute<void> {
     // independent cover flight back to the mini-player on button/back pop.
     final inPlacePop =
         reversing && !_interactiveTransition && !context.isMornye;
-    final slide = _interactiveTransition || _mornyeSprings(context)
+    final slide = _interactiveTransition || _usesSpringSlide
         ? animation
         : animation.drive(CurveTween(curve: Easing.emphasizedDecelerate));
     final position = inPlacePop
