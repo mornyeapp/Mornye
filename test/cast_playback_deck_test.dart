@@ -133,6 +133,66 @@ void main() {
     },
   );
 
+  test('the next song loads after the TV finished one', () async {
+    // A receiver that finished has no media session left to stop or pause.
+    var idle = false;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (idle && const {'stop', 'pause'}.contains(call.method)) {
+        throw PlatformException(code: 'CAST_TRANSPORT');
+      }
+      if (call.method == 'register') return {'url': 'http://192.0.2.2/m/1'};
+      if (call.method == 'load') {
+        load = call.arguments as Map<Object?, Object?>;
+        idle = false;
+      }
+      return null;
+    });
+    await deck.setFileSource('/first.flac');
+    await deck.resume();
+    idle = true;
+    events.add({
+      'connected': true,
+      'deviceId': 'tv',
+      'host': '192.0.2.10',
+      'token': load['token'],
+      'state': 1,
+      'finished': true,
+    });
+    expect(deck.state, PlaybackDeckState.completed);
+    expect(output.connected, isTrue);
+
+    // The player retires the old song before it loads the next one.
+    await deck.pause();
+    await deck.stop();
+    expect(calls.map((call) => call.method), isNot(contains('stop')));
+    expect(calls.map((call) => call.method), isNot(contains('pause')));
+    await deck.setFileSource('/second.flac');
+    await deck.resume();
+    expect(deck.state, PlaybackDeckState.playing);
+    expect(calls.where((call) => call.method == 'load'), hasLength(2));
+  });
+
+  test('a stop the TV refuses does not block the next song', () async {
+    var refuse = false;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (refuse && call.method == 'stop') {
+        throw PlatformException(code: 'CAST_TRANSPORT');
+      }
+      if (call.method == 'register') return {'url': 'http://192.0.2.2/m/1'};
+      return null;
+    });
+    await deck.setFileSource('/first.flac');
+    await deck.resume();
+    // The receiver went idle before its last status reached the app.
+    refuse = true;
+    await deck.stop();
+    expect(deck.state, PlaybackDeckState.stopped);
+    await deck.setFileSource('/second.flac');
+    expect(calls.last.method, 'load');
+  });
+
   test('closing the deck closes the media server it started', () async {
     await deck.setFileSource('/song.flac');
     await deck.dispose();

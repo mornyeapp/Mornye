@@ -26,6 +26,8 @@ class CastPlaybackDeck implements PlaybackDeck {
   static int _nextToken = 0;
   int _token = 0;
   bool _ready = false;
+  // The receiver played the loaded song to its end.
+  bool _finished = false;
   Duration _position = Duration.zero, _duration = Duration.zero;
   PlaybackDeckState _state = PlaybackDeckState.stopped;
 
@@ -79,7 +81,9 @@ class CastPlaybackDeck implements PlaybackDeck {
       _duration = duration;
       _durations.add(duration);
     }
-    if (event['finished'] == true && _state != PlaybackDeckState.completed) {
+    if (event['finished'] == true) {
+      if (_finished) return;
+      _finished = true;
       _setState(PlaybackDeckState.completed);
       _completions.add(null);
     } else if (event['suspended'] == true) {
@@ -107,6 +111,7 @@ class CastPlaybackDeck implements PlaybackDeck {
   Future<void> _load(String source) async {
     final token = _token = ++_nextToken;
     _ready = false;
+    _finished = false;
     final item = metadata();
     final path = Uri.tryParse(source)?.path ?? source;
     final format = item?.extras?['format'] as String?;
@@ -204,9 +209,13 @@ class CastPlaybackDeck implements PlaybackDeck {
     _setState(PlaybackDeckState.playing);
   }
 
+  /// The receiver still holds the loaded song. One that finished it has no
+  /// media session left and answers a transport command with an error.
+  bool get _holdsSong => _ready && !_finished && output.connected;
+
   @override
   Future<void> pause() async {
-    if (_ready && output.connected) await output.command('pause');
+    if (_holdsSong) await output.command('pause');
     _setState(PlaybackDeckState.paused);
   }
 
@@ -220,9 +229,17 @@ class CastPlaybackDeck implements PlaybackDeck {
 
   @override
   Future<void> stop() async {
-    final loaded = _ready;
+    final holdsSong = _holdsSong;
     _ready = false;
-    if (loaded && output.connected) await output.command('stop');
+    if (holdsSong) {
+      try {
+        await output.command('stop');
+      } on Object catch (error) {
+        // The song change that asked for this must go on: the next load
+        // replaces whatever the receiver still plays.
+        _log.w('TV did not stop: $error');
+      }
+    }
     _setState(PlaybackDeckState.stopped);
   }
 
