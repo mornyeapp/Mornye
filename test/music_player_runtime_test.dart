@@ -13,6 +13,7 @@ import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
 import 'package:mornye/services/autoplay_history.dart';
@@ -53,6 +54,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'
     show databaseFactoryFfi, sqfliteFfiInit;
 
+import 'support/fixed_settings.dart';
 import 'support/link_fakes.dart';
 import 'support/virtual_time.dart';
 
@@ -700,6 +702,11 @@ class _Loved implements LibraryCollectionsDatabase {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
+
+/// With Local Library on, the Resume card reads neither History nor Library.
+final _localLibraryOn = settingsProvider.overrideWith(
+  () => FixedSettingsNotifier(const AppSettings(localLibraryEnabled: true)),
+);
 
 MusicPlayerRuntime _runtime({
   AppSettings settings = const AppSettings(pauseOnMute: false),
@@ -1651,7 +1658,10 @@ void main() {
       await fresh.restoreSession();
       expect(fresh.handler, isNull);
       final container = ProviderContainer(
-        overrides: [musicPlayerRuntimeProvider.overrideWithValue(fresh)],
+        overrides: [
+          musicPlayerRuntimeProvider.overrideWithValue(fresh),
+          _localLibraryOn,
+        ],
       );
       addTearDown(container.dispose);
       final preview = await container.read(playbackResumeProvider.future);
@@ -1820,7 +1830,10 @@ void main() {
         sourceDeletionEvents: events,
       );
       final container = ProviderContainer(
-        overrides: [musicPlayerRuntimeProvider.overrideWithValue(runtime)],
+        overrides: [
+          musicPlayerRuntimeProvider.overrideWithValue(runtime),
+          _localLibraryOn,
+        ],
       );
       addTearDown(container.dispose);
       expect(await container.read(playbackResumeProvider.future), isNotNull);
