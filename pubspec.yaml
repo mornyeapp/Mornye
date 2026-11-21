@@ -1,7 +1,7 @@
 name: mornye
 description: Mornye, extension-driven music metadata and downloads for mobile devices
 publish_to: "none"
-version: 5.4.1+170
+version: 5.4.5+171
 
 environment:
   sdk: ^3.10.0
