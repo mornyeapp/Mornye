@@ -77,13 +77,16 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
     ),
   );
 
-  /// Reads the computer's `info`, then asks for the PIN and pairs.
+  /// Reads the computer's `info`, then asks for the PIN and pairs. [typed]
+  /// says whether the person typed the address; null keeps what a known
+  /// computer had.
   Future<void> _pair(
     String host,
     int port, {
     String? expectedFingerprint,
     String? name,
     bool reusePairing = false,
+    bool? typed,
   }) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -96,7 +99,10 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
         expectedFingerprint: expectedFingerprint,
       );
       if (reusePairing) {
-        reconnected = await _controller.reconnectPaired(target);
+        reconnected = await _controller.reconnectPaired(
+          target,
+          typed: typed ?? false,
+        );
       }
     } on LinkPairingException catch (error) {
       if (!mounted) return;
@@ -123,7 +129,7 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
         pairingOpen: target.info.pairing,
         onSubmit: (pin) async {
           try {
-            await _controller.pair(target, pin);
+            await _controller.pair(target, pin, typed: typed);
             return null;
           } on LinkPairingException catch (error) {
             return error.error;
@@ -145,15 +151,16 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
     server.port,
     expectedFingerprint: server.fingerprint,
     name: server.name,
+    typed: false,
   );
 
   /// Pairs a known computer again, at its advertised address when the
-  /// network shows it, else at the saved one.
+  /// network shows it, else at the saved one. A typed address is kept.
   Future<void> _pairAgain(LinkServerRecord record) {
     final found = ref
         .read(linkClientControllerProvider)
         .discoveredServer(record.serverId);
-    if (found != null) return _pairDiscovered(found);
+    if (found != null && !record.typedAddress) return _pairDiscovered(found);
     final address = Uri.parse(record.address);
     return _pair(address.host, address.port, name: record.name);
   }
@@ -164,7 +171,7 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
       builder: (_) => const LinkManualAddDialog(),
     );
     if (address == null || !mounted) return;
-    await _pair(address.host, address.port, reusePairing: true);
+    await _pair(address.host, address.port, reusePairing: true, typed: true);
   }
 
   Future<void> _forget(LinkServerRecord record) async {

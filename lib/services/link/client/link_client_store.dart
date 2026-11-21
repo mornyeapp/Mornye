@@ -92,15 +92,17 @@ class LinkClientStore {
   Future<List<LinkServerRecord>> remove(String serverId) =>
       _write((current) => current..removeWhere((r) => r.serverId == serverId));
 
-  /// Moves a paired desktop to [address] (`https://host:port`).
+  /// Moves a paired desktop to [address] (`https://host:port`), which the
+  /// person typed when [typed].
   Future<List<LinkServerRecord>> updateAddress(
     String serverId,
-    String address,
-  ) => _write(
+    String address, {
+    bool typed = false,
+  }) => _write(
     (current) => [
       for (final record in current)
         record.serverId == serverId
-            ? record.copyWith(address: address)
+            ? record.copyWith(address: address, typedAddress: typed)
             : record,
     ],
   );

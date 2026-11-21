@@ -309,6 +309,12 @@ void main() {
           expect(harness.sessions, [session]);
           expect(session.server.address, 'https://192.168.18.5:47710');
           expect(session.server.connectionId, record.connectionId);
+          // Typed, so the computer seen elsewhere does not take it back.
+          expect(record.typedAddress, isFalse);
+          expect(session.server.typedAddress, isTrue);
+          harness.browser.resolve('a', '10.0.0.2');
+          await _settle(tester);
+          expect(session.server.address, 'https://192.168.18.5:47710');
           await tester.pumpWidget(const SizedBox());
           await tester.pump();
         },
@@ -343,6 +349,7 @@ void main() {
           expect(find.text(_l10n.linkPaired('Desktop b')), findsOneWidget);
           expect(find.text(_l10n.linkPairedSection), findsOneWidget);
           expect(harness.sessions.single.server.serverId, 'b');
+          expect(harness.sessions.single.server.typedAddress, isFalse);
 
           // What this phone does with the computer shows once paired.
           expect(find.text(_l10n.linkPhoneSection), findsOneWidget);

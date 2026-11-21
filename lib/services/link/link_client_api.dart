@@ -12,6 +12,7 @@ class LinkServerRecord {
     required this.connectionId,
     required this.address,
     required this.fingerprint,
+    this.typedAddress = false,
     this.platform = '',
     this.features,
   });
@@ -26,6 +27,10 @@ class LinkServerRecord {
   /// `https://host:port`.
   final String address;
   final String fingerprint;
+
+  /// The person typed [address], so discovery never replaces it: a VPN
+  /// address is not one the local network could find.
+  final bool typedAddress;
 
   /// The host's platform as it announced it, empty for an older host.
   final String platform;
@@ -43,6 +48,7 @@ class LinkServerRecord {
   LinkServerRecord copyWith({
     String? name,
     String? address,
+    bool? typedAddress,
     String? platform,
     Object? features = _keepFeatures,
   }) => LinkServerRecord(
@@ -51,6 +57,7 @@ class LinkServerRecord {
     connectionId: connectionId,
     address: address ?? this.address,
     fingerprint: fingerprint,
+    typedAddress: typedAddress ?? this.typedAddress,
     platform: platform ?? this.platform,
     features: identical(features, _keepFeatures)
         ? this.features
@@ -71,6 +78,7 @@ class LinkServerRecord {
     'connectionId': connectionId,
     'address': address,
     'fingerprint': fingerprint,
+    if (typedAddress) 'typedAddress': true,
     if (platform.isNotEmpty) 'platform': platform,
     'features': ?features,
   };
@@ -93,6 +101,7 @@ class LinkServerRecord {
       connectionId: connectionId,
       address: address,
       fingerprint: fingerprint,
+      typedAddress: json['typedAddress'] == true,
       platform: json['platform'] as String? ?? '',
       features: linkHostFeaturesFromJson(json['features']),
     );

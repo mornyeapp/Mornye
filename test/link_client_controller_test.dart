@@ -519,6 +519,56 @@ void main() {
     );
   });
 
+  test('a typed address is not replaced by one discovery finds', () async {
+    final harness = await _started();
+    // Typed, as a VPN address is: the local network cannot have found it.
+    final typed = linkTestTarget('a', host: '100.64.0.9');
+    final record = await harness.controller.pair(typed, '123456', typed: true);
+    await pumpEventQueue();
+    final session = harness.sessions.single;
+    expect(record.typedAddress, isTrue);
+
+    harness.browser.resolve('a', '10.0.0.7');
+    await pumpEventQueue();
+    expect(harness.state.servers.single.address, typed.address);
+    expect((await LinkClientStore().servers()).single.address, typed.address);
+    expect(
+      harness.bridge.calls.where((call) => call.startsWith('address ')),
+      isEmpty,
+    );
+    // The computer is awake: try the typed address again at once.
+    expect(session.calls.last, 'reconnect');
+
+    // A new PIN for the same computer keeps the typed address.
+    await harness.controller.pair(typed, '123456');
+    await pumpEventQueue();
+    expect(harness.state.servers.single.typedAddress, isTrue);
+
+    // Choosing the computer the network shows follows discovery again.
+    final found = linkTestTarget('a', host: '10.0.0.7', pairing: false);
+    expect(await harness.controller.reconnectPaired(found), isTrue);
+    expect(harness.state.servers.single.typedAddress, isFalse);
+    harness.browser.resolve('a', '10.0.0.8');
+    await pumpEventQueue();
+    expect(harness.state.servers.single.address, 'https://10.0.0.8:47710');
+  });
+
+  test('typing the address of a paired computer keeps it there', () async {
+    final harness = await _started();
+    await harness.controller.pair(linkTestTarget('a'), '123456');
+    await pumpEventQueue();
+    expect(harness.state.servers.single.typedAddress, isFalse);
+
+    // The same address, now typed: nothing moves but discovery lets go.
+    final same = linkTestTarget('a', pairing: false);
+    expect(await harness.controller.reconnectPaired(same, typed: true), isTrue);
+    expect(harness.state.servers.single.typedAddress, isTrue);
+    harness.browser.resolve('a', '10.0.0.7');
+    await pumpEventQueue();
+    expect(harness.state.servers.single.address, same.address);
+    expect((await LinkClientStore().servers()).single.typedAddress, isTrue);
+  });
+
   test('iOS pauses in the background without a playback lease', () async {
     final harness = await _started(platform: 'ios');
     await harness.controller.pair(linkTestTarget('a'), '123456');

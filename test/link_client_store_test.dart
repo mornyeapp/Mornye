@@ -63,6 +63,23 @@ void main() {
     expect((await store.servers()).last.address, 'https://10.0.0.7:47710');
   });
 
+  test('a typed address is remembered until a found one replaces it', () async {
+    final store = LinkClientStore();
+    await store.upsert(_record('a'));
+    // A record saved before the flag existed was never typed.
+    expect((await LinkClientStore().servers()).single.typedAddress, isFalse);
+    expect(_record('a').toJson().containsKey('typedAddress'), isFalse);
+
+    await store.updateAddress('a', 'https://100.64.0.9:47710', typed: true);
+    final typed = (await LinkClientStore().servers()).single;
+    expect(typed.address, 'https://100.64.0.9:47710');
+    expect(typed.typedAddress, isTrue);
+    expect(typed.copyWith(name: 'Renamed').typedAddress, isTrue);
+
+    await store.updateAddress('a', 'https://10.0.0.7:47710');
+    expect((await LinkClientStore().servers()).single.typedAddress, isFalse);
+  });
+
   test('removing and the active choice persist', () async {
     final store = LinkClientStore();
     await store.upsert(_record('a'));

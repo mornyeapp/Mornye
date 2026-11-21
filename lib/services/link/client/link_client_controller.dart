@@ -661,7 +661,9 @@ class LinkClientController extends Notifier<LinkClientState> {
           .firstOrNull;
       // Another certificate under a known id is not followed anywhere.
       if (record == null || record.fingerprint != server.fingerprint) continue;
-      if (record.address != server.address) {
+      // A typed address stays: the one found here may not be reachable, and
+      // it is gone once the phone leaves this network.
+      if (record.address != server.address && !record.typedAddress) {
         unawaited(
           _serial(
             () => _move(
@@ -685,18 +687,21 @@ class LinkClientController extends Notifier<LinkClientState> {
     String serverId,
     String address, {
     required String fingerprint,
+    bool typed = false,
   }) async {
     final record = state.servers
         .where((s) => s.serverId == serverId)
         .firstOrNull;
     if (record == null ||
         record.fingerprint != fingerprint ||
-        record.address == address ||
+        (record.address == address && record.typedAddress == typed) ||
         _disposed) {
       return;
     }
-    _log.i('Computer ${record.name} moved to a new address');
-    final servers = await _store.updateAddress(serverId, address);
+    _log.i(
+      'Computer ${record.name} moved to a ${typed ? 'typed' : 'found'} address',
+    );
+    final servers = await _store.updateAddress(serverId, address, typed: typed);
     await _library.updateAddress(record.connectionId, address);
     if (_disposed) return;
     state = state.copyWith(servers: servers);
@@ -791,8 +796,12 @@ class LinkClientController extends Notifier<LinkClientState> {
   }
 
   /// Reuses a paired computer after a certificate-checked [probe], including
-  /// a manually entered new IP. A missing or refused key still needs a PIN.
-  Future<bool> reconnectPaired(LinkPairingTarget target) => _serial(() async {
+  /// a manually entered new IP ([typed]). A missing or refused key still
+  /// needs a PIN.
+  Future<bool> reconnectPaired(
+    LinkPairingTarget target, {
+    bool typed = false,
+  }) => _serial(() async {
     if (_disposed) return false;
     final record = state.servers
         .where((server) => server.serverId == target.info.serverId)
@@ -811,6 +820,7 @@ class LinkClientController extends Notifier<LinkClientState> {
       record.serverId,
       target.address,
       fingerprint: target.fingerprint,
+      typed: typed,
     );
     if (_disposed) return false;
     if (!active) {
@@ -826,8 +836,14 @@ class LinkClientController extends Notifier<LinkClientState> {
 
   /// Pairs with [target] using [pin]. On success the desktop is saved as a
   /// Subsonic network connection and, when enabled, added to Library and
-  /// scanned. Re-pairing replaces the stored key. Throws [LinkPairingException].
-  Future<LinkServerRecord> pair(LinkPairingTarget target, String pin) async {
+  /// scanned. Re-pairing replaces the stored key. [typed] says whether the
+  /// person typed the address; null keeps what a known computer had. Throws
+  /// [LinkPairingException].
+  Future<LinkServerRecord> pair(
+    LinkPairingTarget target,
+    String pin, {
+    bool? typed,
+  }) async {
     final result = await ref
         .read(linkPairingApiProvider)
         .pair(target, pin: pin, device: await _identity());
@@ -854,6 +870,7 @@ class LinkClientController extends Notifier<LinkClientState> {
         connectionId: connection.id,
         address: target.address,
         fingerprint: result.fingerprint,
+        typedAddress: typed ?? existing?.typedAddress ?? false,
         platform: target.info.platform,
         features: target.info.features,
       );
