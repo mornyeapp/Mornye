@@ -121,39 +121,6 @@ void main() {
       );
     });
 
-    test('keeps Search visible across transient provider reconciliation', () {
-      expect(
-        HomeSearchProviderPolicy.shouldShowSearchBar(
-          hasSearchProvider: false,
-          isSearchProviderLoading: false,
-          hasHomeFeedExtension: true,
-          hasExploreContent: true,
-          hasSearchInput: false,
-        ),
-        isTrue,
-      );
-      expect(
-        HomeSearchProviderPolicy.shouldShowSearchBar(
-          hasSearchProvider: false,
-          isSearchProviderLoading: false,
-          hasHomeFeedExtension: false,
-          hasExploreContent: false,
-          hasSearchInput: true,
-        ),
-        isTrue,
-      );
-      expect(
-        HomeSearchProviderPolicy.shouldShowSearchBar(
-          hasSearchProvider: false,
-          isSearchProviderLoading: false,
-          hasHomeFeedExtension: false,
-          hasExploreContent: false,
-          hasSearchInput: false,
-        ),
-        isFalse,
-      );
-    });
-
     test('canonicalizes built-in and extension search filters', () {
       final extension = _searchExtension(
         id: 'provider',

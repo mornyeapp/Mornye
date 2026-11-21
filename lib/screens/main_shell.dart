@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/saf_migration_prompt_store.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
+import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/extension_auto_update_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -85,17 +86,14 @@ int _watchQueuedCount(WidgetRef ref) =>
 int _watchRepoUpdatesCount(WidgetRef ref) =>
     ref.watch(repoProvider.select((s) => s.updatesAvailableCount));
 
-/// The tab at [index] in a style's destination order.
+/// The tab at [index]: Home, Library, the Store when shown, Search, then
+/// Settings where the style has it as a destination.
 @visibleForTesting
-ShellTab shellTabAt(
-  int index, {
-  required bool mornye,
-  required bool showStore,
-}) {
+ShellTab shellTabAt(int index, {required bool showStore}) {
   if (index == 0) return ShellTab.home;
   if (index == 1) return ShellTab.library;
   if (showStore && index == 2) return ShellTab.repository;
-  if (mornye && index == (showStore ? 3 : 2)) return ShellTab.search;
+  if (index == (showStore ? 3 : 2)) return ShellTab.search;
   return ShellTab.settings;
 }
 
@@ -111,15 +109,9 @@ int? shellIndexOfTab(
   ShellTab.home => 0,
   ShellTab.library => 1,
   ShellTab.repository => showStore ? 2 : null,
-  // Material searches from Home.
-  ShellTab.search => mornye ? (showStore ? 3 : 2) : 0,
+  ShellTab.search => showStore ? 3 : 2,
   // Mornye phones open Settings as a page, not a destination.
-  ShellTab.settings =>
-    !mornye
-        ? (showStore ? 3 : 2)
-        : desktop
-        ? (showStore ? 4 : 3)
-        : null,
+  ShellTab.settings => !mornye || desktop ? (showStore ? 4 : 3) : null,
 };
 
 class MainShell extends ConsumerStatefulWidget {
@@ -198,9 +190,8 @@ class _MainShellState extends ConsumerState<MainShell>
   /// The style the current tab index was chosen under.
   bool? _indexStyleMornye;
 
-  /// The two styles order their destinations differently, so switching
-  /// styles keeps the same tab rather than the same index (Settings would
-  /// otherwise become Mornye's Search).
+  /// Mornye phones have no Settings destination, so switching styles keeps
+  /// the same tab rather than an index the new style lacks.
   void _keepTabAcrossStyles() {
     final mornye = context.isMornye;
     final previous = _indexStyleMornye;
@@ -209,11 +200,7 @@ class _MainShellState extends ConsumerState<MainShell>
     final showStore = ref.read(
       settingsProvider.select((s) => s.showExtensionStore),
     );
-    final tab = shellTabAt(
-      _currentIndex,
-      mornye: previous,
-      showStore: showStore,
-    );
+    final tab = shellTabAt(_currentIndex, showStore: showStore);
     final index =
         shellIndexOfTab(
           tab,
@@ -416,10 +403,7 @@ class _MainShellState extends ConsumerState<MainShell>
 
     Navigator.of(context).popUntil((route) => route.isFirst);
     _onShellTabRequested(ShellTab.search);
-    final searchNavigator = context.isMornye
-        ? _searchTabNavigatorKey
-        : _homeTabNavigatorKey;
-    searchNavigator.currentState?.popUntil((route) => route.isFirst);
+    _searchTabNavigatorKey.currentState?.popUntil((route) => route.isFirst);
     // Mount the lazy Search page before the metadata listener handles the link.
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
@@ -494,10 +478,33 @@ class _MainShellState extends ConsumerState<MainShell>
     );
     final homeNavigator = _navigatorForTab(0, showStore);
     homeNavigator?.popUntil((route) => route.isFirst);
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  /// Tapping Search again returns to its opening page: the field is emptied
+  /// and the feed shows instead of results or recent searches.
+  void _resetSearchToMain() {
+    ref.read(previewPlayerProvider.notifier).stop();
+    _searchTabNavigatorKey.currentState?.popUntil((route) => route.isFirst);
     // Unfocus BEFORE clear so _onTrackStateChanged can properly
     // clear _urlController (it checks !_searchFocusNode.hasFocus)
     FocusManager.instance.primaryFocus?.unfocus();
-    if (!context.isMornye) ref.read(trackProvider.notifier).clear();
+    ref.read(trackProvider.notifier).clear();
+  }
+
+  int _searchIndex(bool showStore) => showStore ? 3 : 2;
+
+  /// The Mornye bar's search button opens Search on its feed; pressed there,
+  /// or with no feed to open on, it goes to the field.
+  void _openSearchFromBar() {
+    final index = _searchIndex(
+      ref.read(settingsProvider.select((s) => s.showExtensionStore)),
+    );
+    if (_currentIndex == index || ref.read(homeFeedExtensionProvider) == null) {
+      ShellNavigationService.requestSearch();
+    } else {
+      _onNavTap(index);
+    }
   }
 
   /// Desktop and TV show Settings after Search in the content pane.
@@ -505,8 +512,7 @@ class _MainShellState extends ConsumerState<MainShell>
   bool get _mornyeSettingsTab =>
       context.isMornye && (isDesktopPlatform || isAndroidTv);
 
-  int _settingsIndex(bool showStore) =>
-      context.isMornye ? (showStore ? 4 : 3) : (showStore ? 3 : 2);
+  int _settingsIndex(bool showStore) => showStore ? 4 : 3;
 
   void _onShellTabRequested(ShellTab tab) {
     // Picking a destination returns from Now Playing to the content pane.
@@ -520,7 +526,7 @@ class _MainShellState extends ConsumerState<MainShell>
     );
     final index = switch (tab) {
       ShellTab.home => 0,
-      ShellTab.search => context.isMornye ? (showStore ? 3 : 2) : 0,
+      ShellTab.search => _searchIndex(showStore),
       ShellTab.library => 1,
       ShellTab.repository => showStore ? 2 : null,
       ShellTab.settings => _settingsIndex(showStore),
@@ -557,6 +563,13 @@ class _MainShellState extends ConsumerState<MainShell>
     if (index == 0 && _currentIndex == 0) {
       return;
     }
+    // A request to search (a shortcut, a shared link) keeps what is typed.
+    if (resetHome &&
+        index == _currentIndex &&
+        index == _searchIndex(showStore)) {
+      _resetSearchToMain();
+      return;
+    }
 
     if (_currentIndex != index) {
       HapticFeedback.selectionClick();
@@ -567,7 +580,6 @@ class _MainShellState extends ConsumerState<MainShell>
       ShellNavigationService.syncState(
         currentTabIndex: _currentIndex,
         showRepoTab: showStore,
-        showSearchTab: context.isMornye,
       );
       if (!isAndroidTv) FocusManager.instance.primaryFocus?.unfocus();
       if (context.isMornye || isAndroidTv) {
@@ -666,7 +678,6 @@ class _MainShellState extends ConsumerState<MainShell>
       ShellNavigationService.syncState(
         currentTabIndex: _currentIndex,
         showRepoTab: showStore,
-        showSearchTab: context.isMornye,
       );
       FocusManager.instance.primaryFocus?.unfocus();
     }
@@ -715,8 +726,7 @@ class _MainShellState extends ConsumerState<MainShell>
     if (!mounted) return;
 
     final trackState = ref.read(trackProvider);
-    final isSearchTab =
-        _currentIndex == (context.isMornye ? (showStore ? 3 : 2) : 0);
+    final isSearchTab = _currentIndex == _searchIndex(showStore);
 
     if (isSearchTab &&
         trackState.isShowingRecentAccess &&
@@ -789,10 +799,8 @@ class _MainShellState extends ConsumerState<MainShell>
     if (index == 0) return ShellTab.home;
     if (index == 1) return ShellTab.library;
     if (showStore && index == 2) return ShellTab.repository;
-    if (_mornyeSettingsTab && index == _settingsIndex(showStore)) {
-      return ShellTab.settings;
-    }
-    return context.isMornye ? ShellTab.search : ShellTab.settings;
+    if (index == _searchIndex(showStore)) return ShellTab.search;
+    return ShellTab.settings;
   }
 
   List<DesktopDestination> _desktopDestinations({
@@ -803,10 +811,7 @@ class _MainShellState extends ConsumerState<MainShell>
     final l10n = context.l10n;
     final mornye = context.isMornye;
     return [
-      for (final tab in desktopDestinationTabs(
-        mornye: mornye,
-        showStore: showStore,
-      ))
+      for (final tab in desktopDestinationTabs(showStore: showStore))
         switch (tab) {
           ShellTab.home => DesktopDestination(
             tab: tab,
@@ -838,8 +843,8 @@ class _MainShellState extends ConsumerState<MainShell>
           ),
           ShellTab.search => DesktopDestination(
             tab: tab,
-            icon: CupertinoIcons.search,
-            selectedIcon: CupertinoIcons.search,
+            icon: mornye ? CupertinoIcons.search : Icons.search,
+            selectedIcon: mornye ? CupertinoIcons.search : Icons.search,
             label: l10n.mornyeSearch,
           ),
           ShellTab.settings => DesktopDestination(
@@ -1014,7 +1019,7 @@ class _MainShellState extends ConsumerState<MainShell>
     if (index == 0) return _homeTabNavigatorKey.currentState;
     if (index == 1) return _libraryTabNavigatorKey.currentState;
     if (showStore && index == 2) return _repoTabNavigatorKey.currentState;
-    if (context.isMornye && index == (showStore ? 3 : 2)) {
+    if (index == _searchIndex(showStore)) {
       return _searchTabNavigatorKey.currentState;
     }
     return null;
@@ -1065,7 +1070,6 @@ class _MainShellState extends ConsumerState<MainShell>
     ShellNavigationService.syncState(
       currentTabIndex: _currentIndex,
       showRepoTab: showStore,
-      showSearchTab: context.isMornye,
     );
 
     final tabs = <Widget>[
@@ -1097,16 +1101,16 @@ class _MainShellState extends ConsumerState<MainShell>
           heroAnimationsEnabled: heroAnimationsEnabled,
           child: const RepoTab(),
         ),
-      if (!context.isMornye) const SettingsTab(),
-      if (context.isMornye)
-        _TabNavigator(
-          key: const ValueKey('tab-search'),
-          navigatorKey: _searchTabNavigatorKey,
-          observers: [_searchPreviewStopObserver],
-          heroAnimationsEnabled: heroAnimationsEnabled,
-          child: const HomeTab(mode: HomeTabMode.search),
-        ),
-      if (_mornyeSettingsTab) const SettingsTab(key: ValueKey('tab-settings')),
+      _TabNavigator(
+        key: const ValueKey('tab-search'),
+        navigatorKey: _searchTabNavigatorKey,
+        observers: [_searchPreviewStopObserver],
+        heroAnimationsEnabled: heroAnimationsEnabled,
+        child: const HomeTab(mode: HomeTabMode.search),
+      ),
+      // Mornye phones open Settings as a page instead.
+      if (!context.isMornye || _mornyeSettingsTab)
+        const SettingsTab(key: ValueKey('tab-settings')),
     ];
 
     final maxIndex = tabs.length - 1;
@@ -1342,17 +1346,23 @@ class _MainShellState extends ConsumerState<MainShell>
           ),
           label: l10n.navStore,
         ),
-      if (!context.isMornye)
+      if (context.isMornye)
+        NavigationDestination(
+          icon: const Icon(CupertinoIcons.search),
+          label: l10n.mornyeSearch,
+        )
+      else ...[
+        NavigationDestination(
+          icon: const AppIcon(Icons.search),
+          selectedIcon: BouncingIcon(child: const AppIcon(Icons.search)),
+          label: l10n.mornyeSearch,
+        ),
         NavigationDestination(
           icon: const AppIcon(Icons.settings_outlined),
           selectedIcon: SpinIcon(child: const AppIcon(Icons.settings)),
           label: l10n.navSettings,
         ),
-      if (context.isMornye)
-        NavigationDestination(
-          icon: const Icon(CupertinoIcons.search),
-          label: l10n.mornyeSearch,
-        ),
+      ],
       if (context.isMornye && isAndroidTv)
         NavigationDestination(
           icon: const Icon(CupertinoIcons.gear_alt),
@@ -1474,8 +1484,7 @@ class _MainShellState extends ConsumerState<MainShell>
                                     selectedIndex: selectedDestination,
                                     onSelected: _onNavTap,
                                     onHome: () => _onNavTap(0),
-                                    onSearch:
-                                        ShellNavigationService.requestSearch,
+                                    onSearch: _openSearchFromBar,
                                     blurEnabled: mornyeBlurEnabled,
                                   ),
                             ),
@@ -1742,9 +1751,7 @@ class _HomeTabRoot extends StatelessWidget {
   const _HomeTabRoot();
 
   @override
-  Widget build(BuildContext context) => HomeTab(
-    mode: context.isMornye ? HomeTabMode.browse : HomeTabMode.combined,
-  );
+  Widget build(BuildContext context) => const HomeTab();
 }
 
 /// Library's root page: one [QueueTab] for the life of the tab. A switch of

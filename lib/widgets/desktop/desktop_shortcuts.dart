@@ -189,9 +189,7 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
   }
 
   void _selectDestination(int position) {
-    final context = _rootNavigator?.context ?? this.context;
     final tabs = desktopDestinationTabs(
-      mornye: context.isMornye,
       showStore: ref.read(settingsProvider).showExtensionStore,
     );
     if (position < 1 || position > tabs.length) return;
@@ -426,7 +424,7 @@ class _DesktopMenuBarState extends ConsumerState<_DesktopMenuBar> {
       _menus = _buildMenus(
         l10n: l10n,
         material: material,
-        tabs: desktopDestinationTabs(mornye: mornye, showStore: showStore),
+        tabs: desktopDestinationTabs(showStore: showStore),
         showPlayer: showPlayer,
         fullScreen: fullScreen,
         mode: mode,

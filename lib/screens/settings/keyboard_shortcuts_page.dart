@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
-import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -22,10 +21,7 @@ class KeyboardShortcutsPage extends ConsumerWidget {
     final showStore = ref.watch(
       settingsProvider.select((s) => s.showExtensionStore),
     );
-    final tabs = desktopDestinationTabs(
-      mornye: context.isMornye,
-      showStore: showStore,
-    );
+    final tabs = desktopDestinationTabs(showStore: showStore);
 
     List<SingleActivator> keys(DesktopCommand command) =>
         desktopCommandShortcuts(command, platform);
@@ -67,8 +63,6 @@ class KeyboardShortcutsPage extends ConsumerWidget {
         l10n.desktopShortcutsNavigation,
         [
           for (final tab in tabs) (tabLabel(tab), tabKeys(tab)),
-          if (!tabs.contains(ShellTab.search))
-            (l10n.mornyeSearch, keys(DesktopCommand.search)),
           (
             MaterialLocalizations.of(context).backButtonTooltip,
             keys(DesktopCommand.back),

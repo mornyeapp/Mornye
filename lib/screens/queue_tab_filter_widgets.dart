@@ -902,9 +902,9 @@ extension _QueueTabFilterWidgets on _QueueTabState {
         // Every empty branch here means "you have not downloaded anything of
         // this kind yet", so the way forward is always search.
         action: ExpressiveButton(
-          onPressed: () => ShellNavigationService.requestTab(ShellTab.home),
+          onPressed: () => ShellNavigationService.requestTab(ShellTab.search),
           icon: const Icon(Icons.search),
-          child: Text(context.l10n.navHome),
+          child: Text(context.l10n.mornyeSearch),
         ),
       );
     }

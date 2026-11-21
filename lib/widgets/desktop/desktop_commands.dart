@@ -255,15 +255,12 @@ String desktopDestinationTooltip(
 }
 
 /// Desktop destinations in rail or sidebar order. Cmd/Ctrl+1..5 select them
-/// by position. Mornye reaches Search from the sidebar search field.
-List<ShellTab> desktopDestinationTabs({
-  required bool mornye,
-  required bool showStore,
-}) => [
+/// by position, in both styles.
+List<ShellTab> desktopDestinationTabs({required bool showStore}) => [
   ShellTab.home,
   ShellTab.library,
   if (showStore) ShellTab.repository,
-  if (mornye) ShellTab.search,
+  ShellTab.search,
   ShellTab.settings,
 ];
 

@@ -139,7 +139,7 @@ void main() {
       tester.widget<MornyeBottomBar>(find.byType(MornyeBottomBar)).collapsed;
 
   testWidgets(
-    'Material Home restores its viewport and navigation after the player',
+    'Material restores its viewport and navigation after the player',
     (tester) async {
       Future<void> settleFrames() async {
         for (var i = 0; i < 30; i++) {
@@ -156,20 +156,32 @@ void main() {
         const MediaItem(id: 'song', title: 'Current song', artist: 'Artist'),
       );
       await settleFrames();
-      final scroll = find.descendant(
-        of: find.byType(HomeTab),
+      Finder page(HomeTabMode mode) => find.descendant(
+        of: find.byWidgetPredicate(
+          (widget) => widget is HomeTab && widget.mode == mode,
+        ),
         matching: find.byType(CustomScrollView),
       );
+      final scroll = page(HomeTabMode.browse);
+      final bar = find.byType(ExpressiveNavigationBar);
+      Finder destination(String label) =>
+          find.descendant(of: bar, matching: find.text(label));
       expect(find.text('Continue listening'), findsOneWidget);
       expect(find.text('Shortcuts'), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
       expect(tester.getRect(scroll).bottom, 932);
+      // The field lives on Search.
+      await tester.tap(destination('Search'));
+      await settleFrames();
+      final searchScroll = page(HomeTabMode.search);
+      expect(tester.getRect(searchScroll).bottom, 932);
       await tester.tap(find.byType(TextField));
       await tester.pump();
       expect(tester.testTextInput.isVisible, isTrue);
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pump();
-      expect(tester.getRect(scroll).bottom, 632);
-      final home = tester.element(find.byType(HomeTab));
+      expect(tester.getRect(searchScroll).bottom, 632);
+      final home = tester.element(searchScroll);
       final navigator = Navigator.of(home, rootNavigator: true);
       unawaited(navigator.push(NowPlayingRoute(child: const Scaffold())));
       await settleFrames();
@@ -178,13 +190,14 @@ void main() {
       navigator.pop();
       await settleFrames();
       expect(tester.testTextInput.isVisible, isFalse);
-      final bar = find.byType(ExpressiveNavigationBar);
-      Finder destination(String label) =>
-          find.descendant(of: bar, matching: find.text(label));
+      expect(tester.getRect(searchScroll).bottom, 932);
       await tester.tap(destination('Home'));
       await settleFrames();
       expect(find.text('Shortcuts'), findsOneWidget);
       expect(tester.getRect(scroll).bottom, 932);
+      // Home fits this screen; a shorter one gives the drag room to scroll.
+      tester.view.physicalSize = const Size(430, 560);
+      await tester.pump();
       final player = tester.getRect(find.byType(MiniPlayer));
       final viewport = tester.state<ScrollableState>(
         find.descendant(of: scroll, matching: find.byType(Scrollable)).first,
@@ -195,9 +208,11 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 400));
       expect(viewport.position.pixels, greaterThan(0));
+      tester.view.physicalSize = const Size(430, 932);
+      await tester.pump();
       await tester.tap(destination('Settings'));
       await settleFrames();
-      expect(tester.widget<ExpressiveNavigationBar>(bar).selectedIndex, 3);
+      expect(tester.widget<ExpressiveNavigationBar>(bar).selectedIndex, 4);
       await tester.tap(destination('Home'));
       await settleFrames();
       expect(tester.widget<ExpressiveNavigationBar>(bar).selectedIndex, 0);

@@ -156,12 +156,11 @@ void main() {
       ShellNavigationService.syncState(currentTabIndex: 0, showRepoTab: true);
       ShellNavigationService.resetHistory();
 
-      // Mornye with the Store: Home, Library, Store, Search, Settings.
+      // With the Store: Home, Library, Store, Search, Settings.
       for (final index in [1, 2, 3]) {
         ShellNavigationService.syncState(
           currentTabIndex: index,
           showRepoTab: true,
-          showSearchTab: true,
         );
       }
       expect(ShellNavigationService.currentTabForTesting, ShellTab.search);
@@ -172,11 +171,7 @@ void main() {
       ]);
 
       // Hiding the Store moves Search to index 2; it is the same destination.
-      ShellNavigationService.syncState(
-        currentTabIndex: 2,
-        showRepoTab: false,
-        showSearchTab: true,
-      );
+      ShellNavigationService.syncState(currentTabIndex: 2, showRepoTab: false);
       expect(ShellNavigationService.backHistoryForTesting, hasLength(3));
 
       // Back skips the Store, which is no longer shown.

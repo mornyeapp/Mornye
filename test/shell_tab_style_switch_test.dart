@@ -9,55 +9,53 @@ void main() {
     required bool showStore,
     bool desktop = true,
   }) => shellIndexOfTab(
-    shellTabAt(index, mornye: fromMornye, showStore: showStore),
+    shellTabAt(index, showStore: showStore),
     mornye: !fromMornye,
     showStore: showStore,
     desktop: desktop,
   );
 
   for (final showStore in [false, true]) {
-    test(
-      'switching styles keeps the tab, not the index (store: $showStore)',
-      () {
-        final materialSettings = showStore ? 3 : 2;
-        final mornyeSearch = showStore ? 3 : 2;
-        final mornyeSettings = showStore ? 4 : 3;
+    test('switching styles keeps the tab (store: $showStore)', () {
+      final search = showStore ? 3 : 2;
+      final settings = showStore ? 4 : 3;
 
-        // Material Settings stays Settings instead of becoming Search.
-        expect(
-          switched(materialSettings, fromMornye: false, showStore: showStore),
-          mornyeSettings,
-        );
-        expect(
-          switched(mornyeSettings, fromMornye: true, showStore: showStore),
-          materialSettings,
-        );
-        // Mornye's Search lands on Material's Home, where Material searches.
-        expect(
-          switched(mornyeSearch, fromMornye: true, showStore: showStore),
-          0,
-        );
-        for (final index in [0, 1, if (showStore) 2]) {
+      // Both styles order their destinations alike.
+      for (final fromMornye in [false, true]) {
+        for (final index in [0, 1, if (showStore) 2, search, settings]) {
           expect(
-            switched(index, fromMornye: false, showStore: showStore),
+            switched(index, fromMornye: fromMornye, showStore: showStore),
             index,
           );
         }
-        // Mornye phones have no Settings destination.
-        expect(
-          switched(
-            materialSettings,
-            fromMornye: false,
-            showStore: showStore,
-            desktop: false,
-          ),
-          isNull,
-        );
-      },
-    );
+      }
+      // Mornye phones have no Settings destination.
+      expect(
+        switched(
+          settings,
+          fromMornye: false,
+          showStore: showStore,
+          desktop: false,
+        ),
+        isNull,
+      );
+      expect(
+        switched(
+          search,
+          fromMornye: false,
+          showStore: showStore,
+          desktop: false,
+        ),
+        search,
+      );
+    });
   }
 
-  test('Mornye Search maps to its own tab', () {
-    expect(shellTabAt(2, mornye: true, showStore: false), ShellTab.search);
+  test('Search follows the Store, Settings follows Search', () {
+    expect(shellTabAt(2, showStore: false), ShellTab.search);
+    expect(shellTabAt(3, showStore: false), ShellTab.settings);
+    expect(shellTabAt(2, showStore: true), ShellTab.repository);
+    expect(shellTabAt(3, showStore: true), ShellTab.search);
+    expect(shellTabAt(4, showStore: true), ShellTab.settings);
   });
 }

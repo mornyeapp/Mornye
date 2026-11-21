@@ -175,73 +175,114 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
   });
 
-  for (final desktop in [false, true]) {
-    for (final mornye in [false, true]) {
-      testWidgets('Home keeps its feed layout through slow startup '
-          '(desktop: $desktop, Mornye: $mornye)', (tester) async {
-        debugDesktopPlatformOverride = desktop;
-        addTearDown(() => debugDesktopPlatformOverride = null);
-        tester.view.physicalSize = desktop
-            ? const Size(1280, 800)
-            : const Size(430, 932);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.reset);
-        final extensions = _StartupExtensions();
-        final explore = _StartupExplore();
-        await _pumpStartupHome(tester, extensions, explore, mornye: mornye);
+  for (final (desktop, mornye) in [
+    (false, false),
+    (false, true),
+    // The Mornye desktop Search shows the feed as Browse tiles instead.
+    (true, false),
+  ]) {
+    testWidgets('Search keeps its feed layout through slow startup '
+        '(desktop: $desktop, Mornye: $mornye)', (tester) async {
+      debugDesktopPlatformOverride = desktop;
+      addTearDown(() => debugDesktopPlatformOverride = null);
+      tester.view.physicalSize = desktop
+          ? const Size(1280, 800)
+          : const Size(430, 932);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final extensions = _StartupExtensions();
+      final explore = _StartupExplore();
+      await _pumpStartupHome(
+        tester,
+        extensions,
+        explore,
+        mornye: mornye,
+        mode: HomeTabMode.search,
+      );
 
-        expect(find.text('Shortcuts'), findsNothing);
-        expect(find.byType(ShimmerLoading), findsOneWidget);
-        // Artwork placeholders stay square: a card's side padding narrows
-        // them, so their height must shrink with it.
-        final artwork = find
-            .byType(SkeletonBox)
-            .evaluate()
-            .map((element) => element.size!)
-            .where((size) => size.height > 40)
-            .toList();
-        expect(artwork, isNotEmpty);
-        for (final size in artwork) {
-          expect(size.width, size.height);
-        }
-        final searchRect = mornye
-            ? null
-            : tester.getRect(find.byType(TextField));
-        await tester.pump(const Duration(seconds: 3));
-        expect(find.text('Shortcuts'), findsNothing);
+      expect(find.text('Recently visited artist'), findsNothing);
+      expect(find.byType(ShimmerLoading), findsOneWidget);
+      // Artwork placeholders stay square: a card's side padding narrows
+      // them, so their height must shrink with it.
+      final artwork = find
+          .byType(SkeletonBox)
+          .evaluate()
+          .map((element) => element.size!)
+          .where((size) => size.height > 40)
+          .toList();
+      expect(artwork, isNotEmpty);
+      for (final size in artwork) {
+        expect(size.width, size.height);
+      }
+      final searchRect = tester.getRect(find.byType(TextField));
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text('Recently visited artist'), findsNothing);
 
-        extensions.update(
-          const ExtensionState(
-            extensions: [_feedExtension],
-            isInitialized: true,
-          ),
-        );
-        await tester.pump();
-        await tester.pump(const Duration(seconds: 3));
-        expect(find.text('Shortcuts'), findsNothing);
-        expect(find.byType(ShimmerLoading), findsOneWidget);
+      extensions.update(
+        const ExtensionState(extensions: [_feedExtension], isInitialized: true),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text('Recently visited artist'), findsNothing);
+      expect(find.byType(ShimmerLoading), findsOneWidget);
 
-        explore.update(
-          const ExploreState(
-            sections: [
-              ExploreSection(
-                uri: 'example:featured',
-                title: 'Featured albums',
-                items: [],
-              ),
-            ],
-          ),
-        );
-        await tester.pump();
-        expect(find.text('Featured albums'), findsOneWidget);
-        expect(find.text('Shortcuts'), findsNothing);
-        expect(find.byType(ShimmerLoading), findsNothing);
-        if (searchRect != null) {
-          expect(tester.getRect(find.byType(TextField)), searchRect);
-        }
-        expect(tester.takeException(), isNull);
-      });
-    }
+      explore.update(
+        const ExploreState(
+          sections: [
+            ExploreSection(
+              uri: 'example:featured',
+              title: 'Featured albums',
+              items: [],
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Featured albums'), findsOneWidget);
+      expect(find.text('Recently visited artist'), findsNothing);
+      expect(find.byType(ShimmerLoading), findsNothing);
+      expect(tester.getRect(find.byType(TextField)), searchRect);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets('Home shows its own sections whatever the feed does '
+        '(Mornye=$mornye)', (tester) async {
+      final extensions = _StartupExtensions();
+      final explore = _StartupExplore();
+      await _pumpStartupHome(tester, extensions, explore, mornye: mornye);
+      expect(find.byType(ShimmerLoading), findsNothing);
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text('Shortcuts'), mornye ? findsNothing : findsOneWidget);
+
+      extensions.update(
+        const ExtensionState(extensions: [_feedExtension], isInitialized: true),
+      );
+      // Home never reads the feed, so the test creates it.
+      ProviderScope.containerOf(
+        tester.element(find.byType(HomeTab)),
+      ).read(exploreProvider);
+      explore.update(
+        const ExploreState(
+          sections: [
+            ExploreSection(
+              uri: 'example:featured',
+              title: 'Featured albums',
+              items: [],
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Featured albums'), findsNothing);
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text('Shortcuts'), mornye ? findsNothing : findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    });
   }
 
   for (final (mornye, result) in [
@@ -254,12 +295,17 @@ void main() {
       ])
         (mornye, result),
   ]) {
-    testWidgets('Home leaves startup loading after $result (Mornye=$mornye)', (
-      tester,
-    ) async {
+    testWidgets('Search leaves startup loading after $result '
+        '(Mornye=$mornye)', (tester) async {
       final extensions = _StartupExtensions();
       final explore = _StartupExplore();
-      await _pumpStartupHome(tester, extensions, explore, mornye: mornye);
+      await _pumpStartupHome(
+        tester,
+        extensions,
+        explore,
+        mornye: mornye,
+        mode: HomeTabMode.search,
+      );
       expect(find.byType(ShimmerLoading), findsOneWidget);
       extensions.update(
         ExtensionState(
@@ -281,16 +327,17 @@ void main() {
       await tester.pump();
       await tester.pumpAndSettle();
       expect(find.byType(ShimmerLoading), findsNothing);
+      // Nothing to search with: the page says so. With a provider but no
+      // feed, it opens on recent searches.
       final showsSetupPrompt =
-          !mornye &&
-          (result == 'no extensions' || result == 'initialization error');
+          result == 'no extensions' || result == 'initialization error';
       expect(
         find.text('No search providers yet'),
         showsSetupPrompt ? findsOneWidget : findsNothing,
       );
       expect(
-        find.text('Shortcuts'),
-        !mornye && !showsSetupPrompt ? findsOneWidget : findsNothing,
+        find.text('Recently visited artist'),
+        showsSetupPrompt ? findsNothing : findsOneWidget,
       );
       expect(tester.takeException(), isNull);
     });
@@ -298,27 +345,32 @@ void main() {
 
   for (final mornye in [false, true]) {
     testWidgets(
-      'Home with its feed disabled skips startup loading (Mornye=$mornye)',
+      'Search with its feed disabled skips startup loading (Mornye=$mornye)',
       (tester) async {
         await _pumpStartupHome(
           tester,
           _StartupExtensions(),
           _StartupExplore(),
           mornye: mornye,
+          mode: HomeTabMode.search,
           feedDisabled: true,
         );
-        expect(find.text('Shortcuts'), mornye ? findsNothing : findsOneWidget);
+        expect(find.text('Recently visited artist'), findsOneWidget);
         expect(find.byType(ShimmerLoading), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
   }
 
-  testWidgets('Home can show restored feed content before extensions finish', (
-    tester,
-  ) async {
+  testWidgets('Search can show restored feed content before extensions '
+      'finish', (tester) async {
     final explore = _StartupExplore();
-    await _pumpStartupHome(tester, _StartupExtensions(), explore);
+    await _pumpStartupHome(
+      tester,
+      _StartupExtensions(),
+      explore,
+      mode: HomeTabMode.search,
+    );
     explore.update(
       const ExploreState(
         sections: [
@@ -332,13 +384,12 @@ void main() {
     );
     await tester.pump();
     expect(find.text('Cached albums'), findsOneWidget);
-    expect(find.text('Shortcuts'), findsNothing);
     expect(find.byType(ShimmerLoading), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
   for (final desktop in [false, true]) {
-    testWidgets('first search extension collapses the empty Home prompt '
+    testWidgets('first search extension collapses the empty Search prompt '
         '(desktop: $desktop)', (tester) async {
       debugDesktopPlatformOverride = desktop;
       addTearDown(() => debugDesktopPlatformOverride = null);
@@ -357,12 +408,13 @@ void main() {
         extensions,
         _StartupExplore(),
         mornye: false,
+        mode: HomeTabMode.search,
         homeVisible: homeVisible,
         pages: pages,
       );
       extensions.update(const ExtensionState(isInitialized: true));
       await tester.pumpAndSettle();
-      expect(find.byType(TextField), findsNothing);
+      expect(find.text('No search providers yet'), findsOneWidget);
 
       homeVisible.value = false;
       pages.jumpToPage(1);
@@ -389,8 +441,12 @@ void main() {
       pages.jumpToPage(0);
       await tester.pump();
 
-      expect(find.text('Shortcuts'), findsOneWidget);
-      expect(tester.getTopLeft(find.byType(TextField)).dy, lessThan(300));
+      expect(find.text('No search providers yet'), findsNothing);
+      expect(find.text('Recently visited artist'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Recently visited artist')).dy,
+        lessThan(300),
+      );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
@@ -402,7 +458,7 @@ void main() {
     (const Size(1024, 768), 'featured'),
   ]) {
     testWidgets(
-      'Home $layout menu follows its source after scrolling at $size',
+      'feed $layout menu follows its source after scrolling at $size',
       (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -442,7 +498,7 @@ void main() {
               theme: MornyeTheme.build(Brightness.dark),
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
-              home: const HomeTab(mode: HomeTabMode.browse),
+              home: const HomeTab(mode: HomeTabMode.search),
             ),
           ),
         );
@@ -505,7 +561,7 @@ void main() {
     );
   }
 
-  testWidgets('Material desktop Home runs across a full screen window', (
+  testWidgets('Material desktop Search runs across a full screen window', (
     tester,
   ) async {
     debugDesktopPlatformOverride = true;
@@ -551,7 +607,7 @@ void main() {
           theme: AppTheme.dark(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: const HomeTab(mode: HomeTabMode.combined),
+          home: const HomeTab(mode: HomeTabMode.search),
         ),
       ),
     );
@@ -581,7 +637,7 @@ void main() {
   });
 
   testWidgets(
-    'Home keeps its feed while Search retains its query and results',
+    'Home stays personal while Search keeps its feed, query and results',
     (tester) async {
       tester.view.physicalSize = const Size(430, 932);
       tester.view.devicePixelRatio = 1;
@@ -606,14 +662,19 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Featured albums'), findsOneWidget);
+      expect(find.text('Featured albums'), findsNothing);
       expect(find.byType(TextField), findsNothing);
       expect(find.text('Recently visited artist'), findsNothing);
 
+      // Search opens on the feed; recent searches wait for the field.
       await tester.tap(find.text('Open Search'));
       await tester.pumpAndSettle();
       expect(find.text('Search'), findsWidgets);
-      expect(find.text('Featured albums').hitTestable(), findsNothing);
+      expect(find.text('Featured albums'), findsOneWidget);
+      expect(find.text('Recently visited artist'), findsNothing);
+      await tester.tap(find.byType(TextField));
+      await tester.pumpAndSettle();
+      expect(find.text('Featured albums'), findsNothing);
       expect(find.text('Recently visited artist'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'Example');
       expect(
@@ -628,7 +689,7 @@ void main() {
 
       await tester.tap(find.text('Open Home'));
       await tester.pumpAndSettle();
-      expect(find.text('Featured albums'), findsOneWidget);
+      expect(find.text('Featured albums'), findsNothing);
       expect(find.byType(TextField).hitTestable(), findsNothing);
       expect(find.text('Found artist').hitTestable(), findsNothing);
 
@@ -642,9 +703,10 @@ void main() {
       expect(search._requests, 1);
       await tester.tap(findByTooltip('Clear'));
       await tester.pumpAndSettle();
+      // An emptied field that is not being typed in returns to the feed.
       expect(find.text('Found artist'), findsNothing);
-      expect(find.text('Recently visited artist'), findsOneWidget);
-      expect(find.text('Featured albums').hitTestable(), findsNothing);
+      expect(find.text('Recently visited artist'), findsNothing);
+      expect(find.text('Featured albums'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -844,7 +906,8 @@ void main() {
         overrides: [
           settingsProvider.overrideWith(_Settings.new),
           extensionProvider.overrideWith(_Extensions.new),
-          exploreProvider.overrideWith(_Explore.new),
+          // Without a feed, Search opens on recent searches.
+          exploreProvider.overrideWith(() => _Explore(sections: const [])),
           downloadHistoryProvider.overrideWith(_History.new),
           recentAccessProvider.overrideWith(() => _Recent(itemCount: 10)),
           trackProvider.overrideWith(_Search.new),
@@ -1100,6 +1163,7 @@ Future<void> _pumpStartupHome(
   _StartupExtensions extensions,
   _StartupExplore explore, {
   bool mornye = true,
+  HomeTabMode mode = HomeTabMode.browse,
   bool feedDisabled = false,
   ValueNotifier<bool>? homeVisible,
   PageController? pages,
@@ -1139,7 +1203,7 @@ Future<void> _pumpStartupHome(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: homeVisible == null
-          ? HomeTab(mode: mornye ? HomeTabMode.browse : HomeTabMode.combined)
+          ? HomeTab(mode: mode)
           : ValueListenableBuilder(
               valueListenable: homeVisible,
               builder: (context, visible, _) => PageView(
@@ -1147,10 +1211,7 @@ Future<void> _pumpStartupHome(
                 children: [
                   TickerMode(
                     enabled: visible,
-                    child: HomeTab(
-                      key: const ValueKey('home'),
-                      mode: mornye ? HomeTabMode.browse : HomeTabMode.combined,
-                    ),
+                    child: HomeTab(key: const ValueKey('home'), mode: mode),
                   ),
                   const Scaffold(key: ValueKey('other')),
                 ],

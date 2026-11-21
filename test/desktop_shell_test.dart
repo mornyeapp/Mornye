@@ -104,8 +104,8 @@ const _libraryLinks = [
   DesktopSidebarLink(id: 'albums', icon: Icons.album, label: 'Albums'),
 ];
 
-List<DesktopDestination> _destinations({required bool mornye}) => [
-  for (final tab in desktopDestinationTabs(mornye: mornye, showStore: true))
+List<DesktopDestination> _destinations() => [
+  for (final tab in desktopDestinationTabs(showStore: true))
     DesktopDestination(
       tab: tab,
       icon: Icons.circle_outlined,
@@ -227,7 +227,7 @@ void main() {
           ),
           home: Scaffold(
             body: DesktopShellLayout(
-              destinations: _destinations(mornye: mornye),
+              destinations: _destinations(),
               selected: selected,
               onSelected: selections.add,
               libraryLinks: libraryLinks,
@@ -566,7 +566,7 @@ void main() {
               child: ValueListenableBuilder<ShellTab>(
                 valueListenable: selected,
                 builder: (context, tab, _) => DesktopNavigationRail(
-                  destinations: _destinations(mornye: false),
+                  destinations: _destinations(),
                   selected: tab,
                   onSelected: (_) {},
                   extended: extended,

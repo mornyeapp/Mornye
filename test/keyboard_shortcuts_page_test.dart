@@ -44,7 +44,6 @@ void main() {
             .map((text) => text.data ?? '')
             .join('\n');
         final destinations = desktopDestinationTabs(
-          mornye: mornye,
           showStore: const AppSettings().showExtensionStore,
         ).length;
         final bound = desktopShortcutBindings(platform).keys;

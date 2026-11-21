@@ -16,6 +16,7 @@ import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/weekly_releases_provider.dart';
 import 'package:mornye/screens/home_tab.dart';
+import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/services/weekly_releases.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -86,6 +87,7 @@ void main() {
       find.text('Songs you add to your Library or play show up here.'),
       findsOneWidget,
     );
+    expect(find.text('Find music'), findsOneWidget);
   });
 
   testWidgets('a Mornye Home with a shelf has no empty state', (tester) async {
@@ -113,11 +115,56 @@ void main() {
     expect(find.text(_title), findsNothing);
   });
 
-  testWidgets('the Material Home keeps its Shortcuts instead', (tester) async {
+  testWidgets('the Material Home says so under its Shortcuts and leads to '
+      'Search', (tester) async {
+    final requested = <ShellTab>[];
+    final owner = Object();
+    ShellNavigationService.registerTabSelectionHandler(
+      owner: owner,
+      handler: requested.add,
+    );
+    addTearDown(
+      () => ShellNavigationService.unregisterTabSelectionHandler(owner),
+    );
     await _open(tester, _home(mornye: false));
     expect(tester.takeException(), isNull);
 
     expect(find.text('Shortcuts'), findsOneWidget);
+    expect(find.text(_title), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text(_title)).dy,
+      greaterThan(tester.getTopLeft(find.text('Shortcuts')).dy),
+    );
+    await tester.ensureVisible(find.text('Find music'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Find music'));
+    expect(requested, [ShellTab.search]);
+  });
+
+  testWidgets('a Material Home with a shelf has no empty state', (
+    tester,
+  ) async {
+    await _open(
+      tester,
+      _home(
+        mornye: false,
+        added: [
+          UnifiedLibraryItem.fromLocalLibrary(
+            LocalLibraryItem(
+              id: 'song',
+              trackName: 'Example song',
+              artistName: 'Artist',
+              albumName: 'Album',
+              filePath: '/music/example.flac',
+              scannedAt: DateTime.utc(2026, 10, 1),
+            ),
+          ),
+        ],
+      ),
+    );
+    expect(tester.takeException(), isNull);
+
+    expect(find.text('Recently added'), findsOneWidget);
     expect(find.text(_title), findsNothing);
   });
 }

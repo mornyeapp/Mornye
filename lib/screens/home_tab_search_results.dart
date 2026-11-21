@@ -1028,12 +1028,9 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
 
   Widget _buildSearchBar() {
     final hasText = _urlController.text.isNotEmpty;
-    // The Material Home keeps the resting field clean; import and paste
-    // appear once it is focused.
-    final showInputActions =
-        context.isMornye ||
-        widget.mode == HomeTabMode.search ||
-        _searchFocusNode.hasFocus;
+    // Material keeps the resting field clean; import and paste appear once
+    // it is focused.
+    final showInputActions = context.isMornye || _searchFocusNode.hasFocus;
 
     final searchingLibrary = _searchingLibrary;
     final compact = _compactSearchField;

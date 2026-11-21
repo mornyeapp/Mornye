@@ -421,11 +421,15 @@
   },
   "homeNothingYetTitle": "Belum ada apa-apa",
   "@homeNothingYetTitle": {
-    "description": "Title on the Mornye Home when the Library is empty and nothing was played"
+    "description": "Title on Home when the Library is empty and nothing was played"
   },
   "homeNothingYetMessage": "Lagu yang Anda tambahkan ke Koleksi atau putar akan muncul di sini.",
   "@homeNothingYetMessage": {
     "description": "Message under homeNothingYetTitle"
+  },
+  "homeFindMusic": "Cari musik",
+  "@homeFindMusic": {
+    "description": "Button under homeNothingYetMessage that opens the Search page"
   },
   "homeRecent": "Terbaru",
   "@homeRecent": {
@@ -6037,19 +6041,19 @@
   "@audioAnalysisRescanning": {
     "description": "Loading text while audio is being re-analyzed after an explicit refresh"
   },
-  "extensionsHomeFeedProvider": "Provider Feed Beranda",
+  "extensionsHomeFeedProvider": "Provider Feed Telusuri",
   "@extensionsHomeFeedProvider": {
     "description": "Extensions page - label for home feed provider selector"
   },
-  "extensionsHomeFeedCountry": "Negara beranda",
+  "extensionsHomeFeedCountry": "Negara feed Telusuri",
   "@extensionsHomeFeedCountry": {
     "description": "Country picker for the active Home feed extension"
   },
-  "extensionsHomeFeedCountryDescription": "Pilih rekomendasi beranda suatu negara tanpa VPN.",
+  "extensionsHomeFeedCountryDescription": "Pilih rekomendasi suatu negara tanpa VPN.",
   "@extensionsHomeFeedCountryDescription": {
     "description": "Help for choosing regional Home recommendations"
   },
-  "extensionsHomeFeedDescription": "Pilih ekstensi provider feed beranda di layar utama",
+  "extensionsHomeFeedDescription": "Pilih ekstensi yang mengisi halaman Telusuri sebelum Anda mengetik",
   "@extensionsHomeFeedDescription": {
     "description": "Extensions page - description for home feed provider picker"
   },
@@ -6065,11 +6069,11 @@
   "@extensionsHomeFeedOff": {
     "description": "Extensions page - home feed provider option: off"
   },
-  "extensionsHomeFeedOffSubtitle": "Jangan tampilkan feed beranda di layar utama",
+  "extensionsHomeFeedOffSubtitle": "Jangan tampilkan feed di halaman Telusuri",
   "@extensionsHomeFeedOffSubtitle": {
     "description": "Extensions page - subtitle for off home feed option"
   },
-  "extensionsHomeFeedUse": "Pakai feed beranda {extensionName}",
+  "extensionsHomeFeedUse": "Pakai feed {extensionName}",
   "@extensionsHomeFeedUse": {
     "description": "Extensions page - subtitle for a specific extension home feed option",
     "placeholders": {

@@ -77,7 +77,7 @@ Widget _home({
     theme: AppTheme.dark(),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    home: const HomeTab(mode: HomeTabMode.combined),
+    home: const HomeTab(),
   ),
 );
 

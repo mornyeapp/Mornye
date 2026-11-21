@@ -385,9 +385,7 @@ Future<void> _pumpHome(
           theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.dark(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: HomeTab(
-            mode: mornye ? HomeTabMode.browse : HomeTabMode.combined,
-          ),
+          home: const HomeTab(),
         ),
       ),
     ),

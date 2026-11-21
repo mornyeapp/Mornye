@@ -137,24 +137,6 @@ class HomeSearchProviderPolicy {
     return resolveProvider(explicitSearchProvider, extensions) != null;
   }
 
-  /// Keeps the Home search surface stable while extension/provider state is
-  /// being reconciled. A transient missing search capability must not remove
-  /// the field above an already-visible Home feed; changing providers should
-  /// never be required just to make Search reappear.
-  static bool shouldShowSearchBar({
-    required bool hasSearchProvider,
-    required bool isSearchProviderLoading,
-    required bool hasHomeFeedExtension,
-    required bool hasExploreContent,
-    required bool hasSearchInput,
-  }) {
-    return hasSearchProvider ||
-        isSearchProviderLoading ||
-        hasHomeFeedExtension ||
-        hasExploreContent ||
-        hasSearchInput;
-  }
-
   static String? sanitizeFilter(
     String? filter,
     String? currentSearchProvider,

@@ -637,11 +637,15 @@
   },
   "homeNothingYetTitle": "Nothing here yet",
   "@homeNothingYetTitle": {
-    "description": "Title on the Mornye Home when the Library is empty and nothing was played"
+    "description": "Title on Home when the Library is empty and nothing was played"
   },
   "homeNothingYetMessage": "Songs you add to your Library or play show up here.",
   "@homeNothingYetMessage": {
     "description": "Message under homeNothingYetTitle"
+  },
+  "homeFindMusic": "Find music",
+  "@homeFindMusic": {
+    "description": "Button under homeNothingYetMessage that opens the Search page"
   },
   "homeRecent": "Recent",
   "@homeRecent": {
@@ -6600,21 +6604,21 @@
   "@audioAnalysisRescanning": {
     "description": "Loading text while audio is being re-analyzed after an explicit refresh"
   },
-  "extensionsHomeFeedProvider": "Home Feed Provider",
+  "extensionsHomeFeedProvider": "Search Feed Provider",
   "@extensionsHomeFeedProvider": {
-    "description": "Extensions page - label for home feed provider selector"
+    "description": "Extensions page - label for the selector of the extension whose feed fills the Search page"
   },
-  "extensionsHomeFeedCountry": "Home feed country",
+  "extensionsHomeFeedCountry": "Search feed country",
   "@extensionsHomeFeedCountry": {
-    "description": "Country picker for the active Home feed extension"
+    "description": "Country picker for the active Search feed extension"
   },
-  "extensionsHomeFeedCountryDescription": "Choose a country's Home recommendations without a VPN.",
+  "extensionsHomeFeedCountryDescription": "Choose a country's recommendations without a VPN.",
   "@extensionsHomeFeedCountryDescription": {
-    "description": "Help for choosing regional Home recommendations"
+    "description": "Help for choosing regional recommendations in the Search feed"
   },
-  "extensionsHomeFeedDescription": "Choose which extension provides the home feed on the main screen",
+  "extensionsHomeFeedDescription": "Choose which extension fills the Search page before you type",
   "@extensionsHomeFeedDescription": {
-    "description": "Extensions page - description for home feed provider picker"
+    "description": "Extensions page - description for the Search feed provider picker"
   },
   "extensionsHomeFeedAuto": "Auto",
   "@extensionsHomeFeedAuto": {
@@ -6628,11 +6632,11 @@
   "@extensionsHomeFeedOff": {
     "description": "Extensions page - home feed provider option: off"
   },
-  "extensionsHomeFeedOffSubtitle": "Do not show the home feed on the main screen",
+  "extensionsHomeFeedOffSubtitle": "Do not show a feed on the Search page",
   "@extensionsHomeFeedOffSubtitle": {
     "description": "Extensions page - subtitle for off home feed option"
   },
-  "extensionsHomeFeedUse": "Use {extensionName} home feed",
+  "extensionsHomeFeedUse": "Use the {extensionName} feed",
   "@extensionsHomeFeedUse": {
     "description": "Extensions page - subtitle for a specific extension home feed option",
     "placeholders": {

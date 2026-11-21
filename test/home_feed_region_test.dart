@@ -314,7 +314,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('United States · Example Music'), findsOneWidget);
-      await tester.tap(find.text('Home feed country'));
+      await tester.tap(find.text('Search feed country'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Japan'));
       await tester.pumpAndSettle();

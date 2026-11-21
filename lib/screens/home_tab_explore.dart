@@ -3,40 +3,13 @@ part of 'home_tab.dart';
 extension _HomeTabExploreUI on _HomeTabState {
   List<Widget> _buildExploreSections(
     List<ExploreSection> sections,
-    String? greeting,
     ColorScheme colorScheme,
   ) {
-    final hasGreeting =
-        !context.isMornye && greeting != null && greeting.isNotEmpty;
-    final isTablet = _usesTabletSizes(context);
-    final sectionOffset = hasGreeting ? 1 : 0;
-    final totalCount = sections.length + sectionOffset + 1;
-
     return [
       SliverList(
         delegate: SliverChildBuilderDelegate((context, index) {
-          if (hasGreeting && index == 0) {
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                16 + homeContentInset(context),
-                12,
-                16 + homeContentInset(context),
-                4,
-              ),
-              child: Text(
-                greeting,
-                style:
-                    (isTablet
-                            ? Theme.of(context).textTheme.headlineMedium
-                            : Theme.of(context).textTheme.headlineSmall)
-                        ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-            );
-          }
-
-          final sectionIndex = index - sectionOffset;
-          if (sectionIndex < sections.length) {
-            final section = sections[sectionIndex];
+          if (index < sections.length) {
+            final section = sections[index];
             return KeyedSubtree(
               key: ValueKey('explore-section-${section.uri}-${section.title}'),
               child: _buildExploreSection(section, colorScheme),
@@ -44,7 +17,7 @@ extension _HomeTabExploreUI on _HomeTabState {
           }
 
           return const SizedBox(height: 24);
-        }, childCount: totalCount),
+        }, childCount: sections.length + 1),
       ),
     ];
   }

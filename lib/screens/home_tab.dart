@@ -128,10 +128,13 @@ part 'home_tab_search_results.dart';
 part 'home_tab_search_wide.dart';
 part 'home_tab_widgets.dart';
 
-enum HomeTabMode { combined, browse, search }
+/// Home is the person's own page ([browse]): the player, shortcuts and
+/// Library shelves. Search ([search]) finds music and, before anything is
+/// typed, shows the chosen extension's feed.
+enum HomeTabMode { browse, search }
 
 class HomeTab extends ConsumerStatefulWidget {
-  const HomeTab({super.key, this.mode = HomeTabMode.combined});
+  const HomeTab({super.key, this.mode = HomeTabMode.browse});
 
   final HomeTabMode mode;
 
@@ -141,8 +144,8 @@ class HomeTab extends ConsumerStatefulWidget {
 
 class _HomeTabState extends ConsumerState<HomeTab>
     with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
-  bool get _showsSearch => widget.mode != HomeTabMode.browse;
-  bool get _showsHome => widget.mode != HomeTabMode.search;
+  bool get _showsSearch => widget.mode == HomeTabMode.search;
+  bool get _showsHome => widget.mode == HomeTabMode.browse;
   final _historySnapshot = TrackHistorySnapshot();
   final _urlController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -289,7 +292,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
       (previous, next) {
         if (next == true && previous != true) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _showsHome) {
+            if (mounted && _showsSearch) {
               ref
                   .read(exploreProvider.notifier)
                   .fetchHomeFeed(forceRefresh: true);
@@ -301,8 +304,8 @@ class _HomeTabState extends ConsumerState<HomeTab>
   }
 
   void _fetchExploreIfNeeded() {
-    // The desktop Mornye Search page browses the feed too.
-    if (!_showsHome && !_offersLibraryScope) return;
+    // Only Search shows the feed; Home never asks for it.
+    if (!_showsSearch) return;
     if (ref.read(settingsProvider).homeFeedProvider ==
         AppSettings.homeFeedProviderOff) {
       ref.read(exploreProvider.notifier).clear();
@@ -427,10 +430,10 @@ class _HomeTabState extends ConsumerState<HomeTab>
   }
 
   void _onSearchFocusChanged() {
-    // The dedicated Search tab already shows recent items independently of
+    // The Mornye desktop Search page shows recent items independently of
     // focus. Let TextField handle its cursor/keyboard without rebuilding the
     // entire results page each time navigation focuses or unfocuses it.
-    if (widget.mode == HomeTabMode.search) return;
+    if (_offersLibraryScope) return;
     if (mounted) {
       setState(() {});
     }
@@ -823,20 +826,21 @@ class _HomeTabState extends ConsumerState<HomeTab>
       ),
     );
 
+    // The feed belongs to Search: Home is the person's own page.
     final hasExploreContent =
-        _showsHome &&
+        _showsSearch &&
         ref.watch(exploreProvider.select((s) => s.sections.isNotEmpty));
     final explorePending =
-        _showsHome &&
+        _showsSearch &&
         ref.watch(
           exploreProvider.select(
             (s) => s.isLoading || (s.lastFetched == null && s.error == null),
           ),
         );
     final hasHomeFeedExtension =
-        _showsHome && ref.watch(homeFeedExtensionProvider) != null;
+        _showsSearch && ref.watch(homeFeedExtensionProvider) != null;
     final homeFeedDisabled =
-        _showsHome &&
+        _showsSearch &&
         ref.watch(
           settingsProvider.select(
             (s) => s.homeFeedProvider == AppSettings.homeFeedProviderOff,
@@ -866,10 +870,37 @@ class _HomeTabState extends ConsumerState<HomeTab>
         ref.watch(trackProvider.select((s) => s.isShowingRecentAccess));
     final screenHeight = MediaQuery.heightOf(context);
 
+    final isSearchProviderLoading =
+        !extensionReadiness.isInitialized && extensionReadiness.error == null;
+    final hasSearchProvider = HomeSearchProviderPolicy.hasProvider(
+      explicitSearchProvider,
+      extensions,
+    );
+    final searchToolbar = _offersLibraryScope;
+    // Search opens on the feed when one shows or may still arrive. The
+    // Mornye desktop page turns it into Browse tiles instead.
+    final feedExpected =
+        _showsSearch &&
+        !searchToolbar &&
+        !homeFeedDisabled &&
+        (hasExploreContent ||
+            isSearchProviderLoading ||
+            (hasHomeFeedExtension && explorePending));
+    // Nothing to search with and nothing to browse: the page says so.
+    final nothingToSearch =
+        _showsSearch &&
+        !searchToolbar &&
+        !isSearchProviderLoading &&
+        !hasSearchProvider &&
+        !hasHomeFeedExtension &&
+        !hasExploreContent;
+    // Recent searches wait for the field while a feed fills the page; without
+    // one, and on the Mornye desktop page, they are what Search opens on.
     final recentModeRequested =
-        widget.mode == HomeTabMode.search ||
+        searchToolbar ||
         isShowingRecentAccess ||
-        isSearchFocused;
+        isSearchFocused ||
+        (_showsSearch && !feedExpected && !nothingToSearch);
     final showRecentAccess =
         recentModeRequested &&
         (!hasSearchInput ||
@@ -878,55 +909,27 @@ class _HomeTabState extends ConsumerState<HomeTab>
                 !hasSearchError &&
                 !hasActiveSearchSurface)) &&
         !isLoading;
-    final isSearchProviderLoading =
-        !extensionReadiness.isInitialized && extensionReadiness.error == null;
-    final hasSearchProvider = HomeSearchProviderPolicy.hasProvider(
-      explicitSearchProvider,
-      extensions,
-    );
-    final showSearchBar =
-        _showsSearch &&
-        (widget.mode == HomeTabMode.search ||
-            HomeSearchProviderPolicy.shouldShowSearchBar(
-              hasSearchProvider: hasSearchProvider,
-              isSearchProviderLoading: isSearchProviderLoading,
-              hasHomeFeedExtension: hasHomeFeedExtension,
-              hasExploreContent: hasExploreContent,
-              hasSearchInput: hasSearchInput,
-            ));
     final hasResults =
         hasSearchInput || hasActualResults || isLoading || showRecentAccess;
     final showExplore =
-        _showsHome &&
+        feedExpected &&
         !hasActualResults &&
         !isLoading &&
         !hasActiveSearchSurface &&
         !showRecentAccess &&
-        !homeFeedDisabled &&
-        (hasHomeFeedExtension || hasExploreContent) &&
         hasExploreContent;
     // Unknown extensions and an unresolved first feed are loading states,
-    // not evidence that Home should mount its local-only fallback.
+    // not evidence that Search has nothing to open on.
     final showExploreLoading =
-        _showsHome &&
+        feedExpected &&
         !hasActualResults &&
         !isLoading &&
         !hasActiveSearchSurface &&
         !showRecentAccess &&
-        !homeFeedDisabled &&
-        !hasExploreContent &&
-        (isSearchProviderLoading || (hasHomeFeedExtension && explorePending));
-    final showFeedSurface = showExplore || showExploreLoading;
-    // Only a surface with a search field asks for a search provider. The
-    // Mornye Home browses without one, so it never stops at this prompt.
-    final showEmptyHomeState =
-        _showsSearch &&
-        !isSearchProviderLoading &&
-        !hasSearchProvider &&
-        !hasHomeFeedExtension &&
-        !hasExploreContent &&
-        !hasResults;
-    final searchToolbar = _offersLibraryScope;
+        !hasExploreContent;
+    // Only Search asks for a search provider. Home works without one, so
+    // it never stops at this prompt.
+    final showEmptyHomeState = nothingToSearch && !hasResults;
     final showLibraryResults = _searchingLibrary && hasSearchInput;
     // The library scope waits for input before showing local matches.
     final showLibraryPrompt = _searchingLibrary && !hasSearchInput;
@@ -935,12 +938,9 @@ class _HomeTabState extends ConsumerState<HomeTab>
     // spring, whose overshoot is a thousandth of the travel, and Mornye's
     // spring. Reduced motion resizes at once.
     final sectionMotion = AppMotion.surface(context);
-    // Without a feed, Home gathers the player, shortcuts and Library shelves.
-    final showHomeSections =
-        _showsHome && !showFeedSurface && !showEmptyHomeState;
-    // The Material Home also greets in its header. A feed brings its own
-    // greeting, and the Mornye style keeps its navigation title.
-    final greetsInHeader = showHomeSections && !context.isMornye;
+    // The Material Home greets in its header; the Mornye style keeps its
+    // navigation title.
+    final greetsInHeader = _showsHome && !context.isMornye;
     final greeting = greetsInHeader
         ? homeGreeting(
             context.l10n,
@@ -989,6 +989,10 @@ class _HomeTabState extends ConsumerState<HomeTab>
         if (_searchFocusNode.hasFocus) {
           _searchFocusNode.unfocus();
         }
+        // A tap beside an empty field leaves recent searches for the feed.
+        if (_showsSearch && _urlController.text.trim().isEmpty) {
+          ref.read(trackProvider.notifier).setShowingRecentAccess(false);
+        }
       },
       behavior: HitTestBehavior.translucent,
       child: Scaffold(
@@ -1005,20 +1009,13 @@ class _HomeTabState extends ConsumerState<HomeTab>
                 _buildHeaderSliver(greeting: greeting),
               AppRefreshIndicator.sliver(enabled: showExplore),
               if (_showsHome) const SliverToBoxAdapter(child: AppCrashBanner()),
+              if (_showsSearch && !searchToolbar) _buildSearchBarSliver(),
               _buildHomeIntroSliver(
                 sectionMotion: sectionMotion,
-                hasResults: hasResults,
-                showExplore: showFeedSurface,
                 colorScheme: colorScheme,
                 screenHeight: screenHeight,
                 showEmptyHomeState: showEmptyHomeState,
               ),
-              if (showSearchBar && !searchToolbar)
-                _buildSearchBarSliver(
-                  hasResults: hasResults,
-                  showExplore: showFeedSurface,
-                  greetsInHeader: greetsInHeader,
-                ),
               if (hasActiveSearchSurface &&
                   !showRecentAccess &&
                   !showLibraryResults)
@@ -1035,13 +1032,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
                   !_searchingLibrary &&
                   !homeFeedDisabled)
                 _buildBrowseSliver(),
-              _buildHomeSectionsSliver(
-                sectionMotion: sectionMotion,
-                hasResults: hasResults,
-                showRecentAccess: showRecentAccess,
-                showExplore: showFeedSurface,
-                showEmptyHomeState: showEmptyHomeState,
-              ),
+              _buildHomeSectionsSliver(sectionMotion),
               if (showExplore) _buildExploreSliver(colorScheme: colorScheme),
               if (showExploreLoading) _buildExploreLoadingSliver(),
               if (_showsSearch && !showLibraryResults)
@@ -1222,8 +1213,6 @@ class _HomeTabState extends ConsumerState<HomeTab>
 
   Widget _buildHomeIntroSliver({
     required AppMotionSpec sectionMotion,
-    required bool hasResults,
-    required bool showExplore,
     required ColorScheme colorScheme,
     required double screenHeight,
     required bool showEmptyHomeState,
@@ -1234,7 +1223,8 @@ class _HomeTabState extends ConsumerState<HomeTab>
         // carrying its height into the compact intro on the first frame.
         key: ValueKey(showEmptyHomeState),
         sectionMotion,
-        (hasResults || showExplore || !_showsHome)
+        // Home opens with its tagline; Search only explains an empty page.
+        !(_showsHome || showEmptyHomeState)
             ? const SizedBox.shrink()
             : _buildHomeIntro(
                 colorScheme: colorScheme,
@@ -1245,23 +1235,15 @@ class _HomeTabState extends ConsumerState<HomeTab>
     );
   }
 
-  Widget _buildSearchBarSliver({
-    required bool hasResults,
-    required bool showExplore,
-    required bool greetsInHeader,
-  }) {
+  Widget _buildSearchBarSliver() {
     return SliverToBoxAdapter(
       child: Padding(
         // Centered with the search results on tablets.
         padding: EdgeInsets.fromLTRB(
           16 + homeContentInset(context),
-          (hasResults || showExplore)
-              ? 8
-              : greetsInHeader
-              ? 20
-              : 32,
+          8,
           16 + homeContentInset(context),
-          (hasResults || showExplore) ? 8 : 16,
+          8,
         ),
         child: _buildSearchBar(),
       ),
@@ -1350,21 +1332,11 @@ class _HomeTabState extends ConsumerState<HomeTab>
     );
   }
 
-  Widget _buildHomeSectionsSliver({
-    required AppMotionSpec sectionMotion,
-    required bool hasResults,
-    required bool showRecentAccess,
-    required bool showExplore,
-    required bool showEmptyHomeState,
-  }) {
+  Widget _buildHomeSectionsSliver(AppMotionSpec sectionMotion) {
     return SliverToBoxAdapter(
       child: _resizeSection(
         sectionMotion,
-        (!_showsHome ||
-                hasResults ||
-                showRecentAccess ||
-                showExplore ||
-                showEmptyHomeState)
+        !_showsHome
             ? const SizedBox.shrink()
             : _HomeSections(inset: 16 + homeContentInset(context)),
       ),
@@ -1395,33 +1367,9 @@ class _HomeTabState extends ConsumerState<HomeTab>
         final exploreSections = ref.watch(
           exploreProvider.select((s) => s.sections),
         );
-        // The feed decides whether a greeting shows; its words
-        // are localized here and address the profile name.
-        final showGreeting =
-            ref.watch(exploreProvider.select((s) => s.greeting)) != null;
-        final profileName = ref.watch(
-          userProfileProvider.select((p) => p.value?.name ?? ''),
-        );
+        // Home greets; the feed on Search opens with its first section.
         return SliverMainAxisGroup(
-          slivers: [
-            // Mornye opens with Top Picks whether or not the feed follows.
-            if (context.isMornye && _HomeTopPicksSection.hasPicks(ref))
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8, bottom: 12),
-                  child: _HomeTopPicksSection(
-                    inset: 16 + homeContentInset(context),
-                  ),
-                ),
-              ),
-            ..._buildExploreSections(
-              exploreSections,
-              showGreeting
-                  ? homeGreeting(context.l10n, name: profileName)
-                  : null,
-              colorScheme,
-            ),
-          ],
+          slivers: _buildExploreSections(exploreSections, colorScheme),
         );
       },
     );
