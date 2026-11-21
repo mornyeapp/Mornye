@@ -16,8 +16,129 @@ class PinyinData {
     this._longestPhrase,
   );
 
-  factory PinyinData.decode(List<int> gzipped) =>
-      PinyinData.parse(utf8.decode(gzip.decode(gzipped)));
+  static const _binaryMagic = <int>[0x4D, 0x50, 0x59, 0x32]; // "MPY2"
+
+  factory PinyinData.decode(List<int> gzipped) {
+    final raw = gzip.decode(gzipped);
+    if (raw.length >= 4 &&
+        raw[0] == _binaryMagic[0] &&
+        raw[1] == _binaryMagic[1] &&
+        raw[2] == _binaryMagic[2] &&
+        raw[3] == _binaryMagic[3]) {
+      return PinyinData._decodeV2(
+        raw is Uint8List ? raw : Uint8List.fromList(raw),
+      );
+    }
+    return PinyinData.parse(utf8.decode(raw));
+  }
+
+  factory PinyinData._decodeV2(Uint8List bytes) {
+    var offset = 4;
+    int readUvar() {
+      var result = 0;
+      var shift = 0;
+      while (true) {
+        if (offset >= bytes.length) {
+          throw const FormatException('Truncated pinyin data');
+        }
+        final b = bytes[offset++];
+        result |= (b & 0x7F) << shift;
+        if ((b & 0x80) == 0) return result;
+        shift += 7;
+      }
+    }
+
+    int readSvar() {
+      final u = readUvar();
+      return (u & 1) == 0 ? (u >> 1) : -((u >> 1) + 1);
+    }
+
+    final readingCount = readUvar();
+    final readingsByteLen = readUvar();
+    if (offset + readingsByteLen > bytes.length) {
+      throw const FormatException('Truncated pinyin readings table');
+    }
+    final readingsText = utf8.decode(
+      bytes.sublist(offset, offset + readingsByteLen),
+    );
+    offset += readingsByteLen;
+    final readings = readingCount == 0
+        ? const <String>[]
+        : readingsText.split('\n');
+    if (readings.length != readingCount) {
+      throw const FormatException('Corrupt pinyin readings table');
+    }
+
+    final byCode = <int, int>{};
+    for (var r = 0; r < readingCount; r++) {
+      final count = readUvar();
+      var cp = 0;
+      for (var i = 0; i < count; i++) {
+        cp += readUvar();
+        byCode[cp] = r;
+      }
+    }
+
+    final phraseCount = readUvar();
+    final phrases = <String, String>{};
+    final longest = <int, int>{};
+    var prevRunes = const <int>[];
+    for (var p = 0; p < phraseCount; p++) {
+      final header = readUvar();
+      final shared = header >> 4;
+      var suffixLen = header & 0x0F;
+      if (suffixLen == 0x0F) suffixLen = readUvar();
+      final runes = List<int>.filled(shared + suffixLen, 0);
+      for (var i = 0; i < shared; i++) {
+        runes[i] = prevRunes[i];
+      }
+      for (var i = 0; i < suffixLen; i++) {
+        runes[shared + i] = 0x4E00 + readSvar();
+      }
+      prevRunes = runes;
+
+      final diffMask = readUvar();
+      final syllables = List<String>.filled(runes.length, '');
+      for (var i = 0; i < runes.length; i++) {
+        final ri = ((diffMask & (1 << i)) != 0)
+            ? readUvar()
+            : (byCode[runes[i]] ?? -1);
+        if (ri < 0 || ri >= readings.length) {
+          throw const FormatException('Invalid pinyin reading index');
+        }
+        syllables[i] = readings[ri];
+      }
+      final phrase = String.fromCharCodes(runes);
+      phrases[phrase] = syllables.join(' ');
+      final first = runes.first;
+      if (runes.length > (longest[first] ?? 0)) {
+        longest[first] = runes.length;
+      }
+    }
+
+    final simplifiedCount = readUvar();
+    final simplified = <int, int>{};
+    var trad = 0;
+    for (var i = 0; i < simplifiedCount; i++) {
+      trad += readUvar();
+      final simp = trad + readSvar();
+      simplified[trad] = simp;
+    }
+
+    final codes = Int32List.fromList(byCode.keys.toList()..sort());
+    final readingOf = Uint16List(codes.length);
+    for (var i = 0; i < codes.length; i++) {
+      readingOf[i] = byCode[codes[i]]!;
+    }
+    return PinyinData._(
+      codes,
+      readingOf,
+      List.unmodifiable(readings),
+      phrases,
+      simplified,
+      longest,
+    );
+  }
 
   factory PinyinData.parse(String data) {
     final lines = data.split('\n');

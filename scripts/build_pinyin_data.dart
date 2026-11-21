@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 /// Builds `assets/romanization/pinyin.txt.gz`, the data of offline Hanyu
 /// Pinyin for lyrics:
@@ -17,15 +18,31 @@ import 'dart:io';
 ///
 /// ```sh
 /// dart scripts/build_pinyin_data.dart <Unihan dir> <phrase pinyin.txt>
+/// dart scripts/build_pinyin_data.dart --repack
 /// ```
 ///
 /// Sources:
 /// https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip and
 /// https://github.com/mozillazg/phrase-pinyin-data/blob/master/pinyin.txt
 Future<void> main(List<String> args) async {
+  const outputPath = 'assets/romanization/pinyin.txt.gz';
+  if (args.length == 1 && args[0] == '--repack') {
+    final existing = File(outputPath);
+    final raw = gzip.decode(existing.readAsBytesSync());
+    final text = utf8.decode(raw);
+    final parsed = _parseTextV1(text);
+    _writeV2(
+      outputPath,
+      defaults: parsed.defaults,
+      phrases: parsed.phrases,
+      simplified: parsed.simplified,
+    );
+    return;
+  }
   if (args.length != 2) {
     stderr.writeln(
-      'Usage: dart scripts/build_pinyin_data.dart <Unihan dir> <pinyin.txt>',
+      'Usage: dart scripts/build_pinyin_data.dart <Unihan dir> <pinyin.txt>\n'
+      '   or: dart scripts/build_pinyin_data.dart --repack',
     );
     exitCode = 64;
     return;
@@ -81,34 +98,163 @@ Future<void> main(List<String> args) async {
   }
   phrases.addAll(_extraPhrases);
 
-  final byReading = <String, StringBuffer>{};
+  _writeV2(
+    outputPath,
+    defaults: defaults,
+    phrases: phrases,
+    simplified: simplified,
+  );
+}
+
+({
+  Map<int, String> defaults,
+  Map<String, String> phrases,
+  Map<int, int> simplified,
+})
+_parseTextV1(String text) {
+  final lines = text.split('\n');
+  if (lines.isEmpty || lines.first != 'mornye-pinyin 1') {
+    throw const FormatException('Expected mornye-pinyin 1 text payload');
+  }
+  final defaults = <int, String>{};
+  final phrases = <String, String>{};
+  final simplified = <int, int>{};
+  var section = '';
+  for (final line in lines.skip(1)) {
+    if (line.isEmpty) continue;
+    if (line.startsWith('#')) {
+      section = line;
+      continue;
+    }
+    switch (section) {
+      case '#chars':
+        final tab = line.indexOf('\t');
+        final reading = line.substring(0, tab);
+        for (final rune in line.substring(tab + 1).runes) {
+          defaults[rune] = reading;
+        }
+      case '#phrases':
+        final tab = line.indexOf('\t');
+        phrases[line.substring(0, tab)] = line.substring(tab + 1);
+      case '#simplified':
+        final runes = line.runes.toList();
+        for (var i = 0; i + 1 < runes.length; i += 2) {
+          simplified[runes[i]] = runes[i + 1];
+        }
+    }
+  }
+  return (defaults: defaults, phrases: phrases, simplified: simplified);
+}
+
+void _writeV2(
+  String outputPath, {
+  required Map<int, String> defaults,
+  required Map<String, String> phrases,
+  required Map<int, int> simplified,
+}) {
+  final byReading = <String, List<int>>{};
   final sortedChars = defaults.keys.toList()..sort();
   for (final rune in sortedChars) {
-    (byReading[defaults[rune]!] ??= StringBuffer()).writeCharCode(rune);
+    (byReading[defaults[rune]!] ??= <int>[]).add(rune);
   }
-  final out = StringBuffer('mornye-pinyin 1\n#chars\n');
-  final readingKeys = byReading.keys.toList()..sort();
-  for (final reading in readingKeys) {
-    out.write('$reading\t${byReading[reading]}\n');
+  for (final syllables in phrases.values) {
+    for (final syllable in syllables.split(' ')) {
+      byReading.putIfAbsent(syllable, () => <int>[]);
+    }
   }
-  out.write('#phrases\n');
-  final phraseKeys = phrases.keys.toList()..sort();
-  for (final phrase in phraseKeys) {
-    out.write('$phrase\t${phrases[phrase]}\n');
-  }
-  out.write('#simplified\n');
-  final pairs = StringBuffer();
-  final traditional = simplified.keys.toList()..sort();
-  for (final rune in traditional) {
-    pairs
-      ..writeCharCode(rune)
-      ..writeCharCode(simplified[rune]!);
-  }
-  out.write('$pairs\n');
 
-  final bytes = utf8.encode(out.toString());
+  final readingKeys = byReading.keys.toList()..sort();
+  final readingIndex = <String, int>{
+    for (var i = 0; i < readingKeys.length; i++) readingKeys[i]: i,
+  };
+
+  final out = BytesBuilder(copy: false);
+  void writeUvar(int value) {
+    if (value < 0) throw RangeError.value(value, 'value', 'must be >= 0');
+    var v = value;
+    while (v >= 0x80) {
+      out.addByte((v & 0x7F) | 0x80);
+      v >>= 7;
+    }
+    out.addByte(v);
+  }
+
+  void writeSvar(int value) {
+    final zigzag = value >= 0 ? (value << 1) : ((-value << 1) - 1);
+    writeUvar(zigzag);
+  }
+
+  // Binary format v2 ("MPY2"): delta-varint codepoints grouped by reading,
+  // front-coded diff-only phrases, and zigzag-encoded simplified pairs.
+  out.add(const [0x4D, 0x50, 0x59, 0x32]);
+  final readingsBytes = utf8.encode(readingKeys.join('\n'));
+  writeUvar(readingKeys.length);
+  writeUvar(readingsBytes.length);
+  out.add(readingsBytes);
+
+  for (final reading in readingKeys) {
+    final chars = byReading[reading]!;
+    writeUvar(chars.length);
+    var prev = 0;
+    for (final rune in chars) {
+      writeUvar(rune - prev);
+      prev = rune;
+    }
+  }
+
+  final phraseKeys = phrases.keys.toList()..sort();
+  writeUvar(phraseKeys.length);
+  var prevRunes = const <int>[];
+  for (final phrase in phraseKeys) {
+    final runes = phrase.runes.toList(growable: false);
+    final syllables = phrases[phrase]!.split(' ');
+    if (runes.length != syllables.length || runes.length > 52) {
+      throw FormatException('Unsupported phrase: $phrase');
+    }
+    var shared = 0;
+    while (shared < prevRunes.length &&
+        shared < runes.length &&
+        prevRunes[shared] == runes[shared]) {
+      shared++;
+    }
+    final suffixLen = runes.length - shared;
+    if (suffixLen < 0x0F) {
+      writeUvar((shared << 4) | suffixLen);
+    } else {
+      writeUvar((shared << 4) | 0x0F);
+      writeUvar(suffixLen);
+    }
+    for (var i = shared; i < runes.length; i++) {
+      writeSvar(runes[i] - 0x4E00);
+    }
+    var diffMask = 0;
+    final diffs = <int>[];
+    for (var i = 0; i < runes.length; i++) {
+      final ri = readingIndex[syllables[i]]!;
+      if (defaults[runes[i]] != syllables[i]) {
+        diffMask |= (1 << i);
+        diffs.add(ri);
+      }
+    }
+    writeUvar(diffMask);
+    for (final ri in diffs) {
+      writeUvar(ri);
+    }
+    prevRunes = runes;
+  }
+
+  final traditional = simplified.keys.toList()..sort();
+  writeUvar(traditional.length);
+  var prevTrad = 0;
+  for (final rune in traditional) {
+    writeUvar(rune - prevTrad);
+    prevTrad = rune;
+    writeSvar(simplified[rune]! - rune);
+  }
+
+  final bytes = out.takeBytes();
   final gz = GZipCodec(level: 9).encode(bytes);
-  final file = File('assets/romanization/pinyin.txt.gz')
+  final file = File(outputPath)
     ..createSync(recursive: true)
     ..writeAsBytesSync(gz);
   stdout.writeln(
