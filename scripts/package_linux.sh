@@ -97,6 +97,20 @@ install_tree() {
   cp -a "$BUNDLE_DIR/." "$root/usr/lib/$BINARY_NAME/"
   ln -s "../lib/$BINARY_NAME/$BINARY_NAME" "$root/usr/bin/$BINARY_NAME"
 
+  # Strip local symbols from the Linux runner, Rust backend, and native plugin
+  # shared libraries. Skip libapp.so and libflutter_linux_gtk.so because
+  # Flutter's AOT snapshot lookup relies on their exported ELF symbols.
+  if command -v strip >/dev/null 2>&1; then
+    strip --strip-unneeded "$root/usr/lib/$BINARY_NAME/$BINARY_NAME" 2>/dev/null || true
+    for lib in "$root/usr/lib/$BINARY_NAME/lib"/*.so; do
+      [[ -f "$lib" && ! -L "$lib" ]] || continue
+      case "$(basename "$lib")" in
+        libapp.so|libflutter_linux_gtk.so) continue ;;
+        *) strip --strip-unneeded "$lib" 2>/dev/null || true ;;
+      esac
+    done
+  fi
+
   install -Dm644 "$PACKAGING_DIR/$APP_ID.desktop" "$share/applications/$APP_ID.desktop"
   mkdir -p "$share/metainfo"
   awk -v version="$UPSTREAM_VERSION" -v date="$release_date" '
@@ -174,7 +188,11 @@ APPRUN
   # The AppStream file is validated separately; appimagetool's check would
   # depend on whichever appstreamcli the host has.
   ARCH="$ARCH" APPIMAGE_EXTRACT_AND_RUN=1 VERSION="$UPSTREAM_VERSION" \
-    "$appimagetool" --no-appstream --runtime-file "$runtime" "$appdir" "$OUTPUT"
+    "$appimagetool" --no-appstream --runtime-file "$runtime" \
+    --comp zstd \
+    --mksquashfs-opt -Xcompression-level --mksquashfs-opt 19 \
+    --mksquashfs-opt -b --mksquashfs-opt 1M \
+    "$appdir" "$OUTPUT"
   chmod 755 "$OUTPUT"
 }
 
@@ -184,7 +202,7 @@ build_deb() {
   chmod -R u+rwX,go+rX,go-w "$root"
 
   local deb_version="${UPSTREAM_VERSION//-/\~}"
-  local fallback_depends="libc6 (>= 2.35), libgcc-s1, libstdc++6, libgtk-3-0 | libgtk-3-0t64, libglib2.0-0 | libglib2.0-0t64, libsecret-1-0, libjson-glib-1.0-0, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, libasound2 | libasound2t64, liblzma5"
+  local fallback_depends="libc6 (>= 2.35), libgcc-s1, libstdc++6, libgtk-3-0 | libgtk-3-0t64, libglib2.0-0 | libglib2.0-0t64, libsecret-1-0, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, libasound2 | libasound2t64, liblzma5"
   local depends=""
 
   if command -v dpkg-shlibdeps >/dev/null 2>&1; then
@@ -198,9 +216,13 @@ build_deb() {
         elf_files+=("$candidate")
       fi
     done < <(find "$root/usr/lib/$BINARY_NAME" -type f -print0)
+    local shlib_paths=(-l"$root/usr/lib/$BINARY_NAME/lib")
+    if [[ -d "$root/usr/lib/$BINARY_NAME/lib/ffmpeg" ]]; then
+      shlib_paths+=(-l"$root/usr/lib/$BINARY_NAME/lib/ffmpeg")
+    fi
     local substvars
     if substvars="$(cd "$shlib_dir" && dpkg-shlibdeps -O --ignore-missing-info \
-        -l"$root/usr/lib/$BINARY_NAME/lib" "${elf_files[@]}" 2>"$WORK_DIR/shlibdeps.log")"; then
+        "${shlib_paths[@]}" "${elf_files[@]}" 2>"$WORK_DIR/shlibdeps.log")"; then
       depends="$(sed -n 's/^shlibs:Depends=//p' <<< "$substvars")"
     else
       echo "Warning: dpkg-shlibdeps failed; using the fixed dependency list." >&2
@@ -231,7 +253,7 @@ CONTROL
 
   mkdir -p "$(dirname "$OUTPUT")"
   rm -f "$OUTPUT"
-  dpkg-deb --build --root-owner-group "$root" "$OUTPUT"
+  dpkg-deb -Zxz -z9 --build --root-owner-group "$root" "$OUTPUT"
   dpkg-deb --info "$OUTPUT"
 }
 

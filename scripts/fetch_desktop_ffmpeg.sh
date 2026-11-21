@@ -70,12 +70,25 @@ MACOS_MIN_VERSION="12.0"
 MACOS_ENCODERS="aac,alac,flac,libmp3lame,libopus,opus,vorbis"
 MACOS_ENCODERS+=",pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le"
 MACOS_ENCODERS+=",pcm_f32le,pcm_u8,mjpeg,png,rawvideo,wrapped_avframe"
+# Drop large standalone video decoders Mornye never needs, while retaining
+# every audio decoder, H.264/HEVC motion artwork, and cover image decoders.
+MACOS_DISABLED_VIDEO_DECODERS="vp8,vp9,av1,mpeg1video,mpeg2video,mpeg4"
+MACOS_DISABLED_VIDEO_DECODERS+=",msmpeg4v1,msmpeg4v2,msmpeg4v3,wmv1,wmv2,wmv3,vc1"
+MACOS_DISABLED_VIDEO_DECODERS+=",theora,prores,dnxhd,rv10,rv20,rv30,rv40,svq1,svq3"
+MACOS_DISABLED_VIDEO_DECODERS+=",cinepak,indeo2,indeo3,indeo4,indeo5,h261,h263,h263i,h263p"
+MACOS_DISABLED_VIDEO_DECODERS+=",flv,flashsv,flashsv2,dirac,snow,bink,smacker"
+MACOS_DISABLED_VIDEO_DECODERS+=",truemotion1,truemotion2,vp3,vp5,vp6,vp6a,vp6f"
+MACOS_DISABLED_VIDEO_DECODERS+=",exr,jpeg2000,jpegls,tiff,psd,dds,qtrle,tscc,utvideo"
+MACOS_DISABLED_VIDEO_DECODERS+=",vvc,evc,cavs,mjpegb,dvvideo,ffv1,ffvhuff,huffyuv"
+MACOS_DISABLED_VIDEO_DECODERS+=",lagarith,magicyuv,pixlet,sheervideo,speedhq,cfhd,hap"
 MACOS_FFMPEG_OPTIONS=(
   --disable-gpl --disable-nonfree --disable-version3
-  --disable-shared --enable-static --disable-autodetect
+  --enable-shared --disable-static --disable-autodetect
   --disable-doc --disable-ffplay --disable-debug
   --disable-avdevice --disable-indevs --disable-outdevs
+  --disable-postproc --disable-hwaccels
   --disable-encoders --enable-encoder="$MACOS_ENCODERS"
+  --disable-decoder="$MACOS_DISABLED_VIDEO_DECODERS"
   --enable-zlib --enable-audiotoolbox --enable-securetransport
   --enable-libmp3lame --enable-libopus --enable-libsoxr
   --pkg-config-flags=--static
@@ -150,7 +163,7 @@ fetch_btbn() {
     windows-x64) platform=win64 ext=zip ;;
     windows-arm64) platform=winarm64 ext=zip ;;
   esac
-  asset="${MORNYE_FFMPEG_BTBN_ASSET:-ffmpeg-n$BTBN_BRANCH-latest-$platform-lgpl-$BTBN_BRANCH.$ext}"
+  asset="${MORNYE_FFMPEG_BTBN_ASSET:-ffmpeg-n$BTBN_BRANCH-latest-$platform-lgpl-shared-$BTBN_BRANCH.$ext}"
   base="https://github.com/BtbN/FFmpeg-Builds/releases/download/$BTBN_TAG"
 
   # "latest" moves; always fetch the checksums that match the archive.
@@ -173,7 +186,30 @@ fetch_btbn() {
   fi
   local root
   root="$(find "$WORK_DIR/extract" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  rm -f "$OUT_DIR"/*.dll "$OUT_DIR"/lib*.so*
   cp "$root/bin/ffmpeg$EXE" "$root/bin/ffprobe$EXE" "$OUT_DIR/"
+  if [[ "$OS" == "windows" ]]; then
+    if compgen -G "$root/bin/*.dll" > /dev/null; then
+      cp "$root/bin/"*.dll "$OUT_DIR/"
+    fi
+  elif [[ "$OS" == "linux" ]]; then
+    if compgen -G "$root/lib/lib*.so*" > /dev/null; then
+      cp -a "$root/lib"/lib*.so* "$OUT_DIR/"
+      # Remove unversioned linker symlinks (.so without version suffix); the
+      # executables link SONAMEs like libavcodec.so.62.
+      for link in "$OUT_DIR"/lib*.so; do
+        [[ -L "$link" ]] && rm -f "$link"
+      done
+      # Keep FFmpeg's shared libraries private to lib/ffmpeg/ via $ORIGIN so
+      # they never collide with the host system's libmpv / libav*.
+      if command -v patchelf >/dev/null 2>&1; then
+        patchelf --set-rpath '$ORIGIN' "$OUT_DIR/ffmpeg" "$OUT_DIR/ffprobe"
+        for lib in "$OUT_DIR"/lib*.so.*; do
+          [[ -f "$lib" && ! -L "$lib" ]] && patchelf --set-rpath '$ORIGIN' "$lib"
+        done
+      fi
+    fi
+  fi
   cp "$root/LICENSE.txt" "$OUT_DIR/LICENSE.txt"
   {
     echo "FFmpeg LGPL build from BtbN/FFmpeg-Builds."
@@ -198,10 +234,10 @@ build_macos_arch() {
   jobs="$(sysctl -n hw.ncpu)"
   prefix="$work/deps"
   src="$work/src"
-  local flags="-arch $clang_arch -mmacosx-version-min=$MACOS_MIN_VERSION -O2"
+  local flags="-arch $clang_arch -mmacosx-version-min=$MACOS_MIN_VERSION -Os"
 
   mkdir -p "$out" "$work" "$downloads"
-  rm -f "$out/ffmpeg" "$out/ffprobe"
+  rm -f "$out/ffmpeg" "$out/ffprobe" "$out"/lib*.dylib
   download "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz" \
     "$downloads/ffmpeg-$FFMPEG_VERSION.tar.xz"
   verify "$downloads/ffmpeg-$FFMPEG_VERSION.tar.xz" "$FFMPEG_SHA256"
@@ -283,14 +319,41 @@ build_macos_arch() {
     # Bash 3.2 (macOS) treats an empty "${cross[@]}" as unbound.
     ${cross[@]+"${cross[@]}"}
     --extra-cflags="$flags -I$prefix/include"
-    --extra-ldflags="-arch $clang_arch -mmacosx-version-min=$MACOS_MIN_VERSION -L$prefix/lib"
+    --extra-ldflags="-arch $clang_arch -mmacosx-version-min=$MACOS_MIN_VERSION -L$prefix/lib -Wl,-rpath,@loader_path -Wl,-dead_strip"
     "${MACOS_FFMPEG_OPTIONS[@]}"
   )
   (
     cd "$src/ffmpeg-$FFMPEG_VERSION"
     ./configure "${configure[@]}"
     make -j"$jobs"
-    cp ffmpeg ffprobe "$out/"
+    make install
+    cp "$prefix/bin/ffmpeg" "$prefix/bin/ffprobe" "$out/"
+    # Stage versioned shared libraries and SONAME symlinks (drop unversioned
+    # development links like libavcodec.dylib).
+    for lib in "$prefix/lib"/lib*.dylib; do
+      local name
+      name="$(basename "$lib")"
+      [[ "$name" =~ ^lib[a-z]+\.[0-9] ]] || continue
+      cp -a "$lib" "$out/$name"
+    done
+    # Rewrite install names from the temporary build prefix to @rpath so
+    # ffmpeg, ffprobe, and their sibling dylibs resolve via @loader_path.
+    local item dep
+    for item in "$out/ffmpeg" "$out/ffprobe" "$out"/lib*.dylib; do
+      [[ -f "$item" && ! -L "$item" ]] || continue
+      if [[ "$item" == *.dylib ]]; then
+        install_name_tool -id "@rpath/$(basename "$item")" "$item"
+      fi
+      while read -r dep _; do
+        case "$dep" in
+          "$prefix"/lib/*)
+            install_name_tool -change "$dep" "@rpath/$(basename "$dep")" "$item"
+            ;;
+        esac
+      done < <(otool -L "$item" | tail -n +2 | grep -v ':$')
+      xcrun strip -x "$item"
+      codesign --force --sign - "$item"
+    done
     cp COPYING.LGPLv2.1 "$out/LICENSE.txt"
   )
   {
@@ -324,9 +387,23 @@ build_macos() {
   build_macos_arch arm64
   build_macos_arch x64
   local base="$PROJECT_DIR/build/ffmpeg"
+  rm -f "$OUT_DIR"/lib*.dylib
   for tool in ffmpeg ffprobe; do
     lipo -create "$base/macos-arm64/$tool" "$base/macos-x64/$tool" \
       -output "$OUT_DIR/$tool"
+    codesign --force --sign - "$OUT_DIR/$tool"
+  done
+  for lib in "$base/macos-arm64"/lib*.dylib; do
+    [[ -e "$lib" || -L "$lib" ]] || continue
+    local name
+    name="$(basename "$lib")"
+    if [[ -L "$lib" ]]; then
+      cp -a "$lib" "$OUT_DIR/$name"
+    else
+      lipo -create "$base/macos-arm64/$name" "$base/macos-x64/$name" \
+        -output "$OUT_DIR/$name"
+      codesign --force --sign - "$OUT_DIR/$name"
+    fi
   done
   cp "$base/macos-arm64/LICENSE.txt" "$OUT_DIR/LICENSE.txt"
   {
@@ -360,18 +437,25 @@ check_license() {
     exit 1
   fi
   if [[ "$OS" == "macos" ]]; then
-    local tool library
-    for tool in ffmpeg ffprobe; do
+    local item library
+    for item in "$OUT_DIR/ffmpeg" "$OUT_DIR/ffprobe" "$OUT_DIR"/lib*.dylib; do
+      [[ -f "$item" && ! -L "$item" ]] || continue
       # The first line names the binary itself; the rest are its libraries.
       while read -r library _; do
         case "$library" in
           /usr/lib/*|/System/Library/*) ;;
+          @rpath/*)
+            if [[ ! -e "$OUT_DIR/${library#@rpath/}" ]]; then
+              echo "Error: $(basename "$item") links missing bundled library $library." >&2
+              exit 1
+            fi
+            ;;
           *)
-            echo "Error: $tool links $library, which is not a system library." >&2
+            echo "Error: $(basename "$item") links $library, which is not a system or bundled library." >&2
             exit 1
             ;;
         esac
-      done < <(otool -L "$OUT_DIR/$tool" | tail -n +2 | grep -v ':$')
+      done < <(otool -L "$item" | tail -n +2 | grep -v ':$')
     done
   fi
 }

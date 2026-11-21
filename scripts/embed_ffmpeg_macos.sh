@@ -38,7 +38,13 @@ is_staged() {
 }
 
 SOURCE_DIR=""
-for candidate in "$STAGE_ROOT/macos-universal" "$STAGE_ROOT/macos-$(host_arch)"; do
+CANDIDATES=()
+case "${MORNYE_MACOS_ARCH:-}" in
+  arm64) CANDIDATES=("$STAGE_ROOT/macos-arm64" "$STAGE_ROOT/macos-universal") ;;
+  x64|x86_64) CANDIDATES=("$STAGE_ROOT/macos-x64" "$STAGE_ROOT/macos-universal") ;;
+  *) CANDIDATES=("$STAGE_ROOT/macos-universal" "$STAGE_ROOT/macos-$(host_arch)") ;;
+esac
+for candidate in "${CANDIDATES[@]}"; do
   if is_staged "$candidate"; then
     SOURCE_DIR="$candidate"
     break
@@ -69,6 +75,10 @@ mkdir -p "$DESTINATION_DIR"
 for file in "${FILES[@]}"; do
   cp -f "$SOURCE_DIR/$file" "$DESTINATION_DIR/$file"
 done
+for lib in "$SOURCE_DIR"/lib*.dylib; do
+  [[ -e "$lib" || -L "$lib" ]] || continue
+  cp -a "$lib" "$DESTINATION_DIR/$(basename "$lib")"
+done
 chmod 755 "$DESTINATION_DIR/ffmpeg" "$DESTINATION_DIR/ffprobe"
 
 # Nested code must be signed before Xcode signs the app. The app ships
@@ -78,6 +88,10 @@ SIGN_IDENTITY="-"
 if [[ "${CODE_SIGNING_ALLOWED:-YES}" != "NO" && -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]]; then
   SIGN_IDENTITY="$EXPANDED_CODE_SIGN_IDENTITY"
 fi
+for lib in "$DESTINATION_DIR"/lib*.dylib; do
+  [[ -f "$lib" && ! -L "$lib" ]] || continue
+  codesign --force --sign "$SIGN_IDENTITY" --timestamp=none "$lib"
+done
 for tool in ffmpeg ffprobe; do
   codesign --force --sign "$SIGN_IDENTITY" --options runtime --timestamp=none \
     "$DESTINATION_DIR/$tool"

@@ -14,6 +14,7 @@
 # Environment:
 #   MORNYE_DMG_VOLUME_NAME     volume name (default: Mornye)
 #   MORNYE_CODE_SIGN_IDENTITY  signing identity (default: - for ad hoc)
+#   MORNYE_MACOS_ARCH          arm64, x86_64/x64, or universal (default: universal)
 
 set -euo pipefail
 
@@ -31,6 +32,15 @@ OUTPUT="$2"
 VOLUME_NAME="${MORNYE_DMG_VOLUME_NAME:-Mornye}"
 SIGN_IDENTITY="${MORNYE_CODE_SIGN_IDENTITY:--}"
 APP_NAME="$(basename "$APP_SOURCE")"
+case "${MORNYE_MACOS_ARCH:-universal}" in
+  arm64) TARGET_ARCH="arm64"; VERIFY_ARCHS=(arm64) ;;
+  x86_64|x64) TARGET_ARCH="x86_64"; VERIFY_ARCHS=(x86_64) ;;
+  universal) TARGET_ARCH="universal"; VERIFY_ARCHS=(arm64 x86_64) ;;
+  *)
+    echo "Error: MORNYE_MACOS_ARCH must be arm64, x86_64, x64, or universal." >&2
+    exit 1
+    ;;
+esac
 
 if [[ ! -f "$APP_SOURCE/Contents/Info.plist" ]]; then
   echo "Error: $APP_SOURCE is not an app bundle." >&2
@@ -68,16 +78,53 @@ is_macho() {
   file -b "$1" | grep -q '^Mach-O'
 }
 
-# Sign nested code first (helper executables such as a bundled ffmpeg,
-# loose dylibs, then frameworks), and the app itself last with the
-# entitlements it was built with.
+# Remove non-macOS Flutter assets before signing and imaging.
+FLUTTER_ASSETS_DIR="$STAGED_APP/Contents/Frameworks/App.framework/Resources/flutter_assets"
+if [[ -d "$FLUTTER_ASSETS_DIR" ]]; then
+  rm -rf \
+    "$FLUTTER_ASSETS_DIR/packages/media_kit/assets/web" \
+    "$FLUTTER_ASSETS_DIR/packages/record_web" \
+    "$FLUTTER_ASSETS_DIR/packages/flutter_local_notifications_web"
+  rm -f \
+    "$FLUTTER_ASSETS_DIR/packages/liquid_glass_easy/lib/assets/shaders/metaball_"* \
+    "$FLUTTER_ASSETS_DIR/packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_desktop.frag" \
+    "$FLUTTER_ASSETS_DIR/packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_border.frag" \
+    "$FLUTTER_ASSETS_DIR/assets/licenses/usb.txt" \
+    "$FLUTTER_ASSETS_DIR/assets/licenses/oboe.txt" \
+    "$FLUTTER_ASSETS_DIR/assets/licenses/wavpack.txt" \
+    "$FLUTTER_ASSETS_DIR/assets/licenses/flac.txt"
+fi
+
+# When packaging a single-architecture DMG, thin every universal Mach-O slice
+# (including FlutterMacOS, media_kit, and plugin frameworks) before signing.
+if [[ "$TARGET_ARCH" != "universal" ]]; then
+  echo "Thinning universal Mach-O binaries in $APP_NAME to $TARGET_ARCH"
+  while IFS= read -r -d '' candidate; do
+    if file -b "$candidate" | grep -q '^Mach-O universal binary'; then
+      if lipo "$candidate" -verify_arch "$TARGET_ARCH" 2>/dev/null; then
+        lipo -thin "$TARGET_ARCH" "$candidate" -output "$candidate.thin"
+        mv -f "$candidate.thin" "$candidate"
+      fi
+    fi
+  done < <(find "$STAGED_APP" -type f ! -lname '*' -print0)
+fi
+
+# Sign nested code first (shared libraries, helper executables such as a
+# bundled ffmpeg, loose dylibs, then frameworks), and the app itself last with
+# the entitlements it was built with.
 echo "Signing $APP_NAME with identity $SIGN_IDENTITY"
+while IFS= read -r -d '' library; do
+  if is_macho "$library"; then
+    codesign --force --sign "$SIGN_IDENTITY" --timestamp=none "$library"
+  fi
+done < <(find "$STAGED_APP/Contents/Resources" -type f -name '*.dylib' -print0)
+
 while IFS= read -r -d '' candidate; do
   if is_macho "$candidate"; then
     codesign --force --sign "$SIGN_IDENTITY" --timestamp=none "$candidate"
   fi
 done < <(find "$STAGED_APP/Contents/MacOS" "$STAGED_APP/Contents/Resources" \
-  -type f -perm -u+x ! -path "$STAGED_APP/Contents/MacOS/$EXECUTABLE" -print0)
+  -type f -perm -u+x ! -name '*.dylib' ! -path "$STAGED_APP/Contents/MacOS/$EXECUTABLE" -print0)
 
 if [[ -d "$STAGED_APP/Contents/Frameworks" ]]; then
   while IFS= read -r -d '' library; do
@@ -100,12 +147,12 @@ codesign --verify --deep --strict "$STAGED_APP"
 mkdir -p "$(dirname "$OUTPUT")"
 rm -f "$OUTPUT"
 echo "Creating $OUTPUT"
+# ULMO (LZMA) is natively supported since macOS 10.15; Mornye targets 12.0+.
 hdiutil create \
   -volname "$VOLUME_NAME" \
   -srcfolder "$STAGE_DIR" \
   -fs HFS+ \
-  -format UDZO \
-  -imagekey zlib-level=9 \
+  -format ULMO \
   -ov \
   "$OUTPUT" >/dev/null
 hdiutil verify "$OUTPUT" >/dev/null
@@ -123,7 +170,7 @@ for binary in "$MOUNTED_APP/Contents/MacOS/$EXECUTABLE" \
   "$MOUNTED_APP/Contents/Frameworks/libmornye_desktop.dylib"; do
   [[ -f "$binary" ]] || continue
   # One architecture per call: some lipo builds reject several at once.
-  for arch in arm64 x86_64; do
+  for arch in "${VERIFY_ARCHS[@]}"; do
     if ! lipo "$binary" -verify_arch "$arch"; then
       echo "Error: $binary has no $arch slice." >&2
       exit 1

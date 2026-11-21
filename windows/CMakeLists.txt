@@ -37,6 +37,8 @@ function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_17)
   target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100")
   target_compile_options(${TARGET} PRIVATE /EHsc)
+  target_compile_options(${TARGET} PRIVATE "$<$<CONFIG:Release>:/O1;/Gy;/Gw>")
+  target_link_options(${TARGET} PRIVATE "$<$<CONFIG:Release>:/OPT:REF;/OPT:ICF>")
   target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
   target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
 endfunction()
@@ -148,6 +150,11 @@ set(MORNYE_FFMPEG_DIR
 if(EXISTS "${MORNYE_FFMPEG_DIR}/ffmpeg.exe" AND EXISTS "${MORNYE_FFMPEG_DIR}/ffprobe.exe")
   install(PROGRAMS "${MORNYE_FFMPEG_DIR}/ffmpeg.exe" "${MORNYE_FFMPEG_DIR}/ffprobe.exe"
     DESTINATION "${CMAKE_INSTALL_PREFIX}/ffmpeg" COMPONENT Runtime)
+  file(GLOB MORNYE_FFMPEG_DLLS "${MORNYE_FFMPEG_DIR}/*.dll")
+  if(MORNYE_FFMPEG_DLLS)
+    install(FILES ${MORNYE_FFMPEG_DLLS}
+      DESTINATION "${CMAKE_INSTALL_PREFIX}/ffmpeg" COMPONENT Runtime)
+  endif()
   install(FILES "${MORNYE_FFMPEG_DIR}/LICENSE.txt" "${MORNYE_FFMPEG_DIR}/SOURCE.txt"
     DESTINATION "${CMAKE_INSTALL_PREFIX}/ffmpeg" COMPONENT Runtime)
 else()
@@ -169,7 +176,18 @@ install(CODE "
   file(REMOVE_RECURSE \"${INSTALL_BUNDLE_DATA_DIR}/${FLUTTER_ASSET_DIR_NAME}\")
   " COMPONENT Runtime)
 install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
-  DESTINATION "${INSTALL_BUNDLE_DATA_DIR}" COMPONENT Runtime)
+  DESTINATION "${INSTALL_BUNDLE_DATA_DIR}" COMPONENT Runtime
+  PATTERN "packages/media_kit/assets/web/*" EXCLUDE
+  PATTERN "packages/record_web/*" EXCLUDE
+  PATTERN "packages/flutter_local_notifications_web/*" EXCLUDE
+  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/metaball_*" EXCLUDE
+  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_border.frag" EXCLUDE
+  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/liquid_glass.frag" EXCLUDE
+  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_geometry.frag" EXCLUDE
+  PATTERN "assets/licenses/usb.txt" EXCLUDE
+  PATTERN "assets/licenses/oboe.txt" EXCLUDE
+  PATTERN "assets/licenses/wavpack.txt" EXCLUDE
+  PATTERN "assets/licenses/flac.txt" EXCLUDE)
 
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release

@@ -72,7 +72,8 @@ SetupIconFile=..\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
 WizardStyle=modern
-Compression=lzma2/max
+Compression=lzma2/ultra64
+LZMAUseSeparateProcess=yes
 SolidCompression=yes
 OutputDir={#OutputDir}
 OutputBaseFilename={#OutputBaseName}
@@ -89,7 +90,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Type: filesandordirs; Name: "{app}\data"
 
 [Files]
-Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#BundleDir}\*"; DestDir: "{app}"; Excludes: "*.pdb,*.lib,*.exp,*.ilk"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "{#AppUserModelId}"

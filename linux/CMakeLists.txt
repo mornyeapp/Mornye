@@ -40,7 +40,8 @@ endif()
 function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_14)
   target_compile_options(${TARGET} PRIVATE -Wall -Werror)
-  target_compile_options(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:-O3>")
+  target_compile_options(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:-Os;-ffunction-sections;-fdata-sections>")
+  target_link_options(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:-Wl,--gc-sections>")
   target_compile_definitions(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:NDEBUG>")
 endfunction()
 
@@ -134,6 +135,11 @@ set(MORNYE_FFMPEG_DIR
 if(EXISTS "${MORNYE_FFMPEG_DIR}/ffmpeg" AND EXISTS "${MORNYE_FFMPEG_DIR}/ffprobe")
   install(PROGRAMS "${MORNYE_FFMPEG_DIR}/ffmpeg" "${MORNYE_FFMPEG_DIR}/ffprobe"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/ffmpeg" COMPONENT Runtime)
+  file(GLOB MORNYE_FFMPEG_LIBS "${MORNYE_FFMPEG_DIR}/lib*.so*")
+  if(MORNYE_FFMPEG_LIBS)
+    install(FILES ${MORNYE_FFMPEG_LIBS}
+      DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/ffmpeg" COMPONENT Runtime)
+  endif()
   install(FILES "${MORNYE_FFMPEG_DIR}/LICENSE.txt" "${MORNYE_FFMPEG_DIR}/SOURCE.txt"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/ffmpeg" COMPONENT Runtime)
 else()
@@ -155,7 +161,18 @@ install(CODE "
   file(REMOVE_RECURSE \"${INSTALL_BUNDLE_DATA_DIR}/${FLUTTER_ASSET_DIR_NAME}\")
   " COMPONENT Runtime)
 install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
-  DESTINATION "${INSTALL_BUNDLE_DATA_DIR}" COMPONENT Runtime)
+  DESTINATION "${INSTALL_BUNDLE_DATA_DIR}" COMPONENT Runtime
+  PATTERN "packages/media_kit/assets/web/*" EXCLUDE
+  PATTERN "packages/record_web/*" EXCLUDE
+  PATTERN "packages/flutter_local_notifications_web/*" EXCLUDE
+  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/metaball_*" EXCLUDE
+  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_border.frag" EXCLUDE
+  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/liquid_glass.frag" EXCLUDE
+  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_geometry.frag" EXCLUDE
+  PATTERN "assets/licenses/usb.txt" EXCLUDE
+  PATTERN "assets/licenses/oboe.txt" EXCLUDE
+  PATTERN "assets/licenses/wavpack.txt" EXCLUDE
+  PATTERN "assets/licenses/flac.txt" EXCLUDE)
 
 if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"

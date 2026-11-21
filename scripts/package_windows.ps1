@@ -52,7 +52,22 @@ $baseName = "Mornye-$Version-windows-$Arch"
 if ($Only -in 'all', 'portable') {
     $zip = Join-Path $OutputDir "$baseName-portable.zip"
     if (Test-Path $zip) { Remove-Item $zip -Force }
-    Compress-Archive -Path (Join-Path $BundleDir '*') -DestinationPath $zip
+    $sevenZip = Get-Command '7z.exe', '7z' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($sevenZip) {
+        Push-Location $BundleDir
+        try {
+            & $sevenZip.Source a -tzip -mx=9 '-xr!*.pdb' '-xr!*.lib' '-xr!*.exp' '-xr!*.ilk' $zip '*' | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "7z failed with exit code $LASTEXITCODE" }
+        }
+        finally {
+            Pop-Location
+        }
+    } else {
+        $items = Get-ChildItem -LiteralPath $BundleDir | Where-Object {
+            $_.Extension -notin '.pdb', '.lib', '.exp', '.ilk'
+        }
+        Compress-Archive -Path $items.FullName -DestinationPath $zip -CompressionLevel Optimal
+    }
     Write-Host "Created $zip"
 }
 
