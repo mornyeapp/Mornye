@@ -210,6 +210,9 @@ List<String> _titles(List<MediaItem> items) => [
 ];
 
 void main() {
+  // The cover store hashes a fetched file over the backend channel first.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('the root shows song, album, artist and playlist tabs', () async {
     final tabs = await _browser().children(AudioService.browsableRootId);
 
