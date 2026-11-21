@@ -439,7 +439,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           translation
               ? l10n.lyricsTranslationEditTitle
               : l10n.lyricsTranslationAddTitle,
-          Icons.edit_note,
+          Icons.edit_outlined,
         ),
       if (timing) ('timing', l10n.lyricsOffset, Icons.timer_outlined),
       if (canEdit) ('edit', l10n.lyricsEditTitle, Icons.edit_note),

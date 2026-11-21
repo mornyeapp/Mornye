@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
@@ -486,12 +485,10 @@ class _LyricsTranslationEditorSheetState
               icon: _saving
                   ? SizedBox.square(
                       dimension: 18,
-                      child: mornye
-                          ? const CupertinoActivityIndicator()
-                          : AppLoadingIndicator(
-                              size: 18,
-                              color: scheme.onPrimary,
-                            ),
+                      child: AppLoadingIndicator(
+                        size: 18,
+                        color: scheme.onPrimary,
+                      ),
                     )
                   : const AppIcon(Icons.check),
               label: Text(l10n.dialogSave),
