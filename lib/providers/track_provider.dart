@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/models/artist_concert.dart';
+import 'package:mornye/services/extension_link_resolver.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/string_utils.dart';
@@ -220,31 +221,11 @@ class TrackNotifier extends Notifier<TrackState> {
 
       _log.i('Found extension URL handler: $extensionHandler');
 
-      Map<String, dynamic>? result;
-      for (int attempt = 1; attempt <= 3; attempt++) {
-        result = await PlatformBridge.handleURLWithExtension(url);
-        if (!_isRequestValid(requestId)) return;
-
-        if (result != null &&
-            result['type'] == 'track' &&
-            result['track'] != null) {
-          final trackData = result['track'] as Map<String, dynamic>;
-          final name = trackData['name']?.toString() ?? '';
-          if (name.isNotEmpty) {
-            break;
-          }
-        } else if (result != null &&
-            (result['type'] == 'album' || result['type'] == 'playlist')) {
-          break;
-        } else if (result != null && result['type'] == 'artist') {
-          break;
-        }
-
-        if (attempt < 3) {
-          await Future<void>.delayed(const Duration(milliseconds: 500));
-          if (!_isRequestValid(requestId)) return;
-        }
-      }
+      final result = await ExtensionLinkResolver.handle(
+        url,
+        isActive: () => _isRequestValid(requestId),
+      );
+      if (!_isRequestValid(requestId)) return;
 
       if (result != null) {
         final type = result['type'] as String?;

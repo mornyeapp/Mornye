@@ -68,20 +68,44 @@ extension _HomeTabCsvImport on _HomeTabState {
     }
 
     try {
-      final tracks = await CsvImportService.pickAndParseCsv(
-        onProgress: (current, total) {
-          currentProgress = current;
-          totalTracks = total;
-          if (!progressDialogInitialized && total > 0) {
-            showProgressDialog();
-          }
-          setDialogState?.call(() {});
-        },
-      );
+      final List<Track> tracks;
+      try {
+        final parsed = await CsvImportService.pickAndParseCsv(
+          onProgress: (current, total) {
+            currentProgress = current;
+            totalTracks = total;
+            if (!progressDialogInitialized && total > 0) {
+              showProgressDialog();
+            }
+            setDialogState?.call(() {});
+          },
+          // Link rows need the extensions' URL handlers.
+          beforeEnrich: () =>
+              ref.read(extensionProvider.notifier).waitForInitialization(),
+        );
+        if (parsed == null) return;
+        tracks = parsed;
+      } catch (_) {
+        closeProgressDialog();
+        if (mounted) {
+          showAppSnackBar(
+            this.context,
+            content: Text(this.context.l10n.playlistImportFailed),
+          );
+        }
+        return;
+      }
 
       closeProgressDialog();
 
-      if (tracks.isNotEmpty) {
+      if (tracks.isEmpty) {
+        if (mounted) {
+          showAppSnackBar(
+            this.context,
+            content: Text(this.context.l10n.playlistImportNoTracks),
+          );
+        }
+      } else {
         final settings = ref.read(settingsProvider);
 
         if (!mounted) return;

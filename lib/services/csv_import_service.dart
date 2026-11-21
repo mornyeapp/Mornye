@@ -5,10 +5,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:mornye/constants/music_services.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/services/extension_link_resolver.dart';
 import 'package:mornye/services/m3u_playlist_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/service_track_link.dart';
 
 List<Track> _parsePlaylistInBackground(Map<String, dynamic> request) {
   final content = utf8.decode(request['bytes'] as Uint8List);
@@ -26,8 +29,11 @@ class CsvImportService {
   static final _log = AppLogger('CsvImportService');
   static final RegExp _lineSplitPattern = RegExp(r'\r\n|\r|\n');
 
-  static Future<List<Track>> pickAndParseCsv({
+  /// Null when no file was picked; empty when the file has no usable rows.
+  /// [beforeEnrich] runs once rows were found, before any lookup.
+  static Future<List<Track>?> pickAndParseCsv({
     void Function(int current, int total)? onProgress,
+    Future<void> Function()? beforeEnrich,
   }) async {
     try {
       final picked = await FilePicker.pickFile(
@@ -44,14 +50,16 @@ class CsvImportService {
         );
 
         if (tracks.isNotEmpty) {
+          await beforeEnrich?.call();
           return await enrichTracksMetadata(tracks, onProgress: onProgress);
         }
         return tracks;
       }
     } catch (e) {
       _log.e('Error picking/parsing playlist file: $e');
+      rethrow;
     }
-    return [];
+    return null;
   }
 
   /// Native parsing consumes bytes directly. Old native binaries and test
@@ -86,6 +94,7 @@ class CsvImportService {
     void Function(int current, int total)? onProgress,
     Future<List<Map<String, dynamic>>> Function(String query, int limit)?
     lookup,
+    Future<List<Track>?> Function(String url)? resolveLink,
     int concurrency = 3,
   }) async {
     if (tracks.isEmpty) return const [];
@@ -97,7 +106,9 @@ class CsvImportService {
               limit: limit,
               includeExtensions: true,
             );
-    final results = List<Track?>.filled(tracks.length, null);
+    final linkLookup = resolveLink ?? ExtensionLinkResolver.resolveTracks;
+    final covers = <String, Future<String?>>{};
+    final results = List<List<Track>>.filled(tracks.length, const []);
     var nextIndex = 0;
     var completed = 0;
     final workerCount = math.min(math.max(1, concurrency), tracks.length);
@@ -111,16 +122,134 @@ class CsvImportService {
         final index = nextIndex++;
         if (index >= tracks.length) return;
         final track = tracks[index];
-        results[index] = await _enrichTrack(track, providerLookup);
+        results[index] = await _enrichRow(
+          track,
+          providerLookup,
+          linkLookup,
+          covers,
+        );
         completed++;
         onProgress?.call(completed, tracks.length);
       }
     }
 
     await Future.wait(List.generate(workerCount, (_) => worker()));
-    final enriched = results.cast<Track>();
-    _log.i('Enrichment complete: ${enriched.length} tracks');
+    final enriched = [for (final row in results) ...row];
+    _log.i(
+      'Enrichment complete: ${enriched.length} tracks from ${tracks.length} rows',
+    );
     return enriched;
+  }
+
+  /// A row's tracks: what its link names (all tracks of an album or a
+  /// playlist), else the row itself matched by ISRC or text.
+  static Future<List<Track>> _enrichRow(
+    Track row,
+    Future<List<Map<String, dynamic>>> Function(String query, int limit) lookup,
+    Future<List<Track>?> Function(String url) resolveLink,
+    Map<String, Future<String?>> covers,
+  ) async {
+    final link = _rowLink(row.id);
+    if (link == null) return [await _enrichTrack(row, lookup)];
+    try {
+      var tracks = await resolveLink(link);
+      if (tracks != null && tracks.isNotEmpty) {
+        final isrc = row.isrc?.trim() ?? '';
+        if (tracks.length == 1 &&
+            isrc.isNotEmpty &&
+            (tracks.single.isrc?.trim() ?? '').isEmpty) {
+          tracks = [tracks.single.copyWith(isrc: isrc)];
+        }
+        // A playlist would cost one search per song, so it keeps its covers.
+        final albums = {for (final track in tracks) track.albumId?.trim()};
+        final oneCover =
+            tracks.length == 1 ||
+            (albums.length == 1 && (albums.single ?? '').isNotEmpty);
+        if (!oneCover) return tracks;
+        return [
+          for (final track in tracks)
+            await _withPriorityCover(track, lookup, covers),
+        ];
+      }
+      _log.d('No extension resolved $link, matching the row text');
+    } catch (e) {
+      _log.w('Link lookup failed for $link: $e');
+    }
+    // A web URL is no track id a download provider understands.
+    final fallback = _isWebUrl(row.id) ? row.copyWith(id: '') : row;
+    return [await _enrichTrack(fallback, lookup)];
+  }
+
+  /// [track] with the cover of the first metadata provider, in the user's
+  /// priority order, that has its exact ISRC, unless that is its own source.
+  static Future<Track> _withPriorityCover(
+    Track track,
+    Future<List<Map<String, dynamic>>> Function(String query, int limit) lookup,
+    Map<String, Future<String?>> covers,
+  ) async {
+    final isrc = track.isrc?.trim().toUpperCase() ?? '';
+    final source = track.source?.trim().toLowerCase() ?? '';
+    if (isrc.isEmpty || source.isEmpty) return track;
+    // The tracks of one album share a cover, so one lookup serves them all.
+    final albumId = track.albumId?.trim() ?? '';
+    final key = albumId.isEmpty ? 'isrc:$isrc' : 'album:$source:$albumId';
+    final cover = await (covers[key] ??= _priorityCover(isrc, source, lookup));
+    return cover == null ? track : track.copyWith(coverUrl: cover);
+  }
+
+  static Future<String?> _priorityCover(
+    String isrc,
+    String source,
+    Future<List<Map<String, dynamic>>> Function(String query, int limit) lookup,
+  ) async {
+    try {
+      // Providers answer in priority order with one result per ISRC, so the
+      // first result belongs to the highest provider that knows the ISRC.
+      for (final candidate in await lookup(isrc, 1)) {
+        final match = Track.fromBackendMap(candidate);
+        final cover = match.coverUrl ?? '';
+        if (match.isrc?.trim().toUpperCase() != isrc || cover.isEmpty) continue;
+        final provider = match.source?.trim().toLowerCase() ?? '';
+        return provider.isEmpty || provider == source ? null : cover;
+      }
+    } catch (e) {
+      _log.w('Cover lookup by ISRC failed for $isrc: $e');
+    }
+    return null;
+  }
+
+  static final _legacyTrackId = RegExp(
+    r'^(?:spotify:track:)?([A-Za-z0-9]{22})$',
+  );
+
+  /// The link a row's id names: a web URL, or a track id of the fixed legacy
+  /// id columns in its link form.
+  static String? _rowLink(String id) {
+    final value = id.trim();
+    if (_isWebUrl(value)) return value;
+    final legacyId = _legacyTrackId.firstMatch(value)?.group(1);
+    return legacyId == null
+        ? null
+        : ServiceTrackLink(MusicServices.spotify, legacyId).webUrl;
+  }
+
+  static bool _isWebUrl(String value) {
+    final uri = Uri.tryParse(value.trim());
+    return uri != null &&
+        (uri.isScheme('http') || uri.isScheme('https')) &&
+        uri.host.isNotEmpty;
+  }
+
+  static const _placeholders = {
+    'Unknown Track',
+    'Unknown Artist',
+    'Unknown Album',
+  };
+
+  /// [value] without the parsers' text for a missing column.
+  static String _known(String value) {
+    final text = value.trim();
+    return _placeholders.contains(text) ? '' : text;
   }
 
   static Future<Track> _enrichTrack(
@@ -140,9 +269,14 @@ class CsvImportService {
       }
     }
 
-    if (selected == null) {
+    final name = _known(track.name);
+    if (selected == null && name.isNotEmpty) {
+      final artist = _known(track.artistName);
       try {
-        final candidates = await lookup('${track.artistName} ${track.name}', 5);
+        final candidates = await lookup(
+          artist.isEmpty ? name : '$artist $name',
+          5,
+        );
         selected = _bestCandidate(track, candidates);
       } catch (e) {
         _log.w('Metadata provider lookup failed for ${track.name}: $e');
@@ -154,7 +288,12 @@ class CsvImportService {
     _log.d(
       'Enriched ${track.name} via ${selected['provider_id'] ?? selected['source'] ?? 'metadata provider'}',
     );
+    // The source fills in a download by its own track id: both travel together.
+    final source = candidate.source?.trim() ?? '';
+    final sourceId = source.isNotEmpty && candidate.id.isNotEmpty;
     return track.copyWith(
+      id: sourceId ? candidate.id : null,
+      source: sourceId ? source : null,
       name: candidate.name.isEmpty ? track.name : candidate.name,
       artistName: candidate.artistName.isEmpty
           ? track.artistName
@@ -166,6 +305,8 @@ class CsvImportService {
       artistId: candidate.artistId,
       albumId: candidate.albumId,
       coverUrl: candidate.coverUrl,
+      headerVideoUrl: candidate.headerVideoUrl,
+      previewUrl: candidate.previewUrl,
       isrc: candidate.isrc,
       duration: candidate.duration > 0 ? candidate.duration : track.duration,
       trackNumber: candidate.trackNumber,
@@ -173,10 +314,14 @@ class CsvImportService {
       totalDiscs: candidate.totalDiscs,
       totalTracks: candidate.totalTracks,
       releaseDate: candidate.releaseDate,
+      albumType: candidate.albumType,
       genre: candidate.genre,
       label: candidate.label,
       copyright: candidate.copyright,
       composer: candidate.composer,
+      comment: candidate.comment,
+      audioQuality: candidate.audioQuality,
+      audioModes: candidate.audioModes,
       explicit: candidate.explicit,
       upc: candidate.upc,
     );
@@ -189,50 +334,113 @@ class CsvImportService {
   }) {
     if (candidates.isEmpty) return null;
     final targetIsrc = track.isrc?.trim().toUpperCase() ?? '';
-    final targetName = _normalizeMatchText(track.name);
-    final targetArtist = _normalizeMatchText(track.artistName);
+    final targetName = _normalizeMatchText(_known(track.name));
+    final targetArtist = _known(track.artistName);
+    final hasArtist = _normalizeMatchText(targetArtist).isNotEmpty;
     Map<String, dynamic>? best;
-    var bestScore = -1;
+    var bestScore = 0;
     for (final candidate in candidates) {
       final candidateIsrc =
           candidate['isrc']?.toString().trim().toUpperCase() ?? '';
-      if (requireExactIsrc &&
-          (targetIsrc.isEmpty || candidateIsrc != targetIsrc)) {
-        continue;
-      }
-      var score = candidateIsrc.isNotEmpty && candidateIsrc == targetIsrc
-          ? 100
-          : 0;
-      final name = _normalizeMatchText(candidate['name']?.toString() ?? '');
-      final artist = _normalizeMatchText(
+      final isrcMatch = targetIsrc.isNotEmpty && candidateIsrc == targetIsrc;
+      if (requireExactIsrc && !isrcMatch) continue;
+      final nameScore = _nameScore(
+        targetName,
+        _normalizeMatchText(candidate['name']?.toString() ?? ''),
+      );
+      final artistScore = _artistScore(
+        targetArtist,
         (candidate['artists'] ?? candidate['artist'])?.toString() ?? '',
       );
-      if (targetName.isNotEmpty && name == targetName) {
-        score += 30;
-      } else if (targetName.isNotEmpty &&
-          name.isNotEmpty &&
-          (name.contains(targetName) || targetName.contains(name))) {
-        score += 15;
-      }
-      if (targetArtist.isNotEmpty && artist == targetArtist) {
-        score += 20;
-      } else if (targetArtist.isNotEmpty &&
-          artist.isNotEmpty &&
-          (artist.contains(targetArtist) || targetArtist.contains(artist))) {
-        score += 10;
-      }
+      // Text alone must agree on the title and on the row's artist, if any.
+      final textMatch = nameScore > 0 && (!hasArtist || artistScore > 0);
+      if (!isrcMatch && !textMatch) continue;
+      final score = (isrcMatch ? 100 : 0) + nameScore + artistScore;
       if (score > bestScore) {
         best = candidate;
         bestScore = score;
       }
     }
-    return bestScore >= (requireExactIsrc ? 100 : 20) ? best : null;
+    return best;
   }
 
-  static String _normalizeMatchText(String value) => value
-      .toLowerCase()
-      .replaceAll(RegExp(r'[^\p{L}\p{N}]+', unicode: true), ' ')
-      .trim();
+  /// 30 for the same title, 15 when one holds the other as specific words.
+  static int _nameScore(String target, String candidate) {
+    if (target.isEmpty || candidate.isEmpty) return 0;
+    if (target == candidate) return 30;
+    return _containsWords(target, candidate) ? 15 : 0;
+  }
+
+  /// 20 for the same credit, 10 when the credits share an artist.
+  static int _artistScore(String target, String candidate) {
+    final targetKey = _normalizeMatchText(target);
+    final candidateKey = _normalizeMatchText(candidate);
+    if (targetKey.isEmpty || candidateKey.isEmpty) return 0;
+    if (targetKey == candidateKey) return 20;
+    final credits = _artistCredits(candidate).toSet();
+    return _artistCredits(target).any(credits.contains) ||
+            _containsWords(targetKey, candidateKey)
+        ? 10
+        : 0;
+  }
+
+  static final _creditSeparator = RegExp(
+    r'[,;&/]|\s+(?:feat\.?|ft\.?|featuring|x)\s+',
+    caseSensitive: false,
+  );
+
+  static Iterable<String> _artistCredits(String artists) => artists
+      .split(_creditSeparator)
+      .map(_normalizeMatchText)
+      .where((credit) => credit.isNotEmpty && !_genericText.contains(credit));
+
+  /// Whether the shorter text sits in the longer one as whole words and is
+  /// specific enough to tell songs or artists apart.
+  static bool _containsWords(String a, String b) {
+    final (shorter, longer) = a.length <= b.length ? (a, b) : (b, a);
+    if (shorter.replaceAll(' ', '').length < 4 ||
+        _genericText.contains(shorter)) {
+      return false;
+    }
+    return ' $longer '.contains(' $shorter ');
+  }
+
+  static const _genericText = {
+    'unknown',
+    'unknown track',
+    'unknown artist',
+    'unknown album',
+    'untitled',
+    'track',
+    'song',
+    'title',
+    'artist',
+    'artists',
+    'various artists',
+    'test',
+    'none',
+    'null',
+  };
+
+  static final _featuring = RegExp(
+    r'[(\[]\s*(?:feat|ft|featuring)\b[^)\]]*[)\]]|\s(?:feat|ft|featuring)\b.*$',
+    caseSensitive: false,
+  );
+  static final _nonWord = RegExp(r'[^\p{L}\p{N}]+', unicode: true);
+  static const _accented = 'àáâãäåçèéêëìíîïñòóôõöøùúûüýÿ';
+  static const _unaccented = 'aaaaaaceeeeiiiinoooooouuuuyy';
+
+  /// Lowercase words without a featured-artist part, accents or punctuation.
+  static String _normalizeMatchText(String value) {
+    final lower = value.replaceAll(_featuring, ' ').toLowerCase();
+    final folded = String.fromCharCodes(
+      lower.codeUnits.map((unit) {
+        final index = _accented.indexOf(String.fromCharCode(unit));
+        return index < 0 ? unit : _unaccented.codeUnitAt(index);
+      }),
+    );
+    return folded.replaceAll(_nonWord, ' ').trim();
+  }
 
   static List<Track> _parseCsv(String content, {int? idSeed}) {
     final List<Track> tracks = [];
@@ -285,6 +493,9 @@ class CsvImportService {
       if (spotifyId != null && spotifyId.startsWith('spotify:track:')) {
         spotifyId = spotifyId.replaceAll('spotify:track:', '');
       }
+      // A link travels in the id; enrichment resolves it before matching text.
+      final url = getVal(['url', 'link', 'track url', 'track link']);
+      if (url != null && url.isNotEmpty) spotifyId = url;
 
       if ((trackName != null && trackName.isNotEmpty && artistName != null) ||
           (spotifyId != null && spotifyId.isNotEmpty)) {

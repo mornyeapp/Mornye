@@ -140,20 +140,25 @@ fn parse_csv(
         let artist = get(&["artist name(s)", "artist name", "artist", "artists"]);
         let album = get(&["album name", "album"]);
         let isrc = get(&["isrc"]);
-        let id = get(&[
-            "track uri",
-            "spotify - id",
-            "spotify id",
-            "spotify_id",
-            "id",
-            "uri",
-        ])
-        .map(|value| {
-            if value.starts_with("spotify:track:") {
-                value.replace("spotify:track:", "")
-            } else {
-                value
-            }
+        // A link travels in the id; enrichment resolves it before matching text.
+        let url =
+            get(&["url", "link", "track url", "track link"]).filter(|value| !value.is_empty());
+        let id = url.or_else(|| {
+            get(&[
+                "track uri",
+                "spotify - id",
+                "spotify id",
+                "spotify_id",
+                "id",
+                "uri",
+            ])
+            .map(|value| {
+                if value.starts_with("spotify:track:") {
+                    value.replace("spotify:track:", "")
+                } else {
+                    value
+                }
+            })
         });
         if (name.as_deref().is_some_and(|name| !name.is_empty()) && artist.is_some())
             || id.as_deref().is_some_and(|id| !id.is_empty())
@@ -317,6 +322,26 @@ mod tests {
         let without_id = parse_csv("title,artist\nA,B\n\nC,D", 42, &|| Ok(())).unwrap();
         assert_eq!(without_id[0]["id"], "csv_42_1");
         assert_eq!(without_id[1]["id"], "csv_42_3");
+    }
+
+    #[test]
+    fn csv_keeps_url_rows_and_prefers_the_url_over_an_id() {
+        let tracks = parse_csv(
+            "Track URL,Title,Artist,Spotify ID\nhttps://example.com/track/1,,,\nhttps://example.com/album/2,Song,Artist,abc\n,Text,Artist,abc\n",
+            5,
+            &|| Ok(()),
+        )
+        .unwrap();
+        assert_eq!(tracks.len(), 3);
+        assert_eq!(tracks[0]["id"], "https://example.com/track/1");
+        assert_eq!(tracks[1]["id"], "https://example.com/album/2");
+        assert_eq!(tracks[1]["name"], "Song");
+        assert_eq!(tracks[2]["id"], "abc");
+        let url_only = parse_csv("LINK\nhttps://example.com/track/3\n", 5, &|| Ok(())).unwrap();
+        assert_eq!(url_only[0]["id"], "https://example.com/track/3");
+        assert_eq!(url_only[0]["name"], "Unknown Track");
+        let empty_url = parse_csv("url,title,artist\n,A,B\n", 5, &|| Ok(())).unwrap();
+        assert_eq!(empty_url[0]["id"], "csv_5_1");
     }
 
     #[test]

@@ -170,6 +170,16 @@
       ]
     },
     {
+      "format": "csv", "id_seed": 7,
+      "body": "Link,Title,Artist,Spotify ID\nhttps://example.com/track/1,,,\n,Song,Artist,0123456789abcdefABCDEF\n,Only Text,Artist,\n,,,https://example.com/track/3\n",
+      "tracks": [
+        {"id": "https://example.com/track/1", "name": "", "artistName": "", "albumName": "Unknown Album", "duration": 0, "isrc": null, "coverUrl": null},
+        {"id": "0123456789abcdefABCDEF", "name": "Song", "artistName": "Artist", "albumName": "Unknown Album", "duration": 0, "isrc": null, "coverUrl": null},
+        {"id": "", "name": "Only Text", "artistName": "Artist", "albumName": "Unknown Album", "duration": 0, "isrc": null, "coverUrl": null},
+        {"id": "https://example.com/track/3", "name": "", "artistName": "", "albumName": "Unknown Album", "duration": 0, "isrc": null, "coverUrl": null}
+      ]
+    },
+    {
       "format": "m3u", "id_seed": 100,
       "body": "#EXTM3U\r#EXTINF:180.5,Artist - Song - Mix\r#comment\r\nfolder/a.flac\nMusic/02 Demo.flac\n#EXTINF:-1,\nx/.hidden",
       "tracks": [
