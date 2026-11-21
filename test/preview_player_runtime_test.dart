@@ -250,40 +250,145 @@ void main() {
     });
   });
 
-  test('a preview link is read again from the song\'s extension', () async {
+  group('reading a preview link again', () {
     const backend = MethodChannel('com.zarz.mornye/backend');
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    final searches = <Map<dynamic, dynamic>>[];
-    messenger.setMockMethodCallHandler(backend, (call) async {
-      if (call.method != 'searchTracksWithMetadataProvider') return null;
-      searches.add(call.arguments as Map);
-      return jsonEncode([
-        {'id': 'other', 'name': 'Song', 'preview_url': 'https://e.test/a.mp3'},
-        {'id': 'song-1', 'name': 'Song', 'preview_url': 'https://e.test/b.mp3'},
-      ]);
-    });
-    addTearDown(() => messenger.setMockMethodCallHandler(backend, null));
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    final refresh = container.read(previewLinkRefreshProvider);
-
+    const old = 'https://e.test/old.mp3';
     const song = Track(
       id: 'song-1',
       name: 'Song',
       artistName: 'Artist',
       albumName: 'Album',
       duration: 180,
+      isrc: 'AA0000000001',
       source: 'example-provider',
-      previewUrl: 'https://e.test/old.mp3',
+      previewUrl: old,
     );
-    expect(await refresh(song), 'https://e.test/b.mp3');
-    expect(searches.single['extension_id'], 'example-provider');
-    expect(searches.single['query'], 'Song Artist');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    late List<MethodCall> searches;
 
-    // A song without an extension to ask has nothing to read again.
-    expect(await refresh(song.copyWith(source: '')), isNull);
-    expect(searches, hasLength(1));
+    /// Answers the song's own extension with [own] and a search of every
+    /// extension with [others]; null fails that search.
+    Future<String?> Function(Track track) refresher({
+      List<Map<String, Object?>>? own = const [],
+      List<Map<String, Object?>>? others = const [],
+    }) {
+      searches = [];
+      messenger.setMockMethodCallHandler(backend, (call) async {
+        final results = switch (call.method) {
+          'searchTracksWithMetadataProvider' => own,
+          'searchTracksWithMetadataProviders' => others,
+          _ => const <Map<String, Object?>>[],
+        };
+        searches.add(call);
+        if (results == null) throw PlatformException(code: 'offline');
+        return jsonEncode(results);
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(backend, null));
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      return container.read(previewLinkRefreshProvider);
+    }
+
+    test('asks the song\'s own extension first', () async {
+      final refresh = refresher(
+        own: [
+          {'id': 'other', 'name': 'Song', 'preview_url': 'https://e.test/a'},
+          {'id': 'song-1', 'name': 'Song', 'preview_url': 'https://e.test/b'},
+        ],
+      );
+
+      expect(await refresh(song), 'https://e.test/b');
+      final arguments = searches.single.arguments as Map;
+      expect(arguments['extension_id'], 'example-provider');
+      expect(arguments['query'], 'Song Artist');
+    });
+
+    test('takes the same song from any other extension', () async {
+      // Its own extension has no preview of its own, or the dead one again.
+      for (final own in [
+        <Map<String, Object?>>[
+          {'id': 'song-1', 'name': 'Song'},
+        ],
+        <Map<String, Object?>>[
+          {'id': 'song-1', 'name': 'Song', 'preview_url': old},
+        ],
+      ]) {
+        final refresh = refresher(
+          own: own,
+          others: [
+            {
+              'id': 'x1',
+              'name': 'Song',
+              'artists': 'Artist',
+              'isrc': 'AA0000000002',
+              'provider_id': 'second-provider',
+              'preview_url': 'https://e.test/another-recording',
+            },
+            {
+              'id': 'x2',
+              'name': 'Song (Remastered)',
+              'artists': 'Artist',
+              'isrc': 'aa0000000001',
+              'provider_id': 'second-provider',
+              'preview_url': 'https://e.test/same-recording',
+            },
+          ],
+        );
+
+        expect(await refresh(song), 'https://e.test/same-recording');
+        expect(searches.map((call) => call.method), [
+          'searchTracksWithMetadataProvider',
+          'searchTracksWithMetadataProviders',
+        ]);
+      }
+    });
+
+    test('matches by title and first artist without an ISRC', () async {
+      final refresh = refresher(
+        others: [
+          {
+            'id': 'x1',
+            'name': 'Song',
+            'artists': 'Someone Else',
+            'preview_url': 'https://e.test/wrong-artist',
+          },
+          {
+            'id': 'x2',
+            'name': ' song ',
+            'artists': 'Artist, Guest',
+            'preview_url': 'https://e.test/right',
+          },
+        ],
+      );
+
+      // A song that came from no extension is still looked up.
+      expect(await refresh(song.copyWith(source: '')), 'https://e.test/right');
+      expect(searches.single.method, 'searchTracksWithMetadataProviders');
+    });
+
+    test('has nothing when no extension knows the song', () async {
+      final refresh = refresher(
+        others: [
+          {
+            'id': 'x1',
+            'name': 'Another Song',
+            'artists': 'Artist',
+            'preview_url': 'https://e.test/other',
+          },
+        ],
+      );
+
+      expect(await refresh(song), isNull);
+    });
+
+    test('fails only when no extension could be asked', () async {
+      expect(await refresher(own: null)(song), isNull);
+      await expectLater(
+        refresher(own: null, others: null)(song),
+        throwsA(isA<PlatformException>()),
+      );
+    });
   });
 }
 

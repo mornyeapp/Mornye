@@ -39,26 +39,78 @@ Future<String> _playablePreviewUrl(String url) async {
 /// Reads a song's preview link again; null when there is none to offer.
 typedef PreviewLinkRefresh = Future<String?> Function();
 
-/// Asks the extension a song came from for its preview link again. A link is
-/// a snapshot, and a service can let it expire minutes after the search that
-/// gave it, long before a saved shelf of songs is read again.
+/// Asks the extension a song came from for its preview link again, then the
+/// other extensions for the same song. A link is a snapshot, and a service
+/// can let it expire minutes after the search that gave it.
 final previewLinkRefreshProvider =
     Provider<Future<String?> Function(Track track)>(
       (ref) => (track) async {
-        final extensionId = track.source ?? '';
-        if (extensionId.isEmpty || track.id.isEmpty) return null;
-        final results = await PlatformBridge.searchTracksWithMetadataProvider(
-          extensionId,
-          '${track.name} ${track.artistName}'.trim(),
-          limit: 10,
-        );
-        for (final result in results) {
-          final found = Track.fromBackendMap(result, source: extensionId);
-          if (found.id == track.id) return found.previewUrl;
+        final query = '${track.name} ${track.artistName}'.trim();
+        if (query.isEmpty) return null;
+        final old = track.previewUrl?.trim() ?? '';
+        String? newer(Track found) {
+          final link = found.previewUrl?.trim() ?? '';
+          return link.isEmpty || link == old ? null : link;
         }
+
+        var answered = false;
+        Object? failure;
+        final extensionId = track.source ?? '';
+        if (extensionId.isNotEmpty && track.id.isNotEmpty) {
+          try {
+            final results =
+                await PlatformBridge.searchTracksWithMetadataProvider(
+                  extensionId,
+                  query,
+                  limit: 10,
+                );
+            answered = true;
+            for (final result in results) {
+              final found = Track.fromBackendMap(result, source: extensionId);
+              if (found.id != track.id) continue;
+              final link = newer(found);
+              if (link != null) return link;
+              break;
+            }
+          } catch (error) {
+            failure = error;
+          }
+        }
+        // Its own extension has nothing newer: any other one that knows the
+        // song can give its preview.
+        try {
+          final results =
+              await PlatformBridge.searchTracksWithMetadataProviders(
+                query,
+                limit: 20,
+              );
+          answered = true;
+          for (final result in results) {
+            final found = Track.fromBackendMap(result);
+            final link = newer(found);
+            if (link != null && _sameSong(track, found)) return link;
+          }
+        } catch (error) {
+          failure ??= error;
+        }
+        if (!answered && failure != null) throw failure;
         return null;
       },
     );
+
+/// Whether two results are one recording: by ISRC when both carry one, else
+/// by the same title and first artist.
+bool _sameSong(Track a, Track b) {
+  final isrcA = a.isrc?.trim().toUpperCase() ?? '';
+  final isrcB = b.isrc?.trim().toUpperCase() ?? '';
+  if (isrcA.isNotEmpty && isrcB.isNotEmpty) return isrcA == isrcB;
+  String key(String text) =>
+      text.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+  String firstArtist(String artists) =>
+      key(artists.split(RegExp(r'[,;&]| feat\.? | ft\.? ')).first);
+  return key(a.name) == key(b.name) &&
+      firstArtist(a.artistName) == firstArtist(b.artistName);
+}
 
 /// Preview links that did not play although their extension answered, so the
 /// button is not offered for them again while the app runs.
