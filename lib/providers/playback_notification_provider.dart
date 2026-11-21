@@ -26,11 +26,11 @@ final playbackNotificationProvider = Provider.autoDispose
       final track = item == null
           ? null
           : ref.watch(playerCollectionTrackProvider(item)).value;
-      final loved = ref.watch(
-        libraryCollectionsProvider.select(
-          (state) => track != null && state.isLoved(track),
-        ),
-      );
+      final loved =
+          track != null &&
+          ref.watch(
+            libraryCollectionsProvider.select((state) => state.isLoved(track)),
+          );
       // Publishing playback state inside a provider build would synchronously
       // modify the stream provider this binding is observing.
       var active = true;

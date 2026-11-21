@@ -40,10 +40,9 @@ final initialSettingsProvider = Provider<AppSettings>(
   (ref) => const AppSettings(),
 );
 
-/// Set during bootstrap when the saved Android SAF tree no longer has a valid
-/// persisted grant. MainShell consumes this once to block downloads until the
-/// user explicitly repairs or changes the destination.
-final initialSafAccessLostProvider = Provider<bool>((ref) => false);
+/// The startup check of the saved Android SAF tree: true when its grant is
+/// lost, null when it gave no answer. MainShell consumes this once.
+final initialSafValidationProvider = Provider<Future<bool?>?>((ref) => null);
 
 bool hasPersistedAppSettings(SharedPreferences prefs) {
   final rawSettings = prefs.getString(_settingsKey);
@@ -245,9 +244,11 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
     LogBuffer.loggingEnabled = state.enableLogging;
 
-    await syncLyricsSettingsToBackend();
-    await _syncNetworkCompatibilitySettingsToBackend();
-    await _syncExtensionFallbackSettingsToBackend();
+    await Future.wait([
+      syncLyricsSettingsToBackend(),
+      _syncNetworkCompatibilitySettingsToBackend(),
+      _syncExtensionFallbackSettingsToBackend(),
+    ]);
   }
 
   void _syncLyricsSettingsToBackend() {
@@ -258,35 +259,37 @@ class SettingsNotifier extends Notifier<AppSettings> {
     final snapshot = settings ?? state;
     if (!PlatformBridge.supportsCoreBackend) return;
 
-    try {
-      await PlatformBridge.setLyricsProviders(snapshot.lyricsProviders);
-    } catch (e) {
-      _log.w('Failed to sync lyrics providers to backend: $e');
-    }
-
-    try {
-      await PlatformBridge.setLyricsFetchOptions(snapshot.lyricsFetchOptions);
-    } catch (e) {
-      _log.w('Failed to sync lyrics fetch options to backend: $e');
-    }
+    await Future.wait([
+      PlatformBridge.setLyricsProviders(snapshot.lyricsProviders).catchError((
+        Object e,
+      ) {
+        _log.w('Failed to sync lyrics providers to backend: $e');
+      }),
+      PlatformBridge.setLyricsFetchOptions(
+        snapshot.lyricsFetchOptions,
+      ).catchError((Object e) {
+        _log.w('Failed to sync lyrics fetch options to backend: $e');
+      }),
+    ]);
   }
 
   Future<void> _syncNetworkCompatibilitySettingsToBackend() async {
     if (!PlatformBridge.supportsCoreBackend) return;
 
     final compatibilityMode = state.networkCompatibilityMode;
-    await PlatformBridge.setNetworkCompatibilityOptions(
-      allowHttp: compatibilityMode,
-      insecureTls: false,
-    ).catchError((Object e) {
-      _log.w('Failed to sync network compatibility options to backend: $e');
-    });
-
-    await PlatformBridge.setAllowPrivateNetwork(
-      state.allowLocalNetwork,
-    ).catchError((Object e) {
-      _log.w('Failed to sync allow local network option to backend: $e');
-    });
+    await Future.wait([
+      PlatformBridge.setNetworkCompatibilityOptions(
+        allowHttp: compatibilityMode,
+        insecureTls: false,
+      ).catchError((Object e) {
+        _log.w('Failed to sync network compatibility options to backend: $e');
+      }),
+      PlatformBridge.setAllowPrivateNetwork(state.allowLocalNetwork).catchError(
+        (Object e) {
+          _log.w('Failed to sync allow local network option to backend: $e');
+        },
+      ),
+    ]);
   }
 
   Future<void> _syncExtensionFallbackSettingsToBackend() async {

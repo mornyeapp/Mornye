@@ -1,11 +1,14 @@
 part of 'main_shell.dart';
 
 extension _MainShellStartupPrompts on _MainShellState {
-  Future<void> _repairSafAccessIfNeeded({bool knownLost = false}) async {
+  Future<void> _repairSafAccessIfNeeded({
+    bool knownLost = false,
+    bool alreadyChecked = false,
+  }) async {
     if (!Platform.isAndroid || _safRepairDialogVisible) return;
 
     var accessLost = knownLost;
-    if (!accessLost) {
+    if (!accessLost && !alreadyChecked) {
       final settings = ref.read(settingsProvider);
       if (settings.storageMode != 'saf' || settings.downloadTreeUri.isEmpty) {
         return;
@@ -149,11 +152,12 @@ extension _MainShellStartupPrompts on _MainShellState {
     if (settings.storageMode == 'saf') return;
     if (settings.downloadDirectory.isEmpty) return;
 
+    if (await _safMigrationPromptStore.wasShown()) return;
+
     final deviceInfo = DeviceInfoPlugin();
     final androidInfo = await deviceInfo.androidInfo;
     if (androidInfo.version.sdkInt < 29) return;
 
-    if (await _safMigrationPromptStore.wasShown()) return;
     await _safMigrationPromptStore.markShown();
 
     if (!mounted) return;

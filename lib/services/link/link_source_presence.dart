@@ -113,20 +113,25 @@ class LinkSourcePresence {
 /// Link. Read for the app's lifetime on phones and on the desktop.
 final linkSourcePresenceProvider = Provider<LinkSourcePresence>((ref) {
   late final LinkSourcePresence presence;
-  presence = LinkSourcePresence(
-    onChanged: () {
-      // Not inside a provider build, which must not change other providers.
-      unawaited(
-        Future(() {
-          if (!ref.mounted) return null;
-          return ref
-              .read(localLibraryProvider.notifier)
-              .setNetworkSourceAvailability(presence.availability);
-        }),
-      );
-    },
-  );
+  void pushAvailability() {
+    // Not inside a provider build, which must not change other providers.
+    unawaited(
+      Future(() {
+        // Avoid eagerly instantiating LocalLibraryNotifier on Frame 1 before
+        // its deferred warmup or first Library tab visit.
+        if (!ref.mounted || !ref.read(localLibraryProvider.exists)) return null;
+        return ref
+            .read(localLibraryProvider.notifier)
+            .setNetworkSourceAvailability(presence.availability);
+      }),
+    );
+  }
+
+  presence = LinkSourcePresence(onChanged: pushAvailability);
   ref.onDispose(presence.dispose);
+  ref.listen(localLibraryProvider.exists, (_, exists) {
+    if (exists) pushAvailability();
+  });
   ref.listen(
     settingsProvider.select((settings) => settings.linkHideDisconnectedSongs),
     (_, hide) => presence.enabled = hide,

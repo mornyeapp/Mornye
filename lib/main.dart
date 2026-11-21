@@ -102,6 +102,10 @@ void main() {
       // The preferences plugin answers without an Activity, so on Android
       // the load overlaps the Activity's creation.
       final preferences = SharedPreferences.getInstance();
+      // Desktop: log files and the unclean-exit marker, awaited before the
+      // error hooks below start writing to them.
+      final desktopDiagnostics = DesktopDiagnostics.initialize();
+      Future<(InstallationState?, Object?)>? installMarker;
       if (Platform.isAndroid) {
         // A media service can start the engine before MainActivity registers
         // the backend and platform channels. Calls made earlier would fail or
@@ -112,6 +116,12 @@ void main() {
           unawaited(_startBackgroundPlayback());
         }
         await waitForActivityAttachment(binding);
+        // Overlap the install marker IPC with preferences and orientation.
+        installMarker = PlatformBridge.ensureInstallMarker()
+            .then<(InstallationState?, Object?)>(
+              (state) => (state, null),
+              onError: (Object error) => (null, error),
+            );
         // Android 15 and later enforce this; older versions stop the app
         // above the navigation bar, so no screen could reach the bottom edge.
         unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
@@ -121,9 +131,6 @@ void main() {
       final dynamicColors = DynamicColors.request();
       // Awaited before runApp, which reports a failure once.
       final orientation = _initializeOrientation()..ignore();
-      // Desktop: log files and the unclean-exit marker, before the error
-      // hooks below start writing to them.
-      await DesktopDiagnostics.initialize();
       if (isDesktopPlatform) MediaKitPlaybackDeck.releaseOutputsOnExit();
       LicenseRegistry.addLicense(() async* {
         yield LicenseEntryWithLineBreaks(
@@ -182,6 +189,7 @@ void main() {
       });
       _startupBenchmark?.observeFirstFrame();
 
+      await desktopDiagnostics;
       final previousOnError = FlutterError.onError;
       FlutterError.onError = (details) {
         previousOnError?.call(details);
@@ -204,22 +212,28 @@ void main() {
       // The SAF check overlaps the install marker read. An installation
       // reset rewrites the settings, so its result is then replaced.
       var safValidation = _startSafTreeValidation(bootstrapSettings);
-      if (await _prepareAndroidInstallationState(prefs)) {
+      if (await _prepareAndroidInstallationState(
+        prefs,
+        installMarker: installMarker,
+      )) {
         bootstrapSettings = loadBootstrapSettings(prefs);
         safValidation = _startSafTreeValidation(bootstrapSettings);
       }
       musicPlayerRuntime.configure(bootstrapSettings);
       if (isDesktopPlatform) restoreDesktopSidebar(prefs);
       final bootstrapTheme = loadBootstrapThemeSettings(prefs);
-      final initialSafAccessLost = await _detectInitialSafAccessLoss(
-        safValidation,
-      );
+      final initialSafValidation = safValidation == null
+          ? null
+          : _detectInitialSafAccessLoss(safValidation);
       final runtimeProfile = await _resolveRuntimeProfile(prefs);
       _configureImageCache(runtimeProfile);
       await orientation;
-      // Usually answered by now. The first frame then has the final theme,
-      // with no fade from the seed colors; a late answer still applies.
-      await dynamicColors.settle(const Duration(milliseconds: 100));
+      // Usually answered by now, so the first frame has the final theme. Only
+      // a Material theme with dynamic color uses the answer.
+      if (bootstrapTheme.style != AppThemeStyle.mornye &&
+          bootstrapTheme.useDynamicColor) {
+        await dynamicColors.settle(const Duration(milliseconds: 100));
+      }
 
       runApp(
         ProviderScope(
@@ -236,8 +250,8 @@ void main() {
               !Platform.isAndroid || runtimeProfile.enableBackdropBlur,
             ),
             initialSettingsProvider.overrideWithValue(bootstrapSettings),
-            initialSafAccessLostProvider.overrideWithValue(
-              initialSafAccessLost,
+            initialSafValidationProvider.overrideWithValue(
+              initialSafValidation,
             ),
             initialThemeSettingsProvider.overrideWithValue(bootstrapTheme),
             initialDynamicColorsProvider.overrideWithValue(dynamicColors),
@@ -438,13 +452,23 @@ const _runtimeProfileTierKey = 'runtime_profile_tier_v1';
 
 /// Returns whether a restored-installation reset started, which may have
 /// rewritten the stored settings.
-Future<bool> _prepareAndroidInstallationState(SharedPreferences prefs) async {
+Future<bool> _prepareAndroidInstallationState(
+  SharedPreferences prefs, {
+  Future<(InstallationState?, Object?)>? installMarker,
+}) async {
   if (!Platform.isAndroid) return false;
 
   var resetStarted = false;
   try {
     final hasPersistedSettings = hasPersistedAppSettings(prefs);
-    final installState = await PlatformBridge.ensureInstallMarker();
+    final InstallationState installState;
+    if (installMarker != null) {
+      final (state, error) = await installMarker;
+      if (error != null) throw error;
+      installState = state!;
+    } else {
+      installState = await PlatformBridge.ensureInstallMarker();
+    }
     final shouldReset = shouldResetRestoredInstallation(
       hasPersistedSettings: hasPersistedSettings,
       installState: installState,
@@ -486,15 +510,16 @@ Future<(bool, Object?)>? _startSafTreeValidation(AppSettings settings) {
       );
 }
 
-Future<bool> _detectInitialSafAccessLoss(
-  Future<(bool, Object?)>? validation,
+/// True when the grant is lost, null when the check gave no answer.
+Future<bool?> _detectInitialSafAccessLoss(
+  Future<(bool, Object?)> validation,
 ) async {
-  if (validation == null) return false;
   final (accessible, error) = await validation;
   if (error != null) {
     // A transient bridge failure must not trap the user at launch. Download
     // preflight validates strictly again before any write starts.
     _log.w('Failed to validate SAF access during startup: $error');
+    return null;
   }
   return !accessible;
 }
@@ -871,9 +896,10 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
 
   Future<void> _initializeAppServices() async {
     try {
-      await CoverCacheManager.initialize();
-      CoverCacheManager.scheduleMaintenance();
       await Future.wait([
+        CoverCacheManager.initialize().then(
+          (_) => CoverCacheManager.scheduleMaintenance(),
+        ),
         NotificationService().initialize(),
         ShareIntentService().initialize(),
         AudioFileOpenService.instance.initialize(),

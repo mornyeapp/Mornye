@@ -190,6 +190,10 @@ class _MainShellState extends ConsumerState<MainShell>
   late final _libraryDepthObserver = _PageDepthObserver(
     onRoot: () => desktopSidebarLink.value = null,
   );
+  late final Listenable _chromeSurfaceListenable = Listenable.merge([
+    ShellNavigationService.chromeBrightness,
+    ShellNavigationService.chromeSurface,
+  ]);
 
   /// The style the current tab index was chosen under.
   bool? _indexStyleMornye;
@@ -301,8 +305,12 @@ class _MainShellState extends ConsumerState<MainShell>
       showRepoTab: false,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Null when the startup check gave no answer: it is then asked again.
+      final safLost = await ref.read(initialSafValidationProvider);
+      if (!mounted) return;
       await _repairSafAccessIfNeeded(
-        knownLost: ref.read(initialSafAccessLostProvider),
+        knownLost: safLost ?? false,
+        alreadyChecked: safLost != null,
       );
       _initialSafRepairComplete = true;
       if (!mounted) return;
@@ -1425,11 +1433,9 @@ class _MainShellState extends ConsumerState<MainShell>
       bottomNavigationBar: Builder(
         builder: (context) {
           if (context.isMornye) {
+            final mornyeBlurEnabled = ref.watch(mornyeBlurEnabledProvider);
             return ListenableBuilder(
-              listenable: Listenable.merge([
-                ShellNavigationService.chromeBrightness,
-                ShellNavigationService.chromeSurface,
-              ]),
+              listenable: _chromeSurfaceListenable,
               builder: (context, child) => Theme(
                 data: ShellNavigationService.chromeBrightness.value == null
                     ? Theme.of(context)
@@ -1455,19 +1461,23 @@ class _MainShellState extends ConsumerState<MainShell>
                     ),
                     child: useNavigationRail
                         ? const MiniPlayer()
-                        : ValueListenableBuilder<bool>(
-                            valueListenable: _mornyeChrome,
-                            builder: (context, collapsed, _) => MornyeBottomBar(
-                              collapsed:
-                                  canMinimizeChrome &&
-                                  collapsed &&
-                                  MediaQuery.viewInsetsOf(context).bottom == 0,
-                              destinations: destinations,
-                              selectedIndex: selectedDestination,
-                              onSelected: _onNavTap,
-                              onHome: () => _onNavTap(0),
-                              onSearch: ShellNavigationService.requestSearch,
-                              blurEnabled: ref.watch(mornyeBlurEnabledProvider),
+                        : _KeyboardOpenProvider(
+                            child: ValueListenableBuilder<bool>(
+                              valueListenable: _mornyeChrome,
+                              builder: (context, collapsed, _) =>
+                                  MornyeBottomBar(
+                                    collapsed:
+                                        canMinimizeChrome &&
+                                        collapsed &&
+                                        !_KeyboardOpenScope.of(context),
+                                    destinations: destinations,
+                                    selectedIndex: selectedDestination,
+                                    onSelected: _onNavTap,
+                                    onHome: () => _onNavTap(0),
+                                    onSearch:
+                                        ShellNavigationService.requestSearch,
+                                    blurEnabled: mornyeBlurEnabled,
+                                  ),
                             ),
                           ),
                   ),
@@ -1533,6 +1543,33 @@ class _MainShellState extends ConsumerState<MainShell>
       ),
     );
   }
+}
+
+/// Tells the Mornye bottom bar only whether the keyboard is open, so the
+/// frames of the keyboard's own animation do not rebuild the bar.
+class _KeyboardOpenProvider extends StatelessWidget {
+  const _KeyboardOpenProvider({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => _KeyboardOpenScope(
+    open: MediaQuery.viewInsetsOf(context).bottom > 0,
+    child: child,
+  );
+}
+
+class _KeyboardOpenScope extends InheritedWidget {
+  const _KeyboardOpenScope({required this.open, required super.child});
+
+  final bool open;
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_KeyboardOpenScope>()!.open;
+
+  @override
+  bool updateShouldNotify(_KeyboardOpenScope oldWidget) =>
+      open != oldWidget.open;
 }
 
 class _TabNavigator extends StatefulWidget {
