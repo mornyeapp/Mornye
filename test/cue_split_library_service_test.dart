@@ -29,6 +29,11 @@ void main() {
       path: '${directory.path}/local_library.db',
     );
     await createNativeLibraryFixture(db);
+    // Library counts leave out the songs a download already holds.
+    await db.execute(
+      'CREATE TABLE history_db.history '
+      '(id TEXT PRIMARY KEY, file_path TEXT, origin_file_path TEXT)',
+    );
     cue = await File(
       '${directory.path}/Album.cue',
     ).writeAsString('Original CUE');

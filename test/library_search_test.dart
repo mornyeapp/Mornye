@@ -30,7 +30,7 @@ album_name TEXT, album_artist TEXT, album_key TEXT, sort_track TEXT,
 sort_album TEXT, sort_album_artist TEXT, track_name_norm TEXT,
 album_name_norm TEXT, album_artist_norm TEXT, search_text TEXT,
 cover_url TEXT, cover_path TEXT, file_path TEXT, enabled INTEGER"""
-db.execute('CREATE TABLE history_db.history (' + columns + ')')
+db.execute('CREATE TABLE history_db.history (' + columns + ', origin_file_path TEXT)')
 db.execute('CREATE TABLE library (' + columns + ')')
 db.execute('CREATE VIEW library_visible AS SELECT * FROM library WHERE enabled = 1')
 for table in ['library_path_keys', 'history_db.history_path_keys']:

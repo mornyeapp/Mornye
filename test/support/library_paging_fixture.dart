@@ -17,7 +17,8 @@ Future<LibraryQueueStore> createLibraryPagingFixture(
     CREATE TABLE history_db.history AS
     SELECT *, track_name_norm AS sort_track, artist_name_norm AS sort_artist,
       album_name_norm AS sort_album, album_artist_norm AS sort_album_artist,
-      NULL AS cover_url, NULL AS downloaded_at, NULL AS service
+      NULL AS cover_url, NULL AS downloaded_at, NULL AS service,
+      NULL AS origin_file_path
     FROM library WHERE 0
   ''');
   await db.execute(
