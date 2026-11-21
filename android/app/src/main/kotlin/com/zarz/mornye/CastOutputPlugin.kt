@@ -8,6 +8,7 @@ import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import android.view.ViewGroup
 import androidx.appcompat.view.ContextThemeWrapper
@@ -48,6 +49,7 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
     private var boundSession: CastSession? = null
     private var revision = 0
     private var wifiLock: WifiManager.WifiLock? = null
+    private var handoverLock: PowerManager.WakeLock? = null
     private val mainThread = Handler(Looper.getMainLooper())
     private val mediaWorker = Executors.newSingleThreadExecutor { Thread(it, "MornyeCastMedia") }
     private var mediaBridge: CastBridge? = null
@@ -57,7 +59,15 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
         override fun onVolumeChanged() = publish()
     }
     private val mediaCallback = object : RemoteMediaClient.Callback() {
-        override fun onStatusUpdated() = publish()
+        override fun onStatusUpdated() {
+            val status = client?.mediaStatus
+            if (status?.playerState == MediaStatus.PLAYER_STATE_IDLE &&
+                status.idleReason == MediaStatus.IDLE_REASON_FINISHED
+            ) {
+                holdForHandover()
+            }
+            publish()
+        }
         override fun onMetadataUpdated() = publish()
         override fun onMediaError(error: com.google.android.gms.cast.MediaError) {
             // Reported for the logs only: a receiver that really stopped says so
@@ -125,6 +135,7 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
                 }
                 "load" -> {
                     val remote = connectedClient()
+                    holdForHandover()
                     val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
                         putString(MediaMetadata.KEY_TITLE, call.argument<String>("title") ?: "")
                         putString(MediaMetadata.KEY_ARTIST, call.argument<String>("artist") ?: "")
@@ -240,6 +251,24 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
         publish()
     }
 
+    /**
+     * Keeps the CPU awake while the next song loads. The playback wake lock is
+     * released when a song ends, and the TV needs seconds to fetch the next one
+     * from this device.
+     */
+    private fun holdForHandover() {
+        try {
+            val lock = handoverLock
+                ?: (context.getSystemService(Context.POWER_SERVICE) as PowerManager)
+                    .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Mornye:CastHandover")
+                    .apply { setReferenceCounted(false) }
+                    .also { handoverLock = it }
+            lock.acquire(HANDOVER_WAKE_MS)
+        } catch (error: RuntimeException) {
+            Log.w("MornyeCast", "Could not stay awake for the next song", error)
+        }
+    }
+
     private fun clearClient() {
         boundSession?.removeCastListener(volumeListener)
         boundSession = null
@@ -252,6 +281,7 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
         clearClient()
         wifiLock?.let { if (it.isHeld) it.release() }
         wifiLock = null
+        handoverLock?.let { if (it.isHeld) it.release() }
         sink?.success(mapOf("connected" to false))
     }
 
@@ -275,6 +305,12 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
     }
 
     private fun publish() { sink?.success(snapshot()) }
+
+    private companion object {
+        /** Longer than the app's own limit for a load. */
+        const val HANDOVER_WAKE_MS = 60_000L
+    }
+
     override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
         this.sink = sink
         publish()
