@@ -20,6 +20,8 @@ with open(os.environ['BUILD_TEST_LOG'], 'a') as log:
         'sdk': os.environ.get('MORNYE_DISCORD_SDK', '1')}) + '\\n')
 if args == ['scripts/prepare_flutter_sdk.dart']:
     sys.exit(int(os.environ.get('BUILD_TEST_PATCH_FAIL', '0')))
+elif args == ['scripts/gen_l10n.dart']:
+    sys.exit(0)
 elif args == ['--version', '--machine']:
     print(json.dumps({'frameworkVersion': os.environ.get('BUILD_TEST_FLUTTER_VERSION', '3.47.5')}))
 else:
@@ -98,6 +100,7 @@ class AndroidBuildScriptTest(unittest.TestCase):
         self.assertEqual(preparation["tool"], "dart")
         self.assertLess(calls.index(preparation), calls.index(build))
         self.assertIn("android-arm64,android-arm", build["args"])
+        self.assertIn("--dart-define=MORNYE_MOBILE=true", build["args"])
         self.assertIn("--verbose", build["args"])
         audits = [call["args"] for call in calls if call["tool"] == "audit"]
         self.assertEqual([Path(args[0]).name for args in audits], [

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -325,6 +326,22 @@ class _DownloadExtensions extends ExtensionNotifier {
       ),
     ],
   );
+}
+
+/// The app's English strings under any locale: the app has no right-to-left
+/// language, so the mirrored layout test supplies its own.
+class _EnglishStrings extends LocalizationsDelegate<AppLocalizations> {
+  const _EnglishStrings();
+
+  @override
+  bool isSupported(Locale locale) => true;
+
+  @override
+  Future<AppLocalizations> load(Locale locale) =>
+      SynchronousFuture(lookupAppLocalizations(const Locale('en')));
+
+  @override
+  bool shouldReload(_EnglishStrings old) => false;
 }
 
 void main() {
@@ -964,8 +981,11 @@ void main() {
             theme: mornye
                 ? MornyeTheme.build(Brightness.dark)
                 : AppTheme.light(),
-            localizationsDelegates: appLocalizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              _EnglishStrings(),
+              ...GlobalMaterialLocalizations.delegates,
+            ],
+            supportedLocales: const [Locale('ar')],
             home: const LibraryTracksFolderScreen(
               mode: LibraryTracksFolderMode.playlist,
               playlistId: 'playlist',

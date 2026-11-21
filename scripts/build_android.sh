@@ -95,6 +95,7 @@ if [[ "$FLUTTER_VERSION" != "$PINNED_FLUTTER_VERSION" ]]; then
   exit 1
 fi
 "${DART_COMMAND[@]}" scripts/prepare_flutter_sdk.dart
+"${DART_COMMAND[@]}" scripts/gen_l10n.dart
 BUILD_GIT_COMMIT="$(git rev-parse --short=8 HEAD)"
 "${FLUTTER_COMMAND[@]}" build apk \
   --release \
@@ -103,6 +104,7 @@ BUILD_GIT_COMMIT="$(git rev-parse --short=8 HEAD)"
   --split-per-abi \
   --target-platform "$TARGET_PLATFORM_LIST" \
   --dart-define="GIT_COMMIT=$BUILD_GIT_COMMIT" \
+  --dart-define="MORNYE_MOBILE=true" \
   ${FLUTTER_ARGS[@]+"${FLUTTER_ARGS[@]}"}
 
 for target in "${ANDROID_ABIS[@]}" universal; do
