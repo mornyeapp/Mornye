@@ -186,6 +186,7 @@ class _ExpressivePlaybackTransportState
               next *= scale;
             }
             return Row(
+              textDirection: TextDirection.ltr,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (widget.leading case final leading?) ...[

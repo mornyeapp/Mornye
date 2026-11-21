@@ -309,18 +309,8 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     // Every marquee frame re-filters the glass chrome around it, so Mornye
     // stops the title after a few passes on every glass level.
     final marqueeCycles = mornye ? 2 : null;
-    final surface = DecoratedBox(
+    final surface = KeyedSubtree(
       key: _surfaceKey,
-      position: DecorationPosition.foreground,
-      decoration: BoxDecoration(
-        border: mornye
-            ? null
-            : Border(
-                top: BorderSide(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                ),
-              ),
-      ),
       child: Material(
         color: mornye
             ? Colors.transparent
@@ -402,40 +392,46 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                         onNext: controller.next,
                       ),
                     ] else ...[
-                      AppIconButton(
-                        color: mornye ? colorScheme.onSurface : null,
-                        tooltip: isPlaying
-                            ? context.l10n.actionPause
-                            : context.l10n.tooltipPlay,
-                        icon: isLoading
-                            ? const AppLoadingIndicator(
-                                size: 20,
-                                strokeWidth: 2.5,
-                              )
-                            : AppIcon(
-                                mornye
-                                    ? (isPlaying
-                                          ? CupertinoIcons.pause_fill
-                                          : CupertinoIcons.play_fill)
-                                    : (isPlaying
-                                          ? Icons.pause
-                                          : Icons.play_arrow),
-                              ),
-                        onPressed: isLoading
-                            ? null
-                            : () => controller.togglePlayPause(isPlaying),
-                      ),
-                      if (!compact)
-                        AppIconButton(
-                          color: mornye ? colorScheme.onSurface : null,
-                          tooltip: context.l10n.nowPlayingNextTrack,
-                          icon: AppIcon(
-                            mornye
-                                ? CupertinoIcons.forward_fill
-                                : Icons.skip_next,
+                      Row(
+                        textDirection: TextDirection.ltr,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppIconButton(
+                            color: mornye ? colorScheme.onSurface : null,
+                            tooltip: isPlaying
+                                ? context.l10n.actionPause
+                                : context.l10n.tooltipPlay,
+                            icon: isLoading
+                                ? const AppLoadingIndicator(
+                                    size: 20,
+                                    strokeWidth: 2.5,
+                                  )
+                                : AppIcon(
+                                    mornye
+                                        ? (isPlaying
+                                              ? CupertinoIcons.pause_fill
+                                              : CupertinoIcons.play_fill)
+                                        : (isPlaying
+                                              ? Icons.pause
+                                              : Icons.play_arrow),
+                                  ),
+                            onPressed: isLoading
+                                ? null
+                                : () => controller.togglePlayPause(isPlaying),
                           ),
-                          onPressed: controller.next,
-                        ),
+                          if (!compact)
+                            AppIconButton(
+                              color: mornye ? colorScheme.onSurface : null,
+                              tooltip: context.l10n.nowPlayingNextTrack,
+                              icon: AppIcon(
+                                mornye
+                                    ? CupertinoIcons.forward_fill
+                                    : Icons.skip_next,
+                              ),
+                              onPressed: controller.next,
+                            ),
+                        ],
+                      ),
                     ],
                   ],
                 ),

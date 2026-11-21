@@ -774,6 +774,7 @@ class _MornyeLcdLines extends ConsumerWidget {
       mediaItem.artist,
       mediaItem.album,
     ].where((part) => part != null && part.trim().isNotEmpty).join(' · ');
+    final playing = ref.watch(playbackPlayingProvider);
     final style = textTheme.bodyMedium?.copyWith(fontSize: 13, height: 1.25);
     return PlayerTrackCrossfade(
       trackKey: mediaItem.id,
@@ -783,6 +784,7 @@ class _MornyeLcdLines extends ConsumerWidget {
         children: [
           OverflowMarquee(
             resetKey: (mediaItem.id, mediaItem.title),
+            playing: playing,
             maxCycles: 2,
             child: ExplicitTrackTitle(
               title: mediaItem.title,
@@ -809,6 +811,7 @@ class _MornyeLcdLines extends ConsumerWidget {
           else if (subtitle.isNotEmpty)
             OverflowMarquee(
               resetKey: (mediaItem.id, subtitle),
+              playing: playing,
               maxCycles: 2,
               child: Text(
                 subtitle,
@@ -1020,6 +1023,7 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
     return MenuAnchor(
       controller: _menu,
       consumeOutsideTap: true,
+      // The directional default alignment already mirrors dx in RTL.
       alignmentOffset: const Offset(-96, 8),
       style: const MenuStyle(
         padding: WidgetStatePropertyAll(EdgeInsets.zero),
@@ -1048,7 +1052,7 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
                   width: 240,
                   child: MenuItemButton(
                     key: const ValueKey('desktop-player-cast'),
-                    leadingIcon: AppIcon(
+                    leadingIcon: AppIcon.adaptive(
                       cast.connected ? Icons.cast_connected : Icons.cast,
                       size: 18,
                     ),
@@ -1074,7 +1078,7 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
           key: const ValueKey('desktop-player-volume'),
           tooltip: context.l10n.nowPlayingVolume,
           color: cast.connected ? colorScheme.primary : colorScheme.onSurface,
-          icon: AppIcon(cast.connected ? Icons.cast_connected : icon),
+          icon: AppIcon.adaptive(cast.connected ? Icons.cast_connected : icon),
           onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
         ),
       ),
@@ -1082,8 +1086,8 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
   }
 }
 
-/// The popover entrance: a fade with a short rise on the effects spring,
-/// which never overshoots, so the rise lands without a bounce.
+/// The popover entrance: a subtle scale and rise on the effects spring without
+/// an opacity layer that would isolate the glass backdrop during entrance.
 class _MornyePopoverEntrance extends StatelessWidget {
   const _MornyePopoverEntrance({required this.child});
 
@@ -1096,10 +1100,11 @@ class _MornyePopoverEntrance extends StatelessWidget {
       tween: Tween(begin: 0, end: 1),
       duration: reduceMotion ? Duration.zero : MornyeMotion.effects.duration,
       curve: MornyeMotion.effects.curve,
-      builder: (context, progress, child) => Opacity(
-        opacity: progress,
-        child: Transform.translate(
-          offset: Offset(0, 6 * (1 - progress)),
+      builder: (context, progress, child) => Transform.translate(
+        offset: Offset(0, 6 * (1 - progress)),
+        child: Transform.scale(
+          scale: 0.96 + 0.04 * progress,
+          alignment: Alignment.bottomCenter,
           child: child,
         ),
       ),

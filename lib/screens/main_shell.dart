@@ -1404,17 +1404,23 @@ class _MainShellState extends ConsumerState<MainShell>
       body: useNavigationRail
           ? Row(
               children: [
-                SafeArea(
-                  right: false,
-                  bottom: false,
-                  child: ExpressiveNavigationRail(
-                    selectedIndex: selectedDestination,
-                    onDestinationSelected: _onNavTap,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainer,
-                    destinations: destinations,
-                  ),
+                Builder(
+                  builder: (context) {
+                    final rtl = Directionality.of(context) == TextDirection.rtl;
+                    return SafeArea(
+                      left: !rtl,
+                      right: rtl,
+                      bottom: false,
+                      child: ExpressiveNavigationRail(
+                        selectedIndex: selectedDestination,
+                        onDestinationSelected: _onNavTap,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainer,
+                        destinations: destinations,
+                      ),
+                    );
+                  },
                 ),
                 const VerticalDivider(width: 1),
                 // Width-based layout (centered columns, grids) measures
@@ -1423,6 +1429,8 @@ class _MainShellState extends ConsumerState<MainShell>
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final mediaQuery = MediaQuery.of(context);
+                      final rtl =
+                          Directionality.of(context) == TextDirection.rtl;
                       return MediaQuery(
                         data: mediaQuery
                             .copyWith(
@@ -1431,7 +1439,7 @@ class _MainShellState extends ConsumerState<MainShell>
                                 mediaQuery.size.height,
                               ),
                             )
-                            .removePadding(removeLeft: true),
+                            .removePadding(removeLeft: !rtl, removeRight: rtl),
                         child: pageView,
                       );
                     },

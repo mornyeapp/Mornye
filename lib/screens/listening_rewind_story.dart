@@ -258,7 +258,11 @@ class _RewindStoryState extends State<_RewindStory>
           behavior: HitTestBehavior.opaque,
           onTapUp: (details) {
             final width = context.size?.width ?? 0;
-            _go(details.localPosition.dx < width / 3 ? _index - 1 : _index + 1);
+            final rtl = Directionality.of(context) == TextDirection.rtl;
+            final back = rtl
+                ? details.localPosition.dx > width * 2 / 3
+                : details.localPosition.dx < width / 3;
+            _go(back ? _index - 1 : _index + 1);
           },
           onLongPressStart: (_) => _pauseProgress(),
           onLongPressEnd: (_) => _resumeProgress(),

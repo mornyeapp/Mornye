@@ -510,9 +510,14 @@ class _PaneMediaQuery extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final mediaQuery = MediaQuery.of(context);
+      final rtl = Directionality.of(context) == TextDirection.rtl;
       var data = mediaQuery
           .copyWith(size: Size(constraints.maxWidth, constraints.maxHeight))
-          .removePadding(removeLeft: true, removeBottom: true);
+          .removePadding(
+            removeLeft: !rtl,
+            removeRight: rtl,
+            removeBottom: true,
+          );
       if (bottomInset > 0) {
         data = data.copyWith(
           padding: data.padding.copyWith(bottom: bottomInset),
@@ -763,7 +768,11 @@ class DesktopNavigationRail extends StatelessWidget {
                 label: Text('${destination.badgeCount}'),
                 child: AppIcon(destination.icon),
               ),
-              selectedIcon: AppIcon(destination.selectedIcon),
+              selectedIcon: Badge(
+                isLabelVisible: destination.badgeCount > 0,
+                label: Text('${destination.badgeCount}'),
+                child: AppIcon(destination.selectedIcon),
+              ),
               label: Text(destination.label),
             ),
         ],

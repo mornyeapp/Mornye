@@ -253,8 +253,12 @@ class MornyePlayerLayout extends ConsumerWidget {
                               fullBleed ? stage.maxWidth : artWidth * scale,
                               fullBleed ? motionHeight : artHeight * scale,
                             ),
-                            const Rect.fromLTWH(
-                              _mornyeContentInset,
+                            Rect.fromLTWH(
+                              Directionality.of(context) == TextDirection.rtl
+                                  ? stage.maxWidth -
+                                        _mornyeContentInset -
+                                        compactCoverSize
+                                  : _mornyeContentInset,
                               8,
                               compactCoverSize,
                               compactCoverSize,
@@ -441,8 +445,9 @@ class MornyePlayerLayout extends ConsumerWidget {
             delegate: _PlayerHeaderLayout(
               progress: progress,
               compactHeight: compactHeaderHeight,
-              compactLeft: _mornyeContentInset + compactCoverSize + 12,
+              compactStart: _mornyeContentInset + compactCoverSize + 12,
               expandLyrics: showLyrics,
+              textDirection: Directionality.of(context),
             ),
             children: [
               LayoutId(
@@ -700,14 +705,16 @@ class _PlayerHeaderLayout extends MultiChildLayoutDelegate {
   _PlayerHeaderLayout({
     required this.progress,
     required this.compactHeight,
-    required this.compactLeft,
+    required this.compactStart,
     required this.expandLyrics,
+    required this.textDirection,
   });
 
   final double progress;
   final double compactHeight;
-  final double compactLeft;
+  final double compactStart;
   final bool expandLyrics;
+  final TextDirection textDirection;
 
   @override
   void performLayout(Size size) {
@@ -720,18 +727,20 @@ class _PlayerHeaderLayout extends MultiChildLayoutDelegate {
       size.height,
     );
     positionChild(_PlayerHeaderSlot.controls, Offset(0, contentHeight));
-    final left = 28 + (compactLeft - 28) * progress;
+    final rtl = textDirection == TextDirection.rtl;
+    final start = 28 + (compactStart - 28) * progress;
     // Align the visible ellipsis with the timeline while leaving its touch
     // target wider than the glyph and interpolating the same live header.
-    const compactRight =
+    const compactEnd =
         _mornyeContentInset -
         (_mornyeHeaderButtonSize - _mornyeCompactIconSize) / 2;
-    final right = 28 + (compactRight - 28) * progress;
+    final end = 28 + (compactEnd - 28) * progress;
+    final left = rtl ? end : start;
     final header = layoutChild(
       _PlayerHeaderSlot.header,
       BoxConstraints(
-        minWidth: size.width - left - right,
-        maxWidth: size.width - left - right,
+        minWidth: size.width - start - end,
+        maxWidth: size.width - start - end,
         minHeight: compactHeight * progress,
       ),
     );
@@ -766,7 +775,9 @@ class _PlayerHeaderLayout extends MultiChildLayoutDelegate {
       positionChild(
         _PlayerHeaderSlot.lyricsOptions,
         Offset(
-          size.width - options.width - _mornyeContentInset,
+          rtl
+              ? _mornyeContentInset
+              : size.width - options.width - _mornyeContentInset,
           contentHeight - options.height - 8,
         ),
       );
@@ -777,6 +788,7 @@ class _PlayerHeaderLayout extends MultiChildLayoutDelegate {
   bool shouldRelayout(_PlayerHeaderLayout oldDelegate) =>
       progress != oldDelegate.progress ||
       compactHeight != oldDelegate.compactHeight ||
-      compactLeft != oldDelegate.compactLeft ||
-      expandLyrics != oldDelegate.expandLyrics;
+      compactStart != oldDelegate.compactStart ||
+      expandLyrics != oldDelegate.expandLyrics ||
+      textDirection != oldDelegate.textDirection;
 }

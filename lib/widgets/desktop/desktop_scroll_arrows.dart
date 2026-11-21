@@ -96,8 +96,8 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
                     Curves.easeOut,
                   ),
                 ),
-                exit: const AppMotionSpec(
-                  Duration(milliseconds: 100),
+                exit: AppMotionSpec(
+                  MotionPace.duration(const Duration(milliseconds: 100)),
                   Curves.easeOut,
                 ),
                 child: _arrows(context),
@@ -132,6 +132,10 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
     if (box is! RenderBox || !box.hasSize) return 0;
     final windowWidth = MediaQuery.sizeOf(context).width;
     if (!desktopInspectorOverlays(windowWidth, mornye: true)) return 0;
+    if (Directionality.of(context) == TextDirection.rtl) {
+      final shelfStart = box.localToGlobal(Offset.zero).dx;
+      return math.max(0, mornyeGlassInspectorWidth - shelfStart);
+    }
     final shelfEnd = box.localToGlobal(Offset(box.size.width, 0)).dx;
     return math.max(0, shelfEnd - (windowWidth - mornyeGlassInspectorWidth));
   }
@@ -140,9 +144,10 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
     final l10n = context.l10n;
     final mornye = context.isMornye;
     final colorScheme = Theme.of(context).colorScheme;
-    final icon = forward
-        ? (mornye ? CupertinoIcons.forward : Icons.chevron_right)
-        : (mornye ? CupertinoIcons.back : Icons.chevron_left);
+    // Both icon sets mirror themselves in right-to-left layouts.
+    final icon = mornye
+        ? (forward ? CupertinoIcons.forward : CupertinoIcons.back)
+        : (forward ? Icons.chevron_right : Icons.chevron_left);
     if (mornye) {
       // A tall glass paddle stays close to the edge of the shelf.
       return PositionedDirectional(

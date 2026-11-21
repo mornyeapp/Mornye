@@ -2,6 +2,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/utils/android_tv.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 
 /// An iOS-style slider: a thin rounded track and a white shadowed knob.
 ///
@@ -43,11 +44,11 @@ class MornyeLevelSlider extends StatelessWidget {
 
   double get _origin => (origin ?? min).clamp(min, max);
 
-  void _update(Offset local, Size size) {
+  void _update(Offset local, Size size, {required bool rtl}) {
     final extent = (vertical ? size.height : size.width) - knobRadius * 2;
     if (extent <= 0) return;
     var fraction = ((vertical ? local.dy : local.dx) - knobRadius) / extent;
-    if (vertical) fraction = 1 - fraction;
+    if (vertical || rtl) fraction = 1 - fraction;
     final next = min + fraction.clamp(0.0, 1.0) * (max - min);
     // A light tick when the knob reaches or crosses the origin.
     final at = _origin;
@@ -64,6 +65,8 @@ class MornyeLevelSlider extends StatelessWidget {
     final active = enabled ? scheme.primary : CupertinoColors.inactiveGray;
     final track = CupertinoColors.systemFill.resolveFrom(context);
     final increment = step ?? (max - min) / 100;
+    final rtl = !vertical && Directionality.of(context) == TextDirection.rtl;
+    final keyboardFocusable = isAndroidTv || isDesktopPlatform;
     String format(double v) =>
         semanticFormatterCallback?.call(v) ?? v.toStringAsFixed(1);
     return Semantics(
@@ -80,22 +83,24 @@ class MornyeLevelSlider extends StatelessWidget {
           ? () => onChanged!((value - increment).clamp(min, max))
           : null,
       child: Focus(
-        canRequestFocus: isAndroidTv && enabled,
-        skipTraversal: !isAndroidTv,
+        canRequestFocus: keyboardFocusable && enabled,
+        skipTraversal: !keyboardFocusable,
         onKeyEvent: (node, event) {
-          if (!isAndroidTv || !enabled || !node.hasPrimaryFocus) {
+          if (!keyboardFocusable || !enabled || !node.hasPrimaryFocus) {
             return KeyEventResult.ignored;
           }
-          final increase =
-              event.logicalKey ==
-              (vertical
-                  ? LogicalKeyboardKey.arrowUp
-                  : LogicalKeyboardKey.arrowRight);
-          final decrease =
-              event.logicalKey ==
-              (vertical
-                  ? LogicalKeyboardKey.arrowDown
-                  : LogicalKeyboardKey.arrowLeft);
+          final increaseKey = vertical
+              ? LogicalKeyboardKey.arrowUp
+              : rtl
+              ? LogicalKeyboardKey.arrowLeft
+              : LogicalKeyboardKey.arrowRight;
+          final decreaseKey = vertical
+              ? LogicalKeyboardKey.arrowDown
+              : rtl
+              ? LogicalKeyboardKey.arrowRight
+              : LogicalKeyboardKey.arrowLeft;
+          final increase = event.logicalKey == increaseKey;
+          final decrease = event.logicalKey == decreaseKey;
           if (!increase && !decrease) return KeyEventResult.ignored;
           if (event is KeyDownEvent || event is KeyRepeatEvent) {
             onChanged!(
@@ -113,7 +118,7 @@ class MornyeLevelSlider extends StatelessWidget {
                   : constraints.maxWidth,
               vertical ? constraints.maxHeight : 48,
             );
-            void update(Offset local) => _update(local, size);
+            void update(Offset local) => _update(local, size, rtl: rtl);
             return GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTapDown: enabled ? (d) => update(d.localPosition) : null,
@@ -135,6 +140,7 @@ class MornyeLevelSlider extends StatelessWidget {
                   fraction: ((value - min) / (max - min)).clamp(0.0, 1.0),
                   origin: (_origin - min) / (max - min),
                   vertical: vertical,
+                  rtl: rtl,
                   active: active,
                   track: track,
                   knobRadius: knobRadius,
@@ -153,13 +159,14 @@ class _LevelPainter extends CustomPainter {
     required this.fraction,
     required this.origin,
     required this.vertical,
+    required this.rtl,
     required this.active,
     required this.track,
     required this.knobRadius,
   });
 
   final double fraction, origin, knobRadius;
-  final bool vertical;
+  final bool vertical, rtl;
   final Color active, track;
 
   @override
@@ -169,12 +176,17 @@ class _LevelPainter extends CustomPainter {
     final length = (vertical ? size.height : size.width) - r * 2;
     Offset at(double f) => vertical
         ? Offset(size.width / 2, r + (1 - f) * length)
-        : Offset(r + f * length, size.height / 2);
+        : Offset(r + (rtl ? 1 - f : f) * length, size.height / 2);
     Rect span(double a, double b) {
       final p = at(a), q = at(b);
       return vertical
           ? Rect.fromLTRB(p.dx - t / 2, q.dy, p.dx + t / 2, p.dy)
-          : Rect.fromLTRB(p.dx, p.dy - t / 2, q.dx, p.dy + t / 2);
+          : Rect.fromLTRB(
+              p.dx < q.dx ? p.dx : q.dx,
+              p.dy - t / 2,
+              p.dx < q.dx ? q.dx : p.dx,
+              p.dy + t / 2,
+            );
     }
 
     const radius = Radius.circular(t / 2);
@@ -201,6 +213,7 @@ class _LevelPainter extends CustomPainter {
       oldDelegate.fraction != fraction ||
       oldDelegate.origin != origin ||
       oldDelegate.vertical != vertical ||
+      oldDelegate.rtl != rtl ||
       oldDelegate.active != active ||
       oldDelegate.track != track ||
       oldDelegate.knobRadius != knobRadius;
