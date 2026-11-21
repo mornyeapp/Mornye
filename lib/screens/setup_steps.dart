@@ -127,7 +127,7 @@ extension _SetupScreenSteps on _SetupScreenState {
                       color: colorScheme.surfaceContainerHighest,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
+                    child: AppIcon.adaptive(
                       Icons.translate,
                       size: iconSize,
                       color: colorScheme.primary,

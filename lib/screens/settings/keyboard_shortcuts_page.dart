@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
+import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -88,27 +90,38 @@ class KeyboardShortcutsPage extends ConsumerWidget {
       ),
     ];
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          AppSliverHeader.page(title: l10n.settingsKeyboardShortcuts),
-          for (final (title, rows) in sections)
-            ...settingsSectionSlivers(
-              title: title,
-              children: [
-                for (final (label, activators) in rows)
-                  if (activators.isNotEmpty)
-                    SettingsItem(
-                      title: label,
-                      trailing: _ShortcutKeys(
-                        activators: activators,
-                        platform: platform,
-                      ),
-                    ),
-              ],
-            ),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-        ],
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            AppSliverHeader.page(title: l10n.settingsKeyboardShortcuts),
+            for (final (title, rows) in sections) ...[
+              () {
+                final active = [
+                  for (final row in rows)
+                    if (row.$2.isNotEmpty) row,
+                ];
+                return SliverMainAxisGroup(
+                  slivers: settingsSectionSlivers(
+                    title: title,
+                    children: [
+                      for (var i = 0; i < active.length; i++)
+                        SettingsItem(
+                          title: active[i].$1,
+                          showDivider: i < active.length - 1,
+                          trailing: _ShortcutKeys(
+                            activators: active[i].$2,
+                            platform: platform,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }(),
+            ],
+            const NavBarSliverSpacer(),
+          ],
+        ),
       ),
     );
   }

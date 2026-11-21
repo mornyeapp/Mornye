@@ -196,19 +196,7 @@ class _FilenameFormatEditorSheetState
         ),
       );
     }
-    return ActionChip(
-      label: Text(tag),
-      onPressed: () => _insertTag(tag),
-      backgroundColor: colorScheme.surfaceContainerHighest.withValues(
-        alpha: 0.5,
-      ),
-      side: BorderSide.none,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      labelStyle: TextStyle(
-        color: colorScheme.onSurface,
-        fontWeight: FontWeight.w500,
-      ),
-    );
+    return ActionChip(label: Text(tag), onPressed: () => _insertTag(tag));
   }
 
   @override

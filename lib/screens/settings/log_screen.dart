@@ -13,6 +13,7 @@ import 'package:mornye/providers/runtime_profile_provider.dart'
     show mornyeGlassLevelProvider;
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
@@ -311,265 +312,267 @@ class _LogScreenState extends State<LogScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final logs = _filteredLogs;
 
-    return PopScope(
-      canPop: !_selectionMode,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _selectionMode) _exitSelectionMode();
-      },
-      child: Scaffold(
-        body: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            AppSliverHeader.page(
-              title: _selectionMode
-                  ? context.l10n.selectionSelected(_selectedEntries.length)
-                  : context.l10n.logTitle,
-              leading: _selectionMode
-                  ? AppIconButton(
-                      tooltip: MaterialLocalizations.of(
-                        context,
-                      ).closeButtonTooltip,
-                      icon: const AppIcon(Icons.close),
-                      onPressed: _exitSelectionMode,
-                    )
-                  : null,
-              actions: _selectionMode
-                  ? [
-                      AppIconButton(
-                        icon: AppIcon(
-                          logs.isNotEmpty &&
-                                  logs.every(_selectedEntries.contains)
-                              ? Icons.deselect
-                              : Icons.select_all,
-                        ),
-                        tooltip:
-                            logs.isNotEmpty &&
-                                logs.every(_selectedEntries.contains)
-                            ? context.l10n.actionDeselect
-                            : context.l10n.actionSelectAll,
-                        onPressed: _toggleSelectAllVisible,
-                      ),
-                      AppIconButton(
-                        icon: const AppIcon(Icons.copy),
-                        tooltip: context.l10n.logCopyLogs,
-                        onPressed: _selectedEntries.isEmpty
-                            ? null
-                            : _copySelectedLogs,
-                      ),
-                      AppIconButton(
-                        icon: const AppIcon(Icons.share),
-                        tooltip: context.l10n.logShareLogs,
-                        onPressed: _selectedEntries.isEmpty
-                            ? null
-                            : _shareSelectedLogs,
-                      ),
-                    ]
-                  : [
-                      AppIconButton(
-                        icon: AppIcon(
-                          _autoScroll
-                              ? Icons.vertical_align_bottom
-                              : Icons.vertical_align_center,
-                        ),
-                        tooltip: _autoScroll
-                            ? context.l10n.logAutoScrollOn
-                            : context.l10n.logAutoScrollOff,
-                        onPressed: () =>
-                            setState(() => _autoScroll = !_autoScroll),
-                      ),
-                      AppIconButton(
-                        icon: const AppIcon(Icons.copy),
-                        tooltip: context.l10n.logCopyLogs,
-                        onPressed: _copyLogs,
-                      ),
-                      AppMenuButton<String>(
-                        icon: const AppIcon(Icons.more_vert),
+    return MornyeSettingsTheme(
+      child: PopScope(
+        canPop: !_selectionMode,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop && _selectionMode) _exitSelectionMode();
+        },
+        child: Scaffold(
+          body: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              AppSliverHeader.page(
+                title: _selectionMode
+                    ? context.l10n.selectionSelected(_selectedEntries.length)
+                    : context.l10n.logTitle,
+                leading: _selectionMode
+                    ? AppIconButton(
                         tooltip: MaterialLocalizations.of(
                           context,
-                        ).showMenuTooltip,
-                        onSelected: (value) {
-                          switch (value) {
-                            case 'share':
-                              _shareLogs();
-                              break;
-                            case 'clear':
-                              _clearLogs();
-                              break;
-                          }
-                        },
-                        items: [
-                          AppMenuItem(
-                            value: 'share',
-                            label: context.l10n.logShareLogs,
-                            leading: const AppIcon(Icons.share),
+                        ).closeButtonTooltip,
+                        icon: const AppIcon(Icons.close),
+                        onPressed: _exitSelectionMode,
+                      )
+                    : null,
+                actions: _selectionMode
+                    ? [
+                        AppIconButton(
+                          icon: AppIcon(
+                            logs.isNotEmpty &&
+                                    logs.every(_selectedEntries.contains)
+                                ? Icons.deselect
+                                : Icons.select_all,
                           ),
-                          AppMenuItem(
-                            value: 'clear',
-                            label: context.l10n.logClearLogs,
-                            leading: const AppIcon(Icons.delete_outline),
+                          tooltip:
+                              logs.isNotEmpty &&
+                                  logs.every(_selectedEntries.contains)
+                              ? context.l10n.actionDeselect
+                              : context.l10n.actionSelectAll,
+                          onPressed: _toggleSelectAllVisible,
+                        ),
+                        AppIconButton(
+                          icon: const AppIcon(Icons.copy),
+                          tooltip: context.l10n.logCopyLogs,
+                          onPressed: _selectedEntries.isEmpty
+                              ? null
+                              : _copySelectedLogs,
+                        ),
+                        AppIconButton(
+                          icon: const AppIcon(Icons.share),
+                          tooltip: context.l10n.logShareLogs,
+                          onPressed: _selectedEntries.isEmpty
+                              ? null
+                              : _shareSelectedLogs,
+                        ),
+                      ]
+                    : [
+                        AppIconButton(
+                          icon: AppIcon(
+                            _autoScroll
+                                ? Icons.vertical_align_bottom
+                                : Icons.vertical_align_center,
                           ),
-                        ],
-                      ),
-                    ],
-            ),
-
-            const SliverToBoxAdapter(child: AppCrashBanner(diagnostic: true)),
-            ...settingsSectionSlivers(
-              title: context.l10n.logFilterSection,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  child: Row(
-                    children: [
-                      AppIcon(
-                        Icons.filter_list,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              context.l10n.logFilterLevel,
-                              style: Theme.of(context).textTheme.bodyLarge,
+                          tooltip: _autoScroll
+                              ? context.l10n.logAutoScrollOn
+                              : context.l10n.logAutoScrollOff,
+                          onPressed: () =>
+                              setState(() => _autoScroll = !_autoScroll),
+                        ),
+                        AppIconButton(
+                          icon: const AppIcon(Icons.copy),
+                          tooltip: context.l10n.logCopyLogs,
+                          onPressed: _copyLogs,
+                        ),
+                        AppMenuButton<String>(
+                          icon: const AppIcon(Icons.more_vert),
+                          tooltip: MaterialLocalizations.of(
+                            context,
+                          ).showMenuTooltip,
+                          onSelected: (value) {
+                            switch (value) {
+                              case 'share':
+                                _shareLogs();
+                                break;
+                              case 'clear':
+                                _clearLogs();
+                                break;
+                            }
+                          },
+                          items: [
+                            AppMenuItem(
+                              value: 'share',
+                              label: context.l10n.logShareLogs,
+                              leading: const AppIcon(Icons.share),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              context.l10n.logFilterBySeverity,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                            AppMenuItem(
+                              value: 'clear',
+                              label: context.l10n.logClearLogs,
+                              leading: const AppIcon(Icons.delete_outline),
                             ),
                           ],
                         ),
-                      ),
-                      ExpressiveButton(
-                        tonal: true,
-                        onPressed: () => _showLevelPicker(context),
-                        icon: const Icon(Icons.arrow_drop_down, size: 20),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(0, 40),
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                        ),
-                        child: Text(
-                          _selectedLevel,
-                          style: TextStyle(
-                            color: _selectedLevel == 'ALL'
-                                ? null
-                                : _getLevelColor(_selectedLevel, colorScheme),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (context.isMornye)
-                  Divider(
-                    height: 1,
-                    indent: 56,
-                    endIndent: 20,
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  child: AppSearchField(
-                    controller: _searchController,
-                    hintText: context.l10n.logSearchHint,
-                    clearTooltip: context.l10n.logClearSearch,
-                    onClear: () => setState(() => _searchQuery = ''),
-                    onChanged: (value) => setState(() => _searchQuery = value),
-                  ),
-                ),
-              ],
-            ),
-
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(
-                title: _selectedLevel != 'ALL' || _searchQuery.isNotEmpty
-                    ? context.l10n.logEntriesFiltered(logs.length)
-                    : context.l10n.logEntries(logs.length),
+                      ],
               ),
-            ),
 
-            SliverToBoxAdapter(
-              child: _LogSummaryCard(logs: LogBuffer().entries),
-            ),
-
-            logs.isEmpty
-                ? SliverToBoxAdapter(
-                    child: SettingsGroup(
+              const SliverToBoxAdapter(child: AppCrashBanner(diagnostic: true)),
+              ...settingsSectionSlivers(
+                title: context.l10n.logFilterSection,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    child: Row(
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 48),
+                        AppIcon(
+                          Icons.filter_list,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
                           child: Column(
-                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              AppIcon(
-                                Icons.article_outlined,
-                                size: 48,
-                                color: colorScheme.onSurfaceVariant.withValues(
-                                  alpha: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
                               Text(
-                                context.l10n.logNoLogsYet,
-                                style: Theme.of(context).textTheme.bodyLarge
-                                    ?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
+                                context.l10n.logFilterLevel,
+                                style: Theme.of(context).textTheme.bodyLarge,
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 2),
                               Text(
-                                context.l10n.logNoLogsYetSubtitle,
+                                context.l10n.logFilterBySeverity,
                                 style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(
-                                      color: colorScheme.onSurfaceVariant
-                                          .withValues(alpha: 0.7),
+                                      color: colorScheme.onSurfaceVariant,
                                     ),
                               ),
                             ],
                           ),
                         ),
+                        ExpressiveButton(
+                          tonal: true,
+                          onPressed: () => _showLevelPicker(context),
+                          icon: const Icon(Icons.arrow_drop_down, size: 20),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 40),
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                          ),
+                          child: Text(
+                            _selectedLevel,
+                            style: TextStyle(
+                              color: _selectedLevel == 'ALL'
+                                  ? null
+                                  : _getLevelColor(_selectedLevel, colorScheme),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                  )
-                : SliverLayoutInfoBuilder<double>(
-                    select: (constraints) => constraints.crossAxisExtent,
-                    builder: (context, width) => SliverSettingsGroup(
-                      margin: EdgeInsets.symmetric(
-                        horizontal: settingsHorizontalInset(context, width),
-                        vertical: 4,
-                      ),
-                      itemCount: logs.length,
-                      itemBuilder: (context, index) {
-                        final log = logs[index];
-                        return _LogEntryTile(
-                          entry: log,
-                          levelColor: _getLevelColor(log.level, colorScheme),
-                          showDivider: index < logs.length - 1,
-                          selectionMode: _selectionMode,
-                          selected: _selectedEntries.contains(log),
-                          onTap: () => _toggleEntrySelection(log),
-                          onLongPress: () => _selectionMode
-                              ? _selectRangeTo(log)
-                              : _enterSelectionMode(log),
-                        );
-                      },
+                  ),
+                  if (context.isMornye)
+                    Divider(
+                      height: 1,
+                      indent: 56,
+                      endIndent: 20,
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    child: AppSearchField(
+                      controller: _searchController,
+                      hintText: context.l10n.logSearchHint,
+                      clearTooltip: context.l10n.logClearSearch,
+                      onClear: () => setState(() => _searchQuery = ''),
+                      onChanged: (value) =>
+                          setState(() => _searchQuery = value),
                     ),
                   ),
+                ],
+              ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
-          ],
+              SliverToBoxAdapter(
+                child: SettingsSectionHeader(
+                  title: _selectedLevel != 'ALL' || _searchQuery.isNotEmpty
+                      ? context.l10n.logEntriesFiltered(logs.length)
+                      : context.l10n.logEntries(logs.length),
+                ),
+              ),
+
+              SliverToBoxAdapter(
+                child: _LogSummaryCard(logs: LogBuffer().entries),
+              ),
+
+              logs.isEmpty
+                  ? SliverToBoxAdapter(
+                      child: SettingsGroup(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 48),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AppIcon(
+                                  Icons.article_outlined,
+                                  size: 48,
+                                  color: colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.5),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  context.l10n.logNoLogsYet,
+                                  style: Theme.of(context).textTheme.bodyLarge
+                                      ?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  context.l10n.logNoLogsYetSubtitle,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: colorScheme.onSurfaceVariant
+                                            .withValues(alpha: 0.7),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : SliverLayoutInfoBuilder<double>(
+                      select: (constraints) => constraints.crossAxisExtent,
+                      builder: (context, width) => SliverSettingsGroup(
+                        margin: EdgeInsets.symmetric(
+                          horizontal: settingsHorizontalInset(context, width),
+                          vertical: 4,
+                        ),
+                        itemCount: logs.length,
+                        itemBuilder: (context, index) {
+                          final log = logs[index];
+                          return _LogEntryTile(
+                            entry: log,
+                            levelColor: _getLevelColor(log.level, colorScheme),
+                            showDivider: index < logs.length - 1,
+                            selectionMode: _selectionMode,
+                            selected: _selectedEntries.contains(log),
+                            onTap: () => _toggleEntrySelection(log),
+                            onLongPress: () => _selectionMode
+                                ? _selectRangeTo(log)
+                                : _enterSelectionMode(log),
+                          );
+                        },
+                      ),
+                    ),
+
+              const NavBarSliverSpacer(),
+            ],
+          ),
         ),
       ),
     );

@@ -10,6 +10,7 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/scroll_edge_fade.dart';
+import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
@@ -347,7 +348,11 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                     color: colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(feature.$1, size: 24, color: colorScheme.primary),
+                  child: AppIcon.adaptive(
+                    feature.$1,
+                    size: 24,
+                    color: colorScheme.primary,
+                  ),
                 ),
                 const SizedBox(width: 20),
                 Expanded(
@@ -383,7 +388,7 @@ class _AnimatedReadyCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
+          AppIcon.adaptive(
             Icons.lightbulb_rounded,
             color: colorScheme.onPrimaryContainer,
             size: 28,
@@ -798,7 +803,7 @@ class _TutorialPage extends StatelessWidget {
                         color: colorScheme.primary.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
+                      child: AppIcon.adaptive(
                         icon,
                         size: iconSize,
                         color: colorScheme.primary,

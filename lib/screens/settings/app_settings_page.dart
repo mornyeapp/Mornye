@@ -1,5 +1,4 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoActivityIndicator;
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
@@ -12,6 +11,7 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
 
 class AppSettingsPage extends ConsumerWidget {
   const AppSettingsPage({super.key});
@@ -21,126 +21,130 @@ class AppSettingsPage extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
-    return PopScope(
-      canPop: true,
-      child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            AppSliverHeader.page(title: context.l10n.settingsApp),
+    return MornyeSettingsTheme(
+      child: PopScope(
+        canPop: true,
+        child: Scaffold(
+          body: CustomScrollView(
+            slivers: [
+              AppSliverHeader.page(title: context.l10n.settingsApp),
 
-            ...settingsSectionSlivers(
-              title: context.l10n.sectionApp,
-              connected: true,
-              children: [
-                SettingsSwitchItem(
-                  icon: Icons.extension,
-                  title: context.l10n.optionsExtensionStore,
-                  subtitle: context.l10n.optionsExtensionStoreSubtitle,
-                  value: settings.showExtensionStore,
-                  onChanged: (v) => ref
-                      .read(settingsProvider.notifier)
-                      .setShowExtensionStore(v),
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.update,
-                  title: context.l10n.optionsAutoUpdateExtensions,
-                  subtitle: context.l10n.optionsAutoUpdateExtensionsSubtitle,
-                  value: settings.autoUpdateExtensions,
-                  onChanged: (v) => ref
-                      .read(settingsProvider.notifier)
-                      .setAutoUpdateExtensions(v),
-                ),
-                _VerificationBrowserModeSelector(
-                  currentMode: settings.extensionVerificationBrowserMode,
-                  onChanged: (mode) => ref
-                      .read(settingsProvider.notifier)
-                      .setExtensionVerificationBrowserMode(mode),
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.system_update,
-                  title: context.l10n.optionsCheckUpdates,
-                  subtitle: context.l10n.optionsCheckUpdatesSubtitle,
-                  value: settings.checkForUpdates,
-                  onChanged: (v) =>
-                      ref.read(settingsProvider.notifier).setCheckForUpdates(v),
-                  showDivider: settings.checkForUpdates,
-                ),
-                if (settings.checkForUpdates)
-                  _UpdateChannelSelector(
-                    currentChannel: settings.updateChannel,
-                    onChanged: (v) =>
-                        ref.read(settingsProvider.notifier).setUpdateChannel(v),
+              ...settingsSectionSlivers(
+                title: context.l10n.sectionApp,
+                connected: true,
+                children: [
+                  SettingsSwitchItem(
+                    icon: Icons.extension,
+                    title: context.l10n.optionsExtensionStore,
+                    subtitle: context.l10n.optionsExtensionStoreSubtitle,
+                    value: settings.showExtensionStore,
+                    onChanged: (v) => ref
+                        .read(settingsProvider.notifier)
+                        .setShowExtensionStore(v),
                   ),
-              ],
-            ),
+                  SettingsSwitchItem(
+                    icon: Icons.update,
+                    title: context.l10n.optionsAutoUpdateExtensions,
+                    subtitle: context.l10n.optionsAutoUpdateExtensionsSubtitle,
+                    value: settings.autoUpdateExtensions,
+                    onChanged: (v) => ref
+                        .read(settingsProvider.notifier)
+                        .setAutoUpdateExtensions(v),
+                  ),
+                  _VerificationBrowserModeSelector(
+                    currentMode: settings.extensionVerificationBrowserMode,
+                    onChanged: (mode) => ref
+                        .read(settingsProvider.notifier)
+                        .setExtensionVerificationBrowserMode(mode),
+                  ),
+                  SettingsSwitchItem(
+                    icon: Icons.system_update,
+                    title: context.l10n.optionsCheckUpdates,
+                    subtitle: context.l10n.optionsCheckUpdatesSubtitle,
+                    value: settings.checkForUpdates,
+                    onChanged: (v) => ref
+                        .read(settingsProvider.notifier)
+                        .setCheckForUpdates(v),
+                    showDivider: settings.checkForUpdates,
+                  ),
+                  if (settings.checkForUpdates)
+                    _UpdateChannelSelector(
+                      currentChannel: settings.updateChannel,
+                      onChanged: (v) => ref
+                          .read(settingsProvider.notifier)
+                          .setUpdateChannel(v),
+                    ),
+                ],
+              ),
 
-            ...settingsSectionSlivers(
-              title: context.l10n.sectionData,
-              children: [
-                SettingsItem(
-                  icon: Icons.cleaning_services_outlined,
-                  title: context.l10n.cleanupOrphanedDownloads,
-                  subtitle: context.l10n.cleanupOrphanedDownloadsSubtitle,
-                  onTap: () => _cleanupOrphanedDownloads(context, ref),
-                ),
-                SettingsItem(
-                  icon: Icons.delete_forever,
-                  title: context.l10n.optionsClearHistory,
-                  subtitle: context.l10n.optionsClearHistorySubtitle,
-                  onTap: () =>
-                      _showClearHistoryDialog(context, ref, colorScheme),
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.history_toggle_off_outlined,
-                  title: context.l10n.settingsSaveDownloadHistory,
-                  subtitle: context.l10n.settingsSaveDownloadHistorySubtitle,
-                  value: settings.saveDownloadHistory,
-                  onChanged: (enabled) {
-                    if (enabled) {
+              ...settingsSectionSlivers(
+                title: context.l10n.sectionData,
+                children: [
+                  SettingsItem(
+                    icon: Icons.cleaning_services_outlined,
+                    title: context.l10n.cleanupOrphanedDownloads,
+                    subtitle: context.l10n.cleanupOrphanedDownloadsSubtitle,
+                    onTap: () => _cleanupOrphanedDownloads(context, ref),
+                  ),
+                  SettingsItem(
+                    icon: Icons.delete_forever,
+                    title: context.l10n.optionsClearHistory,
+                    subtitle: context.l10n.optionsClearHistorySubtitle,
+                    onTap: () =>
+                        _showClearHistoryDialog(context, ref, colorScheme),
+                  ),
+                  SettingsSwitchItem(
+                    icon: Icons.history_toggle_off_outlined,
+                    title: context.l10n.settingsSaveDownloadHistory,
+                    subtitle: context.l10n.settingsSaveDownloadHistorySubtitle,
+                    value: settings.saveDownloadHistory,
+                    onChanged: (enabled) {
+                      if (enabled) {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .setSaveDownloadHistory(true);
+                        return;
+                      }
+
+                      final hasHistory = ref
+                          .read(downloadHistoryProvider)
+                          .items
+                          .isNotEmpty;
+                      if (hasHistory) {
+                        _showDisableHistoryDialog(context, ref, colorScheme);
+                        return;
+                      }
+
                       ref
                           .read(settingsProvider.notifier)
-                          .setSaveDownloadHistory(true);
-                      return;
-                    }
+                          .setSaveDownloadHistory(false);
+                    },
+                    showDivider: false,
+                  ),
+                ],
+              ),
 
-                    final hasHistory = ref
-                        .read(downloadHistoryProvider)
-                        .items
-                        .isNotEmpty;
-                    if (hasHistory) {
-                      _showDisableHistoryDialog(context, ref, colorScheme);
-                      return;
-                    }
+              ...settingsSectionSlivers(
+                title: context.l10n.sectionDebug,
+                children: [
+                  SettingsSwitchItem(
+                    icon: Icons.bug_report,
+                    title: context.l10n.optionsDetailedLogging,
+                    subtitle: settings.enableLogging
+                        ? context.l10n.optionsDetailedLoggingOn
+                        : context.l10n.optionsDetailedLoggingOff,
+                    value: settings.enableLogging,
+                    onChanged: (v) =>
+                        ref.read(settingsProvider.notifier).setEnableLogging(v),
+                    showDivider: false,
+                  ),
+                ],
+              ),
 
-                    ref
-                        .read(settingsProvider.notifier)
-                        .setSaveDownloadHistory(false);
-                  },
-                  showDivider: false,
-                ),
-              ],
-            ),
-
-            ...settingsSectionSlivers(
-              title: context.l10n.sectionDebug,
-              children: [
-                SettingsSwitchItem(
-                  icon: Icons.bug_report,
-                  title: context.l10n.optionsDetailedLogging,
-                  subtitle: settings.enableLogging
-                      ? context.l10n.optionsDetailedLoggingOn
-                      : context.l10n.optionsDetailedLoggingOff,
-                  value: settings.enableLogging,
-                  onChanged: (v) =>
-                      ref.read(settingsProvider.notifier).setEnableLogging(v),
-                  showDivider: false,
-                ),
-              ],
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
-            const NavBarSliverSpacer(),
-          ],
+              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+              const NavBarSliverSpacer(),
+            ],
+          ),
         ),
       ),
     );
@@ -227,10 +231,7 @@ class AppSettingsPage extends ConsumerWidget {
       builder: (context) => AppAlertDialog(
         content: Row(
           children: [
-            if (context.isMornye)
-              const CupertinoActivityIndicator()
-            else
-              const AppLoadingIndicator(),
+            const AppLoadingIndicator(),
             const SizedBox(width: 16),
             Expanded(child: Text(context.l10n.cleanupOrphanedDownloads)),
           ],
@@ -243,13 +244,12 @@ class AppSettingsPage extends ConsumerWidget {
           .cleanupOrphanedDownloads();
       dialogNavigator.pop();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              removed > 0
-                  ? context.l10n.cleanupOrphanedDownloadsResult(removed)
-                  : context.l10n.cleanupOrphanedDownloadsNone,
-            ),
+        showAppSnackBar(
+          context,
+          content: Text(
+            removed > 0
+                ? context.l10n.cleanupOrphanedDownloadsResult(removed)
+                : context.l10n.cleanupOrphanedDownloadsNone,
           ),
         );
       }

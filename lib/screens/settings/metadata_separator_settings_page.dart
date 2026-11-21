@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/metadata_separators.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_content_card.dart';
@@ -26,53 +27,57 @@ class MetadataSeparatorSettingsPage extends ConsumerWidget {
       'composer': context.l10n.editMetadataFieldComposer,
       'genre': context.l10n.trackGenre,
     };
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          AppSliverHeader.page(title: context.l10n.metadataSeparators),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
-              child: Text(context.l10n.metadataSeparatorsDescription),
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            AppSliverHeader.page(title: context.l10n.metadataSeparators),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+                child: Text(context.l10n.metadataSeparatorsDescription),
+              ),
             ),
-          ),
-          SliverToBoxAdapter(
-            child: SettingsGroup(
-              children: [
-                for (final field in MetadataSeparators.fields)
-                  SettingsItem(
-                    icon: field == 'genre'
-                        ? Icons.category_outlined
-                        : Icons.people_alt_outlined,
-                    title: labels[field]!,
-                    subtitle: separators.toJson()[field]!.isEmpty
-                        ? context.l10n.metadataSeparatorSource
-                        : formatMetadataTagValue(
-                            '${labels[field]} A, ${labels[field]} B',
-                            separators.toJson()[field]!,
-                          ),
-                    onTap: () async {
-                      final value = await showAppScrollableBottomSheet<String>(
-                        context: context,
-                        title: labels[field]!,
-                        builder: (_, controller) => _SeparatorPicker(
-                          label: labels[field]!,
-                          current: separators.toJson()[field]!,
-                          scrollController: controller,
-                        ),
-                      );
-                      if (value != null && context.mounted) {
-                        ref
-                            .read(settingsProvider.notifier)
-                            .setMetadataSeparator(field, value);
-                      }
-                    },
-                  ),
-              ],
+            SliverToBoxAdapter(
+              child: SettingsGroup(
+                children: [
+                  for (final (i, field) in MetadataSeparators.fields.indexed)
+                    SettingsItem(
+                      icon: field == 'genre'
+                          ? Icons.category_outlined
+                          : Icons.people_alt_outlined,
+                      title: labels[field]!,
+                      subtitle: separators.toJson()[field]!.isEmpty
+                          ? context.l10n.metadataSeparatorSource
+                          : formatMetadataTagValue(
+                              '${labels[field]} A, ${labels[field]} B',
+                              separators.toJson()[field]!,
+                            ),
+                      showDivider: i < MetadataSeparators.fields.length - 1,
+                      onTap: () async {
+                        final value =
+                            await showAppScrollableBottomSheet<String>(
+                              context: context,
+                              title: labels[field]!,
+                              builder: (_, controller) => _SeparatorPicker(
+                                label: labels[field]!,
+                                current: separators.toJson()[field]!,
+                                scrollController: controller,
+                              ),
+                            );
+                        if (value != null && context.mounted) {
+                          ref
+                              .read(settingsProvider.notifier)
+                              .setMetadataSeparator(field, value);
+                        }
+                      },
+                    ),
+                ],
+              ),
             ),
-          ),
-          const NavBarSliverSpacer(),
-        ],
+            const NavBarSliverSpacer(),
+          ],
+        ),
       ),
     );
   }

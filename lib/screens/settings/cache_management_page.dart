@@ -24,6 +24,7 @@ import 'package:mornye/services/explore_cache_store.dart';
 import 'package:mornye/services/library_cleanup.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -362,223 +363,226 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
     final mornye = context.isMornye;
     final overview = _overview;
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          AppSliverHeader.page(
-            title: context.l10n.cacheTitle,
-            actions: [
-              AppIconButton(
-                tooltip: context.l10n.cacheRefresh,
-                onPressed: _isBusy ? null : _refreshOverview,
-                icon: const AppIcon(Icons.refresh),
-              ),
-            ],
-          ),
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            AppSliverHeader.page(
+              title: context.l10n.cacheTitle,
+              actions: [
+                AppIconButton(
+                  tooltip: context.l10n.cacheRefresh,
+                  onPressed: _isBusy ? null : _refreshOverview,
+                  icon: const AppIcon(Icons.refresh),
+                ),
+              ],
+            ),
 
-          if (_isLoading || overview == null)
-            const SliverFillRemaining(
-              child: Center(child: AppLoadingIndicator()),
-            )
-          else ...[
-            SliverToBoxAdapter(
-              child: _overviewSurface(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.l10n.cacheSummaryTitle,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: mornye
-                            ? colorScheme.onSurface
-                            : colorScheme.onPrimaryContainer,
+            if (_isLoading || overview == null)
+              const SliverFillRemaining(
+                child: Center(child: AppLoadingIndicator()),
+              )
+            else ...[
+              SliverToBoxAdapter(
+                child: _overviewSurface(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.l10n.cacheSummaryTitle,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: mornye
+                                  ? colorScheme.onSurface
+                                  : colorScheme.onPrimaryContainer,
+                            ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      context.l10n.cacheEstimatedTotal(
-                        formatBytes(overview.totalKnownDiskCacheBytes),
+                      const SizedBox(height: 6),
+                      Text(
+                        context.l10n.cacheEstimatedTotal(
+                          formatBytes(overview.totalKnownDiskCacheBytes),
+                        ),
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: mornye
+                              ? colorScheme.onSurface
+                              : colorScheme.onPrimaryContainer,
+                        ),
                       ),
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: mornye
-                            ? colorScheme.onSurface
-                            : colorScheme.onPrimaryContainer,
+                      const SizedBox(height: 2),
+                      Text(
+                        context.l10n.cacheSummarySubtitle,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: mornye
+                              ? colorScheme.onSurfaceVariant
+                              : colorScheme.onPrimaryContainer.withValues(
+                                  alpha: 0.85,
+                                ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      context.l10n.cacheSummarySubtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: mornye
-                            ? colorScheme.onSurfaceVariant
-                            : colorScheme.onPrimaryContainer.withValues(
-                                alpha: 0.85,
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        AppActionButton(
-                          isDestructive: true,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colorScheme.secondaryContainer,
-                            foregroundColor: colorScheme.onSecondaryContainer,
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          AppActionButton(
+                            isDestructive: true,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: colorScheme.secondaryContainer,
+                              foregroundColor: colorScheme.onSecondaryContainer,
+                            ),
+                            onPressed: _isBusy
+                                ? null
+                                : () async {
+                                    final l10n = context.l10n;
+                                    final confirmed = await _confirmClear(
+                                      l10n.cacheClearAllConfirmTitle,
+                                      l10n.cacheClearAllConfirmMessage,
+                                    );
+                                    if (!confirmed) return;
+                                    if (!mounted) return;
+                                    await _runAction(
+                                      'clear_all',
+                                      _clearAllCaches,
+                                      successMessage: l10n.cacheClearSuccess(
+                                        l10n.cacheClearAll,
+                                      ),
+                                    );
+                                  },
+                            icon: const AppIcon(Icons.delete_sweep_outlined),
+                            label: Text(context.l10n.cacheClearAll),
                           ),
-                          onPressed: _isBusy
-                              ? null
-                              : () async {
-                                  final l10n = context.l10n;
-                                  final confirmed = await _confirmClear(
-                                    l10n.cacheClearAllConfirmTitle,
-                                    l10n.cacheClearAllConfirmMessage,
-                                  );
-                                  if (!confirmed) return;
-                                  if (!mounted) return;
-                                  await _runAction(
-                                    'clear_all',
-                                    _clearAllCaches,
-                                    successMessage: l10n.cacheClearSuccess(
-                                      l10n.cacheClearAll,
-                                    ),
-                                  );
-                                },
-                          icon: const AppIcon(Icons.delete_sweep_outlined),
-                          label: Text(context.l10n.cacheClearAll),
-                        ),
-                        AppActionButton(
-                          outlined: true,
-                          glass: false,
-                          onPressed: _isBusy ? null : _refreshOverview,
-                          icon: const AppIcon(Icons.refresh),
-                          label: Text(context.l10n.cacheRefreshStats),
-                        ),
-                      ],
-                    ),
-                  ],
+                          AppActionButton(
+                            outlined: true,
+                            glass: false,
+                            onPressed: _isBusy ? null : _refreshOverview,
+                            icon: const AppIcon(Icons.refresh),
+                            label: Text(context.l10n.cacheRefreshStats),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
-            ...settingsSectionSlivers(
-              title: context.l10n.cacheSectionStorage,
-              children: [
-                _clearRow(
-                  Icons.folder_outlined,
-                  context.l10n.cacheAppDirectory,
-                  context.l10n.cacheAppDirectoryDesc,
-                  _sizeLabel(
-                    overview.appCacheStats.fileCount,
-                    overview.appCacheStats.totalSizeBytes,
-                  ),
-                  'clear_app_cache',
-                  _clearAppCache,
-                ),
-                if (!overview.tempIsSameAsAppCache &&
-                    overview.tempStats != null)
+              ...settingsSectionSlivers(
+                title: context.l10n.cacheSectionStorage,
+                children: [
                   _clearRow(
-                    Icons.timer_outlined,
-                    context.l10n.cacheTempDirectory,
-                    context.l10n.cacheTempDirectoryDesc,
+                    Icons.folder_outlined,
+                    context.l10n.cacheAppDirectory,
+                    context.l10n.cacheAppDirectoryDesc,
                     _sizeLabel(
-                      overview.tempStats!.fileCount,
-                      overview.tempStats!.totalSizeBytes,
+                      overview.appCacheStats.fileCount,
+                      overview.appCacheStats.totalSizeBytes,
                     ),
-                    'clear_temp_cache',
-                    _clearTempCache,
+                    'clear_app_cache',
+                    _clearAppCache,
                   ),
-                _clearRow(
-                  Icons.image_outlined,
-                  context.l10n.cacheCoverImage,
-                  context.l10n.cacheCoverImageDesc,
-                  _sizeLabel(
-                    overview.coverStats.fileCount,
-                    overview.coverStats.totalSizeBytes,
+                  if (!overview.tempIsSameAsAppCache &&
+                      overview.tempStats != null)
+                    _clearRow(
+                      Icons.timer_outlined,
+                      context.l10n.cacheTempDirectory,
+                      context.l10n.cacheTempDirectoryDesc,
+                      _sizeLabel(
+                        overview.tempStats!.fileCount,
+                        overview.tempStats!.totalSizeBytes,
+                      ),
+                      'clear_temp_cache',
+                      _clearTempCache,
+                    ),
+                  _clearRow(
+                    Icons.image_outlined,
+                    context.l10n.cacheCoverImage,
+                    context.l10n.cacheCoverImageDesc,
+                    _sizeLabel(
+                      overview.coverStats.fileCount,
+                      overview.coverStats.totalSizeBytes,
+                    ),
+                    'clear_cover_cache',
+                    _clearCoverCache,
                   ),
-                  'clear_cover_cache',
-                  _clearCoverCache,
-                ),
-                _clearRow(
-                  Icons.library_music_outlined,
-                  context.l10n.cacheLibraryCover,
-                  context.l10n.cacheLibraryCoverDesc,
-                  _sizeLabel(
-                    overview.libraryCoverStats.fileCount,
-                    overview.libraryCoverStats.totalSizeBytes,
+                  _clearRow(
+                    Icons.library_music_outlined,
+                    context.l10n.cacheLibraryCover,
+                    context.l10n.cacheLibraryCoverDesc,
+                    _sizeLabel(
+                      overview.libraryCoverStats.fileCount,
+                      overview.libraryCoverStats.totalSizeBytes,
+                    ),
+                    'clear_library_cover_cache',
+                    _clearLibraryCoverCache,
                   ),
-                  'clear_library_cover_cache',
-                  _clearLibraryCoverCache,
-                ),
-                _clearRow(
-                  Icons.graphic_eq_outlined,
-                  context.l10n.cacheAudioAnalysis,
-                  context.l10n.cacheAudioAnalysisDesc,
-                  _sizeLabel(
-                    overview.audioAnalysisStats.fileCount,
-                    overview.audioAnalysisStats.totalSizeBytes,
+                  _clearRow(
+                    Icons.graphic_eq_outlined,
+                    context.l10n.cacheAudioAnalysis,
+                    context.l10n.cacheAudioAnalysisDesc,
+                    _sizeLabel(
+                      overview.audioAnalysisStats.fileCount,
+                      overview.audioAnalysisStats.totalSizeBytes,
+                    ),
+                    'clear_audio_analysis_cache',
+                    _clearAudioAnalysisCache,
                   ),
-                  'clear_audio_analysis_cache',
-                  _clearAudioAnalysisCache,
-                ),
-                _clearRow(
-                  Icons.video_library_outlined,
-                  context.l10n.cacheMotionArtwork,
-                  context.l10n.cacheMotionArtworkDesc,
-                  overview.motionStats.totalSizeBytes > 0
-                      ? formatBytes(overview.motionStats.totalSizeBytes)
-                      : context.l10n.cacheNoData,
-                  'clear_motion_artwork',
-                  _clearMotionArtwork,
-                ),
-                _clearRow(
-                  Icons.explore_outlined,
-                  context.l10n.cacheExploreFeed,
-                  context.l10n.cacheExploreFeedDesc,
-                  overview.hasExploreCache
-                      ? context.l10n.cacheSizeOnly(
-                          formatBytes(overview.exploreCacheBytes),
-                        )
-                      : context.l10n.cacheNoData,
-                  'clear_explore_cache',
-                  _clearExploreCache,
-                ),
-                _clearRow(
-                  Icons.memory_outlined,
-                  context.l10n.cacheTrackLookup,
-                  context.l10n.cacheTrackLookupDesc,
-                  overview.trackCacheEntries > 0
-                      ? context.l10n.cacheEntries(overview.trackCacheEntries)
-                      : context.l10n.cacheNoData,
-                  'clear_track_cache',
-                  _clearTrackCache,
-                  showDivider: false,
-                ),
-              ],
-            ),
+                  _clearRow(
+                    Icons.video_library_outlined,
+                    context.l10n.cacheMotionArtwork,
+                    context.l10n.cacheMotionArtworkDesc,
+                    overview.motionStats.totalSizeBytes > 0
+                        ? formatBytes(overview.motionStats.totalSizeBytes)
+                        : context.l10n.cacheNoData,
+                    'clear_motion_artwork',
+                    _clearMotionArtwork,
+                  ),
+                  _clearRow(
+                    Icons.explore_outlined,
+                    context.l10n.cacheExploreFeed,
+                    context.l10n.cacheExploreFeedDesc,
+                    overview.hasExploreCache
+                        ? context.l10n.cacheSizeOnly(
+                            formatBytes(overview.exploreCacheBytes),
+                          )
+                        : context.l10n.cacheNoData,
+                    'clear_explore_cache',
+                    _clearExploreCache,
+                  ),
+                  _clearRow(
+                    Icons.memory_outlined,
+                    context.l10n.cacheTrackLookup,
+                    context.l10n.cacheTrackLookupDesc,
+                    overview.trackCacheEntries > 0
+                        ? context.l10n.cacheEntries(overview.trackCacheEntries)
+                        : context.l10n.cacheNoData,
+                    'clear_track_cache',
+                    _clearTrackCache,
+                    showDivider: false,
+                  ),
+                ],
+              ),
 
-            ...settingsSectionSlivers(
-              title: context.l10n.cacheSectionMaintenance,
-              children: [
-                SettingsItem(
-                  icon: Icons.cleaning_services_outlined,
-                  title: context.l10n.cacheCleanupUnused,
-                  subtitle:
-                      '${context.l10n.cacheCleanupUnusedDesc}\n${context.l10n.cacheCleanupUnusedSubtitle}',
-                  trailing: _buildClearTrailing(
-                    'cleanup_unused',
-                    _cleanupUnusedData,
+              ...settingsSectionSlivers(
+                title: context.l10n.cacheSectionMaintenance,
+                children: [
+                  SettingsItem(
+                    icon: Icons.cleaning_services_outlined,
+                    title: context.l10n.cacheCleanupUnused,
+                    subtitle:
+                        '${context.l10n.cacheCleanupUnusedDesc}\n${context.l10n.cacheCleanupUnusedSubtitle}',
+                    trailing: _buildClearTrailing(
+                      'cleanup_unused',
+                      _cleanupUnusedData,
+                    ),
+                    showDivider: false,
                   ),
-                  showDivider: false,
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              const NavBarSliverSpacer(),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

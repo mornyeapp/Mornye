@@ -18,6 +18,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
+import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/link/link_row_action.dart';
@@ -328,132 +329,134 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
     final note = theme.textTheme.bodyMedium?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          AppSliverHeader.page(title: l10n.linkPageTitle),
-          SliverToBoxAdapter(
-            child: _LinkInset(
-              child: Text(l10n.linkPageDescription, style: note),
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            AppSliverHeader.page(title: l10n.linkPageTitle),
+            SliverToBoxAdapter(
+              child: _LinkInset(
+                child: Text(l10n.linkPageDescription, style: note),
+              ),
             ),
-          ),
-          if (_busy)
-            const SliverToBoxAdapter(
-              child: _LinkInset(child: AppProgressIndicator.linear()),
-            ),
-          SliverList.list(children: _notices(state)),
-          if (state.servers.isNotEmpty)
+            if (_busy)
+              const SliverToBoxAdapter(
+                child: _LinkInset(child: AppProgressIndicator.linear()),
+              ),
+            SliverList.list(children: _notices(state)),
+            if (state.servers.isNotEmpty)
+              ...settingsSectionSlivers(
+                title: l10n.linkPairedSection,
+                // The Transfers row is its own widget, so mark the rows.
+                connected: true,
+                children: [
+                  for (final record in state.servers) _pairedRow(state, record),
+                  const LinkTransfersSettingsItem(),
+                ],
+              ),
+            if (state.servers.isNotEmpty)
+              ...settingsSectionSlivers(
+                title: l10n.linkPhoneSection,
+                children: [
+                  SettingsSwitchItem(
+                    icon: Icons.devices_other_outlined,
+                    title: l10n.linkShowComputerSongsTitle,
+                    subtitle: l10n.linkShowComputerSongsSubtitle,
+                    value: options.showComputerSongs,
+                    onChanged: options.loaded
+                        ? optionsNotifier.setShowComputerSongs
+                        : null,
+                  ),
+                  SettingsSwitchItem(
+                    icon: Icons.visibility_off,
+                    title: l10n.linkHideDisconnectedTitle,
+                    subtitle: l10n.linkHideDisconnectedSubtitle,
+                    value: hideDisconnected,
+                    onChanged: options.showComputerSongs
+                        ? ref
+                              .read(settingsProvider.notifier)
+                              .setLinkHideDisconnectedSongs
+                        : null,
+                  ),
+                  SettingsSwitchItem(
+                    icon: Icons.library_music_outlined,
+                    title: l10n.linkShareSongsTitle,
+                    subtitle: l10n.linkShareSongsSubtitle,
+                    value: options.shareSongs,
+                    onChanged: options.loaded
+                        ? optionsNotifier.setShareSongs
+                        : null,
+                  ),
+                  SettingsSwitchItem(
+                    icon: Icons.equalizer,
+                    title: l10n.linkSyncSoundTitle,
+                    subtitle: l10n.linkSyncSoundSubtitle,
+                    value: soundSync.enabled,
+                    onChanged: soundSync.loaded
+                        ? ref
+                              .read(linkSoundSyncOptionProvider.notifier)
+                              .setEnabled
+                        : null,
+                  ),
+                  SettingsSwitchItem(
+                    icon: Icons.devices_outlined,
+                    title: l10n.linkFollowDesktopTitle,
+                    subtitle: l10n.linkFollowDesktopSubtitle,
+                    value: options.followDesktop,
+                    onChanged: options.loaded
+                        ? optionsNotifier.setFollowDesktop
+                        : null,
+                    showDivider: false,
+                  ),
+                ],
+              ),
             ...settingsSectionSlivers(
-              title: l10n.linkPairedSection,
-              // The Transfers row is its own widget, so mark the rows.
-              connected: true,
+              title: l10n.linkNearbySection,
               children: [
-                for (final record in state.servers) _pairedRow(state, record),
-                const LinkTransfersSettingsItem(),
+                for (final (i, server) in unpaired.indexed)
+                  SettingsItem(
+                    icon: server.isPhone ? Icons.phone_android : Icons.computer,
+                    showIconInMornye: true,
+                    title: server.name,
+                    subtitle: server.host,
+                    showDivider: i < unpaired.length - 1,
+                    onTap: _busy ? null : () => _pairDiscovered(server),
+                  ),
+                if (unpaired.isEmpty)
+                  SettingsItem(
+                    icon: Icons.wifi,
+                    showIconInMornye: true,
+                    title: searching
+                        ? l10n.linkSearching
+                        : l10n.linkNoneFoundTitle,
+                    subtitle: l10n.linkNoneFound,
+                    showDivider: false,
+                    trailing: searching
+                        ? const SizedBox.square(
+                            dimension: 24,
+                            child: AppLoadingIndicator(size: 20),
+                          )
+                        : null,
+                  ),
               ],
             ),
-          if (state.servers.isNotEmpty)
-            ...settingsSectionSlivers(
-              title: l10n.linkPhoneSection,
-              children: [
-                SettingsSwitchItem(
-                  icon: Icons.devices_other_outlined,
-                  title: l10n.linkShowComputerSongsTitle,
-                  subtitle: l10n.linkShowComputerSongsSubtitle,
-                  value: options.showComputerSongs,
-                  onChanged: options.loaded
-                      ? optionsNotifier.setShowComputerSongs
-                      : null,
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.visibility_off,
-                  title: l10n.linkHideDisconnectedTitle,
-                  subtitle: l10n.linkHideDisconnectedSubtitle,
-                  value: hideDisconnected,
-                  onChanged: options.showComputerSongs
-                      ? ref
-                            .read(settingsProvider.notifier)
-                            .setLinkHideDisconnectedSongs
-                      : null,
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.library_music_outlined,
-                  title: l10n.linkShareSongsTitle,
-                  subtitle: l10n.linkShareSongsSubtitle,
-                  value: options.shareSongs,
-                  onChanged: options.loaded
-                      ? optionsNotifier.setShareSongs
-                      : null,
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.equalizer,
-                  title: l10n.linkSyncSoundTitle,
-                  subtitle: l10n.linkSyncSoundSubtitle,
-                  value: soundSync.enabled,
-                  onChanged: soundSync.loaded
-                      ? ref
-                            .read(linkSoundSyncOptionProvider.notifier)
-                            .setEnabled
-                      : null,
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.devices_outlined,
-                  title: l10n.linkFollowDesktopTitle,
-                  subtitle: l10n.linkFollowDesktopSubtitle,
-                  value: options.followDesktop,
-                  onChanged: options.loaded
-                      ? optionsNotifier.setFollowDesktop
-                      : null,
-                  showDivider: false,
-                ),
-              ],
-            ),
-          ...settingsSectionSlivers(
-            title: l10n.linkNearbySection,
-            children: [
-              for (final server in unpaired)
-                SettingsItem(
-                  icon: server.isPhone ? Icons.phone_android : Icons.computer,
-                  showIconInMornye: true,
-                  title: server.name,
-                  subtitle: server.host,
-                  onTap: _busy ? null : () => _pairDiscovered(server),
-                ),
-              if (unpaired.isEmpty)
-                SettingsItem(
-                  icon: Icons.wifi,
-                  showIconInMornye: true,
-                  title: searching
-                      ? l10n.linkSearching
-                      : l10n.linkNoneFoundTitle,
-                  subtitle: l10n.linkNoneFound,
-                  trailing: searching
-                      ? SizedBox.square(
-                          dimension: 24,
-                          child: context.isMornye
-                              ? const CupertinoActivityIndicator()
-                              : const AppProgressIndicator.circular(),
-                        )
-                      : null,
-                ),
-            ],
-          ),
-          SliverToBoxAdapter(
-            child: _LinkInset(
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: AppActionButton(
-                  onPressed: _busy ? null : _addManually,
-                  icon: const Icon(Icons.add),
-                  label: Text(l10n.linkAddManually),
-                  tonal: true,
+            SliverToBoxAdapter(
+              child: _LinkInset(
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: AppActionButton(
+                    onPressed: _busy ? null : _addManually,
+                    icon: const Icon(Icons.add),
+                    label: Text(l10n.linkAddManually),
+                    tonal: true,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SliverToBoxAdapter(child: LinkPhoneHostSection()),
-          const NavBarSliverSpacer(),
-        ],
+            const SliverToBoxAdapter(child: LinkPhoneHostSection()),
+            const NavBarSliverSpacer(),
+          ],
+        ),
       ),
     );
   }

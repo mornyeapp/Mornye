@@ -269,6 +269,7 @@ class AppearanceSettingsPage extends ConsumerWidget {
                   onChanged: ref
                       .read(settingsProvider.notifier)
                       .setHomeRecommendations,
+                  showDivider: false,
                 ),
               ],
             ),

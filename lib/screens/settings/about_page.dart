@@ -586,7 +586,7 @@ class _TranslatorChip extends StatelessWidget {
                       ? translator.name[0].toUpperCase()
                       : '?',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: colorScheme.primary,
                   ),

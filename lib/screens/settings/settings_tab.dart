@@ -943,7 +943,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                               profile?.photoPath?.isNotEmpty == true
                           ? null
                           : Text(context.l10n.profileEdit),
-                      trailing: const AppIcon(Icons.chevron_right),
+                      trailing: const AppIcon.adaptive(Icons.chevron_right),
                       onTap: profile == null
                           ? null
                           : () => _navigateTo(

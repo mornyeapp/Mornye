@@ -16,6 +16,7 @@ import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/app_search_field.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/app_action_button.dart';
@@ -140,9 +141,7 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
     try {
       final library = ref.read(localLibraryProvider.notifier);
       if (ref.read(localLibraryProvider).isScanning) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(context.l10n.libraryScanning)));
+        showAppSnackBar(context, content: Text(context.l10n.libraryScanning));
         return;
       }
       final folder = widget.path
@@ -161,11 +160,10 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
       await library.startSourceScan(source.id);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _networkErrorMessage(context, classifyNetworkStorageError(error)),
-            ),
+        showAppSnackBar(
+          context,
+          content: Text(
+            _networkErrorMessage(context, classifyNetworkStorageError(error)),
           ),
         );
       }
@@ -319,11 +317,10 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
           );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _networkErrorMessage(context, classifyNetworkStorageError(error)),
-            ),
+        showAppSnackBar(
+          context,
+          content: Text(
+            _networkErrorMessage(context, classifyNetworkStorageError(error)),
           ),
         );
       }
@@ -351,314 +348,326 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
     final visible = _entries
         .where((e) => e.directory || (e.audio && !widget.pickUploadFolder))
         .toList();
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          AppSliverHeader.page(
-            title: title,
-            actions: [
-              if (connection == null)
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            AppSliverHeader.page(
+              title: title,
+              actions: [
+                if (connection == null)
+                  _NetworkIconAction(
+                    tooltip: context.l10n.networkAddConnection,
+                    onPressed: () => _edit(),
+                    icon: Icons.add,
+                    cupertinoIcon: CupertinoIcons.add,
+                  ),
                 _NetworkIconAction(
-                  tooltip: context.l10n.networkAddConnection,
-                  onPressed: () => _edit(),
-                  icon: Icons.add,
-                  cupertinoIcon: CupertinoIcons.add,
+                  tooltip: context.l10n.networkRefresh,
+                  onPressed: _loading ? null : _load,
+                  icon: Icons.refresh,
+                  cupertinoIcon: CupertinoIcons.refresh,
                 ),
-              _NetworkIconAction(
-                tooltip: context.l10n.networkRefresh,
-                onPressed: _loading ? null : _load,
-                icon: Icons.refresh,
-                cupertinoIcon: CupertinoIcons.refresh,
-              ),
-            ],
-          ),
-          // Centered at the reading width on tablets, under the title.
-          SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
-            sliver: SliverMainAxisGroup(
-              slivers: [
-                if (_subsonic && widget.path.isEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.all(context.tokens.gapLg),
-                      child: AppSearchField(
-                        controller: _search,
-                        hintText: context.l10n.subsonicSearch,
-                        clearTooltip: context.l10n.dialogClear,
-                        samplesBackdrop: false,
-                        onClear: _load,
-                        onSubmitted: (_) => _load(),
+              ],
+            ),
+            // Centered at the reading width on tablets, under the title.
+            SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
+              sliver: SliverMainAxisGroup(
+                slivers: [
+                  if (_subsonic && widget.path.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.all(context.tokens.gapLg),
+                        child: AppSearchField(
+                          controller: _search,
+                          hintText: context.l10n.subsonicSearch,
+                          clearTooltip: context.l10n.dialogClear,
+                          samplesBackdrop: false,
+                          onClear: _load,
+                          onSubmitted: (_) => _load(),
+                        ),
                       ),
                     ),
-                  ),
-                if (connection == null && !widget.pickUploadFolder)
-                  const SliverToBoxAdapter(child: _NetworkUploadStatus()),
-                if (_loading || _starting)
-                  SliverToBoxAdapter(child: _NetworkProgress()),
-                if (!_loading &&
-                    !_failed &&
-                    widget.pickUploadFolder &&
-                    connection != null &&
-                    connection.writable)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          AppActionButton(
-                            onPressed: _selectingDestination
-                                ? null
-                                : _chooseUploadFolder,
-                            icon: const AppIcon.adaptive(
-                              Icons.cloud_upload_outlined,
-                            ),
-                            label: Text(context.l10n.networkUploadHere),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            context.l10n.networkUploadDescription,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          if (_selectingDestination)
-                            const AppProgressIndicator.linear(),
-                        ],
-                      ),
-                    ),
-                  ),
-                if (!_loading &&
-                    !_failed &&
-                    !widget.pickUploadFolder &&
-                    connection != null &&
-                    connection.protocol != NetworkProtocol.http &&
-                    (!_subsonic || widget.path.isEmpty))
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          AppActionButton(
-                            onPressed: _adding || _added ? null : _addToLibrary,
-                            icon: Icon(
-                              _added ? Icons.check : Icons.library_add_outlined,
-                            ),
-                            label: Text(
-                              _added
-                                  ? (_subsonic
-                                        ? context.l10n.subsonicLibraryAdded
-                                        : context.l10n.networkLibraryAdded)
-                                  : (_subsonic
-                                        ? context.l10n.subsonicAddToLibrary
-                                        : context.l10n.networkAddToLibrary),
-                            ),
-                            tonal: true,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _subsonic
-                                ? context.l10n.subsonicLibraryDescription
-                                : context.l10n.networkLibraryDescription,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          if (connection.writable) ...[
-                            const SizedBox(height: 12),
+                  if (connection == null && !widget.pickUploadFolder)
+                    const SliverToBoxAdapter(child: _NetworkUploadStatus()),
+                  if (_loading || _starting)
+                    SliverToBoxAdapter(child: _NetworkProgress()),
+                  if (!_loading &&
+                      !_failed &&
+                      widget.pickUploadFolder &&
+                      connection != null &&
+                      connection.writable)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                             AppActionButton(
-                              onPressed:
-                                  _selectingDestination || isDownloadDestination
+                              onPressed: _selectingDestination
                                   ? null
-                                  : _useForDownloads,
-                              icon: Icon(
-                                isDownloadDestination
-                                    ? Icons.check
-                                    : Icons.download_outlined,
+                                  : _chooseUploadFolder,
+                              icon: const AppIcon.adaptive(
+                                Icons.cloud_upload_outlined,
                               ),
-                              label: Text(
-                                isDownloadDestination
-                                    ? context.l10n.networkDownloadSelected
-                                    : context.l10n.networkUseForDownloads,
-                              ),
-                              tonal: true,
+                              label: Text(context.l10n.networkUploadHere),
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              context.l10n.networkDownloadDescription,
+                              context.l10n.networkUploadDescription,
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                             if (_selectingDestination)
                               const AppProgressIndicator.linear(),
                           ],
-                          if (_adding)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 8),
-                              child: AppProgressIndicator.linear(),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                if (_failed)
-                  SliverToBoxAdapter(
-                    child: _NetworkMessage(
-                      icon: context.isMornye
-                          ? CupertinoIcons.wifi_exclamationmark
-                          : Icons.wifi_off_rounded,
-                      message: _networkErrorMessage(context, _failure),
-                      action: AppActionButton(
-                        onPressed: _load,
-                        icon: const Icon(Icons.refresh),
-                        label: Text(context.l10n.dialogRetry),
-                        tonal: true,
-                      ),
-                    ),
-                  ),
-                if (!_loading && !_failed && connection == null) ...[
-                  SliverToBoxAdapter(
-                    child: _NetworkMessage(
-                      icon: context.isMornye
-                          ? CupertinoIcons.cloud
-                          : Icons.dns_outlined,
-                      message: context.l10n.networkStorageDescription,
-                      action: AppActionButton(
-                        onPressed: () => _edit(),
-                        icon: const Icon(Icons.add),
-                        label: Text(context.l10n.networkAddConnection),
-                      ),
-                    ),
-                  ),
-                  if (_connections.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: SettingsSectionHeader(
-                        title: context.l10n.networkConnections,
-                      ),
-                    ),
-                  // One group for every connection, as on the settings pages.
-                  if (_connections.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: SettingsGroup(
-                        children: [
-                          for (final (index, c) in _connections.indexed)
-                            SettingsItem(
-                              key: ValueKey('network-connection:${c.id}'),
-                              icon: switch ((
-                                links.containsKey(c.id),
-                                context.isMornye,
-                              )) {
-                                (true, true) => CupertinoIcons.desktopcomputer,
-                                (true, false) => Icons.computer,
-                                (false, true) => CupertinoIcons.cloud,
-                                (false, false) => Icons.dns_outlined,
-                              },
-                              showIconInMornye: true,
-                              title: c.name,
-                              subtitle:
-                                  '${_kindLabel(c, links)} · ${c.root.host}',
-                              onTap: () => _open(c),
-                              showDivider: index < _connections.length - 1,
-                              trailing: links.containsKey(c.id)
-                                  ? null
-                                  : _NetworkIconAction(
-                                      tooltip:
-                                          context.l10n.networkEditConnection,
-                                      onPressed: () => _edit(c),
-                                      icon: Icons.edit_outlined,
-                                      cupertinoIcon: CupertinoIcons.pencil,
-                                    ),
-                            ),
-                        ],
-                      ),
-                    ),
-                ],
-                if (!_loading && !_failed && connection != null) ...[
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
-                      child: Text(
-                        '${_kindLabel(connection, links)} · ${connection.root.host}'
-                        '${_subsonic ? '' : '\n/${widget.path}'}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
-                  ),
-                  if (visible.isEmpty)
+                  if (!_loading &&
+                      !_failed &&
+                      !widget.pickUploadFolder &&
+                      connection != null &&
+                      connection.protocol != NetworkProtocol.http &&
+                      (!_subsonic || widget.path.isEmpty))
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            AppActionButton(
+                              onPressed: _adding || _added
+                                  ? null
+                                  : _addToLibrary,
+                              icon: Icon(
+                                _added
+                                    ? Icons.check
+                                    : Icons.library_add_outlined,
+                              ),
+                              label: Text(
+                                _added
+                                    ? (_subsonic
+                                          ? context.l10n.subsonicLibraryAdded
+                                          : context.l10n.networkLibraryAdded)
+                                    : (_subsonic
+                                          ? context.l10n.subsonicAddToLibrary
+                                          : context.l10n.networkAddToLibrary),
+                              ),
+                              tonal: true,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _subsonic
+                                  ? context.l10n.subsonicLibraryDescription
+                                  : context.l10n.networkLibraryDescription,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            if (connection.writable) ...[
+                              const SizedBox(height: 12),
+                              AppActionButton(
+                                onPressed:
+                                    _selectingDestination ||
+                                        isDownloadDestination
+                                    ? null
+                                    : _useForDownloads,
+                                icon: Icon(
+                                  isDownloadDestination
+                                      ? Icons.check
+                                      : Icons.download_outlined,
+                                ),
+                                label: Text(
+                                  isDownloadDestination
+                                      ? context.l10n.networkDownloadSelected
+                                      : context.l10n.networkUseForDownloads,
+                                ),
+                                tonal: true,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                context.l10n.networkDownloadDescription,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              if (_selectingDestination)
+                                const AppProgressIndicator.linear(),
+                            ],
+                            if (_adding)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 8),
+                                child: AppProgressIndicator.linear(),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (_failed)
                     SliverToBoxAdapter(
                       child: _NetworkMessage(
                         icon: context.isMornye
-                            ? CupertinoIcons.folder
-                            : Icons.folder_open_rounded,
-                        message: context.l10n.networkNoFiles,
+                            ? CupertinoIcons.wifi_exclamationmark
+                            : Icons.wifi_off_rounded,
+                        message: _networkErrorMessage(context, _failure),
+                        action: AppActionButton(
+                          onPressed: _load,
+                          icon: const Icon(Icons.refresh),
+                          label: Text(context.l10n.dialogRetry),
+                          tonal: true,
+                        ),
                       ),
                     ),
-                  SliverList.builder(
-                    itemCount: visible.length,
-                    itemBuilder: (context, index) {
-                      final entry = visible[index];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Material(
-                          color: settingsGroupColor(context),
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(
-                              index == 0
-                                  ? (context.isMornye
-                                        ? 28
-                                        : context.tokens.radiusCard)
-                                  : 0,
-                            ),
-                            bottom: Radius.circular(
-                              index == visible.length - 1
-                                  ? (context.isMornye
-                                        ? 28
-                                        : context.tokens.radiusCard)
-                                  : 0,
-                            ),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: SettingsItem(
-                            icon: entry.directory
-                                ? Icons.folder_outlined
-                                : Icons.music_note,
-                            showIconInMornye: true,
-                            title: _entryName(entry),
-                            subtitle: entry.directory
-                                ? null
-                                : [
-                                    if (entry.song != null) entry.song!.artist,
-                                    entry.extension.toUpperCase(),
-                                  ].join(' · '),
-                            showDivider: index != visible.length - 1,
-                            trailing: entry.directory
-                                ? null
-                                : _NetworkIconAction(
-                                    tooltip: context.l10n.tooltipPlay,
-                                    icon: Icons.play_arrow_rounded,
-                                    cupertinoIcon: CupertinoIcons.play_fill,
-                                    onPressed: _starting
-                                        ? null
-                                        : () => _play(entry),
-                                  ),
-                            onTap: _starting
-                                ? null
-                                : () => entry.directory
-                                      ? _open(
-                                          connection,
-                                          entry.path,
-                                          _entryName(entry),
-                                        )
-                                      : _play(entry),
-                          ),
+                  if (!_loading && !_failed && connection == null) ...[
+                    SliverToBoxAdapter(
+                      child: _NetworkMessage(
+                        icon: context.isMornye
+                            ? CupertinoIcons.cloud
+                            : Icons.dns_outlined,
+                        message: context.l10n.networkStorageDescription,
+                        action: AppActionButton(
+                          onPressed: () => _edit(),
+                          icon: const Icon(Icons.add),
+                          label: Text(context.l10n.networkAddConnection),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                    if (_connections.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: SettingsSectionHeader(
+                          title: context.l10n.networkConnections,
+                        ),
+                      ),
+                    // One group for every connection, as on the settings pages.
+                    if (_connections.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: SettingsGroup(
+                          children: [
+                            for (final (index, c) in _connections.indexed)
+                              SettingsItem(
+                                key: ValueKey('network-connection:${c.id}'),
+                                icon: switch ((
+                                  links.containsKey(c.id),
+                                  context.isMornye,
+                                )) {
+                                  (true, true) =>
+                                    CupertinoIcons.desktopcomputer,
+                                  (true, false) => Icons.computer,
+                                  (false, true) => CupertinoIcons.cloud,
+                                  (false, false) => Icons.dns_outlined,
+                                },
+                                showIconInMornye: true,
+                                title: c.name,
+                                subtitle:
+                                    '${_kindLabel(c, links)} · ${c.root.host}',
+                                onTap: () => _open(c),
+                                showDivider: index < _connections.length - 1,
+                                trailing: links.containsKey(c.id)
+                                    ? null
+                                    : _NetworkIconAction(
+                                        tooltip:
+                                            context.l10n.networkEditConnection,
+                                        onPressed: () => _edit(c),
+                                        icon: Icons.edit_outlined,
+                                        cupertinoIcon: CupertinoIcons.pencil,
+                                      ),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                  if (!_loading && !_failed && connection != null) ...[
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
+                        child: Text(
+                          '${_kindLabel(connection, links)} · ${connection.root.host}'
+                          '${_subsonic ? '' : '\n/${widget.path}'}',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ),
+                    ),
+                    if (visible.isEmpty)
+                      SliverToBoxAdapter(
+                        child: _NetworkMessage(
+                          icon: context.isMornye
+                              ? CupertinoIcons.folder
+                              : Icons.folder_open_rounded,
+                          message: context.l10n.networkNoFiles,
+                        ),
+                      ),
+                    SliverList.builder(
+                      itemCount: visible.length,
+                      itemBuilder: (context, index) {
+                        final entry = visible[index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Material(
+                            color: settingsGroupColor(context),
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(
+                                index == 0
+                                    ? (context.isMornye
+                                          ? 28
+                                          : context.tokens.radiusCard)
+                                    : 0,
+                              ),
+                              bottom: Radius.circular(
+                                index == visible.length - 1
+                                    ? (context.isMornye
+                                          ? 28
+                                          : context.tokens.radiusCard)
+                                    : 0,
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: SettingsItem(
+                              icon: entry.directory
+                                  ? Icons.folder_outlined
+                                  : Icons.music_note,
+                              showIconInMornye: true,
+                              title: _entryName(entry),
+                              subtitle: entry.directory
+                                  ? null
+                                  : [
+                                      if (entry.song != null)
+                                        entry.song!.artist,
+                                      entry.extension.toUpperCase(),
+                                    ].join(' · '),
+                              showDivider: index != visible.length - 1,
+                              trailing: entry.directory
+                                  ? null
+                                  : _NetworkIconAction(
+                                      tooltip: context.l10n.tooltipPlay,
+                                      icon: Icons.play_arrow_rounded,
+                                      cupertinoIcon: CupertinoIcons.play_fill,
+                                      onPressed: _starting
+                                          ? null
+                                          : () => _play(entry),
+                                    ),
+                              onTap: _starting
+                                  ? null
+                                  : () => entry.directory
+                                        ? _open(
+                                            connection,
+                                            entry.path,
+                                            _entryName(entry),
+                                          )
+                                        : _play(entry),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const NavBarSliverSpacer(),
-        ],
+            const NavBarSliverSpacer(),
+          ],
+        ),
       ),
     );
   }
@@ -1249,13 +1258,9 @@ class _NetworkUploadStatus extends ConsumerWidget {
 
 class _NetworkProgress extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(16),
-    child: Center(
-      child: context.isMornye
-          ? const CupertinoActivityIndicator()
-          : const AppLoadingIndicator(),
-    ),
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.all(16),
+    child: Center(child: AppLoadingIndicator()),
   );
 }
 

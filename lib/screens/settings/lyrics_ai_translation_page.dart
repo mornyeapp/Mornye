@@ -72,188 +72,194 @@ class _LyricsAiTranslationPageState
     );
     final ready = lyricsAiReady(settings, apiKey);
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          AppSliverHeader.page(title: l10n.lyricsAiTranslation),
-          SliverToBoxAdapter(
-            child: SettingsInfoCard(
-              icon: Icons.privacy_tip_outlined,
-              message: l10n.lyricsAiTranslationNotice,
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            AppSliverHeader.page(title: l10n.lyricsAiTranslation),
+            SliverToBoxAdapter(
+              child: SettingsInfoCard(
+                icon: Icons.privacy_tip_outlined,
+                message: l10n.lyricsAiTranslationNotice,
+              ),
             ),
-          ),
-          ...settingsSectionSlivers(
-            title: l10n.lyricsAiSectionProvider,
-            children: [
-              SettingsItem(
-                icon: Icons.auto_awesome_outlined,
-                title: l10n.lyricsAiProvider,
-                subtitle: lyricsAiProviderName(l10n, provider),
-                onTap: () => _pickProvider(provider),
-              ),
-              if (provider == LyricsAiProvider.custom)
+            ...settingsSectionSlivers(
+              title: l10n.lyricsAiSectionProvider,
+              children: [
                 SettingsItem(
-                  icon: Icons.dns_outlined,
-                  title: l10n.lyricsAiBaseUrl,
-                  subtitle: settings.lyricsAiBaseUrl.isEmpty
-                      ? l10n.lyricsAiNotSet
-                      : settings.lyricsAiBaseUrl,
-                  onTap: () => _editBaseUrl(settings.lyricsAiBaseUrl),
+                  icon: Icons.auto_awesome_outlined,
+                  title: l10n.lyricsAiProvider,
+                  subtitle: lyricsAiProviderName(l10n, provider),
+                  onTap: () => _pickProvider(provider),
                 ),
-              SettingsItem(
-                key: const ValueKey('lyrics-ai-api-key'),
-                icon: Icons.key_outlined,
-                title: l10n.lyricsAiApiKey,
-                subtitle: apiKey.isNotEmpty
-                    ? l10n.lyricsAiApiKeySaved(_keySuffix(apiKey))
-                    : provider.requiresKey
-                    ? l10n.lyricsAiNotSet
-                    : l10n.lyricsAiApiKeyOptional,
-                onTap: () => _editKey(provider, apiKey),
-              ),
-              SettingsItem(
-                icon: Icons.memory_outlined,
-                title: l10n.lyricsAiModel,
-                subtitle: settings.lyricsAiModel.isNotEmpty
-                    ? settings.lyricsAiModel
-                    : defaultModel != null
-                    ? l10n.lyricsAiModelDefault(defaultModel)
-                    : l10n.lyricsAiNotSet,
-                onTap: () => _editModel(provider, apiKey),
-              ),
-              SettingsItem(
-                key: const ValueKey('lyrics-ai-test'),
-                icon: Icons.network_check_outlined,
-                title: l10n.lyricsAiTestConnection,
-                subtitle: l10n.lyricsAiTestConnectionSubtitle,
-                trailing: _testing ? const AppLoadingIndicator(size: 24) : null,
-                onTap: ready && !_testing
-                    ? () => _testConnection(apiKey)
-                    : null,
-                showDivider: false,
-              ),
-            ],
-          ),
-          ...settingsSectionSlivers(
-            title: l10n.lyricsAiSectionTranslation,
-            children: [
-              SettingsItem(
-                icon: Icons.language_outlined,
-                title: l10n.lyricsAiTargetLanguage,
-                subtitle: target == null
-                    ? l10n.lyricsAiTargetLanguageApp(appLanguage.nativeName)
-                    : target.nativeName,
-                onTap: () async {
-                  final code = await showLyricsLanguagePicker(
-                    context,
-                    title: l10n.lyricsAiTargetLanguage,
-                    selected: target?.code ?? '',
-                    appDefaultLabel: l10n.lyricsAiTargetLanguageApp(
-                      appLanguage.nativeName,
-                    ),
-                  );
-                  if (code != null) notifier.setLyricsTranslationLanguage(code);
-                },
-              ),
-              SettingsItem(
-                key: const ValueKey('lyrics-ai-second-language'),
-                icon: Icons.translate_outlined,
-                title: l10n.lyricsAiSecondLanguage,
-                subtitle:
-                    secondLanguage?.nativeName ??
-                    l10n.lyricsAiSecondLanguageSubtitle,
-                onTap: () async {
-                  final code = await showLyricsLanguagePicker(
-                    context,
-                    title: l10n.lyricsAiSecondLanguage,
-                    subtitle: l10n.lyricsAiSecondLanguageSubtitle,
-                    selected: secondLanguage?.code ?? '',
-                    appDefaultLabel: l10n.lyricsAiSecondLanguageOff,
-                  );
-                  if (code != null) {
-                    notifier.setLyricsTranslationSecondLanguage(code);
-                  }
-                },
-              ),
-              SettingsItem(
-                key: const ValueKey('lyrics-ai-mode'),
-                icon: Icons.speed_outlined,
-                title: l10n.lyricsAiMode,
-                subtitle: settings.lyricsAiWordSync
-                    ? l10n.lyricsAiModeSynced
-                    : l10n.lyricsAiModeFast,
-                onTap: () => _pickMode(settings.lyricsAiWordSync),
-              ),
-              SettingsItem(
-                icon: Icons.edit_note_outlined,
-                title: l10n.lyricsAiInstruction,
-                subtitle: settings.lyricsAiInstruction.isEmpty
-                    ? l10n.lyricsAiInstructionNone
-                    : settings.lyricsAiInstruction,
-                onTap: () => _editInstruction(settings.lyricsAiInstruction),
-              ),
-              SettingsSwitchItem(
-                icon: Icons.bolt_outlined,
-                title: l10n.lyricsAiAutoTranslate,
-                subtitle: l10n.lyricsAiAutoTranslateSubtitle,
-                value: settings.lyricsAutoTranslate,
-                onChanged: notifier.setLyricsAutoTranslate,
-              ),
-              SettingsSwitchItem(
-                icon: Icons.record_voice_over_outlined,
-                title: l10n.lyricsAiRomanize,
-                subtitle: l10n.lyricsAiRomanizeSubtitle,
-                // Romanization off in Lyrics settings turns it off here too.
-                value: settings.lyricsRomanize && settings.lyricsAiRomanize,
-                enabled: settings.lyricsRomanize,
-                onChanged: notifier.setLyricsAiRomanize,
-              ),
-              SettingsItem(
-                icon: Icons.delete_outline,
-                title: l10n.lyricsAiClearCache,
-                subtitle: _cachedCount == null
-                    ? null
-                    : l10n.lyricsAiClearCacheSubtitle(_cachedCount!),
-                onTap: (_cachedCount ?? 0) > 0 ? _clearCache : null,
-                showDivider: false,
-              ),
-            ],
-          ),
-          ...settingsSectionSlivers(
-            title: l10n.lyricsAiSectionFiles,
-            children: [
-              SettingsItem(
-                key: const ValueKey('lyrics-ai-save-to'),
-                icon: Icons.save_alt,
-                title: l10n.lyricsAiSaveTo,
-                subtitle:
-                    settings.lyricsTranslationSaveTo ==
-                        lyricsTranslationSaveToMlrc
-                    ? l10n.lyricsAiSaveToMlrc
-                    : l10n.lyricsAiSaveToSongFile,
-                onTap: () => _pickSaveTo(settings.lyricsTranslationSaveTo),
-              ),
-              SettingsSwitchItem(
-                icon: Icons.autorenew_rounded,
-                title: l10n.lyricsAiAutoSave,
-                subtitle: l10n.lyricsAiAutoSaveSubtitle,
-                value: settings.lyricsTranslationAutoSave,
-                onChanged: notifier.setLyricsTranslationAutoSave,
-              ),
-              SettingsSwitchItem(
-                key: const ValueKey('lyrics-ai-translate-downloads'),
-                icon: Icons.download_for_offline_outlined,
-                title: l10n.lyricsAiTranslateDownloads,
-                subtitle: l10n.lyricsAiTranslateDownloadsSubtitle,
-                value: settings.lyricsTranslateDownloads,
-                onChanged: notifier.setLyricsTranslateDownloads,
-                showDivider: false,
-              ),
-            ],
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
-          const NavBarSliverSpacer(),
-        ],
+                if (provider == LyricsAiProvider.custom)
+                  SettingsItem(
+                    icon: Icons.dns_outlined,
+                    title: l10n.lyricsAiBaseUrl,
+                    subtitle: settings.lyricsAiBaseUrl.isEmpty
+                        ? l10n.lyricsAiNotSet
+                        : settings.lyricsAiBaseUrl,
+                    onTap: () => _editBaseUrl(settings.lyricsAiBaseUrl),
+                  ),
+                SettingsItem(
+                  key: const ValueKey('lyrics-ai-api-key'),
+                  icon: Icons.key_outlined,
+                  title: l10n.lyricsAiApiKey,
+                  subtitle: apiKey.isNotEmpty
+                      ? l10n.lyricsAiApiKeySaved(_keySuffix(apiKey))
+                      : provider.requiresKey
+                      ? l10n.lyricsAiNotSet
+                      : l10n.lyricsAiApiKeyOptional,
+                  onTap: () => _editKey(provider, apiKey),
+                ),
+                SettingsItem(
+                  icon: Icons.memory_outlined,
+                  title: l10n.lyricsAiModel,
+                  subtitle: settings.lyricsAiModel.isNotEmpty
+                      ? settings.lyricsAiModel
+                      : defaultModel != null
+                      ? l10n.lyricsAiModelDefault(defaultModel)
+                      : l10n.lyricsAiNotSet,
+                  onTap: () => _editModel(provider, apiKey),
+                ),
+                SettingsItem(
+                  key: const ValueKey('lyrics-ai-test'),
+                  icon: Icons.network_check_outlined,
+                  title: l10n.lyricsAiTestConnection,
+                  subtitle: l10n.lyricsAiTestConnectionSubtitle,
+                  trailing: _testing
+                      ? const AppLoadingIndicator(size: 24)
+                      : null,
+                  onTap: ready && !_testing
+                      ? () => _testConnection(apiKey)
+                      : null,
+                  showDivider: false,
+                ),
+              ],
+            ),
+            ...settingsSectionSlivers(
+              title: l10n.lyricsAiSectionTranslation,
+              children: [
+                SettingsItem(
+                  icon: Icons.language_outlined,
+                  title: l10n.lyricsAiTargetLanguage,
+                  subtitle: target == null
+                      ? l10n.lyricsAiTargetLanguageApp(appLanguage.nativeName)
+                      : target.nativeName,
+                  onTap: () async {
+                    final code = await showLyricsLanguagePicker(
+                      context,
+                      title: l10n.lyricsAiTargetLanguage,
+                      selected: target?.code ?? '',
+                      appDefaultLabel: l10n.lyricsAiTargetLanguageApp(
+                        appLanguage.nativeName,
+                      ),
+                    );
+                    if (code != null) {
+                      notifier.setLyricsTranslationLanguage(code);
+                    }
+                  },
+                ),
+                SettingsItem(
+                  key: const ValueKey('lyrics-ai-second-language'),
+                  icon: Icons.translate_outlined,
+                  title: l10n.lyricsAiSecondLanguage,
+                  subtitle:
+                      secondLanguage?.nativeName ??
+                      l10n.lyricsAiSecondLanguageSubtitle,
+                  onTap: () async {
+                    final code = await showLyricsLanguagePicker(
+                      context,
+                      title: l10n.lyricsAiSecondLanguage,
+                      subtitle: l10n.lyricsAiSecondLanguageSubtitle,
+                      selected: secondLanguage?.code ?? '',
+                      appDefaultLabel: l10n.lyricsAiSecondLanguageOff,
+                    );
+                    if (code != null) {
+                      notifier.setLyricsTranslationSecondLanguage(code);
+                    }
+                  },
+                ),
+                SettingsItem(
+                  key: const ValueKey('lyrics-ai-mode'),
+                  icon: Icons.speed_outlined,
+                  title: l10n.lyricsAiMode,
+                  subtitle: settings.lyricsAiWordSync
+                      ? l10n.lyricsAiModeSynced
+                      : l10n.lyricsAiModeFast,
+                  onTap: () => _pickMode(settings.lyricsAiWordSync),
+                ),
+                SettingsItem(
+                  icon: Icons.edit_note_outlined,
+                  title: l10n.lyricsAiInstruction,
+                  subtitle: settings.lyricsAiInstruction.isEmpty
+                      ? l10n.lyricsAiInstructionNone
+                      : settings.lyricsAiInstruction,
+                  onTap: () => _editInstruction(settings.lyricsAiInstruction),
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.bolt_outlined,
+                  title: l10n.lyricsAiAutoTranslate,
+                  subtitle: l10n.lyricsAiAutoTranslateSubtitle,
+                  value: settings.lyricsAutoTranslate,
+                  onChanged: notifier.setLyricsAutoTranslate,
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.record_voice_over_outlined,
+                  title: l10n.lyricsAiRomanize,
+                  subtitle: l10n.lyricsAiRomanizeSubtitle,
+                  // Romanization off in Lyrics settings turns it off here too.
+                  value: settings.lyricsRomanize && settings.lyricsAiRomanize,
+                  enabled: settings.lyricsRomanize,
+                  onChanged: notifier.setLyricsAiRomanize,
+                ),
+                SettingsItem(
+                  icon: Icons.delete_outline,
+                  title: l10n.lyricsAiClearCache,
+                  subtitle: _cachedCount == null
+                      ? null
+                      : l10n.lyricsAiClearCacheSubtitle(_cachedCount!),
+                  onTap: (_cachedCount ?? 0) > 0 ? _clearCache : null,
+                  showDivider: false,
+                ),
+              ],
+            ),
+            ...settingsSectionSlivers(
+              title: l10n.lyricsAiSectionFiles,
+              children: [
+                SettingsItem(
+                  key: const ValueKey('lyrics-ai-save-to'),
+                  icon: Icons.save_alt,
+                  title: l10n.lyricsAiSaveTo,
+                  subtitle:
+                      settings.lyricsTranslationSaveTo ==
+                          lyricsTranslationSaveToMlrc
+                      ? l10n.lyricsAiSaveToMlrc
+                      : l10n.lyricsAiSaveToSongFile,
+                  onTap: () => _pickSaveTo(settings.lyricsTranslationSaveTo),
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.autorenew_rounded,
+                  title: l10n.lyricsAiAutoSave,
+                  subtitle: l10n.lyricsAiAutoSaveSubtitle,
+                  value: settings.lyricsTranslationAutoSave,
+                  onChanged: notifier.setLyricsTranslationAutoSave,
+                ),
+                SettingsSwitchItem(
+                  key: const ValueKey('lyrics-ai-translate-downloads'),
+                  icon: Icons.download_for_offline_outlined,
+                  title: l10n.lyricsAiTranslateDownloads,
+                  subtitle: l10n.lyricsAiTranslateDownloadsSubtitle,
+                  value: settings.lyricsTranslateDownloads,
+                  onChanged: notifier.setLyricsTranslateDownloads,
+                  showDivider: false,
+                ),
+              ],
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            const NavBarSliverSpacer(),
+          ],
+        ),
       ),
     );
   }

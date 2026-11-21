@@ -16,6 +16,7 @@ import 'package:mornye/screens/settings/profile_edit_page.dart';
 import 'package:mornye/services/listening_rewind.dart';
 import 'package:mornye/services/user_profile_store.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/animation_utils.dart' show slidePageRoute;
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -45,55 +46,57 @@ class ProfileSettingsPage extends ConsumerWidget {
     final overview = recording ? ref.watch(profileOverviewProvider) : null;
     final data = overview?.value;
     final heard = data != null && !data.allTime.isEmpty;
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          AppSliverHeader.page(title: l10n.profileTitle),
-          SliverList.list(
-            children: [
-              _Header(profile: profile, overview: heard ? data : null),
-              const _NowPlaying(),
-              if (!recording)
-                SettingsInfoCard(
-                  message: l10n.profileListeningOff,
-                  icon: Icons.insights_outlined,
-                )
-              else if (data == null)
-                overview!.hasError
-                    ? SettingsInfoCard(message: l10n.listeningStatsLoadError)
-                    : const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Center(child: AppLoadingIndicator()),
-                      )
-              else if (!heard)
-                SettingsInfoCard(
-                  message: l10n.listeningStatsEmpty,
-                  icon: Icons.insights_outlined,
-                )
-              else
-                ..._listening(context, data),
-              SettingsSectionHeader(title: l10n.profileCollection),
-              const _Collection(),
-              const SizedBox(height: 16),
-              SettingsGroup(
-                children: [
-                  SettingsItem(
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            AppSliverHeader.page(title: l10n.profileTitle),
+            SliverList.list(
+              children: [
+                _Header(profile: profile, overview: heard ? data : null),
+                const _NowPlaying(),
+                if (!recording)
+                  SettingsInfoCard(
+                    message: l10n.profileListeningOff,
                     icon: Icons.insights_outlined,
-                    title: l10n.listeningStats,
-                    trailing: const AppIcon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context).push(
-                      slidePageRoute<void>(
-                        page: const ListeningStatisticsScreen(),
+                  )
+                else if (data == null)
+                  overview!.hasError
+                      ? SettingsInfoCard(message: l10n.listeningStatsLoadError)
+                      : const Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Center(child: AppLoadingIndicator()),
+                        )
+                else if (!heard)
+                  SettingsInfoCard(
+                    message: l10n.listeningStatsEmpty,
+                    icon: Icons.insights_outlined,
+                  )
+                else
+                  ..._listening(context, data),
+                SettingsSectionHeader(title: l10n.profileCollection),
+                const _Collection(),
+                const SizedBox(height: 16),
+                SettingsGroup(
+                  children: [
+                    SettingsItem(
+                      icon: Icons.insights_outlined,
+                      title: l10n.listeningStats,
+                      trailing: const AppIcon.adaptive(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        slidePageRoute<void>(
+                          page: const ListeningStatisticsScreen(),
+                        ),
                       ),
+                      showDivider: false,
                     ),
-                    showDivider: false,
-                  ),
-                ],
-              ),
-              SizedBox(height: 32 + MediaQuery.paddingOf(context).bottom),
-            ],
-          ),
-        ],
+                  ],
+                ),
+              ],
+            ),
+            const NavBarSliverSpacer(),
+          ],
+        ),
       ),
     );
   }

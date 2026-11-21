@@ -9,6 +9,7 @@ import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/screens/settings/appearance_settings_page.dart';
 import 'package:mornye/theme/dynamic_color_wrapper.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/app_slider.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 
 import 'support/tooltip_finder.dart';
@@ -211,7 +212,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.drag(slider, const Offset(160, 0));
       await tester.pumpAndSettle();
-      expect(tester.widget<Slider>(slider).value, 1);
+      expect(tester.widget<AppSlider>(slider).value, 1);
       expect(prefs.getDouble(kMornyeGlassClarityKey), 1);
       final context = tester.element(slider);
       expect(MornyeTheme.glassClarityOf(context), 1);
@@ -228,12 +229,12 @@ void main() {
       );
       await tester.pumpWidget(const SizedBox());
       await openSettings(tester, prefs);
-      expect(tester.widget<Slider>(slider).value, 1);
+      expect(tester.widget<AppSlider>(slider).value, 1);
       await tester.ensureVisible(slider);
       await tester.pumpAndSettle();
       await tester.drag(slider, const Offset(-320, 0));
       await tester.pumpAndSettle();
-      expect(tester.widget<Slider>(slider).value, 0);
+      expect(tester.widget<AppSlider>(slider).value, 0);
       expect(prefs.getDouble(kMornyeGlassClarityKey), 0);
       expect(
         find.byKey(const ValueKey('mornye-glass-clear-performance')),
@@ -257,7 +258,7 @@ void main() {
       );
       await tester.ensureVisible(slider);
       await tester.pumpAndSettle();
-      expect(tester.widget<Slider>(slider).onChanged, isNull);
+      expect(tester.widget<AppSlider>(slider).onChanged, isNull);
       expect(
         find.byKey(const ValueKey('mornye-glass-clear-performance')),
         findsNothing,
@@ -269,7 +270,10 @@ void main() {
       );
       await tester.drag(slider, const Offset(160, 0));
       await tester.pumpAndSettle();
-      expect(tester.widget<Slider>(slider).value, kDefaultMornyeGlassClarity);
+      expect(
+        tester.widget<AppSlider>(slider).value,
+        kDefaultMornyeGlassClarity,
+      );
       expect(prefs.getDouble(kMornyeGlassClarityKey), isNull);
 
       final forceBlur = find.text('Always use blur effects');
@@ -289,7 +293,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(hint, findsNothing);
-      expect(tester.widget<Slider>(slider).onChanged, isNotNull);
+      expect(tester.widget<AppSlider>(slider).onChanged, isNotNull);
       await tester.drag(slider, const Offset(160, 0));
       await tester.pumpAndSettle();
       expect(prefs.getDouble(kMornyeGlassClarityKey), 1);
@@ -313,7 +317,7 @@ void main() {
       final slider = find.byKey(const ValueKey('mornye-glass-clarity'));
       await tester.ensureVisible(slider);
       await tester.pumpAndSettle();
-      expect(tester.widget<Slider>(slider).onChanged, isNull);
+      expect(tester.widget<AppSlider>(slider).onChanged, isNull);
       expect(
         tester
             .widget<Text>(
@@ -339,7 +343,7 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      expect(tester.widget<Slider>(slider).onChanged, isNotNull);
+      expect(tester.widget<AppSlider>(slider).onChanged, isNotNull);
       expect(
         find.byKey(const ValueKey('mornye-glass-clarity-unavailable')),
         findsNothing,
@@ -354,8 +358,8 @@ void main() {
       await openSettings(tester, prefs);
       await tester.ensureVisible(slider);
       await tester.pumpAndSettle();
-      expect(tester.widget<Slider>(slider).onChanged, isNotNull);
-      expect(tester.widget<Slider>(slider).value, 1);
+      expect(tester.widget<AppSlider>(slider).onChanged, isNotNull);
+      expect(tester.widget<AppSlider>(slider).value, 1);
       expect(tester.takeException(), isNull);
     });
 

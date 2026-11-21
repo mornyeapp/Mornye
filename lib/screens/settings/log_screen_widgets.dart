@@ -77,7 +77,7 @@ class _LogEntryTile extends StatelessWidget {
                         child: Text(
                           entry.level,
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: levelColor,
                           ),
@@ -97,7 +97,7 @@ class _LogEntryTile extends StatelessWidget {
                           child: Text(
                             'Native',
                             style: TextStyle(
-                              fontSize: 9,
+                              fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: colorScheme.onSecondaryContainer,
                             ),
@@ -392,7 +392,6 @@ class _IssueBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

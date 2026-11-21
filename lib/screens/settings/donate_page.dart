@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:mornye/services/app_remote_config_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
@@ -79,37 +80,40 @@ class _DonatePageState extends State<DonatePage> {
     final colorScheme = Theme.of(context).colorScheme;
     final monthlyGoal = _config.monthlyGoal;
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          AppSliverHeader.page(title: 'Donate'),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                16 + wideListInset(context),
-                16,
-                16 + wideListInset(context),
-                16,
-              ),
-              child: Column(
-                children: [
-                  if (monthlyGoal != null && monthlyGoal.isVisible) ...[
-                    _MonthlyDonationGoalCard(goal: monthlyGoal),
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            AppSliverHeader.page(title: 'Donate'),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16 + wideListInset(context),
+                  16,
+                  16 + wideListInset(context),
+                  16,
+                ),
+                child: Column(
+                  children: [
+                    if (monthlyGoal != null && monthlyGoal.isVisible) ...[
+                      _MonthlyDonationGoalCard(goal: monthlyGoal),
+                      const SizedBox(height: 16),
+                    ],
+                    _DonateLinksCard(colorScheme: colorScheme, config: _config),
                     const SizedBox(height: 16),
+                    _RecentSupportersCard(supporters: _config.supporters),
+                    const SizedBox(height: 16),
+                    _DonateNoticeCard(
+                      colorScheme: colorScheme,
+                      notices: _config.notices,
+                    ),
                   ],
-                  _DonateLinksCard(colorScheme: colorScheme, config: _config),
-                  const SizedBox(height: 16),
-                  _RecentSupportersCard(supporters: _config.supporters),
-                  const SizedBox(height: 16),
-                  _DonateNoticeCard(
-                    colorScheme: colorScheme,
-                    notices: _config.notices,
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+            const NavBarSliverSpacer(),
+          ],
+        ),
       ),
     );
   }

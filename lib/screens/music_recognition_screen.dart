@@ -116,70 +116,74 @@ class _MusicRecognitionScreenState
       ),
     };
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          AppSliverHeader.page(
-            title: l10n.recognizeTitle,
-            actions: history.isEmpty || state.isBusy
-                ? null
-                : [
-                    AppIconButton(
-                      tooltip: l10n.recognizeClearHistory,
-                      icon: const AppIcon.adaptive(Icons.delete_sweep_outlined),
-                      onPressed: _clearHistory,
-                    ),
-                  ],
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(inset, 8, inset, 16),
-              child: AnimatedSwitcher(
-                duration: motion.duration,
-                switchInCurve: motion.curve,
-                switchOutCurve: motion.leaving,
-                // Listening turns into searching in place.
-                child: KeyedSubtree(
-                  key: ValueKey((
-                    state.phase == RecognitionPhase.processing
-                        ? RecognitionPhase.listening
-                        : state.phase,
-                    state.song?.historyKey,
-                  )),
-                  child: stage,
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            AppSliverHeader.page(
+              title: l10n.recognizeTitle,
+              actions: history.isEmpty || state.isBusy
+                  ? null
+                  : [
+                      AppIconButton(
+                        tooltip: l10n.recognizeClearHistory,
+                        icon: const AppIcon.adaptive(
+                          Icons.delete_sweep_outlined,
+                        ),
+                        onPressed: _clearHistory,
+                      ),
+                    ],
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(inset, 8, inset, 16),
+                child: AnimatedSwitcher(
+                  duration: motion.duration,
+                  switchInCurve: motion.curve,
+                  switchOutCurve: motion.leaving,
+                  // Listening turns into searching in place.
+                  child: KeyedSubtree(
+                    key: ValueKey((
+                      state.phase == RecognitionPhase.processing
+                          ? RecognitionPhase.listening
+                          : state.phase,
+                      state.song?.historyKey,
+                    )),
+                    child: stage,
+                  ),
                 ),
               ),
             ),
-          ),
-          if (history.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(title: l10n.recognizeHistory),
-            ),
-            SliverSettingsGroup(
-              margin: EdgeInsets.symmetric(horizontal: inset),
-              itemCount: history.length,
-              itemBuilder: (context, index) {
-                final song = history[index];
-                return ListTile(
-                  leading: _Cover(url: song.coverUrl, size: 48, thumb: true),
-                  title: Text(
-                    song.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    song.artist,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  enabled: !state.isBusy,
-                  onTap: () => controller.show(song),
-                );
-              },
-            ),
+            if (history.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: SettingsSectionHeader(title: l10n.recognizeHistory),
+              ),
+              SliverSettingsGroup(
+                margin: EdgeInsets.symmetric(horizontal: inset),
+                itemCount: history.length,
+                itemBuilder: (context, index) {
+                  final song = history[index];
+                  return ListTile(
+                    leading: _Cover(url: song.coverUrl, size: 48, thumb: true),
+                    title: Text(
+                      song.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      song.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    enabled: !state.isBusy,
+                    onTap: () => controller.show(song),
+                  );
+                },
+              ),
+            ],
+            const NavBarSliverSpacer(),
           ],
-          const NavBarSliverSpacer(),
-        ],
+        ),
       ),
     );
   }
@@ -562,7 +566,8 @@ class _ResultStageState extends ConsumerState<_ResultStage> {
       if (webUrl != null)
         AppActionButton(
           tonal: true,
-          outlined: true,
+          // Mornye fills every non-outlined button with the accent.
+          outlined: context.isMornye,
           onPressed: () => _openInShazam(webUrl),
           icon: const Icon(Icons.open_in_new),
           label: Text(l10n.recognizeOpenInShazam),

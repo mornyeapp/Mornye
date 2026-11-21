@@ -274,18 +274,29 @@ class _AnimatedScanCount extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0, end: count.toDouble()),
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-            builder: (context, value, _) => Text(
-              value.round().toString(),
-              maxLines: 1,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              final motion = AppMotion.effectsFast(
+                context,
+                const AppMotionSpec(
+                  Duration(milliseconds: 250),
+                  Curves.easeOut,
+                ),
+              );
+              return TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: count.toDouble()),
+                duration: motion.duration,
+                curve: motion.curve,
+                builder: (context, value, _) => Text(
+                  value.round().toString(),
+                  maxLines: 1,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -366,8 +377,8 @@ class _LibraryHeroCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          Positioned(
-            right: -20,
+          PositionedDirectional(
+            end: -20,
             top: -20,
             child: AppIcon(
               Icons.library_music,
@@ -375,8 +386,8 @@ class _LibraryHeroCard extends StatelessWidget {
               color: colorScheme.primary.withValues(alpha: 0.05),
             ),
           ),
-          Positioned(
-            left: -40,
+          PositionedDirectional(
+            start: -40,
             bottom: -40,
             child: Container(
               width: 150,

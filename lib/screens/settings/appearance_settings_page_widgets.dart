@@ -215,7 +215,7 @@ class _ThemePreviewCard extends StatelessWidget {
                           : context.l10n.appearanceThemeLight,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -305,7 +305,7 @@ class _MornyeGlassClaritySlider extends ConsumerWidget {
                       ),
                       child: Row(
                         children: [
-                          const AppIcon(Icons.music_note_rounded),
+                          const AppIcon.adaptive(Icons.music_note_rounded),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
@@ -313,7 +313,7 @@ class _MornyeGlassClaritySlider extends ConsumerWidget {
                               style: theme.textTheme.titleMedium,
                             ),
                           ),
-                          const AppIcon(Icons.play_arrow_rounded),
+                          const AppIcon.adaptive(Icons.play_arrow_rounded),
                         ],
                       ),
                     ),
@@ -322,19 +322,17 @@ class _MornyeGlassClaritySlider extends ConsumerWidget {
               ),
             ),
           ),
-          Semantics(
-            label: l10n.appearanceGlassClarity,
-            child: Slider(
-              key: const ValueKey('mornye-glass-clarity'),
-              value: clarity,
-              divisions: 20,
-              label: '${(clarity * 100).round()}%',
-              onChanged: adjustable
-                  ? (value) =>
-                        notifier.setMornyeGlassClarity(value, persist: false)
-                  : null,
-              onChangeEnd: adjustable ? notifier.setMornyeGlassClarity : null,
-            ),
+          AppSlider(
+            key: const ValueKey('mornye-glass-clarity'),
+            value: clarity,
+            divisions: 20,
+            label: '${(clarity * 100).round()}%',
+            semanticLabel: l10n.appearanceGlassClarity,
+            onChanged: adjustable
+                ? (value) =>
+                      notifier.setMornyeGlassClarity(value, persist: false)
+                : null,
+            onChangeEnd: adjustable ? notifier.setMornyeGlassClarity : null,
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

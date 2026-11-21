@@ -13,7 +13,9 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/services/backup_service.dart';
 import 'package:mornye/services/history_database.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
@@ -258,103 +260,105 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          AppSliverHeader.page(title: l10n.backupTitle),
-          ...settingsSectionSlivers(
-            title: l10n.backupExportSectionTitle,
-            children: [
-              SettingsItem(
-                icon: Icons.settings_outlined,
-                title: l10n.backupSettingsOnly,
-                onTap: _isBusy
-                    ? null
-                    : () => setState(() {
-                        _includeSettings = true;
-                        _includeHistory = false;
-                        _includeCollections = false;
-                        _includeExtensions = false;
-                        _includeSecrets = false;
-                      }),
-              ),
-              SettingsSwitchItem(
-                icon: Icons.settings_outlined,
-                title: l10n.backupContentsSettings,
-                subtitle: l10n.backupIncludesProfile,
-                value: _includeSettings,
-                onChanged: _isBusy
-                    ? null
-                    : (value) => setState(() => _includeSettings = value),
-              ),
-              SettingsSwitchItem(
-                icon: Icons.history,
-                title: l10n.backupSelectHistory,
-                value: _includeHistory,
-                onChanged: _isBusy
-                    ? null
-                    : (value) => setState(() => _includeHistory = value),
-              ),
-              SettingsSwitchItem(
-                icon: Icons.library_music_outlined,
-                title: l10n.backupSelectCollections,
-                subtitle: l10n.backupSelectCollectionsDescription,
-                value: _includeCollections,
-                onChanged: _isBusy
-                    ? null
-                    : (value) => setState(() => _includeCollections = value),
-              ),
-              SettingsSwitchItem(
-                icon: Icons.extension_outlined,
-                title: l10n.backupSelectExtensions,
-                value: _includeExtensions,
-                onChanged: _isBusy
-                    ? null
-                    : (value) => setState(() {
-                        _includeExtensions = value;
-                        if (!value) _includeSecrets = false;
-                      }),
-              ),
-              SettingsSwitchItem(
-                icon: Icons.vpn_key_outlined,
-                title: l10n.backupIncludeSecrets,
-                subtitle: l10n.backupIncludeSecretsDescription,
-                value: _includeSecrets,
-                onChanged: _isBusy || !_includeExtensions
-                    ? null
-                    : (value) => setState(() => _includeSecrets = value),
-              ),
-              SettingsItem(
-                icon: Icons.ios_share,
-                title: l10n.backupExportButton,
-                subtitle: _hasSelection
-                    ? l10n.backupSelectedExportDescription
-                    : l10n.backupSelectAtLeastOne,
-                onTap: _isBusy || !_hasSelection ? null : _createBackup,
-                trailing: _isExporting
-                    ? const AppLoadingIndicator(size: 20, strokeWidth: 2)
-                    : null,
-                showDivider: false,
-              ),
-            ],
-          ),
-          ...settingsSectionSlivers(
-            title: l10n.backupImportSectionTitle,
-            children: [
-              SettingsItem(
-                icon: Icons.settings_backup_restore,
-                title: l10n.backupImportButton,
-                subtitle: l10n.backupImportSectionDescription,
-                onTap: _isBusy ? null : _restoreBackup,
-                trailing: _isImporting
-                    ? const AppLoadingIndicator(size: 20, strokeWidth: 2)
-                    : null,
-                showDivider: false,
-              ),
-            ],
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-        ],
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            AppSliverHeader.page(title: l10n.backupTitle),
+            ...settingsSectionSlivers(
+              title: l10n.backupExportSectionTitle,
+              children: [
+                SettingsItem(
+                  icon: Icons.settings_outlined,
+                  title: l10n.backupSettingsOnly,
+                  onTap: _isBusy
+                      ? null
+                      : () => setState(() {
+                          _includeSettings = true;
+                          _includeHistory = false;
+                          _includeCollections = false;
+                          _includeExtensions = false;
+                          _includeSecrets = false;
+                        }),
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.settings_outlined,
+                  title: l10n.backupContentsSettings,
+                  subtitle: l10n.backupIncludesProfile,
+                  value: _includeSettings,
+                  onChanged: _isBusy
+                      ? null
+                      : (value) => setState(() => _includeSettings = value),
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.history,
+                  title: l10n.backupSelectHistory,
+                  value: _includeHistory,
+                  onChanged: _isBusy
+                      ? null
+                      : (value) => setState(() => _includeHistory = value),
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.library_music_outlined,
+                  title: l10n.backupSelectCollections,
+                  subtitle: l10n.backupSelectCollectionsDescription,
+                  value: _includeCollections,
+                  onChanged: _isBusy
+                      ? null
+                      : (value) => setState(() => _includeCollections = value),
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.extension_outlined,
+                  title: l10n.backupSelectExtensions,
+                  value: _includeExtensions,
+                  onChanged: _isBusy
+                      ? null
+                      : (value) => setState(() {
+                          _includeExtensions = value;
+                          if (!value) _includeSecrets = false;
+                        }),
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.vpn_key_outlined,
+                  title: l10n.backupIncludeSecrets,
+                  subtitle: l10n.backupIncludeSecretsDescription,
+                  value: _includeSecrets,
+                  onChanged: _isBusy || !_includeExtensions
+                      ? null
+                      : (value) => setState(() => _includeSecrets = value),
+                ),
+                SettingsItem(
+                  icon: Icons.ios_share,
+                  title: l10n.backupExportButton,
+                  subtitle: _hasSelection
+                      ? l10n.backupSelectedExportDescription
+                      : l10n.backupSelectAtLeastOne,
+                  onTap: _isBusy || !_hasSelection ? null : _createBackup,
+                  trailing: _isExporting
+                      ? const AppLoadingIndicator(size: 20, strokeWidth: 2)
+                      : null,
+                  showDivider: false,
+                ),
+              ],
+            ),
+            ...settingsSectionSlivers(
+              title: l10n.backupImportSectionTitle,
+              children: [
+                SettingsItem(
+                  icon: Icons.settings_backup_restore,
+                  title: l10n.backupImportButton,
+                  subtitle: l10n.backupImportSectionDescription,
+                  onTap: _isBusy ? null : _restoreBackup,
+                  trailing: _isImporting
+                      ? const AppLoadingIndicator(size: 20, strokeWidth: 2)
+                      : null,
+                  showDivider: false,
+                ),
+              ],
+            ),
+            const NavBarSliverSpacer(),
+          ],
+        ),
       ),
     );
   }

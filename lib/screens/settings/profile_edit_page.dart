@@ -6,10 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/services/user_profile_store.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/profile_avatar.dart';
@@ -59,9 +62,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
       });
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.l10n.profilePhotoError)));
+      showAppSnackBar(context, content: Text(context.l10n.profilePhotoError));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -80,9 +81,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.l10n.profileSaveError)));
+      showAppSnackBar(context, content: Text(context.l10n.profileSaveError));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -93,95 +92,98 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     final inset = wideListInset(context);
     final hasPhoto =
         _photo != null || (!_removePhoto && widget.profile.photoPath != null);
-    return PopScope(
-      canPop: !_busy,
-      child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            AppSliverHeader.page(title: context.l10n.profileEditAction),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(24 + inset, 16, 24 + inset, 32),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: ValueListenableBuilder<TextEditingValue>(
-                        valueListenable: _name,
-                        builder: (context, value, _) => ProfileAvatar(
-                          name: value.text,
-                          photo: _photo,
-                          photoPath: _removePhoto
-                              ? null
-                              : widget.profile.photoPath,
-                          size: 128,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: AppActionButton(
-                        onPressed: _busy ? null : _pickPhoto,
-                        icon: const AppIcon(Icons.photo_library_outlined),
-                        label: Text(context.l10n.profileChangePhoto),
-                        outlined: true,
-                        tonal: true,
-                      ),
-                    ),
-                    if (hasPhoto)
+    return MornyeSettingsTheme(
+      child: PopScope(
+        canPop: !_busy,
+        child: Scaffold(
+          body: CustomScrollView(
+            slivers: [
+              AppSliverHeader.page(title: context.l10n.profileEditAction),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(24 + inset, 16, 24 + inset, 32),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                       Center(
-                        child: ExpressiveButton(
-                          text: true,
-                          onPressed: _busy
-                              ? null
-                              : () => setState(() {
-                                  _photo = null;
-                                  _removePhoto = true;
-                                }),
-                          child: Text(context.l10n.profileRemovePhoto),
-                        ),
-                      ),
-                    const SizedBox(height: 24),
-                    SettingsGroup(
-                      margin: EdgeInsets.zero,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: TextField(
-                            controller: _name,
-                            enabled: !_busy,
-                            maxLength: 50,
-                            textCapitalization: TextCapitalization.words,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _busy ? null : _save(),
-                            decoration: InputDecoration(
-                              labelText: context.l10n.profileName,
-                              hintText: context.l10n.profileNameHint,
-                              filled: false,
-                              contentPadding: EdgeInsets.zero,
-                              border: InputBorder.none,
-                              counterText: '',
-                            ),
+                        child: ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _name,
+                          builder: (context, value, _) => ProfileAvatar(
+                            name: value.text,
+                            photo: _photo,
+                            photoPath: _removePhoto
+                                ? null
+                                : widget.profile.photoPath,
+                            size: 128,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    AppActionButton(
-                      onPressed: _busy ? null : _save,
-                      icon: _busy
-                          ? const AppLoadingIndicator(size: 20, strokeWidth: 2)
-                          : const AppIcon(Icons.check),
-                      label: Text(context.l10n.dialogSave),
-                    ),
-                  ],
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: AppActionButton(
+                          onPressed: _busy ? null : _pickPhoto,
+                          icon: const AppIcon(Icons.photo_library_outlined),
+                          label: Text(context.l10n.profileChangePhoto),
+                          outlined: context.isMornye,
+                          tonal: !context.isMornye,
+                        ),
+                      ),
+                      if (hasPhoto)
+                        Center(
+                          child: ExpressiveButton(
+                            text: true,
+                            onPressed: _busy
+                                ? null
+                                : () => setState(() {
+                                    _photo = null;
+                                    _removePhoto = true;
+                                  }),
+                            child: Text(context.l10n.profileRemovePhoto),
+                          ),
+                        ),
+                      const SizedBox(height: 24),
+                      SettingsGroup(
+                        margin: EdgeInsets.zero,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: TextField(
+                              controller: _name,
+                              enabled: !_busy,
+                              maxLength: 50,
+                              textCapitalization: TextCapitalization.words,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _busy ? null : _save(),
+                              decoration: InputDecoration(
+                                labelText: context.l10n.profileName,
+                                hintText: context.l10n.profileNameHint,
+                                filled: false,
+                                contentPadding: EdgeInsets.zero,
+                                border: InputBorder.none,
+                                counterText: '',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      AppActionButton(
+                        onPressed: _busy ? null : _save,
+                        icon: _busy
+                            ? const AppLoadingIndicator(
+                                size: 20,
+                                strokeWidth: 2,
+                              )
+                            : const AppIcon(Icons.check),
+                        label: Text(context.l10n.dialogSave),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(height: MediaQuery.paddingOf(context).bottom),
-            ),
-          ],
+              const NavBarSliverSpacer(),
+            ],
+          ),
         ),
       ),
     );
