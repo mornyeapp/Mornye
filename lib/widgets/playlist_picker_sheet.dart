@@ -274,6 +274,8 @@ class _PlaylistPickerSheetContentState
                     );
                   }
                   return ListView.builder(
+                    // The sheet is as tall as its playlists, up to the cap.
+                    shrinkWrap: true,
                     itemCount: playlists.length,
                     itemBuilder: (context, index) {
                       final playlist = playlists[index];
@@ -315,8 +317,12 @@ class _PlaylistPickerSheetContentState
                     },
                   );
                 },
-                loading: () => const Center(
-                  child: AppLoadingIndicator(size: 24, strokeWidth: 2),
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    heightFactor: 1,
+                    child: AppLoadingIndicator(size: 24, strokeWidth: 2),
+                  ),
                 ),
                 error: (_, _) => Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),

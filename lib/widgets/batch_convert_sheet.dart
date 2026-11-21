@@ -100,11 +100,8 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
+      // As tall as the options the chosen format shows.
+      child: AppScrollableSheet(
         builder: (context, scrollController) => _sheetSurface(
           child: SingleChildScrollView(
             controller: scrollController,

@@ -50,11 +50,10 @@ Future<void> showPlayerDetailsSheet(
     isScrollControlled: true,
     useRootNavigator: true,
     mornyeGlass: false,
-    builder: (context) => DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: isDesktopPlatform ? 1 : 0.75,
-      maxChildSize: isDesktopPlatform ? 1 : 0.9,
-      minChildSize: isDesktopPlatform ? 1 : 0.4,
+    // As tall as its rows; the desktop dialog brings its own cap.
+    builder: (context) => AppScrollableSheet(
+      initialSize: isDesktopPlatform ? 1 : 0.75,
+      maxSize: isDesktopPlatform ? 1 : 0.9,
       builder: (context, scrollController) => details(scrollController),
     ),
   );

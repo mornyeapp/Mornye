@@ -1,3 +1,5 @@
+import 'package:flutter/rendering.dart'
+    show RenderAbstractViewport, RenderViewport;
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart'
     show CupertinoButton, CupertinoDynamicColor, kCupertinoModalBarrierColor;
@@ -205,9 +207,20 @@ Future<T?> showAppBottomSheet<T>({
 
 /// Fits short content and coordinates scrolling/dragging for longer sheets.
 class AppScrollableSheet extends StatefulWidget {
-  const AppScrollableSheet({super.key, required this.builder});
+  const AppScrollableSheet({
+    super.key,
+    required this.builder,
+    this.initialSize = 0.85,
+    this.maxSize = 0.95,
+  });
 
   final ScrollableWidgetBuilder builder;
+
+  /// The most of the screen the sheet opens at.
+  final double initialSize;
+
+  /// The most of the screen a drag up grows the sheet to.
+  final double maxSize;
 
   @override
   State<AppScrollableSheet> createState() => _AppScrollableSheetState();
@@ -218,9 +231,42 @@ class _AppScrollableSheetState extends State<AppScrollableSheet> {
   final _sheetController = DraggableScrollableController();
   ScrollController? _scrollController;
   double _availableHeight = 0;
-  double _initialSize = 0.85;
-  double _maxSize = 0.95;
+  late double _initialSize = widget.initialSize;
+  late double _maxSize = widget.maxSize;
   bool _fitScheduled = false;
+
+  /// The height a list leaves empty when it fills the sheet with fewer rows
+  /// than fit; a shrink-wrapped or single-child body leaves none.
+  double _unusedViewport(ScrollController scroll) {
+    if (scroll.positions.length != 1) return 0;
+    final position = scroll.position;
+    if (position.axis != Axis.vertical) return 0;
+    // The first viewport under the scrollable is its own.
+    RenderAbstractViewport? viewport;
+    void visit(RenderObject object) {
+      if (viewport != null) return;
+      if (object is RenderAbstractViewport) {
+        viewport = object;
+        return;
+      }
+      object.visitChildren(visit);
+    }
+
+    position.context.notificationContext?.findRenderObject()?.visitChildren(
+      visit,
+    );
+    final list = viewport;
+    if (list is! RenderViewport || !list.hasSize) return 0;
+    var content = 0.0;
+    for (
+      var sliver = list.firstChild;
+      sliver != null;
+      sliver = list.childAfter(sliver)
+    ) {
+      content += sliver.geometry?.scrollExtent ?? 0;
+    }
+    return (list.size.height - content).clamp(0.0, double.infinity);
+  }
 
   void _scheduleFit() {
     if (_fitScheduled) return;
@@ -238,9 +284,13 @@ class _AppScrollableSheetState extends State<AppScrollableSheet> {
       // Align lets the header/body shrink below the allocated sheet height.
       // Adding the scroll overflow recovers the full content height without
       // an intrinsic-layout pass or a second hidden copy of the form.
-      final contentFraction = (box.size.height + overflow) / _availableHeight;
-      final initial = contentFraction.clamp(0.01, 0.85);
-      final maximum = contentFraction.clamp(initial, 0.95);
+      final contentHeight =
+          box.size.height +
+          overflow -
+          (scroll.hasClients ? _unusedViewport(scroll) : 0.0);
+      final contentFraction = contentHeight / _availableHeight;
+      final initial = contentFraction.clamp(0.01, widget.initialSize);
+      final maximum = contentFraction.clamp(initial, widget.maxSize);
       if ((initial - _initialSize).abs() * _availableHeight < 1 &&
           (maximum - _maxSize).abs() * _availableHeight < 1) {
         return;

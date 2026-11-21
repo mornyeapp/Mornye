@@ -75,11 +75,15 @@ class AlbumDescription extends StatelessWidget {
       useRootNavigator: true,
       builder: (context) {
         final theme = Theme.of(context);
-        return SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.9,
+        // As tall as the text, up to most of the screen.
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+          ),
           child: SafeArea(
             top: false,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -110,7 +114,7 @@ class AlbumDescription extends StatelessWidget {
                     ],
                   ),
                 ),
-                Expanded(
+                Flexible(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                     child: SelectionArea(

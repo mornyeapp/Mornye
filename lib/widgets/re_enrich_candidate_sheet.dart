@@ -122,6 +122,8 @@ class _CandidateListState extends State<_CandidateList> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return ListView(
+      // The sheet is as tall as its results, up to its cap.
+      shrinkWrap: true,
       padding: const EdgeInsets.only(bottom: 16),
       children: [
         if (_likely.isNotEmpty) ...[

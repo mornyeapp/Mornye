@@ -26,11 +26,10 @@ Future<void> showPlayerQueueSheet(
   isScrollControlled: true,
   showDragHandle: true,
   backgroundColor: colorScheme.surfaceContainerHigh,
-  builder: (context) => DraggableScrollableSheet(
-    expand: false,
-    initialChildSize: 0.6,
-    maxChildSize: 0.9,
-    minChildSize: 0.4,
+  // A short queue gets a sheet as tall as its songs.
+  builder: (context) => AppScrollableSheet(
+    initialSize: 0.6,
+    maxSize: 0.9,
     // The sheet's own messenger, so a swipe's confirmation shows over the
     // sheet instead of behind it.
     builder: (context, scrollController) => AppScaffoldMessenger(
@@ -119,6 +118,13 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
     final queue = ref.watch(playQueueProvider).value ?? const [];
     final current = ref.watch(currentMediaItemProvider).value;
     if (queue.isNotEmpty && current != null) _openAtPlayingSong();
+    // A queue that got shorter leaves room its sheet gives back.
+    ref.listen(playQueueProvider.select((state) => state.value?.length), (
+      _,
+      _,
+    ) {
+      if (!embedded) const SizeChangedLayoutNotification().dispatch(context);
+    });
     final controller = ref.read(musicPlayerControllerProvider);
     // Locked: no reordering or swiping songs away here; adding still works.
     final locked = ref.watch(settingsProvider.select((s) => s.queueLocked));

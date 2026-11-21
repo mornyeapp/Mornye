@@ -181,6 +181,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a short queue gets a sheet that ends at its last song', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      playing: 0,
+      sheet: true,
+      queue: _defaultQueue.sublist(0, 2),
+    );
+    final list = find.byType(ReorderableListView);
+    // The list's own padding is all that follows the last song.
+    expect(
+      tester.getBottomLeft(list).dy - tester.getBottomLeft(_row(1)).dy,
+      moreOrLessEquals(24),
+    );
+    expect(
+      tester.getSize(list).height,
+      moreOrLessEquals(2 * tester.getSize(_row(0)).height + 24),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the Now Playing sheet opens at the playing song and scrolls '
       'back before it closes', (tester) async {
     await _pump(tester, playing: 20, sheet: true);

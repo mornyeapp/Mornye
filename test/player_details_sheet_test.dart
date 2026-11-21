@@ -9,6 +9,7 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/widgets/mornye_metadata_row.dart';
 import 'package:mornye/widgets/mornye_player_details_sheet.dart';
 import 'package:mornye/widgets/player_details_sheet.dart';
 
@@ -111,6 +112,40 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  testWidgets('the Material sheet ends at its last row', (tester) async {
+    await open(tester, mornye: false);
+    final list = find.byType(ListView);
+    final viewport = tester.state<ScrollableState>(
+      find.descendant(of: list, matching: find.byType(Scrollable)),
+    );
+    final screen =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    // Three rows fill their list, and the sheet is no taller than them.
+    expect(viewport.position.maxScrollExtent, 0);
+    expect(tester.getSize(list).height, lessThan(screen * 0.4));
+    expect(
+      tester.getBottomLeft(list).dy -
+          tester.getBottomLeft(find.text('An album')).dy,
+      lessThan(48),
+    );
+  });
+
+  for (final desktop in [false, true]) {
+    testWidgets('the Mornye ${desktop ? 'dialog' : 'sheet'} ends at its '
+        'last row', (tester) async {
+      debugDesktopPlatformOverride = desktop;
+      await open(tester, mornye: true);
+      final list = find.byType(CustomScrollView);
+      final rows = find.byType(MornyeMetadataRow);
+      // Only the list's own padding follows the last row.
+      expect(
+        tester.getBottomLeft(list).dy - tester.getBottomLeft(rows.last).dy,
+        moreOrLessEquals(24),
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('Mornye decodes the cover at its thumbnail size', (tester) async {
