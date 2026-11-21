@@ -7,6 +7,7 @@ import 'package:liquid_glass_easy/liquid_glass_easy.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
@@ -102,15 +103,7 @@ class MornyeBottomBar extends ConsumerStatefulWidget {
 
 class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
     with SingleTickerProviderStateMixin {
-  // A spring keeps its velocity when a scroll reverses the fold mid-flight, and
-  // being slightly underdamped lets the glass run past its size and settle.
-  static const _foldSpring = SpringDescription(
-    mass: 1,
-    stiffness: 170,
-    damping: 20,
-  );
-
-  /// Runs past 0 and 1 by the spring's overshoot.
+  /// Runs past 0 and 1 by the Liquid Glass morph spring's subtle overshoot.
   late final _controller = AnimationController.unbounded(
     vsync: this,
     value: widget.collapsed ? 1 : 0,
@@ -165,7 +158,7 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
     _target = target;
     _controller.animateWith(
       SpringSimulation(
-        _foldSpring,
+        MornyeMotion.glassMorphSpring,
         _controller.value,
         target,
         _controller.velocity,

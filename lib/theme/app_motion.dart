@@ -107,6 +107,8 @@ abstract final class MornyeMotion {
   static final SpringDescription _standardSpring = _spring(350);
   static final SpringDescription _slowSpring = _spring(500);
   static final SpringDescription _snappySpring = _spring(350, 0.15);
+  static final SpringDescription _glassPressSpring = _spring(300, 0.25);
+  static final SpringDescription _glassMorphSpring = _spring(480, 0.22);
   static final SpringDescription _effectsFastSpring = _spring(150);
   static final SpringDescription _effectsSpring = _spring(250);
 
@@ -125,6 +127,16 @@ abstract final class MornyeMotion {
   /// surface whose size resizes other content.
   static SpringDescription get snappySpring => MotionPace.spring(_snappySpring);
 
+  /// Tactile Liquid Glass press and release: responsive swell with crisp
+  /// elastic rebound, sitting between Apple's `snappy` and `bouncy` presets.
+  static SpringDescription get glassPressSpring =>
+      MotionPace.spring(_glassPressSpring);
+
+  /// Liquid Glass surface morph: folding bars and pouring menus that expand
+  /// smoothly and settle with a subtle ~2% glass overshoot.
+  static SpringDescription get glassMorphSpring =>
+      MotionPace.spring(_glassMorphSpring);
+
   /// Opacity and color of small controls.
   static SpringDescription get effectsFastSpring =>
       MotionPace.spring(_effectsFastSpring);
@@ -139,16 +151,22 @@ abstract final class MornyeMotion {
   }
 
   static final AppMotionSpec _fast = _spec(_fastSpring);
+  static final Curve _fastLeaving = _fast.leaving;
   static final AppMotionSpec _standard = _spec(_standardSpring);
   static final AppMotionSpec _slow = _spec(_slowSpring);
   static final AppMotionSpec _snappy = _spec(_snappySpring);
+  static final AppMotionSpec _glassPress = _spec(_glassPressSpring);
+  static final AppMotionSpec _glassMorph = _spec(_glassMorphSpring);
   static final AppMotionSpec _effectsFast = _spec(_effectsFastSpring);
   static final AppMotionSpec _effects = _spec(_effectsSpring);
 
   static AppMotionSpec get fast => _fast.paced;
+  static Curve get fastLeaving => _fastLeaving;
   static AppMotionSpec get standard => _standard.paced;
   static AppMotionSpec get slow => _slow.paced;
   static AppMotionSpec get snappy => _snappy.paced;
+  static AppMotionSpec get glassPress => _glassPress.paced;
+  static AppMotionSpec get glassMorph => _glassMorph.paced;
   static AppMotionSpec get effectsFast => _effectsFast.paced;
   static AppMotionSpec get effects => _effects.paced;
 }
@@ -169,6 +187,7 @@ abstract final class AppMotion {
     M3EMotion.expressiveSpatialDefault,
   );
   static final _spatialSlow = SpringCurve(M3EMotion.expressiveSpatialSlow);
+  static final Curve _spatialSlowLeaving = _spatialSlow.flipped;
   static final _effectsFast = SpringCurve(M3EMotion.effectsFast);
   static final _effectsDefault = SpringCurve(M3EMotion.effectsDefault);
 
@@ -263,17 +282,32 @@ abstract final class AppMotion {
     mornye,
   );
 
-  /// Entrance for sheets and menus. The slow spatial spring is critically
-  /// damped, so a surface never overshoots its own size and reveals what is
-  /// behind it. Null keeps the platform transition.
-  static AnimationStyle? surfaceEntrance(BuildContext context) =>
-      materialExpressiveEnabled(context)
-      ? AnimationStyle(
-          duration: MotionPace.duration(_spatialSlow.duration),
-          curve: _spatialSlow,
-          reverseDuration: MotionPace.duration(
-            const Duration(milliseconds: 200),
-          ),
-        )
-      : null;
+  /// Entrance and exit for sheets and popup menus. Both styles use their
+  /// critically damped full-screen spring on entrance so surfaces never
+  /// overshoot their bounds, and dismiss fastest-first on their leaving curve.
+  /// Reduced motion removes the transition.
+  static AnimationStyle? surfaceEntrance(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return AnimationStyle.noAnimation;
+    }
+    if (context.isMornye) {
+      final enter = MornyeMotion.slow;
+      final exit = MornyeMotion.fast;
+      return AnimationStyle(
+        duration: enter.duration,
+        curve: enter.curve,
+        reverseDuration: exit.duration,
+        reverseCurve: MornyeMotion.fastLeaving,
+      );
+    }
+    if (materialExpressiveEnabled(context)) {
+      return AnimationStyle(
+        duration: MotionPace.duration(_spatialSlow.duration),
+        curve: _spatialSlow,
+        reverseDuration: MotionPace.duration(const Duration(milliseconds: 200)),
+        reverseCurve: _spatialSlowLeaving,
+      );
+    }
+    return null;
+  }
 }

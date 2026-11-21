@@ -4,6 +4,7 @@ import 'dart:ui' show lerpDouble;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 
@@ -26,16 +27,17 @@ Future<T?> showMornyeContextMenu<T>({
   final navigator = Navigator.of(context, rootNavigator: true);
   final themes = InheritedTheme.capture(from: context, to: navigator.context);
   final target = anchor ?? mornyeMenuAnchor(context);
+  final reduce = MediaQuery.disableAnimationsOf(context);
   return navigator.push<T>(
     _MenuRoute<T>(
       barrierColor: Colors.black.withValues(alpha: 0.12),
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      transitionDuration: MediaQuery.disableAnimationsOf(context)
+      transitionDuration: reduce
           ? Duration.zero
-          : _openDuration,
-      closeDuration: MediaQuery.disableAnimationsOf(context)
+          : MornyeMotion.glassMorph.duration,
+      closeDuration: reduce
           ? Duration.zero
-          : const Duration(milliseconds: 240),
+          : MotionPace.duration(const Duration(milliseconds: 240)),
       // Opacity layers isolate a BackdropFilter from the underlying artwork.
       transitionBuilder: (_, _, _, child) => child,
       pageBuilder: (context, animation, _) {
@@ -66,8 +68,9 @@ Future<T?> showMornyeContextMenu<T>({
   );
 }
 
-/// Long enough for the spring in [_MenuFlight] to settle.
-const _openDuration = Duration(milliseconds: 640);
+/// Fraction of the opening flight that width trails height, so the drop
+/// elongates vertically before spreading to the menu's width.
+const double _widthDelay = 0.08;
 
 /// A dialog route that closes faster than it opens.
 class _MenuRoute<T> extends RawDialogRoute<T> {
@@ -110,26 +113,13 @@ class _MenuFlight extends InheritedWidget {
       animation != oldWidget.animation || anchor != oldWidget.anchor;
 }
 
-/// One axis of the opening: an underdamped spring, [delay] seconds late.
-double _pour(double seconds, double delay) {
-  const damping = 0.62;
-  const frequency = 15.0;
-  final damped = frequency * math.sqrt(1 - damping * damping);
-  double position(double time) {
-    final decay = math.exp(-damping * frequency * time);
-    return 1 -
-        decay *
-            (math.cos(damped * time) +
-                damping * frequency / damped * math.sin(damped * time));
-  }
-
-  final time = math.max(seconds - delay, 0.0);
-  final length = _openDuration.inMicroseconds / 1e6 - delay;
-  // The spring is still a pixel or two short when the route ends: spread that
-  // remainder over the flight so the menu lands on its exact size.
-  final spring = position(time) + (1 - position(length)) * (time / length);
-  // The size runs just past its target, not by the spring's whole overshoot.
-  return spring <= 1 ? spring : 1 + (spring - 1) * 0.35;
+/// One axis of the Liquid Glass opening on [MornyeMotion.glassMorph],
+/// delayed by [delay] (a fraction of the flight).
+double _pour(double progress, double delay) {
+  final t = delay <= 0
+      ? progress.clamp(0.0, 1.0)
+      : ((progress - delay) / (1 - delay)).clamp(0.0, 1.0);
+  return MornyeMotion.glassMorph.curve.transform(t);
 }
 
 /// Sizes shared by the two render objects of a morphing menu.
@@ -144,8 +134,9 @@ class _MenuGeometry {
 
 /// Pours the glass out of its control like water: a drop at the control runs
 /// down into a tall oval, then spreads to the menu's width and settles with a
-/// small wobble. The panel really changes size, so its lens, rim and corners
-/// stay true on every frame, while the rows wait in place and fade up inside.
+/// subtle Liquid Glass spring overshoot. The panel really changes size, so its
+/// lens, rim and corners stay true on every frame, while the rows wait in place
+/// and fade up inside.
 class _LiquidMenuGlass extends StatefulWidget {
   const _LiquidMenuGlass({
     required this.flight,
@@ -169,9 +160,6 @@ class _LiquidMenuGlassState extends State<_LiquidMenuGlass> {
   double? _closingFrom;
   double _closingWidth = 1;
   double _closingHeight = 1;
-
-  double get _seconds =>
-      widget.flight.animation.value * _openDuration.inMilliseconds / 1000;
 
   @override
   void initState() {
@@ -197,14 +185,17 @@ class _LiquidMenuGlassState extends State<_LiquidMenuGlass> {
   void _onStatus(AnimationStatus status) {
     if (status != AnimationStatus.reverse) return;
     // Closes from wherever the opening had reached.
-    _closingFrom = widget.flight.animation.value;
-    _closingHeight = _pour(_seconds, 0);
-    _closingWidth = _pour(_seconds, 0.05);
+    final progress = widget.flight.animation.value;
+    _closingFrom = progress;
+    _closingHeight = _pour(progress, 0);
+    _closingWidth = _pour(progress, _widthDelay);
   }
 
   @override
   Widget build(BuildContext context) {
     final animation = widget.flight.animation;
+    final closeCurve = MornyeMotion.fast.curve;
+    final fadeCurve = MornyeMotion.effectsFast.curve;
     return AnimatedBuilder(
       animation: animation,
       child: widget.child,
@@ -215,23 +206,17 @@ class _LiquidMenuGlassState extends State<_LiquidMenuGlass> {
         final double fade;
         if (from != null && from > 0) {
           final closing = 1 - (animation.value / from).clamp(0.0, 1.0);
-          // Drawn back into the control, width first.
+          // Drawn back into the control on Apple's fast spring, width first.
           width =
               _closingWidth *
-              (1 -
-                  Curves.easeInCubic.transform(
-                    (closing * 1.2).clamp(0.0, 1.0),
-                  ));
-          height = _closingHeight * (1 - Curves.easeInCubic.transform(closing));
+              (1 - closeCurve.transform((closing * 1.15).clamp(0.0, 1.0)));
+          height = _closingHeight * (1 - closeCurve.transform(closing));
           fade = 1 - const Interval(0, 0.45).transform(closing);
         } else {
-          width = _pour(_seconds, 0.05);
-          height = _pour(_seconds, 0);
-          fade = const Interval(
-            0.14,
-            0.46,
-            curve: Curves.easeOut,
-          ).transform(animation.value);
+          final progress = animation.value;
+          width = _pour(progress, _widthDelay);
+          height = _pour(progress, 0);
+          fade = Interval(0.14, 0.46, curve: fadeCurve).transform(progress);
         }
         final resting = _geometry.resting;
         final shortest = math.min(

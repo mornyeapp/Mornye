@@ -74,6 +74,8 @@ void main() {
       expect(spec.duration.inMilliseconds, inInclusiveRange(150, 800));
     }
     expect(peak(MornyeMotion.snappy), inExclusiveRange(1, 1.05));
+    expect(peak(MornyeMotion.glassPress), inExclusiveRange(1.01, 1.05));
+    expect(peak(MornyeMotion.glassMorph), inExclusiveRange(1.01, 1.04));
     // Most of the way early: a spring is not a slow ease.
     expect(MornyeMotion.standard.curve.transform(0.5), greaterThan(0.9));
     expect(
@@ -210,4 +212,65 @@ void main() {
       isNot(same(MornyeMotion.snappy)),
     );
   });
+
+  testWidgets(
+    'surfaceEntrance uses style springs, leaving curves, MotionPace and Reduce Motion',
+    (tester) async {
+      addTearDown(() => MotionPace.speed = 1);
+      Future<AnimationStyle?> readStyle(
+        ThemeData theme, {
+        bool reduceMotion = false,
+      }) async {
+        AnimationStyle? style;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: MediaQuery(
+              data: MediaQueryData(disableAnimations: reduceMotion),
+              child: Builder(
+                builder: (context) {
+                  style = AppMotion.surfaceEntrance(context);
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        return style;
+      }
+
+      final mornyeStyle = await readStyle(MornyeTheme.build(Brightness.light));
+      expect(mornyeStyle, isNotNull);
+      expect(mornyeStyle!.duration, MornyeMotion.slow.duration);
+      expect(mornyeStyle.curve, MornyeMotion.slow.curve);
+      expect(mornyeStyle.reverseDuration, MornyeMotion.fast.duration);
+      expect(mornyeStyle.reverseCurve, same(MornyeMotion.fastLeaving));
+      expect(
+        mornyeStyle.reverseCurve!.transform(0.75),
+        closeTo(MornyeMotion.fast.leaving.transform(0.75), 1e-9),
+      );
+
+      final materialStyle = await readStyle(AppTheme.light());
+      expect(materialStyle, isNotNull);
+      expect(materialStyle!.curve, isA<SpringCurve>());
+      expect(materialStyle.reverseCurve, isNotNull);
+      // Reversing must move fastest-first rather than holding near open.
+      expect(materialStyle.reverseCurve!.transform(0.75), lessThan(0.6));
+
+      MotionPace.speed = 2;
+      final fastMornye = await readStyle(MornyeTheme.build(Brightness.light));
+      expect(fastMornye!.duration, mornyeStyle.duration! * 0.5);
+      expect(fastMornye.reverseDuration, mornyeStyle.reverseDuration! * 0.5);
+      MotionPace.speed = 1;
+
+      for (final theme in [
+        AppTheme.light(),
+        MornyeTheme.build(Brightness.light),
+      ]) {
+        final reduced = await readStyle(theme, reduceMotion: true);
+        expect(reduced, AnimationStyle.noAnimation);
+      }
+    },
+  );
 }

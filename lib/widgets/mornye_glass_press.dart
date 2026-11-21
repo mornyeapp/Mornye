@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/physics.dart';
+import 'package:mornye/theme/app_motion.dart';
 
 /// How far the press value rests while a mouse is over the control.
 const double _hoverLevel = 0.3;
@@ -34,13 +35,6 @@ class MornyeGlassPress extends StatefulWidget {
 
 class _MornyeGlassPressState extends State<MornyeGlassPress>
     with SingleTickerProviderStateMixin {
-  // Underdamped, so a release overshoots a little and settles.
-  static const _spring = SpringDescription(
-    mass: 1,
-    stiffness: 420,
-    damping: 24,
-  );
-
   late final AnimationController _press = AnimationController.unbounded(
     vsync: this,
   );
@@ -79,7 +73,7 @@ class _MornyeGlassPressState extends State<MornyeGlassPress>
     }
     _press.animateWith(
       SpringSimulation(
-        _spring,
+        MornyeMotion.glassPressSpring,
         _press.value,
         target,
         _press.velocity,
