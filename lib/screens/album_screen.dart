@@ -656,7 +656,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
                 style: isDesktopPlatform
                     ? desktopDetailSubtitleStyle(header)
                     : TextStyle(
-                        color: colorScheme.primary,
+                        color: HeaderPalette.of(header).primary,
                         fontSize: context.tokens.headerSubtitleSize,
                         fontWeight: context.isMornye
                             ? FontWeight.w400

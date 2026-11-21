@@ -50,7 +50,8 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.text('1 play · 1 track · 1 active day'), findsOneWidget);
-        await tester.tap(find.text('${DateTime.now().year}'));
+        // The expressive segmented group also lays out a measuring copy.
+        await tester.tap(find.text('${DateTime.now().year}').first);
         await tester.pumpAndSettle();
         expect(requested.last.days, 0);
         expect(requested.last.year, DateTime.now().year);

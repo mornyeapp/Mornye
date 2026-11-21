@@ -246,7 +246,7 @@ class _ArtistAlbumTypeBadge extends StatelessWidget {
             : context.l10n.releaseTypeSingle,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
       ),

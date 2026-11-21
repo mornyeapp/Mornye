@@ -8,9 +8,12 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_shape.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/animation_utils.dart';
+import 'package:mornye/widgets/error_card.dart';
+import 'package:mornye/widgets/settings_group.dart';
 
 class ArtistConcertsScreen extends StatefulWidget {
   const ArtistConcertsScreen({
@@ -56,6 +59,8 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
 
   Widget _buildPage(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final mornye = context.isMornye;
     final inset = wideListInset(context) + 24;
     final locale = Localizations.localeOf(context).toString();
     return Scaffold(
@@ -84,13 +89,15 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
                     child: SizedBox.square(
                       dimension: 96,
                       child: widget.coverUrl == null || widget.coverUrl!.isEmpty
-                          ? const Icon(Icons.person, size: 56)
+                          ? const AppIcon.adaptive(Icons.person, size: 56)
                           : CachedCoverImage(
                               imageUrl: widget.coverUrl!,
                               fit: BoxFit.cover,
                               memCacheWidth: 288,
-                              errorWidget: (_, _, _) =>
-                                  const Icon(Icons.person, size: 56),
+                              errorWidget: (_, _, _) => const AppIcon.adaptive(
+                                Icons.person,
+                                size: 56,
+                              ),
                             ),
                     ),
                   ),
@@ -101,17 +108,15 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
                       children: [
                         Text(
                           context.l10n.artistUpcomingConcerts,
-                          style: TextStyle(
+                          style: textTheme.labelLarge?.copyWith(
                             color: scheme.onSurfaceVariant,
-                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           widget.artistName,
-                          style: const TextStyle(
-                            fontSize: 28,
+                          style: textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -127,8 +132,7 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
             sliver: SliverToBoxAdapter(
               child: Text(
                 context.l10n.artistAllUpcomingConcerts,
-                style: const TextStyle(
-                  fontSize: 21,
+                style: textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -138,7 +142,10 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
             SliverPadding(
               padding: EdgeInsets.all(inset),
               sliver: SliverToBoxAdapter(
-                child: Text(context.l10n.artistNoUpcomingConcerts),
+                child: EmptyState(
+                  icon: Icons.event_busy_outlined,
+                  title: context.l10n.artistNoUpcomingConcerts,
+                ),
               ),
             )
           else
@@ -146,8 +153,9 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
               padding: EdgeInsets.symmetric(horizontal: inset),
               sliver: SliverList.separated(
                 itemCount: widget.concerts.length,
-                separatorBuilder: (_, _) =>
-                    const Divider(height: 1, indent: 60),
+                separatorBuilder: (_, _) => mornye
+                    ? const Divider(height: 1, indent: 60)
+                    : const SizedBox(height: 2),
                 itemBuilder: (context, index) {
                   final concert = widget.concerts[index];
                   final date = DateFormat.MMMEd(locale).format(concert.date);
@@ -158,11 +166,16 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
                     if (concert.hasTime)
                       DateFormat.Hm(locale).format(concert.date),
                   ].join(' · ');
-                  return InkWell(
+                  final row = InkWell(
                     onTap: () => _openConcert(context, concert),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: mornye ? BorderRadius.circular(12) : null,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      padding: mornye
+                          ? const EdgeInsets.symmetric(vertical: 5)
+                          : const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
                       child: Row(
                         children: [
                           Semantics(
@@ -172,11 +185,13 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
                               width: 48,
                               padding: const EdgeInsets.symmetric(vertical: 3),
                               decoration: BoxDecoration(
-                                color: scheme.surfaceContainerHigh,
+                                color: mornye
+                                    ? scheme.surfaceContainerHigh
+                                    : scheme.surfaceContainerHighest,
                                 borderRadius: BorderRadius.circular(9),
-                                border: Border.all(
-                                  color: scheme.outlineVariant,
-                                ),
+                                border: mornye
+                                    ? Border.all(color: scheme.outlineVariant)
+                                    : null,
                               ),
                               child: Column(
                                 children: [
@@ -189,7 +204,7 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
                                       maxLines: 1,
                                       style: TextStyle(
                                         color: scheme.primary,
-                                        fontSize: 10,
+                                        fontSize: 11,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -198,8 +213,7 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
                                     fit: BoxFit.scaleDown,
                                     child: Text(
                                       DateFormat.d(locale).format(concert.date),
-                                      style: const TextStyle(
-                                        fontSize: 28,
+                                      style: textTheme.headlineMedium?.copyWith(
                                         height: 1.05,
                                       ),
                                     ),
@@ -215,7 +229,7 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
                               children: [
                                 Text(
                                   concert.location,
-                                  style: const TextStyle(fontSize: 16),
+                                  style: textTheme.bodyLarge,
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
@@ -234,8 +248,7 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
                                           1.3
                                       ? null
                                       : TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 13,
+                                  style: textTheme.bodySmall?.copyWith(
                                     color: scheme.onSurfaceVariant,
                                   ),
                                 ),
@@ -245,6 +258,17 @@ class _ArtistConcertsScreenState extends State<ArtistConcertsScreen> {
                         ],
                       ),
                     ),
+                  );
+                  if (mornye) return row;
+                  return Material(
+                    color: settingsGroupColor(context),
+                    clipBehavior: Clip.antiAlias,
+                    borderRadius: connectedRowRadius(
+                      context,
+                      first: index == 0,
+                      last: index == widget.concerts.length - 1,
+                    ),
+                    child: row,
                   );
                 },
               ),

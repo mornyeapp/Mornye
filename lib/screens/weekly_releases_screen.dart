@@ -4,8 +4,10 @@ import 'package:intl/intl.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/weekly_releases_provider.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
+import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_refresh_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
@@ -113,20 +115,27 @@ class _WeeklyReleasesScreenState extends ConsumerState<WeeklyReleasesScreen> {
                           ),
                         if (releases.isEmpty)
                           SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(context.l10n.weeklyReleasesEmpty),
+                            child: EmptyState(
+                              icon: Icons.new_releases_outlined,
+                              title: context.l10n.weeklyReleasesEmpty,
                             ),
                           ),
-                        SliverList.list(
-                          children: [
-                            for (final release in releases)
-                              ListTile(
+                        if (releases.isNotEmpty)
+                          SliverList.separated(
+                            itemCount: releases.length,
+                            separatorBuilder: (_, _) => context.isMornye
+                                ? const Divider(height: 1, indent: 88)
+                                : const SizedBox(height: 2),
+                            itemBuilder: (context, index) {
+                              final release = releases[index];
+                              final tile = ListTile(
                                 leading: release.coverUrl == null
                                     ? const SizedBox(
                                         width: 56,
                                         height: 56,
-                                        child: Icon(Icons.album_outlined),
+                                        child: AppIcon.adaptive(
+                                          Icons.album_outlined,
+                                        ),
                                       )
                                     : CachedCoverImage(
                                         imageUrl: release.coverUrl!,
@@ -146,18 +155,32 @@ class _WeeklyReleasesScreenState extends ConsumerState<WeeklyReleasesScreen> {
                                   coverUrl: release.coverUrl,
                                   extensionId: release.providerId,
                                 ),
-                              ),
-                          ],
-                        ),
+                              );
+                              if (context.isMornye) return tile;
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                child: Material(
+                                  color: settingsGroupColor(context),
+                                  clipBehavior: Clip.antiAlias,
+                                  borderRadius: connectedRowRadius(
+                                    context,
+                                    first: index == 0,
+                                    last: index == releases.length - 1,
+                                  ),
+                                  child: tile,
+                                ),
+                              );
+                            },
+                          ),
                       ];
                     },
                   ),
                 ],
               ),
             ),
-            SliverToBoxAdapter(
-              child: SizedBox(height: context.navBarBottomInset),
-            ),
+            const NavBarSliverSpacer(),
           ],
         ),
       ),

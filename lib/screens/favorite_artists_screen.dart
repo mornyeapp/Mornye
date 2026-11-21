@@ -10,9 +10,13 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/animation_utils.dart';
+import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_shape.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
+import 'package:mornye/widgets/error_card.dart';
+import 'package:mornye/widgets/settings_group.dart';
 
 class FavoriteArtistsScreen extends ConsumerWidget {
   const FavoriteArtistsScreen({super.key});
@@ -23,68 +27,50 @@ class FavoriteArtistsScreen extends ConsumerWidget {
       libraryCollectionsProvider.select((state) => state.favoriteArtists),
     );
     final colorScheme = Theme.of(context).colorScheme;
-    final bottomInset = context.navBarBottomInset;
+    final mornye = context.isMornye;
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
           AppSliverHeader.page(title: context.l10n.collectionFavoriteArtists),
           SliverToBoxAdapter(
-            child: ListTile(
-              leading: const Icon(Icons.new_releases_outlined),
-              title: Text(context.l10n.weeklyReleases),
-              subtitle: Text(context.l10n.weeklyReleasesDescription),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(
-                context,
-              ).push(slidePageRoute<void>(page: const WeeklyReleasesScreen())),
+            child: SettingsGroup(
+              children: [
+                SettingsItem(
+                  icon: Icons.new_releases_outlined,
+                  showIconInMornye: true,
+                  title: context.l10n.weeklyReleases,
+                  subtitle: context.l10n.weeklyReleasesDescription,
+                  showDivider: false,
+                  onTap: () => Navigator.of(context).push(
+                    slidePageRoute<void>(page: const WeeklyReleasesScreen()),
+                  ),
+                ),
+              ],
             ),
           ),
           if (artists.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.favorite,
-                        size: 60,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        context.l10n.collectionFavoriteArtistsEmptyTitle,
-                        style: Theme.of(context).textTheme.titleMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        context.l10n.collectionFavoriteArtistsEmptySubtitle,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              child: EmptyState(
+                icon: Icons.favorite,
+                title: context.l10n.collectionFavoriteArtistsEmptyTitle,
+                message: context.l10n.collectionFavoriteArtistsEmptySubtitle,
               ),
             )
           else
             SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
+              padding: EdgeInsets.symmetric(
+                horizontal: wideListInset(context) + (mornye ? 0 : 16),
+              ),
               sliver: SliverList.separated(
                 itemCount: artists.length,
-                // Material lists separate rows by space; dividers are Mornye's.
-                separatorBuilder: (_, _) => context.isMornye
+                separatorBuilder: (_, _) => mornye
                     ? const Divider(height: 1)
-                    : const SizedBox.shrink(),
+                    : const SizedBox(height: 2),
                 itemBuilder: (context, index) {
                   final artist = artists[index];
-                  return ListTile(
+                  final tile = ListTile(
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 4,
@@ -111,12 +97,11 @@ class FavoriteArtistsScreen extends ConsumerWidget {
                             .read(libraryCollectionsProvider.notifier)
                             .removeFavoriteArtist(artist.key);
                         if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              context.l10n.collectionRemovedFromFavoriteArtists(
-                                artist.name,
-                              ),
+                        showAppSnackBar(
+                          context,
+                          content: Text(
+                            context.l10n.collectionRemovedFromFavoriteArtists(
+                              artist.name,
                             ),
                           ),
                         );
@@ -139,10 +124,21 @@ class FavoriteArtistsScreen extends ConsumerWidget {
                       );
                     },
                   );
+                  if (mornye) return tile;
+                  return Material(
+                    color: settingsGroupColor(context),
+                    clipBehavior: Clip.antiAlias,
+                    borderRadius: connectedRowRadius(
+                      context,
+                      first: index == 0,
+                      last: index == artists.length - 1,
+                    ),
+                    child: tile,
+                  );
                 },
               ),
             ),
-          SliverToBoxAdapter(child: SizedBox(height: bottomInset)),
+          const NavBarSliverSpacer(),
         ],
       ),
     );
@@ -180,7 +176,10 @@ class _ArtistThumbnail extends StatelessWidget {
       width: 56,
       height: 56,
       color: colorScheme.surfaceContainerHighest,
-      child: Icon(Icons.person, color: colorScheme.onSurfaceVariant),
+      child: AppIcon.adaptive(
+        Icons.person,
+        color: colorScheme.onSurfaceVariant,
+      ),
     );
   }
 }

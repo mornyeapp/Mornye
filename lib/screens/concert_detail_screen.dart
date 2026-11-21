@@ -90,14 +90,9 @@ class _ConcertDetailScreenState extends State<ConcertDetailScreen> {
   Widget build(BuildContext context) {
     final source = _detail.coverUrl ?? widget.coverUrl;
     if (!context.isMornye) {
-      // Material follows the app brightness with a cover-seeded scheme.
-      return CoverPaletteBuilder(
-        imageSource: source,
-        builder: (context, palette) => Theme(
-          data: Theme.of(context).copyWith(colorScheme: palette),
-          child: Builder(builder: (context) => _materialPage(context, source)),
-        ),
-      );
+      // Material keeps the page on the app scheme; only the header takes the
+      // cover-derived palette.
+      return _materialPage(context, source);
     }
     final base = MornyeTheme.fromContext(context, brightness: Brightness.dark);
     return Theme(
@@ -208,12 +203,15 @@ class _ConcertDetailScreenState extends State<ConcertDetailScreen> {
                           child: SizedBox.square(
                             dimension: photoSize,
                             child: source == null
-                                ? const Icon(Icons.person, size: 96)
+                                ? const AppIcon.adaptive(Icons.person, size: 96)
                                 : CachedCoverImage(
                                     imageUrl: source,
                                     fit: BoxFit.cover,
                                     errorWidget: (_, _, _) =>
-                                        const Icon(Icons.person, size: 96),
+                                        const AppIcon.adaptive(
+                                          Icons.person,
+                                          size: 96,
+                                        ),
                                   ),
                           ),
                         ),
@@ -224,7 +222,9 @@ class _ConcertDetailScreenState extends State<ConcertDetailScreen> {
                             width: 64,
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             decoration: BoxDecoration(
-                              color: const Color(0xff202023),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainer,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: Colors.white24),
                             ),
@@ -232,9 +232,9 @@ class _ConcertDetailScreenState extends State<ConcertDetailScreen> {
                               children: [
                                 Text(
                                   DateFormat.MMM(locale).format(date),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
-                                    color: Color(0xffff646b),
+                                    color: CupertinoColors.systemRed.darkColor,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -406,7 +406,9 @@ class _ConcertDetailScreenState extends State<ConcertDetailScreen> {
                                   child: SizedBox.square(
                                     dimension: 88,
                                     child: _detail.setListCover == null
-                                        ? const Icon(Icons.queue_music)
+                                        ? const AppIcon.adaptive(
+                                            Icons.queue_music,
+                                          )
                                         : CachedCoverImage(
                                             imageUrl: _detail.setListCover!,
                                             fit: BoxFit.cover,
@@ -481,124 +483,142 @@ class _ConcertDetailScreenState extends State<ConcertDetailScreen> {
             ],
           ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Column(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      AppShapeClip(
-                        kind: AppShapes.artist,
-                        child: SizedBox.square(
-                          dimension: photoSize,
-                          child: source == null
-                              ? ColoredBox(
-                                  color: scheme.surfaceContainerHigh,
-                                  child: placeholder,
-                                )
-                              : CachedCoverImage(
-                                  imageUrl: source,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, _, _) => placeholder,
-                                ),
-                        ),
-                      ),
-                      PositionedDirectional(
-                        end: -4,
-                        bottom: -4,
-                        child: Container(
-                          width: 64,
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          decoration: BoxDecoration(
-                            color: scheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
+            child: CoverPaletteBuilder(
+              imageSource: source,
+              builder: (context, palette) => Theme(
+                data: Theme.of(context).copyWith(colorScheme: palette),
+                child: Builder(
+                  builder: (context) {
+                    final headerScheme = Theme.of(context).colorScheme;
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: Column(
+                        children: [
+                          Stack(
+                            clipBehavior: Clip.none,
                             children: [
-                              Text(
-                                DateFormat.MMM(locale).format(date),
-                                style: textTheme.labelLarge?.copyWith(
-                                  color: scheme.onPrimaryContainer,
-                                  fontWeight: FontWeight.w600,
+                              AppShapeClip(
+                                kind: AppShapes.artist,
+                                child: SizedBox.square(
+                                  dimension: photoSize,
+                                  child: source == null
+                                      ? ColoredBox(
+                                          color:
+                                              headerScheme.surfaceContainerHigh,
+                                          child: placeholder,
+                                        )
+                                      : CachedCoverImage(
+                                          imageUrl: source,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (_, _, _) => placeholder,
+                                        ),
                                 ),
                               ),
-                              Text(
-                                DateFormat.d(locale).format(date),
-                                style: textTheme.headlineMedium?.copyWith(
-                                  color: scheme.onPrimaryContainer,
-                                  height: 1.1,
+                              PositionedDirectional(
+                                end: -4,
+                                bottom: -4,
+                                child: Container(
+                                  width: 64,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: headerScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Text(
+                                        DateFormat.MMM(locale).format(date),
+                                        style: textTheme.labelLarge?.copyWith(
+                                          color:
+                                              headerScheme.onPrimaryContainer,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        DateFormat.d(locale).format(date),
+                                        style: textTheme.headlineMedium
+                                            ?.copyWith(
+                                              color: headerScheme
+                                                  .onPrimaryContainer,
+                                              height: 1.1,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    artist,
-                    textAlign: TextAlign.center,
-                    style: textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: scheme.onSurface,
-                    ),
-                  ),
-                  if (_loading) ...[
-                    const SizedBox(height: 24),
-                    const ShimmerLoading(
-                      child: Column(
-                        children: [
-                          SkeletonBox(
-                            width: double.infinity,
-                            height: 48,
-                            borderRadius: 24,
+                          const SizedBox(height: 24),
+                          Text(
+                            artist,
+                            textAlign: TextAlign.center,
+                            style: textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: headerScheme.onSurface,
+                            ),
                           ),
-                          SizedBox(height: 16),
-                          SkeletonBox(
-                            width: double.infinity,
-                            height: 144,
-                            borderRadius: 20,
-                          ),
+                          if (_loading) ...[
+                            const SizedBox(height: 24),
+                            const ShimmerLoading(
+                              child: Column(
+                                children: [
+                                  SkeletonBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    borderRadius: 24,
+                                  ),
+                                  SizedBox(height: 16),
+                                  SkeletonBox(
+                                    width: double.infinity,
+                                    height: 144,
+                                    borderRadius: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else if (hasTicket || hasSetList) ...[
+                            const SizedBox(height: 24),
+                            // Tickets are the one filled action; the set list is tonal.
+                            Row(
+                              spacing: 12,
+                              children: [
+                                if (hasTicket)
+                                  Expanded(
+                                    child: ExpressiveButton(
+                                      onPressed: () =>
+                                          _openLink(_detail.ticketUrl!),
+                                      icon: const Icon(
+                                        Icons.confirmation_number_outlined,
+                                      ),
+                                      child: Text(
+                                        context.l10n.concertGetTickets,
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                if (hasSetList)
+                                  Expanded(
+                                    child: ExpressiveButton(
+                                      tonal: true,
+                                      onPressed: _openSetList,
+                                      icon: const Icon(Icons.queue_music),
+                                      child: Text(
+                                        context.l10n.concertSetListButton,
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
-                    ),
-                  ] else if (hasTicket || hasSetList) ...[
-                    const SizedBox(height: 24),
-                    // Tickets are the one filled action; the set list is tonal.
-                    Row(
-                      spacing: 12,
-                      children: [
-                        if (hasTicket)
-                          Expanded(
-                            child: ExpressiveButton(
-                              onPressed: () => _openLink(_detail.ticketUrl!),
-                              icon: const Icon(
-                                Icons.confirmation_number_outlined,
-                              ),
-                              child: Text(
-                                context.l10n.concertGetTickets,
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                        if (hasSetList)
-                          Expanded(
-                            child: ExpressiveButton(
-                              tonal: true,
-                              onPressed: _openSetList,
-                              icon: const Icon(Icons.queue_music),
-                              child: Text(
-                                context.l10n.concertSetListButton,
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ],
+                    );
+                  },
+                ),
               ),
             ),
           ),

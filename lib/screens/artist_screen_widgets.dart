@@ -185,7 +185,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
                     icon: CupertinoIcons.shuffle,
                     buttonSize: 50,
                     iconSize: 24,
-                    iconColor: colorScheme.primary,
+                    iconColor: Colors.white,
                     glassTintColor: Colors.white,
                     glassTintOpacity: 0.10,
                     tooltip: context.l10n.actionShuffle,
@@ -220,9 +220,11 @@ extension _ArtistScreenSections on _ArtistScreenState {
                       : CupertinoIcons.star,
                   buttonSize: 50,
                   iconSize: 24,
-                  iconColor: colorScheme.primary,
-                  glassTintColor: Colors.white,
-                  glassTintOpacity: 0.10,
+                  iconColor: Colors.white,
+                  glassTintColor: isFavoriteArtist
+                      ? colorScheme.primary
+                      : Colors.white,
+                  glassTintOpacity: isFavoriteArtist ? 0.45 : 0.10,
                   tooltip: isFavoriteArtist
                       ? context.l10n.artistOptionRemoveFromFavorites
                       : context.l10n.artistOptionAddToFavorites,

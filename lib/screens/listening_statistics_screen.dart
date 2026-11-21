@@ -10,13 +10,17 @@ import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/animation_utils.dart' show SkeletonBox;
 import 'package:mornye/widgets/app_alert_dialog.dart';
-import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/app_content_card.dart';
+import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_refresh_indicator.dart';
 import 'package:mornye/widgets/app_shape.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
+import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/player_artwork.dart';
@@ -56,8 +60,9 @@ class _ListeningStatisticsScreenState
       ref.invalidate(listeningRewindSpotlightProvider);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.listeningStatsClearError)),
+        showAppSnackBar(
+          context,
+          content: Text(context.l10n.listeningStatsClearError),
         );
       }
     } finally {
@@ -70,110 +75,127 @@ class _ListeningStatisticsScreenState
     final period = (days: _days, year: _year);
     final summary = ref.watch(listeningSummaryProvider(period));
     final colors = Theme.of(context).colorScheme;
-    return Scaffold(
-      body: AppRefreshIndicator(
-        onRefresh: () => ref.refresh(listeningSummaryProvider(period).future),
-        child: CustomScrollView(
-          slivers: [
-            AppSliverHeader.page(title: context.l10n.listeningStats),
-            AppRefreshIndicator.sliver(),
-            // Centered at the reading width on tablets, under the title.
-            SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
-              sliver: SliverMainAxisGroup(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: SettingsGroup(
-                      children: [
-                        SettingsSwitchItem(
-                          icon: Icons.insights_outlined,
-                          title: context.l10n.listeningStatsRecord,
-                          subtitle: context.l10n.listeningStatsDescription,
-                          value: ref
-                              .watch(settingsProvider)
-                              .listeningStatisticsEnabled,
-                          enabled: !_clearing,
-                          onChanged: (value) => ref
-                              .read(settingsProvider.notifier)
-                              .setListeningStatisticsEnabled(value),
-                          showDivider: false,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SliverToBoxAdapter(child: ListeningRewindEntry()),
-                  SliverPadding(
-                    padding: const EdgeInsets.all(16),
-                    sliver: SliverToBoxAdapter(
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+    return MornyeSettingsTheme(
+      child: Scaffold(
+        body: AppRefreshIndicator(
+          onRefresh: () => ref.refresh(listeningSummaryProvider(period).future),
+          child: CustomScrollView(
+            slivers: [
+              AppSliverHeader.page(title: context.l10n.listeningStats),
+              AppRefreshIndicator.sliver(),
+              // Centered at the reading width on tablets, under the title.
+              SliverPadding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: wideListInset(context),
+                ),
+                sliver: SliverMainAxisGroup(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: SettingsGroup(
                         children: [
-                          for (final days in [7, 30, 0])
-                            AppChoiceChip(
-                              label: Text(
-                                days == 0
-                                    ? '$_year'
-                                    : context.l10n.listeningStatsDays(days),
-                              ),
-                              selected: _days == days,
-                              onSelected: (_) => setState(() => _days = days),
-                            ),
-                          if (_days == 0)
-                            AppIconButton(
-                              tooltip: context.l10n.listeningStatsPreviousYear,
-                              onPressed: () => setState(() => _year--),
-                              icon: const Icon(Icons.chevron_left),
-                            ),
-                          if (_days == 0)
-                            AppIconButton(
-                              tooltip: context.l10n.listeningStatsNextYear,
-                              onPressed: _year >= DateTime.now().year
-                                  ? null
-                                  : () => setState(() => _year++),
-                              icon: const Icon(Icons.chevron_right),
-                            ),
+                          SettingsSwitchItem(
+                            icon: Icons.insights_outlined,
+                            title: context.l10n.listeningStatsRecord,
+                            subtitle: context.l10n.listeningStatsDescription,
+                            value: ref
+                                .watch(settingsProvider)
+                                .listeningStatisticsEnabled,
+                            enabled: !_clearing,
+                            onChanged: (value) => ref
+                                .read(settingsProvider.notifier)
+                                .setListeningStatisticsEnabled(value),
+                            showDivider: false,
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                  ...summary.when(
-                    loading: () => [
-                      SliverToBoxAdapter(child: _summarySkeleton(context)),
-                    ],
-                    error: (error, _) => [
-                      SliverToBoxAdapter(
-                        child: ListTile(
-                          title: Text(context.l10n.listeningStatsLoadError),
-                          trailing: AppIconButton(
-                            icon: const Icon(Icons.refresh),
-                            onPressed: () => ref.invalidate(
-                              listeningSummaryProvider(period),
+                    const SliverToBoxAdapter(child: ListeningRewindEntry()),
+                    SliverPadding(
+                      padding: const EdgeInsets.all(16),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SettingsSegmentedChoice<int>(
+                              selected: _days,
+                              onChanged: (days) => setState(() => _days = days),
+                              semanticLabel: context.l10n.listeningStats,
+                              options: [
+                                for (final days in [7, 30, 0])
+                                  SettingsSegmentOption(
+                                    value: days,
+                                    label: days == 0
+                                        ? '$_year'
+                                        : context.l10n.listeningStatsDays(days),
+                                  ),
+                              ],
                             ),
-                          ),
-                        ),
-                      ),
-                    ],
-                    data: (data) => _summarySlivers(context, data),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 48),
-                      child: ExpressiveButton(
-                        text: true,
-                        onPressed: _clearing ? null : _clear,
-                        icon: Icon(Icons.delete_outline, color: colors.error),
-                        child: Text(
-                          context.l10n.listeningStatsClear,
-                          style: TextStyle(color: colors.error),
+                            if (_days == 0) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  AppIconButton(
+                                    tooltip:
+                                        context.l10n.listeningStatsPreviousYear,
+                                    onPressed: () => setState(() => _year--),
+                                    icon: const Icon(Icons.chevron_left),
+                                  ),
+                                  AppIconButton(
+                                    tooltip:
+                                        context.l10n.listeningStatsNextYear,
+                                    onPressed: _year >= DateTime.now().year
+                                        ? null
+                                        : () => setState(() => _year++),
+                                    icon: const Icon(Icons.chevron_right),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    ...summary.when(
+                      loading: () => [
+                        SliverToBoxAdapter(child: _summarySkeleton(context)),
+                      ],
+                      error: (error, _) => [
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: ErrorCard(
+                              error: context.l10n.listeningStatsLoadError,
+                              colorScheme: colors,
+                              onRetry: () => ref.invalidate(
+                                listeningSummaryProvider(period),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                      data: (data) => _summarySlivers(context, data),
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 48),
+                        child: ExpressiveButton(
+                          text: true,
+                          onPressed: _clearing ? null : _clear,
+                          icon: Icon(Icons.delete_outline, color: colors.error),
+                          child: Text(
+                            context.l10n.listeningStatsClear,
+                            style: TextStyle(color: colors.error),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const NavBarSliverSpacer(),
+            ],
+          ),
         ),
       ),
     );
@@ -395,9 +417,10 @@ class _ListeningStatisticsScreenState
                                   fraction: day.value / peakDay,
                                   peak: day.value == peakDay,
                                 )
-                              : LinearProgressIndicator(
+                              : AppProgressIndicator.linear(
                                   value: day.value / peakDay,
                                   minHeight: 8,
+                                  wavy: false,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                         ),
@@ -432,7 +455,9 @@ class _ListeningStatisticsScreenState
                       child: artistArtwork[artist.key] == null
                           ? ColoredBox(
                               color: colors.surfaceContainerHighest,
-                              child: const Icon(Icons.person_outline),
+                              child: const AppIcon.adaptive(
+                                Icons.person_outline,
+                              ),
                             )
                           : PlayerArtwork(
                               artUri: artistArtwork[artist.key],

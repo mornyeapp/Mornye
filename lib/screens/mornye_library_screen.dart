@@ -20,6 +20,8 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/open_audio_button.dart';
 import 'package:mornye/widgets/tv_navigation.dart';
 import 'package:mornye/widgets/app_refresh_indicator.dart';
@@ -544,7 +546,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
                         child: ListTile(
                           contentPadding: EdgeInsets.zero,
                           minVerticalPadding: 12,
-                          leading: Icon(
+                          leading: AppIcon.adaptive(
                             category.$1,
                             color: colors.primary,
                             size: 28,
@@ -553,7 +555,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
                             category.$2,
                             style: const TextStyle(fontSize: 22),
                           ),
-                          trailing: Icon(
+                          trailing: AppIcon.adaptive(
                             Icons.chevron_right,
                             color: colors.onSurfaceVariant,
                           ),
@@ -718,10 +720,11 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
             if (result.hasError || result.value?.loadMoreError != null)
               SliverToBoxAdapter(
                 child: Center(
-                  child: TextButton.icon(
+                  child: ExpressiveButton(
+                    text: true,
                     onPressed: reload,
-                    icon: const Icon(Icons.refresh),
-                    label: Text(context.l10n.dialogRetry),
+                    icon: const AppIcon.adaptive(Icons.refresh),
+                    child: Text(context.l10n.dialogRetry),
                   ),
                 ),
               )
@@ -729,7 +732,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator.adaptive()),
+                  child: Center(child: AppLoadingIndicator()),
                 ),
               )
             else if (_rows.isEmpty)
