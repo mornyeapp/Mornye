@@ -1,10 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/platform_bridge.dart';
-import 'package:mornye/widgets/settings_group.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Bottom sheet listing every streaming platform song.link resolves for a
@@ -137,21 +137,18 @@ class _OpenOnPlatformSheetState extends State<OpenOnPlatformSheet> {
           ..sort((a, b) => _displayName(a.key).compareTo(_displayName(b.key)));
         return SingleChildScrollView(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              SettingsGroup(
-                children: [
-                  for (final entry in entries)
-                    AppSheetOption(
-                      title: Text(_displayName(entry.key)),
-                      trailing: Icon(
-                        Icons.open_in_new,
-                        size: 18,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      onTap: () => _openLink(context, entry.value),
-                    ),
-                ],
-              ),
+              for (final entry in entries)
+                AppSheetOption(
+                  title: Text(_displayName(entry.key)),
+                  trailing: AppIcon.adaptive(
+                    Icons.open_in_new,
+                    size: 18,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  onTap: () => _openLink(context, entry.value),
+                ),
               const SizedBox(height: 16),
             ],
           ),

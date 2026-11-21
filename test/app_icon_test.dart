@@ -134,7 +134,7 @@ void main() {
     await tester.pumpWidget(_host(button(), mornye: true));
     await tester.pumpAndSettle();
     expect(find.byType(IconButton), findsOneWidget);
-    expect(_drawnIcon(tester).icon, Icons.close);
+    expect(_drawnIcon(tester).icon, CupertinoIcons.xmark);
 
     await tester.pumpWidget(_host(button(), reduceMotion: true));
     await tester.pumpAndSettle();

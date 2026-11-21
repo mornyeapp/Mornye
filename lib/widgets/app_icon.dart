@@ -3,11 +3,11 @@ import 'package:mornye/theme/material_symbols.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 
-/// [widget] as an [AppIcon] when it is a plain [Icon], so shared components
-/// can adopt Material Symbols without changing every caller.
+/// [widget] as an adaptive [AppIcon] when it is a plain [Icon], so shared
+/// components draw Material Symbols in Material and Cupertino glyphs in Mornye.
 Widget symbolIconWidget(Widget widget) {
   if (widget case Icon(:final icon?)) {
-    return AppIcon(
+    return AppIcon.adaptive(
       icon,
       key: widget.key,
       size: widget.size,

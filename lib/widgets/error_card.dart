@@ -127,7 +127,11 @@ class EmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (context.isMornye)
-              Icon(icon, size: 64, color: colorScheme.onSurfaceVariant)
+              AppIcon.adaptive(
+                icon,
+                size: 64,
+                color: colorScheme.onSurfaceVariant,
+              )
             else
               AppShapeBadge(
                 kind: AppShapes.badge,

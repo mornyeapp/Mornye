@@ -150,7 +150,7 @@ class AppSliverHeader extends StatelessWidget {
                           tooltip: MaterialLocalizations.of(
                             context,
                           ).backButtonTooltip,
-                          icon: const AppIcon(Icons.chevron_left),
+                          icon: const AppIcon.adaptive(Icons.arrow_back),
                           onPressed: () => Navigator.pop(context),
                         )
                       // Expressive app bars hold navigation in a tonal circle.
