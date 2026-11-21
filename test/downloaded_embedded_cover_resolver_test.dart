@@ -918,8 +918,8 @@ void main() {
     final coverSource = File(
       'lib/screens/track_metadata_screen_cover.dart',
     ).readAsStringSync();
-    final cardsSource = File(
-      'lib/screens/track_metadata_cards.dart',
+    final headerSource = File(
+      'lib/screens/track_metadata_header.dart',
     ).readAsStringSync();
 
     expect(
@@ -932,15 +932,15 @@ void main() {
     );
     expect(coverSource, isNot(contains('PlatformBridge.extractCoverToFile')));
     expect(
-      cardsSource,
+      headerSource,
       contains('Downloaded-item entry points must await resolveOrExtract'),
     );
     expect(
-      cardsSource,
+      headerSource,
       contains(
-        'Widget coverImage() => artworkImage(cacheWidth: coverCacheWidth)',
+        'child: artworkImage(cacheWidth: coverCacheWidth, iconSize: 48)',
       ),
     );
-    expect(cardsSource, contains('cacheHeight: backdropCacheWidth'));
+    expect(headerSource, contains('cacheHeight: backdropCacheWidth'));
   });
 }
