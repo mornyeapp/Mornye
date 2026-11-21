@@ -102,9 +102,8 @@ class _LazyTabViewState extends State<LazyTabView> {
   );
 }
 
-/// Keeps hidden tabs at their last visible window size and without a keyboard,
-/// so resizes and pane motion rebuild only the tab on screen. A tab gets the
-/// current size when it shows again.
+/// Keeps hidden tabs at their last visible size and padding, without a
+/// keyboard, so only the tab on screen rebuilds. A shown tab gets them anew.
 class HiddenTabMediaQuery extends StatefulWidget {
   const HiddenTabMediaQuery({
     super.key,
@@ -121,14 +120,18 @@ class HiddenTabMediaQuery extends StatefulWidget {
 
 class _HiddenTabMediaQueryState extends State<HiddenTabMediaQuery> {
   Size? _visibleSize;
+  EdgeInsets? _visiblePadding;
 
   @override
   Widget build(BuildContext context) {
     final data = MediaQuery.of(context);
-    if (!widget.hidden || _visibleSize == null) _visibleSize = data.size;
+    if (!widget.hidden || _visibleSize == null) {
+      _visibleSize = data.size;
+      _visiblePadding = data.padding;
+    }
     return MediaQuery(
       data: data
-          .copyWith(size: _visibleSize)
+          .copyWith(size: _visibleSize, padding: _visiblePadding)
           .removeViewInsets(removeBottom: widget.hidden),
       child: widget.child,
     );

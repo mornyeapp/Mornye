@@ -68,6 +68,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
   late String _sort;
   List<LibraryBrowseEntry> _rows = const [];
   bool _loading = true;
+  bool _hasMore = false;
 
   bool get _overview => widget.page == MornyeLibraryPage.overview;
   bool get _artists => widget.page == MornyeLibraryPage.artists;
@@ -91,7 +92,8 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
         : ref.read(settingsProvider).libraryAlbumSortMode;
     _scroll.addListener(() {
       // Genres arrive in one read.
-      if (_scroll.position.extentAfter < 500 &&
+      if (_hasMore &&
+          _scroll.position.extentAfter < 500 &&
           !_loading &&
           !_genres &&
           !(_overview && _query.isNotEmpty)) {
@@ -364,6 +366,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
         ? ref.watch(libraryGenresProvider).whenData(_genreRows)
         : ref.watch(libraryBrowseProvider(_request));
     _loading = result.isLoading || (result.value?.isLoadingMore ?? false);
+    _hasMore = result.value?.hasMore ?? false;
     if (result.hasValue) _rows = result.requireValue.entries;
     void reload() => _genres
         ? ref.invalidate(libraryGenresProvider)

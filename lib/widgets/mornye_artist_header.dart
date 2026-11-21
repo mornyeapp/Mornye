@@ -83,131 +83,139 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
       );
     }
     final darkTheme = _darkTheme;
+    Widget buildFromPalette(
+      BuildContext context, {
+      required ColorScheme palette,
+      required Color? resolvedSourceColor,
+    }) {
+      final source = widget.imageSource;
+      // Album surfaces use only the source colour, which the player may
+      // already have resolved without a scheme.
+      final dominant = HSLColor.fromColor(
+        resolvedSourceColor ??
+            (source == null
+                ? Colors.grey
+                : CoverPalette.sourceColor(source, Brightness.dark) ??
+                      Colors.grey),
+      );
+      // Averaging a portrait mixes its highlights and foliage into gray.
+      // Artist pages use the extracted accent at a deeper tone instead;
+      // album surfaces and monochrome artwork keep their neutral shading.
+      final useAccent = !widget.neutralActions && dominant.saturation >= 0.08;
+      final accent = HSLColor.fromColor(palette.primary);
+      // Keep a faint artwork tint on artist pages; album pages use the
+      // lighter neutral surface.
+      final surface = useAccent
+          ? accent
+                .withSaturation((accent.saturation * 0.6).clamp(0.0, 0.6))
+                .withLightness(0.08 + dominant.lightness * 0.03)
+                .toColor()
+          : dominant
+                .withSaturation((dominant.saturation * 0.45).clamp(0.0, 0.22))
+                .withLightness(
+                  widget.neutralActions
+                      ? 0.24 + dominant.lightness * 0.20
+                      : 0.05,
+                )
+                .toColor();
+      final route = ModalRoute.of(context);
+      if (route != null) {
+        ShellNavigationService.setChromeBrightness(
+          owner: this,
+          route: route,
+          brightness: Brightness.dark,
+          surface: surface,
+          backdrop: isDesktopPlatform && !widget.neutralActions ? source : null,
+        );
+      }
+      Widget finish(BuildContext context) {
+        final logo = widget.logoSource;
+        // Use the logo's original pixels, including white lettering,
+        // without Material's pastel accent mapping.
+        final logoColor = logo == null
+            ? null
+            : CoverPalette.sourceColor(logo, Brightness.dark);
+        // Keep the artwork accent for colorful portraits. A neutral
+        // portrait can acquire a blue Material accent; use white there,
+        // while allowing an explicit logo color to take precedence.
+        final primary = widget.neutralActions
+            ? Colors.white
+            : logoColor ?? (useAccent ? palette.primary : Colors.white);
+        final primaryLuminance = primary.computeLuminance();
+        final surfaceContrast =
+            (primaryLuminance + 0.05) / (surface.computeLuminance() + 0.05);
+        final onPrimary = widget.neutralActions
+            ? Colors.black
+            : logoColor == null && useAccent
+            ? palette.onPrimary
+            : surfaceContrast >= 4.5
+            ? surface
+            : primaryLuminance > 0.179
+            ? Colors.black
+            : Colors.white;
+        final innerKey = (surface, primary, onPrimary, widget.neutralActions);
+        if (innerKey != _innerKey) {
+          _innerKey = innerKey;
+          _innerTheme = darkTheme.copyWith(
+            scaffoldBackgroundColor: surface,
+            colorScheme: darkTheme.colorScheme.copyWith(
+              primary: primary,
+              onPrimary: onPrimary,
+              onSurfaceVariant: widget.neutralActions ? Colors.white70 : null,
+              surface: surface,
+              surfaceContainer: Color.alphaBlend(
+                Colors.white.withValues(alpha: 0.08),
+                surface,
+              ),
+              surfaceContainerHigh: Color.alphaBlend(
+                Colors.white.withValues(alpha: 0.12),
+                surface,
+              ),
+            ),
+          );
+        }
+        final page = HeaderPalette(
+          scheme: _innerTheme.colorScheme,
+          child: widget.child,
+        );
+        return Theme(
+          data: _innerTheme,
+          child: isDesktopPlatform && !widget.neutralActions
+              ? NotificationListener<ScrollNotification>(
+                  onNotification: _onPageScroll,
+                  child: page,
+                )
+              : page,
+        );
+      }
+
+      if (widget.neutralActions) return finish(context);
+      // Built before the logo is known, so its arrival keeps the page's state.
+      return CoverPaletteBuilder(
+        imageSource: widget.logoSource,
+        builder: (context, _) => finish(context),
+      );
+    }
+
     return Theme(
       data: _outerTheme,
-      child: CoverPaletteBuilder(
-        imageSource: widget.imageSource,
-        builder: (context, palette) {
-          final source = widget.imageSource;
-          // Album surfaces use only the source colour, which the player may
-          // already have resolved without a scheme.
-          final dominant = HSLColor.fromColor(
-            source == null
-                ? Colors.grey
-                : (widget.neutralActions
-                          ? CoverPalette.peekSourceColor(source)
-                          : null) ??
-                      CoverPalette.sourceColor(source, Brightness.dark) ??
-                      Colors.grey,
-          );
-          // Averaging a portrait mixes its highlights and foliage into gray.
-          // Artist pages use the extracted accent at a deeper tone instead;
-          // album surfaces and monochrome artwork keep their neutral shading.
-          final useAccent =
-              !widget.neutralActions && dominant.saturation >= 0.08;
-          final accent = HSLColor.fromColor(palette.primary);
-          // Keep a faint artwork tint on artist pages; album pages use the
-          // lighter neutral surface.
-          final surface = useAccent
-              ? accent
-                    .withSaturation((accent.saturation * 0.6).clamp(0.0, 0.6))
-                    .withLightness(0.08 + dominant.lightness * 0.03)
-                    .toColor()
-              : dominant
-                    .withSaturation(
-                      (dominant.saturation * 0.45).clamp(0.0, 0.22),
-                    )
-                    .withLightness(
-                      widget.neutralActions
-                          ? 0.24 + dominant.lightness * 0.20
-                          : 0.05,
-                    )
-                    .toColor();
-          final route = ModalRoute.of(context);
-          if (route != null) {
-            ShellNavigationService.setChromeBrightness(
-              owner: this,
-              route: route,
-              brightness: Brightness.dark,
-              surface: surface,
-              backdrop: isDesktopPlatform && !widget.neutralActions
-                  ? source
-                  : null,
-            );
-          }
-          return CoverPaletteBuilder(
-            imageSource: widget.neutralActions ? null : widget.logoSource,
-            builder: (context, _) {
-              final logo = widget.logoSource;
-              // Use the logo's original pixels, including white lettering,
-              // without Material's pastel accent mapping.
-              final logoColor = logo == null
-                  ? null
-                  : CoverPalette.sourceColor(logo, Brightness.dark);
-              // Keep the artwork accent for colorful portraits. A neutral
-              // portrait can acquire a blue Material accent; use white there,
-              // while allowing an explicit logo color to take precedence.
-              final primary = widget.neutralActions
-                  ? Colors.white
-                  : logoColor ?? (useAccent ? palette.primary : Colors.white);
-              final primaryLuminance = primary.computeLuminance();
-              final surfaceContrast =
-                  (primaryLuminance + 0.05) /
-                  (surface.computeLuminance() + 0.05);
-              final onPrimary = widget.neutralActions
-                  ? Colors.black
-                  : logoColor == null && useAccent
-                  ? palette.onPrimary
-                  : surfaceContrast >= 4.5
-                  ? surface
-                  : primaryLuminance > 0.179
-                  ? Colors.black
-                  : Colors.white;
-              final innerKey = (
-                surface,
-                primary,
-                onPrimary,
-                widget.neutralActions,
-              );
-              if (innerKey != _innerKey) {
-                _innerKey = innerKey;
-                _innerTheme = darkTheme.copyWith(
-                  scaffoldBackgroundColor: surface,
-                  colorScheme: darkTheme.colorScheme.copyWith(
-                    primary: primary,
-                    onPrimary: onPrimary,
-                    onSurfaceVariant: widget.neutralActions
-                        ? Colors.white70
-                        : null,
-                    surface: surface,
-                    surfaceContainer: Color.alphaBlend(
-                      Colors.white.withValues(alpha: 0.08),
-                      surface,
-                    ),
-                    surfaceContainerHigh: Color.alphaBlend(
-                      Colors.white.withValues(alpha: 0.12),
-                      surface,
-                    ),
-                  ),
-                );
-              }
-              final page = HeaderPalette(
-                scheme: _innerTheme.colorScheme,
-                child: widget.child,
-              );
-              return Theme(
-                data: _innerTheme,
-                child: isDesktopPlatform && !widget.neutralActions
-                    ? NotificationListener<ScrollNotification>(
-                        onNotification: _onPageScroll,
-                        child: page,
-                      )
-                    : page,
-              );
-            },
-          );
-        },
-      ),
+      child: widget.neutralActions
+          ? CoverSourceColorBuilder(
+              imageSource: widget.imageSource,
+              builder: (context, sourceColor) => buildFromPalette(
+                context,
+                palette: _outerTheme.colorScheme,
+                resolvedSourceColor: sourceColor,
+              ),
+            )
+          : CoverPaletteBuilder(
+              imageSource: widget.imageSource,
+              builder: (context, palette) => buildFromPalette(
+                context,
+                palette: palette,
+                resolvedSourceColor: null,
+              ),
+            ),
     );
   }
 }

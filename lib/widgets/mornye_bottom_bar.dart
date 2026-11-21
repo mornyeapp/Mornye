@@ -36,6 +36,10 @@ class MornyeChromeController extends ValueNotifier<bool> {
     if (notification is! ScrollUpdateNotification) return false;
     final metrics = notification.metrics;
     if (metrics.pixels <= metrics.minScrollExtent + 12) {
+      if (!value) {
+        _distance = 0;
+        return false;
+      }
       // The Library list can reach its start while its outer header is still
       // collapsed. Restore the tabs only when both scroll positions return.
       final outer = notification.context
@@ -116,6 +120,39 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
   // Side capsules move between backdrop batches; keep their lenses mounted.
   final _leadingSurfaceKey = GlobalKey();
   final _searchSurfaceKey = GlobalKey();
+  String? _cachedLabelText;
+  TextStyle? _cachedLabelStyle;
+  TextDirection? _cachedLabelDirection;
+  TextScaler? _cachedLabelScaler;
+  double _cachedLabelHeight = 0;
+
+  double _measureLabelHeight(
+    String text,
+    TextStyle style,
+    TextDirection direction,
+    TextScaler scaler,
+  ) {
+    if (_cachedLabelText == text &&
+        _cachedLabelStyle == style &&
+        _cachedLabelDirection == direction &&
+        _cachedLabelScaler == scaler) {
+      return _cachedLabelHeight;
+    }
+    final labelPainter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: direction,
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    final height = labelPainter.height;
+    labelPainter.dispose();
+    _cachedLabelText = text;
+    _cachedLabelStyle = style;
+    _cachedLabelDirection = direction;
+    _cachedLabelScaler = scaler;
+    _cachedLabelHeight = height;
+    return height;
+  }
 
   void _updateCollapse() {
     final target = widget.collapsed ? 1.0 : 0.0;
@@ -199,7 +236,9 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
     final leadingIndex = searchSelected ? 0 : selectedIndex;
     final scheme = Theme.of(context).colorScheme;
     final inactiveIconColor = scheme.onSurface;
-    final player = MiniPlayer(compact: collapsed, bottomPadding: 0);
+    final player = RepaintBoundary(
+      child: MiniPlayer(compact: collapsed, bottomPadding: 0),
+    );
     Widget tabs({required bool hideMovingIcons}) => TickerMode(
       enabled: !collapsed,
       child: RepaintBoundary(
@@ -231,14 +270,12 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
           fontSize: glassTabs ? 11 : null,
           fontWeight: FontWeight.w600,
         );
-        final labelPainter = TextPainter(
-          text: TextSpan(text: destinations.first.label, style: labelStyle),
-          textDirection: Directionality.of(context),
-          textScaler: MediaQuery.textScalerOf(context),
-          maxLines: 1,
-        )..layout();
-        final labelHeight = labelPainter.height;
-        labelPainter.dispose();
+        final labelHeight = _measureLabelHeight(
+          destinations.first.label,
+          labelStyle,
+          Directionality.of(context),
+          MediaQuery.textScalerOf(context),
+        );
         final fullIconBottom = glassTabs
             ? 8 + math.max(64, 37 + labelHeight) / 2 + (labelHeight + 2) / 2
             : math.max(64.0, 49 + labelHeight) - 23.5;

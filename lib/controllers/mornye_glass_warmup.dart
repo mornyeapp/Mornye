@@ -17,7 +17,7 @@ class MornyeGlassWarmup {
   static bool _ready = false;
   static final _log = AppLogger('MornyeGlass');
 
-  @visibleForTesting
+  /// Whether the one-time warmup has finished.
   static bool get isReady => _ready;
 
   static Future<void> prepare(ui.FlutterView view) {

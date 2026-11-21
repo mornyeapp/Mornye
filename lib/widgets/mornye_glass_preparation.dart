@@ -15,6 +15,7 @@ class MornyeGlassPreparation extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (MornyeGlassWarmup.isReady) return child;
     if (context.isMornye &&
         ref.watch(mornyeGlassLevelProvider) == MornyeGlassLevel.liquid &&
         MornyeTheme.glassClarityOf(context) > 0.2 &&

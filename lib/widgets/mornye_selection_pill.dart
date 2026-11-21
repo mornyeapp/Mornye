@@ -73,7 +73,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
   /// How far the held lens has swollen, on the fast spring.
   late final AnimationController _press = AnimationController.unbounded(
     vsync: this,
-  )..addListener(() => setState(() {}));
+  );
 
   /// Where the pill stands, as a directional alignment. A drag places it
   /// under the finger; otherwise the snappy spring carries it to its slot,
@@ -83,6 +83,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
     vsync: this,
     value: _slotAlignment(widget.selectedIndex),
   );
+  late final Listenable _visualChanges = Listenable.merge([_slide, _press]);
 
   /// The slot the pill is moving to, or null after a drag placed it.
   double? _slideTarget;
@@ -244,8 +245,8 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
         ui.ImageFilter.isShaderFilterSupported &&
         !MediaQuery.disableAnimationsOf(context) &&
         !(widget.contrastBlocked ?? MediaQuery.highContrastOf(context));
-    final pressProgress = lensEnabled ? _press.value.clamp(0.0, 1.0) : 0.0;
-    final restingOpacity = 1 - pressProgress;
+    final outlines = MornyeTheme.glassOutlinesOf(context);
+    final isDark = scheme.brightness == Brightness.dark;
     final content = Listener(
       // An accepted drag can end with a PointerCancelEvent. Do not navigate
       // when the OS interrupts the gesture (e.g. opening system controls).
@@ -324,74 +325,86 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
                   Positioned.fill(
                     child: IgnorePointer(
                       child: AnimatedBuilder(
-                        animation: _slide,
-                        builder: (context, child) => Align(
-                          alignment: AlignmentDirectional(_shownAlignment, 0),
-                          child: child,
-                        ),
-                        child: FractionallySizedBox(
-                          widthFactor: 1 / count,
-                          heightFactor: 1,
-                          // Share the lens outline while fading into it. A
-                          // fixed resting pill leaves a second capsule inside
-                          // the held glass, especially during release.
-                          child: Transform.scale(
-                            scaleX: 1 + _heldWidthGrowth * pressProgress,
-                            scaleY: 1 + _heldHeightGrowth * pressProgress,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: scheme.onSurface.withValues(
-                                  alpha:
-                                      restingOpacity *
-                                      (scheme.brightness == Brightness.dark
-                                          ? 0.12
-                                          : 0.08),
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  _pillRadius,
-                                ),
-                                border: MornyeTheme.glassOutlinesOf(context)
-                                    ? Border.all(
-                                        color: scheme.onSurface.withValues(
-                                          alpha: 0.05 * restingOpacity,
-                                        ),
-                                        width: 0.5,
-                                      )
-                                    : null,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(
-                                      alpha: 0.08 * restingOpacity,
+                        animation: _visualChanges,
+                        builder: (context, _) {
+                          final pressProgress = lensEnabled
+                              ? _press.value.clamp(0.0, 1.0)
+                              : 0.0;
+                          final restingOpacity = 1 - pressProgress;
+                          return Align(
+                            alignment: AlignmentDirectional(_shownAlignment, 0),
+                            child: FractionallySizedBox(
+                              widthFactor: 1 / count,
+                              heightFactor: 1,
+                              // Share the lens outline while fading into it. A
+                              // fixed resting pill leaves a second capsule
+                              // inside the held glass, especially on release.
+                              child: Transform.scale(
+                                scaleX: 1 + _heldWidthGrowth * pressProgress,
+                                scaleY: 1 + _heldHeightGrowth * pressProgress,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: scheme.onSurface.withValues(
+                                      alpha:
+                                          restingOpacity *
+                                          (isDark ? 0.12 : 0.08),
                                     ),
-                                    blurRadius: 1,
-                                    offset: const Offset(0, 0.5),
+                                    borderRadius: BorderRadius.circular(
+                                      _pillRadius,
+                                    ),
+                                    border: outlines
+                                        ? Border.all(
+                                            color: scheme.onSurface.withValues(
+                                              alpha: 0.05 * restingOpacity,
+                                            ),
+                                            width: 0.5,
+                                          )
+                                        : null,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.08 * restingOpacity,
+                                        ),
+                                        blurRadius: 1,
+                                        offset: const Offset(0, 0.5),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
                     ),
                   ),
                 _foreground(
                   selected,
                   count,
-                  pressProgress,
+                  lensEnabled,
                   _buildItems(selected),
                 ),
                 // The lens must sample the foreground as well as the page.
                 // Below the icons it would look like a rim on a flat backdrop.
                 if (lensEnabled && selected >= 0 && selected < count)
-                  _interactionLens(selected, count, pressProgress),
+                  _interactionLens(count, isDark, outlines),
               ],
             ),
           ),
         ),
       ),
     );
-    return widget.interactionBuilder?.call(context, pressProgress, content) ??
-        content;
+    final interactionBuilder = widget.interactionBuilder;
+    if (interactionBuilder == null) return content;
+    return AnimatedBuilder(
+      animation: _press,
+      child: content,
+      builder: (context, child) => interactionBuilder(
+        context,
+        lensEnabled ? _press.value.clamp(0.0, 1.0) : 0.0,
+        child!,
+      ),
+    );
   }
 
   Widget _buildItems(int selected) {
@@ -444,94 +457,82 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
         : child;
   }
 
-  Widget _foreground(
-    int selected,
-    int count,
-    double pressProgress,
-    Widget child,
-  ) {
+  Widget _foreground(int selected, int count, bool lensEnabled, Widget child) {
     final color = widget.selectionColor;
     if (color == null) return child;
-    return AnimatedBuilder(
-      animation: _slide,
-      builder: (context, child) => _SelectionForegroundScope(
-        rowKey: _foregroundKey,
-        alignment: Directionality.of(context) == TextDirection.rtl
-            ? -_shownAlignment
-            : _shownAlignment,
-        count: count,
-        scaleX: 1 + _heldWidthGrowth * pressProgress,
-        scaleY: 1 + _heldHeightGrowth * pressProgress,
-        program: _maskProgram,
-        color: selected >= 0 && selected < count
-            ? color
-            : color.withValues(alpha: 0),
-        child: child!,
-      ),
+    return _SelectionForegroundScope(
+      rowKey: _foregroundKey,
+      repaint: _visualChanges,
+      rtl: Directionality.of(context) == TextDirection.rtl,
+      lensEnabled: lensEnabled,
+      readAlignment: () => _shownAlignment,
+      readPress: () => _press.value,
+      count: count,
+      program: _maskProgram,
+      color: selected >= 0 && selected < count
+          ? color
+          : color.withValues(alpha: 0),
       child: child,
     );
   }
 
-  Widget _interactionLens(
-    int selected,
-    int count,
-    double progress,
-  ) => Positioned.fill(
-    child: IgnorePointer(
-      child: AnimatedBuilder(
-        animation: _slide,
-        builder: (context, child) => Align(
-          alignment: AlignmentDirectional(_shownAlignment, 0),
-          child: child,
-        ),
-        child: FractionallySizedBox(
-          widthFactor: 1 / count,
-          heightFactor: 1,
-          child: Transform.scale(
-            scaleX: 1 + _heldWidthGrowth * progress,
-            scaleY: 1 + _heldHeightGrowth * progress,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(_pillRadius),
-              child: LiquidGlassBatch.exclude(
-                child: MornyeLiquidBackdrop(
-                  borderRadius: BorderRadius.circular(_pillRadius),
-                  clarity: 1,
-                  interaction: true,
-                  progress: progress,
-                  blurSigma: 0,
-                  // A broader bevel makes the held lens visible as it crosses
-                  // the icons, while leaving its center undistorted.
-                  refractionDepth: 0.18,
-                  refractionWidth: 18,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
+  Widget _interactionLens(int count, bool isDark, bool outlines) =>
+      Positioned.fill(
+        child: IgnorePointer(
+          child: AnimatedBuilder(
+            animation: _visualChanges,
+            builder: (context, _) {
+              final progress = _press.value.clamp(0.0, 1.0);
+              if (progress <= 0) return const SizedBox.shrink();
+              return Align(
+                alignment: AlignmentDirectional(_shownAlignment, 0),
+                child: FractionallySizedBox(
+                  widthFactor: 1 / count,
+                  heightFactor: 1,
+                  child: Transform.scale(
+                    scaleX: 1 + _heldWidthGrowth * progress,
+                    scaleY: 1 + _heldHeightGrowth * progress,
+                    child: ClipRRect(
                       borderRadius: BorderRadius.circular(_pillRadius),
-                      color: Colors.white.withValues(
-                        alpha:
-                            progress *
-                            (Theme.of(context).brightness == Brightness.light
-                                ? 0.24
-                                : 0.08),
-                      ),
-                      border: MornyeTheme.glassOutlinesOf(context)
-                          ? Border.all(
+                      child: LiquidGlassBatch.exclude(
+                        child: MornyeLiquidBackdrop(
+                          borderRadius: BorderRadius.circular(_pillRadius),
+                          clarity: 1,
+                          interaction: true,
+                          progress: progress,
+                          blurSigma: 0,
+                          // A broader bevel makes the held lens visible as it
+                          // crosses the icons, while leaving its center
+                          // undistorted.
+                          refractionDepth: 0.18,
+                          refractionWidth: 18,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(_pillRadius),
                               color: Colors.white.withValues(
-                                alpha: 0.6 * progress,
+                                alpha: progress * (isDark ? 0.08 : 0.24),
                               ),
-                              width: 0.75,
-                            )
-                          : null,
+                              border: outlines
+                                  ? Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.6 * progress,
+                                      ),
+                                      width: 0.75,
+                                    )
+                                  : null,
+                            ),
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+                      ),
                     ),
-                    child: const SizedBox.expand(),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
-      ),
-    ),
-  );
+      );
 }
 
 /// Paint only icons and labels with the sliding selection color. Badge fills
@@ -570,19 +571,28 @@ class _MornyeSelectionForegroundState extends State<MornyeSelectionForeground> {
     late double width;
     late double rowHeight;
     return _SelectionShaderMask(
-      maskIntersects: (bounds) {
+      repaint: scope.repaint,
+      maskIntersects: (box, bounds) {
         // A transparent srcATop source leaves the foreground unchanged.
         if (scope.color.a == 0) return false;
         final row =
-            scope.rowKey.currentContext!.findRenderObject()! as RenderBox;
-        final box = context.findRenderObject()! as RenderBox;
+            scope.rowKey.currentContext?.findRenderObject() as RenderBox?;
+        if (row == null || !row.hasSize) return false;
         width = row.size.width / scope.count;
         rowHeight = row.size.height;
-        final left = (scope.alignment + 1) * (row.size.width - width) / 2;
+        final alignment = scope.rtl
+            ? -scope.readAlignment()
+            : scope.readAlignment();
+        final pressProgress = scope.lensEnabled
+            ? scope.readPress().clamp(0.0, 1.0)
+            : 0.0;
+        final scaleX = 1 + _heldWidthGrowth * pressProgress;
+        final scaleY = 1 + _heldHeightGrowth * pressProgress;
+        final left = (alignment + 1) * (row.size.width - width) / 2;
         final lens = Rect.fromCenter(
           center: Offset(left + width / 2, rowHeight / 2),
-          width: width * scope.scaleX,
-          height: rowHeight * scope.scaleY,
+          width: width * scaleX,
+          height: rowHeight * scaleY,
         );
         local = Rect.fromPoints(
           box.globalToLocal(row.localToGlobal(lens.topLeft)),
@@ -633,16 +643,19 @@ class _MornyeSelectionForegroundState extends State<MornyeSelectionForeground> {
 
 class _SelectionShaderMask extends ShaderMask {
   const _SelectionShaderMask({
+    required this.repaint,
     required this.maskIntersects,
     required super.shaderCallback,
     required super.child,
   }) : super(blendMode: BlendMode.srcATop);
 
-  final bool Function(Rect) maskIntersects;
+  final Listenable repaint;
+  final bool Function(RenderBox box, Rect bounds) maskIntersects;
 
   @override
   RenderShaderMask createRenderObject(BuildContext context) =>
       _SelectionRenderShaderMask(
+        repaint: repaint,
         maskIntersects: maskIntersects,
         shaderCallback: shaderCallback,
       );
@@ -650,23 +663,46 @@ class _SelectionShaderMask extends ShaderMask {
   @override
   void updateRenderObject(BuildContext context, RenderShaderMask renderObject) {
     super.updateRenderObject(context, renderObject);
-    (renderObject as _SelectionRenderShaderMask).maskIntersects =
-        maskIntersects;
+    (renderObject as _SelectionRenderShaderMask)
+      ..repaint = repaint
+      ..maskIntersects = maskIntersects;
   }
 }
 
 class _SelectionRenderShaderMask extends RenderShaderMask {
   _SelectionRenderShaderMask({
+    required Listenable repaint,
     required this.maskIntersects,
     required super.shaderCallback,
-  }) : super(blendMode: BlendMode.srcATop);
+  }) : _repaint = repaint,
+       super(blendMode: BlendMode.srcATop);
 
-  bool Function(Rect) maskIntersects;
+  Listenable _repaint;
+  set repaint(Listenable value) {
+    if (identical(_repaint, value)) return;
+    if (attached) _repaint.removeListener(markNeedsPaint);
+    _repaint = value;
+    if (attached) _repaint.addListener(markNeedsPaint);
+  }
+
+  bool Function(RenderBox box, Rect bounds) maskIntersects;
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _repaint.addListener(markNeedsPaint);
+  }
+
+  @override
+  void detach() {
+    _repaint.removeListener(markNeedsPaint);
+    super.detach();
+  }
 
   @override
   void paint(PaintingContext context, Offset offset) {
     final foreground = child;
-    if (foreground != null && !maskIntersects(foreground.paintBounds)) {
+    if (foreground != null && !maskIntersects(this, foreground.paintBounds)) {
       // Drop any layer retained from a previous intersecting frame.
       layer = null;
       context.paintChild(foreground, offset);
@@ -680,29 +716,33 @@ class _SelectionRenderShaderMask extends RenderShaderMask {
 class _SelectionForegroundScope extends InheritedWidget {
   const _SelectionForegroundScope({
     required this.rowKey,
-    required this.alignment,
+    required this.repaint,
+    required this.rtl,
+    required this.lensEnabled,
+    required this.readAlignment,
+    required this.readPress,
     required this.count,
-    required this.scaleX,
-    required this.scaleY,
     required this.program,
     required this.color,
     required super.child,
   });
 
   final GlobalKey rowKey;
-  final double alignment;
+  final Listenable repaint;
+  final bool rtl;
+  final bool lensEnabled;
+  final double Function() readAlignment;
+  final double Function() readPress;
   final int count;
-  final double scaleX;
-  final double scaleY;
   final ui.FragmentProgram? program;
   final Color color;
 
   @override
   bool updateShouldNotify(_SelectionForegroundScope oldWidget) =>
-      alignment != oldWidget.alignment ||
+      repaint != oldWidget.repaint ||
+      rtl != oldWidget.rtl ||
+      lensEnabled != oldWidget.lensEnabled ||
       count != oldWidget.count ||
-      scaleX != oldWidget.scaleX ||
-      scaleY != oldWidget.scaleY ||
       program != oldWidget.program ||
       color != oldWidget.color ||
       rowKey != oldWidget.rowKey;
