@@ -161,6 +161,7 @@ class PlayableMedia {
     String? unknownTitle,
     String? unknownArtist,
     CoverStore? covers,
+    int? playbackInstance,
   }) {
     final reference = coverReference;
     final stored = resolvedArtwork == null
@@ -200,6 +201,7 @@ class PlayableMedia {
           'format': format!.trim(),
         if (explicit) 'explicit': true,
         if (autoplay) 'autoplay': true,
+        'playbackInstance': ?playbackInstance,
       },
     );
   }

@@ -219,6 +219,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   /// No engine position has arrived since a forced broadcast.
   bool _positionCheckDue = false;
+  bool _hapticsConfiguredActive = false;
   late final PlaybackSessionWriter _sessionWriter;
   int get _sessionQueueRevision => _sessionWriter.queueRevision;
   static const Duration _positionBroadcastInterval = Duration(
@@ -377,17 +378,14 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
   }
 
-  MediaItem _toMediaItem(PlayableMedia media, {String? resolvedSource}) {
-    final item = media.toMediaItem(
-      resolvedSource: resolvedSource,
-      unknownTitle: _runtime.unknownTitle,
-      unknownArtist: _runtime.unknownArtist,
-      covers: _dependencies.coverStore,
-    );
-    return item.copyWith(
-      extras: {...?item.extras, 'playbackInstance': _playbackInstance},
-    );
-  }
+  MediaItem _toMediaItem(PlayableMedia media, {String? resolvedSource}) =>
+      media.toMediaItem(
+        resolvedSource: resolvedSource,
+        unknownTitle: _runtime.unknownTitle,
+        unknownArtist: _runtime.unknownArtist,
+        covers: _dependencies.coverStore,
+        playbackInstance: _playbackInstance,
+      );
 
   void _init() {
     if (_initialized) return;
@@ -496,6 +494,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   /// Haptics follow only decodable local files; streams have no full copy.
   void _updateHaptics() {
     if (_disposed) return;
+    if (!_settings.musicHaptics && !_hapticsConfiguredActive) return;
     final extras = mediaItem.value?.extras;
     final source = extras?['source']?.toString() ?? '';
     final resolved = extras?['resolvedSource']?.toString().trim() ?? '';
@@ -510,6 +509,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         (document || !path.contains('://')) &&
         _settings.musicHaptics &&
         _settings.playerMode == 'internal';
+    _hapticsConfiguredActive = local;
     _haptics.configure(
       sensitivity: _settings.musicHapticsSensitivity,
       strength: _settings.musicHapticsStrength,
@@ -1665,21 +1665,19 @@ class MusicPlayerHandler extends BaseAudioHandler
       return;
     }
     final added = _withoutQueuedDuplicates(items);
-    var at = playNext
-        ? (_index + 1).clamp(0, _media.length)
-        : _autoplay.manualInsertIndex;
-    final queued = <MediaItem>[];
-    for (final item in added) {
-      _media.insert(at, item);
-      final queueItem = _toMediaItem(item);
-      _queueItems.insert(at, queueItem);
-      queued.add(queueItem);
+    if (added.isNotEmpty) {
+      final at = playNext
+          ? (_index + 1).clamp(0, _media.length)
+          : _autoplay.manualInsertIndex;
+      final queued = [for (final item in added) _toMediaItem(item)];
+      _media.insertAll(at, added);
+      _queueItems.insertAll(at, queued);
+      final delta = added.length;
       for (var i = 0; i < _playHistory.length; i++) {
-        if (_playHistory[i] >= at) _playHistory[i]++;
+        if (_playHistory[i] >= at) _playHistory[i] += delta;
       }
-      at++;
+      _rememberEnqueued(queued, playNext: playNext);
     }
-    _rememberEnqueued(queued, playNext: playNext);
     _markSessionQueueChanged();
     queue.add(List<MediaItem>.unmodifiable(_queueItems));
     _broadcastState();
