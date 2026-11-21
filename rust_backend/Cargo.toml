@@ -38,7 +38,7 @@ blowfish = { version = "=0.10.0", features = ["zeroize"] }
 zeroize = "1.8"
 getrandom = "0.4"
 tempfile = "3.27"
-zip = { version = "=9.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "=9.6.0", default-features = false, features = ["deflate-flate2"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["float_roundtrip", "raw_value"] }
 thiserror = "2.0"
@@ -49,7 +49,6 @@ hyper-rustls = { version = "=0.27.10", default-features = false, features = ["ht
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-native-certs = "=0.8.5"
 rustls-platform-verifier = "=0.7.1"
-rustls-pemfile = "2.2"
 http = "1.4"
 http-body-util = "0.1"
 bytes = "1.11"
@@ -60,7 +59,8 @@ tower-service = "0.3"
 hickory-proto = { version = "=0.26.3", default-features = false, features = ["std"] }
 cookie = "0.18"
 url = "2.5"
-regex = "=1.13.1"
+# The lazy DFA stays: without it log redaction runs fifty times slower.
+regex = { version = "=1.13.1", default-features = false, features = ["std", "perf-cache", "perf-dfa", "perf-literal", "unicode-case", "unicode-perl"] }
 scraper = { version = "=0.29.0", default-features = false }
 # Keep the parser compatible with scraper's HtmlTreeSink implementation.
 html5ever = "=0.40.1"
@@ -97,5 +97,26 @@ socket2 = "0.6"
 unsafe_code = "deny"
 
 [profile.release]
-lto = "thin"
+opt-level = "s"
+lto = "fat"
 codegen-units = 1
+
+# Audio and image work is CPU bound and keeps the speed level: the Direct USB
+# resampler runs six times slower at "s". Costs about 0.4 MB on Android.
+[profile.release.package.mornye-mobile]
+opt-level = 3
+
+[profile.release.package.mornye-core]
+opt-level = 3
+
+[profile.release.package.claxon]
+opt-level = 3
+
+[profile.release.package.image]
+opt-level = 3
+
+[profile.release.package.zune-jpeg]
+opt-level = 3
+
+[profile.release.package.png]
+opt-level = 3

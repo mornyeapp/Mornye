@@ -143,8 +143,11 @@ impl NetworkService {
     }
 
     pub fn with_options(options: NetworkOptions) -> io::Result<Arc<Self>> {
-        let roots = rustls_pemfile::certs(&mut options.extra_root_pem.as_slice())
-            .collect::<Result<Vec<_>, _>>()?;
+        use rustls::pki_types::CertificateDer;
+        use rustls::pki_types::pem::PemObject;
+        let roots = CertificateDer::pem_slice_iter(&options.extra_root_pem)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(io::Error::other)?;
         if !options.extra_root_pem.is_empty() && roots.is_empty() {
             return Err(io::Error::other("no certificates in extra root PEM"));
         }

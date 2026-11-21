@@ -1,5 +1,6 @@
 use rustls::ClientConfig;
 use rustls::pki_types::CertificateDer;
+use rustls::pki_types::pem::PemObject;
 use std::io;
 use std::sync::Arc;
 
@@ -8,8 +9,9 @@ pub(crate) fn configuration(extra_roots: &[CertificateDer<'static>]) -> io::Resu
     let builder = ClientConfig::builder_with_provider(Arc::clone(&provider))
         .with_safe_default_protocol_versions()
         .map_err(io::Error::other)?;
-    let supplemental = rustls_pemfile::certs(&mut include_bytes!("roots.pem").as_slice())
-        .collect::<Result<Vec<_>, _>>()?;
+    let supplemental = CertificateDer::pem_slice_iter(include_bytes!("roots.pem"))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(io::Error::other)?;
 
     #[cfg(target_vendor = "apple")]
     let builder = {
@@ -39,7 +41,7 @@ pub(crate) fn configuration(extra_roots: &[CertificateDer<'static>]) -> io::Resu
                     for entry in entries.flatten() {
                         if let Ok(pem) = std::fs::read(entry.path()) {
                             roots.add_parsable_certificates(
-                                rustls_pemfile::certs(&mut pem.as_slice()).flatten(),
+                                CertificateDer::pem_slice_iter(&pem).flatten(),
                             );
                         }
                     }
