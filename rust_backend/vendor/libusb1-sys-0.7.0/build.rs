@@ -155,7 +155,7 @@ fn make_source() {
         base_config.define("HAVE_CLOCK_GETTIME", Some("1"));
         base_config.define(
             "DEFAULT_VISIBILITY",
-            Some("__attribute__((visibility(\"default\")))"),
+            Some("__attribute__((visibility(\"hidden\")))"),
         );
 
         if let Ok(lib) = pkg_config::probe_library("libudev") {

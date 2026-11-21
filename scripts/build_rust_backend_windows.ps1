@@ -31,11 +31,25 @@ $targetDir = Join-Path $rustBackendDir 'target'
 Push-Location $rustBackendDir
 try {
     $env:CARGO_TARGET_DIR = $targetDir
-
+    $env:CFLAGS = (($env:CFLAGS, '/Gy', '/Gw') | Where-Object { $_ }) -join ' '
+    $env:LIBSQLITE3_FLAGS = (($env:LIBSQLITE3_FLAGS,
+        '-USQLITE_ENABLE_FTS3',
+        '-USQLITE_ENABLE_FTS3_PARENTHESIS',
+        '-USQLITE_ENABLE_RTREE',
+        '-USQLITE_ENABLE_MATH_FUNCTIONS',
+        '-DSQLITE_OMIT_LOAD_EXTENSION',
+        '-DSQLITE_OMIT_DEPRECATED',
+        '-DSQLITE_OMIT_UTF16',
+        '-DSQLITE_OMIT_GET_TABLE',
+        '-DSQLITE_OMIT_SHARED_CACHE',
+        '-DSQLITE_OMIT_COMPLETE',
+        '-DSQLITE_OMIT_TCL_VARIABLE') | Where-Object { $_ }) -join ' '
     rustup target add $Target
     if ($LASTEXITCODE -ne 0) { throw "rustup target add $Target failed." }
 
-    cargo build --locked --release -p mornye-desktop --target $Target
+    cargo rustc --locked --release -p mornye-desktop --lib --target $Target -- `
+        -C link-arg=/OPT:REF `
+        -C link-arg=/OPT:ICF
     if ($LASTEXITCODE -ne 0) { throw "Building mornye-desktop for $Target failed." }
 
     $arch = if ($Target -eq 'aarch64-pc-windows-msvc') { 'arm64' } else { 'x64' }

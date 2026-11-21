@@ -27,6 +27,10 @@ fi
 
 cd "$RUST_BACKEND_DIR"
 export CARGO_TARGET_DIR="$RUST_BACKEND_DIR/target"
+# Trim unused subsystems from the bundled SQLite on every platform, while
+# preserving FTS5/trigram, JSON1, WAL, and triggers.
+BUNDLED_SQLITE_FLAGS="-USQLITE_ENABLE_FTS3 -USQLITE_ENABLE_FTS3_PARENTHESIS -USQLITE_ENABLE_RTREE -USQLITE_ENABLE_MATH_FUNCTIONS -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_OMIT_DEPRECATED -DSQLITE_OMIT_UTF16 -DSQLITE_OMIT_GET_TABLE -DSQLITE_OMIT_SHARED_CACHE -DSQLITE_OMIT_COMPLETE -DSQLITE_OMIT_TCL_VARIABLE"
+export LIBSQLITE3_FLAGS="${LIBSQLITE3_FLAGS:-} $BUNDLED_SQLITE_FLAGS"
 # AES 0.9 detects ARM64 AES at runtime and retains the software fallback;
 # do not force target-feature=+aes on Android.
 
@@ -50,28 +54,52 @@ if [[ "$PLATFORM" == "desktop" ]]; then
       # its own; naming it here also keeps Xcode and command line builds on
       # one Cargo cache.
       export SDKROOT="${SDKROOT:-$(xcrun --sdk macosx --show-sdk-path)}"
+      MACOS_ARCH="${MORNYE_MACOS_ARCH:-universal}"
+      case "$MACOS_ARCH" in
+        arm64) MACOS_TARGETS=(aarch64-apple-darwin) ;;
+        x86_64|x64) MACOS_TARGETS=(x86_64-apple-darwin) ;;
+        universal) MACOS_TARGETS=(aarch64-apple-darwin x86_64-apple-darwin) ;;
+        *)
+          echo "Error: MORNYE_MACOS_ARCH must be arm64, x86_64, x64, or universal." >&2
+          exit 1
+          ;;
+      esac
       DESKTOP_DIR="$CARGO_TARGET_DIR/desktop/macos"
-      rustup target add aarch64-apple-darwin x86_64-apple-darwin
-      for target in aarch64-apple-darwin x86_64-apple-darwin; do
-        cargo build --locked --release -p mornye-desktop --target "$target"
+      export CFLAGS_aarch64_apple_darwin="${CFLAGS_aarch64_apple_darwin:-} -fvisibility=hidden"
+      export CFLAGS_x86_64_apple_darwin="${CFLAGS_x86_64_apple_darwin:-} -fvisibility=hidden"
+      rustup target add "${MACOS_TARGETS[@]}"
+      for target in "${MACOS_TARGETS[@]}"; do
+        cargo rustc --locked --release -p mornye-desktop --lib --target "$target" -- \
+          -C link-arg=-Wl,-dead_strip
       done
       mkdir -p "$DESKTOP_DIR"
-      xcrun lipo -create \
-        "$CARGO_TARGET_DIR/aarch64-apple-darwin/release/libmornye_desktop.dylib" \
-        "$CARGO_TARGET_DIR/x86_64-apple-darwin/release/libmornye_desktop.dylib" \
-        -output "$DESKTOP_DIR/libmornye_desktop.dylib"
+      if [[ "${#MACOS_TARGETS[@]}" -eq 1 ]]; then
+        cp "$CARGO_TARGET_DIR/${MACOS_TARGETS[0]}/release/libmornye_desktop.dylib" \
+          "$DESKTOP_DIR/libmornye_desktop.dylib"
+      else
+        xcrun lipo -create \
+          "$CARGO_TARGET_DIR/aarch64-apple-darwin/release/libmornye_desktop.dylib" \
+          "$CARGO_TARGET_DIR/x86_64-apple-darwin/release/libmornye_desktop.dylib" \
+          -output "$DESKTOP_DIR/libmornye_desktop.dylib"
+      fi
       # Load by rpath from the app bundle's Frameworks directory.
       install_name_tool -id "@rpath/libmornye_desktop.dylib" \
         "$DESKTOP_DIR/libmornye_desktop.dylib"
-      # install_name_tool drops the linker's ad hoc signature, and arm64
-      # refuses unsigned code. The app build re-signs with its identity.
+      # Strip local symbols from the shipped dylib before ad hoc signing.
+      xcrun strip -x "$DESKTOP_DIR/libmornye_desktop.dylib"
+      # install_name_tool and strip drop the linker's ad hoc signature, and
+      # arm64 refuses unsigned code. The app build re-signs with its identity.
       codesign --force --sign - "$DESKTOP_DIR/libmornye_desktop.dylib"
       ;;
     Linux)
       DESKTOP_DIR="$CARGO_TARGET_DIR/desktop/linux"
-      cargo build --locked --release -p mornye-desktop
+      export CFLAGS="${CFLAGS:-} -fvisibility=hidden"
+      cargo rustc --locked --release -p mornye-desktop --lib -- \
+        -C link-arg=-Wl,--gc-sections \
+        -C link-arg=-Wl,-O2
       mkdir -p "$DESKTOP_DIR"
       cp "$CARGO_TARGET_DIR/release/libmornye_desktop.so" "$DESKTOP_DIR/"
+      strip --strip-unneeded "$DESKTOP_DIR/libmornye_desktop.so"
       ;;
     *) echo "Error: use macOS or Linux for desktop builds (Windows: scripts/build_rust_backend_windows.ps1)." >&2; exit 1 ;;
   esac
@@ -147,12 +175,16 @@ if [[ "$PLATFORM" == "android" ]]; then
   done
 
   rustup target add "${ANDROID_TARGETS[@]}"
-  # Align ELF segments for 16 KB pages and pack relocations (Android API 23+).
+  export CFLAGS_aarch64_linux_android="${CFLAGS_aarch64_linux_android:-} -Os -fvisibility=hidden -ffunction-sections -fdata-sections"
+  export CFLAGS_armv7_linux_androideabi="${CFLAGS_armv7_linux_androideabi:-} -Os -fvisibility=hidden -ffunction-sections -fdata-sections"
+  # Align ELF segments for 16 KB pages, pack relocations (Android API 23+),
+  # and fold identical functions whose addresses are not significant.
   # Keep APS2 rather than RELR, which requires API 28; our minimum is API 24.
-  # Fold only identical functions whose addresses are not significant.
-  export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,--pack-dyn-relocs=android -C link-arg=-Wl,--icf=safe"
   for target in "${ANDROID_TARGETS[@]}"; do
-    cargo build --locked --release -p mornye-mobile --target "$target"
+    cargo rustc --locked --release -p mornye-mobile --lib --target "$target" -- \
+      -C link-arg=-Wl,-z,max-page-size=16384 \
+      -C link-arg=-Wl,--pack-dyn-relocs=android \
+      -C link-arg=-Wl,--icf=safe
     case "$target" in
       aarch64-linux-android) ABI="arm64-v8a" ;;
       armv7-linux-androideabi) ABI="armeabi-v7a" ;;
@@ -168,6 +200,9 @@ elif [[ "$PLATFORM" == "ios" ]]; then
   fi
   rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
   export IPHONEOS_DEPLOYMENT_TARGET=16.0
+  export CFLAGS_aarch64_apple_ios="${CFLAGS_aarch64_apple_ios:-} -fvisibility=hidden"
+  export CFLAGS_aarch64_apple_ios_sim="${CFLAGS_aarch64_apple_ios_sim:-} -fvisibility=hidden"
+  export CFLAGS_x86_64_apple_ios="${CFLAGS_x86_64_apple_ios:-} -fvisibility=hidden"
   export BINDGEN_EXTRA_CLANG_ARGS_aarch64_apple_ios="-isysroot \"$(xcrun --sdk iphoneos --show-sdk-path)\" --target=arm64-apple-ios16.0"
   export BINDGEN_EXTRA_CLANG_ARGS_aarch64_apple_ios_sim="-isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\" --target=arm64-apple-ios16.0-simulator"
   export BINDGEN_EXTRA_CLANG_ARGS_x86_64_apple_ios="-isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\" --target=x86_64-apple-ios16.0-simulator"
