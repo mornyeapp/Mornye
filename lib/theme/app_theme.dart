@@ -50,6 +50,7 @@ class AppTheme {
       navigationBarTheme: _navigationBarTheme(scheme),
       snackBarTheme: _snackBarTheme(scheme, family),
       progressIndicatorTheme: _progressIndicatorTheme(scheme),
+      sliderTheme: _sliderTheme(scheme),
       switchTheme: _switchTheme(scheme),
       chipTheme: _chipTheme(scheme),
       popupMenuTheme: _popupMenuTheme(scheme),
@@ -102,6 +103,7 @@ class AppTheme {
       navigationBarTheme: _navigationBarTheme(scheme, isAmoled: isAmoled),
       snackBarTheme: _snackBarTheme(scheme, family),
       progressIndicatorTheme: _progressIndicatorTheme(scheme),
+      sliderTheme: _sliderTheme(scheme),
       switchTheme: _switchTheme(scheme),
       chipTheme: _chipTheme(scheme),
       popupMenuTheme: _popupMenuTheme(scheme),
@@ -319,6 +321,12 @@ class AppTheme {
     color: scheme.primary,
     linearTrackColor: scheme.surfaceContainerHighest,
     circularTrackColor: scheme.surfaceContainerHighest,
+  );
+
+  static SliderThemeData _sliderTheme(ColorScheme scheme) => SliderThemeData(
+    activeTrackColor: scheme.primary,
+    inactiveTrackColor: scheme.secondaryContainer,
+    thumbColor: scheme.primary,
   );
 
   static SwitchThemeData _switchTheme(ColorScheme scheme) => SwitchThemeData(

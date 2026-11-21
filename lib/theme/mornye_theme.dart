@@ -267,7 +267,9 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
           primaryContainer: grouped,
           onPrimaryContainer: accent,
           secondary: accent,
-          onSecondary: Colors.white,
+          onSecondary: accent.computeLuminance() < 0.179
+              ? Colors.white
+              : Colors.black,
           secondaryContainer: grouped,
           onSecondaryContainer: foreground,
           surface: surface,

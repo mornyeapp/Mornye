@@ -207,6 +207,8 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
   static ThemeData _scopedTheme(ThemeData base, ColorScheme scheme) {
     final appBar = base.appBarTheme;
     final progress = base.progressIndicatorTheme;
+    final navBar = base.navigationBarTheme;
+    final slider = base.sliderTheme;
     return base.copyWith(
       colorScheme: scheme,
       canvasColor: scheme.surface,
@@ -219,6 +221,23 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
         titleTextStyle: appBar.titleTextStyle?.copyWith(
           color: scheme.onSurface,
         ),
+      ),
+      navigationBarTheme: navBar.copyWith(
+        backgroundColor: navBar.backgroundColor == null
+            ? null
+            : scheme.surfaceContainer,
+        indicatorColor: navBar.indicatorColor == null
+            ? null
+            : scheme.secondaryContainer,
+      ),
+      sliderTheme: slider.copyWith(
+        activeTrackColor: slider.activeTrackColor == null
+            ? null
+            : scheme.primary,
+        inactiveTrackColor: slider.inactiveTrackColor == null
+            ? null
+            : scheme.secondaryContainer,
+        thumbColor: slider.thumbColor == null ? null : scheme.primary,
       ),
       progressIndicatorTheme: progress.copyWith(
         color: progress.color == null ? null : scheme.primary,
