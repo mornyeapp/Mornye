@@ -6,13 +6,16 @@
 //! contract.
 
 mod cancellation;
+#[cfg(feature = "uniffi")]
 mod cast;
 mod data_jobs;
 mod extensions;
 mod ffmpeg;
 mod filename;
 mod hires;
+#[cfg(feature = "uniffi")]
 mod library_metadata;
+#[cfg(feature = "uniffi")]
 mod link;
 mod logging;
 mod lyrics;
@@ -35,8 +38,10 @@ mod network_tags;
 mod progress;
 mod repository;
 mod tags;
+#[cfg(feature = "uniffi")]
 mod usb_audio;
 
+#[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
 
 // Plain Rust surface for the desktop C ABI crate (`crates/desktop`), which
@@ -54,7 +59,7 @@ pub use progress::{DownloadProgressSubscription, DownloadState};
 pub use repository::ExtensionRepository;
 pub use tags::read_file_metadata;
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 pub fn sanitize_filename(filename: String) -> String {
     mornye_core::filename::sanitize_filename(&filename)
 }

@@ -107,6 +107,7 @@ impl Song {
 
     /// Bit rate in kbps: the exported value, else estimated from size and
     /// duration.
+    #[cfg(any(feature = "transcode", test))]
     pub(crate) fn source_kbps(&self) -> Option<u32> {
         self.bit_rate.or_else(|| {
             let size = self.size?;

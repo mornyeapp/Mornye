@@ -6,14 +6,15 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{fs::File, io::Read, sync::Arc};
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-#[uniffi(flat_error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", uniffi(flat_error))]
 pub enum NativeDataJobError {
     #[error("{0}")]
     Operation(String),
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 pub fn run_native_data_job(
     request_json: String,
     bytes: Vec<u8>,
@@ -22,7 +23,7 @@ pub fn run_native_data_job(
     run(&request_json, &bytes, lease.as_deref(), None)
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl ExtensionManager {
     pub fn run_native_data_job(
         &self,

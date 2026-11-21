@@ -12,7 +12,7 @@ name = "mornye_desktop"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-mornye-mobile = { path = "../mobile" }
+mornye-mobile = { path = "../mobile", default-features = false }
 mornye-link.workspace = true
 mornye-cast.workspace = true
 chrono.workspace = true

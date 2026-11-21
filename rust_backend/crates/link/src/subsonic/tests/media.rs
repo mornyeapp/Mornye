@@ -1,5 +1,6 @@
 use super::*;
 use crate::subsonic::media::{ByteRange, Codec, Transcode, ffmpeg_args, parse_range, plan};
+#[cfg(feature = "transcode")]
 use std::time::{Duration, Instant};
 
 fn catalog_with(extra: Value) -> Catalog {
@@ -22,6 +23,7 @@ fn decide(
         .map(|plan| (plan.codec, plan.kbps, plan.offset_secs))
 }
 
+#[cfg(feature = "transcode")]
 fn which_ffmpeg() -> Option<PathBuf> {
     let output = std::process::Command::new("which")
         .arg("ffmpeg")
@@ -33,6 +35,7 @@ fn which_ffmpeg() -> Option<PathBuf> {
 }
 
 /// A sine WAV of `seconds` at `rate` Hz.
+#[cfg(feature = "transcode")]
 fn sine_wav(ffmpeg: &Path, path: &Path, seconds: u32, rate: u32) {
     let status = std::process::Command::new(ffmpeg)
         .args(["-nostdin", "-loglevel", "error", "-f", "lavfi", "-i"])
@@ -309,6 +312,7 @@ async fn transcode_requests_fall_back_to_the_file_without_ffmpeg() {
     }
 }
 
+#[cfg(feature = "transcode")]
 #[tokio::test]
 async fn transcodes_with_ffmpeg_when_available() {
     let Some(ffmpeg) = which_ffmpeg() else {
@@ -366,6 +370,7 @@ async fn transcodes_with_ffmpeg_when_available() {
     assert_eq!(raw.header("content-type"), Some("audio/wav"));
 }
 
+#[cfg(feature = "transcode")]
 #[tokio::test]
 async fn dropping_a_transcode_body_stops_ffmpeg() {
     let Some(ffmpeg) = which_ffmpeg() else {

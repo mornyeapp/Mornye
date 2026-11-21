@@ -3,7 +3,7 @@ use crate::manager::{ExtensionManager, ExtensionManagerError};
 use mornye_extensions::backend::LyricsRequest as CoreRequest;
 use std::sync::Arc;
 
-#[derive(uniffi::Record)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct LyricsRequest {
     pub spotify_id: String,
     pub track: String,
@@ -35,7 +35,7 @@ fn check(lease: &Option<Arc<RequestLease>>) -> Result<(), String> {
 
 /// Lyrics use the installed manager's root/cache. Native file access shares
 /// environment grants; the caller retains platform access through this call.
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl ExtensionManager {
     pub fn embed_lyrics_to_file(
         &self,

@@ -3,8 +3,9 @@ use mornye_core::downloads::DownloadState as CoreState;
 use mornye_core::progress::{ProgressError, ProgressSubscription};
 use std::sync::Arc;
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-#[uniffi(flat_error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", uniffi(flat_error))]
 pub enum DownloadProgressError {
     #[error("download progress registry closed")]
     Closed,
@@ -22,14 +23,14 @@ impl From<ProgressError> for DownloadProgressError {
 }
 
 /// Share one instance between the native download manager and its listeners.
-#[derive(uniffi::Object)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct DownloadState {
     pub(crate) inner: Arc<CoreState>,
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl DownloadState {
-    #[uniffi::constructor]
+    #[cfg_attr(feature = "uniffi", uniffi::constructor)]
     pub fn new() -> Self {
         Self {
             inner: Arc::new(CoreState::default()),
@@ -214,12 +215,12 @@ mod tests {
     }
 }
 
-#[derive(uniffi::Object)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct DownloadProgressSubscription {
     inner: ProgressSubscription,
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl DownloadProgressSubscription {
     pub fn wait_delta(&self, since: i64, timeout_ms: i64) -> Result<String, DownloadProgressError> {
         self.inner.wait_delta(since, timeout_ms).map_err(Into::into)

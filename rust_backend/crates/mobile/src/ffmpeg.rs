@@ -1,8 +1,9 @@
 use mornye_extensions::ffmpeg::{CommandRegistry, CommandResult, RegistryClosed};
 use std::sync::Arc;
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-#[uniffi(flat_error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", uniffi(flat_error))]
 pub enum FfmpegError {
     #[error("FFmpeg command registry closed")]
     Closed,
@@ -15,12 +16,12 @@ impl From<RegistryClosed> for FfmpegError {
 }
 
 /// All handles returned by one environment refer to its single command queue.
-#[derive(uniffi::Object)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct FfmpegCommands {
     pub(crate) inner: Arc<CommandRegistry>,
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl FfmpegCommands {
     pub fn wait_pending(&self, timeout_ms: i64) -> Result<String, FfmpegError> {
         self.inner.wait_pending_json(timeout_ms).map_err(Into::into)

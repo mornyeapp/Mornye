@@ -1,12 +1,17 @@
 //! `stream` and `download`: the original file with single-range support, or
 //! an ffmpeg transcode piped as a chunked body.
 
+#[cfg(feature = "transcode")]
+use super::number;
 use super::objects::content_type;
-use super::{Failure, number, required};
+use super::{Failure, required};
 use crate::catalog::{Catalog, Song};
 use crate::source::{self, Lease, OpenError, Readable};
 use crate::types::{Body, HttpResponse, Shared, SubsonicRequest, full};
 use bytes::Bytes;
+#[cfg(not(feature = "transcode"))]
+use futures_util::TryStreamExt;
+#[cfg(feature = "transcode")]
 use futures_util::{Stream, StreamExt, TryStreamExt};
 use http::header::{
     ACCEPT_RANGES, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE, HeaderName,
@@ -15,15 +20,20 @@ use http::header::{
 use http::{HeaderMap, Response};
 use http_body_util::{BodyExt, StreamBody};
 use hyper::body::Frame;
+#[cfg(any(feature = "transcode", test))]
 use std::ffi::OsString;
 use std::io::SeekFrom;
 use std::path::Path;
 use std::pin::Pin;
+#[cfg(feature = "transcode")]
 use std::process::Stdio;
+#[cfg(feature = "transcode")]
 use std::sync::Mutex;
 use std::task::{Context, Poll};
+#[cfg(feature = "transcode")]
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeekExt, ReadBuf};
+#[cfg(feature = "transcode")]
 use tokio::process::{Child, ChildStdout, Command};
 use tokio_util::io::ReaderStream;
 
@@ -31,8 +41,10 @@ use tokio_util::io::ReaderStream;
 const CHUNK: usize = 64 * 1024;
 /// How long ffmpeg may take to produce its first bytes before the original
 /// file is served instead.
+#[cfg(feature = "transcode")]
 const FIRST_CHUNK_TIMEOUT: Duration = Duration::from_secs(20);
 /// Sources whose bit rate exceeds any lossy cap even when unknown.
+#[cfg_attr(not(feature = "transcode"), allow(dead_code))]
 const LOSSLESS: &[&str] = &[
     "flac", "wav", "aif", "aiff", "aifc", "alac", "ape", "wv", "dsf", "dff", "tta",
 ];
@@ -43,18 +55,21 @@ pub(super) async fn stream(
     request: &SubsonicRequest,
 ) -> Result<HttpResponse, Failure> {
     let song = song(catalog, request)?;
-    let plan = plan(
-        song,
-        request.param("format"),
-        number::<u32>(request, "maxBitRate"),
-        number::<f64>(request, "timeOffset"),
-    );
-    // ffmpeg opens the path itself, which it cannot do for a lent file.
-    if let (Some(plan), Some(ffmpeg)) = (plan, &shared.config.ffmpeg_path)
-        && !source::needs_app(&song.path)
-        && let Some(response) = transcode(ffmpeg, &song.path, &plan).await
+    #[cfg(feature = "transcode")]
     {
-        return Ok(response);
+        let plan = plan(
+            song,
+            request.param("format"),
+            number::<u32>(request, "maxBitRate"),
+            number::<f64>(request, "timeOffset"),
+        );
+        // ffmpeg opens the path itself, which it cannot do for a lent file.
+        if let (Some(plan), Some(ffmpeg)) = (plan, &shared.config.ffmpeg_path)
+            && !source::needs_app(&song.path)
+            && let Some(response) = transcode(ffmpeg, &song.path, &plan).await
+        {
+            return Ok(response);
+        }
     }
     file_response(
         shared,
@@ -232,6 +247,7 @@ pub(super) fn parse_range(header: &str, len: u64) -> ByteRange {
 }
 
 /// Transcode targets.
+#[cfg(any(feature = "transcode", test))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Codec {
     Mp3,
@@ -239,6 +255,7 @@ pub(super) enum Codec {
     Aac,
 }
 
+#[cfg(any(feature = "transcode", test))]
 impl Codec {
     fn parse(format: &str) -> Option<Self> {
         match format.trim().to_ascii_lowercase().as_str() {
@@ -265,6 +282,7 @@ impl Codec {
         }
     }
 
+    #[cfg(feature = "transcode")]
     pub(super) fn content_type(self) -> &'static str {
         match self {
             Self::Mp3 => "audio/mpeg",
@@ -299,6 +317,7 @@ impl Codec {
 }
 
 /// A transcode to run instead of serving the file.
+#[cfg(any(feature = "transcode", test))]
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct Transcode {
     pub(super) codec: Codec,
@@ -309,6 +328,7 @@ pub(super) struct Transcode {
 /// Decides whether `stream` transcodes: `format=mp3|opus|aac` (unless the
 /// source already is that codec within the cap), or `maxBitRate` below the
 /// source bit rate (to MP3). `format=raw` never transcodes.
+#[cfg(any(feature = "transcode", test))]
 pub(super) fn plan(
     song: &Song,
     format: Option<&str>,
@@ -346,6 +366,7 @@ pub(super) fn plan(
 }
 
 /// ffmpeg arguments that write `plan` to stdout.
+#[cfg(any(feature = "transcode", test))]
 pub(super) fn ffmpeg_args(input: &Path, plan: &Transcode) -> Vec<OsString> {
     let mut args: Vec<OsString> = ["-nostdin", "-hide_banner", "-loglevel", "error"]
         .into_iter()
@@ -382,6 +403,7 @@ pub(super) fn ffmpeg_args(input: &Path, plan: &Transcode) -> Vec<OsString> {
 
 /// Starts ffmpeg and answers once it produced its first bytes; `None` when
 /// it cannot start or fails before writing, so the caller serves the file.
+#[cfg(feature = "transcode")]
 async fn transcode(ffmpeg: &Path, input: &Path, plan: &Transcode) -> Option<HttpResponse> {
     let mut child = Command::new(ffmpeg)
         .args(ffmpeg_args(input, plan))
@@ -411,6 +433,7 @@ async fn transcode(ffmpeg: &Path, input: &Path, plan: &Transcode) -> Option<Http
 
 /// ffmpeg's stdout. Dropping it (the client went away or the body ended)
 /// drops the child, which `kill_on_drop` terminates.
+#[cfg(feature = "transcode")]
 struct TranscodeStream {
     first: Option<Bytes>,
     stream: ReaderStream<ChildStdout>,
@@ -419,6 +442,7 @@ struct TranscodeStream {
     _child: Mutex<Child>,
 }
 
+#[cfg(feature = "transcode")]
 impl Stream for TranscodeStream {
     type Item = std::io::Result<Bytes>;
 

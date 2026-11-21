@@ -9,8 +9,9 @@ use mornye_extensions::manager::ManagerError;
 use std::path::Path;
 use std::sync::Arc;
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-#[uniffi(flat_error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", uniffi(flat_error))]
 pub enum ExtensionManagerError {
     #[error("{0}")]
     Operation(String),
@@ -24,14 +25,14 @@ impl From<ManagerError> for ExtensionManagerError {
 
 /// Owns installed source, data, and JavaScript workers. Use a background native
 /// thread for operations that read packages or run extension code.
-#[derive(uniffi::Object)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct ExtensionManager {
     pub(crate) inner: CoreManager,
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl ExtensionManager {
-    #[uniffi::constructor]
+    #[cfg_attr(feature = "uniffi", uniffi::constructor)]
     pub fn new(
         source_directory: String,
         data_directory: String,
@@ -50,7 +51,7 @@ impl ExtensionManager {
         )
     }
 
-    #[uniffi::constructor]
+    #[cfg_attr(feature = "uniffi", uniffi::constructor)]
     pub fn with_lyrics_settings(
         source_directory: String,
         data_directory: String,

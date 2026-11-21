@@ -1,14 +1,15 @@
 use mornye_core::cancellation as core;
 use std::sync::Arc;
 
-#[derive(uniffi::Enum)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 pub enum CancellationDomain {
     Download,
     ExtensionRequest,
 }
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-#[uniffi(flat_error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", uniffi(flat_error))]
 pub enum CancellationError {
     #[error("download cancelled")]
     DownloadCancelled,
@@ -31,14 +32,14 @@ impl From<core::CancellationError> for CancellationError {
     }
 }
 
-#[derive(uniffi::Object)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct CancellationRegistry {
     inner: core::CancellationRegistry,
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl CancellationRegistry {
-    #[uniffi::constructor]
+    #[cfg_attr(feature = "uniffi", uniffi::constructor)]
     pub fn new(domain: CancellationDomain) -> Self {
         let domain = match domain {
             CancellationDomain::Download => core::CancellationDomain::Download,
@@ -68,12 +69,12 @@ impl CancellationRegistry {
     }
 }
 
-#[derive(uniffi::Object)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct RequestLease {
     pub(crate) inner: Arc<core::RequestLease>,
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl RequestLease {
     pub fn is_cancelled(&self) -> Result<bool, CancellationError> {
         self.inner.is_cancelled().map_err(Into::into)

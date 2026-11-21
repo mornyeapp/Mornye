@@ -1,17 +1,20 @@
+#[cfg(feature = "uniffi")]
 use crate::cancellation::RequestLease;
+use mornye_extensions::ExtensionError;
 use mornye_extensions::environment::{EnvironmentError, ExtensionEnvironment as CoreEnvironment};
-use mornye_extensions::{ExtensionError, ExtensionRuntime, RuntimeLimits};
+#[cfg(feature = "uniffi")]
+use mornye_extensions::{ExtensionRuntime, RuntimeLimits};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 /// Keeps operation directories accessible until native finalization finishes.
 /// Explicit close and object destruction both release only these grants.
-#[derive(uniffi::Object)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct DownloadDirectoryScope {
     grants: Mutex<Option<Vec<mornye_extensions::files::TemporaryGrant>>>,
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl DownloadDirectoryScope {
     pub fn release(&self) {
         self.grants
@@ -21,8 +24,9 @@ impl DownloadDirectoryScope {
     }
 }
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-#[uniffi(flat_error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", uniffi(flat_error))]
 pub enum JsExtensionError {
     #[error("extension runtime closed")]
     Closed,
@@ -89,11 +93,13 @@ impl From<ExtensionError> for JsExtensionError {
 /// Standalone runtime for a single extension script. Used by instrumentation
 /// tests; the app routes through `ExtensionManager`. Calls must run off the UI
 /// thread.
+#[cfg(feature = "uniffi")]
 #[derive(uniffi::Object)]
 pub struct JsExtension {
     inner: Arc<ExtensionRuntime>,
 }
 
+#[cfg(feature = "uniffi")]
 #[uniffi::export]
 impl JsExtension {
     pub fn download_state(&self) -> Arc<crate::progress::DownloadState> {
@@ -135,12 +141,12 @@ impl JsExtension {
     }
 }
 
-#[derive(uniffi::Object)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct ExtensionEnvironment {
     pub(crate) inner: Arc<CoreEnvironment>,
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl ExtensionEnvironment {
     pub fn log_buffer(&self) -> Arc<crate::logging::LogBuffer> {
         Arc::new(crate::logging::LogBuffer {
@@ -160,7 +166,7 @@ impl ExtensionEnvironment {
         })
     }
 
-    #[uniffi::constructor]
+    #[cfg_attr(feature = "uniffi", uniffi::constructor)]
     pub fn new(
         data_directory: String,
         master_key: String,

@@ -3,8 +3,9 @@ use mornye_extensions::repository::{ExtensionRepository as CoreRepository, Repos
 use std::path::Path;
 use std::sync::Arc;
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-#[uniffi(flat_error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", uniffi(flat_error))]
 pub enum ExtensionRepositoryError {
     #[error("{0}")]
     Operation(String),
@@ -18,15 +19,15 @@ impl From<RepositoryError> for ExtensionRepositoryError {
 
 /// Retains the manager for current installed versions and shares its network
 /// policy. Registry and package IO must run on a native background thread.
-#[derive(uniffi::Object)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct ExtensionRepository {
     inner: CoreRepository,
     manager: Arc<ExtensionManager>,
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl ExtensionRepository {
-    #[uniffi::constructor]
+    #[cfg_attr(feature = "uniffi", uniffi::constructor)]
     pub fn new(
         manager: Arc<ExtensionManager>,
         cache_directory: String,

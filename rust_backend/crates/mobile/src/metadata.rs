@@ -13,7 +13,7 @@ fn check(lease: &Option<Arc<RequestLease>>) -> Result<(), String> {
 
 /// Metadata, platform resolution and installed extensions share one root.
 /// Run network operations on a native background thread and retain any lease.
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl ExtensionManager {
     pub fn handle_url_json(&self, url: String) -> Result<String, ExtensionManagerError> {
         self.inner

@@ -3,8 +3,9 @@ use crate::tags::{check_lease, open_audio_file};
 use mornye_core::media::hires::{self, HiResCheckOptions};
 use std::sync::Arc;
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-#[uniffi(flat_error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", uniffi(flat_error))]
 pub enum HiResCheckError {
     #[error("{message}")]
     Failed { message: String },
@@ -26,7 +27,7 @@ impl From<String> for HiResCheckError {
 /// integrity, real bit depth and any trace of a lossy source.
 /// With `verify_replacement_path`, bypasses sampled analysis and compares the
 /// entire decoded PCM stream, returning only `replacement_equivalent`.
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 pub fn check_hires_authenticity(
     path: String,
     options_json: String,

@@ -8,8 +8,9 @@ use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
 use std::sync::Arc;
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-#[uniffi(flat_error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", uniffi(flat_error))]
 pub enum AudioTagsError {
     #[error("{message}")]
     Read { message: String },
@@ -21,7 +22,7 @@ impl From<String> for AudioTagsError {
     }
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl ExtensionManager {
     pub fn set_library_cover_cache_directory(
         &self,
@@ -299,7 +300,7 @@ fn decode_fields(json: &str) -> Result<BTreeMap<String, String>, String> {
 /// Complete application metadata. An empty hint is equivalent to the legacy
 /// ReadFileMetadata call. Native callers retain ownership of any platform
 /// descriptor referenced by `path` until this synchronous operation returns.
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 pub fn read_file_metadata(
     path: String,
     hint: String,
