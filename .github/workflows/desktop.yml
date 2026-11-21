@@ -100,7 +100,9 @@ jobs:
           restore-keys: pub-${{ runner.os }}-
 
       - name: Get Flutter dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          dart scripts/gen_l10n.dart
 
       - name: Prepare and test Flutter framework patch
         run: |
@@ -181,9 +183,9 @@ jobs:
           # dependency; asking for it first lets apt replace the LLVM one.
           sudo apt-get install -y libunwind-dev
           sudo apt-get install -y \
-            clang cmake ninja-build pkg-config zip \
+            clang cmake ninja-build pkg-config zip patchelf \
             libgtk-3-dev liblzma-dev libsecret-1-dev libstdc++-12-dev \
-            libjson-glib-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
             libasound2-dev libclang-dev libmpv-dev
 
       # The arm64 runner image ships without rustup.
@@ -243,7 +245,9 @@ jobs:
           restore-keys: pub-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Get Flutter dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          dart scripts/gen_l10n.dart
 
       - name: Prepare Flutter framework patch
         run: dart scripts/prepare_flutter_sdk.dart
@@ -280,7 +284,7 @@ jobs:
             exit 1
           fi
           mkdir -p build/desktop
-          (cd "$bundle" && zip -r -y "$GITHUB_WORKSPACE/build/desktop/Mornye-linux-${{ matrix.flutter_arch }}.zip" .)
+          (cd "$bundle" && zip -r -9 -y "$GITHUB_WORKSPACE/build/desktop/Mornye-linux-${{ matrix.flutter_arch }}.zip" .)
 
       - name: Upload Linux bundle artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -365,7 +369,9 @@ jobs:
           restore-keys: pub-${{ runner.os }}-${{ matrix.arch }}-
 
       - name: Get Flutter dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          dart scripts/gen_l10n.dart
 
       - name: Prepare Flutter framework patch
         run: dart scripts/prepare_flutter_sdk.dart

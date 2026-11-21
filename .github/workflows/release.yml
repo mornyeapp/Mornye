@@ -142,7 +142,9 @@ jobs:
           restore-keys: pub-${{ runner.os }}-
 
       - name: Get Flutter dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          dart scripts/gen_l10n.dart
 
       - name: Prepare Flutter framework patch
         run: dart scripts/prepare_flutter_sdk.dart
@@ -310,19 +312,12 @@ jobs:
           restore-keys: pub-${{ runner.os }}-
 
       - name: Get Flutter dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          dart scripts/gen_l10n.dart
 
       - name: Prepare Flutter framework patch
         run: dart scripts/prepare_flutter_sdk.dart
-
-      - name: Normalize ffmpeg plugin shell scripts (strip CRLF)
-        run: |
-          find "$HOME/.pub-cache/hosted" -path "*ffmpeg_kit_flutter_new_audio*/scripts/*.sh" -type f -print0 |
-            while IFS= read -r -d '' f; do
-              perl -pi -e 's/\r$//' "$f"
-              chmod +x "$f"
-              echo "Normalized line endings: $f"
-            done
 
       - name: Generate app icons
         run: dart run flutter_launcher_icons
@@ -343,6 +338,8 @@ jobs:
           LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
         run: |
           flutter build ios --release --no-codesign --config-only --target lib/main.dart \
+            --obfuscate --split-debug-info=build/symbols/ios \
+            --dart-define="MORNYE_MOBILE=true" \
             --dart-define="LASTFM_API_KEY=$LASTFM_API_KEY" \
             --dart-define="LASTFM_API_SECRET=$LASTFM_API_SECRET" \
             --dart-define="GIT_COMMIT=$(git rev-parse --short=8 HEAD)"
@@ -385,9 +382,31 @@ jobs:
           mkdir -p build/ios/ipa
           cd ios/build/Runner.xcarchive/Products/Applications
           mkdir Payload
-          cp -r Runner.app Payload/
-          # Use absolute path to avoid relative path issues
-          zip -r "$GITHUB_WORKSPACE/build/ios/ipa/Mornye-${VERSION}-ios-unsigned.ipa" Payload
+          ditto Runner.app Payload/Runner.app
+          # Prune non-iOS Flutter assets from the unsigned IPA bundle.
+          assets="Payload/Runner.app/Frameworks/App.framework/flutter_assets"
+          if [ -d "$assets" ]; then
+            rm -rf \
+              "$assets/packages/media_kit/assets/web" \
+              "$assets/packages/record_web" \
+              "$assets/packages/flutter_local_notifications_web"
+            rm -f \
+              "$assets/packages/liquid_glass_easy/lib/assets/shaders/metaball_"* \
+              "$assets/packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_skia.frag" \
+              "$assets/packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_desktop.frag" \
+              "$assets/packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_border"* \
+              "$assets/assets/licenses/usb.txt" \
+              "$assets/assets/licenses/oboe.txt" \
+              "$assets/assets/licenses/wavpack.txt" \
+              "$assets/assets/licenses/flac.txt"
+          fi
+          ipa="$GITHUB_WORKSPACE/build/ios/ipa/Mornye-${VERSION}-ios-unsigned.ipa"
+          rm -f "$ipa"
+          if command -v 7z >/dev/null 2>&1; then
+            7z a -tzip -mx=9 "$ipa" Payload >/dev/null
+          else
+            zip -r -9 -y "$ipa" Payload
+          fi
           rm -rf Payload
 
       - name: Verify IPA created
@@ -400,6 +419,14 @@ jobs:
             exit 1
           fi
 
+      - name: Upload iOS symbol artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-symbols
+          retention-days: 90
+          if-no-files-found: error
+          path: build/symbols/ios/
+
       - name: Upload IPA artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -411,10 +438,18 @@ jobs:
   # AppImage and deb per Linux architecture, and a Windows installer and
   # portable zip. Each job uploads SHA256SUMS-<target>.txt for create-release.
   build-macos:
-    name: Build macOS (universal)
+    name: Build macOS (${{ matrix.arch }})
     runs-on: macos-15
     needs: get-version
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.desktop }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            xcode_arch: arm64
+          - arch: x64
+            xcode_arch: x86_64
 
     steps:
       - name: Checkout repository
@@ -430,6 +465,8 @@ jobs:
         run: rustup show
 
       - name: Build Rust desktop library
+        env:
+          MORNYE_MACOS_ARCH: ${{ matrix.xcode_arch }}
         run: bash scripts/build_rust_backend.sh desktop
 
       # The from-source LGPL build only changes with the script, which pins
@@ -438,12 +475,12 @@ jobs:
         id: ffmpeg-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: build/ffmpeg/macos-universal
-          key: ffmpeg-macos-universal-${{ hashFiles('scripts/fetch_desktop_ffmpeg.sh') }}
+          path: build/ffmpeg/macos-${{ matrix.arch }}
+          key: ffmpeg-macos-${{ matrix.arch }}-${{ hashFiles('scripts/fetch_desktop_ffmpeg.sh') }}
 
       - name: Build LGPL FFmpeg
         if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
-        run: bash scripts/fetch_desktop_ffmpeg.sh macos-universal
+        run: bash scripts/fetch_desktop_ffmpeg.sh "macos-${{ matrix.arch }}"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
@@ -460,7 +497,9 @@ jobs:
           restore-keys: pub-${{ runner.os }}-
 
       - name: Get Flutter dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          dart scripts/gen_l10n.dart
 
       - name: Prepare Flutter framework patch
         run: dart scripts/prepare_flutter_sdk.dart
@@ -481,10 +520,12 @@ jobs:
         env:
           MORNYE_SKIP_RUST_BUILD: "1"
           MORNYE_REQUIRE_FFMPEG: "1"
+          MORNYE_MACOS_ARCH: ${{ matrix.arch }}
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
         run: |
           flutter build macos --release --target lib/main.dart \
+            --obfuscate --split-debug-info="build/symbols/macos-${{ matrix.arch }}" \
             --dart-define="LASTFM_API_KEY=$LASTFM_API_KEY" \
             --dart-define="LASTFM_API_SECRET=$LASTFM_API_SECRET" \
             --dart-define="GIT_COMMIT=$(git rev-parse --short=8 HEAD)"
@@ -492,26 +533,33 @@ jobs:
       - name: Package disk image
         env:
           VERSION: ${{ needs.get-version.outputs.version }}
+          MORNYE_MACOS_ARCH: ${{ matrix.xcode_arch }}
         run: |
           app="build/macos/Build/Products/Release/Mornye.app"
           test -s "$app/Contents/Frameworks/libmornye_desktop.dylib"
           for tool in ffmpeg ffprobe; do
             test -x "$app/Contents/Resources/ffmpeg/$tool"
-            for arch in arm64 x86_64; do
-              lipo "$app/Contents/Resources/ffmpeg/$tool" -verify_arch "$arch"
-            done
+            lipo "$app/Contents/Resources/ffmpeg/$tool" -verify_arch "${{ matrix.xcode_arch }}"
           done
-          bash scripts/package_macos_dmg.sh "$app" "build/desktop/Mornye-${VERSION}-macos-universal.dmg"
-          (cd build/desktop && shasum -a 256 Mornye-*.dmg > SHA256SUMS-macos.txt)
+          bash scripts/package_macos_dmg.sh "$app" "build/desktop/Mornye-${VERSION}-macos-${{ matrix.arch }}.dmg"
+          (cd build/desktop && shasum -a 256 Mornye-*.dmg > "SHA256SUMS-macos-${{ matrix.arch }}.txt")
+
+      - name: Upload macOS symbol artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-symbols-macos-${{ matrix.arch }}
+          retention-days: 90
+          if-no-files-found: error
+          path: build/symbols/macos-${{ matrix.arch }}/
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: desktop-release-macos
+          name: desktop-release-macos-${{ matrix.arch }}
           if-no-files-found: error
           path: |
             build/desktop/Mornye-*.dmg
-            build/desktop/SHA256SUMS-macos.txt
+            build/desktop/SHA256SUMS-macos-${{ matrix.arch }}.txt
 
   build-linux:
     name: Build Linux (${{ matrix.arch }})
@@ -544,9 +592,9 @@ jobs:
           # dependency; asking for it first lets apt replace the LLVM one.
           sudo apt-get install -y libunwind-dev
           sudo apt-get install -y \
-            clang cmake ninja-build pkg-config zip file \
+            clang cmake ninja-build pkg-config zip file patchelf \
             libgtk-3-dev liblzma-dev libsecret-1-dev libstdc++-12-dev \
-            libjson-glib-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
             libasound2-dev libclang-dev \
             desktop-file-utils appstream dpkg-dev
 
@@ -595,7 +643,9 @@ jobs:
           restore-keys: pub-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Get Flutter dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          dart scripts/gen_l10n.dart
 
       - name: Prepare Flutter framework patch
         run: dart scripts/prepare_flutter_sdk.dart
@@ -608,6 +658,7 @@ jobs:
           LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
         run: |
           flutter build linux --release --target lib/main.dart \
+            --obfuscate --split-debug-info="build/symbols/linux-${{ matrix.flutter_arch }}" \
             --dart-define="LASTFM_API_KEY=$LASTFM_API_KEY" \
             --dart-define="LASTFM_API_SECRET=$LASTFM_API_SECRET" \
             --dart-define="GIT_COMMIT=$(git rev-parse --short=8 HEAD)"
@@ -640,6 +691,14 @@ jobs:
             grep -E 'usr/share/applications/com.zarz.mornye.desktop|usr/lib/mornye/mornye$'
           file "build/desktop/Mornye-${VERSION}-linux-${ARCH}.AppImage"
           (cd build/desktop && sha256sum Mornye-* > "SHA256SUMS-linux-${ARCH}.txt")
+
+      - name: Upload Linux symbol artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-symbols-linux-${{ matrix.arch }}
+          retention-days: 90
+          if-no-files-found: error
+          path: build/symbols/linux-${{ matrix.flutter_arch }}/
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -747,7 +806,9 @@ jobs:
           restore-keys: pub-${{ runner.os }}-${{ matrix.arch }}-
 
       - name: Get Flutter dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          dart scripts/gen_l10n.dart
 
       - name: Prepare Flutter framework patch
         run: dart scripts/prepare_flutter_sdk.dart
@@ -760,9 +821,10 @@ jobs:
           LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
         run: |
           $commit = git rev-parse --short=8 HEAD
-          flutter build windows --release --target lib/main.dart --dart-define="GIT_COMMIT=$commit" --dart-define="LASTFM_API_KEY=$env:LASTFM_API_KEY" --dart-define="LASTFM_API_SECRET=$env:LASTFM_API_SECRET"
+          flutter build windows --release --target lib/main.dart --obfuscate --split-debug-info="build/symbols/windows-${{ matrix.arch }}" --dart-define="GIT_COMMIT=$commit" --dart-define="LASTFM_API_KEY=$env:LASTFM_API_KEY" --dart-define="LASTFM_API_SECRET=$env:LASTFM_API_SECRET"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $bundle = 'build\windows\${{ matrix.arch }}\runner\Release'
+          Get-ChildItem -LiteralPath $bundle -Recurse -File -Include '*.pdb','*.lib','*.exp','*.ilk' | Remove-Item -Force -ErrorAction SilentlyContinue
           ./scripts/check_windows_bundle.ps1 -BundleDir $bundle -Arch ${{ matrix.arch }}
           "MORNYE_WINDOWS_BUNDLE=$bundle" >> $env:GITHUB_ENV
           $productVersion = (Get-Item "$bundle\mornye.exe").VersionInfo.ProductVersion
@@ -861,6 +923,14 @@ jobs:
           if (-not $lines) { throw 'No Windows packages were created' }
           [IO.File]::WriteAllText("$PWD\build\desktop\SHA256SUMS-windows-${{ matrix.arch }}.txt", (($lines -join "`n") + "`n"))
           Get-Content build\desktop\SHA256SUMS-windows-${{ matrix.arch }}.txt
+
+      - name: Upload Windows symbol artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-symbols-windows-${{ matrix.arch }}
+          retention-days: 90
+          if-no-files-found: error
+          path: build/symbols/windows-${{ matrix.arch }}/
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -1064,6 +1134,8 @@ jobs:
               printf "| %s | \`%s\` | %s |\n" "$1" "$2" "$3" >> /tmp/release_body.txt
             fi
           }
+          desktop_row "macOS" "Mornye-${VERSION}-macos-arm64.dmg" "Apple silicon, macOS 12 or later"
+          desktop_row "macOS" "Mornye-${VERSION}-macos-x64.dmg" "Intel, macOS 12 or later"
           desktop_row "macOS" "Mornye-${VERSION}-macos-universal.dmg" "Apple silicon and Intel, macOS 12 or later"
           desktop_row "Windows" "Mornye-${VERSION}-windows-x64-setup.exe" "Installer (x64), no administrator rights needed"
           desktop_row "Windows" "Mornye-${VERSION}-windows-x64-portable.zip" "Portable (x64): extract and run mornye.exe"
