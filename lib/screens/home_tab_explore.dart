@@ -360,14 +360,37 @@ extension _HomeTabExploreUI on _HomeTabState {
         );
         return;
       default:
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('${item.type}: ${item.name}')));
+        showAppSnackBar(context, content: Text('${item.type}: ${item.name}'));
         return;
     }
   }
 
   void _showTrackBottomSheet(ExploreItem item, BuildContext itemContext) {
+    if (isDesktopPlatform) {
+      final origin =
+          contextMenuPositionBelow(itemContext) ??
+          contextMenuOriginOf(itemContext) ??
+          MediaQuery.sizeOf(context).center(Offset.zero);
+      showContextMenu(
+        itemContext,
+        position: origin,
+        groups: [
+          [
+            ContextMenuAction(
+              icon: Icons.download,
+              label: context.l10n.downloadTitle,
+              onSelected: () => _handleExploreTrackPrimaryAction(item),
+            ),
+            ContextMenuAction(
+              icon: Icons.album,
+              label: context.l10n.homeGoToAlbum,
+              onSelected: () => _navigateToTrackAlbum(item),
+            ),
+          ],
+        ],
+      );
+      return;
+    }
     if (context.isMornye) {
       final box = itemContext.findRenderObject();
       final anchor = box is RenderBox && box.hasSize

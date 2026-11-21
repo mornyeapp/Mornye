@@ -766,8 +766,8 @@ class _HomeSection extends StatelessWidget {
                           children: [
                             Flexible(child: heading),
                             const SizedBox(width: 4),
-                            Icon(
-                              CupertinoIcons.chevron_forward,
+                            AppIcon.adaptive(
+                              Icons.chevron_right,
                               size: 15,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -860,8 +860,8 @@ class _HomeContinueListeningCardState
     final dimmed = neutral
         ? colorScheme.onSurfaceVariant
         : colorScheme.onPrimaryContainer.withValues(alpha: 0.8);
-    final playColor = neutral ? colorScheme.onSurface : colorScheme.primary;
-    final onPlayColor = neutral ? colorScheme.surface : colorScheme.onPrimary;
+    final playColor = colorScheme.primary;
+    final onPlayColor = colorScheme.onPrimary;
 
     Widget artwork(double extent) => PlayerArtwork(
       // A network cover not stored yet shows once fetched.
@@ -1058,15 +1058,21 @@ class _HomeContinueListeningProgress extends ConsumerWidget {
         : 0.0;
     // Repaints on every position tick without repainting the sections.
     return RepaintBoundary(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(2),
-        child: LinearProgressIndicator(
-          value: progress,
-          minHeight: 4,
-          color: neutral ? colorScheme.onSurface : colorScheme.primary,
-          backgroundColor:
-              (neutral ? colorScheme.onSurface : colorScheme.onPrimaryContainer)
-                  .withValues(alpha: 0.16),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: AppProgressIndicator.linear(
+            value: progress,
+            minHeight: 4,
+            wavy: false,
+            color: neutral ? colorScheme.onSurface : colorScheme.primary,
+            trackColor:
+                (neutral
+                        ? colorScheme.onSurface
+                        : colorScheme.onPrimaryContainer)
+                    .withValues(alpha: 0.16),
+          ),
         ),
       ),
     );
@@ -1290,7 +1296,7 @@ class _HomeRecommendationTile extends ConsumerWidget {
         coverAction: PreviewButton(
           track: track,
           size: 28,
-          dense: true,
+          dense: isDesktopPlatform,
           overArtwork: true,
         ),
         onTap: () => downloadSingleTrack(context, ref, track),

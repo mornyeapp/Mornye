@@ -715,20 +715,75 @@ class _QuickPicksPageViewState extends State<_QuickPicksPageView> {
 
   @override
   Widget build(BuildContext context) {
+    final rowHeight = MediaQuery.textScalerOf(context).scale(64.0);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            widget.section.title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.section.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (isDesktopPlatform && widget.totalPages > 1) ...[
+                AppIconButton(
+                  tooltip: MaterialLocalizations.of(
+                    context,
+                  ).previousPageTooltip,
+                  icon: const AppIcon.adaptive(Icons.chevron_left),
+                  onPressed: _currentPage > 0
+                      ? () => _pageController.previousPage(
+                          duration: AppMotion.spatial(
+                            context,
+                            const AppMotionSpec(
+                              Duration(milliseconds: 250),
+                              Curves.easeOut,
+                            ),
+                          ).duration,
+                          curve: AppMotion.spatial(
+                            context,
+                            const AppMotionSpec(
+                              Duration(milliseconds: 250),
+                              Curves.easeOut,
+                            ),
+                          ).curve,
+                        )
+                      : null,
+                ),
+                AppIconButton(
+                  tooltip: MaterialLocalizations.of(context).nextPageTooltip,
+                  icon: const AppIcon.adaptive(Icons.chevron_right),
+                  onPressed: _currentPage < widget.totalPages - 1
+                      ? () => _pageController.nextPage(
+                          duration: AppMotion.spatial(
+                            context,
+                            const AppMotionSpec(
+                              Duration(milliseconds: 250),
+                              Curves.easeOut,
+                            ),
+                          ).duration,
+                          curve: AppMotion.spatial(
+                            context,
+                            const AppMotionSpec(
+                              Duration(milliseconds: 250),
+                              Curves.easeOut,
+                            ),
+                          ).curve,
+                        )
+                      : null,
+                ),
+              ],
+            ],
           ),
         ),
         SizedBox(
-          height: widget.itemsPerPage * 64.0,
+          height: widget.itemsPerPage * rowHeight,
           child: PageView.builder(
             controller: _pageController,
             itemCount: widget.totalPages,
