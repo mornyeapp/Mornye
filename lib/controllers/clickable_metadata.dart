@@ -78,9 +78,26 @@ List<String> _metadataSearchProviderCandidates(
   String? sourceProviderId,
 }) {
   final container = ProviderScope.containerOf(context, listen: false);
-  final extensionState = container.read(extensionProvider);
-  final settings = container.read(settingsProvider);
-  final extensionNotifier = container.read(extensionProvider.notifier);
+  return metadataLookupOrder(
+    extensionState: container.read(extensionProvider),
+    allMetadataProviders: container
+        .read(extensionProvider.notifier)
+        .getAllMetadataProviders(),
+    sourceProviderId: sourceProviderId,
+    searchProvider: container.read(settingsProvider).searchProvider,
+  );
+}
+
+/// The extensions a lookup by name asks, in order: the item's own provider,
+/// then the Metadata Priority list from the top, then the search provider
+/// and every other extension that can search.
+@visibleForTesting
+List<String> metadataLookupOrder({
+  required ExtensionState extensionState,
+  required List<String> allMetadataProviders,
+  String? sourceProviderId,
+  String? searchProvider,
+}) {
   final candidates = <String>[];
 
   void addProvider(String? providerId) {
@@ -95,12 +112,11 @@ List<String> _metadataSearchProviderCandidates(
   }
 
   addProvider(sourceProviderId);
-  addProvider(settings.searchProvider);
-
   for (final providerId in extensionState.metadataProviderPriority) {
     addProvider(providerId);
   }
-  for (final providerId in extensionNotifier.getAllMetadataProviders()) {
+  addProvider(searchProvider);
+  for (final providerId in allMetadataProviders) {
     addProvider(providerId);
   }
 

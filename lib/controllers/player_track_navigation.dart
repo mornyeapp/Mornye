@@ -17,7 +17,7 @@ Future<void> openPlayingArtist(
 ) async {
   final track = ref.read(playerCollectionTrackProvider(mediaItem)).value;
   // A downloaded track's source is the service its audio came from, not a
-  // metadata catalog; the lookup uses the user's search provider instead.
+  // metadata catalog; the lookup follows the Metadata Priority list instead.
   await navigateToArtist(
     context,
     artistName: mediaItem.artist ?? '',

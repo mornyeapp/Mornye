@@ -11,6 +11,27 @@ import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/services/cross_extension_share_service.dart';
 import 'package:mornye/services/share_intent_service.dart';
 
+/// [results] with the services that found the item first, each group in
+/// the Metadata Priority order ([priority]), then by name.
+@visibleForTesting
+List<CrossExtensionShareResult> sortCrossExtensionResults(
+  List<CrossExtensionShareResult> results,
+  List<String> priority,
+) {
+  int rank(CrossExtensionShareResult result) {
+    final index = priority.indexOf(result.extensionId);
+    return index < 0 ? priority.length : index;
+  }
+
+  return [...results]..sort((a, b) {
+    if (a.found != b.found) return a.found ? -1 : 1;
+    final byPriority = rank(a).compareTo(rank(b));
+    return byPriority != 0
+        ? byPriority
+        : a.displayName.compareTo(b.displayName);
+  });
+}
+
 class CrossExtensionShareSheet extends ConsumerStatefulWidget {
   final String name;
   final String artists;
@@ -68,14 +89,12 @@ class _CrossExtensionShareSheetState
           type: widget.type,
           sourceExtensionId: widget.sourceExtensionId,
         )
-        .then((results) {
-          final sorted = [...results];
-          sorted.sort((a, b) {
-            if (a.found != b.found) return a.found ? -1 : 1;
-            return a.displayName.compareTo(b.displayName);
-          });
-          return sorted;
-        });
+        .then(
+          (results) => sortCrossExtensionResults(
+            results,
+            ref.read(extensionProvider).metadataProviderPriority,
+          ),
+        );
   }
 
   String? _iconPathFor(String extensionId) {
