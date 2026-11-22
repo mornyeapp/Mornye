@@ -1,7 +1,6 @@
 import 'dart:convert';
-
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'dart:io';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -118,19 +117,8 @@ class HistoryDatabase {
 
   HistoryDatabase._init();
 
-  /// History writes race the native backend's own history.db writers and
-  /// library merges on the attached Library connection. On desktop the
-  /// connection reports BUSY from BEGIN IMMEDIATE almost immediately even
-  /// with `PRAGMA busy_timeout` set, so the retry schedule must span several
-  /// seconds of real time to cover a competing merge.
-  ///
-  /// The bound is attempt-based, not a wall-clock deadline: the initial
-  /// attempt plus up to 7 retries, with scheduled sleeps totalling ~10.3s.
-  /// Each attempt can additionally wait inside SQLite up to the connection's
-  /// busy_timeout (5s in production), so under these assumptions a fully
-  /// contended write is modeled to take roughly 8 x busy_timeout + 10.3s
-  /// (~50s) before surfacing. Persistent locks still surface after the last
-  /// delay.
+  /// Library write transactions lock the attached history.db for their whole
+  /// length, so a history write retries BEGIN long enough to outlast a merge.
   static const List<Duration> _writeRetryDelays = [
     Duration(milliseconds: 100),
     Duration(milliseconds: 200),
@@ -150,9 +138,7 @@ class HistoryDatabase {
     retryDelays: _writeRetryDelays,
   );
 
-  /// Test seam: replaces the lazily opened connection with [db] so host
-  /// tests can drive real contention against a temporary file. Passing null
-  /// restores the production opener for the next access.
+  /// Test seam: uses [db] as the connection; null restores the real opener.
   @visibleForTesting
   static void debugReplaceDatabaseForTest(Database? db) {
     _database.reset();

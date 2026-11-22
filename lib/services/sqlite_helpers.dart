@@ -139,7 +139,8 @@ String normalizeLookupText(String? value) {
 /// Retry only lock contention while acquiring BEGIN, before the callback runs.
 /// History download writers can also lock transactions on an attached Library
 /// connection. Never replay a body or COMMIT failure: it may have side effects
-/// or an already durable result. Persistent locks still surface after 3 attempts.
+/// or an already durable result. Persistent locks still surface once
+/// [retryDelays] run out (two quick retries by default).
 Future<T> transactionWithBusyRetry<T>(
   Database db,
   Future<T> Function(Transaction txn) action, {
