@@ -68,6 +68,7 @@ import 'package:mornye/providers/library_counts_provider.dart';
 import 'package:mornye/providers/library_mixes_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/models/home_layout.dart';
 import 'package:mornye/models/home_shortcut.dart';

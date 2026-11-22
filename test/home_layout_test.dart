@@ -17,6 +17,7 @@ import 'package:mornye/providers/home_top_picks_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/library_mixes_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/weekly_releases_provider.dart';
@@ -71,8 +72,9 @@ Widget _app(
   Widget page, {
   required AppSettings settings,
   bool mornye = false,
+  List<Override> overrides = const [],
 }) => ProviderScope(
-  overrides: _overrides(settings),
+  overrides: [..._overrides(settings), ...overrides],
   child: MaterialApp(
     theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.dark(),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -94,12 +96,15 @@ Future<void> _open(
     homeFeedProvider: AppSettings.homeFeedProviderOff,
   ),
   bool mornye = false,
+  List<Override> overrides = const [],
 }) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(400, 1600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(_app(page, settings: settings, mornye: mornye));
+  await tester.pumpWidget(
+    _app(page, settings: settings, mornye: mornye, overrides: overrides),
+  );
   await _settle(tester);
 }
 
@@ -357,6 +362,30 @@ void main() {
       expect(settings.homeLayout, const HomeLayout());
       expect(settings.homeContinueListening, isTrue);
     });
+  });
+
+  testWidgets('with an external player a Recently added song opens in the '
+      'other app', (tester) async {
+    final opened = <String>[];
+    await _open(
+      tester,
+      _home,
+      settings: const AppSettings(
+        homeFeedProvider: AppSettings.homeFeedProviderOff,
+        playerMode: 'external',
+      ),
+      overrides: [
+        playbackProvider.overrideWith(
+          () => PlaybackController(
+            openExternal: (path) async => opened.add(path),
+          ),
+        ),
+      ],
+    );
+    await tester.tap(find.text('Example song'));
+    await _settle(tester);
+    expect(opened, ['/music/example.flac']);
+    expect(tester.takeException(), isNull);
   });
 }
 

@@ -1419,7 +1419,7 @@ class _HomeRecentlyAddedShelf extends ConsumerWidget {
                 coverSize,
                 cacheWidth,
               ),
-              onTap: () => _play(ref, index),
+              onTap: () => _play(context, ref, index),
             );
           },
         );
@@ -1427,19 +1427,31 @@ class _HomeRecentlyAddedShelf extends ConsumerWidget {
     );
   }
 
-  void _play(WidgetRef ref, int index) {
+  /// Plays the shelf from the tapped song, or with an external player opens
+  /// that song's file in the other app.
+  Future<void> _play(BuildContext context, WidgetRef ref, int index) async {
     final media = <PlayableMedia>[];
+    final paths = <String>[];
     var initialIndex = 0;
     for (final (i, item) in items.indexed) {
       final playable = _homePlayableFromLibrary(item);
       if (playable == null || playable.source.trim().isEmpty) continue;
       if (i == index) initialIndex = media.length;
       media.add(playable);
+      paths.add(item.filePath);
     }
     if (media.isEmpty) return;
-    ref
-        .read(musicPlayerControllerProvider)
-        .playAll(media, initialIndex: initialIndex);
+    try {
+      await ref
+          .read(playbackProvider.notifier)
+          .playMediaQueue(
+            media,
+            startIndex: initialIndex,
+            externalPath: paths[initialIndex],
+          );
+    } catch (e) {
+      if (context.mounted) showCannotOpenFileSnackBar(context, e);
+    }
   }
 }
 
