@@ -469,7 +469,10 @@ void main() {
       (tester) async {
         MornyeGlass.debugShaderFilterSupport = true;
         addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
-        Future<LiquidGlassSettings> lensAt(double clarity) async {
+        Future<LiquidGlassSettings> lensAt(
+          double clarity, {
+          Color? tintColor,
+        }) async {
           await tester.pumpWidget(
             ProviderScope(
               overrides: [
@@ -483,6 +486,7 @@ void main() {
                   body: Center(
                     child: MornyeGlass.navigation(
                       blurEnabled: true,
+                      tintColor: tintColor,
                       child: const SizedBox(width: 80, height: 40),
                     ),
                   ),
@@ -521,6 +525,22 @@ void main() {
         expect(thinned.frost, lessThan(material.frost));
         expect(thinned.blur, material.blur);
         expect(thinned.bodyMode, material.bodyMode);
+
+        // A neutral tint is only density, which the material sets itself. A
+        // colored one is a meaning, such as a state, and stays.
+        final neutral = await lensAt(
+          kDefaultMornyeGlassClarity,
+          tintColor: Colors.black,
+        );
+        expect(neutral.glassColor, material.glassColor);
+        final colored = await lensAt(
+          kDefaultMornyeGlassClarity,
+          tintColor: const Color(0xffff3b30),
+        );
+        expect(colored.bodyMode, GlassBodyMode.clear);
+        expect(colored.glassColor.r, greaterThan(colored.glassColor.b + 0.2));
+        expect(colored.glassColor.a, greaterThan(0.4));
+        expect(colored.frost, material.frost);
         expect(tester.takeException(), isNull);
       },
     );

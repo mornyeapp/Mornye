@@ -193,6 +193,14 @@ class MornyeGlass extends ConsumerWidget {
   // How much of the material's frost the clearest setting drops.
   static const _thinnedShare = 0.5;
 
+  // A colored tint is a meaning, such as a state, and stays at every clarity.
+  // A neutral one is only density, which the material sets by itself.
+  static bool _isColored(Color? tint) {
+    if (tint == null) return false;
+    final channels = [tint.r, tint.g, tint.b]..sort();
+    return channels.last - channels.first > 0.08;
+  }
+
   /// Host tests cannot run shader filters; this lets them build the lens.
   @visibleForTesting
   static bool? debugShaderFilterSupport;
@@ -312,7 +320,7 @@ class MornyeGlass extends ConsumerWidget {
     const rest = kDefaultMornyeGlassClarity;
     final tinted = ((rest - clarity) / (rest - 0.2)).clamp(0.0, 1.0);
     final thinned = ((clarity - rest) / (1 - rest)).clamp(0.0, 1.0);
-    final ownMaterial = useLens && !strongTint;
+    final ownMaterial = useLens && !strongTint && !_isColored(tintColor);
     final density = ownMaterial ? 1 - _thinnedShare * thinned : 1.0;
     final fill = Color.lerp(
       scheme.surfaceContainerHigh,
