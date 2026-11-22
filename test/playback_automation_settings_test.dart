@@ -71,21 +71,24 @@ void main() {
       expect(saved.headphoneResume, 'always');
 
       container.read(settingsProvider.notifier).setPlayerMode('external');
-      await tester.pump();
-      final muteSwitch = tester.widget<SettingsSwitchItem>(
+      await tester.pumpAndSettle();
+      // Another app plays: the controls are hidden and keep their values.
+      expect(
         find.byWidgetPredicate(
           (widget) =>
               widget is SettingsSwitchItem &&
               widget.title == 'Pause when muted',
         ),
+        findsNothing,
       );
-      expect(muteSwitch.enabled, isFalse);
-      await tester.tap(find.text('Off').first, warnIfMissed: false);
-      await tester.pumpAndSettle();
+      expect(connected, findsNothing);
+      expect(container.read(settingsProvider).pauseOnMute, isTrue);
       expect(container.read(settingsProvider).headphoneResume, 'always');
       expect(tester.takeException(), isNull);
 
-      final l10n = AppLocalizations.of(tester.element(connected));
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(PlaybackSettingsPage)),
+      );
       final catalog = SettingsSearchCatalog(l10n);
       expect(
         catalog.playback.any(

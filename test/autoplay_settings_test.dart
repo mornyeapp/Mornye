@@ -93,17 +93,20 @@ void main() {
         isTrue,
       );
       container.read(settingsProvider.notifier).setPlayerMode('external');
-      await tester.pump();
+      await tester.pumpAndSettle();
+      // Another app plays: the switch is gone from the page and its search.
       expect(
-        tester
-            .widget<SettingsSwitchItem>(
-              find.byWidgetPredicate(
-                (widget) =>
-                    widget is SettingsSwitchItem &&
-                    widget.title == 'Personalized autoplay',
-              ),
-            )
-            .enabled,
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SettingsSwitchItem &&
+              widget.title == 'Personalized autoplay',
+        ),
+        findsNothing,
+      );
+      expect(
+        SettingsSearchCatalog(l10n, builtInPlayer: false).playback.any(
+          (entry) => entry.matches(SettingsSearchQuery('machine learning')),
+        ),
         isFalse,
       );
       expect(tester.takeException(), isNull);

@@ -17,19 +17,37 @@ enum HomeShortcut {
 
   static const defaults = [shuffle, equalizer, listeningStats, networkStorage];
 
+  /// Shortcuts that only work with the built-in player.
+  static const playerOnly = {shuffle, equalizer, listeningStats};
+
+  /// The shortcuts Home can offer: all of them, or without [playerOnly]
+  /// while another app plays the music.
+  static List<HomeShortcut> available({required bool player}) => [
+    for (final shortcut in values)
+      if (player || !playerOnly.contains(shortcut)) shortcut,
+  ];
+
   /// The [slotCount] shortcuts named in [names], in order. Unknown names and
   /// repeats give way to the first defaults not chosen yet, so Home keeps a
   /// full set after an update drops a shortcut or a backup holds too few.
-  static List<HomeShortcut> resolve(List<String> names) {
+  /// Without [player] the [playerOnly] ones give way the same way.
+  static List<HomeShortcut> resolve(List<String> names, {bool player = true}) {
+    final offered = available(player: player);
     final chosen = <HomeShortcut>[];
     for (final name in names) {
       if (chosen.length == slotCount) break;
       final shortcut = values.asNameMap()[name];
-      if (shortcut != null && !chosen.contains(shortcut)) chosen.add(shortcut);
+      if (shortcut != null &&
+          offered.contains(shortcut) &&
+          !chosen.contains(shortcut)) {
+        chosen.add(shortcut);
+      }
     }
     for (final shortcut in [...defaults, ...values]) {
       if (chosen.length == slotCount) break;
-      if (!chosen.contains(shortcut)) chosen.add(shortcut);
+      if (offered.contains(shortcut) && !chosen.contains(shortcut)) {
+        chosen.add(shortcut);
+      }
     }
     return chosen;
   }

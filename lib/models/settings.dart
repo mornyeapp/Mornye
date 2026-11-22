@@ -748,6 +748,10 @@ class AppSettings {
     'prefer_best_timing': lyricsPreferBestTiming,
   };
 
+  /// Whether this app plays the music. With another app chosen, settings
+  /// that only shape the built-in player are hidden.
+  bool get usesBuiltInPlayer => playerMode == 'internal';
+
   /// The cover art style the player shows: the one chosen, else the app
   /// style's own, full screen in Material and a card in Mornye.
   String playerCoverStyleFor({required bool mornye}) =>

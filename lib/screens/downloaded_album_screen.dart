@@ -510,6 +510,7 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
               shuffleTooltip: context.l10n.actionShuffle,
               onPlay: () => _playAll(tracks),
               onShuffle: () => _shuffleAll(tracks),
+              showShuffle: ref.watch(playerUiEnabledProvider),
               onAddToPlaylist: () => showAddTracksToPlaylistSheet(
                 Navigator.of(context, rootNavigator: true).context,
                 ref,

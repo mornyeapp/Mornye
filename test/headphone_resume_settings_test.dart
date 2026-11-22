@@ -148,18 +148,15 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the external player disables the choice ($mornye)', (
+    testWidgets('the external player hides the choice ($mornye)', (
       tester,
     ) async {
-      final container = await _pumpPage(
+      await _pumpPage(
         tester,
         mornye: mornye,
         settings: const AppSettings(playerMode: 'external'),
       );
-      await _scrollToChoice(tester);
-      await tester.tap(_option('Always'), warnIfMissed: false);
-      await tester.pumpAndSettle();
-      expect(container.read(settingsProvider).headphoneResume, 'off');
+      expect(find.text(_title), findsNothing);
     });
   }
 

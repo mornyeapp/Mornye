@@ -403,6 +403,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
 
   @override
   Widget build(BuildContext context) {
+    _showShuffle = ref.watch(playerUiEnabledProvider);
     final indexValue = ref.watch(libraryDirectoryIndexProvider);
     final index = indexValue.value;
     final key = widget.folderKey;
@@ -519,6 +520,9 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
     );
   }
 
+  /// Read in build: the header builds its actions in a layout callback.
+  bool _showShuffle = true;
+
   /// Play, Shuffle and, on desktop, Add to Playlist over every song under
   /// [folder].
   Widget _playActions(LibraryDirectory folder) => AlbumPlayActions(
@@ -526,6 +530,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
     shuffleTooltip: context.l10n.actionShuffle,
     onPlay: () => _playFolder(folder),
     onShuffle: () => _playFolder(folder, shuffle: true),
+    showShuffle: _showShuffle,
     onAddToPlaylist: () => _addFolderToPlaylist(folder),
     onDownload: !folder.key.startsWith('network://')
         ? null

@@ -616,7 +616,7 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                     settings.libraryQualityLabelMode,
                   ),
                 ),
-                if (queueSwipeOffered)
+                if (queueSwipeOffered && settings.usesBuiltInPlayer)
                   SettingsSwitchItem(
                     icon: Icons.queue_music,
                     title: context.l10n.swipeToQueue,

@@ -342,6 +342,14 @@
   "extensionAccountRequiredValue": "Enter a value.",
   "extensionAccountInvalidNumber": "Enter a valid number.",
   "settingsPlaybackSubtitle": "Player, volume, AutoMix, and audio output",
+  "settingsPlaybackExternalSubtitle": "Songs open in another music app",
+  "@settingsPlaybackExternalSubtitle": {
+    "description": "Subtitle of the Playback settings entry while the External player option is chosen"
+  },
+  "playbackExternalHidden": "Songs open in another music app, so the player and its settings are hidden across the app. Choose Built-in player to bring them back.",
+  "@playbackExternalHidden": {
+    "description": "Note under the player choice in Playback settings while External player is chosen. Built-in player is the name of the other option"
+  },
   "sectionPlayer": "Player",
   "sectionVolumeAndTransitions": "Volume and transitions",
   "sectionAudioOutput": "Audio output",

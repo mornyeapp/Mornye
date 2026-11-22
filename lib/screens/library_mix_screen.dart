@@ -422,6 +422,7 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
                       .togglePlayPause(isPlaying)
                 : () => _play(0),
             onShuffle: _shuffle,
+            showShuffle: ref.watch(playerUiEnabledProvider),
             onAddToPlaylist: () => _saveAsPlaylist(context),
           );
         },

@@ -440,16 +440,24 @@ class _HomeSections extends ConsumerWidget {
     final recentlyAdded = ref.watch(
       homeRecentlyAddedProvider.select((s) => s.value),
     );
-    final onRepeat =
-        ref.watch(homeOnRepeatProvider.select((s) => s.value)) ?? const [];
+    // What was heard and the mixes built from it belong to the built-in
+    // player; with another app playing, Home keeps to the Library.
+    final onRepeat = showPlayer
+        ? ref.watch(homeOnRepeatProvider.select((s) => s.value)) ??
+              const <HomeRepeatTrack>[]
+        : const <HomeRepeatTrack>[];
     // Read only without a listening record, when they take On repeat's place.
     final libraryAlbums =
-        ref.watch(settingsProvider.select((s) => s.listeningStatisticsEnabled))
+        showPlayer &&
+            ref.watch(
+              settingsProvider.select((s) => s.listeningStatisticsEnabled),
+            )
         ? const <LibraryBrowseEntry>[]
         : ref.watch(homeLibraryAlbumsProvider.select((s) => s.value)) ??
               const <LibraryBrowseEntry>[];
-    final mixes =
-        ref.watch(libraryMixesProvider.select((s) => s.value)) ?? const [];
+    final mixes = showPlayer
+        ? ref.watch(libraryMixesProvider.select((s) => s.value))
+        : null;
     final newReleases =
         ref.watch(homeNewReleasesProvider.select((s) => s.value)) ?? const [];
     final recommended =
@@ -461,7 +469,7 @@ class _HomeSections extends ConsumerWidget {
         ref.watch(settingsProvider.select((s) => s.homeContinueListening));
 
     final mornye = context.isMornye;
-    final recentlyPlayed = mornye
+    final recentlyPlayed = mornye && showPlayer
         ? ref.watch(homeRecentlyPlayedProvider.select((s) => s.value)) ??
               const <HomeRepeatTrack>[]
         : const <HomeRepeatTrack>[];
@@ -469,12 +477,14 @@ class _HomeSections extends ConsumerWidget {
     // loads, it would show and then give way to Recently Played.
     final recentlyPlayedLoading =
         mornye &&
+        showPlayer &&
         ref.watch(
           homeRecentlyPlayedProvider.select((s) => !s.hasValue && !s.hasError),
         );
-    final hasTopPicks = mornye && _HomeTopPicksSection.hasPicks(ref);
+    final hasTopPicks =
+        mornye && _HomeTopPicksSection.hasPicks(ref, mixes: showPlayer);
     final sections = <Widget>[
-      if (hasTopPicks) _HomeTopPicksSection(inset: inset),
+      if (hasTopPicks) _HomeTopPicksSection(inset: inset, mixes: showPlayer),
       if (_homeDesktop(context))
         _HomeDesktopTop(inset: inset, showContinue: showContinue)
       else ...[
@@ -508,7 +518,7 @@ class _HomeSections extends ConsumerWidget {
       ],
       // Built after startup settles when nothing is cached: the sections'
       // size animation opens its space rather than letting it jump in.
-      if (!mornye && mixes.isNotEmpty)
+      if (!mornye && mixes != null && mixes.isNotEmpty)
         _HomeSection(
           title: l10n.homeMixesForYou,
           inset: inset,
@@ -1849,14 +1859,18 @@ class _HomeTopPicksShelf extends StatelessWidget {
 
 /// Mornye's first section: the day's mixes, then random extension playlists.
 class _HomeTopPicksSection extends ConsumerWidget {
-  const _HomeTopPicksSection({required this.inset});
+  const _HomeTopPicksSection({required this.inset, required this.mixes});
 
   final double inset;
 
-  static bool hasPicks(WidgetRef ref) =>
-      ref.watch(
-        libraryMixesProvider.select((s) => s.value?.isNotEmpty ?? false),
-      ) ||
+  /// Whether the day's mixes lead the shelf; they need the built-in player.
+  final bool mixes;
+
+  static bool hasPicks(WidgetRef ref, {required bool mixes}) =>
+      (mixes &&
+          ref.watch(
+            libraryMixesProvider.select((s) => s.value?.isNotEmpty ?? false),
+          )) ||
       ref.watch(
         homeTopPicksProvider.select((s) => s.value?.isNotEmpty ?? false),
       );
@@ -1867,7 +1881,9 @@ class _HomeTopPicksSection extends ConsumerWidget {
     inset: inset,
     shelf: true,
     child: _HomeTopPicksShelf(
-      mixes: ref.watch(libraryMixesProvider.select((s) => s.value)) ?? const [],
+      mixes: mixes
+          ? ref.watch(libraryMixesProvider.select((s) => s.value)) ?? const []
+          : const [],
       playlists:
           ref.watch(homeTopPicksProvider.select((s) => s.value)) ?? const [],
       inset: inset + 8,
@@ -1898,8 +1914,10 @@ class _HomeShortcuts extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final player = ref.watch(playerUiEnabledProvider);
     final shortcuts = HomeShortcut.resolve(
       ref.watch(settingsProvider.select((s) => s.homeShortcuts)),
+      player: player,
     );
 
     // The first shortcut is the one emphasized action; the others share a
@@ -1926,7 +1944,7 @@ class _HomeShortcuts extends ConsumerWidget {
                 : colorScheme.onSecondaryContainer,
             onTap: entry.onTap,
             onMenu: (position) =>
-                _showMenu(context, ref, shortcuts, index, position),
+                _showMenu(context, ref, shortcuts, index, position, player),
             layout: layout,
             position: (index: index, count: shortcuts.length),
           ),
@@ -2055,13 +2073,15 @@ class _HomeShortcuts extends ConsumerWidget {
     List<HomeShortcut> shortcuts,
     int slot,
     Offset position,
+    bool player,
   ) {
     final l10n = context.l10n;
     // Read up front: the layout can rebuild this widget while the menu or
     // the sheet is open.
     final settings = ref.read(settingsProvider.notifier);
+    final defaults = HomeShortcut.resolve(const [], player: player);
     final choices = [
-      for (final shortcut in HomeShortcut.values)
+      for (final shortcut in HomeShortcut.available(player: player))
         if (_entry(context, ref, shortcut) case final entry)
           AppChoice(shortcut, entry.icon, entry.label),
     ];
@@ -2090,7 +2110,7 @@ class _HomeShortcuts extends ConsumerWidget {
           ContextMenuAction(
             icon: Icons.restart_alt,
             label: l10n.homeShortcutsReset,
-            onSelected: listEquals(shortcuts, HomeShortcut.defaults)
+            onSelected: listEquals(shortcuts, defaults)
                 ? null
                 : () => settings.setHomeShortcuts(HomeShortcut.defaults),
           ),

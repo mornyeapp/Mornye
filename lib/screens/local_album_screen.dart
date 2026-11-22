@@ -517,6 +517,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
                       .togglePlayPause(isPlaying)
                 : _playAll,
             onShuffle: _shuffleAll,
+            showShuffle: ref.watch(playerUiEnabledProvider),
             onAddToPlaylist: () => showAddTracksToPlaylistSheet(
               Navigator.of(context, rootNavigator: true).context,
               ref,

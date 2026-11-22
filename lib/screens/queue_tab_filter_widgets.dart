@@ -394,8 +394,12 @@ extension _QueueTabFilterWidgets on _QueueTabState {
       );
     }
 
-    // Songs, not Singles, offer Shuffle while the tools show.
-    final showShuffle = filterMode == 'all' && !_isSelectionMode;
+    // Songs, not Singles, offer Shuffle while the tools show. Another app
+    // takes one song at a time, so there is nothing to shuffle there.
+    final showShuffle =
+        filterMode == 'all' &&
+        !_isSelectionMode &&
+        ref.watch(playerUiEnabledProvider);
     void shuffleSongs() => _shuffleLibrarySongs(
       allFilteredUnifiedItems,
       complete: allFilteredUnifiedItems.length >= totalTrackCount,

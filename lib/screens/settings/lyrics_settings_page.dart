@@ -49,85 +49,90 @@ class LyricsSettingsPage extends ConsumerWidget {
               title: context.l10n.sectionLyrics,
               connected: true,
               children: [
-                const LyricsSizeSetting(),
-                // Lyrics blur only where the player draws it.
-                if (context.isMornye && ref.watch(mornyeLiquidGlassProvider))
-                  const LyricsBlurSetting(),
-                const LyricsOffsetSetting(),
-                SettingsSwitchItem(
-                  icon: Icons.light_mode_outlined,
-                  title: context.l10n.lyricsKeepScreenOn,
-                  subtitle: context.l10n.lyricsKeepScreenOnSubtitle,
-                  value: settings.keepScreenOnLyrics,
-                  onChanged: (value) => ref
-                      .read(settingsProvider.notifier)
-                      .setKeepScreenOnLyrics(value),
-                ),
-                if (Platform.isAndroid || Platform.isIOS)
+                // How the built-in player shows lyrics; another app has its
+                // own lyrics view.
+                if (settings.usesBuiltInPlayer) ...[
+                  const LyricsSizeSetting(),
+                  // Lyrics blur only where the player draws it.
+                  if (context.isMornye && ref.watch(mornyeLiquidGlassProvider))
+                    const LyricsBlurSetting(),
+                  const LyricsOffsetSetting(),
                   SettingsSwitchItem(
-                    icon: Icons.screen_lock_portrait_outlined,
-                    title: context.l10n.lyricsLockScreen,
-                    subtitle: Platform.isIOS
-                        ? context.l10n.lyricsLockScreenSubtitleIos
-                        : context.l10n.lyricsLockScreenSubtitle,
-                    value: settings.lockScreenLyrics,
+                    icon: Icons.light_mode_outlined,
+                    title: context.l10n.lyricsKeepScreenOn,
+                    subtitle: context.l10n.lyricsKeepScreenOnSubtitle,
+                    value: settings.keepScreenOnLyrics,
                     onChanged: (value) => ref
                         .read(settingsProvider.notifier)
-                        .setLockScreenLyrics(value),
+                        .setKeepScreenOnLyrics(value),
                   ),
-                if (Platform.isAndroid || Platform.isIOS)
+                  if (Platform.isAndroid || Platform.isIOS)
+                    SettingsSwitchItem(
+                      icon: Icons.screen_lock_portrait_outlined,
+                      title: context.l10n.lyricsLockScreen,
+                      subtitle: Platform.isIOS
+                          ? context.l10n.lyricsLockScreenSubtitleIos
+                          : context.l10n.lyricsLockScreenSubtitle,
+                      value: settings.lockScreenLyrics,
+                      onChanged: (value) => ref
+                          .read(settingsProvider.notifier)
+                          .setLockScreenLyrics(value),
+                    ),
+                  if (Platform.isAndroid || Platform.isIOS)
+                    SettingsSwitchItem(
+                      key: const ValueKey('lock-screen-lyrics-keep-title'),
+                      icon: Icons.title_rounded,
+                      title: context.l10n.lyricsLockScreenKeepTitle,
+                      subtitle: context.l10n.lyricsLockScreenKeepTitleSubtitle,
+                      value: settings.lockScreenLyricsKeepTitle,
+                      enabled: settings.lockScreenLyrics,
+                      onChanged: (value) => ref
+                          .read(settingsProvider.notifier)
+                          .setLockScreenLyricsKeepTitle(value),
+                    ),
                   SettingsSwitchItem(
-                    key: const ValueKey('lock-screen-lyrics-keep-title'),
-                    icon: Icons.title_rounded,
-                    title: context.l10n.lyricsLockScreenKeepTitle,
-                    subtitle: context.l10n.lyricsLockScreenKeepTitleSubtitle,
-                    value: settings.lockScreenLyricsKeepTitle,
-                    enabled: settings.lockScreenLyrics,
+                    key: const ValueKey('lyric-snippet-preview'),
+                    icon: Icons.lyrics_outlined,
+                    title: context.l10n.lyricsPlayerPreview,
+                    subtitle: context.l10n.lyricsPlayerPreviewSubtitle,
+                    value: settings.playerShowLyricSnippet,
                     onChanged: (value) => ref
                         .read(settingsProvider.notifier)
-                        .setLockScreenLyricsKeepTitle(value),
+                        .setPlayerShowLyricSnippet(value),
                   ),
-                SettingsSwitchItem(
-                  key: const ValueKey('lyric-snippet-preview'),
-                  icon: Icons.lyrics_outlined,
-                  title: context.l10n.lyricsPlayerPreview,
-                  subtitle: context.l10n.lyricsPlayerPreviewSubtitle,
-                  value: settings.playerShowLyricSnippet,
-                  onChanged: (value) => ref
-                      .read(settingsProvider.notifier)
-                      .setPlayerShowLyricSnippet(value),
-                ),
-                SettingsSwitchItem(
-                  key: const ValueKey('lyric-snippet-translation'),
-                  icon: Icons.translate_rounded,
-                  title: context.l10n.lyricsPlayerPreviewTranslation,
-                  subtitle: context.l10n.lyricsPlayerPreviewTranslationSubtitle,
-                  value: settings.playerLyricSnippetTranslation,
-                  enabled: settings.playerShowLyricSnippet,
-                  onChanged: (value) => ref
-                      .read(settingsProvider.notifier)
-                      .setPlayerLyricSnippetTranslation(value),
-                ),
-                SettingsSwitchItem(
-                  key: const ValueKey('lyrics-romanize'),
-                  icon: Icons.record_voice_over_outlined,
-                  title: context.l10n.lyricsRomanize,
-                  subtitle: context.l10n.lyricsRomanizeSubtitle,
-                  value: settings.lyricsRomanize,
-                  onChanged: (value) => ref
-                      .read(settingsProvider.notifier)
-                      .setLyricsRomanize(value),
-                ),
-                SettingsSwitchItem(
-                  key: const ValueKey('lyrics-romanized-main-line'),
-                  icon: Icons.swap_vert_rounded,
-                  title: context.l10n.lyricsRomanizedMainLine,
-                  subtitle: context.l10n.lyricsRomanizedMainLineSubtitle,
-                  value: settings.lyricsRomanizedMainLine,
-                  onChanged: (value) => ref
-                      .read(settingsProvider.notifier)
-                      .setLyricsRomanizedMainLine(value),
-                ),
+                  SettingsSwitchItem(
+                    key: const ValueKey('lyric-snippet-translation'),
+                    icon: Icons.translate_rounded,
+                    title: context.l10n.lyricsPlayerPreviewTranslation,
+                    subtitle:
+                        context.l10n.lyricsPlayerPreviewTranslationSubtitle,
+                    value: settings.playerLyricSnippetTranslation,
+                    enabled: settings.playerShowLyricSnippet,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setPlayerLyricSnippetTranslation(value),
+                  ),
+                  SettingsSwitchItem(
+                    key: const ValueKey('lyrics-romanize'),
+                    icon: Icons.record_voice_over_outlined,
+                    title: context.l10n.lyricsRomanize,
+                    subtitle: context.l10n.lyricsRomanizeSubtitle,
+                    value: settings.lyricsRomanize,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setLyricsRomanize(value),
+                  ),
+                  SettingsSwitchItem(
+                    key: const ValueKey('lyrics-romanized-main-line'),
+                    icon: Icons.swap_vert_rounded,
+                    title: context.l10n.lyricsRomanizedMainLine,
+                    subtitle: context.l10n.lyricsRomanizedMainLineSubtitle,
+                    value: settings.lyricsRomanizedMainLine,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setLyricsRomanizedMainLine(value),
+                  ),
+                ],
                 SettingsItem(
                   key: const ValueKey('lyrics-ai-translation'),
                   icon: Icons.auto_awesome_outlined,

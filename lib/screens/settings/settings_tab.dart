@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/screens/settings/profile_settings_page.dart';
 import 'package:mornye/screens/settings/about_page.dart';
@@ -107,6 +108,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   AppLocalizations? _cachedLocalizations;
+  bool? _cachedBuiltInPlayer;
   List<_Group>? _cachedGroups;
   String _query = '';
   bool _hasRequestedDonationGoal = false;
@@ -183,13 +185,17 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
   /// without adding section labels that compete with the page title.
   List<_Group> _groups(BuildContext context) {
     final l10n = context.l10n;
-    if (identical(_cachedLocalizations, l10n) && _cachedGroups != null) {
+    final builtInPlayer = ref.read(settingsProvider).usesBuiltInPlayer;
+    if (identical(_cachedLocalizations, l10n) &&
+        _cachedBuiltInPlayer == builtInPlayer &&
+        _cachedGroups != null) {
       return _cachedGroups!;
     }
 
     final searchCatalog = SettingsSearchCatalog(
       l10n,
       androidAudio: Platform.isAndroid,
+      builtInPlayer: builtInPlayer,
     );
     final groups = [
       // On its own at the top, so its progress reads as the app's status.
@@ -232,7 +238,9 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
             icon: Icons.play_circle_outline,
             iconColor: Colors.indigo,
             title: l10n.libraryPlayback,
-            subtitle: l10n.settingsPlaybackSubtitle,
+            subtitle: builtInPlayer
+                ? l10n.settingsPlaybackSubtitle
+                : l10n.settingsPlaybackExternalSubtitle,
             keywords: const ['player', 'audio', 'playback', 'pemutaran'],
             searchEntries: searchCatalog.playback,
             pageBuilder: () => const PlaybackSettingsPage(),
@@ -434,6 +442,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       ),
     ];
     _cachedLocalizations = l10n;
+    _cachedBuiltInPlayer = builtInPlayer;
     _cachedGroups = groups;
     return groups;
   }
@@ -522,6 +531,9 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
 
   @override
   Widget build(BuildContext context) {
+    // The list and its search leave out built-in player settings while
+    // another app plays the music.
+    ref.watch(settingsProvider.select((s) => s.usesBuiltInPlayer));
     // Settings reads as chrome; its pages scroll without a bar.
     if (!_supportsListDetail) return NoScrollbars(child: _buildList(context));
     return NoScrollbars(

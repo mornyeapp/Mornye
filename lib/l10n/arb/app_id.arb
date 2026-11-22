@@ -242,6 +242,8 @@
   "extensionAccountRequiredValue": "Harap diisi.",
   "extensionAccountInvalidNumber": "Beri angka yang valid.",
   "settingsPlaybackSubtitle": "Pemutar, volume, AutoMix, dan output audio",
+  "settingsPlaybackExternalSubtitle": "Lagu dibuka di aplikasi musik lain",
+  "playbackExternalHidden": "Lagu dibuka di aplikasi musik lain, jadi pemutar dan setelannya disembunyikan di seluruh aplikasi. Pilih Pemutar bawaan untuk menampilkannya lagi.",
   "sectionPlayer": "Pemutar",
   "sectionVolumeAndTransitions": "Volume dan transisi",
   "sectionAudioOutput": "Output audio",

@@ -40,9 +40,12 @@ class ProfileSettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final profile = ref.watch(userProfileProvider).value ?? this.profile;
-    final recording = ref.watch(
-      settingsProvider.select((s) => s.listeningStatisticsEnabled),
-    );
+    // The listening record belongs to the built-in player; with another app
+    // playing, the profile keeps to the collection.
+    final player = ref.watch(playerUiEnabledProvider);
+    final recording =
+        player &&
+        ref.watch(settingsProvider.select((s) => s.listeningStatisticsEnabled));
     final overview = recording ? ref.watch(profileOverviewProvider) : null;
     final data = overview?.value;
     final heard = data != null && !data.allTime.isEmpty;
@@ -55,7 +58,9 @@ class ProfileSettingsPage extends ConsumerWidget {
               children: [
                 _Header(profile: profile, overview: heard ? data : null),
                 const _NowPlaying(),
-                if (!recording)
+                if (!player)
+                  const SizedBox.shrink()
+                else if (!recording)
                   SettingsInfoCard(
                     message: l10n.profileListeningOff,
                     icon: Icons.insights_outlined,
@@ -76,22 +81,23 @@ class ProfileSettingsPage extends ConsumerWidget {
                   ..._listening(context, data),
                 SettingsSectionHeader(title: l10n.profileCollection),
                 const _Collection(),
-                const SizedBox(height: 16),
-                SettingsGroup(
-                  children: [
-                    SettingsItem(
-                      icon: Icons.insights_outlined,
-                      title: l10n.listeningStats,
-                      trailing: const AppIcon.adaptive(Icons.chevron_right),
-                      onTap: () => Navigator.of(context).push(
-                        slidePageRoute<void>(
-                          page: const ListeningStatisticsScreen(),
+                if (player) const SizedBox(height: 16),
+                if (player)
+                  SettingsGroup(
+                    children: [
+                      SettingsItem(
+                        icon: Icons.insights_outlined,
+                        title: l10n.listeningStats,
+                        trailing: const AppIcon.adaptive(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push(
+                          slidePageRoute<void>(
+                            page: const ListeningStatisticsScreen(),
+                          ),
                         ),
+                        showDivider: false,
                       ),
-                      showDivider: false,
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
               ],
             ),
             const NavBarSliverSpacer(),

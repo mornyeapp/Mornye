@@ -7,6 +7,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/library_browse_provider.dart';
 import 'package:mornye/providers/library_genres_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/downloaded_album_screen.dart';
 import 'package:mornye/screens/library_artist_screen.dart';
@@ -570,6 +571,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
             // The seasonal Rewind, beside the listening history it replays.
             if (_overview &&
                 _query.isEmpty &&
+                ref.watch(playerUiEnabledProvider) &&
                 ref.watch(
                   settingsProvider.select((s) => s.listeningStatisticsEnabled),
                 ))

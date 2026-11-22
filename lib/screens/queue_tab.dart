@@ -812,9 +812,10 @@ class _QueueTabState extends ConsumerState<QueueTab> {
             ),
           )
         : const <String>[];
-    final listeningStatisticsEnabled = ref.watch(
-      settingsProvider.select((s) => s.listeningStatisticsEnabled),
-    );
+    // Rewind replays what the built-in player recorded.
+    final listeningStatisticsEnabled =
+        ref.watch(playerUiEnabledProvider) &&
+        ref.watch(settingsProvider.select((s) => s.listeningStatisticsEnabled));
     final historyTotalCount = ref.watch(
       downloadHistoryProvider.select((state) => state.totalCount),
     );

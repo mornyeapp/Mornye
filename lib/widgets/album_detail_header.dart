@@ -773,6 +773,7 @@ class AlbumPlayActions extends StatelessWidget {
     required this.shuffleTooltip,
     required this.onPlay,
     required this.onShuffle,
+    this.showShuffle = true,
     this.isPlaying = false,
     this.onAddToPlaylist,
     this.onDownload,
@@ -782,6 +783,9 @@ class AlbumPlayActions extends StatelessWidget {
   final String shuffleTooltip;
   final VoidCallback onPlay;
   final VoidCallback onShuffle;
+
+  /// Off while another app plays the music: it takes one song at a time.
+  final bool showShuffle;
   final bool isPlaying;
 
   /// Desktop only: a round "+" after Play that adds the songs to a playlist.
@@ -814,14 +818,16 @@ class AlbumPlayActions extends StatelessWidget {
               onPressed: onPlay,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _MornyeHeaderButton(
-              icon: CupertinoIcons.shuffle,
-              label: shuffleTooltip,
-              onPressed: onShuffle,
+          if (showShuffle) ...[
+            const SizedBox(width: 12),
+            Expanded(
+              child: _MornyeHeaderButton(
+                icon: CupertinoIcons.shuffle,
+                label: shuffleTooltip,
+                onPressed: onShuffle,
+              ),
             ),
-          ),
+          ],
         ],
       );
     }
@@ -847,14 +853,15 @@ class AlbumPlayActions extends StatelessWidget {
           ),
           child: Text(playLabel, maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
-        ExpressiveIconButton(
-          tooltip: shuffleTooltip,
-          onPressed: onShuffle,
-          icon: const AppIcon(Icons.shuffle),
-          size: tokens.minTouchTarget,
-          backgroundColor: scheme.secondaryContainer,
-          foregroundColor: scheme.onSecondaryContainer,
-        ),
+        if (showShuffle)
+          ExpressiveIconButton(
+            tooltip: shuffleTooltip,
+            onPressed: onShuffle,
+            icon: const AppIcon(Icons.shuffle),
+            size: tokens.minTouchTarget,
+            backgroundColor: scheme.secondaryContainer,
+            foregroundColor: scheme.onSecondaryContainer,
+          ),
       ],
     );
   }
@@ -876,12 +883,13 @@ class AlbumPlayActions extends StatelessWidget {
               tonal: true,
               onPressed: onDownload,
             ),
-          HeaderCircleButton(
-            icon: CupertinoIcons.shuffle,
-            tooltip: shuffleTooltip,
-            tonal: true,
-            onPressed: onShuffle,
-          ),
+          if (showShuffle)
+            HeaderCircleButton(
+              icon: CupertinoIcons.shuffle,
+              tooltip: shuffleTooltip,
+              tonal: true,
+              onPressed: onShuffle,
+            ),
           _MornyeHeaderButton(
             icon: isPlaying
                 ? CupertinoIcons.pause_fill
@@ -915,11 +923,12 @@ class AlbumPlayActions extends StatelessWidget {
           label: Text(playLabel),
           style: FilledButton.styleFrom(minimumSize: const Size(112, 40)),
         ),
-        IconButton.filledTonal(
-          tooltip: shuffleTooltip,
-          onPressed: onShuffle,
-          icon: const AppIcon(Icons.shuffle),
-        ),
+        if (showShuffle)
+          IconButton.filledTonal(
+            tooltip: shuffleTooltip,
+            onPressed: onShuffle,
+            icon: const AppIcon(Icons.shuffle),
+          ),
         if (onAddToPlaylist != null)
           IconButton.filledTonal(
             tooltip: addLabel,
