@@ -3,7 +3,8 @@ import 'package:mornye/routes/now_playing_route.dart';
 
 /// The page under the full player. While the player moves over it, the page
 /// is drawn as one picture, so its glass and lists are not painted again on
-/// every frame of the move.
+/// every frame of the move. A touch on the page ends the picture early: the
+/// page answers it live.
 class PlayerUnderlay extends StatefulWidget {
   const PlayerUnderlay({super.key, this.enabled = true, required this.child});
 
@@ -17,6 +18,9 @@ class PlayerUnderlay extends StatefulWidget {
 
 class _PlayerUnderlayState extends State<PlayerUnderlay> {
   final _picture = SnapshotController();
+
+  // The page was touched during this move and is painted live until it ends.
+  bool _touched = false;
 
   @override
   void initState() {
@@ -40,17 +44,32 @@ class _PlayerUnderlayState extends State<PlayerUnderlay> {
     super.dispose();
   }
 
-  void _follow() => _picture.allowSnapshotting =
-      widget.enabled && NowPlayingRoute.moving.value;
+  void _follow() {
+    final moving = NowPlayingRoute.moving.value;
+    if (!moving) _touched = false;
+    _picture.allowSnapshotting = widget.enabled && moving && !_touched;
+  }
 
   // The mini player hides or shows its cover under the picture.
   void _retake() => _picture.clear();
 
+  // A closing player lets touches through to this page. A scrolled list
+  // under a still picture would look stuck until the player is gone.
+  void _touch(PointerDownEvent event) {
+    if (!_picture.allowSnapshotting) return;
+    _touched = true;
+    _follow();
+  }
+
   @override
-  Widget build(BuildContext context) => SnapshotWidget(
-    controller: _picture,
-    mode: SnapshotMode.permissive,
-    autoresize: true,
-    child: widget.child,
+  Widget build(BuildContext context) => Listener(
+    behavior: HitTestBehavior.translucent,
+    onPointerDown: _touch,
+    child: SnapshotWidget(
+      controller: _picture,
+      mode: SnapshotMode.permissive,
+      autoresize: true,
+      child: widget.child,
+    ),
   );
 }

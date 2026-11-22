@@ -52,6 +52,50 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a touched page is live for the rest of the move', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: PlayerUnderlay(child: ColoredBox(color: Colors.blue)),
+      ),
+    );
+    NowPlayingRoute.moving.value = true;
+    await tester.pump();
+    expect(picture(tester).allowSnapshotting, isTrue);
+
+    final touch = await tester.startGesture(const Offset(100, 100));
+    await tester.pump();
+    expect(picture(tester).allowSnapshotting, isFalse);
+    await touch.up();
+    await tester.pump();
+    expect(picture(tester).allowSnapshotting, isFalse);
+
+    // The next move takes a picture again.
+    NowPlayingRoute.moving.value = false;
+    await tester.pump();
+    NowPlayingRoute.moving.value = true;
+    await tester.pump();
+    expect(picture(tester).allowSnapshotting, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a touch on a resting page changes nothing', (tester) async {
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: PlayerUnderlay(child: ColoredBox(color: Colors.blue)),
+      ),
+    );
+    await tester.tapAt(const Offset(100, 100));
+    await tester.pump();
+    NowPlayingRoute.moving.value = true;
+    await tester.pump();
+    expect(picture(tester).allowSnapshotting, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a disabled underlay always paints the live page', (
     tester,
   ) async {

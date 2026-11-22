@@ -1082,6 +1082,57 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a closing player lands on a mini player that moved', (
+    tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        theme: MornyeTheme.build(Brightness.dark),
+        home: const Text('Home'),
+      ),
+    );
+    var drop = 0.0;
+    final route = _TestPlayerRoute(
+      miniPlayerGeometry: () => (
+        surface: Rect.fromLTWH(16, 400 + drop, 300, 56),
+        artwork: Rect.fromLTWH(24, 408 + drop, 40, 40),
+      ),
+    );
+    navigator.currentState!.push(route);
+    await tester.pumpAndSettle();
+    route.readArtwork = () => (
+      bounds: const Rect.fromLTWH(40, 80, 300, 300),
+      child: const ColoredBox(color: Colors.red),
+      fullBleed: false,
+    );
+    const cover = ValueKey('player-minimize-artwork');
+    const surface = ValueKey('player-minimize-surface');
+    navigator.currentState!.pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    final before = tester.getRect(find.byKey(cover));
+
+    // The page under it was scrolled and its bar moved the mini player.
+    drop = 80;
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(tester.getRect(find.byKey(cover)).top, greaterThan(before.top));
+    Rect? lastCover;
+    Rect? lastSurface;
+    for (var i = 0; i < 200 && find.byKey(cover).evaluate().isNotEmpty; i++) {
+      lastCover = tester.getRect(find.byKey(cover));
+      lastSurface = tester.getRect(find.byKey(surface));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(lastCover!.top, moreOrLessEquals(488, epsilon: 2));
+    expect(lastCover.width, moreOrLessEquals(40, epsilon: 2));
+    expect(lastSurface!.top, moreOrLessEquals(480, epsilon: 2));
+    await tester.pumpAndSettle();
+    expect(find.byKey(_sheet), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a player closed without a cover of its own leaves the mini '
       'player\'s alone', (tester) async {
     final navigator = GlobalKey<NavigatorState>();

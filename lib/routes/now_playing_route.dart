@@ -512,7 +512,7 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    final target = _dismissTarget;
+    var target = _dismissTarget;
     final size = MediaQuery.sizeOf(context);
     // The Material mini player is a square bar, which its surface keeps.
     // Material dims the page behind while the player covers it.
@@ -520,6 +520,12 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
     // Restoring portrait can resize the window during dismissal. Geometry
     // captured in landscape no longer points at the mini player in that case.
     if (target != null && _dismissSize == size) {
+      // The page below still takes touches, and a scroll there can move the
+      // mini player: the landing follows it.
+      final live = miniPlayerGeometry?.call();
+      if (live != null && !live.surface.isEmpty) {
+        target = _dismissTarget = live;
+      }
       // The shrink runs on a spring simulation in both styles.
       final progress = (1 - animation.value / _dismissStartValue).clamp(
         0.0,
