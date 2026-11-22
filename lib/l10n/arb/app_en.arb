@@ -9775,6 +9775,68 @@
       }
     }
   },
+  "homeStatusAddedSinceYesterday": "{count, plural, =1{1 song added since yesterday} other{{count} songs added since yesterday}}",
+  "@homeStatusAddedSinceYesterday": {
+    "description": "Home status line under the greeting: songs that finished downloading since the previous visit, which was yesterday",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeStatusAddedSinceLastVisit": "{count, plural, =1{1 song added since your last visit} other{{count} songs added since your last visit}}",
+  "@homeStatusAddedSinceLastVisit": {
+    "description": "Home status line under the greeting: songs that finished downloading since the previous visit to Home",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeStatusDownloading": "{count, plural, other{{count} downloading}}",
+  "@homeStatusDownloading": {
+    "description": "Home status line under the greeting: songs waiting or downloading in the download queue",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeDownloadsNothing": "Nothing downloading",
+  "@homeDownloadsNothing": {
+    "description": "Home downloads section while the download queue is empty"
+  },
+  "homeDownloadsPaused": "Downloads paused",
+  "@homeDownloadsPaused": {
+    "description": "Home downloads section while the download queue is paused"
+  },
+  "homeDownloadsWaiting": "{count, plural, other{{count} waiting}}",
+  "@homeDownloadsWaiting": {
+    "description": "Home downloads section: songs in the queue that have not started",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeDownloadsFinishedToday": "{count, plural, other{{count} finished today}}",
+  "@homeDownloadsFinishedToday": {
+    "description": "Home downloads section: songs that finished downloading today",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeDownloadsFailed": "{count, plural, other{{count} failed}}",
+  "@homeDownloadsFailed": {
+    "description": "Home downloads section: songs in the queue whose download failed",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "homeContinueListening": "Continue listening",
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"
@@ -10054,6 +10116,10 @@
   "homeEditHint": "Drag to reorder. A section with nothing to show stays off Home.",
   "@homeEditHint": {
     "description": "Hint above the list of Home sections on the Edit Home page"
+  },
+  "homeSectionAboutDownloads": "What is downloading, waiting and finished today",
+  "@homeSectionAboutDownloads": {
+    "description": "Edit Home: what the Downloads section shows"
   },
   "homeSectionAboutTopPicks": "Today's mixes and playlists as banners",
   "@homeSectionAboutTopPicks": {

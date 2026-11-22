@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 /// A part of Home the person can move or hide, in the order Home ships.
 /// Settings store the names, so renaming a value drops it from saved layouts.
 enum HomeSection {
+  /// The download queue at a glance, while another app is the player.
+  downloads,
+
   /// Mornye's banner shelf of the day's mixes and playlists.
   topPicks,
 
@@ -26,12 +29,18 @@ enum HomeSection {
   /// The most played songs, or Library albums without a listening record.
   onRepeat;
 
-  /// Whether the section exists in the style at all.
-  bool availableIn({required bool mornye}) => switch (this) {
-    topPicks || recentlyPlayed => mornye,
-    shortcuts || mixes => !mornye,
-    _ => true,
-  };
+  /// Whether the section exists at all in the style, with the built-in
+  /// [player] or with another app playing.
+  bool availableIn({required bool mornye, bool player = true}) =>
+      switch (this) {
+        downloads => !player,
+        topPicks => mornye,
+        recentlyPlayed => mornye && player,
+        continueListening => player,
+        shortcuts => !mornye,
+        mixes => !mornye && player,
+        _ => true,
+      };
 }
 
 /// How the person arranged Home. The default value is Home as it ships.

@@ -140,7 +140,7 @@ void main() {
         sections.indexOf(HomeSection.shortcuts) + 1,
       );
       // What ships before every named section stays at the front.
-      expect(sections.first, HomeSection.topPicks);
+      expect(sections.first, HomeSection.values.first);
     });
 
     test('survives a round trip, unknown names and damaged data', () {
@@ -330,7 +330,10 @@ void main() {
         lessThan(sections.indexOf(HomeSection.continueListening)),
       );
       // Mornye's sections keep their places around the move.
-      expect(sections.first, HomeSection.topPicks);
+      expect(
+        sections.indexOf(HomeSection.topPicks),
+        lessThan(sections.indexOf(HomeSection.shortcuts)),
+      );
     });
 
     testWidgets('Reset Home brings the shipped Home back', (tester) async {

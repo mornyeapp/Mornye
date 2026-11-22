@@ -504,6 +504,8 @@ class _HomeSections extends ConsumerWidget {
     // What each section has to show now, before the person's order and
     // their hidden sections apply.
     final built = <HomeSection, Widget>{
+      if (_HomeDownloadsSection.hasContent(ref))
+        HomeSection.downloads: _HomeDownloadsSection(inset: inset),
       if (hasTopPicks)
         HomeSection.topPicks: _HomeTopPicksSection(
           inset: inset,
@@ -625,11 +627,7 @@ class _HomeSections extends ConsumerWidget {
     // the Library shelves have answered. Hidden sections do not count: a
     // Home the person emptied is not a Library with nothing in it.
     final bare =
-        !showContinue &&
-        built.keys.every(
-          (section) =>
-              section == HomeSection.shortcuts || section == HomeSection.link,
-        );
+        !showContinue && built.keys.every(_homeStandingSections.contains);
     Widget? nothingYet;
     if (bare) {
       final librarySettled = ref.watch(
@@ -673,6 +671,14 @@ class _HomeSections extends ConsumerWidget {
     );
   }
 }
+
+/// Sections that show without any music: with only these, Home still says
+/// there is nothing yet.
+const _homeStandingSections = {
+  HomeSection.downloads,
+  HomeSection.shortcuts,
+  HomeSection.link,
+};
 
 /// The way from the end of Home to the page that arranges it.
 class _HomeEditButton extends StatelessWidget {

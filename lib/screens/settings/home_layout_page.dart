@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/home_layout.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
@@ -21,13 +23,15 @@ class HomeLayoutPage extends ConsumerWidget {
 
   /// Moves a section among the ones this style has. The other style's
   /// sections keep their places in the saved order.
-  void _reorder(WidgetRef ref, bool mornye, int from, int to) {
+  void _reorder(
+    WidgetRef ref,
+    bool Function(HomeSection) available,
+    int from,
+    int to,
+  ) {
     final layout = ref.read(settingsProvider).homeLayout;
     final all = layout.sections;
-    final listed = [
-      for (final section in all)
-        if (section.availableIn(mornye: mornye)) section,
-    ];
+    final listed = all.where(available).toList();
     listed.insert(to, listed.removeAt(from));
     var next = 0;
     ref
@@ -35,7 +39,7 @@ class HomeLayoutPage extends ConsumerWidget {
         .setHomeLayout(
           layout.withOrder([
             for (final section in all)
-              section.availableIn(mornye: mornye) ? listed[next++] : section,
+              available(section) ? listed[next++] : section,
           ]),
         );
   }
@@ -71,10 +75,10 @@ class HomeLayoutPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final mornye = context.isMornye;
     final settings = ref.watch(settingsProvider);
-    final sections = [
-      for (final section in settings.homeLayout.sections)
-        if (section.availableIn(mornye: mornye)) section,
-    ];
+    final player = ref.watch(playerUiEnabledProvider);
+    bool available(HomeSection section) =>
+        section.availableIn(mornye: mornye, player: player);
+    final sections = settings.homeLayout.sections.where(available).toList();
     final side = wideListInset(context);
     return Scaffold(
       body: CustomScrollView(
@@ -96,7 +100,7 @@ class HomeLayoutPage extends ConsumerWidget {
             sliver: SliverReorderableList(
               proxyDecorator: ScaledDragProxy.plain,
               itemCount: sections.length,
-              onReorderItem: (from, to) => _reorder(ref, mornye, from, to),
+              onReorderItem: (from, to) => _reorder(ref, available, from, to),
               itemBuilder: (context, index) {
                 final section = sections[index];
                 return _SectionRow(

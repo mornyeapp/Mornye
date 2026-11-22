@@ -6430,6 +6430,7 @@
   "homeEdit": "Atur Beranda",
   "homeEditSubtitle": "Bagian mana yang tampil, dan urutannya",
   "homeEditHint": "Seret untuk mengurutkan. Bagian yang belum ada isinya tidak tampil di Beranda.",
+  "homeSectionAboutDownloads": "Yang sedang diunduh, menunggu, dan selesai hari ini",
   "homeSectionAboutTopPicks": "Mix dan playlist hari ini sebagai banner",
   "homeSectionAboutRecentlyPlayed": "Album yang baru kamu putar",
   "homeSectionAboutShortcuts": "Jalan cepat ke alat dan koleksi",
@@ -8354,6 +8355,14 @@
       }
     }
   },
+  "homeStatusAddedSinceYesterday": "{count, plural, other{{count} lagu ditambahkan sejak kemarin}}",
+  "homeStatusAddedSinceLastVisit": "{count, plural, other{{count} lagu ditambahkan sejak kunjungan terakhir}}",
+  "homeStatusDownloading": "{count, plural, other{{count} sedang diunduh}}",
+  "homeDownloadsNothing": "Tidak ada yang diunduh",
+  "homeDownloadsPaused": "Unduhan dijeda",
+  "homeDownloadsWaiting": "{count, plural, other{{count} menunggu}}",
+  "homeDownloadsFinishedToday": "{count, plural, other{{count} selesai hari ini}}",
+  "homeDownloadsFailed": "{count, plural, other{{count} gagal}}",
   "homeContinueListening": "Lanjutkan mendengarkan",
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"

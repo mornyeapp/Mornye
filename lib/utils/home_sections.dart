@@ -5,6 +5,7 @@ import 'package:mornye/models/home_layout.dart';
 /// The title Home gives [section].
 String homeSectionName(AppLocalizations l10n, HomeSection section) =>
     switch (section) {
+      HomeSection.downloads => l10n.libraryDownloads,
       HomeSection.topPicks => l10n.homeTopPicks,
       HomeSection.recentlyPlayed => l10n.homeRecentlyPlayed,
       HomeSection.continueListening => l10n.homeContinueListening,
@@ -21,6 +22,7 @@ String homeSectionName(AppLocalizations l10n, HomeSection section) =>
 /// One line on what [section] shows, for the page that arranges Home.
 String homeSectionAbout(AppLocalizations l10n, HomeSection section) =>
     switch (section) {
+      HomeSection.downloads => l10n.homeSectionAboutDownloads,
       HomeSection.topPicks => l10n.homeSectionAboutTopPicks,
       HomeSection.recentlyPlayed => l10n.homeSectionAboutRecentlyPlayed,
       HomeSection.continueListening => l10n.appearanceContinueListeningSubtitle,
@@ -35,6 +37,7 @@ String homeSectionAbout(AppLocalizations l10n, HomeSection section) =>
     };
 
 IconData homeSectionIcon(HomeSection section) => switch (section) {
+  HomeSection.downloads => Icons.download_outlined,
   HomeSection.topPicks => Icons.auto_awesome_mosaic_outlined,
   HomeSection.recentlyPlayed => Icons.history,
   HomeSection.continueListening => Icons.play_circle_outline,
