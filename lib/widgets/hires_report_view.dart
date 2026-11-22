@@ -240,8 +240,13 @@ abstract final class HiResSongColors {
   static Color of(BuildContext context, int slot) {
     final theme = Theme.of(context);
     if (slot >= count) return theme.colorScheme.outline;
-    return (theme.brightness == Brightness.dark ? _dark : _light)[slot];
+    return on(theme.brightness, slot);
   }
+
+  /// The color in [slot] (below [count]) on a [brightness] surface, for
+  /// drawings that do not follow the theme.
+  static Color on(Brightness brightness, int slot) =>
+      (brightness == Brightness.dark ? _dark : _light)[slot % count];
 }
 
 /// The average spectra of several songs on one chart, a line per song.

@@ -1,14 +1,372 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/library_song_reads.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/autoplay_personalization.dart'
+    show AutoplayFeedbackKind;
+import 'package:mornye/services/autoplay_taste.dart' show AutoplayTastePlay;
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/listening_rewind.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/sqlite_helpers.dart' show normalizeLookupText;
+import 'package:mornye/utils/audio_format_utils.dart'
+    show normalizeAudioFormatValue;
 import 'package:mornye/utils/genre_tags.dart';
 
 /// A genre and the time spent listening to its songs.
 typedef ProfileGenre = ({String name, int milliseconds});
+
+/// A decade, as its first year, and the time spent on songs released in it.
+typedef ProfileDecade = ({int decade, int milliseconds});
+
+/// A file format and the time spent on songs stored in it.
+typedef ProfileFormat = ({String name, int milliseconds});
+
+/// How a heard song is stored.
+enum ProfileQuality { hiRes, lossless, lossy }
+
+/// The tier of a file of [format] with [bitDepth] and [sampleRate], or null
+/// when nothing tells. Hi-Res is lossless past 16 bits or 48 kHz.
+ProfileQuality? profileQualityOf({
+  String? format,
+  int? bitDepth,
+  int? sampleRate,
+}) {
+  final name = normalizeAudioFormatValue(format);
+  const lossy = {'aac', 'eac3', 'ac3', 'ac4', 'mp3', 'opus'};
+  if (lossy.contains(name)) return ProfileQuality.lossy;
+  final depth = bitDepth ?? 0;
+  if (depth > 0 || const {'flac', 'alac', 'wav', 'aiff'}.contains(name)) {
+    return depth > 16 || (sampleRate ?? 0) > 48000
+        ? ProfileQuality.hiRes
+        : ProfileQuality.lossless;
+  }
+  // An MP4 file without a bit depth holds AAC.
+  return name == 'm4a' ? ProfileQuality.lossy : null;
+}
+
+/// When and how the heard songs were made: release decades, file quality
+/// and formats, each by listening time.
+class ProfileSound {
+  const ProfileSound({
+    this.decades = const [],
+    this.decadeMilliseconds = 0,
+    this.quality = const {},
+    this.qualityMilliseconds = 0,
+    this.formats = const [],
+  });
+
+  /// Decades by listening time, oldest first.
+  final List<ProfileDecade> decades;
+
+  /// Listening time of the songs whose year is known.
+  final int decadeMilliseconds;
+
+  final Map<ProfileQuality, int> quality;
+
+  /// Listening time of the songs whose quality is known.
+  final int qualityMilliseconds;
+
+  /// Formats by listening time, longest first.
+  final List<ProfileFormat> formats;
+
+  /// The decade with the most listening.
+  ProfileDecade? get era => decades.isEmpty
+      ? null
+      : decades.reduce((a, b) => b.milliseconds > a.milliseconds ? b : a);
+
+  /// The share of known-quality listening in [tier].
+  double share(ProfileQuality tier) =>
+      qualityMilliseconds <= 0 ? 0 : (quality[tier] ?? 0) / qualityMilliseconds;
+}
+
+/// The decades and quality of [tracks]. [rows] are `match_key`,
+/// `release_date`, `format`, `bit_depth` and `sample_rate` rows from
+/// [LibraryDatabase.getDetailsOfSongs]; a song in several files counts once,
+/// at its best quality.
+ProfileSound listeningSound(
+  Iterable<ListeningTotal> tracks,
+  Iterable<Map<String, Object?>> rows, {
+  DateTime? now,
+}) {
+  final latest = (now ?? DateTime.now()).year + 1;
+  final years = <String, int>{};
+  final tiers = <String, ProfileQuality>{};
+  final formatOf = <String, String>{};
+  for (final row in rows) {
+    final key = row['match_key'] as String? ?? '';
+    if (key.isEmpty) continue;
+    final date = (row['release_date'] as String? ?? '').trim();
+    final year = date.length >= 4 ? int.tryParse(date.substring(0, 4)) : null;
+    if (year != null && year >= 1900 && year <= latest) {
+      years.putIfAbsent(key, () => year);
+    }
+    final format = row['format'] as String?;
+    final tier = profileQualityOf(
+      format: format,
+      bitDepth: (row['bit_depth'] as num?)?.toInt(),
+      sampleRate: (row['sample_rate'] as num?)?.toInt(),
+    );
+    final known = tiers[key];
+    // ProfileQuality lists the best tier first.
+    if (tier != null && (known == null || tier.index < known.index)) {
+      tiers[key] = tier;
+      final name = normalizeAudioFormatValue(format);
+      if (name != null) formatOf[key] = name;
+    }
+  }
+  final decades = <int, int>{};
+  final quality = <ProfileQuality, int>{};
+  final formats = <String, int>{};
+  var dated = 0;
+  var rated = 0;
+  for (final total in tracks) {
+    final key = profileSongKey(total.track);
+    final year = years[key];
+    if (year != null) {
+      final decade = year - year % 10;
+      decades[decade] = (decades[decade] ?? 0) + total.milliseconds;
+      dated += total.milliseconds;
+    }
+    final tier = tiers[key];
+    if (tier != null) {
+      quality[tier] = (quality[tier] ?? 0) + total.milliseconds;
+      rated += total.milliseconds;
+      final format = formatOf[key];
+      if (format != null) {
+        formats[format] = (formats[format] ?? 0) + total.milliseconds;
+      }
+    }
+  }
+  String formatName(String name) => switch (name) {
+    'opus' => 'Opus',
+    'm4a' => 'AAC',
+    _ => name.toUpperCase(),
+  };
+  final namedFormats = <String, int>{};
+  for (final entry in formats.entries) {
+    final name = formatName(entry.key);
+    namedFormats[name] = (namedFormats[name] ?? 0) + entry.value;
+  }
+  return ProfileSound(
+    decades: [
+      for (final decade in decades.keys.toList()..sort())
+        (decade: decade, milliseconds: decades[decade]!),
+    ],
+    decadeMilliseconds: dated,
+    quality: quality,
+    qualityMilliseconds: rated,
+    formats: [
+      for (final entry in namedFormats.entries)
+        (name: entry.key, milliseconds: entry.value),
+    ]..sort((a, b) => b.milliseconds.compareTo(a.milliseconds)),
+  );
+}
+
+/// The parts of a day, as the hours they start and end at.
+enum ProfileDaypart {
+  morning(5, 12),
+  afternoon(12, 17),
+  evening(17, 21),
+  night(21, 5);
+
+  const ProfileDaypart(this.start, this.end);
+
+  final int start;
+  final int end;
+
+  static ProfileDaypart of(int hour) => values.firstWhere(
+    (part) => part.start < part.end
+        ? hour >= part.start && hour < part.end
+        : hour >= part.start || hour < part.end,
+  );
+}
+
+/// The hours songs are played at and how often they are played through,
+/// read from the recent sessions the player learns from.
+class ProfileRhythm {
+  const ProfileRhythm({
+    this.hours = const [],
+    this.playedThrough = 0,
+    this.skipped = 0,
+    this.since,
+  });
+
+  factory ProfileRhythm.of(Iterable<AutoplayTastePlay> plays) {
+    final hours = List.filled(24, 0);
+    var through = 0;
+    var skipped = 0;
+    DateTime? since;
+    for (final play in plays) {
+      switch (play.kind) {
+        case AutoplayFeedbackKind.listened || AutoplayFeedbackKind.replayed:
+          hours[play.at.hour]++;
+          through++;
+        case AutoplayFeedbackKind.skipped:
+          skipped++;
+        case AutoplayFeedbackKind.loved || AutoplayFeedbackKind.playlisted:
+          continue;
+      }
+      if (since == null || play.at.isBefore(since)) since = play.at;
+    }
+    return ProfileRhythm(
+      hours: hours,
+      playedThrough: through,
+      skipped: skipped,
+      since: since,
+    );
+  }
+
+  /// Songs played on at each hour of the day, midnight first.
+  final List<int> hours;
+
+  /// Songs played through at least half of the way.
+  final int playedThrough;
+  final int skipped;
+
+  /// The oldest session read.
+  final DateTime? since;
+
+  /// Fewer sessions than this say little about a listener's day.
+  static const enough = 20;
+
+  bool get isEmpty => playedThrough + skipped < enough;
+
+  /// The share of songs played through.
+  double get throughShare {
+    final all = playedThrough + skipped;
+    return all == 0 ? 0 : playedThrough / all;
+  }
+
+  /// Songs played on in each part of the day.
+  Map<ProfileDaypart, int> get dayparts {
+    final parts = {for (final part in ProfileDaypart.values) part: 0};
+    for (final (hour, count) in hours.indexed) {
+      final part = ProfileDaypart.of(hour);
+      parts[part] = parts[part]! + count;
+    }
+    return parts;
+  }
+
+  /// The part of the day with the most songs played on.
+  ProfileDaypart? get daypart {
+    if (playedThrough == 0) return null;
+    return dayparts.entries.reduce((a, b) => b.value > a.value ? b : a).key;
+  }
+
+  /// The hour with the most songs played on.
+  int? get peakHour {
+    if (playedThrough == 0) return null;
+    var best = 0;
+    for (var hour = 1; hour < hours.length; hour++) {
+      if (hours[hour] > hours[best]) best = hour;
+    }
+    return best;
+  }
+}
+
+/// How few of [artists], most heard first, take half of the time they add
+/// up to. 0 without listening.
+int profileArtistsForHalf(List<MapEntry<String, int>> artists) {
+  final total = artists.fold(0, (sum, artist) => sum + artist.value);
+  if (total <= 0) return 0;
+  var sum = 0;
+  for (final (index, artist) in artists.indexed) {
+    sum += artist.value;
+    if (sum * 2 >= total) return index + 1;
+  }
+  return artists.length;
+}
+
+/// A word for a listener that the record bears out.
+enum ProfileTrait {
+  onAStreak,
+  audiophile,
+  nightOwl,
+  earlyBird,
+  weekender,
+  loyal,
+  explorer,
+  eclectic,
+  onRepeat,
+}
+
+/// A trait with what bears it out: a [share] of the listening, a [count] or
+/// the [subject] it is about, as the trait needs.
+typedef ProfileTraitFact = ({
+  ProfileTrait trait,
+  double share,
+  int count,
+  String subject,
+});
+
+/// The traits [overview] and [rhythm] bear out, in [ProfileTrait] order, at
+/// most [limit].
+List<ProfileTraitFact> profileTraits(
+  ProfileOverview overview, {
+  ProfileRhythm? rhythm,
+  int limit = 4,
+}) {
+  final traits = <ProfileTraitFact>[];
+  void add(
+    ProfileTrait trait, {
+    double share = 0,
+    int count = 0,
+    String subject = '',
+  }) =>
+      traits.add((trait: trait, share: share, count: count, subject: subject));
+  final habits = overview.habits;
+  if (habits.currentStreak >= 7) {
+    add(ProfileTrait.onAStreak, count: habits.currentStreak);
+  }
+  final sound = overview.sound;
+  final hiRes = sound.share(ProfileQuality.hiRes);
+  if (sound.qualityMilliseconds >= const Duration(hours: 1).inMilliseconds &&
+      hiRes >= 0.5) {
+    add(ProfileTrait.audiophile, share: hiRes);
+  }
+  if (rhythm != null && !rhythm.isEmpty) {
+    final parts = rhythm.dayparts;
+    double share(ProfileDaypart part) => parts[part]! / rhythm.playedThrough;
+    if (share(ProfileDaypart.night) >= 0.35) {
+      add(ProfileTrait.nightOwl, share: share(ProfileDaypart.night));
+    } else if (share(ProfileDaypart.morning) >= 0.35) {
+      add(ProfileTrait.earlyBird, share: share(ProfileDaypart.morning));
+    }
+  }
+  final week = habits.weekdays.fold(0, (sum, time) => sum + time);
+  final weekend = week == 0
+      ? 0.0
+      : (habits.weekdays[5] + habits.weekdays[6]) / week;
+  // Two days of seven are 29% of an even week.
+  if (weekend >= 0.45) add(ProfileTrait.weekender, share: weekend);
+  final artists = overview.allTime.topArtists;
+  final artistTime = artists.fold(0, (sum, artist) => sum + artist.value);
+  if (artists.length >= 3 && artistTime > 0) {
+    final share = artists.first.value / artistTime;
+    if (share >= 0.25) {
+      add(ProfileTrait.loyal, share: share, subject: artists.first.key);
+    }
+  }
+  final found = overview.month.newArtists.length;
+  if (found >= 10) add(ProfileTrait.explorer, count: found);
+  final genres = overview.genres;
+  if (genres.length >= 8 && overview.genreMilliseconds > 0) {
+    final top = genres.first.milliseconds / overview.genreMilliseconds;
+    if (top < 0.3) {
+      add(ProfileTrait.eclectic, share: top, count: genres.length);
+    }
+  }
+  final replay = overview.allTime.replay;
+  if (replay != null && replay.plays >= 8) {
+    add(
+      ProfileTrait.onRepeat,
+      count: replay.plays,
+      subject: replay.track.title,
+    );
+  }
+  return traits.take(limit).toList(growable: false);
+}
 
 /// The days a listener plays music on, read from the daily totals.
 class ProfileHabits {
@@ -17,6 +375,7 @@ class ProfileHabits {
     this.weekdays = const [0, 0, 0, 0, 0, 0, 0],
     this.averageMilliseconds = 0,
     this.recent = const [],
+    this.months = const [],
   });
 
   /// [days] maps a [listeningDay] to its listening time; [now] is today.
@@ -35,6 +394,7 @@ class ProfileHabits {
     }
 
     final weekdays = List.filled(7, 0);
+    final months = List.filled(recentMonths, 0);
     var total = 0;
     var active = 0;
     for (final entry in days.entries) {
@@ -43,6 +403,10 @@ class ProfileHabits {
       weekdays[day.weekday - 1] += entry.value;
       total += entry.value;
       active++;
+      final back = (today.year - day.year) * 12 + today.month - day.month;
+      if (back >= 0 && back < recentMonths) {
+        months[recentMonths - 1 - back] += entry.value;
+      }
     }
     return ProfileHabits(
       currentStreak: streak,
@@ -52,11 +416,15 @@ class ProfileHabits {
         for (var back = recentDays - 1; back >= 0; back--)
           time(before(today, back)),
       ],
+      months: months,
     );
   }
 
   /// How many days [recent] covers, today included.
   static const recentDays = 30;
+
+  /// How many months [months] covers, this one included.
+  static const recentMonths = 12;
 
   /// Days in a row with listening, up to today or, before today's first
   /// song, up to yesterday.
@@ -70,6 +438,10 @@ class ProfileHabits {
 
   /// Listening time of each of the last [recentDays] days, oldest first.
   final List<int> recent;
+
+  /// Listening time of each of the last [recentMonths] months, oldest
+  /// first.
+  final List<int> months;
 }
 
 /// Everything the listening record tells about its listener.
@@ -80,6 +452,7 @@ class ProfileOverview {
     this.genres = const [],
     this.genreMilliseconds = 0,
     this.habits = const ProfileHabits(),
+    this.sound = const ProfileSound(),
     this.since,
   });
 
@@ -97,6 +470,9 @@ class ProfileOverview {
   final int genreMilliseconds;
 
   final ProfileHabits habits;
+
+  /// Release decades and file quality of the heard songs.
+  final ProfileSound sound;
 
   /// The first day with any listening.
   final DateTime? since;
@@ -219,6 +595,12 @@ final profileOverviewProvider = FutureProvider.autoDispose<ProfileOverview>((
           includeLocal: includeLocal,
         );
   final genres = listeningGenres(heard, rows, separator: separator);
+  final details = keys.isEmpty
+      ? const <Map<String, Object?>>[]
+      : await LibraryDatabase.instance.getDetailsOfSongs(
+          keys.toList(),
+          includeLocal: includeLocal,
+        );
   final days = [
     for (final entry in summary.days.entries)
       if (entry.value > 0) entry.key,
@@ -229,6 +611,20 @@ final profileOverviewProvider = FutureProvider.autoDispose<ProfileOverview>((
     genres: genres.genres,
     genreMilliseconds: genres.milliseconds,
     habits: ProfileHabits.of(summary.days, now),
+    sound: listeningSound(heard, details, now: now),
     since: days.isEmpty ? null : DateTime.tryParse(days.first),
   );
+});
+
+/// The hours of the day and the play-through rate, from the sessions the
+/// player keeps for learning. Empty while learning has seen too little.
+final profileRhythmProvider = FutureProvider.autoDispose<ProfileRhythm>((
+  ref,
+) async {
+  try {
+    final taste = ref.read(musicPlayerRuntimeProvider).taste;
+    return ProfileRhythm.of(await taste.readLog());
+  } catch (_) {
+    return const ProfileRhythm();
+  }
 });

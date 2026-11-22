@@ -8333,6 +8333,179 @@
     }
   },
   "profileRecentChart": "Waktu mendengarkan pada tiap hari dalam 30 hari terakhir",
+  "profileNowPlayingProgress": "{position} dari {duration}",
+  "@profileNowPlayingProgress": {
+    "placeholders": {
+      "position": {
+        "type": "String"
+      },
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTasteOther": "Lainnya",
+  "profileTasteChart": "Bagian waktu mendengarkan per genre",
+  "profileLast12Months": "12 bulan terakhir",
+  "profileBestMonth": "Bulan terbaik",
+  "profileMonthChart": "Waktu mendengarkan pada tiap bulan dalam 12 bulan terakhir",
+  "profileTraits": "Tipe pendengar",
+  "profileTraitStreak": "Sedang beruntun",
+  "profileTraitStreakBody": "{count} hari berturut-turut dengan musik",
+  "@profileTraitStreakBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileTraitAudiophile": "Audiophile",
+  "profileTraitAudiophileBody": "{percent} dari waktu mendengarkan Anda dalam Hi-Res",
+  "@profileTraitAudiophileBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitNightOwl": "Burung hantu",
+  "profileTraitNightOwlBody": "{percent} lagu Anda diputar larut malam",
+  "@profileTraitNightOwlBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitEarlyBird": "Si pagi",
+  "profileTraitEarlyBirdBody": "{percent} lagu Anda diputar pada pagi hari",
+  "@profileTraitEarlyBirdBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitWeekender": "Pendengar akhir pekan",
+  "profileTraitWeekenderBody": "{percent} dari waktu mendengarkan Anda jatuh pada Sabtu dan Minggu",
+  "@profileTraitWeekenderBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitLoyal": "Penggemar setia",
+  "profileTraitLoyalBody": "{artist} mengambil {percent} dari waktu mendengarkan Anda",
+  "@profileTraitLoyalBody": {
+    "placeholders": {
+      "artist": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitExplorer": "Penjelajah",
+  "profileTraitExplorerBody": "{count} artis baru dalam 30 hari terakhir",
+  "@profileTraitExplorerBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileTraitEclectic": "Serba ragam",
+  "profileTraitEclecticBody": "{count} genre, yang terbesar {percent}",
+  "@profileTraitEclecticBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitOnRepeat": "Diulang terus",
+  "profileTraitOnRepeatBody": "{title}, {count} kali dalam sehari",
+  "@profileTraitOnRepeatBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileDecades": "Dekade",
+  "profileDecade": "{decade}-an",
+  "@profileDecade": {
+    "placeholders": {
+      "decade": {
+        "type": "String"
+      }
+    }
+  },
+  "profileEra": "Dekade paling sering diputar",
+  "profileDecadeChart": "Waktu mendengarkan per dekade rilis, terbanyak pada {decade}",
+  "@profileDecadeChart": {
+    "placeholders": {
+      "decade": {
+        "type": "String"
+      }
+    }
+  },
+  "profileDecadesNote": "Untuk lagu yang tahun rilisnya diketahui Koleksi.",
+  "profileSound": "Kualitas suara",
+  "profileQualityHiRes": "Hi-Res",
+  "profileQualityLossless": "Lossless",
+  "profileQualityLossy": "Lossy",
+  "profileTopFormat": "Format paling sering diputar",
+  "profileSoundNote": "Bagian dari waktu mendengarkan Anda, untuk lagu yang filenya diketahui Koleksi.",
+  "profileSoundChart": "Bagian waktu mendengarkan per kualitas suara",
+  "profileTimeOfDay": "Waktu dalam sehari",
+  "profilePeakHour": "Jam tersibuk",
+  "profileMostActive": "Paling aktif",
+  "profileDaypartMorning": "Pagi",
+  "profileDaypartAfternoon": "Siang",
+  "profileDaypartEvening": "Sore",
+  "profileDaypartNight": "Malam",
+  "profileNotSkipped": "Lagu yang tidak dilewati",
+  "profileHourChart": "Lagu yang diputar pada tiap jam dalam sehari, terbanyak pada {hour}",
+  "@profileHourChart": {
+    "placeholders": {
+      "hour": {
+        "type": "String"
+      }
+    }
+  },
+  "profileRhythmNote": "Dari {count} lagu terakhir Anda.",
+  "@profileRhythmNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileArtistsHalf": "Separuh waktu mendengarkan Anda untuk {count} artis.",
+  "@profileArtistsHalf": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileShare": "Bagikan profil",
+  "profileShareShow": "Tampilkan",
+  "profileShareIdentity": "Nama dan foto",
+  "profileShareHighlights": "Sorotan",
+  "profileShareHeadline": "Musik saya",
+  "profileShareText": "Profil mendengarkan saya",
+  "profileShareSaved": "Kartu profil disimpan",
+  "profileShareError": "Tidak dapat membuat gambar profil",
   "homeGreetingMorning1": "Selamat pagi",
   "homeGreetingMorning2": "Pagi yang cerah",
   "homeGreetingMorning3": "Awali harimu",

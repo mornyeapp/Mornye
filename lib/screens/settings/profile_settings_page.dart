@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
@@ -13,19 +13,26 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/screens/settings/profile_edit_page.dart';
+import 'package:mornye/screens/settings/profile_share_screen.dart';
 import 'package:mornye/services/listening_rewind.dart';
 import 'package:mornye/services/user_profile_store.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
+import 'package:mornye/utils/string_utils.dart' show formatClock;
 import 'package:mornye/widgets/animation_utils.dart' show slidePageRoute;
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
+import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_shape.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
+import 'package:mornye/widgets/hires_report_view.dart' show HiResSongColors;
+import 'package:mornye/widgets/now_playing_indicator.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/profile_avatar.dart';
 import 'package:mornye/widgets/settings_group.dart';
+
+part 'profile_sections.dart';
 
 /// The listener's profile: who they are, what is playing, and what the
 /// listening record and the Library say about their taste. The name and
@@ -94,8 +101,21 @@ class ProfileSettingsPage extends ConsumerWidget {
                             page: const ListeningStatisticsScreen(),
                           ),
                         ),
-                        showDivider: false,
+                        showDivider: heard,
                       ),
+                      if (heard)
+                        SettingsItem(
+                          icon: Icons.ios_share,
+                          title: l10n.profileShare,
+                          trailing: const AppIcon.adaptive(Icons.chevron_right),
+                          onTap: () => openProfileShare(
+                            context,
+                            profile: profile,
+                            overview: data,
+                            rhythm: ref.read(profileRhythmProvider).value,
+                          ),
+                          showDivider: false,
+                        ),
                     ],
                   ),
               ],
@@ -125,10 +145,24 @@ class ProfileSettingsPage extends ConsumerWidget {
       ),
       SettingsSectionHeader(title: l10n.profileLast30Days),
       _RecentCard(month: data.month, days: data.habits.recent),
+      if (data.habits.months.where((time) => time > 0).length > 1) ...[
+        SettingsSectionHeader(title: l10n.profileLast12Months),
+        _MonthsCard(months: data.habits.months),
+      ],
+      _TraitsSection(overview: data),
       SettingsSectionHeader(title: l10n.profileTaste),
       _TasteCard(overview: data),
+      if (data.sound.decades.isNotEmpty) ...[
+        SettingsSectionHeader(title: l10n.profileDecades),
+        _DecadesCard(sound: data.sound),
+      ],
+      if (data.sound.qualityMilliseconds > 0) ...[
+        SettingsSectionHeader(title: l10n.profileSound),
+        _SoundCard(sound: data.sound),
+      ],
       SettingsSectionHeader(title: l10n.profileHabits),
       _HabitsCard(overview: data),
+      const _TimeOfDaySection(),
       if (all.topArtists.isNotEmpty) ...[
         SettingsSectionHeader(title: l10n.listeningStatsTopArtists),
         _Shelf(
@@ -142,6 +176,18 @@ class ProfileSettingsPage extends ConsumerWidget {
               ),
           ],
         ),
+        if (all.topArtists.length >= 3)
+          _Inset(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                l10n.profileArtistsHalf(profileArtistsForHalf(all.topArtists)),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
       ],
       if (all.topAlbums.isNotEmpty) ...[
         SettingsSectionHeader(title: l10n.profileTopAlbums),
@@ -170,9 +216,12 @@ class ProfileSettingsPage extends ConsumerWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
-                total.track.artist.trim().isEmpty
-                    ? l10n.unknownArtist
-                    : total.track.artist,
+                [
+                  total.track.artist.trim().isEmpty
+                      ? l10n.unknownArtist
+                      : total.track.artist,
+                  if (total.plays > 0) l10n.listeningRewindPlays(total.plays),
+                ].join(' · '),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -190,18 +239,11 @@ String _locale(BuildContext context) =>
 String _count(BuildContext context, int value) =>
     NumberFormat.decimalPattern(_locale(context)).format(value);
 
-/// Minutes under an hour, hours above: one decimal under ten hours.
-String _duration(BuildContext context, int milliseconds) {
-  final minutes = (milliseconds / 60000).round();
-  if (minutes < 60) return context.l10n.listeningStatsMinutes(minutes);
-  final hours = milliseconds / 3600000;
-  return context.l10n.profileHours(
-    NumberFormat.decimalPatternDigits(
-      locale: _locale(context),
-      decimalDigits: hours < 10 ? 1 : 0,
-    ).format(hours),
-  );
-}
+String _duration(BuildContext context, int milliseconds) =>
+    profileDuration(context, milliseconds);
+
+String _percent(BuildContext context, double share) =>
+    NumberFormat.percentPattern(_locale(context)).format(share);
 
 /// The side inset [SettingsGroup] gives itself, for content outside one.
 class _Inset extends StatelessWidget {
@@ -308,7 +350,7 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// The song in the player, when there is one.
+/// The song in the player, when there is one, with how far it has played.
 class _NowPlaying extends ConsumerWidget {
   const _NowPlaying();
 
@@ -316,6 +358,7 @@ class _NowPlaying extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final item = ref.watch(currentMediaItemProvider).value;
     if (item == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
     final artist = item.artist?.trim() ?? '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -323,22 +366,120 @@ class _NowPlaying extends ConsumerWidget {
         SettingsSectionHeader(title: context.l10n.profileNowPlaying),
         SettingsGroup(
           children: [
-            ListTile(
-              leading: _Cover(artwork: item.artUri?.toString(), size: 48),
-              title: Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: Text(
-                artist.isEmpty ? context.l10n.unknownArtist : artist,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      _Cover(artwork: item.artUri?.toString(), size: 56),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              artist.isEmpty
+                                  ? context.l10n.unknownArtist
+                                  : artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      NowPlayingIndicator(
+                        playing: ref.watch(playbackPlayingProvider),
+                        color: theme.colorScheme.primary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _NowPlayingProgress(duration: item.duration),
+                ],
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+/// The played time, a bar and the song's length, following every position
+/// tick while the page shows.
+class _NowPlayingProgress extends ConsumerWidget {
+  const _NowPlayingProgress({required this.duration});
+
+  final Duration? duration;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final length = duration ?? Duration.zero;
+    final position = TickerMode.valuesOf(context).enabled
+        ? ref.watch(playbackPositionProvider)
+        : ref.read(playbackPositionProvider);
+    final shown = length > Duration.zero && position > length
+        ? length
+        : position;
+    final elapsed = formatClock(shown.inSeconds);
+    final total = length > Duration.zero ? formatClock(length.inSeconds) : '';
+    final style = theme.textTheme.labelMedium?.copyWith(
+      color: colors.onSurfaceVariant,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    // Playback progress runs left to right in right-to-left layouts too.
+    return Semantics(
+      label: total.isEmpty
+          ? elapsed
+          : context.l10n.profileNowPlayingProgress(elapsed, total),
+      child: ExcludeSemantics(
+        child: RepaintBoundary(
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (length > Duration.zero)
+                  AppProgressIndicator.linear(
+                    value: (shown.inMilliseconds / length.inMilliseconds).clamp(
+                      0.0,
+                      1.0,
+                    ),
+                    minHeight: 4,
+                    wavy: false,
+                    color: colors.primary,
+                    trackColor: colors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Text(elapsed, style: style),
+                    const Spacer(),
+                    if (total.isNotEmpty) Text(total, style: style),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -537,29 +678,34 @@ class _Fact extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Flexible(
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+      // The label keeps its own width, up to half the row; the value takes
+      // the rest and ends at the row's end.
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth / 2),
+              child: Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                fontFeatures: const [FontFeature.tabularFigures()],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                value,
+                textAlign: TextAlign.end,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -652,11 +798,14 @@ class _RecentCard extends StatelessWidget {
 }
 
 /// The genres the listening time goes to, as shares of the time whose genre
-/// is known.
+/// is known, each in a color of its own.
 class _TasteCard extends StatelessWidget {
   const _TasteCard({required this.overview});
 
   final ProfileOverview overview;
+
+  /// Genres with a color of their own; the rest share Other.
+  static const shown = 6;
 
   @override
   Widget build(BuildContext context) {
@@ -666,68 +815,35 @@ class _TasteCard extends StatelessWidget {
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: colors.onSurfaceVariant,
     );
-    final genres = overview.genres.take(5).toList();
-    final percent = NumberFormat.percentPattern(_locale(context));
+    final genres = overview.genres.take(shown).toList();
+    final total = overview.genreMilliseconds;
+    final other =
+        total - genres.fold<int>(0, (sum, genre) => sum + genre.milliseconds);
+    final parts = <_Part>[
+      for (final (index, genre) in genres.indexed)
+        (
+          label: genre.name,
+          milliseconds: genre.milliseconds,
+          color: HiResSongColors.of(context, index),
+        ),
+      if (other > 0)
+        (
+          label: l10n.profileTasteOther,
+          milliseconds: other,
+          color: colors.outline,
+        ),
+    ];
     return SettingsGroup(
       children: [
         Padding(
           padding: const EdgeInsets.all(20),
           child: genres.isEmpty
               ? Text(l10n.profileTasteEmpty, style: muted)
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final genre in genres) ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              genre.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyLarge,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            percent.format(
-                              genre.milliseconds / overview.genreMilliseconds,
-                            ),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      // One hue: the bars measure, they do not name.
-                      Container(
-                        height: 8,
-                        decoration: ShapeDecoration(
-                          color: colors.surfaceContainerHighest,
-                          shape: const StadiumBorder(),
-                        ),
-                        alignment: AlignmentDirectional.centerStart,
-                        child: FractionallySizedBox(
-                          widthFactor:
-                              (genre.milliseconds / overview.genreMilliseconds)
-                                  .clamp(0.0, 1.0),
-                          heightFactor: 1,
-                          child: DecoratedBox(
-                            decoration: ShapeDecoration(
-                              color: colors.primary,
-                              shape: const StadiumBorder(),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-                    Text(l10n.profileTasteNote, style: muted),
-                  ],
+              : _PartsChart(
+                  parts: parts,
+                  total: total,
+                  label: l10n.profileTasteChart,
+                  note: l10n.profileTasteNote,
                 ),
         ),
       ],

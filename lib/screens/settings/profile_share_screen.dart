@@ -1,0 +1,1092 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:intl/intl.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/profile_overview_provider.dart';
+import 'package:mornye/screens/lyrics_share_screen.dart'
+    show
+        LyricsCardBackground,
+        LyricsCardSaver,
+        LyricsCardShape,
+        ShareCardBackdrop,
+        ShareCardBackgroundPicker,
+        ShareCardBrand,
+        saveShareCardWithSystemDialog;
+import 'package:mornye/services/user_profile_store.dart';
+import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/cover_palette.dart';
+import 'package:mornye/theme/page_transitions.dart';
+import 'package:mornye/utils/widget_capture.dart';
+import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/app_shape.dart';
+import 'package:mornye/widgets/expressive_button.dart';
+import 'package:mornye/widgets/hires_report_view.dart' show HiResSongColors;
+import 'package:mornye/widgets/player_artwork.dart';
+import 'package:mornye/widgets/profile_avatar.dart';
+import 'package:mornye/widgets/settings_group.dart';
+
+/// Minutes under an hour, hours above: one decimal under ten hours.
+String profileDuration(BuildContext context, int milliseconds) {
+  final minutes = (milliseconds / 60000).round();
+  if (minutes < 60) return context.l10n.listeningStatsMinutes(minutes);
+  final hours = milliseconds / 3600000;
+  return context.l10n.profileHours(
+    NumberFormat.decimalPatternDigits(
+      locale: Localizations.localeOf(context).toLanguageTag(),
+      decimalDigits: hours < 10 ? 1 : 0,
+    ).format(hours),
+  );
+}
+
+String _percent(BuildContext context, double share) =>
+    NumberFormat.percentPattern(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(share);
+
+IconData profileTraitIcon(ProfileTrait trait) => switch (trait) {
+  ProfileTrait.onAStreak => Icons.local_fire_department_outlined,
+  ProfileTrait.audiophile => Icons.graphic_eq,
+  ProfileTrait.nightOwl => Icons.bedtime_outlined,
+  ProfileTrait.earlyBird => Icons.wb_twilight,
+  ProfileTrait.weekender => Icons.weekend_outlined,
+  ProfileTrait.loyal => Icons.favorite_outline,
+  ProfileTrait.explorer => Icons.explore_outlined,
+  ProfileTrait.eclectic => Icons.auto_awesome_outlined,
+  ProfileTrait.onRepeat => Icons.repeat_one,
+};
+
+String profileTraitName(BuildContext context, ProfileTrait trait) {
+  final l10n = context.l10n;
+  return switch (trait) {
+    ProfileTrait.onAStreak => l10n.profileTraitStreak,
+    ProfileTrait.audiophile => l10n.profileTraitAudiophile,
+    ProfileTrait.nightOwl => l10n.profileTraitNightOwl,
+    ProfileTrait.earlyBird => l10n.profileTraitEarlyBird,
+    ProfileTrait.weekender => l10n.profileTraitWeekender,
+    ProfileTrait.loyal => l10n.profileTraitLoyal,
+    ProfileTrait.explorer => l10n.profileTraitExplorer,
+    ProfileTrait.eclectic => l10n.profileTraitEclectic,
+    ProfileTrait.onRepeat => l10n.profileTraitOnRepeat,
+  };
+}
+
+/// What bears the trait out, in one line.
+String profileTraitBody(BuildContext context, ProfileTraitFact fact) {
+  final l10n = context.l10n;
+  final share = _percent(context, fact.share);
+  return switch (fact.trait) {
+    ProfileTrait.onAStreak => l10n.profileTraitStreakBody(fact.count),
+    ProfileTrait.audiophile => l10n.profileTraitAudiophileBody(share),
+    ProfileTrait.nightOwl => l10n.profileTraitNightOwlBody(share),
+    ProfileTrait.earlyBird => l10n.profileTraitEarlyBirdBody(share),
+    ProfileTrait.weekender => l10n.profileTraitWeekenderBody(share),
+    ProfileTrait.loyal => l10n.profileTraitLoyalBody(fact.subject, share),
+    ProfileTrait.explorer => l10n.profileTraitExplorerBody(fact.count),
+    ProfileTrait.eclectic => l10n.profileTraitEclecticBody(fact.count, share),
+    ProfileTrait.onRepeat => l10n.profileTraitOnRepeatBody(
+      fact.subject,
+      fact.count,
+    ),
+  };
+}
+
+String profileQualityName(BuildContext context, ProfileQuality tier) =>
+    switch (tier) {
+      ProfileQuality.hiRes => context.l10n.profileQualityHiRes,
+      ProfileQuality.lossless => context.l10n.profileQualityLossless,
+      ProfileQuality.lossy => context.l10n.profileQualityLossy,
+    };
+
+/// Hi-Res in amber, lossless in blue, lossy in [lossy].
+Color profileQualityColor(
+  Brightness brightness,
+  ProfileQuality tier, {
+  required Color lossy,
+}) => switch (tier) {
+  ProfileQuality.hiRes => HiResSongColors.on(brightness, 3),
+  ProfileQuality.lossless => HiResSongColors.on(brightness, 0),
+  ProfileQuality.lossy => lossy,
+};
+
+/// What a profile card can show.
+enum ProfileCardPart {
+  identity,
+  highlights,
+  traits,
+  taste,
+  artists,
+  tracks,
+  sound,
+}
+
+/// How the profile card looks and what it shows. The last choice is kept
+/// for the next share.
+class ProfileCardStyle {
+  const ProfileCardStyle({
+    this.background = LyricsCardBackground.color,
+    this.shape = LyricsCardShape.story,
+    this.parts = defaultParts,
+  });
+
+  static const defaultParts = {
+    ProfileCardPart.identity,
+    ProfileCardPart.highlights,
+    ProfileCardPart.traits,
+    ProfileCardPart.taste,
+    ProfileCardPart.artists,
+    ProfileCardPart.tracks,
+  };
+
+  /// The shapes a profile fits: the wide card has no room for it.
+  static const shapes = [LyricsCardShape.story, LyricsCardShape.square];
+
+  final LyricsCardBackground background;
+  final LyricsCardShape shape;
+  final Set<ProfileCardPart> parts;
+
+  static const _key = 'profile_card_style';
+
+  ProfileCardStyle copyWith({
+    LyricsCardBackground? background,
+    LyricsCardShape? shape,
+    Set<ProfileCardPart>? parts,
+  }) => ProfileCardStyle(
+    background: background ?? this.background,
+    shape: shape ?? this.shape,
+    parts: parts ?? this.parts,
+  );
+
+  ProfileCardStyle toggled(ProfileCardPart part) => copyWith(
+    parts: parts.contains(part) ? ({...parts}..remove(part)) : {...parts, part},
+  );
+
+  String encode() => [
+    background.name,
+    shape.name,
+    [
+      for (final part in ProfileCardPart.values)
+        if (parts.contains(part)) part.name,
+    ].join('|'),
+  ].join(',');
+
+  /// Unknown or missing parts fall back to the default look.
+  factory ProfileCardStyle.decode(String? saved) {
+    final fields = (saved ?? '').split(',');
+    String? field(int index) => index < fields.length ? fields[index] : null;
+    const fallback = ProfileCardStyle();
+    final shape = LyricsCardShape.values.asNameMap()[field(1)];
+    final names = field(2);
+    final known = ProfileCardPart.values.asNameMap();
+    return ProfileCardStyle(
+      background:
+          LyricsCardBackground.values.asNameMap()[field(0)] ??
+          fallback.background,
+      shape: shapes.contains(shape) ? shape! : fallback.shape,
+      parts: names == null
+          ? fallback.parts
+          : {for (final name in names.split('|')) ?known[name]},
+    );
+  }
+
+  static Future<ProfileCardStyle> load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return ProfileCardStyle.decode(prefs.getString(_key));
+    } catch (_) {
+      return const ProfileCardStyle();
+    }
+  }
+
+  Future<void> save() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_key, encode());
+    } catch (_) {}
+  }
+}
+
+/// Opens the profile card editor for [overview], with the traits [rhythm]
+/// bears out.
+Future<void> openProfileShare(
+  BuildContext context, {
+  required UserProfile profile,
+  required ProfileOverview overview,
+  ProfileRhythm? rhythm,
+}) async {
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final style = await ProfileCardStyle.load();
+  if (!navigator.mounted) return;
+  await navigator.push(
+    SteadyPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => ProfileShareScreen(
+        profile: profile,
+        overview: overview,
+        traits: profileTraits(overview, rhythm: rhythm, limit: 3),
+        style: style,
+      ),
+    ),
+  );
+}
+
+class ProfileShareScreen extends StatefulWidget {
+  const ProfileShareScreen({
+    super.key,
+    required this.profile,
+    required this.overview,
+    this.traits = const [],
+    this.style = const ProfileCardStyle(),
+    this.saveImage = saveShareCardWithSystemDialog,
+  });
+
+  final UserProfile profile;
+  final ProfileOverview overview;
+  final List<ProfileTraitFact> traits;
+
+  /// The look the card opens with.
+  final ProfileCardStyle style;
+  final LyricsCardSaver saveImage;
+
+  @override
+  State<ProfileShareScreen> createState() => _ProfileShareScreenState();
+}
+
+class _ProfileShareScreenState extends State<ProfileShareScreen> {
+  final _cardKey = GlobalKey();
+  final _shareButtonKey = GlobalKey();
+  late ProfileCardStyle _style = widget.style;
+  bool _sharing = false;
+
+  /// The cover the artwork and color backgrounds come from.
+  String? get _artwork =>
+      widget.overview.allTime.topAlbums.firstOrNull?.artwork ??
+      widget.overview.summary.tracks.firstOrNull?.track.artwork;
+
+  void _restyle(ProfileCardStyle style) {
+    setState(() => _style = style);
+    unawaited(style.save());
+  }
+
+  /// The parts this record has something for.
+  List<ProfileCardPart> get _offered {
+    final overview = widget.overview;
+    return [
+      for (final part in ProfileCardPart.values)
+        if (switch (part) {
+          ProfileCardPart.traits => widget.traits.isNotEmpty,
+          ProfileCardPart.taste => overview.genres.isNotEmpty,
+          ProfileCardPart.artists => overview.allTime.topArtists.isNotEmpty,
+          ProfileCardPart.tracks => overview.summary.tracks.isNotEmpty,
+          ProfileCardPart.sound => overview.sound.qualityMilliseconds > 0,
+          ProfileCardPart.identity || ProfileCardPart.highlights => true,
+        })
+          part,
+    ];
+  }
+
+  Future<File?> _capture() async {
+    // A style change or a cover color can still be waiting for paint.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return null;
+    final file = await captureBoundaryToPngFile(
+      _cardKey,
+      pixelRatio: _style.shape.pixelRatio,
+      fileName: 'mornye_profile.png',
+    );
+    if (file == null) throw StateError('Card could not be captured');
+    return file;
+  }
+
+  Future<void> _save() async {
+    if (_sharing) return;
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final name = widget.profile.name
+        .replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1f]'), '_')
+        .trim();
+    setState(() => _sharing = true);
+    try {
+      final file = await _capture();
+      if (file == null) return;
+      final saved = await widget.saveImage(
+        '${name.isEmpty ? 'profile' : '$name profile'}.png',
+        await file.readAsBytes(),
+      );
+      if (saved) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.profileShareSaved)));
+      }
+    } catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.profileShareError)));
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
+
+  Future<void> _share() async {
+    if (_sharing) return;
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final box = _shareButtonKey.currentContext?.findRenderObject();
+    final origin = box is RenderBox && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+    setState(() => _sharing = true);
+    try {
+      final file = await _capture();
+      if (file == null) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'image/png')],
+          text: l10n.profileShareText,
+          sharePositionOrigin: origin,
+        ),
+      );
+    } catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.profileShareError)));
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final tokens = context.tokens;
+    final l10n = context.l10n;
+    final buttonStyle = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(64, 56)),
+      textStyle: WidgetStatePropertyAll(theme.textTheme.titleMedium),
+    );
+    return Scaffold(
+      appBar: AppBar(
+        leading: AppIconButton(
+          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+          icon: const AppIcon(Icons.close),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: Text(l10n.profileShare),
+      ),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Expanded(
+              flex: 6,
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  vertical: tokens.gapSm,
+                  horizontal: tokens.gapMd,
+                ),
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: _style.shape.size.aspectRatio,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colors.shadow.withValues(alpha: 0.22),
+                            blurRadius: 24,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: FittedBox(
+                          child: CoverSourceColorBuilder(
+                            imageSource: _artwork,
+                            builder: (context, coverColor) => RepaintBoundary(
+                              key: _cardKey,
+                              child: ProfileShareCard(
+                                profile: widget.profile,
+                                overview: widget.overview,
+                                traits: widget.traits,
+                                style: _style,
+                                artwork: _artwork,
+                                coverColor: coverColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(flex: 5, child: _stylePane(context)),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                tokens.gapMd,
+                tokens.gapSm,
+                tokens.gapMd,
+                tokens.gapMd,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ExpressiveButton(
+                      tonal: true,
+                      icon: const AppIcon(Icons.download_outlined),
+                      style: buttonStyle,
+                      onPressed: _sharing ? null : _save,
+                      child: Text(l10n.lyricsShareSave),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ExpressiveButton(
+                      key: _shareButtonKey,
+                      icon: const AppIcon(Icons.ios_share),
+                      style: buttonStyle,
+                      onPressed: _sharing ? null : _share,
+                      child: Text(l10n.lyricsShareAction),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// What the card shows, its background and its shape.
+  Widget _stylePane(BuildContext context) {
+    final l10n = context.l10n;
+    final tokens = context.tokens;
+    final theme = Theme.of(context);
+    final label = theme.textTheme.titleSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    Widget group(String title, Widget choice) => Padding(
+      padding: EdgeInsets.only(bottom: tokens.gapMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 8, bottom: 8),
+            child: Text(title, style: label),
+          ),
+          choice,
+        ],
+      ),
+    );
+    final names = {
+      ProfileCardPart.identity: (
+        l10n.profileShareIdentity,
+        Icons.person_outline,
+      ),
+      ProfileCardPart.highlights: (
+        l10n.profileShareHighlights,
+        Icons.insights_outlined,
+      ),
+      ProfileCardPart.traits: (l10n.profileTraits, Icons.auto_awesome_outlined),
+      ProfileCardPart.taste: (l10n.profileTaste, Icons.donut_large_outlined),
+      ProfileCardPart.artists: (
+        l10n.listeningStatsTopArtists,
+        Icons.mic_none_outlined,
+      ),
+      ProfileCardPart.tracks: (
+        l10n.listeningStatsTopTracks,
+        Icons.music_note_outlined,
+      ),
+      ProfileCardPart.sound: (l10n.profileSound, Icons.graphic_eq),
+    };
+    return ListView(
+      padding: EdgeInsets.fromLTRB(tokens.gapMd, tokens.gapSm, tokens.gapMd, 0),
+      children: [
+        group(
+          l10n.profileShareShow,
+          SettingsChoiceGrid(
+            children: [
+              for (final part in _offered)
+                SettingsChoiceChip(
+                  label: names[part]!.$1,
+                  icon: names[part]!.$2,
+                  isSelected: _style.parts.contains(part),
+                  onTap: () => _restyle(_style.toggled(part)),
+                ),
+            ],
+          ),
+        ),
+        group(
+          l10n.lyricsShareBackground,
+          ShareCardBackgroundPicker(
+            value: _style.background,
+            onChanged: (value) => _restyle(_style.copyWith(background: value)),
+          ),
+        ),
+        group(
+          l10n.lyricsShareShape,
+          SettingsSegmentedChoice<LyricsCardShape>(
+            semanticLabel: l10n.lyricsShareShape,
+            options: [
+              SettingsSegmentOption(
+                value: LyricsCardShape.story,
+                label: l10n.lyricsShareShapeStory,
+                icon: Icons.crop_portrait,
+              ),
+              SettingsSegmentOption(
+                value: LyricsCardShape.square,
+                label: l10n.lyricsShareShapeSquare,
+                icon: Icons.crop_square,
+              ),
+            ],
+            selected: _style.shape,
+            onChanged: (value) => _restyle(_style.copyWith(shape: value)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The profile on one image: who listens, a few figures, the traits, the
+/// genres in their colors, the top artists and songs and the sound quality,
+/// as [style] picks. Its layout ignores the device, so every phone makes
+/// the same card.
+class ProfileShareCard extends StatelessWidget {
+  const ProfileShareCard({
+    super.key,
+    required this.profile,
+    required this.overview,
+    this.traits = const [],
+    this.style = const ProfileCardStyle(),
+    this.artwork,
+    this.coverColor,
+  });
+
+  final UserProfile profile;
+  final ProfileOverview overview;
+  final List<ProfileTraitFact> traits;
+  final ProfileCardStyle style;
+
+  /// The cover behind [LyricsCardBackground.artwork].
+  final String? artwork;
+
+  /// The cover's average color, for [LyricsCardBackground.color].
+  final Color? coverColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final light = style.background == LyricsCardBackground.light;
+    final ink = _Ink(
+      foreground: light ? const Color(0xFF111111) : Colors.white,
+      brightness: light ? Brightness.light : Brightness.dark,
+      story: style.shape == LyricsCardShape.story,
+    );
+    final size = style.shape.size;
+    final padding = ink.story
+        ? const EdgeInsets.fromLTRB(26, 30, 26, 24)
+        : const EdgeInsets.all(22);
+    final parts = style.parts;
+    final artists =
+        parts.contains(ProfileCardPart.artists) &&
+        overview.allTime.topArtists.isNotEmpty;
+    final tracks =
+        parts.contains(ProfileCardPart.tracks) &&
+        overview.summary.tracks.isNotEmpty;
+    final both = artists && tracks;
+    final rows = ink.story ? (both ? 3 : 5) : 3;
+    final gap = SizedBox(height: ink.story ? 18 : 14);
+    final sections = <Widget>[
+      _identity(context, ink),
+      if (parts.contains(ProfileCardPart.traits) && traits.isNotEmpty)
+        _traits(context, ink),
+      if (parts.contains(ProfileCardPart.highlights)) _highlights(context, ink),
+      if (parts.contains(ProfileCardPart.taste) && overview.genres.isNotEmpty)
+        _taste(context, ink),
+      // The square has room for both lists only side by side.
+      if (both && !ink.story)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _artists(context, ink, rows)),
+            const SizedBox(width: 12),
+            Expanded(child: _tracks(context, ink, rows)),
+          ],
+        )
+      else ...[
+        if (artists) _artists(context, ink, rows),
+        if (tracks) _tracks(context, ink, rows),
+      ],
+      if (parts.contains(ProfileCardPart.sound) &&
+          overview.sound.qualityMilliseconds > 0)
+        _sound(context, ink),
+    ];
+    // The card sets its own type, so it reads the same wherever it is drawn.
+    return MediaQuery.withNoTextScaling(
+      child: DefaultTextStyle(
+        style: Theme.of(context).textTheme.bodyMedium ?? const TextStyle(),
+        child: SizedBox.fromSize(
+          size: size,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ShareCardBackdrop(
+                background: style.background,
+                artUri: artwork,
+                coverColor: coverColor,
+              ),
+              Padding(
+                padding: padding,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Everything chosen stays on the card: too much for its
+                    // shape shrinks instead of being cut.
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.topStart,
+                        child: SizedBox(
+                          width: size.width - padding.horizontal,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final (index, section)
+                                  in sections.indexed) ...[
+                                if (index > 0) gap,
+                                section,
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ShareCardBrand(foreground: ink.foreground, light: light),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _identity(BuildContext context, _Ink ink) {
+    final l10n = context.l10n;
+    final name = profile.name.trim();
+    final shown = style.parts.contains(ProfileCardPart.identity);
+    final since = overview.since;
+    final title = Text(
+      shown && name.isNotEmpty ? name : l10n.profileShareHeadline,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: ink.foreground,
+        fontSize: ink.story ? 22 : 19,
+        fontWeight: FontWeight.w700,
+        height: 1.2,
+      ),
+    );
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        title,
+        if (since != null)
+          Text(
+            l10n.profileListeningSince(
+              DateFormat.yMMMM(
+                Localizations.localeOf(context).toLanguageTag(),
+              ).format(since),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: ink.secondary, fontSize: 13),
+          ),
+      ],
+    );
+    if (!shown) return text;
+    return Row(
+      children: [
+        ProfileAvatar(
+          name: profile.name,
+          photoPath: profile.photoPath,
+          size: ink.story ? 56 : 44,
+        ),
+        const SizedBox(width: 14),
+        Expanded(child: text),
+      ],
+    );
+  }
+
+  Widget _traits(BuildContext context, _Ink ink) => Wrap(
+    spacing: 6,
+    runSpacing: 6,
+    children: [
+      for (final fact in traits)
+        Container(
+          padding: const EdgeInsetsDirectional.fromSTEB(8, 5, 11, 5),
+          decoration: ShapeDecoration(
+            color: ink.foreground.withValues(alpha: ink.light ? 0.07 : 0.16),
+            shape: const StadiumBorder(),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                profileTraitIcon(fact.trait),
+                size: 14,
+                color: ink.foreground,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                profileTraitName(context, fact.trait),
+                style: TextStyle(
+                  color: ink.foreground,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
+
+  Widget _highlights(BuildContext context, _Ink ink) {
+    final l10n = context.l10n;
+    final number = NumberFormat.decimalPattern(
+      Localizations.localeOf(context).toLanguageTag(),
+    );
+    final summary = overview.summary;
+    final figures = [
+      (
+        profileDuration(context, summary.milliseconds),
+        l10n.profileStatListening,
+      ),
+      (number.format(summary.tracks.length), l10n.profileStatSongs),
+      (
+        number.format(overview.allTime.topArtists.length),
+        l10n.profileStatArtists,
+      ),
+    ];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (index, figure) in figures.indexed) ...[
+          if (index > 0) const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    figure.$1,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: ink.foreground,
+                      fontSize: ink.story ? 24 : 21,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+                Text(
+                  figure.$2,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: ink.secondary, fontSize: 11.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _taste(BuildContext context, _Ink ink) {
+    final l10n = context.l10n;
+    final genres = overview.genres.take(5).toList();
+    final total = overview.genreMilliseconds;
+    final other =
+        total - genres.fold<int>(0, (sum, genre) => sum + genre.milliseconds);
+    return _ShareParts(
+      ink: ink,
+      title: l10n.profileTaste,
+      total: total,
+      parts: [
+        for (final (index, genre) in genres.indexed)
+          (
+            label: genre.name,
+            milliseconds: genre.milliseconds,
+            color: HiResSongColors.on(ink.brightness, index),
+          ),
+        if (other > 0)
+          (
+            label: l10n.profileTasteOther,
+            milliseconds: other,
+            color: ink.foreground.withValues(alpha: 0.4),
+          ),
+      ],
+    );
+  }
+
+  Widget _sound(BuildContext context, _Ink ink) {
+    final sound = overview.sound;
+    return _ShareParts(
+      ink: ink,
+      title: context.l10n.profileSound,
+      total: sound.qualityMilliseconds,
+      parts: [
+        for (final tier in ProfileQuality.values)
+          if ((sound.quality[tier] ?? 0) > 0)
+            (
+              label: profileQualityName(context, tier),
+              milliseconds: sound.quality[tier]!,
+              color: profileQualityColor(
+                ink.brightness,
+                tier,
+                lossy: ink.foreground.withValues(alpha: 0.4),
+              ),
+            ),
+      ],
+    );
+  }
+
+  Widget _artists(BuildContext context, _Ink ink, int rows) {
+    final artwork = overview.summary.artistArtwork;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _heading(context.l10n.listeningStatsTopArtists, ink),
+        for (final (index, artist)
+            in overview.allTime.topArtists.take(rows).indexed)
+          _ShareRow(
+            ink: ink,
+            rank: index + 1,
+            artwork: artwork[artist.key],
+            round: true,
+            title: artist.key,
+            detail: profileDuration(context, artist.value),
+          ),
+      ],
+    );
+  }
+
+  Widget _tracks(BuildContext context, _Ink ink, int rows) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _heading(context.l10n.listeningStatsTopTracks, ink),
+      for (final (index, total) in overview.summary.tracks.take(rows).indexed)
+        _ShareRow(
+          ink: ink,
+          rank: index + 1,
+          artwork: total.track.artwork,
+          title: total.track.title,
+          detail: total.track.artist.trim().isEmpty
+              ? context.l10n.unknownArtist
+              : total.track.artist,
+        ),
+    ],
+  );
+}
+
+/// The card's text colors and the surface its chart colors are made for.
+class _Ink {
+  const _Ink({
+    required this.foreground,
+    required this.brightness,
+    required this.story,
+  });
+
+  final Color foreground;
+  final Brightness brightness;
+
+  /// The tall story shape, which gets larger type.
+  final bool story;
+
+  bool get light => brightness == Brightness.light;
+  Color get secondary => foreground.withValues(alpha: 0.72);
+}
+
+Widget _heading(String text, _Ink ink) => Padding(
+  padding: const EdgeInsets.only(bottom: 6),
+  child: Text(
+    text,
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    style: TextStyle(
+      color: ink.foreground,
+      fontSize: 14,
+      fontWeight: FontWeight.w700,
+    ),
+  ),
+);
+
+typedef _SharePart = ({String label, int milliseconds, Color color});
+
+/// A titled share bar with a legend of each part and its share.
+class _ShareParts extends StatelessWidget {
+  const _ShareParts({
+    required this.ink,
+    required this.title,
+    required this.total,
+    required this.parts,
+  });
+
+  final _Ink ink;
+  final String title;
+  final int total;
+  final List<_SharePart> parts;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _heading(title, ink),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(5),
+        child: SizedBox(
+          height: 10,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (index, part) in parts.indexed) ...[
+                if (index > 0) const SizedBox(width: 2),
+                Expanded(
+                  flex: (part.milliseconds * 1000 / total).round().clamp(
+                    1,
+                    1000,
+                  ),
+                  child: ColoredBox(color: part.color),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        children: [
+          for (final part in parts)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DecoratedBox(
+                  decoration: ShapeDecoration(
+                    color: part.color,
+                    shape: const CircleBorder(),
+                  ),
+                  child: const SizedBox.square(dimension: 8),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  '${part.label} ${_percent(context, part.milliseconds / total)}',
+                  style: TextStyle(color: ink.secondary, fontSize: 12),
+                ),
+              ],
+            ),
+        ],
+      ),
+    ],
+  );
+}
+
+class _ShareRow extends StatelessWidget {
+  const _ShareRow({
+    required this.ink,
+    required this.rank,
+    required this.artwork,
+    required this.title,
+    required this.detail,
+    this.round = false,
+  });
+
+  final _Ink ink;
+  final int rank;
+  final String? artwork;
+  final String title;
+  final String detail;
+
+  /// The artist shape instead of a cover's rounded square.
+  final bool round;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final image = SizedBox.square(
+      dimension: 34,
+      child: round && artwork == null
+          ? ColoredBox(
+              color: ink.foreground.withValues(alpha: 0.16),
+              child: Icon(
+                Icons.person_outline,
+                size: 18,
+                color: ink.foreground,
+              ),
+            )
+          : PlayerArtwork(
+              artUri: artwork,
+              colorScheme: scheme,
+              iconSize: 16,
+              cacheWidth: 120,
+            ),
+    );
+    return SizedBox(
+      height: 42,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 20,
+            child: Text(
+              '$rank',
+              style: TextStyle(
+                color: ink.secondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          round
+              ? AppShapeClip(kind: AppShapes.artist, child: image)
+              : ClipRRect(borderRadius: BorderRadius.circular(6), child: image),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: ink.foreground,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: ink.secondary, fontSize: 11.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -9751,6 +9751,182 @@
     }
   },
   "profileRecentChart": "Listening time on each of the last 30 days",
+  "profileNowPlayingProgress": "{position} of {duration}",
+  "@profileNowPlayingProgress": {
+    "description": "Screen reader description of the profile's Now playing progress; position and duration are clock times such as 1:23 and 3:45",
+    "placeholders": {
+      "position": {
+        "type": "String"
+      },
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTasteOther": "Other",
+  "profileTasteChart": "Share of listening time by genre",
+  "profileLast12Months": "Last 12 months",
+  "profileBestMonth": "Best month",
+  "profileMonthChart": "Listening time in each of the last 12 months",
+  "profileTraits": "Listener type",
+  "profileTraitStreak": "On a streak",
+  "profileTraitStreakBody": "{count, plural, =1{1 day in a row with music} other{{count} days in a row with music}}",
+  "@profileTraitStreakBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileTraitAudiophile": "Audiophile",
+  "profileTraitAudiophileBody": "{percent} of your listening is Hi-Res",
+  "@profileTraitAudiophileBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitNightOwl": "Night owl",
+  "profileTraitNightOwlBody": "{percent} of your songs play late at night",
+  "@profileTraitNightOwlBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitEarlyBird": "Early bird",
+  "profileTraitEarlyBirdBody": "{percent} of your songs play in the morning",
+  "@profileTraitEarlyBirdBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitWeekender": "Weekend listener",
+  "profileTraitWeekenderBody": "{percent} of your listening falls on Saturday and Sunday",
+  "@profileTraitWeekenderBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitLoyal": "Loyal fan",
+  "profileTraitLoyalBody": "{artist} takes {percent} of your listening",
+  "@profileTraitLoyalBody": {
+    "placeholders": {
+      "artist": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitExplorer": "Explorer",
+  "profileTraitExplorerBody": "{count, plural, =1{1 new artist in the last 30 days} other{{count} new artists in the last 30 days}}",
+  "@profileTraitExplorerBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileTraitEclectic": "Eclectic",
+  "profileTraitEclecticBody": "{count} genres, the biggest at {percent}",
+  "@profileTraitEclecticBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitOnRepeat": "On repeat",
+  "profileTraitOnRepeatBody": "{title}, {count} times in one day",
+  "@profileTraitOnRepeatBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileDecades": "Decades",
+  "profileDecade": "{decade}s",
+  "@profileDecade": {
+    "description": "A decade from its first year or its last two digits, such as 1990s or 90s",
+    "placeholders": {
+      "decade": {
+        "type": "String"
+      }
+    }
+  },
+  "profileEra": "Most played decade",
+  "profileDecadeChart": "Listening time by release decade, most in the {decade}",
+  "@profileDecadeChart": {
+    "description": "Screen reader description of the decades chart; decade is a decade such as 1990s",
+    "placeholders": {
+      "decade": {
+        "type": "String"
+      }
+    }
+  },
+  "profileDecadesNote": "For songs whose release year your Library knows.",
+  "profileSound": "Sound quality",
+  "profileQualityHiRes": "Hi-Res",
+  "profileQualityLossless": "Lossless",
+  "profileQualityLossy": "Lossy",
+  "profileTopFormat": "Most played format",
+  "profileSoundNote": "Share of your listening time, for songs whose file your Library knows.",
+  "profileSoundChart": "Share of listening time by sound quality",
+  "profileTimeOfDay": "Time of day",
+  "profilePeakHour": "Busiest hour",
+  "profileMostActive": "Most active",
+  "profileDaypartMorning": "Morning",
+  "profileDaypartAfternoon": "Afternoon",
+  "profileDaypartEvening": "Evening",
+  "profileDaypartNight": "Night",
+  "profileNotSkipped": "Songs not skipped",
+  "profileHourChart": "Songs played at each hour of the day, most at {hour}",
+  "@profileHourChart": {
+    "placeholders": {
+      "hour": {
+        "type": "String"
+      }
+    }
+  },
+  "profileRhythmNote": "{count, plural, =1{From your last song.} other{From your last {count} songs.}}",
+  "@profileRhythmNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileArtistsHalf": "{count, plural, =1{Half of your listening goes to 1 artist.} other{Half of your listening goes to {count} artists.}}",
+  "@profileArtistsHalf": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileShare": "Share profile",
+  "profileShareShow": "Show",
+  "profileShareIdentity": "Name and photo",
+  "profileShareHighlights": "Highlights",
+  "profileShareHeadline": "My listening",
+  "profileShareText": "My listening profile",
+  "profileShareSaved": "Profile card saved",
+  "profileShareError": "Couldn't create the profile image",
   "homeGreetingMorning1": "Good morning",
   "homeGreetingMorning2": "Rise and shine",
   "homeGreetingMorning3": "Fresh start",

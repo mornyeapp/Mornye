@@ -194,6 +194,27 @@ void main() {
     expect([for (final row in many) row['genre_name']], ['Jazz']);
   });
 
+  test('songs named by title and artist give their file details', () async {
+    String key(String id) => LibraryDatabase.matchKeyFor('Song $id', 'Artist');
+    Future<Set<Object?>> keys({required bool includeLocal}) async => {
+      for (final row in await LibraryDatabase.instance.getDetailsOfSongs([
+        for (final id in ['d1', 'd5', 'l2', 'unknown']) key(id),
+      ], includeLocal: includeLocal))
+        row['match_key'],
+    };
+
+    // Untagged songs are listed too; scanned ones only with local songs.
+    expect(await keys(includeLocal: true), {key('d1'), key('d5'), key('l2')});
+    expect(await keys(includeLocal: false), {key('d1'), key('d5')});
+    final row = (await LibraryDatabase.instance.getDetailsOfSongs([
+      key('l2'),
+    ], includeLocal: true)).single;
+    expect(
+      row.keys,
+      containsAll(['release_date', 'format', 'bit_depth', 'sample_rate']),
+    );
+  });
+
   test('a genre lists and counts exactly the songs of that genre', () async {
     expect(await _songIds('rock'), {'d1', 'd2', 'd3', 'd7', 'l1'});
     expect(await _songIds('pop'), {'d4', 'd7'});

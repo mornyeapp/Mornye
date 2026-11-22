@@ -128,7 +128,11 @@ class LyricsCardStyle {
 /// Writes the card's PNG where the user chooses. False when they cancel.
 typedef LyricsCardSaver = Future<bool> Function(String fileName, Uint8List png);
 
-Future<bool> _saveWithSystemDialog(String fileName, Uint8List png) async =>
+/// Asks where to save a card image; the default [LyricsCardSaver].
+Future<bool> saveShareCardWithSystemDialog(
+  String fileName,
+  Uint8List png,
+) async =>
     await FilePicker.saveFile(
       fileName: fileName,
       bytes: png,
@@ -233,7 +237,7 @@ class LyricsShareScreen extends StatefulWidget {
     required this.lines,
     this.initialSelection = const {},
     this.style = const LyricsCardStyle(),
-    this.saveImage = _saveWithSystemDialog,
+    this.saveImage = saveShareCardWithSystemDialog,
   });
 
   final MediaItem mediaItem;
@@ -602,7 +606,7 @@ class _StylePane extends StatelessWidget {
       children: [
         group(
           l10n.lyricsShareBackground,
-          _BackgroundPicker(
+          ShareCardBackgroundPicker(
             value: style.background,
             onChanged: (value) => onChanged(style.copyWith(background: value)),
           ),
@@ -679,8 +683,13 @@ class _StylePane extends StatelessWidget {
   }
 }
 
-class _BackgroundPicker extends StatelessWidget {
-  const _BackgroundPicker({required this.value, required this.onChanged});
+/// The card backgrounds as swatches in one row, for every share card.
+class ShareCardBackgroundPicker extends StatelessWidget {
+  const ShareCardBackgroundPicker({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
 
   final LyricsCardBackground value;
   final ValueChanged<LyricsCardBackground> onChanged;
@@ -1015,7 +1024,7 @@ class LyricsShareCard extends StatelessWidget {
             .firstOrNull ??
         Directionality.of(context);
     final song = _song(scheme, foreground, secondary);
-    final brand = _brand(context, foreground, light);
+    final brand = ShareCardBrand(foreground: foreground, light: light);
     // Centered lines sit in the middle; others at the side they read from.
     final side = align == LyricsCardAlign.center
         ? Alignment.center
@@ -1026,7 +1035,11 @@ class LyricsShareCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            _background(scheme),
+            ShareCardBackdrop(
+              background: background,
+              artUri: artUri,
+              coverColor: coverColor,
+            ),
             if (shape != LyricsCardShape.story)
               // The square and wide cards have no room for the story's inner
               // panel: the quote takes what the song and the mark leave.
@@ -1264,40 +1277,71 @@ class LyricsShareCard extends StatelessWidget {
       },
     );
   }
+}
 
-  /// The app's mark and name.
-  Widget _brand(BuildContext context, Color foreground, bool light) =>
-      Container(
-        padding: const EdgeInsetsDirectional.fromSTEB(6, 6, 14, 6),
-        decoration: ShapeDecoration(
-          color: foreground.withValues(alpha: light ? 0.06 : 0.14),
-          shape: const StadiumBorder(),
+/// The app's mark and name on a share card.
+class ShareCardBrand extends StatelessWidget {
+  const ShareCardBrand({
+    super.key,
+    required this.foreground,
+    required this.light,
+  });
+
+  final Color foreground;
+
+  /// The card is on [LyricsCardBackground.light].
+  final bool light;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsetsDirectional.fromSTEB(6, 6, 14, 6),
+    decoration: ShapeDecoration(
+      color: foreground.withValues(alpha: light ? 0.06 : 0.14),
+      shape: const StadiumBorder(),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // The asset is the bare mark, so it only needs the card's text
+        // color.
+        Image.asset(
+          'assets/images/logo-transparent.png',
+          width: 26,
+          height: 26,
+          color: foreground,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // The asset is the bare mark, so it only needs the card's text
-            // color.
-            Image.asset(
-              'assets/images/logo-transparent.png',
-              width: 26,
-              height: 26,
-              color: foreground,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              context.l10n.appName,
-              style: TextStyle(
-                color: foreground,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.1,
-              ),
-            ),
-          ],
+        const SizedBox(width: 8),
+        Text(
+          context.l10n.appName,
+          style: TextStyle(
+            color: foreground,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.1,
+          ),
         ),
-      );
+      ],
+    ),
+  );
+}
+
+/// A share card's [background], filling the card.
+class ShareCardBackdrop extends StatelessWidget {
+  const ShareCardBackdrop({
+    super.key,
+    required this.background,
+    this.artUri,
+    this.coverColor,
+  });
+
+  final LyricsCardBackground background;
+
+  /// The cover that [LyricsCardBackground.artwork] blurs.
+  final String? artUri;
+
+  /// Average cover color for [LyricsCardBackground.color].
+  final Color? coverColor;
 
   static final _artworkBlur = ImageFilter.blur(
     sigmaX: 36,
@@ -1305,7 +1349,9 @@ class LyricsShareCard extends StatelessWidget {
     tileMode: TileMode.mirror,
   );
 
-  Widget _background(ColorScheme scheme) {
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     switch (background) {
       case LyricsCardBackground.artwork:
         return RepaintBoundary(

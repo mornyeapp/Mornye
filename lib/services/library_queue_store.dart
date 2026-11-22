@@ -400,9 +400,34 @@ class LibraryQueueStore {
   Future<List<Map<String, Object?>>> genresOfSongs(
     List<String> matchKeys, {
     required bool includeLocal,
+  }) => _rowsOfSongs(
+    matchKeys,
+    includeLocal: includeLocal,
+    columns: 'TRIM(genre) AS genre_name',
+    where: "sort_genre != ''",
+  );
+
+  /// The release date, format, bit depth and sample rate of each Library
+  /// song among [matchKeys], listed like [genresOfSongs].
+  Future<List<Map<String, Object?>>> detailsOfSongs(
+    List<String> matchKeys, {
+    required bool includeLocal,
+  }) => _rowsOfSongs(
+    matchKeys,
+    includeLocal: includeLocal,
+    columns: 'release_date, format, bit_depth, sample_rate',
+  );
+
+  /// `match_key` and [columns] of the songs among [matchKeys] in both
+  /// sources, in chunks under SQLite's limit of 999 variables.
+  Future<List<Map<String, Object?>>> _rowsOfSongs(
+    List<String> matchKeys, {
+    required bool includeLocal,
+    required String columns,
+    String? where,
   }) async {
     final rows = <Map<String, Object?>>[];
-    // Under SQLite's limit of 999 variables with both sources.
+    final filter = where == null ? '' : '$where AND ';
     const chunk = 400;
     for (var start = 0; start < matchKeys.length; start += chunk) {
       final keys = matchKeys.sublist(
@@ -412,15 +437,15 @@ class LibraryQueueStore {
       final marks = List.filled(keys.length, '?').join(',');
       final parts = <String>[
         '''
-          SELECT match_key, TRIM(genre) AS genre_name
+          SELECT match_key, $columns
           FROM history_db.history
-          WHERE sort_genre != '' AND match_key IN ($marks)
+          WHERE ${filter}match_key IN ($marks)
         ''',
         if (includeLocal)
           '''
-            SELECT l.match_key, TRIM(l.genre) AS genre_name
-            FROM ${LibrarySchema.visibleView} l
-            WHERE l.sort_genre != '' AND l.match_key IN ($marks)
+            SELECT match_key, $columns
+            FROM ${LibrarySchema.visibleView}
+            WHERE ${filter}match_key IN ($marks)
           ''',
       ];
       rows.addAll(

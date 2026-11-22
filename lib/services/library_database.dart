@@ -582,6 +582,16 @@ class LibraryDatabase {
     includeLocal: includeLocal,
   );
 
+  /// The release date, format and resolution of the Library songs with
+  /// [matchKeys]; see [LibraryQueueStore.detailsOfSongs].
+  Future<List<Map<String, Object?>>> getDetailsOfSongs(
+    List<String> matchKeys, {
+    required bool includeLocal,
+  }) => _queueRead(
+    (store) => store.detailsOfSongs(matchKeys, includeLocal: includeLocal),
+    includeLocal: includeLocal,
+  );
+
   Future<List<Map<String, dynamic>>> getQueueLocalAlbumTracks(
     String albumName,
     String artistName,
