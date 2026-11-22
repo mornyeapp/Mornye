@@ -23,6 +23,29 @@ class SteadyPageRoute<T> extends MaterialPageRoute<T> with SteadyStartRoute<T> {
   });
 }
 
+/// A scale that moves its child as a picture. Text at a new size every frame
+/// is drawn again glyph by glyph, which costs the raster thread its frames;
+/// at rest, a scale of one, the child is drawn as itself.
+class PictureScaleTransition extends AnimatedWidget {
+  const PictureScaleTransition({
+    super.key,
+    required Animation<double> scale,
+    this.child,
+  }) : super(listenable: scale);
+
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = (listenable as Animation<double>).value;
+    return Transform.scale(
+      scale: scale,
+      filterQuality: scale == 1 ? null : FilterQuality.low,
+      child: child,
+    );
+  }
+}
+
 /// Material page transitions: Android phones push a solid page and pop it as
 /// a card, and the desktops share one light builder.
 const PageTransitionsTheme materialPageTransitionsTheme = PageTransitionsTheme(
@@ -505,6 +528,9 @@ class _LeavingCard extends AnimatedWidget {
       child: Transform.scale(
         scale:
             1 - (1 - MaterialPhonePageTransitionsBuilder._cardScale) * drawnIn,
+        // Scaled as a picture: text at a new size every frame is drawn
+        // again glyph by glyph, which costs the raster thread its frames.
+        filterQuality: drawnIn > 0 ? FilterQuality.low : null,
         // Always in the tree, so the page keeps its state when it leaves.
         child: ClipRRect(
           clipBehavior: drawnIn > 0 ? Clip.antiAlias : Clip.none,

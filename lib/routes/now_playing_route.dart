@@ -654,6 +654,9 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
         child: Transform.scale(
           scale: bounds.width / size.width,
           alignment: Alignment.topLeft,
+          // Scaled as a picture, so its text is not drawn again at a new
+          // size on every frame.
+          filterQuality: bounds.width == size.width ? null : FilterQuality.low,
           child: Opacity(opacity: opacity, child: child),
         ),
       ),

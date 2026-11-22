@@ -449,6 +449,37 @@ void main() {
       (_) {},
     );
 
+    testWidgets('a surface narrower than the screen grows as a picture', (
+      tester,
+    ) async {
+      final navigator = await pumpApp(tester);
+      navigator.currentState!.push(
+        _TestPlayerRoute(
+          miniPlayerGeometry: () => (
+            surface: const Rect.fromLTWH(40, 700, 320, 72),
+            artwork: const Rect.fromLTWH(52, 714, 44, 44),
+          ),
+          morph: morph,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      await frames(tester, 6);
+      // The page is scaled to the surface's width: not as text at a new
+      // size on every frame.
+      final scaled = tester.widget<Transform>(
+        find
+            .descendant(
+              of: find.byKey(surface),
+              matching: find.byType(Transform),
+            )
+            .first,
+      );
+      expect(scaled.filterQuality, FilterQuality.low);
+      await tester.pumpAndSettle();
+      expect(find.byKey(surface), findsNothing);
+    });
+
     testWidgets('the player grows out of the mini player and shrinks back', (
       tester,
     ) async {

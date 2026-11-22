@@ -49,6 +49,13 @@ Future<void> _frames(WidgetTester tester, int count) async {
   }
 }
 
+/// Whether a transform above [label] moves it as a picture.
+bool _pictureAbove(WidgetTester tester, String label) => tester
+    .widgetList<Transform>(
+      find.ancestor(of: find.text(label), matching: find.byType(Transform)),
+    )
+    .any((transform) => transform.filterQuality != null);
+
 double _opacityAbove(WidgetTester tester, String label) => tester
     .widgetList<FadeTransition>(
       find.ancestor(
@@ -170,6 +177,7 @@ void main() {
 
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(find.byType(Scaffold).last).dx, 0);
+    expect(_pictureAbove(tester, 'page'), isFalse);
 
     _navigatorKey.currentState!.pop();
     await tester.pump();
@@ -179,6 +187,9 @@ void main() {
     expect(card.width, lessThan(width));
     expect(card.center.dx, lessThan(width * 0.6));
     expect(_opacityAbove(tester, 'page'), 1);
+    // It is scaled as a picture of the live page, not text at a new size.
+    expect(_pictureAbove(tester, 'page'), isTrue);
+    expect(find.byType(SnapshotWidget), findsNothing);
     // A third of the way in time, the page below is most of the way back.
     expect(
       tester.getTopLeft(find.byType(Scaffold).first).dx,
@@ -188,6 +199,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('page'), findsNothing);
     expect(tester.getTopLeft(find.byType(Scaffold)).dx, 0);
+  });
+
+  testWidgets('a picture scale draws its child as itself at rest', (
+    tester,
+  ) async {
+    FilterQuality? quality() =>
+        tester.widget<Transform>(find.byType(Transform)).filterQuality;
+
+    await tester.pumpWidget(
+      const PictureScaleTransition(
+        scale: AlwaysStoppedAnimation(0.92),
+        child: SizedBox(),
+      ),
+    );
+    expect(quality(), FilterQuality.low);
+    await tester.pumpWidget(
+      const PictureScaleTransition(
+        scale: AlwaysStoppedAnimation(1),
+        child: SizedBox(),
+      ),
+    );
+    expect(quality(), isNull);
   });
 
   for (final platform in [TargetPlatform.windows, TargetPlatform.linux]) {

@@ -1188,7 +1188,7 @@ class _MainShellState extends ConsumerState<MainShell>
             )
           : FadeTransition(
               opacity: _tabOpacity,
-              child: ScaleTransition(
+              child: PictureScaleTransition(
                 scale: _tabJumpScale,
                 child: PageView.builder(
                   controller: _pageController,
