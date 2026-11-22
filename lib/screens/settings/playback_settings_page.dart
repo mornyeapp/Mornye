@@ -490,7 +490,9 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
               ),
               SettingsItem(
                 title: 'Single Tap Action',
-                subtitle: _headsetActionLabel(settings.headsetSingleClickAction),
+                subtitle: _headsetActionLabel(
+                  settings.headsetSingleClickAction,
+                ),
                 trailing: const AppIcon(Icons.chevron_right),
                 showDivider: true,
                 onTap: () => _showHeadsetActionPicker(
@@ -504,7 +506,9 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
               ),
               SettingsItem(
                 title: 'Double Tap Action',
-                subtitle: _headsetActionLabel(settings.headsetDoubleClickAction),
+                subtitle: _headsetActionLabel(
+                  settings.headsetDoubleClickAction,
+                ),
                 trailing: const AppIcon(Icons.chevron_right),
                 showDivider: true,
                 onTap: () => _showHeadsetActionPicker(
@@ -518,7 +522,9 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
               ),
               SettingsItem(
                 title: 'Triple Tap Action',
-                subtitle: _headsetActionLabel(settings.headsetTripleClickAction),
+                subtitle: _headsetActionLabel(
+                  settings.headsetTripleClickAction,
+                ),
                 trailing: const AppIcon(Icons.chevron_right),
                 showDivider: true,
                 onTap: () => _showHeadsetActionPicker(
@@ -1192,24 +1198,15 @@ class _SpatialAudioItemState extends ConsumerState<_SpatialAudioItem>
   }
 }
 
-String _headsetActionLabel(String action) {
-  switch (action) {
-    case 'play_pause':
-      return 'Play / Pause';
-    case 'next':
-      return 'Next Track';
-    case 'previous':
-      return 'Previous Track';
-    case 'fast_forward':
-      return 'Fast Forward';
-    case 'rewind':
-      return 'Rewind';
-    case 'none':
-      return 'None';
-    default:
-      return 'Play / Pause';
-  }
-}
+String _headsetActionLabel(String action) => switch (action) {
+  'play_pause' => 'Play / Pause',
+  'next' => 'Next Track',
+  'previous' => 'Previous Track',
+  'fast_forward' => 'Fast Forward',
+  'rewind' => 'Rewind',
+  'none' => 'None',
+  _ => 'Play / Pause',
+};
 
 Future<void> _showHeadsetActionPicker(
   BuildContext context, {
