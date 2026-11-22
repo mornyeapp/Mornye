@@ -4,7 +4,36 @@ import java.io.File
 import java.security.MessageDigest
 
 internal object AndroidLibraryCovers {
-    @Synchronized
+    private val HEX_CHARS = "0123456789abcdef".toCharArray()
+
+    private fun sha256Hex(data: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(data)
+        val out = CharArray(digest.size * 2)
+        for (i in digest.indices) {
+            val v = digest[i].toInt() and 0xff
+            out[i * 2] = HEX_CHARS[v ushr 4]
+            out[i * 2 + 1] = HEX_CHARS[v and 0x0f]
+        }
+        return String(out)
+    }
+
+    private fun fileEqualsBytes(file: File, expected: ByteArray): Boolean {
+        if (file.length() != expected.size.toLong()) return false
+        val buffer = ByteArray(minOf(expected.size, 8192).coerceAtLeast(1))
+        var offset = 0
+        file.inputStream().use { input ->
+            while (offset < expected.size) {
+                val read = input.read(buffer, 0, minOf(buffer.size, expected.size - offset))
+                if (read <= 0) return false
+                for (i in 0 until read) {
+                    if (buffer[i] != expected[offset + i]) return false
+                }
+                offset += read
+            }
+            return input.read() == -1
+        }
+    }
+
     fun cache(directory: File?, cached: File?, bytes: ByteArray, mime: String): File? {
         if (directory == null) return cached
         if (bytes.isEmpty() && cached != null && cached.length() > 24L * 1024 * 1024) return cached
@@ -19,11 +48,10 @@ internal object AndroidLibraryCovers {
         } else if (bytes.isNotEmpty()) {
             if (mime.contains("png")) "png" else "jpg"
         } else if (cached?.extension == "png") "png" else "jpg"
-        val hash = MessageDigest.getInstance("SHA-256").digest(data)
-            .joinToString("") { "%02x".format(it) }
+        val hash = sha256Hex(data)
         val output = File(directory, "cover_content_$hash.$extension")
         if (output.exists()) {
-            check(output.length() == data.size.toLong() && output.readBytes().contentEquals(data)) {
+            check(fileEqualsBytes(output, data)) {
                 "Content-addressed library artwork differs from its name"
             }
             return output
@@ -33,8 +61,16 @@ internal object AndroidLibraryCovers {
             staged.outputStream().use { stream ->
                 stream.write(data)
             }
-            check(staged.renameTo(output)) { "Could not publish library artwork" }
-            return output
+            synchronized(this) {
+                if (output.exists()) {
+                    check(fileEqualsBytes(output, data)) {
+                        "Content-addressed library artwork differs from its name"
+                    }
+                    return output
+                }
+                check(staged.renameTo(output)) { "Could not publish library artwork" }
+                return output
+            }
         } finally {
             staged.delete()
         }

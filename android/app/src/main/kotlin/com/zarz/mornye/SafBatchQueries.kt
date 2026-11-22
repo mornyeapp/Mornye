@@ -3,7 +3,6 @@ package com.zarz.mornye
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
-import androidx.documentfile.provider.DocumentFile
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -60,14 +59,27 @@ internal fun MainActivity.getSafFileModTimes(urisJson: String): String {
             JSONArray()
         }
 
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+        )
         for (i in 0 until uris.length()) {
             val uriStr = uris.optString(i, "")
             if (uriStr.isBlank()) continue
             try {
                 val uri = Uri.parse(uriStr)
-                val doc = DocumentFile.fromSingleUri(this, uri)
-                if (doc != null && doc.exists()) {
-                    result.put(uriStr, doc.lastModified())
+                contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val modIndex = cursor.getColumnIndex(
+                            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+                        )
+                        val lastModified = if (modIndex >= 0 && !cursor.isNull(modIndex)) {
+                            cursor.getLong(modIndex)
+                        } else {
+                            0L
+                        }
+                        result.put(uriStr, lastModified)
+                    }
                 }
             } catch (_: Exception) {}
         }

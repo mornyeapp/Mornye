@@ -2,6 +2,7 @@ package com.zarz.mornye
 
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import org.json.JSONArray
 import org.json.JSONObject
@@ -139,16 +140,46 @@ internal fun Context.inspectSafFiles(requestsJson: String): String {
         }
 
         val pendingByTree = linkedMapOf<String, MutableList<SafFileInspectionRequest>>()
+        val singleDocProjection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        )
         for (request in requests) {
             if (request.currentUri.startsWith("content://")) {
                 try {
-                    val current = DocumentFile.fromSingleUri(this, Uri.parse(request.currentUri))
-                    if (current != null && current.exists() && current.isFile) {
+                    val uri = Uri.parse(request.currentUri)
+                    var foundName: String? = null
+                    contentResolver.query(uri, singleDocProjection, null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val mimeIndex = cursor.getColumnIndex(
+                                DocumentsContract.Document.COLUMN_MIME_TYPE,
+                            )
+                            val mime = if (mimeIndex >= 0 && !cursor.isNull(mimeIndex)) {
+                                cursor.getString(mimeIndex)
+                            } else {
+                                null
+                            }
+                            if (!mime.isNullOrEmpty() &&
+                                mime != DocumentsContract.Document.MIME_TYPE_DIR
+                            ) {
+                                val nameIndex = cursor.getColumnIndex(
+                                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                                )
+                                foundName = if (nameIndex >= 0 && !cursor.isNull(nameIndex)) {
+                                    cursor.getString(nameIndex).orEmpty()
+                                } else {
+                                    ""
+                                }
+                            }
+                        }
+                    }
+                    if (foundName != null) {
                         resultsByKey[request.key] = result(
                             key = request.key,
                             status = "found",
                             uri = request.currentUri,
-                            fileName = current.name.orEmpty(),
+                            fileName = foundName.orEmpty(),
                             relativeDir = request.relativeDir,
                         )
                         continue
@@ -164,13 +195,18 @@ internal fun Context.inspectSafFiles(requestsJson: String): String {
             pendingByTree.getOrPut(request.treeUri) { mutableListOf() }.add(request)
         }
 
+        val persistedPermissions = if (pendingByTree.isNotEmpty()) {
+            contentResolver.persistedUriPermissions
+        } else {
+            emptyList()
+        }
         for ((treeUriString, treeRequests) in pendingByTree) {
             val treeUri = try {
                 Uri.parse(treeUriString)
             } catch (_: Exception) {
                 null
             }
-            val hasPermission = treeUri != null && contentResolver.persistedUriPermissions.any {
+            val hasPermission = treeUri != null && persistedPermissions.any {
                 it.uri == treeUri && it.isReadPermission && it.isWritePermission
             }
             val root = if (hasPermission) {

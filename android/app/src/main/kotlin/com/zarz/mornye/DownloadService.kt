@@ -213,11 +213,14 @@ class DownloadService : Service() {
 
         // Header of the last written state snapshot (all fields except the
         // per-item payload). Lets steady-state polls skip re-reading and
-        // re-parsing the full state file — which grows with every completed
-        // item (results embed history rows and lyrics) — once the caller has
-        // already consumed that items payload.
+        // re-parsing the full state file (which grows with every completed
+        // item because results embed history rows and lyrics) once the caller
+        // has already consumed that items payload.
         @Volatile internal var lastStateHeaderJson: String? = null
         @Volatile internal var lastStateHeaderSerial = 0L
+        // Transient progress ticks live in memory instead of forcing an
+        // AtomicFile fsync every second while downloads are active.
+        @Volatile internal var lastProgressSnapshotJson: String? = null
 
         fun getNativeWorkerSnapshot(context: Context, sinceStateSerial: Long = 0L): String {
             synchronized(NATIVE_WORKER_STATE_FILE_LOCK) {
@@ -260,12 +263,21 @@ class DownloadService : Service() {
                     }
                 }
 
-                val progressFile = File(context.filesDir, NATIVE_WORKER_PROGRESS_FILE)
-                if (progressFile.exists()) {
+                val progressText = lastProgressSnapshotJson ?: File(
+                    context.filesDir,
+                    NATIVE_WORKER_PROGRESS_FILE,
+                ).takeIf { it.exists() }?.let { progressFile ->
                     try {
-                        val progress = AtomicFile(progressFile).openRead().bufferedReader(Charsets.UTF_8).use {
+                        AtomicFile(progressFile).openRead().bufferedReader(Charsets.UTF_8).use {
                             it.readText()
-                        }.let { JSONObject(it) }
+                        }
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                if (progressText != null) {
+                    try {
+                        val progress = JSONObject(progressText)
                         if (progress.optString("run_id", "") == state.optString("run_id", "") &&
                             progress.optLong("snapshot_serial", 0L) > state.optLong("snapshot_serial", 0L)
                         ) {
@@ -359,6 +371,7 @@ class DownloadService : Service() {
     internal var nativeWorkerRunId = ""
     @Volatile private var nativeWorkerCurrentItemId = ""
     internal val nativeWorkerItems = mutableListOf<NativeWorkerItem>()
+    internal val nativeWorkerItemsById = HashMap<String, NativeWorkerItem>()
     internal val nativeWorkerTerminalStatuses = mutableMapOf<String, String>()
     internal val nativeReplayGainEntries = mutableListOf<JSONObject>()
     internal val nativeReplayGainRequestAlbumKeys = mutableMapOf<String, String>()
@@ -774,17 +787,19 @@ class DownloadService : Service() {
         }
         synchronized(nativeWorkerItems) {
             nativeWorkerItems.clear()
+            nativeWorkerItemsById.clear()
             nativeWorkerTerminalStatuses.clear()
-            nativeWorkerItems.addAll(
-                requests.map {
-                    NativeWorkerItem(
-                        itemId = it.itemId,
-                        trackName = it.trackName,
-                        artistName = it.artistName,
-                    )
-                }
-            )
+            for (request in requests) {
+                val item = NativeWorkerItem(
+                    itemId = request.itemId,
+                    trackName = request.trackName,
+                    artistName = request.artistName,
+                )
+                nativeWorkerItems.add(item)
+                nativeWorkerItemsById[item.itemId] = item
+            }
         }
+        lastProgressSnapshotJson = null
         configureNativeWorkerNetworkPolicy(settingsJson)
         writeNativeReplayGainJournal()
         currentStatus = "preparing"
@@ -839,12 +854,14 @@ class DownloadService : Service() {
         }
         if (requests.isEmpty()) return
 
-        val knownIds = synchronized(nativeWorkerItems) {
-            nativeWorkerItems.mapTo(mutableSetOf()) { it.itemId }.apply {
-                addAll(nativeWorkerTerminalStatuses.keys)
+        val additions = synchronized(nativeWorkerItems) {
+            val seen = HashSet<String>(requests.size)
+            requests.filter { request ->
+                !nativeWorkerItemsById.containsKey(request.itemId) &&
+                    !nativeWorkerTerminalStatuses.containsKey(request.itemId) &&
+                    seen.add(request.itemId)
             }
         }
-        val additions = requests.filter { knownIds.add(it.itemId) }
         if (additions.isEmpty()) return
 
         synchronized(nativeReplayGainRequestAlbumKeys) {
@@ -862,15 +879,15 @@ class DownloadService : Service() {
             }
         }
         synchronized(nativeWorkerItems) {
-            nativeWorkerItems.addAll(
-                additions.map {
-                    NativeWorkerItem(
-                        itemId = it.itemId,
-                        trackName = it.trackName,
-                        artistName = it.artistName,
-                    )
-                },
-            )
+            for (request in additions) {
+                val item = NativeWorkerItem(
+                    itemId = request.itemId,
+                    trackName = request.trackName,
+                    artistName = request.artistName,
+                )
+                nativeWorkerItems.add(item)
+                nativeWorkerItemsById[item.itemId] = item
+            }
             queueCount = maxOf(queueCount, nativeWorkerItems.size)
         }
         for (request in additions) {
@@ -925,6 +942,7 @@ class DownloadService : Service() {
                     continue
                 }
                 nativeWorkerTerminalStatuses[item.itemId] = item.status
+                nativeWorkerItemsById.remove(item.itemId)
                 iterator.remove()
                 releasedAny = true
             }

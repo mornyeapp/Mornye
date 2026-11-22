@@ -289,23 +289,39 @@ internal fun MainActivity.scanSafTree(
             mutableMapOf()
         }
         val checkpointWriter = checkpointPath?.let {
-            FileOutputStream(File(it), true).bufferedWriter(Charsets.UTF_8)
+            FileOutputStream(File(it), true).writer(Charsets.UTF_8).buffered(32 * 1024)
         }
         val ndjsonWriter = outputPath?.let {
-            FileOutputStream(File(it), true).bufferedWriter(Charsets.UTF_8)
+            FileOutputStream(File(it), true).writer(Charsets.UTF_8).buffered(16 * 1024)
         }
         var resultCount = outputPath?.let(::countSafScanRows) ?: 0
+        var pendingCheckpointFlush = 0
+        var pendingCheckpointBytes = 0
         fun checkpointed(uri: String, lastModified: Long): Boolean =
             checkpoint[uri] == lastModified
 
+        fun flushWriters() {
+            if (pendingCheckpointFlush == 0) return
+            // Flush NDJSON rows before advancing the checkpoint file.
+            ndjsonWriter?.flush()
+            checkpointWriter?.flush()
+            pendingCheckpointFlush = 0
+            pendingCheckpointBytes = 0
+        }
+
         fun recordCheckpoint(uri: String, lastModified: Long) {
             if (checkpointWriter == null || uri.isBlank()) return
+            val modStr = lastModified.toString()
             checkpoint[uri] = lastModified
             checkpointWriter.write(uri)
             checkpointWriter.write('\t'.code)
-            checkpointWriter.write(lastModified.toString())
+            checkpointWriter.write(modStr)
             checkpointWriter.newLine()
-            checkpointWriter.flush()
+            pendingCheckpointFlush++
+            pendingCheckpointBytes += uri.length + modStr.length + 2
+            if (pendingCheckpointFlush >= 32 || pendingCheckpointBytes >= 16 * 1024) {
+                flushWriters()
+            }
         }
 
         fun putResult(obj: JSONObject) {
@@ -339,7 +355,9 @@ internal fun MainActivity.scanSafTree(
             val cueUri = cueDoc.uri.toString()
             val cueAlreadyIndexed = checkpointed(cueUri, cue.lastModified)
             if (safScanStopRequested()) {
+                flushWriters()
                 ndjsonWriter?.close()
+                checkpointWriter?.close()
                 spill?.abandon()
                 return cancelledResult()
             }
@@ -388,7 +406,6 @@ internal fun MainActivity.scanSafTree(
                     folderCovers.fill(trackObj, cue.folderImage)
                     putResult(trackObj)
                 }
-                ndjsonWriter?.flush()
                 recordCheckpoint(cueUri, cue.lastModified)
 
             } catch (e: Exception) {
@@ -414,7 +431,9 @@ internal fun MainActivity.scanSafTree(
         for (audio in audioFiles) {
             val doc = audio.doc
             if (safScanStopRequested()) {
+                flushWriters()
                 ndjsonWriter?.close()
+                checkpointWriter?.close()
                 spill?.abandon()
                 return cancelledResult()
             }
@@ -485,8 +504,6 @@ internal fun MainActivity.scanSafTree(
                         metadataObj.put("filePath", outcome.uri)
                         metadataObj.put("fileModTime", outcome.lastModified)
                         putResult(metadataObj)
-                        // Flush before recording the checkpoint to avoid losing the row.
-                        ndjsonWriter?.flush()
                         recordCheckpoint(outcome.uri, outcome.lastModified)
                     } catch (error: Exception) {
                         errors++
@@ -499,7 +516,9 @@ internal fun MainActivity.scanSafTree(
             reportScanned()
         }
         if (!completed) {
+            flushWriters()
             ndjsonWriter?.close()
+            checkpointWriter?.close()
             spill?.abandon()
             return cancelledResult()
         }
@@ -510,6 +529,7 @@ internal fun MainActivity.scanSafTree(
         }
 
         if (ndjsonWriter != null) {
+            flushWriters()
             ndjsonWriter.close()
             checkpointWriter?.close()
             return mapOf("path" to outputPath, "count" to resultCount, "error_count" to errors)
@@ -517,6 +537,7 @@ internal fun MainActivity.scanSafTree(
         spill!!.raw(if (resultCount == 0) "[]" else "]")
         return spill.result()
         } catch (e: Exception) {
+            try { flushWriters() } catch (_: Exception) {}
             try { ndjsonWriter?.close() } catch (_: Exception) {}
             try { checkpointWriter?.close() } catch (_: Exception) {}
             spill?.abandon()

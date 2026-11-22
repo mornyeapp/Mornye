@@ -45,8 +45,17 @@ internal object NativeDataJobs {
 
 internal fun MainActivity.runNativeDataJobPlatform(arguments: Any?, lease: RequestLease): Any {
     val args = arguments as? Map<*, *> ?: error("Missing data job arguments")
-    val request = JSONObject(args["request_json"] as? String ?: error("Missing data job request"))
+    val raw = args["request_json"] as? String ?: error("Missing data job request")
     val bytes = args["bytes"] as? ByteArray ?: byteArrayOf()
+    val operation = args["operation"] as? String
+    if (operation != null &&
+        operation != "library_snapshot" &&
+        operation != "library_scan_incremental"
+    ) {
+        check(!lease.isCancelled()) { "Native data job cancelled" }
+        return bridgeJsonResult(com.mornye.backend.runNativeDataJob(raw, bytes, lease))
+    }
+    val request = JSONObject(raw)
     var spilledDelta: File? = null
     return run {
         fun checkActive() { check(!lease.isCancelled()) { "Native data job cancelled" } }

@@ -97,30 +97,26 @@ internal fun DownloadService.writeNativeWorkerSnapshot(
             }
 
             synchronized(DownloadService.NATIVE_WORKER_STATE_FILE_LOCK) {
-                val targetFileName = if (includeItems) {
-                    DownloadService.NATIVE_WORKER_STATE_FILE
+                if (!includeItems) {
+                    DownloadService.lastProgressSnapshotJson = snapshot.toString()
+                    latestCommittedProgressSnapshotSerial = snapshotSerial
                 } else {
-                    DownloadService.NATIVE_WORKER_PROGRESS_FILE
-                }
-                val file = AtomicFile(File(filesDir, targetFileName))
-                var stream: java.io.FileOutputStream? = null
-                try {
-                    stream = file.startWrite()
-                    stream.write(snapshot.toString().toByteArray(Charsets.UTF_8))
-                    file.finishWrite(stream)
-                    stream = null
-                    if (includeItems) {
+                    val file = AtomicFile(File(filesDir, DownloadService.NATIVE_WORKER_STATE_FILE))
+                    var stream: java.io.FileOutputStream? = null
+                    try {
+                        stream = file.startWrite()
+                        stream.write(snapshot.toString().toByteArray(Charsets.UTF_8))
+                        file.finishWrite(stream)
+                        stream = null
                         latestCommittedStateSnapshotSerial = snapshotSerial
                         if (headerCandidate != null) {
                             DownloadService.lastStateHeaderJson = headerCandidate
                             DownloadService.lastStateHeaderSerial = snapshotSerial
                         }
-                    } else {
-                        latestCommittedProgressSnapshotSerial = snapshotSerial
-                    }
-                } finally {
-                    if (stream != null) {
-                        file.failWrite(stream)
+                    } finally {
+                        if (stream != null) {
+                            file.failWrite(stream)
+                        }
                     }
                 }
             }
@@ -215,7 +211,7 @@ internal fun DownloadService.readNativeWorkerRunIdFromSnapshotFile(): String {
 
 internal fun DownloadService.updateNativeWorkerItem(itemId: String, updater: (DownloadService.NativeWorkerItem) -> Unit) {
     synchronized(nativeWorkerItems) {
-        nativeWorkerItems.firstOrNull { it.itemId == itemId }?.let(updater)
+        nativeWorkerItemsById[itemId]?.let(updater)
     }
 }
 
@@ -248,7 +244,7 @@ internal fun DownloadService.startNativeWorkerProgressCoordinator(generation: Lo
                     continue
                 }
                 val signature = synchronized(nativeWorkerItems) {
-                    nativeWorkerItems.firstOrNull { it.itemId == itemId }?.let {
+                    nativeWorkerItemsById[itemId]?.let {
                         "${it.status}:${it.bytesReceived}:${it.bytesTotal}:${it.progress}"
                     }
                 }
@@ -471,7 +467,7 @@ internal fun DownloadService.nativeWorkerCounts(): DownloadService.NativeWorkerC
 internal fun DownloadService.nativeWorkerItemSnapshot(itemId: String, includeStatic: Boolean): JSONObject? {
     if (itemId.isBlank()) return null
     synchronized(nativeWorkerItems) {
-        val item = nativeWorkerItems.firstOrNull { it.itemId == itemId } ?: return null
+        val item = nativeWorkerItemsById[itemId] ?: return null
         return nativeWorkerItemSnapshotLocked(item, includeStatic)
     }
 }
@@ -500,13 +496,13 @@ internal fun DownloadService.nativeWorkerItemsSnapshot(
     itemIds: Collection<String>,
     includeStatic: Boolean,
 ): JSONArray {
-    val requested = itemIds.toSet()
     val array = JSONArray()
+    val seen = HashSet<String>(itemIds.size)
     synchronized(nativeWorkerItems) {
-        for (item in nativeWorkerItems) {
-            if (item.itemId in requested) {
-                array.put(nativeWorkerItemSnapshotLocked(item, includeStatic))
-            }
+        for (itemId in itemIds) {
+            if (!seen.add(itemId)) continue
+            val item = nativeWorkerItemsById[itemId] ?: continue
+            array.put(nativeWorkerItemSnapshotLocked(item, includeStatic))
         }
     }
     return array
