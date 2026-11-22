@@ -15,6 +15,7 @@ import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/expressive_button_group.dart';
 import 'package:mornye/widgets/home_pin_action.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/page_transitions.dart';
 import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
@@ -1491,7 +1492,13 @@ class _CollectionTrackTile extends ConsumerWidget {
                     )
                   : TrackCoverPlaceholder(size: size),
             );
-            return heroTag != null ? Hero(tag: heroTag, child: cover) : cover;
+            return heroTag != null
+                ? Hero(
+                    tag: heroTag,
+                    transitionOnUserGestures: heroFollowsBackSwipe(context),
+                    child: cover,
+                  )
+                : cover;
           },
         ),
       ),

@@ -197,6 +197,7 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
       // it itself.
       coverBuilder: (context, coverSize) => Hero(
         tag: _coverHeroTag,
+        transitionOnUserGestures: heroFollowsBackSwipe(context),
         flightShuttleBuilder: _coverFlight,
         child: SizedBox.square(
           dimension: coverSize,

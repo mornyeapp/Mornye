@@ -410,6 +410,91 @@ void main() {
       expect(tester.getRect(find.byType(Scaffold)).width, width);
     });
 
+    testWidgets('a cover flies back to its row on a swipe as on a press', (
+      tester,
+    ) async {
+      const row = Key('row-cover');
+      const header = Key('header-cover');
+      Widget cover(BuildContext context, Key key, double size) => Hero(
+        tag: 'cover',
+        transitionOnUserGestures: heroFollowsBackSwipe(context),
+        child: SizedBox.square(
+          key: key,
+          dimension: size,
+          child: const ColoredBox(color: Colors.red),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: _navigatorKey,
+          theme: android,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => Align(
+                alignment: Alignment.topLeft,
+                child: cover(context, row, 40),
+              ),
+            ),
+          ),
+        ),
+      );
+      observe(() => [_navigatorKey.currentState]);
+      final rowRect = tester.getRect(find.byKey(row));
+      Future<void> open() async {
+        _navigatorKey.currentState!.push(
+          SteadyPageRoute<void>(
+            builder: (context) =>
+                Scaffold(body: Center(child: cover(context, header, 200))),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await open();
+      final headerRect = tester.getRect(find.byKey(header));
+
+      // Under the finger the cover has left the page and is on its way.
+      await swipe(tester, 'startBackGesture', 0);
+      await swipe(tester, 'updateBackGestureProgress', 1);
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(header), findsNothing);
+      final flying = tester.getRect(find.byKey(row));
+      expect(flying.width, inExclusiveRange(rowRect.width, headerRect.width));
+      expect(flying.center.dx, lessThan(headerRect.center.dx));
+
+      // Let go without going back: the cover returns to the page.
+      await swipe(tester, 'cancelBackGesture');
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byKey(header)), headerRect);
+
+      // Let go to go back: it lands on its row.
+      await swipe(tester, 'startBackGesture', 0);
+      await swipe(tester, 'updateBackGestureProgress', 1);
+      await tester.pump();
+      await swipe(tester, 'commitBackGesture');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.byKey(header), findsNothing);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byKey(row)), rowRect);
+
+      // A press flies it the same way.
+      await open();
+      _navigatorKey.currentState!.pop();
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(header), findsNothing);
+      expect(
+        tester.getRect(find.byKey(row)).width,
+        inExclusiveRange(rowRect.width, headerRect.width),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byKey(row)), rowRect);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('a dialog above the page closes first', (tester) async {
       await _pumpApp(tester, android);
       observe(() => [_navigatorKey.currentState]);

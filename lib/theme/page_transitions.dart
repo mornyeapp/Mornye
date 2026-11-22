@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show PredictiveBackEvent;
 import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 
 // Every map avoids Flutter's Android default,
 // PredictiveBackPageTransitionsBuilder: its gesture detector mis-routes the
@@ -432,6 +433,11 @@ class _PhonePageTransitionState extends State<_PhonePageTransition> {
     );
   }
 }
+
+/// Whether a cover's Hero flies on a back swipe as it does on a back press.
+/// A Material page follows the swipe, and a Hero that sat the swipe out
+/// would ride off with the page instead of going back to its row.
+bool heroFollowsBackSwipe(BuildContext context) => !context.isMornye;
 
 /// Lets a Material phone page follow the system back swipe: the swipe seeks
 /// the page's own pop, and letting go finishes it or puts the page back.

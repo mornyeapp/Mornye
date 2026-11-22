@@ -134,6 +134,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
           leading: isCompleted
               ? Hero(
                   tag: 'cover_${item.id}',
+                  transitionOnUserGestures: heroFollowsBackSwipe(context),
                   child: _buildCoverArt(item, colorScheme),
                 )
               : _buildCoverArt(item, colorScheme),
@@ -1178,6 +1179,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
     final playbackKey = _libraryPlaybackKey(item);
     final leading = Hero(
       tag: 'cover_lib_${item.id}',
+      transitionOnUserGestures: heroFollowsBackSwipe(context),
       child: _buildUnifiedCoverImage(
         item,
         colorScheme,
@@ -1400,6 +1402,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
       onLongPress: onLongPress,
       cover: Hero(
         tag: 'cover_lib_${item.id}',
+        transitionOnUserGestures: heroFollowsBackSwipe(context),
         child: _buildUnifiedCoverImage(item, colorScheme),
       ),
       overlays: [

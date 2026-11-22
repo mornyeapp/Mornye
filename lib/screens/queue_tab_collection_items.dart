@@ -269,7 +269,11 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     if (!grid) {
       return TrackCard(
         onTap: onTap,
-        leading: Hero(tag: heroTag, child: cover),
+        leading: Hero(
+          tag: heroTag,
+          transitionOnUserGestures: heroFollowsBackSwipe(context),
+          child: cover,
+        ),
         title: trackName,
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,7 +307,11 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     return TrackGridCard(
       semanticLabel: context.l10n.a11yTrackByArtist(trackName, artistName),
       onTap: onTap,
-      cover: Hero(tag: heroTag, child: cover),
+      cover: Hero(
+        tag: heroTag,
+        transitionOnUserGestures: heroFollowsBackSwipe(context),
+        child: cover,
+      ),
       overlays: [
         PositionedDirectional(
           end: 4,
