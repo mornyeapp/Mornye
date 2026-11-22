@@ -4,8 +4,11 @@ import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/providers/library_mixes_provider.dart'
+    show libraryMixesStartupProvider;
 import 'package:mornye/providers/library_song_reads.dart';
 import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/collection_suggestions.dart';
 import 'package:mornye/services/history_database.dart';
@@ -132,10 +135,48 @@ final homeRecommendationFilterProvider =
       },
     );
 
-/// Songs outside the Library like the ones a person plays, adds and loves,
-/// asked from an extension once a day and kept for that day. A failed
-/// request falls back on the last day's songs.
+/// What Home shows of [homeRecommendationCandidatesProvider]: its first
+/// songs in the order of [homeRecommendationFitProvider], or in the
+/// extension's order until that has a fit.
 final homeRecommendationsProvider = FutureProvider<List<Track>>((ref) async {
+  final tracks = await ref.watch(homeRecommendationCandidatesProvider.future);
+  final fit = ref.watch(homeRecommendationFitProvider).value;
+  return orderHomeRecommendations(
+    tracks,
+    homeRecommendationFits(tracks, fit),
+  ).take(homeRecommendationCount).toList(growable: false);
+});
+
+/// How well recommended songs fit the listener, from what Autoplay learned.
+/// Null, so the extension's order stays, while learning is off, before
+/// startup settles and before the models know enough.
+final homeRecommendationFitProvider = FutureProvider<HomeRecommendationFit?>((
+  ref,
+) async {
+  // The lasting taste reads the taste log: not before startup settles, as
+  // the Library mixes wait.
+  if (!ref.watch(libraryMixesStartupProvider)) return null;
+  if (!ref.watch(settingsProvider.select((s) => s.autoplayPersonalization))) {
+    return null;
+  }
+  final runtime = ref.read(musicPlayerRuntimeProvider);
+  final learning = runtime.personalization;
+  if (!learning.enabled) return null;
+  await learning.ensureLoaded();
+  final taste = await runtime.taste.profile();
+  return homeRecommendationFit(
+    preference: learning.rankingSnapshot,
+    taste: taste,
+    at: DateTime.now(),
+  );
+});
+
+/// Songs outside the Library like the ones a person plays, adds and loves,
+/// asked from an extension once a day and kept for that day, in the
+/// extension's order. A failed request falls back on the last day's songs.
+final homeRecommendationCandidatesProvider = FutureProvider<List<Track>>((
+  ref,
+) async {
   if (!ref.watch(settingsProvider.select((s) => s.homeRecommendations))) {
     return const [];
   }
@@ -149,9 +190,7 @@ final homeRecommendationsProvider = FutureProvider<List<Track>>((ref) async {
   final outsideLibrary = ref.watch(homeRecommendationFilterProvider);
   final readSeeds = ref.watch(homeRecommendationSeedsProvider);
 
-  Future<List<Track>> shown(List<Track> tracks) async => (await outsideLibrary(
-    tracks,
-  )).take(homeRecommendationCount).toList(growable: false);
+  Future<List<Track>> shown(List<Track> tracks) => outsideLibrary(tracks);
 
   final prefs = await SharedPreferences.getInstance();
   final cached = HomeRecommendationCache.decode(prefs.getString(_cacheKey));

@@ -150,6 +150,13 @@ class AutoplayPreferenceModel {
   AutoplayExploration explore(Random random) =>
       AutoplayExploration._(this, random);
 
+  /// How much the arms have seen of [artist], in weighted plays: 0 for an
+  /// artist never heard or long forgotten.
+  double artistEvidence(String artist) {
+    final arm = _arms[_artistArm(_text(artist))];
+    return arm == null ? 0 : arm.$1 + arm.$2;
+  }
+
   void _reward(int arm, double reward, double weight) {
     final (hits, misses) = _arms.remove(arm) ?? (0.0, 0.0);
     // Re-inserted last, so the map keeps the latest arms at its end.

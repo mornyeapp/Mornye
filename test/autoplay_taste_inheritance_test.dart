@@ -38,6 +38,43 @@ PlayableMedia _media(
 String _song(String artist, String title) =>
     'song:${artist.toLowerCase()}|${title.toLowerCase()}';
 
+final _start = DateTime(2026, 10, 1, 8);
+
+/// Sessions three hours apart of two groups the listener never plays
+/// together: Night 1-3 and Day 1-3.
+List<AutoplayFeedback> _clusters({int sessions = 16}) {
+  final random = Random(5);
+  return [
+    for (var session = 0; session < sessions; session++)
+      for (var i = 0; i < 8; i++)
+        AutoplayFeedback(
+          kind: AutoplayFeedbackKind.listened,
+          track: AutoplayLearningTrack(
+            source: '/private/path/$session/$i.flac',
+            title: 'Song ${random.nextInt(4)}',
+            artist:
+                '${session.isEven ? 'Night' : 'Day'} '
+                '${1 + random.nextInt(3)}',
+          ),
+          previous: null,
+          at: _start.add(Duration(hours: 3 * session, minutes: 4 * i)),
+          reward: 1,
+        ),
+  ];
+}
+
+Future<Database> _database() async {
+  sqfliteFfiInit();
+  final directory = await Directory.systemTemp.createTemp('taste-inherit-');
+  addTearDown(() => directory.delete(recursive: true));
+  final db = await AutoplayTaste.openWithFactory(
+    databaseFactoryFfi,
+    '${directory.path}/taste.db',
+  );
+  addTearDown(db.close);
+  return db;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -158,40 +195,13 @@ void main() {
 
   test('the signal carries the credited artists of unknown songs, keys only, '
       'and a Library of 20000 songs stays cheap', () async {
-    sqfliteFfiInit();
-    final directory = await Directory.systemTemp.createTemp('taste-inherit-');
-    addTearDown(() => directory.delete(recursive: true));
-    final db = await AutoplayTaste.openWithFactory(
-      databaseFactoryFfi,
-      '${directory.path}/taste.db',
-    );
-    addTearDown(db.close);
-    // Two groups the listener never plays together.
-    final random = Random(5);
-    final start = DateTime(2026, 10, 1, 8);
+    final db = await _database();
     final taste = AutoplayTaste(
       open: () async => db,
       train: (plays) async => trainAutoplayTaste(plays),
     );
     addTearDown(taste.dispose);
-    for (var session = 0; session < 16; session++) {
-      final group = session.isEven ? 'Night' : 'Day';
-      for (var i = 0; i < 8; i++) {
-        taste.record(
-          AutoplayFeedback(
-            kind: AutoplayFeedbackKind.listened,
-            track: AutoplayLearningTrack(
-              source: '/private/path/$session/$i.flac',
-              title: 'Song ${random.nextInt(4)}',
-              artist: '$group ${1 + random.nextInt(3)}',
-            ),
-            previous: null,
-            at: start.add(Duration(hours: 3 * session, minutes: 4 * i)),
-            reward: 1,
-          ),
-        );
-      }
-    }
+    _clusters().forEach(taste.record);
     await taste.train();
     final listening = [
       _media('Night 1', 'Song 0'),
@@ -256,5 +266,79 @@ void main() {
       'prepare $prepared ms, ${large.vectors.length} vectors',
     );
     expect(collected + prepared, lessThan(5000));
+  });
+
+  test('the lasting taste follows the latest listening and places credited '
+      'artists for less', () {
+    final plays = _clusters().map(AutoplayTastePlay.of).toList();
+    final model = trainAutoplayTaste(plays);
+    final now = DateTime(2027, 6, 1);
+    AutoplayTasteProfile profile({required String recent}) =>
+        autoplayTasteProfile(model, [
+          for (final play in plays)
+            AutoplayTastePlay(
+              song: play.song,
+              artist: play.artist,
+              at: now.subtract(
+                Duration(days: play.artist.startsWith(recent) ? 1 : 200),
+              ),
+              kind: play.kind,
+              reward: play.reward,
+            ),
+        ], at: now)!;
+    final night = profile(recent: 'night');
+    final day = profile(recent: 'day');
+    debugPrint(
+      'Lasting taste: night ${night.fit('Night 2', 'Song 1')}, '
+      '${night.fit('Day 2', 'Song 1')}; credited '
+      '${night.fit('Night 1 feat. Guest', 'Unheard')}',
+    );
+    expect(night.fit('Night 2', 'Song 1'), greaterThan(0));
+    expect(
+      night.fit('Night 2', 'Song 1'),
+      greaterThan(night.fit('Day 2', 'Song 1')!),
+    );
+    expect(
+      day.fit('Day 2', 'Song 1'),
+      greaterThan(day.fit('Night 2', 'Song 1')!),
+    );
+    // An artist's unheard song is the artist; a credit counts for less.
+    final artist = night.fit('Night 1', 'Unheard')!;
+    final credited = night.fit('Night 1 feat. Guest', 'Unheard')!;
+    expect(artist, greaterThan(0));
+    expect(credited, greaterThan(0));
+    expect(credited, lessThan(artist));
+    expect(night.fit('Somebody Else', 'Song 1'), isNull);
+    // Skips are not taste.
+    expect(
+      autoplayTasteProfile(model, [
+        for (final play in plays)
+          AutoplayTastePlay(
+            song: play.song,
+            artist: play.artist,
+            at: play.at,
+            kind: AutoplayFeedbackKind.skipped,
+            reward: 0,
+          ),
+      ], at: now),
+      isNull,
+    );
+  });
+
+  test('the lasting taste waits for enough plays', () async {
+    final db = await _database();
+    final taste = AutoplayTaste(
+      open: () async => db,
+      train: (plays) async => trainAutoplayTaste(plays),
+    );
+    addTearDown(taste.dispose);
+    final history = _clusters();
+    history.take(40).forEach(taste.record);
+    await taste.train();
+    expect(await taste.profile(), isNull);
+    history.skip(40).forEach(taste.record);
+    await taste.train();
+    final profile = (await taste.profile(at: _start.add(Duration(days: 3))))!;
+    expect(profile.fit('Night 3', 'Song 2'), isNotNull);
   });
 }

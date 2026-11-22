@@ -770,6 +770,72 @@ class AutoplayTasteSignal extends AutoplaySignal {
       _scores[candidate.source] ?? _average;
 }
 
+/// Days after which a play counts half toward the listener's lasting taste.
+const _profileHalfLife = 30;
+
+/// The listener's lasting taste: the direction of what they listened
+/// through, the latest counting most, for songs outside any session.
+class AutoplayTasteProfile {
+  AutoplayTasteProfile._(this._model, this._centre);
+
+  final AutoplayTasteModel _model;
+
+  /// A unit vector.
+  final Float64List _centre;
+
+  /// How well a song fits, -1 to 1: its vector's cosine to the taste, an
+  /// inherited one shrunk toward 0 by its trust. Null when the model can
+  /// place neither the song nor its artists.
+  double? fit(String artist, String title) {
+    final List<double>? vector =
+        _model.song(artist, title) ??
+        _model.artist(artist) ??
+        _TasteInheritance(_model._vector).inherit(artist, '', null);
+    if (vector == null) return null;
+    var dot = 0.0;
+    for (var k = 0; k < _centre.length; k++) {
+      dot += _centre[k] * vector[k];
+    }
+    return dot;
+  }
+}
+
+/// [model]'s taste of [plays] at [at]: listens, replays and loves by their
+/// strength, halving every [_profileHalfLife] days; skips count for nothing.
+/// Null when none of them is known.
+AutoplayTasteProfile? autoplayTasteProfile(
+  AutoplayTasteModel model,
+  List<AutoplayTastePlay> plays, {
+  required DateTime at,
+}) {
+  final centre = Float64List(AutoplayTasteModel.dimensions);
+  for (final play in plays) {
+    final strength = switch (play.kind) {
+      AutoplayFeedbackKind.listened => play.reward,
+      AutoplayFeedbackKind.replayed => 1.5,
+      AutoplayFeedbackKind.loved => 2.0,
+      AutoplayFeedbackKind.playlisted => 1.5,
+      AutoplayFeedbackKind.skipped => 0.0,
+    };
+    if (strength <= 0) continue;
+    final vector =
+        model._vector(_songToken(play.song)) ??
+        model._vector(_artistToken(play.artist));
+    if (vector == null) continue;
+    final days = max(0, at.difference(play.at).inHours) / 24;
+    final weight = strength * pow(0.5, days / _profileHalfLife);
+    for (var k = 0; k < centre.length; k++) {
+      centre[k] += weight * vector[k];
+    }
+  }
+  final norm = sqrt(centre.fold(0.0, (sum, value) => sum + value * value));
+  if (norm == 0 || !norm.isFinite) return null;
+  for (var k = 0; k < centre.length; k++) {
+    centre[k] /= norm;
+  }
+  return AutoplayTasteProfile._(model, centre);
+}
+
 /// Learns, from this device's listening sessions only, which songs and
 /// artists the listener plays together. Logs what [AutoplayPersonalization]
 /// observes, which it reports only while learning is on.
@@ -1035,6 +1101,23 @@ class AutoplayTaste {
       add(media, credits: true);
     }
     return AutoplayTasteSignal(vectors);
+  }
+
+  /// The listener's lasting taste, or null before the model knows enough.
+  /// Reads the whole log, so callers wait until startup has settled.
+  Future<AutoplayTasteProfile?> profile({DateTime? at}) async {
+    if (_disposed) return null;
+    await _ensureLoaded();
+    final model = _model;
+    if (model == null || model.positives < _coldStart) return null;
+    try {
+      final plays = await readLog();
+      if (_disposed) return null;
+      return autoplayTasteProfile(model, plays, at: at ?? DateTime.now());
+    } catch (error) {
+      _log.w('Could not read the lasting autoplay taste: $error');
+      return null;
+    }
   }
 
   Future<void> reset() async {

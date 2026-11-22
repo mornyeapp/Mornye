@@ -1,18 +1,27 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/home_recommendations_provider.dart';
+import 'package:mornye/providers/library_mixes_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/collection_suggestions.dart';
 import 'package:mornye/services/home_recommendations.dart';
 import 'package:mornye/services/listening_statistics.dart';
+import 'package:mornye/services/music_player_runtime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'support/fixed_settings.dart';
 
@@ -85,11 +94,13 @@ void main() {
   ProviderContainer container({
     AppSettings settings = const AppSettings(),
     List<Track>? seeds,
+    List<Override> overrides = const [],
   }) {
     final result = ProviderContainer(
       // A failed read is not asked again by itself in a test.
       retry: (_, _) => null,
       overrides: [
+        ...overrides,
         settingsProvider.overrideWith(() => FixedSettingsNotifier(settings)),
         extensionProvider.overrideWith(_Extensions.new),
         downloadHistoryProvider.overrideWith(_History.new),
@@ -255,5 +266,149 @@ void main() {
       HomeRecommendationCache.decode(prefs.getString(_cacheKey))!.tracks,
       hasLength(homeRecommendationKept),
     );
+  });
+
+  test('a fit orders the shelf, while the day keeps the extension\'s '
+      'order', () async {
+    answer = [for (var i = 0; i < 15; i++) _result('Song $i')];
+    final read = container(
+      overrides: [
+        homeRecommendationFitProvider.overrideWith(
+          (ref) async =>
+              (Track track) => double.parse(track.name.split(' ').last),
+        ),
+      ],
+    );
+    // Until the fit is read, the shelf keeps the extension's order.
+    await read.read(homeRecommendationFitProvider.future);
+    final shown = await read.read(homeRecommendationsProvider.future);
+    expect(
+      [for (final track in shown) track.name],
+      [for (var i = 14; i >= 3; i--) 'Song $i'],
+    );
+    final extension = [for (var i = 0; i < 15; i++) 'Song $i'];
+    expect([
+      for (final track in await read.read(
+        homeRecommendationCandidatesProvider.future,
+      ))
+        track.name,
+    ], extension);
+    final prefs = await SharedPreferences.getInstance();
+    expect([
+      for (final track in HomeRecommendationCache.decode(
+        prefs.getString(_cacheKey),
+      )!.tracks)
+        track.name,
+    ], extension);
+  });
+
+  test('a fit that arrives later orders the shelf then', () async {
+    answer = [_result('Low'), _result('High')];
+    final fit = Completer<HomeRecommendationFit?>();
+    final read = container(
+      overrides: [
+        homeRecommendationFitProvider.overrideWith((ref) => fit.future),
+      ],
+    );
+    final shelf = read.listen(homeRecommendationsProvider, (_, _) {});
+    addTearDown(shelf.close);
+    expect(
+      [
+        for (final track in await read.read(homeRecommendationsProvider.future))
+          track.name,
+      ],
+      ['Low', 'High'],
+    );
+    fit.complete((Track track) => track.name == 'High' ? 1.0 : 0.0);
+    await read.read(homeRecommendationFitProvider.future);
+    expect(
+      [
+        for (final track in await read.read(homeRecommendationsProvider.future))
+          track.name,
+      ],
+      ['High', 'Low'],
+    );
+    expect(requests, hasLength(1));
+  });
+
+  test('before startup settles or with learning off there is no fit and the '
+      'extension\'s order stays', () async {
+    answer = [for (var i = 0; i < 15; i++) _result('Song $i')];
+    final unsettled = container();
+    expect(await unsettled.read(homeRecommendationFitProvider.future), isNull);
+    final off = container(
+      settings: const AppSettings(autoplayPersonalization: false),
+      overrides: [
+        libraryMixesStartupProvider.overrideWithBuild((ref, notifier) => true),
+      ],
+    );
+    expect(await off.read(homeRecommendationFitProvider.future), isNull);
+    expect(
+      [
+        for (final track in await off.read(homeRecommendationsProvider.future))
+          track.name,
+      ],
+      [for (var i = 0; i < homeRecommendationCount; i++) 'Song $i'],
+    );
+  });
+
+  test('once learning knows the listener, songs of their artists have a '
+      'fit and others none', () async {
+    sqfliteFfiInit();
+    final directory = await Directory.systemTemp.createTemp('home-fit-');
+    addTearDown(() => directory.delete(recursive: true));
+    final db = await AutoplayTaste.openWithFactory(
+      databaseFactoryFfi,
+      '${directory.path}/taste.db',
+    );
+    addTearDown(db.close);
+    final taste = AutoplayTaste(
+      open: () async => db,
+      train: (plays) async => trainAutoplayTaste(plays),
+    );
+    var elapsed = Duration.zero;
+    final learning = AutoplayPersonalization(
+      load: () async => null,
+      save: (_) async {},
+      elapsed: () => elapsed,
+      now: () => DateTime(2026, 11, 23, 20),
+    );
+    final runtime = MusicPlayerRuntime(
+      dependencies: PlaybackDependencies(
+        createPersonalization: () => learning,
+        createTaste: () => taste,
+      ),
+    );
+    addTearDown(runtime.dispose);
+    learning.setEnabled(true);
+    await learning.ensureLoaded();
+    for (var i = 0; i < 60; i++) {
+      final track = AutoplayLearningTrack(
+        source: '/played/$i.flac',
+        title: 'Track ${i % 5}',
+        artist: i.isEven ? 'Someone' : 'Another',
+        duration: const Duration(seconds: 100),
+      );
+      runtime.personalization.begin(track);
+      runtime.personalization.updatePlayback(
+        source: track.source,
+        playing: true,
+      );
+      elapsed += const Duration(seconds: 100);
+    }
+    runtime.personalization.finish();
+    await pumpEventQueue();
+    await taste.train();
+
+    final read = container(
+      overrides: [
+        libraryMixesStartupProvider.overrideWithBuild((ref, notifier) => true),
+        musicPlayerRuntimeProvider.overrideWithValue(runtime),
+      ],
+    );
+    final fit = (await read.read(homeRecommendationFitProvider.future))!;
+    expect(fit(_track('New', 'Someone')), isNotNull);
+    expect(fit(_track('New', 'Guest feat. Another')), isNotNull);
+    expect(fit(_track('New', 'Nobody')), isNull);
   });
 }
