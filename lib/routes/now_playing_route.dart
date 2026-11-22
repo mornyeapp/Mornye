@@ -71,6 +71,14 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
         PlayerCoverRectTween(begin: begin, end: end, curve: curve);
   }
 
+  /// True while a player route is on its way open or closed, a held drag
+  /// included. The page under it is drawn as one picture meanwhile.
+  static final ValueNotifier<bool> moving = ValueNotifier(false);
+
+  /// True while a closing player flies its cover onto the mini player, which
+  /// hides its own until that cover lands.
+  static final ValueNotifier<bool> coverLanding = ValueNotifier(false);
+
   /// The mini player's bounds while the player grows out of them.
   ({Rect surface, Rect artwork})? _openFrom;
   Size? _openSize;
@@ -135,6 +143,9 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
     // shows the route offstage, where [animation] reads as completed.
     controller!.addStatusListener((status) {
       if (status.isCompleted) _openFrom = null;
+      moving.value = status.isAnimating;
+      // The frame that removes the closed player shows the mini player's.
+      if (status.isDismissed) coverLanding.value = false;
     });
     if (morph != null) {
       WidgetsBinding.instance.addObserver(
@@ -162,6 +173,9 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
     if (_backGesture case final observer?) {
       WidgetsBinding.instance.removeObserver(observer);
     }
+    // A route removed while it moves never reports that it stopped.
+    moving.value = false;
+    coverLanding.value = false;
     super.dispose();
   }
 
@@ -408,6 +422,7 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
     _dismissSize = size;
     _dismissTarget = target;
     _dismissArtwork = readArtwork?.call();
+    coverLanding.value = _dismissArtwork != null;
     return true;
   }
 
@@ -455,6 +470,7 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
     _dismissStart = null;
     _dismissSize = null;
     _dismissArtwork = null;
+    coverLanding.value = false;
   }
 
   void _cancelBackGesture() {

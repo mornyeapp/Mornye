@@ -1017,4 +1017,95 @@ void main() {
     expect(route.isActive, isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('a moving player says so, and its landing cover too', (
+    tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        theme: MornyeTheme.build(Brightness.dark),
+        home: const Text('Home'),
+      ),
+    );
+    final route = _TestPlayerRoute(
+      miniPlayerGeometry: () => (
+        surface: const Rect.fromLTWH(16, 480, 300, 56),
+        artwork: const Rect.fromLTWH(24, 488, 40, 40),
+      ),
+    );
+    expect(NowPlayingRoute.moving.value, isFalse);
+    navigator.currentState!.push(route);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(NowPlayingRoute.moving.value, isTrue);
+    expect(NowPlayingRoute.coverLanding.value, isFalse);
+    await tester.pumpAndSettle();
+    expect(NowPlayingRoute.moving.value, isFalse);
+
+    // A held drag keeps the page under the player a picture.
+    route.startDrag();
+    route.updateDrag(
+      DragUpdateDetails(
+        globalPosition: const Offset(0, 120),
+        delta: const Offset(0, 120),
+        primaryDelta: 120,
+      ),
+      600,
+    );
+    await tester.pump();
+    expect(NowPlayingRoute.moving.value, isTrue);
+    expect(NowPlayingRoute.coverLanding.value, isFalse);
+    route.cancelDrag();
+    await tester.pumpAndSettle();
+    expect(NowPlayingRoute.moving.value, isFalse);
+
+    route.readArtwork = () => (
+      bounds: const Rect.fromLTWH(40, 80, 300, 300),
+      child: const ColoredBox(color: Colors.red),
+      fullBleed: false,
+    );
+    navigator.currentState!.pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(
+      find.byKey(const ValueKey('player-minimize-artwork')),
+      findsOneWidget,
+    );
+    expect(NowPlayingRoute.moving.value, isTrue);
+    expect(NowPlayingRoute.coverLanding.value, isTrue);
+    await tester.pumpAndSettle();
+    expect(find.byKey(_sheet), findsNothing);
+    expect(NowPlayingRoute.moving.value, isFalse);
+    expect(NowPlayingRoute.coverLanding.value, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a player closed without a cover of its own leaves the mini '
+      'player\'s alone', (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        theme: MornyeTheme.build(Brightness.dark),
+        home: const Text('Home'),
+      ),
+    );
+    final route = _TestPlayerRoute(
+      miniPlayerGeometry: () => (
+        surface: const Rect.fromLTWH(16, 480, 300, 56),
+        artwork: const Rect.fromLTWH(24, 488, 40, 40),
+      ),
+    );
+    navigator.currentState!.push(route);
+    await tester.pumpAndSettle();
+    navigator.currentState!.pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.byKey(const ValueKey('player-minimize-artwork')), findsNothing);
+    expect(NowPlayingRoute.coverLanding.value, isFalse);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 }

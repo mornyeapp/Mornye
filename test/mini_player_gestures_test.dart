@@ -402,6 +402,29 @@ void main() {
       });
     }
 
+    testWidgets('${configuration.name}: the cover hides while a closing '
+        'player lands its own', (tester) async {
+      addTearDown(() => NowPlayingRoute.coverLanding.value = false);
+      await pumpPlayer(tester);
+      double coverOpacity() => tester
+          .widget<Opacity>(
+            find
+                .ancestor(
+                  of: find.byType(PlayerArtwork),
+                  matching: find.byType(Opacity),
+                )
+                .first,
+          )
+          .opacity;
+      expect(coverOpacity(), 1);
+      NowPlayingRoute.coverLanding.value = true;
+      await tester.pump();
+      expect(coverOpacity(), 0);
+      NowPlayingRoute.coverLanding.value = false;
+      await tester.pump();
+      expect(coverOpacity(), 1);
+    });
+
     testWidgets('${configuration.name}: a new song fades the lines through', (
       tester,
     ) async {

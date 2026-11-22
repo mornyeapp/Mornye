@@ -50,6 +50,7 @@ import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/nav_destination_icons.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/mini_player.dart';
+import 'package:mornye/widgets/player_underlay.dart';
 import 'package:mornye/widgets/tv_shell.dart';
 import 'package:mornye/widgets/lazy_tab_view.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
@@ -1305,7 +1306,11 @@ class _MainShellState extends ConsumerState<MainShell>
         ),
       ),
     );
-    return DownloadQueueFeedback(child: shell);
+    return DownloadQueueFeedback(
+      // Mornye's glass bar is the costly part of a page under a moving
+      // player. Material flies its cover as a Hero out of the live page.
+      child: PlayerUnderlay(enabled: context.isMornye, child: shell),
+    );
   }
 
   /// Phone, tablet and TV destinations, with the download count on Library.

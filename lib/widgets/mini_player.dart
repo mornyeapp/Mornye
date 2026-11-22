@@ -347,12 +347,19 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                         child: SizedBox(
                           width: context.tokens.coverMini,
                           height: context.tokens.coverMini,
-                          child: PlayerArtwork(
-                            artUri: mediaItem.artUri?.toString(),
-                            colorScheme: colorScheme,
-                            cacheWidth: PlayerArtwork.miniCacheWidth,
-                            iconSize: 22,
-                            crossfade: playerTrackChangeMotion(context),
+                          // A closing Mornye player lands its own cover here;
+                          // two covers would show until it does.
+                          child: ValueListenableBuilder<bool>(
+                            valueListenable: NowPlayingRoute.coverLanding,
+                            builder: (context, landing, cover) =>
+                                Opacity(opacity: landing ? 0 : 1, child: cover),
+                            child: PlayerArtwork(
+                              artUri: mediaItem.artUri?.toString(),
+                              colorScheme: colorScheme,
+                              cacheWidth: PlayerArtwork.miniCacheWidth,
+                              iconSize: 22,
+                              crossfade: playerTrackChangeMotion(context),
+                            ),
                           ),
                         ),
                       ),
