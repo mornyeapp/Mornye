@@ -158,6 +158,24 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
       );
     }
 
+    final backdropKey = (
+      _itemId,
+      artworkSource,
+      backdropCacheWidth,
+      colorScheme,
+    );
+    if (backdropKey != _backdropKey) {
+      _backdropKey = backdropKey;
+      _backdrop = RepaintBoundary(
+        key: ValueKey<String>('metadata_backdrop_$_itemId'),
+        child: artworkImage(
+          cacheWidth: backdropCacheWidth,
+          cacheHeight: backdropCacheWidth,
+          iconSize: 80,
+        ),
+      );
+    }
+
     // Watched here: the header builds its actions outside this build.
     final showPlayer = ref.watch(playerUiEnabledProvider);
     final back = HeaderCircleButton(
@@ -170,14 +188,7 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
       expandedHeight: calculateExpandedHeight(context),
       showTitleInAppBar: false,
       showTitleListenable: showTitleNotifier,
-      background: RepaintBoundary(
-        key: ValueKey<String>('metadata_backdrop_$_itemId'),
-        child: artworkImage(
-          cacheWidth: backdropCacheWidth,
-          cacheHeight: backdropCacheWidth,
-          iconSize: 80,
-        ),
-      ),
+      background: _backdrop!,
       paletteSource: artworkSource == null || isHttpCoverUrl(artworkSource)
           ? artworkSource
           : coverFilePath(artworkSource),

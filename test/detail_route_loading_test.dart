@@ -12,6 +12,7 @@ import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/animation_utils.dart';
+import 'package:mornye/widgets/settled_blur.dart';
 
 LocalLibraryItem _track(int number) => LocalLibraryItem(
   id: 'track-$number',
@@ -24,7 +25,10 @@ LocalLibraryItem _track(int number) => LocalLibraryItem(
 );
 
 void main() {
-  Future<GlobalKey<NavigatorState>> mount(WidgetTester tester) async {
+  Future<GlobalKey<NavigatorState>> mount(
+    WidgetTester tester, {
+    ThemeData? theme,
+  }) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize = const Size(430, 1200);
     tester.view.devicePixelRatio = 1;
@@ -34,7 +38,7 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           navigatorKey: navigator,
-          theme: MornyeTheme.build(Brightness.light),
+          theme: theme ?? MornyeTheme.build(Brightness.light),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: const Scaffold(body: Text('Library')),
@@ -100,6 +104,48 @@ void main() {
       },
     );
   }
+
+  testWidgets('track details apply the file check once the page is in, '
+      'and keep the blurred backdrop through the rebuild', (tester) async {
+    final navigator = await mount(
+      tester,
+      theme: ThemeData.dark(useMaterial3: true),
+    );
+    const channel = MethodChannel('com.zarz.mornye/backend');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      channel,
+      (call) async =>
+          call.method == 'safStat' ? jsonEncode({'exists': false}) : null,
+    );
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    final track = LocalLibraryItem(
+      id: 'track-1',
+      trackName: 'Song 1',
+      artistName: 'Artist',
+      albumName: 'Album',
+      filePath: 'content://library/document/song-1.flac',
+      coverPath: '/missing/cover.jpg',
+      scannedAt: DateTime(2026),
+    );
+    unawaited(
+      navigator.currentState!.push(
+        route(TrackMetadataScreen(localItem: track)),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.text('File not found'), findsNothing);
+    final backdrop = tester.widget<SettledBlur>(find.byType(SettledBlur)).child;
+    await tester.pumpAndSettle();
+    expect(find.text('File not found'), findsOneWidget);
+    expect(
+      tester.widget<SettledBlur>(find.byType(SettledBlur)).child,
+      same(backdrop),
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'album shows header immediately and applies rows during entrance',

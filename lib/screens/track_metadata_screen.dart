@@ -277,8 +277,18 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
   /// What the header's cover shows until its own picture is decoded.
   Widget? get _landedCover => _flownCoverItem == _itemId ? _flownCover : null;
 
+  /// The header's backdrop, kept while its picture stays the same: a new
+  /// widget would make the header blur it again, mid-flight on opening.
+  Widget? _backdrop;
+  Object? _backdropKey;
+
   /// Shared by the lyrics box and its scrollbar.
   final _lyricsScrollController = ScrollController();
+
+  /// The page's way in. What the file check finds waits for it to end: it
+  /// rebuilds the whole page, frames the flying cover would miss.
+  Animation<double>? _entrance;
+  final _entered = Completer<void>();
 
   @override
   void initState() {
@@ -314,11 +324,35 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
         _fileAccess = const FileAccessMissing();
       });
     });
+    // Read after the first frame: Hero lays the page out offstage in it,
+    // where the route reports its entrance as already done.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _watchEntrance());
     unawaited(_checkFile());
+  }
+
+  void _watchEntrance() {
+    if (!mounted) return;
+    final entrance = ModalRoute.of(context)?.animation;
+    if (entrance == null || !entrance.isAnimating) {
+      _endEntrance();
+      return;
+    }
+    _entrance = entrance..addStatusListener(_entranceChanged);
+  }
+
+  void _entranceChanged(AnimationStatus status) {
+    if (!status.isAnimating) _endEntrance();
+  }
+
+  void _endEntrance() {
+    _entrance?.removeStatusListener(_entranceChanged);
+    _entrance = null;
+    if (!_entered.isCompleted) _entered.complete();
   }
 
   @override
   void dispose() {
+    _endEntrance();
     _unsubscribeMetadata();
     _unsubscribeDeletion();
     unawaited(_cleanupTempFileAndParentIfNotCached(_embeddedCoverPreviewPath));
@@ -346,6 +380,7 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
     final networkFileDeletable =
         filePath.startsWith('network://') &&
         await NetworkStorageService.instance.canDeleteFile(filePath);
+    if (!_entered.isCompleted) await _entered.future;
     if (!mounted ||
         generation != _metadataLoadGeneration ||
         filePath != cleanFilePath) {
