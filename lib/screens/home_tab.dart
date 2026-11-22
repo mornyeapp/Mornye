@@ -133,6 +133,11 @@ import 'package:mornye/widgets/desktop/desktop_link_devices_sheet.dart'
     show showDesktopLinkDevicesSheet;
 import 'package:mornye/widgets/link/link_devices_sheet.dart'
     show showLinkDevicesSheet;
+import 'package:mornye/models/home_pin.dart';
+import 'package:mornye/providers/home_pins_provider.dart';
+import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/providers/library_genres_provider.dart';
+import 'package:mornye/screens/library_directory_screen.dart';
 
 export 'package:mornye/screens/extension_collection_screens.dart';
 
@@ -142,6 +147,7 @@ part 'home_tab_explore.dart';
 part 'home_tab_recent.dart';
 part 'home_tab_import.dart';
 part 'home_tab_intro.dart';
+part 'home_tab_pins.dart';
 part 'home_tab_search_results.dart';
 part 'home_tab_search_wide.dart';
 part 'home_tab_status.dart';

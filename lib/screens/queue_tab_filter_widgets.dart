@@ -993,6 +993,14 @@ extension _QueueTabFilterWidgets on _QueueTabState {
               : null,
           badgeIcon: Icons.music_note,
           coverUrl: album.coverUrl,
+          pin: HomePin.album(
+            source: 'downloaded',
+            albumKey: album.key,
+            name: album.albumName,
+            artist: album.artistName,
+            cover: album.coverUrl,
+            coverFile: album.sampleFilePath,
+          ),
           onTap: () => _navigateToDownloadedAlbum(album),
           onPlay: () => _playDownloadedAlbum(album),
         );
@@ -1028,6 +1036,16 @@ extension _QueueTabFilterWidgets on _QueueTabState {
               )
             : null,
         badgeIcon: Icons.folder,
+        pin: album.albumKey.isEmpty
+            ? null
+            : HomePin.album(
+                source: 'local',
+                albumKey: album.albumKey,
+                name: album.albumName,
+                artist: album.artistName,
+                cover: album.coverPath,
+                coverFile: album.sampleFilePath,
+              ),
         onTap: () => _navigateToLocalAlbum(album),
         onPlay: () => _playLocalAlbum(album),
       ),
@@ -1059,6 +1077,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
     VoidCallback? onPlay,
     String? coverUrl,
     AlbumCompleteness? completeness,
+    HomePin? pin,
   }) {
     final completenessLabel = completeness == null
         ? null
@@ -1098,6 +1117,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
                   label: context.l10n.tooltipPlay,
                   onSelected: onPlay,
                 ),
+              if (pin != null) homePinMenuAction(context, ref, pin),
             ],
           ],
         ),

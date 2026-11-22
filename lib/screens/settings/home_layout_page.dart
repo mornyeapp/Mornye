@@ -6,6 +6,7 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/home_sections.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
@@ -76,8 +77,11 @@ class HomeLayoutPage extends ConsumerWidget {
     final mornye = context.isMornye;
     final settings = ref.watch(settingsProvider);
     final player = ref.watch(playerUiEnabledProvider);
-    bool available(HomeSection section) =>
-        section.availableIn(mornye: mornye, player: player);
+    bool available(HomeSection section) => section.availableIn(
+      mornye: mornye,
+      player: player,
+      desktop: isDesktopPlatform,
+    );
     final sections = settings.homeLayout.sections.where(available).toList();
     final side = wideListInset(context);
     return Scaffold(

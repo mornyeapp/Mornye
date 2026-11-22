@@ -136,7 +136,7 @@ void main() {
       );
       // What ships right after Shortcuts follows them.
       expect(
-        sections.indexOf(HomeSection.link),
+        sections.indexOf(HomeSection.values[HomeSection.shortcuts.index + 1]),
         sections.indexOf(HomeSection.shortcuts) + 1,
       );
       // What ships before every named section stays at the front.

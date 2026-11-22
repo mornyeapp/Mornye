@@ -6,6 +6,7 @@ import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart';
 import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/home_pin.dart';
 import 'package:mornye/models/library_database_models.dart'
     show LocalLibraryItem;
 import 'package:mornye/models/unified_library_item.dart';
@@ -33,6 +34,7 @@ import 'package:mornye/widgets/desktop/detail_header.dart';
 import 'package:mornye/widgets/desktop/library_track_menu.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/expressive_button.dart';
+import 'package:mornye/widgets/home_pin_action.dart';
 import 'package:mornye/widgets/library_mix_cover.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
@@ -427,12 +429,29 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
           );
         },
       ),
-      moreMenu: () => libraryTrackMenuGroups(
-        context,
-        ref,
-        items: _items,
-        onPlay: () => _play(0),
-      ),
+      moreMenu: () {
+        final groups = libraryTrackMenuGroups(
+          context,
+          ref,
+          items: _items,
+          onPlay: () => _play(0),
+        );
+        final pin = switch (widget) {
+          LibraryMixScreen(:final genre?) => homePinOfBrowseEntry(
+            genre,
+            HomePinKind.genre,
+          ),
+          LibraryMixScreen(:final artist?) => HomePin.artist(
+            name: artist,
+            cover: _paletteSource,
+          ),
+          _ => null,
+        };
+        if (pin != null && groups.isNotEmpty) {
+          groups.first.add(homePinMenuAction(context, ref, pin));
+        }
+        return groups;
+      },
     );
   }
 

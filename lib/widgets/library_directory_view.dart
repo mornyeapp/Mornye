@@ -6,6 +6,7 @@ import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart';
 import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/home_pin.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/library_directory_provider.dart';
@@ -41,6 +42,7 @@ import 'package:mornye/widgets/desktop/library_track_menu.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/expressive_button.dart';
+import 'package:mornye/widgets/home_pin_action.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
@@ -364,6 +366,17 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
             icon: Icons.folder_open_outlined,
             label: l10n.desktopMenuOpen,
             onSelected: () => _openFolder(folder),
+          ),
+          homePinMenuAction(
+            context,
+            ref,
+            HomePin.folder(
+              key: folder.key,
+              name: folder.name,
+              path: folder.path,
+              cover: folder.cover,
+              coverFile: folder.coverFile,
+            ),
           ),
         ],
         ...groups,

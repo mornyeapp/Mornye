@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/home_pin.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/library_browse_provider.dart';
 import 'package:mornye/providers/library_genres_provider.dart';
@@ -34,6 +35,7 @@ import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/hover_play_button.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/widgets/home_pin_action.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/library_search_results.dart';
 import 'package:mornye/widgets/sliver_layout_info_builder.dart';
@@ -652,6 +654,16 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
                                   label: context.l10n.desktopMenuOpen,
                                   onSelected: open,
                                 ),
+                                homePinMenuAction(
+                                  context,
+                                  ref,
+                                  homePinOfBrowseEntry(
+                                    entry,
+                                    _genres
+                                        ? HomePinKind.genre
+                                        : HomePinKind.artist,
+                                  ),
+                                ),
                               ],
                             ],
                           ),
@@ -780,6 +792,11 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
             icon: Icons.play_arrow,
             label: context.l10n.tooltipPlay,
             onSelected: () => _playAlbum(entry),
+          ),
+          homePinMenuAction(
+            context,
+            ref,
+            homePinOfBrowseEntry(entry, HomePinKind.album),
           ),
         ],
       ],

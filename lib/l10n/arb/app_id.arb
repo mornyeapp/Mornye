@@ -6433,7 +6433,8 @@
   "homeSectionAboutDownloads": "Yang sedang diunduh, menunggu, dan selesai hari ini",
   "homeSectionAboutTopPicks": "Mix dan playlist hari ini sebagai banner",
   "homeSectionAboutRecentlyPlayed": "Album yang baru kamu putar",
-  "homeSectionAboutShortcuts": "Jalan cepat ke alat dan koleksi",
+  "homeSectionAboutShortcuts": "Jalan cepat ke alat dan koleksi, dan yang kamu sematkan",
+  "homeSectionAboutPins": "Album, playlist, artis, genre, dan folder yang kamu sematkan",
   "homeSectionLink": "Perangkat terhubung",
   "homeSectionAboutLink": "Tampil selama perangkat lain terhubung ke perangkat ini",
   "homeSectionAboutHiRes": "Album Hi-Res milikmu, selama DAC atau output eksklusif memutar",
@@ -8436,6 +8437,43 @@
   "homeShortcutsReset": "Atur ulang pintasan",
   "@homeShortcutsReset": {
     "description": "Menu item that restores the default Home shortcuts"
+  },
+  "homePinAdd": "Sematkan ke Beranda",
+  "@homePinAdd": {
+    "description": "Menu item that adds a Library album, playlist, artist, genre or folder to Home"
+  },
+  "homePinRemove": "Lepas dari Beranda",
+  "@homePinRemove": {
+    "description": "Menu item that takes a pinned Library album, playlist, artist, genre or folder off Home"
+  },
+  "homePinUnpin": "Lepas sematan",
+  "@homePinUnpin": {
+    "description": "Menu item of a pin on Home, and the snackbar action for a pin whose target is gone, that takes the pin off Home"
+  },
+  "homePinMoveToFront": "Pindahkan ke depan",
+  "@homePinMoveToFront": {
+    "description": "Menu item of a pin on Home that makes it the first pin"
+  },
+  "homePinned": "Disematkan",
+  "@homePinned": {
+    "description": "Home section header for the albums, playlists, artists, genres and folders the person pinned"
+  },
+  "homePinLimit": "Beranda memuat paling banyak {count} sematan. Lepas satu dulu.",
+  "@homePinLimit": {
+    "description": "Snackbar when pinning to Home while Home already holds the most pins it can",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homePinMissing": "Item ini sudah tidak ada di Koleksi",
+  "@homePinMissing": {
+    "description": "Snackbar when a pin on Home is tapped but its album, playlist, artist, genre or folder is gone"
+  },
+  "homePinFolder": "Folder",
+  "@homePinFolder": {
+    "description": "Subtitle of a pinned Library folder on Home"
   },
   "artistUpcomingConcerts": "Konser Mendatang",
   "artistAllUpcomingConcerts": "Semua Konser Mendatang",

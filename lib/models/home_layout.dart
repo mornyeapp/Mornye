@@ -14,6 +14,9 @@ enum HomeSection {
   continueListening,
   shortcuts,
 
+  /// What the person pinned, where it does not sit among [shortcuts].
+  pins,
+
   /// The attached Link device, while there is one.
   link,
 
@@ -34,16 +37,21 @@ enum HomeSection {
 
   /// Whether the section exists at all in the style, with the built-in
   /// [player] or with another app playing.
-  bool availableIn({required bool mornye, bool player = true}) =>
-      switch (this) {
-        downloads => !player,
-        topPicks => mornye,
-        recentlyPlayed => mornye && player,
-        continueListening => player,
-        shortcuts => !mornye,
-        mixes => !mornye && player,
-        _ => true,
-      };
+  bool availableIn({
+    required bool mornye,
+    bool player = true,
+    bool desktop = false,
+  }) => switch (this) {
+    downloads => !player,
+    topPicks => mornye,
+    recentlyPlayed => mornye && player,
+    continueListening => player,
+    shortcuts => !mornye,
+    // Material phones and tablets show the pins among the Shortcuts.
+    pins => mornye || desktop,
+    mixes => !mornye && player,
+    _ => true,
+  };
 }
 
 /// How the person arranged Home. The default value is Home as it ships.

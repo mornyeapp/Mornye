@@ -524,6 +524,11 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
                   .renamePlaylist(playlist.id, trimmed);
             },
           ),
+          homePinMenuAction(
+            context,
+            ref,
+            HomePin.playlist(id: playlist.id, name: playlist.name),
+          ),
         ],
         [
           ContextMenuAction(

@@ -548,6 +548,9 @@ class _HomeSections extends ConsumerWidget {
             child: const _HomeShortcuts(),
           ),
       },
+      // On Material phones and tablets the pins sit among the Shortcuts.
+      if ((mornye || _homeDesktop(context)) && _HomePinsSection.hasContent(ref))
+        HomeSection.pins: _HomePinsSection(inset: inset),
       if (_HomeLinkSection.hasContent(ref))
         HomeSection.link: _HomeLinkSection(inset: inset),
       if (_HomeHiResSection.hasContent(ref))
@@ -2280,6 +2283,10 @@ class _HomeShortcuts extends ConsumerWidget {
             layout: layout,
             position: (index: index, count: shortcuts.length),
           ),
+      // Pins follow in the grid; the desktop gives them their own section.
+      if (layout == _HomeShortcutsLayout.grid)
+        for (final pin in ref.watch(homePinsProvider))
+          _HomePinShortcutTile(pin: pin, layout: layout),
     ];
 
     switch (layout) {
@@ -2321,7 +2328,11 @@ class _HomeShortcuts extends ConsumerWidget {
               children: [
                 Expanded(child: tiles[row]),
                 const SizedBox(width: 8),
-                Expanded(child: tiles[row + 1]),
+                Expanded(
+                  child: row + 1 < tiles.length
+                      ? tiles[row + 1]
+                      : const SizedBox.shrink(),
+                ),
               ],
             ),
           ),
@@ -2474,10 +2485,14 @@ class _HomeShortcutTile extends StatelessWidget {
     required this.onMenu,
     required this.layout,
     required this.position,
+    this.leading,
   });
 
   final String label;
   final IconData icon;
+
+  /// Stands in for the icon badge: a pin's cover.
+  final Widget? leading;
   final Color container;
   final Color onContainer;
   final Color badge;
@@ -2494,11 +2509,8 @@ class _HomeShortcutTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badgeWidget = _HomeIconBadge(
-      icon: icon,
-      color: badge,
-      onColor: onBadge,
-    );
+    final badgeWidget =
+        leading ?? _HomeIconBadge(icon: icon, color: badge, onColor: onBadge);
     final text = Text(
       label,
       maxLines: 2,

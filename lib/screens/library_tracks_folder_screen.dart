@@ -13,6 +13,7 @@ import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/expressive_button_group.dart';
+import 'package:mornye/widgets/home_pin_action.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
@@ -23,6 +24,7 @@ import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/home_pin.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/m3u_playlist_service.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
@@ -1311,6 +1313,8 @@ class _LibraryTracksFolderScreenState
             onSelected: _pickCoverImage,
           ),
         ],
+        if (_homePin(title, playlist) case final pin?)
+          homePinMenuAction(context, ref, pin),
       ],
       if (isPlaylistMode && hasCustomCover)
         [
@@ -1322,6 +1326,20 @@ class _LibraryTracksFolderScreenState
           ),
         ],
     ];
+  }
+
+  /// The Home pin of this playlist or of Loved; the Wishlist has none.
+  HomePin? _homePin(String title, UserPlaylistCollection? playlist) {
+    switch (widget.mode) {
+      case LibraryTracksFolderMode.loved:
+        return HomePin.loved;
+      case LibraryTracksFolderMode.playlist:
+        final id = widget.playlistId ?? playlist?.id;
+        if (id == null || id.isEmpty) return null;
+        return HomePin.playlist(id: id, name: playlist?.name ?? title);
+      case LibraryTracksFolderMode.wishlist:
+        return null;
+    }
   }
 
   Future<void> _showRenamePlaylistDialog(

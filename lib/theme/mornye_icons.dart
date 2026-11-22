@@ -67,6 +67,10 @@ IconData _cupertinoFor(IconData icon) {
     Icons.insert_drive_file_outlined => CupertinoIcons.doc_text,
     Icons.favorite_outline || Icons.favorite_border => CupertinoIcons.heart,
     Icons.favorite => CupertinoIcons.heart_fill,
+    Icons.push_pin_outlined => CupertinoIcons.pin,
+    // The filled pin marks Unpin, as the slashed pin does in Mornye.
+    Icons.push_pin => CupertinoIcons.pin_slash,
+    Icons.vertical_align_top => CupertinoIcons.arrow_up_to_line,
     Icons.arrow_back || Icons.chevron_left => CupertinoIcons.back,
     Icons.chevron_right => CupertinoIcons.forward,
     Icons.arrow_forward || Icons.arrow_forward_rounded => mornyeArrowForward,

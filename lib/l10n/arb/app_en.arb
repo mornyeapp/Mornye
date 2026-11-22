@@ -9960,6 +9960,43 @@
   "@homeShortcutsReset": {
     "description": "Menu item that restores the default Home shortcuts"
   },
+  "homePinAdd": "Pin to Home",
+  "@homePinAdd": {
+    "description": "Menu item that adds a Library album, playlist, artist, genre or folder to Home"
+  },
+  "homePinRemove": "Unpin from Home",
+  "@homePinRemove": {
+    "description": "Menu item that takes a pinned Library album, playlist, artist, genre or folder off Home"
+  },
+  "homePinUnpin": "Unpin",
+  "@homePinUnpin": {
+    "description": "Menu item of a pin on Home, and the snackbar action for a pin whose target is gone, that takes the pin off Home"
+  },
+  "homePinMoveToFront": "Move to front",
+  "@homePinMoveToFront": {
+    "description": "Menu item of a pin on Home that makes it the first pin"
+  },
+  "homePinned": "Pinned",
+  "@homePinned": {
+    "description": "Home section header for the albums, playlists, artists, genres and folders the person pinned"
+  },
+  "homePinLimit": "Home holds up to {count} pins. Unpin one first.",
+  "@homePinLimit": {
+    "description": "Snackbar when pinning to Home while Home already holds the most pins it can",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homePinMissing": "This is no longer in your Library",
+  "@homePinMissing": {
+    "description": "Snackbar when a pin on Home is tapped but its album, playlist, artist, genre or folder is gone"
+  },
+  "homePinFolder": "Folder",
+  "@homePinFolder": {
+    "description": "Subtitle of a pinned Library folder on Home"
+  },
   "searchResults": "Search Results",
   "@searchResults": {
     "description": "Heading of a mixed preview of search result types, without implying a relevance ranking"
@@ -10190,9 +10227,13 @@
   "@homeSectionAboutRecentlyPlayed": {
     "description": "Edit Home: what the Recently Played section shows"
   },
-  "homeSectionAboutShortcuts": "Quick ways into tools and collections",
+  "homeSectionAboutShortcuts": "Quick ways into tools and collections, and what you pinned",
   "@homeSectionAboutShortcuts": {
-    "description": "Edit Home: what the Shortcuts section shows"
+    "description": "Edit Home: what the Shortcuts section shows; on phones the pinned items sit among them"
+  },
+  "homeSectionAboutPins": "Albums, playlists, artists, genres and folders you pinned",
+  "@homeSectionAboutPins": {
+    "description": "Edit Home: what the Pinned section shows"
   },
   "homeSectionLink": "Connected device",
   "@homeSectionLink": {
