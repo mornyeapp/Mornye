@@ -113,6 +113,9 @@ void main() {
     expect(find.text('Add translation'), findsOneWidget);
     expect(find.text('Hello there'), findsOneWidget);
     expect(find.text('Second line'), findsOneWidget);
+    // Nothing to change yet, so no note on what an edit drops.
+    expect(find.textContaining('word-by-word timing'), findsNothing);
+    expect(find.textContaining('Translation into'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('lyrics-translation-field-0')),
@@ -224,6 +227,7 @@ void main() {
 
     expect(find.text('Edit translation'), findsOneWidget);
     expect(find.text('سلام قدیمی'), findsOneWidget);
+    expect(find.textContaining('word-by-word timing'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('lyrics-translation-field-0')),

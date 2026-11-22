@@ -152,6 +152,9 @@ class _LyricsTranslationEditorSheetState
   late final String _source = widget.metadata.source ?? '';
   late final String _itemId = widget.metadata.item?.id ?? '';
   late final List<_TranslationLine> _lines = _buildTranslationLines();
+  late final bool _hadTranslation = _lines.any(
+    (line) => (line.translation.value ?? '').trim().isNotEmpty,
+  );
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
   bool _dirty = false;
   bool _saving = false;
@@ -321,13 +324,11 @@ class _LyricsTranslationEditorSheetState
     );
   }
 
+  // Header like the lyrics editor's: the title and the track.
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
-    final hasTranslation = _lines.any(
-      (line) => (line.translation.value ?? '').trim().isNotEmpty,
-    );
     final subtitle = [
       widget.metadata.item?.title ?? '',
       if ((widget.metadata.item?.artist ?? '').trim().isNotEmpty)
@@ -335,61 +336,34 @@ class _LyricsTranslationEditorSheetState
     ].join(' · ');
     return Padding(
       padding: const EdgeInsetsDirectional.fromSTEB(24, 20, 12, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      hasTranslation
-                          ? l10n.lyricsTranslationEditTitle
-                          : l10n.lyricsTranslationAddTitle,
-                      style: theme.textTheme.titleLarge,
-                    ),
-                    Text(
-                      l10n.lyricsTranslationEditSubtitle(
-                        widget.target.nativeName,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _hadTranslation
+                      ? l10n.lyricsTranslationEditTitle
+                      : l10n.lyricsTranslationAddTitle,
+                  style: theme.textTheme.titleLarge,
                 ),
-              ),
-              AppIconButton(
-                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                onPressed: _saving ? null : _close,
-                icon: const AppIcon.adaptive(Icons.close),
-              ),
-            ],
+                if (subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
           ),
-          if (subtitle.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              l10n.lyricsTranslationEditWordTimingNote,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
+          AppIconButton(
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+            onPressed: _saving ? null : _close,
+            icon: const AppIcon.adaptive(Icons.close),
           ),
         ],
       ),
@@ -400,51 +374,48 @@ class _LyricsTranslationEditorSheetState
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final tokens = context.tokens;
+    final caption = theme.textTheme.bodySmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      itemCount: _lines.length,
+      itemCount: _lines.length + 1,
       itemBuilder: (context, index) {
+        // Below the lines, as the lyrics editor's Add line: the language,
+        // and what an edit does once there is a translation to change.
+        if (index == _lines.length) {
+          return Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(8, tokens.gapMd, 8, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.l10n.lyricsTranslationEditSubtitle(
+                    widget.target.nativeName,
+                  ),
+                  style: caption,
+                ),
+                if (_hadTranslation)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      context.l10n.lyricsTranslationEditWordTimingNote,
+                      style: caption,
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }
         final line = _lines[index];
         return Padding(
           key: line.key,
-          padding: EdgeInsets.only(top: index == 0 ? 0 : tokens.gapMd),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                line.original,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 4),
-              ValueListenableBuilder<TextDirection?>(
-                valueListenable: line.direction,
-                builder: (context, direction, _) => TextField(
-                  key: ValueKey('lyrics-translation-field-${line.segment}'),
-                  controller: line.text,
-                  focusNode: line.focus,
-                  textDirection: direction,
-                  minLines: 1,
-                  maxLines: null,
-                  scrollPhysics: const NeverScrollableScrollPhysics(),
-                  textInputAction: TextInputAction.done,
-                  style: theme.textTheme.bodyLarge,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    border: const OutlineInputBorder(),
-                    hintText: widget.target.nativeName,
-                    hintStyle: theme.textTheme.bodyLarge?.copyWith(
-                      color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          padding: EdgeInsets.only(top: index == 0 ? 0 : 2),
+          child: _TranslationRow(
+            line: line,
+            first: index == 0,
+            last: index == _lines.length - 1,
+            hint: widget.target.nativeName,
           ),
         );
       },
@@ -494,6 +465,100 @@ class _LyricsTranslationEditorSheetState
               label: Text(l10n.dialogSave),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One line: the original above its translation field. Rows stack as one
+/// connected list, as in the lyrics editor; the row being typed in rounds
+/// its ends on `secondaryContainer`, like the lyrics editor's selected line.
+class _TranslationRow extends StatelessWidget {
+  const _TranslationRow({
+    required this.line,
+    required this.first,
+    required this.last,
+    required this.hint,
+  });
+
+  final _TranslationLine line;
+  final bool first;
+  final bool last;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: line.focus,
+    builder: (context, _) => _buildRow(context, line.focus.hasFocus),
+  );
+
+  Widget _buildRow(BuildContext context, bool focused) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens = context.tokens;
+    final outer = Radius.circular(tokens.radiusCard);
+    final inner = Radius.circular(tokens.radiusThumb);
+    final radius = focused
+        ? BorderRadius.all(outer)
+        : BorderRadius.vertical(
+            top: first ? outer : inner,
+            bottom: last ? outer : inner,
+          );
+    final fill = focused
+        ? scheme.secondaryContainer
+        : context.isMornye
+        ? MornyeTheme.controlFill(context)
+        : scheme.surfaceContainerHighest;
+    final onFill = focused ? scheme.onSecondaryContainer : scheme.onSurface;
+    return Material(
+      color: fill,
+      shape: RoundedRectangleBorder(borderRadius: radius),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        // The whole row leads to its field, not only the text line.
+        onTap: line.focus.requestFocus,
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                line.original,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: onFill.withValues(alpha: 0.7),
+                ),
+              ),
+              ValueListenableBuilder<TextDirection?>(
+                valueListenable: line.direction,
+                builder: (context, direction, _) => TextField(
+                  key: ValueKey('lyrics-translation-field-${line.segment}'),
+                  controller: line.text,
+                  focusNode: line.focus,
+                  textDirection: direction,
+                  minLines: 1,
+                  maxLines: null,
+                  // The field grows with its text, so a wheel over it
+                  // scrolls the list instead.
+                  scrollPhysics: const NeverScrollableScrollPhysics(),
+                  textInputAction: TextInputAction.done,
+                  style: theme.textTheme.bodyLarge?.copyWith(color: onFill),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    hintText: hint,
+                    hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                      color: onFill.withValues(alpha: 0.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

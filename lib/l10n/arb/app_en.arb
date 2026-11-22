@@ -8110,7 +8110,7 @@
   },
   "lyricsTranslationEditSubtitle": "Translation into {language}",
   "@lyricsTranslationEditSubtitle": {
-    "description": "Subtitle of the translation editor naming the language the translation is written in; language is that language's own name",
+    "description": "Caption under the lines of the translation editor naming the language the translation is written in; language is that language's own name",
     "placeholders": {
       "language": {
         "type": "String"
@@ -8119,7 +8119,7 @@
   },
   "lyricsTranslationEditWordTimingNote": "Editing a line removes its word-by-word timing for that line. An empty field clears that line's translation.",
   "@lyricsTranslationEditWordTimingNote": {
-    "description": "Note at the top of the translation editor explaining that editing a translated line drops its word timing and clearing a field removes that line's translation"
+    "description": "Note under the lines of the translation editor, shown once the song has a translation, explaining that editing a translated line drops its word timing and clearing a field removes that line's translation"
   },
   "lyricsTranslationEditSaved": "Translation saved",
   "@lyricsTranslationEditSaved": {
