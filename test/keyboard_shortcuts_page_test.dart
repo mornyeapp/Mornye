@@ -14,7 +14,41 @@ class _Settings extends SettingsNotifier {
   AppSettings build() => const AppSettings();
 }
 
+class _ExternalSettings extends SettingsNotifier {
+  @override
+  AppSettings build() => const AppSettings(playerMode: 'external');
+}
+
 void main() {
+  testWidgets('another app leaves out the keys of the player', (tester) async {
+    tester.view.physicalSize = const Size(1200, 3000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [settingsProvider.overrideWith(_ExternalSettings.new)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const KeyboardShortcutsPage(platform: TargetPlatform.macOS),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(KeyboardShortcutsPage)),
+    );
+
+    expect(find.text(l10n.desktopMenuPlayPause), findsNothing);
+    expect(find.text(l10n.desktopMenuControls), findsNothing);
+    expect(find.text(l10n.nowPlayingUpNext), findsNothing);
+    expect(find.text(l10n.desktopMenuMiniPlayer), findsNothing);
+    expect(find.text(l10n.desktopShortcutToggleSidebar), findsOneWidget);
+    expect(find.text(l10n.openAudioFiles), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final mornye in [false, true]) {
     for (final platform in [TargetPlatform.macOS, TargetPlatform.windows]) {
       final style = mornye ? 'Mornye' : 'Material';

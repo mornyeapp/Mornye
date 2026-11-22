@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -24,6 +25,8 @@ class KeyboardShortcutsPage extends ConsumerWidget {
       settingsProvider.select((s) => s.showExtensionStore),
     );
     final tabs = desktopDestinationTabs(showStore: showStore);
+    // With an external player the player's keys do nothing; leave them out.
+    final player = ref.watch(playerUiEnabledProvider);
 
     List<SingleActivator> keys(DesktopCommand command) =>
         desktopCommandShortcuts(command, platform);
@@ -51,16 +54,17 @@ class KeyboardShortcutsPage extends ConsumerWidget {
           (l10n.openAudioFolder, keys(DesktopCommand.openAudioFolder)),
         ],
       ),
-      (
-        l10n.desktopMenuControls,
-        [
-          (l10n.desktopMenuPlayPause, keys(DesktopCommand.playPause)),
-          (l10n.nowPlayingNextTrack, keys(DesktopCommand.next)),
-          (l10n.nowPlayingPreviousTrack, keys(DesktopCommand.previous)),
-          (l10n.desktopVolumeUp, keys(DesktopCommand.volumeUp)),
-          (l10n.desktopVolumeDown, keys(DesktopCommand.volumeDown)),
-        ],
-      ),
+      if (player)
+        (
+          l10n.desktopMenuControls,
+          [
+            (l10n.desktopMenuPlayPause, keys(DesktopCommand.playPause)),
+            (l10n.nowPlayingNextTrack, keys(DesktopCommand.next)),
+            (l10n.nowPlayingPreviousTrack, keys(DesktopCommand.previous)),
+            (l10n.desktopVolumeUp, keys(DesktopCommand.volumeUp)),
+            (l10n.desktopVolumeDown, keys(DesktopCommand.volumeDown)),
+          ],
+        ),
       (
         l10n.desktopShortcutsNavigation,
         [
@@ -77,13 +81,16 @@ class KeyboardShortcutsPage extends ConsumerWidget {
       (
         l10n.desktopMenuView,
         [
-          (l10n.nowPlayingTabLyrics, keys(DesktopCommand.lyrics)),
-          (l10n.nowPlayingUpNext, keys(DesktopCommand.upNext)),
+          if (player) ...[
+            (l10n.nowPlayingTabLyrics, keys(DesktopCommand.lyrics)),
+            (l10n.nowPlayingUpNext, keys(DesktopCommand.upNext)),
+          ],
           (
             l10n.desktopShortcutToggleSidebar,
             keys(DesktopCommand.toggleSidebar),
           ),
-          (l10n.desktopMenuMiniPlayer, keys(DesktopCommand.miniPlayer)),
+          if (player)
+            (l10n.desktopMenuMiniPlayer, keys(DesktopCommand.miniPlayer)),
           (l10n.desktopWindowFullscreen, keys(DesktopCommand.fullScreen)),
           (l10n.desktopWindowBorderless, keys(DesktopCommand.borderless)),
         ],

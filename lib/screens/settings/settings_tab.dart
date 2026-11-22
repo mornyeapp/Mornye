@@ -29,6 +29,8 @@ import 'package:mornye/screens/settings/metadata_settings_page.dart';
 import 'package:mornye/screens/settings/playback_settings_page.dart';
 import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/services/app_remote_config_service.dart';
+import 'package:mornye/services/link/client/link_client_controller.dart';
+import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
@@ -37,6 +39,7 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/animation_utils.dart';
+import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_search_field.dart';
@@ -46,8 +49,45 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/profile_avatar.dart';
 import 'package:mornye/widgets/no_scrollbars.dart';
 
+/// Whether Link is set up on this device: a device is paired, or this one
+/// is shared. With an external player the Link page is listed only then.
+final settingsLinkInUseProvider = Provider.autoDispose<bool>((ref) {
+  final phone = ref.watch(linkClientSupportedProvider);
+  if (!phone && !isDesktopPlatform) return false;
+  if (ref.watch(linkDesktopHostProvider.select((host) => host.enabled))) {
+    return true;
+  }
+  return phone &&
+      ref.watch(
+        linkClientControllerProvider.select((s) => s.servers.isNotEmpty),
+      );
+});
+
+/// Names a Settings page, so the open one stays open when the list changes.
+enum _Page {
+  donate,
+  appearance,
+  playback,
+  lyrics,
+  library,
+  networkStorage,
+  link,
+  linkDesktop,
+  download,
+  extensions,
+  files,
+  metadata,
+  app,
+  keyboard,
+  cache,
+  backup,
+  logs,
+  about,
+}
+
 class _Destination {
   const _Destination({
+    required this.id,
     required this.icon,
     required this.iconColor,
     required this.title,
@@ -59,6 +99,7 @@ class _Destination {
     this.beta = false,
   });
 
+  final _Page id;
   final IconData icon;
   final MaterialColor iconColor;
   final String title;
@@ -109,6 +150,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
   final FocusNode _searchFocusNode = FocusNode();
   AppLocalizations? _cachedLocalizations;
   bool? _cachedBuiltInPlayer;
+  bool? _cachedLinkListed;
   List<_Group>? _cachedGroups;
   String _query = '';
   bool _hasRequestedDonationGoal = false;
@@ -120,8 +162,8 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
   /// Desktop list-detail: the selected category ([_profileSelection] for the
   /// profile), the setting a search result points at, and the detail pane's
   /// navigator. Each selection gets a fresh navigator, so the pages pushed
-  /// for the previous category close. Opens on Appearance, the first page
-  /// after the donation card.
+  /// for the previous category close. Opens on the first page after the
+  /// donation card: Appearance, or Download with an external player.
   int _selected = 1;
   String? _selectedTarget;
   var _detailNavigatorKey = GlobalKey<NavigatorState>();
@@ -186,8 +228,11 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
   List<_Group> _groups(BuildContext context) {
     final l10n = context.l10n;
     final builtInPlayer = ref.read(settingsProvider).usesBuiltInPlayer;
+    // A download-focused app lists Link only once it is set up.
+    final linkListed = builtInPlayer || ref.read(settingsLinkInUseProvider);
     if (identical(_cachedLocalizations, l10n) &&
         _cachedBuiltInPlayer == builtInPlayer &&
+        _cachedLinkListed == linkListed &&
         _cachedGroups != null) {
       return _cachedGroups!;
     }
@@ -197,255 +242,304 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       androidAudio: Platform.isAndroid,
       builtInPlayer: builtInPlayer,
     );
+    final donate = _Destination(
+      id: _Page.donate,
+      icon: Icons.favorite_outline,
+      iconColor: Colors.pink,
+      title: l10n.settingsDonate,
+      subtitle: l10n.settingsDonateSubtitle,
+      keywords: const ['support', 'ko-fi', 'sponsor'],
+      pageBuilder: () => DonatePage(remoteConfigService: _remoteConfigService),
+      showDonationProgress: true,
+    );
+    final appearance = _Destination(
+      id: _Page.appearance,
+      icon: Icons.palette_outlined,
+      iconColor: Colors.purple,
+      title: l10n.settingsAppearance,
+      subtitle: l10n.settingsAppearanceSubtitle,
+      keywords: const [
+        'theme',
+        'dark',
+        'light',
+        'amoled',
+        'color',
+        'language',
+        'locale',
+        'layout',
+        'grid',
+      ],
+      searchEntries: searchCatalog.appearance,
+      pageBuilder: () => const AppearanceSettingsPage(),
+    );
+    final playback = _Destination(
+      id: _Page.playback,
+      icon: Icons.play_circle_outline,
+      iconColor: Colors.indigo,
+      title: l10n.libraryPlayback,
+      subtitle: builtInPlayer
+          ? l10n.settingsPlaybackSubtitle
+          : l10n.settingsPlaybackExternalSubtitle,
+      keywords: const ['player', 'audio', 'playback', 'pemutaran'],
+      searchEntries: searchCatalog.playback,
+      pageBuilder: () => const PlaybackSettingsPage(),
+    );
+    final lyrics = _Destination(
+      id: _Page.lyrics,
+      icon: Icons.lyrics_outlined,
+      iconColor: Colors.cyan,
+      title: l10n.settingsLyrics,
+      subtitle: l10n.settingsLyricsSubtitle,
+      keywords: const ['lrc', 'synced', 'provider'],
+      searchEntries: searchCatalog.lyrics,
+      pageBuilder: () => const LyricsSettingsPage(),
+    );
+    final library = _Destination(
+      id: _Page.library,
+      icon: Icons.library_music_outlined,
+      iconColor: Colors.blue,
+      title: l10n.settingsLocalLibrary,
+      subtitle: l10n.settingsLocalLibrarySubtitle,
+      keywords: const ['scan', 'local', 'duplicate'],
+      searchEntries: searchCatalog.library,
+      pageBuilder: () => const LibrarySettingsPage(),
+    );
+    final networkStorage = _Destination(
+      id: _Page.networkStorage,
+      icon: Icons.dns_outlined,
+      iconColor: Colors.blueGrey,
+      title: l10n.networkStorage,
+      subtitle: 'SMB · WebDAV · HTTP(S) · Subsonic',
+      keywords: const ['nas', 'server', 'network', 'smb', 'webdav', 'http'],
+      pageBuilder: () => const NetworkStorageScreen(),
+    );
+    final link = linkListed && (Platform.isAndroid || Platform.isIOS)
+        ? _Destination(
+            id: _Page.link,
+            icon: Icons.devices,
+            iconColor: Colors.deepPurple,
+            title: l10n.linkSettingsTitle,
+            subtitle: l10n.linkSettingsSubtitle,
+            keywords: const [
+              'computer',
+              'desktop',
+              'pc',
+              'mac',
+              'phone',
+              'device',
+              'pair',
+              'link',
+              'komputer',
+              'ponsel',
+              'perangkat',
+            ],
+            pageBuilder: () => const LinkSettingsPage(),
+            beta: true,
+          )
+        : null;
+    final linkDesktop = linkListed && isDesktopPlatform
+        ? _Destination(
+            id: _Page.linkDesktop,
+            icon: Icons.phone_android,
+            iconColor: Colors.lightBlue,
+            title: l10n.linkDesktopSettingsTitle,
+            subtitle: l10n.linkDesktopSettingsSubtitle,
+            keywords: const [
+              'phone',
+              'mobile',
+              'pair',
+              'remote',
+              'handoff',
+              'subsonic',
+              'ponsel',
+            ],
+            pageBuilder: () => const LinkDesktopSettingsPage(),
+          )
+        : null;
+    final download = _Destination(
+      id: _Page.download,
+      icon: Icons.download_outlined,
+      iconColor: Colors.green,
+      title: l10n.settingsDownload,
+      subtitle: l10n.settingsDownloadSubtitle,
+      keywords: const [
+        'quality',
+        'flac',
+        'concurrent',
+        'network',
+        'wifi',
+        'service',
+        'region',
+      ],
+      searchEntries: searchCatalog.download,
+      pageBuilder: () => const DownloadSettingsPage(),
+    );
+    final extensions = _Destination(
+      id: _Page.extensions,
+      icon: Icons.extension_outlined,
+      iconColor: Colors.teal,
+      title: l10n.settingsExtensions,
+      subtitle: l10n.settingsExtensionsSubtitle,
+      keywords: const ['plugin', 'provider', 'priority', 'store'],
+      searchEntries: searchCatalog.extensions,
+      pageBuilder: () => const ExtensionsPage(),
+    );
+    final files = _Destination(
+      id: _Page.files,
+      icon: Icons.folder_outlined,
+      iconColor: Colors.orange,
+      title: l10n.settingsFiles,
+      subtitle: l10n.settingsFilesSubtitle,
+      keywords: const [
+        'saf',
+        'storage',
+        'folder',
+        'filename',
+        'path',
+        'permission',
+      ],
+      searchEntries: searchCatalog.files,
+      pageBuilder: () => const FilesSettingsPage(),
+    );
+    final metadata = _Destination(
+      id: _Page.metadata,
+      icon: Icons.sell_outlined,
+      iconColor: Colors.amber,
+      title: l10n.settingsMetadata,
+      subtitle: l10n.settingsMetadataSubtitle,
+      keywords: const ['tag', 'cover', 'artwork', 'isrc', 'provider'],
+      searchEntries: searchCatalog.metadata,
+      pageBuilder: () => const MetadataSettingsPage(),
+    );
+    final app = _Destination(
+      id: _Page.app,
+      icon: Icons.tune_outlined,
+      iconColor: Colors.blueGrey,
+      title: l10n.settingsApp,
+      subtitle: l10n.settingsAppSubtitle,
+      keywords: const ['update', 'channel', 'debug', 'logging'],
+      searchEntries: searchCatalog.app,
+      pageBuilder: () => const AppSettingsPage(),
+    );
+    final keyboard = isDesktopPlatform
+        ? _Destination(
+            id: _Page.keyboard,
+            icon: Icons.keyboard_outlined,
+            iconColor: Colors.blueGrey,
+            title: l10n.settingsKeyboardShortcuts,
+            subtitle: l10n.settingsKeyboardShortcutsSubtitle,
+            keywords: const ['hotkey', 'keys', 'keybinding', 'pintasan'],
+            pageBuilder: () => const KeyboardShortcutsPage(),
+          )
+        : null;
+    final cache = _Destination(
+      id: _Page.cache,
+      icon: Icons.storage_outlined,
+      iconColor: Colors.indigo,
+      title: l10n.settingsCache,
+      subtitle: l10n.settingsCacheSubtitle,
+      keywords: const ['clear', 'space', 'image', 'temp'],
+      searchEntries: searchCatalog.cache,
+      pageBuilder: () => const CacheManagementPage(),
+    );
+    final backup = _Destination(
+      id: _Page.backup,
+      icon: Icons.settings_backup_restore,
+      iconColor: Colors.teal,
+      title: l10n.settingsBackup,
+      subtitle: l10n.settingsBackupSubtitle,
+      keywords: const ['export', 'import', 'restore', 'json'],
+      searchEntries: searchCatalog.backup,
+      pageBuilder: () => const BackupRestorePage(),
+    );
+    final logs = _Destination(
+      id: _Page.logs,
+      icon: Icons.article_outlined,
+      iconColor: Colors.brown,
+      title: l10n.logTitle,
+      subtitle: l10n.settingsLogsSubtitle,
+      keywords: const ['debug', 'error', 'report'],
+      searchEntries: searchCatalog.logs,
+      pageBuilder: () => const LogScreen(),
+    );
+    final about = _Destination(
+      id: _Page.about,
+      icon: Icons.info_outline,
+      iconColor: Colors.grey,
+      title: l10n.settingsAbout,
+      subtitle: '${l10n.aboutVersion} ${AppInfo.displayVersion}',
+      keywords: const ['version', 'license', 'contributor'],
+      searchEntries: searchCatalog.about,
+      pageBuilder: () => const AboutPage(),
+    );
+    final sources = _Group(
+      destinations: [library, networkStorage, ?link, ?linkDesktop],
+    );
     final groups = [
       // On its own at the top, so its progress reads as the app's status.
-      _Group(
-        destinations: [
-          _Destination(
-            icon: Icons.favorite_outline,
-            iconColor: Colors.pink,
-            title: l10n.settingsDonate,
-            subtitle: l10n.settingsDonateSubtitle,
-            keywords: const ['support', 'ko-fi', 'sponsor'],
-            pageBuilder: () =>
-                DonatePage(remoteConfigService: _remoteConfigService),
-            showDonationProgress: true,
-          ),
-        ],
-      ),
-      _Group(
-        destinations: [
-          _Destination(
-            icon: Icons.palette_outlined,
-            iconColor: Colors.purple,
-            title: l10n.settingsAppearance,
-            subtitle: l10n.settingsAppearanceSubtitle,
-            keywords: const [
-              'theme',
-              'dark',
-              'light',
-              'amoled',
-              'color',
-              'language',
-              'locale',
-              'layout',
-              'grid',
-            ],
-            searchEntries: searchCatalog.appearance,
-            pageBuilder: () => const AppearanceSettingsPage(),
-          ),
-          _Destination(
-            icon: Icons.play_circle_outline,
-            iconColor: Colors.indigo,
-            title: l10n.libraryPlayback,
-            subtitle: builtInPlayer
-                ? l10n.settingsPlaybackSubtitle
-                : l10n.settingsPlaybackExternalSubtitle,
-            keywords: const ['player', 'audio', 'playback', 'pemutaran'],
-            searchEntries: searchCatalog.playback,
-            pageBuilder: () => const PlaybackSettingsPage(),
-          ),
-          _Destination(
-            icon: Icons.lyrics_outlined,
-            iconColor: Colors.cyan,
-            title: l10n.settingsLyrics,
-            subtitle: l10n.settingsLyricsSubtitle,
-            keywords: const ['lrc', 'synced', 'provider'],
-            searchEntries: searchCatalog.lyrics,
-            pageBuilder: () => const LyricsSettingsPage(),
-          ),
-        ],
-      ),
-      _Group(
-        destinations: [
-          _Destination(
-            icon: Icons.library_music_outlined,
-            iconColor: Colors.blue,
-            title: l10n.settingsLocalLibrary,
-            subtitle: l10n.settingsLocalLibrarySubtitle,
-            keywords: const ['scan', 'local', 'duplicate'],
-            searchEntries: searchCatalog.library,
-            pageBuilder: () => const LibrarySettingsPage(),
-          ),
-          _Destination(
-            icon: Icons.dns_outlined,
-            iconColor: Colors.blueGrey,
-            title: l10n.networkStorage,
-            subtitle: 'SMB · WebDAV · HTTP(S) · Subsonic',
-            keywords: const [
-              'nas',
-              'server',
-              'network',
-              'smb',
-              'webdav',
-              'http',
-            ],
-            pageBuilder: () => const NetworkStorageScreen(),
-          ),
-          if (Platform.isAndroid || Platform.isIOS)
-            _Destination(
-              icon: Icons.devices,
-              iconColor: Colors.deepPurple,
-              title: l10n.linkSettingsTitle,
-              subtitle: l10n.linkSettingsSubtitle,
-              keywords: const [
-                'computer',
-                'desktop',
-                'pc',
-                'mac',
-                'phone',
-                'device',
-                'pair',
-                'link',
-                'komputer',
-                'ponsel',
-                'perangkat',
-              ],
-              pageBuilder: () => const LinkSettingsPage(),
-              beta: true,
-            ),
-          if (isDesktopPlatform)
-            _Destination(
-              icon: Icons.phone_android,
-              iconColor: Colors.lightBlue,
-              title: l10n.linkDesktopSettingsTitle,
-              subtitle: l10n.linkDesktopSettingsSubtitle,
-              keywords: const [
-                'phone',
-                'mobile',
-                'pair',
-                'remote',
-                'handoff',
-                'subsonic',
-                'ponsel',
-              ],
-              pageBuilder: () => const LinkDesktopSettingsPage(),
-            ),
-        ],
-      ),
-      _Group(
-        destinations: [
-          _Destination(
-            icon: Icons.download_outlined,
-            iconColor: Colors.green,
-            title: l10n.settingsDownload,
-            subtitle: l10n.settingsDownloadSubtitle,
-            keywords: const [
-              'quality',
-              'flac',
-              'concurrent',
-              'network',
-              'wifi',
-              'service',
-              'region',
-            ],
-            searchEntries: searchCatalog.download,
-            pageBuilder: () => const DownloadSettingsPage(),
-          ),
-          _Destination(
-            icon: Icons.extension_outlined,
-            iconColor: Colors.teal,
-            title: l10n.settingsExtensions,
-            subtitle: l10n.settingsExtensionsSubtitle,
-            keywords: const ['plugin', 'provider', 'priority', 'store'],
-            searchEntries: searchCatalog.extensions,
-            pageBuilder: () => const ExtensionsPage(),
-          ),
-          _Destination(
-            icon: Icons.folder_outlined,
-            iconColor: Colors.orange,
-            title: l10n.settingsFiles,
-            subtitle: l10n.settingsFilesSubtitle,
-            keywords: const [
-              'saf',
-              'storage',
-              'folder',
-              'filename',
-              'path',
-              'permission',
-            ],
-            searchEntries: searchCatalog.files,
-            pageBuilder: () => const FilesSettingsPage(),
-          ),
-          _Destination(
-            icon: Icons.sell_outlined,
-            iconColor: Colors.amber,
-            title: l10n.settingsMetadata,
-            subtitle: l10n.settingsMetadataSubtitle,
-            keywords: const ['tag', 'cover', 'artwork', 'isrc', 'provider'],
-            searchEntries: searchCatalog.metadata,
-            pageBuilder: () => const MetadataSettingsPage(),
-          ),
-        ],
-      ),
-      _Group(
-        destinations: [
-          _Destination(
-            icon: Icons.tune_outlined,
-            iconColor: Colors.blueGrey,
-            title: l10n.settingsApp,
-            subtitle: l10n.settingsAppSubtitle,
-            keywords: const ['update', 'channel', 'debug', 'logging'],
-            searchEntries: searchCatalog.app,
-            pageBuilder: () => const AppSettingsPage(),
-          ),
-          if (isDesktopPlatform)
-            _Destination(
-              icon: Icons.keyboard_outlined,
-              iconColor: Colors.blueGrey,
-              title: l10n.settingsKeyboardShortcuts,
-              subtitle: l10n.settingsKeyboardShortcutsSubtitle,
-              keywords: const ['hotkey', 'keys', 'keybinding', 'pintasan'],
-              pageBuilder: () => const KeyboardShortcutsPage(),
-            ),
-          _Destination(
-            icon: Icons.storage_outlined,
-            iconColor: Colors.indigo,
-            title: l10n.settingsCache,
-            subtitle: l10n.settingsCacheSubtitle,
-            keywords: const ['clear', 'space', 'image', 'temp'],
-            searchEntries: searchCatalog.cache,
-            pageBuilder: () => const CacheManagementPage(),
-          ),
-          _Destination(
-            icon: Icons.settings_backup_restore,
-            iconColor: Colors.teal,
-            title: l10n.settingsBackup,
-            subtitle: l10n.settingsBackupSubtitle,
-            keywords: const ['export', 'import', 'restore', 'json'],
-            searchEntries: searchCatalog.backup,
-            pageBuilder: () => const BackupRestorePage(),
-          ),
-        ],
-      ),
-      _Group(
-        destinations: [
-          _Destination(
-            icon: Icons.article_outlined,
-            iconColor: Colors.brown,
-            title: l10n.logTitle,
-            subtitle: l10n.settingsLogsSubtitle,
-            keywords: const ['debug', 'error', 'report'],
-            searchEntries: searchCatalog.logs,
-            pageBuilder: () => const LogScreen(),
-          ),
-          _Destination(
-            icon: Icons.info_outline,
-            iconColor: Colors.grey,
-            title: l10n.settingsAbout,
-            subtitle: '${l10n.aboutVersion} ${AppInfo.displayVersion}',
-            keywords: const ['version', 'license', 'contributor'],
-            searchEntries: searchCatalog.about,
-            pageBuilder: () => const AboutPage(),
-          ),
-        ],
-      ),
+      _Group(destinations: [donate]),
+      if (builtInPlayer) ...[
+        _Group(destinations: [appearance, playback, lyrics]),
+        sources,
+        _Group(destinations: [download, extensions, files, metadata]),
+      ] else ...[
+        // Download focus: what shapes a download leads the list.
+        _Group(destinations: [download, files, metadata, lyrics, extensions]),
+        sources,
+        _Group(destinations: [appearance, playback]),
+      ],
+      _Group(destinations: [app, ?keyboard, cache, backup]),
+      _Group(destinations: [logs, about]),
     ];
+    // The list changes with the player choice; the open category stays open.
+    final previous = _cachedGroups;
+    if (previous != null && _selected >= 0) {
+      final open = [
+        for (final group in previous) ...group.destinations,
+      ].elementAtOrNull(_selected)?.id;
+      final index = [
+        for (final group in groups) ...group.destinations,
+      ].indexWhere((destination) => destination.id == open);
+      if (index >= 0) _selected = index;
+    }
     _cachedLocalizations = l10n;
     _cachedBuiltInPlayer = builtInPlayer;
+    _cachedLinkListed = linkListed;
     _cachedGroups = groups;
     return groups;
   }
+
+  /// With an external player the Playback page holds only this choice, so
+  /// the phone list offers it as a row.
+  void _choosePlayer() {
+    final l10n = context.l10n;
+    showAppChoiceSheet<String>(
+      context: context,
+      title: l10n.sectionPlayer,
+      subtitle: l10n.playbackExternalHidden,
+      selected: ref.read(settingsProvider).playerMode,
+      choices: [
+        AppChoice(
+          'external',
+          Icons.open_in_new,
+          l10n.libraryExternalPlayer,
+          subtitle: l10n.libraryExternalPlayerSubtitle,
+        ),
+        AppChoice(
+          'internal',
+          Icons.play_circle_outline,
+          l10n.libraryBuiltInPreviewPlayer,
+          subtitle: l10n.libraryBuiltInPreviewPlayerSubtitle,
+        ),
+      ],
+      onSelected: (mode) =>
+          ref.read(settingsProvider.notifier).setPlayerMode(mode),
+    );
+  }
+
+  bool _isPlayerChoice(_Destination destination) =>
+      destination.id == _Page.playback &&
+      !ref.read(settingsProvider).usesBuiltInPlayer;
 
   Future<void> _navigateTo(
     BuildContext context,
@@ -485,6 +579,18 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       : Theme.of(context).colorScheme.onSurfaceVariant;
 
   Widget _itemFor(_Destination destination, {required bool showDivider}) {
+    if (_isPlayerChoice(destination)) {
+      return SettingsItem(
+        key: const ValueKey('settings-player-choice'),
+        icon: destination.icon,
+        iconColor: _iconColorFor(destination),
+        showIconInMornye: true,
+        title: context.l10n.sectionPlayer,
+        subtitle: context.l10n.libraryExternalPlayer,
+        showDivider: showDivider,
+        onTap: _choosePlayer,
+      );
+    }
     final goal = _monthlyGoal;
     return SettingsItem(
       icon: destination.icon,
@@ -517,11 +623,13 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       title: entry.title,
       subtitle: result.destination.title,
       showDivider: showDivider,
-      onTap: () => _navigateTo(
-        context,
-        result.destination.pageBuilder(),
-        targetLabel: entry.targetLabel,
-      ),
+      onTap: _isPlayerChoice(result.destination)
+          ? _choosePlayer
+          : () => _navigateTo(
+              context,
+              result.destination.pageBuilder(),
+              targetLabel: entry.targetLabel,
+            ),
     );
   }
 
@@ -533,7 +641,10 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
   Widget build(BuildContext context) {
     // The list and its search leave out built-in player settings while
     // another app plays the music.
-    ref.watch(settingsProvider.select((s) => s.usesBuiltInPlayer));
+    final builtInPlayer = ref.watch(
+      settingsProvider.select((s) => s.usesBuiltInPlayer),
+    );
+    if (!builtInPlayer) ref.watch(settingsLinkInUseProvider);
     // Settings reads as chrome; its pages scroll without a bar.
     if (!_supportsListDetail) return NoScrollbars(child: _buildList(context));
     return NoScrollbars(
