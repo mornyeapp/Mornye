@@ -26,7 +26,7 @@ void main() {
     await source.writeAsString(_original);
     version = File('${sdk.path}/bin/cache/flutter.version.json');
     await version.parent.create(recursive: true);
-    await version.writeAsString(jsonEncode({'frameworkVersion': '3.50.0'}));
+    await version.writeAsString(jsonEncode({'frameworkVersion': '3.50.1'}));
     final result = await Process.run('git', ['init', '--quiet', sdk.path]);
     expect(result.exitCode, 0, reason: result.stderr.toString());
   });
@@ -74,7 +74,7 @@ void main() {
     addTearDown(() => project.delete(recursive: true));
     await File(
       '${project.path}/.fvmrc',
-    ).writeAsString(jsonEncode({'flutter': '3.50.1'}));
+    ).writeAsString(jsonEncode({'flutter': '3.50.2'}));
     await expectLater(
       preparation.prepareFlutterSdk(sdk: sdk, project: project),
       throwsStateError,
