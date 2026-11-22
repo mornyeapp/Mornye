@@ -1,4 +1,6 @@
 import 'dart:convert';
+
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
@@ -115,6 +117,49 @@ class HistoryDatabase {
   bool? _searchFtsAvailable;
 
   HistoryDatabase._init();
+
+  /// History writes race the native backend's own history.db writers and
+  /// library merges on the attached Library connection. On desktop the
+  /// connection reports BUSY from BEGIN IMMEDIATE almost immediately even
+  /// with `PRAGMA busy_timeout` set, so the retry schedule must span several
+  /// seconds of real time to cover a competing merge.
+  ///
+  /// The bound is attempt-based, not a wall-clock deadline: the initial
+  /// attempt plus up to 7 retries, with scheduled sleeps totalling ~10.3s.
+  /// Each attempt can additionally wait inside SQLite up to the connection's
+  /// busy_timeout (5s in production), so under these assumptions a fully
+  /// contended write is modeled to take roughly 8 x busy_timeout + 10.3s
+  /// (~50s) before surfacing. Persistent locks still surface after the last
+  /// delay.
+  static const List<Duration> _writeRetryDelays = [
+    Duration(milliseconds: 100),
+    Duration(milliseconds: 200),
+    Duration(milliseconds: 400),
+    Duration(milliseconds: 800),
+    Duration(milliseconds: 1600),
+    Duration(milliseconds: 3200),
+    Duration(milliseconds: 4000),
+  ];
+
+  static Future<T> _writeTransaction<T>(
+    Database db,
+    Future<T> Function(Transaction txn) action,
+  ) => sqlite.transactionWithBusyRetry(
+    db,
+    action,
+    retryDelays: _writeRetryDelays,
+  );
+
+  /// Test seam: replaces the lazily opened connection with [db] so host
+  /// tests can drive real contention against a temporary file. Passing null
+  /// restores the production opener for the next access.
+  @visibleForTesting
+  static void debugReplaceDatabaseForTest(Database? db) {
+    _database.reset();
+    if (db != null) {
+      _database.getOrCreate(() async => db);
+    }
+  }
 
   Future<Database> get database {
     return _database.getOrCreate(() async {
@@ -289,7 +334,7 @@ class HistoryDatabase {
 
   Future<void> upsert(Map<String, dynamic> json) async {
     final db = await database;
-    await db.transaction((txn) async {
+    await _writeTransaction(db, (txn) async {
       await txn.insert(
         'history',
         HistoryRowMapper.jsonToDbRow(json),
@@ -308,7 +353,7 @@ class HistoryDatabase {
   Future<void> upsertBatch(List<Map<String, dynamic>> items) async {
     if (items.isEmpty) return;
     final db = await database;
-    await db.transaction((txn) async {
+    await _writeTransaction(db, (txn) async {
       final batch = txn.batch();
       for (final json in items) {
         batch.insert(
@@ -331,7 +376,8 @@ class HistoryDatabase {
   ) async {
     if (items.isEmpty) return const {};
     final db = await database;
-    return db.transaction(
+    return _writeTransaction(
+      db,
       (txn) => updateExistingHistoryRows(
         txn,
         items.map(HistoryRowMapper.jsonToDbRow),
@@ -594,7 +640,7 @@ class HistoryDatabase {
 
   Future<void> clearAll() async {
     final db = await database;
-    await db.transaction((txn) async {
+    await _writeTransaction(db, (txn) async {
       await txn.delete('history_path_keys');
       await txn.delete('history');
     });
@@ -670,7 +716,7 @@ class HistoryDatabase {
         values['sample_rate'] = newSampleRate;
       }
     }
-    return db.transaction((txn) async {
+    return _writeTransaction(db, (txn) async {
       final changed = await txn.update(
         'history',
         values,
@@ -720,7 +766,7 @@ class HistoryDatabase {
     List<Map<String, dynamic>> entries,
   ) async {
     final db = await database;
-    return db.transaction((txn) async {
+    return _writeTransaction(db, (txn) async {
       final deletedIds = <String>[];
       for (final entry in entries) {
         final id = entry['id'] as String;
@@ -748,7 +794,7 @@ class HistoryDatabase {
     if (ids.isEmpty) return 0;
 
     final db = await database;
-    final totalDeleted = await db.transaction((txn) async {
+    final totalDeleted = await _writeTransaction(db, (txn) async {
       var deleted = 0;
       const chunkSize = 500;
       for (var i = 0; i < ids.length; i += chunkSize) {
