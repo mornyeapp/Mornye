@@ -9960,6 +9960,14 @@
   "@homeShortcutsReset": {
     "description": "Menu item that restores the default Home shortcuts"
   },
+  "homeShortcutRemove": "Remove shortcut",
+  "@homeShortcutRemove": {
+    "description": "Menu item that takes one shortcut off Home"
+  },
+  "homeShortcutAdd": "Add shortcut",
+  "@homeShortcutAdd": {
+    "description": "Menu item and sheet title for adding a shortcut to Home after one was removed"
+  },
   "homePinAdd": "Pin to Home",
   "@homePinAdd": {
     "description": "Menu item that adds a Library album, playlist, artist, genre or folder to Home"
@@ -10271,7 +10279,7 @@
   "@homeReset": {
     "description": "Action on the Edit Home page and title of its confirmation"
   },
-  "homeResetMessage": "Home's sections go back to the order they came in, and all of them show.",
+  "homeResetMessage": "Home's sections go back to the order they came in, all of them show, and the original shortcuts return. What you pinned stays.",
   "@homeResetMessage": {
     "description": "Confirmation message before Home's sections are reset"
   },

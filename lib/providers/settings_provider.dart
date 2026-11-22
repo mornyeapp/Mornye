@@ -1073,9 +1073,8 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setSearchViewMode(String mode) =>
       _commit(state.copyWith(searchViewMode: mode));
 
-  void setHomeShortcuts(List<HomeShortcut> shortcuts) => _commit(
-    state.copyWith(homeShortcuts: [for (final s in shortcuts) s.name]),
-  );
+  void setHomeShortcuts(List<HomeShortcut> shortcuts) =>
+      _commit(state.copyWith(homeShortcuts: HomeShortcut.names(shortcuts)));
 
   void setHomeContinueListening(bool enabled) =>
       _commit(state.copyWith(homeContinueListening: enabled));
@@ -1103,6 +1102,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void resetHomeLayout() => _commit(
     state.copyWith(
       homeLayout: const HomeLayout(),
+      homeShortcuts: HomeShortcut.names(HomeShortcut.defaults),
       homeContinueListening: true,
       homeRecommendations: true,
     ),

@@ -501,6 +501,10 @@ class _HomeSections extends ConsumerWidget {
         (pickedAlbums.isNotEmpty ||
             pickedReleases.isNotEmpty ||
             _HomeTopPicksSection.hasPicks(ref, mixes: showPlayer));
+    // On Material phones and tablets the pins sit among the Shortcuts, so
+    // the section stays while either is left.
+    final hasShortcuts =
+        !mornye && _HomeShortcuts.hasContent(ref, pins: !_homeDesktop(context));
     // What each section has to show now, before the person's order and
     // their hidden sections apply.
     final built = <HomeSection, Widget>{
@@ -514,7 +518,9 @@ class _HomeSections extends ConsumerWidget {
           releases: pickedReleases,
         ),
       // The desktop top holds both; without Shortcuts the card stands alone.
-      if (_homeDesktop(context) && layout.shows(HomeSection.shortcuts))
+      if (_homeDesktop(context) &&
+          hasShortcuts &&
+          layout.shows(HomeSection.shortcuts))
         HomeSection.shortcuts: _HomeDesktopTop(
           inset: inset,
           showContinue: showContinue,
@@ -541,7 +547,7 @@ class _HomeSections extends ConsumerWidget {
             child: const _HomeContinueListeningCard(),
           ),
         // Mornye exposes these tools in the player and Settings.
-        if (!mornye)
+        if (hasShortcuts)
           HomeSection.shortcuts: _HomeSection(
             title: l10n.homeShortcuts,
             inset: inset,
@@ -2239,12 +2245,23 @@ enum _HomeShortcutsLayout {
 }
 
 /// Quick ways into tools and collections that otherwise sit a few screens
-/// deep. The user picks them: a long press or right-click on a tile opens
-/// its menu.
+/// deep. The user picks them, down to none: a long press or right-click on
+/// a tile opens its menu.
 class _HomeShortcuts extends ConsumerWidget {
   const _HomeShortcuts({this.layout = _HomeShortcutsLayout.grid});
 
   final _HomeShortcutsLayout layout;
+
+  /// Whether a shortcut is left, or with [pins] a pin that sits among them.
+  static bool hasContent(WidgetRef ref, {required bool pins}) {
+    final player = ref.watch(playerUiEnabledProvider);
+    final some = ref.watch(
+      settingsProvider.select(
+        (s) => HomeShortcut.resolve(s.homeShortcuts, player: player).isNotEmpty,
+      ),
+    );
+    return some || (pins && _HomePinsSection.hasContent(ref));
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2286,17 +2303,28 @@ class _HomeShortcuts extends ConsumerWidget {
       // Pins follow in the grid; the desktop gives them their own section.
       if (layout == _HomeShortcutsLayout.grid)
         for (final pin in ref.watch(homePinsProvider))
-          _HomePinShortcutTile(pin: pin, layout: layout),
+          _HomePinShortcutTile(
+            pin: pin,
+            layout: layout,
+            // The way back to a shortcut once the last one was removed.
+            more: () => [?_addAction(context, ref, shortcuts, player)],
+          ),
     ];
 
     switch (layout) {
       case _HomeShortcutsLayout.list:
+        // Each row keeps a quarter of the height, so fewer rows end early
+        // rather than stretch.
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final (index, tile) in tiles.indexed) ...[
-              if (index > 0) const SizedBox(height: 4),
-              Expanded(child: tile),
+            for (var slot = 0; slot < HomeShortcut.slotCount; slot++) ...[
+              if (slot > 0) const SizedBox(height: 4),
+              Expanded(
+                child: slot < tiles.length
+                    ? tiles[slot]
+                    : const SizedBox.shrink(),
+              ),
             ],
           ],
         );
@@ -2450,6 +2478,15 @@ class _HomeShortcuts extends ConsumerWidget {
               );
             },
           ),
+          ?_addAction(context, ref, shortcuts, player),
+          ContextMenuAction(
+            icon: Icons.remove_circle_outline,
+            label: l10n.homeShortcutRemove,
+            onSelected: () =>
+                settings.setHomeShortcuts([...shortcuts]..removeAt(slot)),
+          ),
+        ],
+        [
           ContextMenuAction(
             icon: Icons.restart_alt,
             label: l10n.homeShortcutsReset,
@@ -2459,6 +2496,42 @@ class _HomeShortcuts extends ConsumerWidget {
           ),
         ],
       ],
+    );
+  }
+
+  /// "Add shortcut", while a slot is empty and a shortcut is left to add.
+  ContextMenuAction? _addAction(
+    BuildContext context,
+    WidgetRef ref,
+    List<HomeShortcut> shortcuts,
+    bool player,
+  ) {
+    if (shortcuts.length >= HomeShortcut.slotCount) return null;
+    final l10n = context.l10n;
+    final settings = ref.read(settingsProvider.notifier);
+    final choices = [
+      for (final shortcut in HomeShortcut.available(player: player))
+        if (!shortcuts.contains(shortcut))
+          if (_entry(context, ref, shortcut) case final entry)
+            AppChoice<HomeShortcut?>(shortcut, entry.icon, entry.label),
+    ];
+    if (choices.isEmpty) return null;
+    return ContextMenuAction(
+      icon: Icons.add,
+      label: l10n.homeShortcutAdd,
+      onSelected: () {
+        if (!context.mounted) return;
+        showAppChoiceSheet<HomeShortcut?>(
+          context: context,
+          title: l10n.homeShortcutAdd,
+          selected: null,
+          choices: choices,
+          onSelected: (picked) {
+            if (picked == null) return;
+            settings.setHomeShortcuts([...shortcuts, picked]);
+          },
+        );
+      },
     );
   }
 

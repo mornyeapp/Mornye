@@ -184,13 +184,15 @@ Future<void> _openHomePin(
   await pushPage<void>(context, (_) => screen);
 }
 
-/// A pin's menu on Home: Move to front and Unpin.
+/// A pin's menu on Home: Move to front and Unpin, then [more] in a group
+/// of its own.
 void _showHomePinMenu(
   BuildContext context,
   WidgetRef ref,
   HomePin pin,
-  Offset position,
-) {
+  Offset position, {
+  List<ContextMenuAction> more = const [],
+}) {
   final l10n = context.l10n;
   // Read up front: unpinning removes the tile that opened the menu.
   final pins = ref.read(homePinsProvider.notifier);
@@ -211,6 +213,7 @@ void _showHomePinMenu(
           onSelected: () => pins.remove(pin.key),
         ),
       ],
+      if (more.isNotEmpty) more,
     ],
   );
 }
@@ -218,10 +221,17 @@ void _showHomePinMenu(
 /// A pin among the Material Home's shortcuts: the same tile, with the
 /// pin's cover where a shortcut has its icon.
 class _HomePinShortcutTile extends ConsumerWidget {
-  const _HomePinShortcutTile({required this.pin, required this.layout});
+  const _HomePinShortcutTile({
+    required this.pin,
+    required this.layout,
+    this.more,
+  });
 
   final HomePin pin;
   final _HomeShortcutsLayout layout;
+
+  /// Menu rows beyond the pin's own, read when the menu opens.
+  final List<ContextMenuAction> Function()? more;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -249,7 +259,13 @@ class _HomePinShortcutTile extends ConsumerWidget {
       badge: colorScheme.secondaryContainer,
       onBadge: colorScheme.onSecondaryContainer,
       onTap: () => _openHomePin(context, ref, pin),
-      onMenu: (position) => _showHomePinMenu(context, ref, pin, position),
+      onMenu: (position) => _showHomePinMenu(
+        context,
+        ref,
+        pin,
+        position,
+        more: more?.call() ?? const [],
+      ),
       layout: layout,
       position: (index: 0, count: 1),
     );

@@ -6444,7 +6444,7 @@
   "homeSectionAboutNewReleases": "Musik baru dari artis favoritmu",
   "homeSectionAboutOnRepeat": "Lagu yang paling sering kamu putar, atau album dari Koleksi selama pemutaran tidak dicatat",
   "homeReset": "Atur ulang Beranda",
-  "homeResetMessage": "Bagian Beranda kembali ke urutan semula, dan semuanya tampil.",
+  "homeResetMessage": "Bagian Beranda kembali ke urutan semula, semuanya tampil, dan pintasan bawaan kembali. Yang kamu sematkan tetap ada.",
   "actionPaste": "Tempel",
   "@actionPaste": {
     "description": "Generic action - paste from clipboard"
@@ -8437,6 +8437,14 @@
   "homeShortcutsReset": "Atur ulang pintasan",
   "@homeShortcutsReset": {
     "description": "Menu item that restores the default Home shortcuts"
+  },
+  "homeShortcutRemove": "Hapus pintasan",
+  "@homeShortcutRemove": {
+    "description": "Menu item that takes one shortcut off Home"
+  },
+  "homeShortcutAdd": "Tambah pintasan",
+  "@homeShortcutAdd": {
+    "description": "Menu item and sheet title for adding a shortcut to Home after one was removed"
   },
   "homePinAdd": "Sematkan ke Beranda",
   "@homePinAdd": {

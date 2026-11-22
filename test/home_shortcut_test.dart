@@ -40,6 +40,57 @@ void main() {
         HomeShortcut.values.reversed.take(HomeShortcut.slotCount),
       );
     });
+
+    test('a removed slot stays empty', () {
+      expect(HomeShortcut.resolve(['loved', 'none', 'equalizer', 'none']), [
+        HomeShortcut.loved,
+        HomeShortcut.equalizer,
+      ]);
+      expect(HomeShortcut.resolve(['none', 'none', 'none', 'none']), isEmpty);
+    });
+
+    test('an unknown name beside a removed slot is still filled', () {
+      expect(HomeShortcut.resolve(['removedTool', 'none', 'none', 'none']), [
+        HomeShortcut.shuffle,
+      ]);
+    });
+
+    test('without the player a removed slot stays empty too', () {
+      expect(
+        HomeShortcut.resolve([
+          'shuffle',
+          'networkStorage',
+          'none',
+          'none',
+        ], player: false),
+        [HomeShortcut.networkStorage, HomeShortcut.loved],
+      );
+    });
+  });
+
+  group('HomeShortcut.names', () {
+    test('marks the slots left empty', () {
+      expect(HomeShortcut.names([HomeShortcut.loved]), [
+        'loved',
+        'none',
+        'none',
+        'none',
+      ]);
+      expect(
+        HomeShortcut.names(HomeShortcut.defaults),
+        const AppSettings().homeShortcuts,
+      );
+    });
+
+    test('round trips through resolve', () {
+      for (final shortcuts in [
+        <HomeShortcut>[],
+        [HomeShortcut.link, HomeShortcut.shuffle],
+        HomeShortcut.defaults,
+      ]) {
+        expect(HomeShortcut.resolve(HomeShortcut.names(shortcuts)), shortcuts);
+      }
+    });
   });
 
   group('HomeShortcut.place', () {
