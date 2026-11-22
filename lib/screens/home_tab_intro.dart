@@ -1870,8 +1870,8 @@ class _HomeTopPicksShelf extends StatefulWidget {
 class _HomeTopPicksShelfState extends State<_HomeTopPicksShelf> {
   static const _gap = 16.0;
 
-  /// One slow round that every banner's blooms follow.
-  final _drift = DecorativePhase(const Duration(seconds: 32));
+  /// One loop that every banner's field flows through.
+  final _drift = DecorativePhase(const Duration(seconds: 30));
   bool _motion = false;
   bool _onScreen = true;
 

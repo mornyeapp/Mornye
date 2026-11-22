@@ -123,8 +123,8 @@ class MornyeMixBanner extends StatelessWidget {
   final String subtitle;
   final double width;
 
-  /// A looping phase in `[0, 1)` that carries the blooms slowly around where
-  /// they sit. Without one the field is still.
+  /// A looping phase in `[0, 1)` the field flows through: its blooms wander
+  /// and its wash leans. Without one the field is still.
   final ValueListenable<double>? drift;
 
   static const aspectRatio = 3 / 4;
@@ -229,10 +229,23 @@ class _BannerPainter extends CustomPainter {
   final int seed;
   final ValueListenable<double>? phase;
 
+  /// A value that swings between [low] and [high], [turns] times so far,
+  /// from [rest]: where it is when the loop starts.
+  static double _swing(double low, double high, double rest, double turns) {
+    final middle = (low + high) / 2, reach = (high - low) / 2;
+    final start = math.asin(((rest - middle) / reach).clamp(-1.0, 1.0));
+    return middle + reach * math.sin(start + 2 * math.pi * turns);
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final palette = _palettes[seed % _palettes.length];
     final rect = Offset.zero & size;
+    // Every swing starts where the still banner has it, so a field at rest
+    // is the banner as drawn still.
+    final loop = phase?.value ?? 0;
+    final way = (seed >> 3).isEven ? 1.0 : -1.0;
+    final breath = math.sin(2 * math.pi * loop);
     canvas.drawRect(
       rect,
       Paint()
@@ -240,18 +253,12 @@ class _BannerPainter extends CustomPainter {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [palette.start, palette.end],
+          transform: GradientRotation(way * 0.5 * breath),
         ).createShader(rect),
     );
     // The seed's upper bits place the blooms, apart from the palette's choice.
     final drift = ((seed >> 8) & 0xff) / 255;
     final lean = ((seed >> 16) & 0xff) / 255;
-    // Each bloom goes once around in a loop, the two in opposite ways, and
-    // every banner starts somewhere else on its round. The round starts
-    // where the bloom sits, so a field at rest is the banner as drawn still.
-    final rest = 2 * math.pi * drift;
-    final turn = rest + 2 * math.pi * (phase?.value ?? 0);
-    final across = math.cos(turn) - math.cos(rest);
-    final along = math.sin(turn) - math.sin(rest);
     void bloom(Offset center, double radius, Color color, double strength) {
       final circle = Rect.fromCircle(center: center, radius: radius);
       canvas.drawRect(
@@ -268,21 +275,22 @@ class _BannerPainter extends CustomPainter {
       );
     }
 
+    // The light bloom keeps to the top, clear of the white title.
     bloom(
       Offset(
-        size.width * (0.55 + 0.4 * drift + 0.2 * across),
-        size.height * (0.12 + 0.28 * lean + 0.13 * along),
+        size.width * _swing(0.15, 0.95, 0.55 + 0.4 * drift, way * 2 * loop),
+        size.height * _swing(0.1, 0.42, 0.12 + 0.28 * lean, way * 3 * loop),
       ),
-      size.width * 0.86,
+      size.width * 0.86 * (1 + 0.12 * breath),
       palette.glow,
       0.9,
     );
     bloom(
       Offset(
-        size.width * (0.05 + 0.4 * lean + 0.22 * along),
-        size.height * (0.82 + 0.14 * drift + 0.1 * across),
+        size.width * _swing(0.05, 0.85, 0.05 + 0.4 * lean, -way * 2 * loop),
+        size.height * _swing(0.56, 0.96, 0.82 + 0.14 * drift, -way * 3 * loop),
       ),
-      size.width * 0.96,
+      size.width * 0.96 * (1 - 0.1 * breath),
       palette.depth,
       0.82,
     );
