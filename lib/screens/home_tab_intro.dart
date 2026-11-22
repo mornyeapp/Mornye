@@ -472,6 +472,10 @@ class _HomeSections extends ConsumerWidget {
     final recommended =
         ref.watch(homeRecommendationsProvider.select((s) => s.value)) ??
         const <Track>[];
+    // Shelves that need the internet step aside without a network.
+    final offline = ref.watch(
+      homeOfflineProvider.select((s) => s.value ?? false),
+    );
 
     final showContinue =
         (hasMediaItem || hasResume) &&
@@ -489,7 +493,7 @@ class _HomeSections extends ConsumerWidget {
         ref.watch(
           homeRecentlyPlayedProvider.select((s) => !s.hasValue && !s.hasError),
         );
-    final pickedReleases = mornye
+    final pickedReleases = mornye && !offline
         ? newReleases.take(_homeTopPickReleases).toList()
         : const <WeeklyRelease>[];
     final hasTopPicks =
@@ -542,6 +546,10 @@ class _HomeSections extends ConsumerWidget {
             child: const _HomeShortcuts(),
           ),
       },
+      if (_HomeLinkSection.hasContent(ref))
+        HomeSection.link: _HomeLinkSection(inset: inset),
+      if (_HomeHiResSection.hasContent(ref))
+        HomeSection.hiRes: _HomeHiResSection(inset: inset),
       // Built after startup settles when nothing is cached: the sections'
       // size animation opens its space rather than letting it jump in.
       if (!mornye && mixes != null && mixes.isNotEmpty)
@@ -562,7 +570,7 @@ class _HomeSections extends ConsumerWidget {
             inset: mornye ? inset + 8 : inset,
           ),
         ),
-      if (recommended.isNotEmpty)
+      if (recommended.isNotEmpty && !offline)
         HomeSection.recommended: _HomeSection(
           title: l10n.homeRecommendedForYou,
           inset: inset,
@@ -572,7 +580,7 @@ class _HomeSections extends ConsumerWidget {
             inset: mornye ? inset + 8 : inset,
           ),
         ),
-      if (newReleases.isNotEmpty)
+      if (newReleases.isNotEmpty && !offline)
         HomeSection.newReleases: _HomeSection(
           title: l10n.weeklyReleases,
           inset: inset,
@@ -618,7 +626,10 @@ class _HomeSections extends ConsumerWidget {
     // Home the person emptied is not a Library with nothing in it.
     final bare =
         !showContinue &&
-        built.keys.every((section) => section == HomeSection.shortcuts);
+        built.keys.every(
+          (section) =>
+              section == HomeSection.shortcuts || section == HomeSection.link,
+        );
     Widget? nothingYet;
     if (bare) {
       final librarySettled = ref.watch(
@@ -641,7 +652,7 @@ class _HomeSections extends ConsumerWidget {
             ),
           ),
         );
-        if (mornye) return nothingYet;
+        if (mornye && sections.isEmpty) return nothingYet;
       }
     }
 

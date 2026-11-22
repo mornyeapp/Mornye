@@ -51,6 +51,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/explore_provider.dart';
+import 'package:mornye/providers/home_context_provider.dart';
 import 'package:mornye/providers/home_recommendations_provider.dart';
 import 'package:mornye/providers/home_top_picks_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
@@ -124,9 +125,14 @@ import 'package:mornye/widgets/view_queue_snackbar_action.dart';
 import 'package:mornye/widgets/profile_avatar.dart';
 import 'package:mornye/widgets/downloadable_cover.dart';
 import 'package:mornye/widgets/app_crash_banner.dart';
+import 'package:mornye/widgets/desktop/desktop_link_devices_sheet.dart'
+    show showDesktopLinkDevicesSheet;
+import 'package:mornye/widgets/link/link_devices_sheet.dart'
+    show showLinkDevicesSheet;
 
 export 'package:mornye/screens/extension_collection_screens.dart';
 
+part 'home_tab_context.dart';
 part 'home_tab_helpers.dart';
 part 'home_tab_explore.dart';
 part 'home_tab_recent.dart';

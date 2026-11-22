@@ -11,6 +11,12 @@ enum HomeSection {
   continueListening,
   shortcuts,
 
+  /// The attached Link device, while there is one.
+  link,
+
+  /// The person's Hi-Res albums, while a DAC or exclusive output plays.
+  hiRes,
+
   /// The Material mixes shelf; Mornye shows the mixes in [topPicks].
   mixes,
   recentlyAdded,

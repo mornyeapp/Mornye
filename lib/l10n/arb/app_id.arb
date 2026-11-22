@@ -6433,6 +6433,9 @@
   "homeSectionAboutTopPicks": "Mix dan playlist hari ini sebagai banner",
   "homeSectionAboutRecentlyPlayed": "Album yang baru kamu putar",
   "homeSectionAboutShortcuts": "Jalan cepat ke alat dan koleksi",
+  "homeSectionLink": "Perangkat terhubung",
+  "homeSectionAboutLink": "Tampil selama perangkat lain terhubung ke perangkat ini",
+  "homeSectionAboutHiRes": "Album Hi-Res milikmu, selama DAC atau output eksklusif memutar",
   "homeSectionAboutMixes": "Mix harian dari lagumu sendiri",
   "homeSectionAboutRecentlyAdded": "Lagu terbaru di Koleksimu",
   "homeSectionAboutNewReleases": "Musik baru dari artis favoritmu",
@@ -8358,6 +8361,28 @@
   "homeRecommendedForYou": "Rekomendasi untukmu",
   "@homeRecommendedForYou": {
     "description": "Home section header for songs outside the Library that resemble the ones the user plays and downloads"
+  },
+  "homeHiResInYourLibrary": "Hi-Res di Koleksimu",
+  "@homeHiResInYourLibrary": {
+    "description": "Home section header, shown while a DAC or an exclusive hi-res output plays, for the user's own albums above CD quality"
+  },
+  "homeLinkConnectedTo": "Terhubung ke {name}",
+  "@homeLinkConnectedTo": {
+    "description": "Home row shown while a Mornye Link device is attached; opens the Devices sheet",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeLinkConnectedDevices": "{count, plural, other{Terhubung ke {count} perangkat}}",
+  "@homeLinkConnectedDevices": {
+    "description": "Home row shown while several phones are connected to this Mornye Link host",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "appearanceRecommendationsSubtitle": "Tampilkan lagu yang mirip dengan yang kamu putar dan unduh di Beranda",
   "@appearanceRecommendationsSubtitle": {

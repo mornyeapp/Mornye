@@ -134,9 +134,9 @@ void main() {
         sections.indexOf(HomeSection.onRepeat),
         lessThan(sections.indexOf(HomeSection.shortcuts)),
       );
-      // Mixes ship right after Shortcuts and follow them.
+      // What ships right after Shortcuts follows them.
       expect(
-        sections.indexOf(HomeSection.mixes),
+        sections.indexOf(HomeSection.link),
         sections.indexOf(HomeSection.shortcuts) + 1,
       );
       // What ships before every named section stays at the front.

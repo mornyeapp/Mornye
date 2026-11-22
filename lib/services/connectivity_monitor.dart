@@ -28,6 +28,9 @@ class ConnectivityMonitor {
       ? _pollingChanges()
       : _connectivity.onConnectivityChanged;
 
+  /// The current connectivity, read once without opening the event channel.
+  Future<List<ConnectivityResult>> check() => _connectivity.checkConnectivity();
+
   Stream<List<ConnectivityResult>> _pollingChanges() =>
       Stream<List<ConnectivityResult>>.multi((listener) {
         var cancelled = false;

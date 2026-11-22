@@ -9783,6 +9783,28 @@
   "@homeRecommendedForYou": {
     "description": "Home section header for songs outside the Library that resemble the ones the user plays and downloads"
   },
+  "homeHiResInYourLibrary": "Hi-Res in your Library",
+  "@homeHiResInYourLibrary": {
+    "description": "Home section header, shown while a DAC or an exclusive hi-res output plays, for the user's own albums above CD quality"
+  },
+  "homeLinkConnectedTo": "Connected to {name}",
+  "@homeLinkConnectedTo": {
+    "description": "Home row shown while a Mornye Link device is attached; opens the Devices sheet",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeLinkConnectedDevices": "{count, plural, =1{Connected to 1 device} other{Connected to {count} devices}}",
+  "@homeLinkConnectedDevices": {
+    "description": "Home row shown while several phones are connected to this Mornye Link host",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "homeRecentlyPlayed": "Recently Played",
   "@homeRecentlyPlayed": {
     "description": "Mornye Home: heading of the shelf of what was played lately"
@@ -10044,6 +10066,18 @@
   "homeSectionAboutShortcuts": "Quick ways into tools and collections",
   "@homeSectionAboutShortcuts": {
     "description": "Edit Home: what the Shortcuts section shows"
+  },
+  "homeSectionLink": "Connected device",
+  "@homeSectionLink": {
+    "description": "Edit Home: name of the row that shows while a Mornye Link device is connected"
+  },
+  "homeSectionAboutLink": "Shows while another device is connected to this one",
+  "@homeSectionAboutLink": {
+    "description": "Edit Home: what the Connected device section shows"
+  },
+  "homeSectionAboutHiRes": "Your Hi-Res albums, while a DAC or exclusive output plays",
+  "@homeSectionAboutHiRes": {
+    "description": "Edit Home: what the Hi-Res in your Library section shows"
   },
   "homeSectionAboutMixes": "Daily mixes of your own songs",
   "@homeSectionAboutMixes": {
