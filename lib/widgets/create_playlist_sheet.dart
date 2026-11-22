@@ -6,6 +6,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/playlist_sources.dart';
+import 'package:mornye/utils/desktop_folders.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -197,7 +198,7 @@ class _FolderListState extends State<_FolderList> {
     final l10n = context.l10n;
     final String? dir;
     try {
-      dir = await FilePicker.getDirectoryPath();
+      dir = await pickDesktopDirectoryPath();
     } catch (e) {
       _log.e('Folder picker failed: $e');
       if (!mounted) return;

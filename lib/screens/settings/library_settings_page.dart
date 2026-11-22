@@ -21,6 +21,7 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/link/link_source_names.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/desktop_folders.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/duplicate_review_sheet.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -181,7 +182,11 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
       }
       String? result;
       try {
-        result = await FilePicker.getDirectoryPath();
+        result = Platform.isAndroid
+            // Android 9 and older scan by path; pickDirectory gives a tree URI.
+            // ignore: deprecated_member_use
+            ? await FilePicker.getDirectoryPath()
+            : await pickDesktopDirectoryPath();
       } catch (e) {
         // Linux reaches the picker through the desktop portal, which a
         // session may not run.

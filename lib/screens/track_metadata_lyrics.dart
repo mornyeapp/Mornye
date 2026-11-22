@@ -690,7 +690,7 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
         if (picked == null) return null;
         return (treeUri: null, path: picked.path, bookmark: picked.bookmark);
       default:
-        final path = await FilePicker.getDirectoryPath();
+        final path = await pickDesktopDirectoryPath();
         if (path == null) return null;
         return (treeUri: null, path: path, bookmark: null);
     }

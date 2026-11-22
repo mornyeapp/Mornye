@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:path/path.dart' as p;
@@ -105,6 +106,20 @@ Future<String?> resolveDesktopPickerInitialDirectory(String? preferred) async {
     if (parent.path == directory.path) return null;
     directory = parent;
   }
+}
+
+/// Shows the system folder picker on desktop and returns the folder's path,
+/// without the trailing separator of the picker's directory URI.
+Future<String?> pickDesktopDirectoryPath({
+  String? dialogTitle,
+  String? initialDirectory,
+}) async {
+  final uri = await FilePicker.pickDirectory(
+    dialogTitle: dialogTitle,
+    initialDirectory: initialDirectory,
+  );
+  if (uri == null || !uri.isScheme('file')) return null;
+  return p.normalize(uri.toFilePath(windows: Platform.isWindows));
 }
 
 String? _join(p.Context context, String? root, String child) {

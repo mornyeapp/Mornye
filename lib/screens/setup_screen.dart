@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
@@ -477,7 +476,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
   /// Desktop folders are plain paths: no SAF tree and no iOS bookmark.
   Future<void> _pickDesktopDirectory() async {
     final title = context.l10n.setupDownloadLocationTitle;
-    final picked = await FilePicker.getDirectoryPath(
+    final picked = await pickDesktopDirectoryPath(
       dialogTitle: title,
       initialDirectory: await resolveDesktopPickerInitialDirectory(
         _selectedDirectory,

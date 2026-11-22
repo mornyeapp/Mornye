@@ -9,6 +9,7 @@ import 'package:mornye/services/audio_file_open_service.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
+import 'package:mornye/utils/desktop_folders.dart';
 import 'package:path/path.dart' as p;
 
 final openAudioControllerProvider = NotifierProvider<OpenAudioController, bool>(
@@ -87,7 +88,7 @@ class OpenAudioController extends Notifier<bool> {
       await open([OpenAudioFile(access.path)], access: access);
       return;
     }
-    final path = await FilePicker.getDirectoryPath();
+    final path = await pickDesktopDirectoryPath();
     if (ref.mounted && path != null) await open([OpenAudioFile(path)]);
   }
 

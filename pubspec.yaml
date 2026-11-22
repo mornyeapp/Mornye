@@ -88,14 +88,14 @@ dependencies:
   logger: ^2.8.0
 
   # FFmpeg for audio conversion
-  ffmpeg_kit_flutter_new_audio: 2.5.8
+  ffmpeg_kit_flutter_new_audio: 3.0.0
   open_filex: ^5.0.0
 
   video_player: ^2.14.1
 
   xml: ^7.1.0
   html: ^0.15.7
-  dart_smb2: 0.4.1
+  dart_smb2: 0.5.0
   synchronized: ^3.6.1
 
   # Notifications

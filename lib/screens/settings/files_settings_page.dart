@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/app_tokens.dart';
@@ -545,7 +544,7 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
     final current = ref.read(settingsProvider).downloadDirectory;
     String? picked;
     try {
-      picked = await FilePicker.getDirectoryPath(
+      picked = await pickDesktopDirectoryPath(
         dialogTitle: title,
         initialDirectory: await resolveDesktopPickerInitialDirectory(current),
       );
