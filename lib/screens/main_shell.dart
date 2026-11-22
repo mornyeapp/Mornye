@@ -61,6 +61,7 @@ import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/theme/page_transitions.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/search_moved_hint.dart';
@@ -165,6 +166,7 @@ class _MainShellState extends ConsumerState<MainShell>
   StreamSubscription<String>? _shareSubscription;
   StreamSubscription<List<OpenAudioFile>>? _audioOpenSubscription;
   DateTime? _lastBackPress;
+  late final PageBackSwipe _backSwipe = PageBackSwipe(_backNavigators);
   final GlobalKey<NavigatorState> _homeTabNavigatorKey =
       ShellNavigationService.homeTabNavigatorKey;
   final GlobalKey<NavigatorState> _libraryTabNavigatorKey =
@@ -260,6 +262,7 @@ class _MainShellState extends ConsumerState<MainShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addObserver(_backSwipe);
     usbAudioStatus.addListener(_onUsbAudioStatusChanged);
     _homePreviewStopObserver = _PreviewStopNavigatorObserver(
       () => ref.read(previewPlayerProvider.notifier).stop(),
@@ -471,6 +474,7 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    WidgetsBinding.instance.removeObserver(_backSwipe);
     usbAudioStatus.removeListener(_onUsbAudioStatusChanged);
     ShellNavigationService.unregisterTabSelectionHandler(this);
     _shareSubscription?.cancel();
@@ -716,6 +720,18 @@ class _MainShellState extends ConsumerState<MainShell>
   bool get _canMinimizeChrome {
     final media = context.getInheritedWidgetOfExactType<MediaQuery>()!.data;
     return _canMinimizeChromeAt(media.size.width, media.textScaler);
+  }
+
+  /// The navigators a back press pops from, in [_handleBackPress]'s order.
+  Iterable<NavigatorState?> _backNavigators() {
+    if (!mounted) return const [];
+    final showStore = ref.read(
+      settingsProvider.select((s) => s.showExtensionStore),
+    );
+    return [
+      Navigator.of(context, rootNavigator: true),
+      _navigatorForTab(_currentIndex, showStore),
+    ];
   }
 
   Future<void> _handleBackPress() async {

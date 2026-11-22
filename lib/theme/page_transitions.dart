@@ -1,4 +1,5 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart' show PredictiveBackEvent;
 import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/app_motion.dart';
@@ -8,7 +9,8 @@ import 'package:mornye/theme/app_motion.dart';
 // predictive-back gesture to a nested Navigator instead of the topmost route
 // (flutter#152323), which pops the page behind a root modal, sheet or dialog
 // instead of closing the modal first. The builders used here register no back
-// gesture observer, so system back keeps closing the topmost route first.
+// gesture observer; [PageBackSwipe] is the one observer, and it asks the
+// navigators in the order a back press does.
 
 /// Material page transitions: Android phones push a solid page and pop it as
 /// a card, and the desktops share one light builder.
@@ -199,6 +201,19 @@ class MaterialPhonePageTransitionsBuilder extends PageTransitionsBuilder {
     end: 0,
   ).chain(_move);
 
+  /// How far a full back swipe draws the page in as a card.
+  static const double _backPreview = 0.8;
+
+  static final Expando<bool> _pages = Expando<bool>();
+
+  /// Whether [route] moves by this builder, so a back swipe can seek its pop.
+  static bool moves(Route<dynamic> route) => _pages[route] ?? false;
+
+  /// The value of a page's animation for a back swipe at [progress]: the
+  /// card draws in evenly under the finger.
+  static double backSwipeValue(double progress) =>
+      1 - curveTimeFor(Easing.standard, _backPreview * progress.clamp(0, 1));
+
   @override
   Duration get transitionDuration => _duration;
 
@@ -213,31 +228,234 @@ class MaterialPhonePageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    return DualTransitionBuilder(
+    _pages[route] = true;
+    return _PhonePageTransition(
       animation: animation,
-      forwardBuilder: (context, animation, child) => FadeTransition(
-        opacity: _solid.animate(animation),
-        child: SlideTransition(
-          position: _slideIn.animate(animation),
-          textDirection: Directionality.of(context),
-          child: child,
+      secondaryAnimation: secondaryAnimation,
+      child: child,
+    );
+  }
+}
+
+/// A phone page between the page it covers and the page that covers it.
+///
+/// Which way each animation plays is read from the end it left and held
+/// until it rests: a back swipe seeks the pop while the animation still
+/// reports forward, and a cancelled one returns the way it came.
+class _PhonePageTransition extends StatefulWidget {
+  const _PhonePageTransition({
+    required this.animation,
+    required this.secondaryAnimation,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final Animation<double> secondaryAnimation;
+  final Widget child;
+
+  @override
+  State<_PhonePageTransition> createState() => _PhonePageTransitionState();
+}
+
+class _PhonePageTransitionState extends State<_PhonePageTransition> {
+  final ProxyAnimation _enter = ProxyAnimation();
+  final ProxyAnimation _leave = ProxyAnimation();
+  final ProxyAnimation _covered = ProxyAnimation();
+  late final Animation<double> _opacity = MaterialPhonePageTransitionsBuilder
+      ._solid
+      .animate(_enter);
+  late final Animation<Offset> _position = MaterialPhonePageTransitionsBuilder
+      ._slideIn
+      .animate(_enter);
+
+  late AnimationStatus _pageStatus = widget.animation.status;
+  late AnimationStatus _coverStatus = widget.secondaryAnimation.status;
+  late bool _leaving = _pageStatus == AnimationStatus.reverse;
+  late bool _uncovering = _coverStatus == AnimationStatus.reverse;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.animation.addStatusListener(_pageChanged);
+    widget.secondaryAnimation.addStatusListener(_coverChanged);
+    _connect();
+  }
+
+  @override
+  void didUpdateWidget(_PhonePageTransition oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final page = !identical(oldWidget.animation, widget.animation);
+    final cover = !identical(
+      oldWidget.secondaryAnimation,
+      widget.secondaryAnimation,
+    );
+    if (!page && !cover) return;
+    // Reduced motion swaps a resting animation for the live one when a
+    // back swipe starts: the swap is where the live one left rest.
+    if (page) {
+      oldWidget.animation.removeStatusListener(_pageChanged);
+      widget.animation.addStatusListener(_pageChanged);
+      _leaving = _fromTop(widget.animation, _pageStatus, _leaving);
+      _pageStatus = widget.animation.status;
+    }
+    if (cover) {
+      oldWidget.secondaryAnimation.removeStatusListener(_coverChanged);
+      widget.secondaryAnimation.addStatusListener(_coverChanged);
+      _uncovering = _fromTop(
+        widget.secondaryAnimation,
+        _coverStatus,
+        _uncovering,
+      );
+      _coverStatus = widget.secondaryAnimation.status;
+    }
+    _connect();
+  }
+
+  @override
+  void dispose() {
+    widget.animation.removeStatusListener(_pageChanged);
+    widget.secondaryAnimation.removeStatusListener(_coverChanged);
+    super.dispose();
+  }
+
+  /// Whether [animation], [held] so far, plays from its completed end. Read
+  /// where it leaves rest, from the end it is nearer: a route laid out
+  /// offstage for its first frame reports completed before it has moved.
+  static bool _fromTop(
+    Animation<double> animation,
+    AnimationStatus last,
+    bool held,
+  ) => animation.status.isAnimating && !last.isAnimating
+      ? animation.value > 0.5
+      : held;
+
+  void _pageChanged(AnimationStatus status) {
+    final leaving = _fromTop(widget.animation, _pageStatus, _leaving);
+    _pageStatus = status;
+    if (leaving == _leaving) return;
+    _leaving = leaving;
+    _connect();
+  }
+
+  void _coverChanged(AnimationStatus status) {
+    final uncovering = _fromTop(
+      widget.secondaryAnimation,
+      _coverStatus,
+      _uncovering,
+    );
+    _coverStatus = status;
+    if (uncovering == _uncovering) return;
+    _uncovering = uncovering;
+    _connect();
+  }
+
+  // Parents are swapped under widgets that stay, so the page keeps its state.
+  void _connect() {
+    final page = widget.animation;
+    _enter.parent = _leaving ? kAlwaysCompleteAnimation : page;
+    _leave.parent = _leaving
+        ? ReverseAnimation(page)
+        : kAlwaysDismissedAnimation;
+    // Each direction starts fast: the covered page is back in place while
+    // the card above it is still leaving.
+    final cover = widget.secondaryAnimation;
+    _covered.parent = _uncovering
+        ? MaterialPhonePageTransitionsBuilder._uncover.animate(
+            ReverseAnimation(cover),
+          )
+        : MaterialPhonePageTransitionsBuilder._move.animate(cover);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(
+        position: _position,
+        textDirection: Directionality.of(context),
+        child: _LeavingCard(
+          progress: _leave,
+          child: _CoveredPage(amount: _covered, child: widget.child),
         ),
       ),
-      reverseBuilder: (context, animation, child) => IgnorePointer(
-        ignoring: animation.status == AnimationStatus.forward,
-        child: _LeavingCard(progress: animation, child: child),
-      ),
-      // Each direction starts fast: the covered page is back in place
-      // while the card above it is still leaving.
-      child: DualTransitionBuilder(
-        animation: ReverseAnimation(secondaryAnimation),
-        forwardBuilder: (context, animation, child) =>
-            _CoveredPage(amount: _uncover.animate(animation), child: child),
-        reverseBuilder: (context, animation, child) =>
-            _CoveredPage(amount: _move.animate(animation), child: child),
-        child: child,
+    );
+  }
+}
+
+/// Lets a Material phone page follow the system back swipe: the swipe seeks
+/// the page's own pop, and letting go finishes it or puts the page back.
+///
+/// One observer for the app, given the navigators a back press pops from in
+/// order, so the swipe reaches the route a press would (flutter#152323).
+class PageBackSwipe with WidgetsBindingObserver {
+  PageBackSwipe(this._navigators);
+
+  final Iterable<NavigatorState?> Function() _navigators;
+  PageRoute<dynamic>? _page;
+
+  PageRoute<dynamic>? _target() {
+    for (final navigator in _navigators()) {
+      if (navigator == null) continue;
+      Route<dynamic>? top;
+      navigator.popUntil((route) {
+        top = route;
+        return true;
+      });
+      final route = top;
+      // A first route with no objection passes the press on, as maybePop
+      // does; any other answer ends the search at this navigator.
+      if (route == null || route.popDisposition == RoutePopDisposition.bubble) {
+        continue;
+      }
+      return route is PageRoute &&
+              MaterialPhonePageTransitionsBuilder.moves(route) &&
+              route.popGestureEnabled
+          ? route
+          : null;
+    }
+    return null;
+  }
+
+  @override
+  bool handleStartBackGesture(PredictiveBackEvent backEvent) {
+    _page = backEvent.isButtonEvent ? null : _target();
+    _page?.handleStartBackGesture(
+      progress: MaterialPhonePageTransitionsBuilder.backSwipeValue(
+        backEvent.progress,
       ),
     );
+    return _page != null;
+  }
+
+  @override
+  void handleUpdateBackGestureProgress(PredictiveBackEvent backEvent) {
+    _page?.handleUpdateBackGestureProgress(
+      progress: MaterialPhonePageTransitionsBuilder.backSwipeValue(
+        backEvent.progress,
+      ),
+    );
+  }
+
+  @override
+  void handleCommitBackGesture() {
+    final page = _page;
+    _page = null;
+    if (page == null) return;
+    if (!page.isCurrent) {
+      page.handleCancelBackGesture();
+      return;
+    }
+    // Popped inside the gesture, the page leaves from where the finger
+    // left it; the framework's own commit starts over from the full page.
+    final navigator = page.navigator;
+    navigator?.pop();
+    navigator?.didStopUserGesture();
+  }
+
+  @override
+  void handleCancelBackGesture() {
+    _page?.handleCancelBackGesture();
+    _page = null;
   }
 }
 

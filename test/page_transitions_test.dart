@@ -254,6 +254,147 @@ void main() {
     });
   }
 
+  group('Material Android back swipe', () {
+    const codec = StandardMethodCodec();
+    Future<void> swipe(
+      WidgetTester tester,
+      String method, [
+      double? progress,
+    ]) => tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      SystemChannels.backGesture.name,
+      codec.encodeMethodCall(
+        MethodCall(
+          method,
+          progress == null
+              ? null
+              : <String, Object?>{
+                  'touchOffset': <double>[5, 300],
+                  'progress': progress,
+                  'swipeEdge': 0,
+                },
+        ),
+      ),
+      (_) {},
+    );
+
+    void observe(Iterable<NavigatorState?> Function() navigators) {
+      final observer = PageBackSwipe(navigators);
+      WidgetsBinding.instance.addObserver(observer);
+      addTearDown(() => WidgetsBinding.instance.removeObserver(observer));
+    }
+
+    final android = material.copyWith(platform: TargetPlatform.android);
+
+    testWidgets('the page follows the finger as a card', (tester) async {
+      await _pumpApp(tester, android);
+      observe(() => [_navigatorKey.currentState]);
+      final width = tester.getSize(find.byType(Scaffold)).width;
+      _push('page');
+      await tester.pumpAndSettle();
+
+      await swipe(tester, 'startBackGesture', 0);
+      await swipe(tester, 'updateBackGestureProgress', 0.5);
+      await tester.pump();
+      final half = tester.getRect(find.byType(Scaffold).last);
+      await swipe(tester, 'updateBackGestureProgress', 1);
+      await tester.pump();
+      final full = tester.getRect(find.byType(Scaffold).last);
+      // Drawn in evenly under the finger, solid, over the page below.
+      expect(
+        width - half.width,
+        moreOrLessEquals((width - full.width) / 2, epsilon: 1),
+      );
+      expect(full.width, inExclusiveRange(width * 0.88, width * 0.93));
+      expect(_opacityAbove(tester, 'page'), 1);
+      expect(find.text('home'), findsOneWidget);
+
+      // Let go without going back: the page returns the way it came.
+      await swipe(tester, 'cancelBackGesture');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      final returning = tester.getRect(find.byType(Scaffold).last);
+      expect(returning.width, inExclusiveRange(full.width, width));
+      expect(_opacityAbove(tester, 'page'), 1);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byType(Scaffold).last).width, width);
+      expect(find.text('page'), findsOneWidget);
+
+      // Let go to go back: the card leaves from where the finger left it.
+      await swipe(tester, 'startBackGesture', 0);
+      await swipe(tester, 'updateBackGestureProgress', 1);
+      await tester.pump();
+      await swipe(tester, 'commitBackGesture');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      final leaving = tester.getRect(find.byType(Scaffold).last);
+      expect(leaving.width, lessThan(full.width));
+      expect(leaving.width, greaterThan(full.width - 20));
+      expect(leaving.left, greaterThan(full.left));
+      await tester.pumpAndSettle();
+      expect(find.text('page'), findsNothing);
+      expect(tester.getRect(find.byType(Scaffold)).width, width);
+    });
+
+    testWidgets('a dialog above the page closes first', (tester) async {
+      await _pumpApp(tester, android);
+      observe(() => [_navigatorKey.currentState]);
+      final width = tester.getSize(find.byType(Scaffold)).width;
+      _push('page');
+      await tester.pumpAndSettle();
+      showDialog<void>(
+        context: _navigatorKey.currentContext!,
+        builder: (_) => const AlertDialog(content: Text('dialog')),
+      );
+      await tester.pumpAndSettle();
+
+      await swipe(tester, 'startBackGesture', 0);
+      await swipe(tester, 'updateBackGestureProgress', 1);
+      await tester.pump();
+      expect(tester.getRect(find.byType(Scaffold).last).width, width);
+      await swipe(tester, 'commitBackGesture');
+      await tester.pumpAndSettle();
+      expect(find.text('dialog'), findsNothing);
+      expect(find.text('page'), findsOneWidget);
+    });
+
+    testWidgets('the swipe reaches the navigator a back press would', (
+      tester,
+    ) async {
+      final tab = GlobalKey<NavigatorState>();
+      Route<void> page(String label) =>
+          MaterialPageRoute<void>(builder: (_) => Scaffold(body: Text(label)));
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: _navigatorKey,
+          theme: android,
+          home: Navigator(key: tab, onGenerateRoute: (_) => page('tab')),
+        ),
+      );
+      observe(() => [_navigatorKey.currentState, tab.currentState]);
+      Future<void> swipeBack() async {
+        await swipe(tester, 'startBackGesture', 0);
+        await swipe(tester, 'updateBackGestureProgress', 1);
+        await tester.pump();
+        await swipe(tester, 'commitBackGesture');
+        await tester.pumpAndSettle();
+      }
+
+      // A root page above a page of the tab: only the root page goes.
+      tab.currentState!.push(page('tab page'));
+      await tester.pumpAndSettle();
+      _navigatorKey.currentState!.push(page('root page'));
+      await tester.pumpAndSettle();
+      await swipeBack();
+      expect(find.text('root page'), findsNothing);
+      expect(find.text('tab page'), findsOneWidget);
+
+      // Nothing above the tab at the root: its page goes.
+      await swipeBack();
+      expect(find.text('tab page'), findsNothing);
+      expect(find.text('tab'), findsOneWidget);
+    });
+  });
+
   group('reduced motion', () {
     for (final (style, theme, platform) in [
       ('Material', material, TargetPlatform.windows),

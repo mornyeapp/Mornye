@@ -89,6 +89,23 @@ class SpringCurve extends Curve {
       _simulation.x(t * duration.inMicroseconds / 1e6);
 }
 
+/// The time at which [curve], which must only rise, reaches [value].
+double curveTimeFor(Curve curve, double value) {
+  if (value <= 0) return 0;
+  if (value >= 1) return 1;
+  var low = 0.0;
+  var high = 1.0;
+  for (var i = 0; i < 24; i++) {
+    final middle = (low + high) / 2;
+    if (curve.transform(middle) < value) {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  return (low + high) / 2;
+}
+
 /// Apple-style springs for the Mornye theme.
 ///
 /// A spring is named the way SwiftUI's `spring(duration:bounce:)` names it:

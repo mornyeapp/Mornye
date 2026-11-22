@@ -21,25 +21,8 @@ class PlayerCoverRectTween extends RectTween {
 
   @override
   Rect? lerp(double t) {
-    final time = _timeOf(t);
+    final time = curveTimeFor(Curves.fastOutSlowIn, t);
     return Rect.lerp(begin, end, curve?.transform(time) ?? time);
-  }
-
-  // The Hero's ease only rises, so bisecting finds the time it was given.
-  static double _timeOf(double eased) {
-    if (eased <= 0) return 0;
-    if (eased >= 1) return 1;
-    var low = 0.0;
-    var high = 1.0;
-    for (var i = 0; i < 24; i++) {
-      final middle = (low + high) / 2;
-      if (Curves.fastOutSlowIn.transform(middle) < eased) {
-        low = middle;
-      } else {
-        high = middle;
-      }
-    }
-    return (low + high) / 2;
   }
 }
 
