@@ -1326,28 +1326,75 @@ class _HomeRecommendationsShelf extends StatelessWidget {
       inset: inset,
       coverSize: coverSize,
       itemCount: tracks.length,
-      itemBuilder: (context, index) =>
-          _HomeRecommendationTile(track: tracks[index], size: coverSize),
+      itemBuilder: (context, index) => _HomeRecommendationTile(
+        track: tracks[index],
+        rank: index,
+        size: coverSize,
+      ),
     ),
   );
 }
 
 /// A recommended song. A tap downloads it and a long press opens its
 /// actions, as on search results; the button on the cover plays its preview.
-class _HomeRecommendationTile extends ConsumerWidget {
-  const _HomeRecommendationTile({required this.track, required this.size});
+/// Learning logs that it showed at [rank] and what the listener did with it.
+class _HomeRecommendationTile extends ConsumerStatefulWidget {
+  const _HomeRecommendationTile({
+    required this.track,
+    required this.rank,
+    required this.size,
+  });
 
   final Track track;
+  final int rank;
   final double size;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HomeRecommendationTile> createState() =>
+      _HomeRecommendationTileState();
+}
+
+class _HomeRecommendationTileState
+    extends ConsumerState<_HomeRecommendationTile> {
+  SuggestionOutcomes get _outcomes =>
+      ref.read(musicPlayerRuntimeProvider).suggestionOutcomes;
+
+  @override
+  void initState() {
+    super.initState();
+    _shown();
+  }
+
+  @override
+  void didUpdateWidget(_HomeRecommendationTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.track != widget.track || oldWidget.rank != widget.rank) {
+      _shown();
+    }
+  }
+
+  void _shown() => _outcomes.recommendationShown(
+    artist: widget.track.artistName,
+    title: widget.track.name,
+    rank: widget.rank,
+  );
+
+  void _acted(SuggestionAction action) => _outcomes.recommendationActed(
+    artist: widget.track.artistName,
+    title: widget.track.name,
+    action: action,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final track = widget.track, size = widget.size;
     void showOptions({Offset? position}) =>
         TrackCollectionQuickActions.showTrackOptionsSheet(
           context,
           ref,
           track,
           position: position,
+          onAction: _acted,
         );
     return DesktopContextMenuRegion(
       onContextMenu: (position) => showOptions(position: position),
@@ -1369,8 +1416,12 @@ class _HomeRecommendationTile extends ConsumerWidget {
           size: 28,
           dense: isDesktopPlatform,
           overArtwork: true,
+          onPreview: () => _acted(SuggestionAction.previewed),
         ),
-        onTap: () => downloadSingleTrack(context, ref, track),
+        onTap: () {
+          _acted(SuggestionAction.downloaded);
+          downloadSingleTrack(context, ref, track);
+        },
         onLongPress: showOptions,
       ),
     );

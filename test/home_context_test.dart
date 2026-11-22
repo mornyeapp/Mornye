@@ -29,8 +29,10 @@ import 'package:mornye/services/library_row_mapper.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/music_playback_deck.dart';
+import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
+import 'package:mornye/services/suggestion_outcomes.dart';
 import 'package:mornye/services/weekly_releases.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -91,8 +93,10 @@ Widget _home({
   bool offline = false,
   List<Track> recommended = const [],
   List<WeeklyRelease> releases = const [],
+  MusicPlayerRuntime? runtime,
 }) => ProviderScope(
   overrides: [
+    if (runtime != null) musicPlayerRuntimeProvider.overrideWithValue(runtime),
     homeHiResOutputProvider.overrideWith(() => _Output(hiResOutput)),
     homeHiResAlbumsProvider.overrideWith((ref) async {
       onHiResRead?.call();
@@ -478,6 +482,43 @@ void main() {
         expect(find.text('New album'), offline ? findsNothing : findsWidgets);
       });
     }
+
+    testWidgets('the $style Home logs each recommended song it shows '
+        'with its place', (tester) async {
+      final outcomes = _Outcomes();
+      await _open(
+        tester,
+        _home(
+          mornye: mornye,
+          recommended: const [
+            Track(
+              id: 'first',
+              name: 'First song',
+              artistName: 'Someone',
+              albumName: 'Album',
+              duration: 200,
+            ),
+            Track(
+              id: 'second',
+              name: 'Second song',
+              artistName: 'Someone else',
+              albumName: 'Album',
+              duration: 200,
+            ),
+          ],
+          runtime: MusicPlayerRuntime(
+            dependencies: PlaybackDependencies(
+              createSuggestionOutcomes: () => outcomes,
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(outcomes.shown, [
+        ('Someone', 'First song', 0),
+        ('Someone else', 'Second song', 1),
+      ]);
+    });
   }
 }
 
@@ -502,4 +543,18 @@ class _History extends DownloadHistoryNotifier {
 class _Recent extends RecentAccessNotifier {
   @override
   RecentAccessState build() => const RecentAccessState(isLoaded: true);
+}
+
+/// Keeps what the shelf logs instead of writing it.
+class _Outcomes extends SuggestionOutcomes {
+  final shown = <(String, String, int)>[];
+
+  @override
+  void recommendationShown({
+    required String artist,
+    required String title,
+    required int rank,
+    int? sourceRank,
+    double? fit,
+  }) => shown.add((artist, title, rank));
 }

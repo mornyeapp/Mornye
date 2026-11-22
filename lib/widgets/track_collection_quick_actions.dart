@@ -11,6 +11,7 @@ import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/suggestion_outcomes.dart' show SuggestionAction;
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/local_playback.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -45,13 +46,14 @@ class TrackCollectionQuickActions extends ConsumerWidget {
 
   /// Track options: a bottom sheet (Material) or popover (Mornye) on phones
   /// and tablets, a context menu at [position] or under [context] on
-  /// desktop.
+  /// desktop. [onAction] hears the options that show interest in the song.
   static void showTrackOptionsSheet(
     BuildContext context,
     WidgetRef ref,
     Track track, {
     bool hasLocalPlaybackCandidate = false,
     Offset? position,
+    ValueChanged<SuggestionAction>? onAction,
   }) {
     if (isDesktopPlatform) {
       final origin =
@@ -66,6 +68,7 @@ class TrackCollectionQuickActions extends ConsumerWidget {
           ref,
           track,
           hasLocalPlaybackCandidate: hasLocalPlaybackCandidate,
+          onAction: onAction,
         ),
       );
       return;
@@ -76,6 +79,7 @@ class TrackCollectionQuickActions extends ConsumerWidget {
         builder: (_) => _TrackOptionsSheet(
           track: track,
           hasLocalPlaybackCandidate: hasLocalPlaybackCandidate,
+          onAction: onAction,
         ),
       );
       return;
@@ -90,6 +94,7 @@ class TrackCollectionQuickActions extends ConsumerWidget {
           track: track,
           hasLocalPlaybackCandidate: hasLocalPlaybackCandidate,
           scrollController: controller,
+          onAction: onAction,
         ),
       ),
     );
@@ -137,12 +142,14 @@ void copyTrackText(BuildContext context, String text) {
 }
 
 /// The track options as desktop context menu groups: playback and download,
-/// collections, navigation, then copying.
+/// collections, navigation, then copying. [onAction] hears the options that
+/// show interest in the song.
 List<List<ContextMenuAction>> trackOptionMenuGroups(
   BuildContext context,
   WidgetRef ref,
   Track track, {
   bool hasLocalPlaybackCandidate = false,
+  ValueChanged<SuggestionAction>? onAction,
 }) {
   final l10n = context.l10n;
   final root = Navigator.of(context, rootNavigator: true).context;
@@ -161,6 +168,11 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
   }
 
   Future<void> toggle({required bool wishlist}) async {
+    if (!(wishlist ? isInWishlist : isLoved)) {
+      onAction?.call(
+        wishlist ? SuggestionAction.wishlisted : SuggestionAction.loved,
+      );
+    }
     final notifier = ref.read(libraryCollectionsProvider.notifier);
     final added = wishlist
         ? await notifier.toggleWishlist(track)
@@ -196,15 +208,20 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
       ContextMenuAction(
         icon: Icons.download_outlined,
         label: l10n.dialogDownload,
-        onSelected: () => downloadSingleTrack(root, ref, track),
+        onSelected: () {
+          onAction?.call(SuggestionAction.downloaded);
+          downloadSingleTrack(root, ref, track);
+        },
       ),
       if (qualityVariantAction ==
           QualityVariantMenuAction.downloadAnotherQuality)
         ContextMenuAction(
           icon: Icons.high_quality_outlined,
           label: l10n.trackOptionDownloadQualityVariant,
-          onSelected: () =>
-              downloadSingleTrack(root, ref, track, forceQualityPicker: true),
+          onSelected: () {
+            onAction?.call(SuggestionAction.downloaded);
+            downloadSingleTrack(root, ref, track, forceQualityPicker: true);
+          },
         ),
     ],
     [
@@ -227,14 +244,20 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
       ContextMenuAction(
         icon: Icons.playlist_add,
         label: l10n.collectionAddToPlaylist,
-        onSelected: () => showAddTrackToPlaylistSheet(root, ref, track),
+        onSelected: () {
+          onAction?.call(SuggestionAction.playlisted);
+          showAddTrackToPlaylistSheet(root, ref, track);
+        },
       ),
     ],
     [
       ContextMenuAction(
         icon: Icons.album_outlined,
         label: l10n.homeGoToAlbum,
-        onSelected: () => navigateToTrackAlbum(root, track),
+        onSelected: () {
+          onAction?.call(SuggestionAction.opened);
+          navigateToTrackAlbum(root, track);
+        },
       ),
     ],
     [
@@ -274,11 +297,13 @@ class _TrackOptionsSheet extends ConsumerWidget {
 
   /// The Material sheet's controller; the Mornye popover scrolls by itself.
   final ScrollController? scrollController;
+  final ValueChanged<SuggestionAction>? onAction;
 
   const _TrackOptionsSheet({
     required this.track,
     required this.hasLocalPlaybackCandidate,
     this.scrollController,
+    this.onAction,
   });
 
   @override
@@ -317,6 +342,7 @@ class _TrackOptionsSheet extends ConsumerWidget {
             onPressed: () {
               final root = Navigator.of(context, rootNavigator: true).context;
               Navigator.pop(context);
+              onAction?.call(SuggestionAction.downloaded);
               downloadSingleTrack(root, ref, track);
             },
           ),
@@ -384,6 +410,7 @@ class _TrackOptionsSheet extends ConsumerWidget {
               onPressed: () {
                 final root = Navigator.of(context, rootNavigator: true).context;
                 Navigator.pop(context);
+                onAction?.call(SuggestionAction.playlisted);
                 showAddTrackToPlaylistSheet(root, ref, track);
               },
             ),
@@ -564,6 +591,7 @@ class _TrackOptionsSheet extends ConsumerWidget {
                         : context.l10n.trackOptionAddToLoved,
                     onTap: () async {
                       Navigator.pop(context);
+                      if (!isLoved) onAction?.call(SuggestionAction.loved);
                       final added = await ref
                           .read(libraryCollectionsProvider.notifier)
                           .toggleLoved(track);
@@ -593,6 +621,9 @@ class _TrackOptionsSheet extends ConsumerWidget {
                         : context.l10n.trackOptionAddToWishlist,
                     onTap: () async {
                       Navigator.pop(context);
+                      if (!isInWishlist) {
+                        onAction?.call(SuggestionAction.wishlisted);
+                      }
                       final added = await ref
                           .read(libraryCollectionsProvider.notifier)
                           .toggleWishlist(track);
@@ -621,6 +652,7 @@ class _TrackOptionsSheet extends ConsumerWidget {
                         rootNavigator: true,
                       ).context;
                       Navigator.pop(context);
+                      onAction?.call(SuggestionAction.playlisted);
                       showAddTrackToPlaylistSheet(rootContext, ref, track);
                     },
                   ),
@@ -636,12 +668,14 @@ class _TrackOptionsSheet extends ConsumerWidget {
   void _downloadQualityVariant(BuildContext context, WidgetRef ref) {
     final rootContext = Navigator.of(context, rootNavigator: true).context;
     Navigator.pop(context);
+    onAction?.call(SuggestionAction.downloaded);
     downloadSingleTrack(rootContext, ref, track, forceQualityPicker: true);
   }
 
   void _downloadOnDesktop(BuildContext context, WidgetRef ref) {
     final rootContext = Navigator.of(context, rootNavigator: true).context;
     Navigator.pop(context);
+    onAction?.call(SuggestionAction.downloaded);
     linkDownloadTracksOnDesktop(rootContext, ref, [track]);
   }
 
@@ -652,7 +686,15 @@ class _TrackOptionsSheet extends ConsumerWidget {
   }) async {
     final root = Navigator.of(context, rootNavigator: true).context;
     final notifier = ref.read(libraryCollectionsProvider.notifier);
+    final collections = ref.read(libraryCollectionsProvider);
     Navigator.pop(context);
+    if (!(wishlist
+        ? collections.isInWishlist(track)
+        : collections.isLoved(track))) {
+      onAction?.call(
+        wishlist ? SuggestionAction.wishlisted : SuggestionAction.loved,
+      );
+    }
     final added = wishlist
         ? await notifier.toggleWishlist(track)
         : await notifier.toggleLoved(track);
@@ -691,6 +733,7 @@ class _TrackOptionsSheet extends ConsumerWidget {
       rootNavigator: true,
     ).context;
     Navigator.pop(context);
+    onAction?.call(SuggestionAction.opened);
     await navigateToTrackAlbum(navigationContext, track);
   }
 

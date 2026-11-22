@@ -8,6 +8,7 @@ Future<void> resetAutoplayLearning({MusicPlayerRuntime? runtime}) async {
   await target.personalization.reset();
   await target.taste.reset();
   await target.ranker.reset();
+  await target.suggestionOutcomes.reset();
   final handler = target.handler;
   if (handler == null || handler.isDisposed) return;
   handler._configurePersonalization();

@@ -610,19 +610,30 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
     final start = songs.indexWhere((song) => song.$1 >= index);
     final controller = ref.read(musicPlayerControllerProvider);
     await controller.setShuffle(false);
-    await controller.playAll([
-      for (final song in songs) song.$2,
-    ], initialIndex: max(0, start));
+    await _queue([for (final song in songs) song.$2], max(0, start));
   }
 
   Future<void> _shuffle() async {
     final songs = await _playable();
     if (songs.isEmpty || !mounted) return;
     final controller = ref.read(musicPlayerControllerProvider);
-    await controller.playAll([
+    await _queue([
       for (final song in songs) song.$2,
-    ], initialIndex: Random().nextInt(songs.length));
+    ], Random().nextInt(songs.length));
     await controller.setShuffle(true);
+  }
+
+  /// Plays [songs] as the queue; a mix's queue counts how its songs go.
+  Future<void> _queue(List<PlayableMedia> songs, int initialIndex) {
+    final controller = ref.read(musicPlayerControllerProvider);
+    return switch (widget.view?.mix) {
+      final mix? => controller.playMix(
+        mix.kind,
+        songs,
+        initialIndex: initialIndex,
+      ),
+      null => controller.playAll(songs, initialIndex: initialIndex),
+    };
   }
 
   Future<void> _saveAsPlaylist(BuildContext context) =>

@@ -22,12 +22,16 @@ class PreviewButton extends ConsumerWidget {
   /// shows its filled icon button, in every state.
   final bool overArtwork;
 
+  /// Called when a press starts this song's preview, not when it stops it.
+  final VoidCallback? onPreview;
+
   const PreviewButton({
     super.key,
     required this.track,
     this.size = 24,
     this.dense = false,
     this.overArtwork = false,
+    this.onPreview,
   });
 
   BoxConstraints get _constraints => dense
@@ -39,6 +43,9 @@ class PreviewButton extends ConsumerWidget {
       : null;
 
   Future<void> _onPressed(BuildContext context, WidgetRef ref) async {
+    if (!ref.read(previewPlayerProvider).isActiveUrl(track.previewUrl)) {
+      onPreview?.call();
+    }
     try {
       await ref
           .read(previewPlayerProvider.notifier)

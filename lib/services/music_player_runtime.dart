@@ -50,6 +50,7 @@ import 'package:mornye/services/scrobbling/scrobbler.dart';
 import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/source_metadata_events.dart';
+import 'package:mornye/services/suggestion_outcomes.dart';
 import 'package:mornye/services/system_volume_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
@@ -88,6 +89,7 @@ class PlaybackDependencies {
     this.createPersonalization = AutoplayPersonalization.new,
     this.createTaste = AutoplayTaste.new,
     this.createRanker = AutoplayRanker.new,
+    this.createSuggestionOutcomes = SuggestionOutcomes.new,
     this.createSongAnalysis = _createSongAnalysis,
     this.convertAudio = _convertAudio,
     this.callActive = AudioplayersPlaybackDeck.callActive,
@@ -163,6 +165,9 @@ class PlaybackDependencies {
   final AutoplayPersonalization Function() createPersonalization;
   final AutoplayTaste Function() createTaste;
   final AutoplayRanker Function() createRanker;
+
+  /// The log of how Home's mixes and recommendations go.
+  final SuggestionOutcomes Function() createSuggestionOutcomes;
 
   /// Analysis of how the Library's songs sound, reading songs from it.
   final SongAnalysis Function(LibraryDatabase library) createSongAnalysis;
@@ -345,15 +350,31 @@ class MusicPlayerRuntime {
   List<Scrobbler?> get _createdScrobblers => [_lastfm, _librefm, _listenBrainz];
   AutoplayPersonalization? _personalization;
   // What learning observes also teaches [taste] what plays together and
-  // [ranker] how much each part of a score counts.
+  // [ranker] how much each part of a score counts, and tells
+  // [suggestionOutcomes] how a mix's songs go.
   AutoplayPersonalization get personalization =>
       _personalization ??= (dependencies.createPersonalization()
         ..feedback.listen(taste.record)
-        ..feedback.listen(ranker.record));
+        ..feedback.listen(ranker.record)
+        ..feedback.listen(
+          (feedback) => suggestionOutcomes.recordPlay(
+            feedback,
+            queue: _handler?.queueGeneration,
+          ),
+        ));
   AutoplayTaste? _taste;
   AutoplayTaste get taste => _taste ??= dependencies.createTaste();
   AutoplayRanker? _ranker;
   AutoplayRanker get ranker => _ranker ??= dependencies.createRanker();
+  SuggestionOutcomes? _suggestionOutcomes;
+  SuggestionOutcomes get suggestionOutcomes =>
+      _suggestionOutcomes ??= (dependencies.createSuggestionOutcomes()
+        ..enabled = _learns(_settings));
+
+  /// Whether learning is on, as the player configures it, before the
+  /// player has started too.
+  static bool _learns(AppSettings settings) =>
+      settings.autoplayPersonalization && settings.playerMode == 'internal';
   SongAnalysis? _songAnalysis;
 
   /// How the Library's songs sound, analyzed in the background for Autoplay.
@@ -481,6 +502,7 @@ class MusicPlayerRuntime {
       keepTitle: settings.lockScreenLyricsKeepTitle,
     );
     _songAnalysis?.configure(settings);
+    _suggestionOutcomes?.enabled = _learns(settings);
     _handler?.applySettings(previous);
     if (previous.playerMode == 'internal' &&
         settings.playerMode != 'internal') {
@@ -795,6 +817,7 @@ class MusicPlayerRuntime {
     await _personalization?.dispose();
     await _taste?.dispose();
     await _ranker?.dispose();
+    await _suggestionOutcomes?.dispose();
     await _songAnalysis?.dispose();
     await _handlers.close();
     await _mutedPlaybackEvents.close();

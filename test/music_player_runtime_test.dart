@@ -25,6 +25,7 @@ import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/library_mixes.dart' show LibraryMixKind;
 import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
@@ -49,6 +50,7 @@ import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/source_metadata_events.dart';
+import 'package:mornye/services/suggestion_outcomes.dart';
 import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
@@ -729,6 +731,7 @@ MusicPlayerRuntime _runtime({
   AutoplayPersonalization Function()? createPersonalization,
   AutoplayTaste Function()? createTaste,
   AutoplayRanker Function()? createRanker,
+  SuggestionOutcomes Function()? createSuggestionOutcomes,
   bool isIOS = false,
   bool isAndroid = false,
   Future<void> Function()? synchronizePlaybackState,
@@ -765,6 +768,8 @@ MusicPlayerRuntime _runtime({
           createPersonalization ?? AutoplayPersonalization.new,
       createTaste: createTaste ?? AutoplayTaste.new,
       createRanker: createRanker ?? AutoplayRanker.new,
+      createSuggestionOutcomes:
+          createSuggestionOutcomes ?? SuggestionOutcomes.new,
       createDeck:
           createDeck ??
           (_) {
@@ -2224,6 +2229,71 @@ void main() {
 
     await resetAutoplayLearning(runtime: runtime);
     expect(await ranker.readOutcomes(), isEmpty);
+  });
+
+  test('a mix counts its songs while the queue it started plays', () async {
+    sqfliteFfiInit();
+    final directory = await Directory.systemTemp.createTemp('suggestions-');
+    addTearDown(() => directory.delete(recursive: true));
+    final db = await SuggestionOutcomes.openWithFactory(
+      databaseFactoryFfi,
+      '${directory.path}/suggestions.db',
+    );
+    addTearDown(db.close);
+    final outcomes = SuggestionOutcomes(open: () async => db);
+    var elapsed = Duration.zero;
+    final learning = AutoplayPersonalization(
+      load: () async => null,
+      save: (_) async {},
+      elapsed: () => elapsed,
+    );
+    final runtime = _runtime(
+      settings: const AppSettings(
+        pauseOnMute: false,
+        autoplayPersonalization: true,
+      ),
+      createPersonalization: () => learning,
+      createSuggestionOutcomes: () => outcomes,
+    );
+    final handler = await runtime.initialize();
+    await learning.ensureLoaded();
+    PlayableMedia song(String id) => PlayableMedia(
+      id: id,
+      source: '/$id.flac',
+      title: id,
+      artist: 'Artist $id',
+      duration: const Duration(seconds: 60),
+    );
+    await MusicPlayerController(
+      runtime: runtime,
+    ).playMix(LibraryMixKind.genre, [_track, song('two'), song('three')]);
+    await _settle();
+    final mixQueue = handler.queueGeneration;
+    // Shuffling reorders the mix's queue; it stays the same queue.
+    await handler.setShuffleMode(AudioServiceShuffleMode.all);
+    await handler.setShuffleMode(AudioServiceShuffleMode.none);
+    expect(handler.queueGeneration, mixQueue);
+    elapsed += const Duration(seconds: 40);
+    await handler.skipToNext();
+    await _settle();
+    elapsed += const Duration(seconds: 5);
+    await handler.skipToNext();
+    await _settle();
+    // The third song plays on, but another queue replaces the mix.
+    elapsed += const Duration(seconds: 40);
+    await handler.setQueueAndPlay([song('four')]);
+    await _settle();
+    expect(handler.queueGeneration, mixQueue + 1);
+    expect(
+      [
+        for (final outcome in await outcomes.readMixOutcomes())
+          (outcome.kind, outcome.played),
+      ],
+      [(LibraryMixKind.genre, true), (LibraryMixKind.genre, false)],
+    );
+
+    await resetAutoplayLearning(runtime: runtime);
+    expect(await outcomes.readMixOutcomes(), isEmpty);
   });
 
   test(

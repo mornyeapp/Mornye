@@ -173,6 +173,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   int _index = -1;
   int _playRequestGeneration = 0;
+  int _queueGeneration = 0;
   int _playbackInstance = 0;
   final _metadataChanges = <String, Object>{};
   String? _activeResolvedPath;
@@ -244,6 +245,10 @@ class MusicPlayerHandler extends BaseAudioHandler
   bool get sleepAtEndOfSong => _sleepAtEndOfSong;
   bool get isDisposed => _disposed;
   int get playbackRequestGeneration => _playRequestGeneration;
+
+  /// Counts the queues that replaced the whole queue, so one tells which
+  /// queue plays. Reordering or adding songs keeps it.
+  int get queueGeneration => _queueGeneration;
 
   /// Reconcile only the playback fields affected by the new settings snapshot.
   void applySettings(AppSettings previous) {
@@ -1625,6 +1630,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     // Never clobber a session the user already started this launch.
     if (_index >= 0 || (_media.isNotEmpty && !replaceStoppedQueue)) return;
     _restoringSession = true;
+    _queueGeneration++;
     try {
       _media
         ..clear()
@@ -1698,6 +1704,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (items.isEmpty) return;
     _autoplay.reset();
     _playRequestGeneration++;
+    _queueGeneration++;
     _media
       ..clear()
       ..addAll(items);
