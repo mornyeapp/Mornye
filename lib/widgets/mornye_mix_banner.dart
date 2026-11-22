@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
@@ -112,6 +113,7 @@ class MornyeMixBanner extends StatelessWidget {
     required this.eyebrow,
     required this.subtitle,
     required this.width,
+    this.drift,
   });
 
   /// Picks the palette and where its blooms sit; see [mornyeBannerSeed].
@@ -120,6 +122,10 @@ class MornyeMixBanner extends StatelessWidget {
   final String eyebrow;
   final String subtitle;
   final double width;
+
+  /// A looping phase in `[0, 1)` that carries the blooms slowly around where
+  /// they sit. Without one the field is still.
+  final ValueListenable<double>? drift;
 
   static const aspectRatio = 3 / 4;
 
@@ -136,76 +142,80 @@ class MornyeMixBanner extends StatelessWidget {
         child: SizedBox(
           width: width,
           height: width / aspectRatio,
-          child: CustomPaint(
-            painter: _BannerPainter(seed),
-            child: Stack(
-              children: [
-                PositionedDirectional(
-                  top: 16,
-                  end: 16,
-                  child: ExcludeSemantics(
-                    child: Image.asset(
-                      mornyeLockupAsset,
-                      width: logoWidth,
-                      cacheWidth: (logoWidth * pixelRatio).round(),
-                      filterQuality: FilterQuality.medium,
-                    ),
+          child: Stack(
+            children: [
+              // A layer of its own: the drift repaints the field, not the
+              // text over it.
+              Positioned.fill(
+                child: RepaintBoundary(
+                  child: CustomPaint(painter: _BannerPainter(seed, drift)),
+                ),
+              ),
+              PositionedDirectional(
+                top: 16,
+                end: 16,
+                child: ExcludeSemantics(
+                  child: Image.asset(
+                    mornyeLockupAsset,
+                    width: logoWidth,
+                    cacheWidth: (logoWidth * pixelRatio).round(),
+                    filterQuality: FilterQuality.medium,
                   ),
                 ),
-                Positioned.fill(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Center(
-                      child: Text(
-                        title,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: textTheme.displaySmall?.copyWith(
-                          color: Colors.white,
-                          fontSize: mornyeBannerTitleSize(title, width),
-                          fontWeight: FontWeight.w700,
-                          height: 1.04,
-                          letterSpacing: -0.6,
-                        ),
+              ),
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Center(
+                    child: Text(
+                      title,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: textTheme.displaySmall?.copyWith(
+                        color: Colors.white,
+                        fontSize: mornyeBannerTitleSize(title, width),
+                        fontWeight: FontWeight.w700,
+                        height: 1.04,
+                        letterSpacing: -0.6,
                       ),
                     ),
                   ),
                 ),
-                PositionedDirectional(
-                  start: 16,
-                  end: 16,
-                  bottom: 16,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+              ),
+              PositionedDirectional(
+                start: 16,
+                end: 16,
+                bottom: 16,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      eyebrow,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.82),
+                        fontSize: captionSize,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty)
                       Text(
-                        eyebrow,
-                        maxLines: 1,
+                        subtitle,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.82),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: Colors.white,
                           fontSize: captionSize,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      if (subtitle.isNotEmpty)
-                        Text(
-                          subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: Colors.white,
-                            fontSize: captionSize,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -214,9 +224,10 @@ class MornyeMixBanner extends StatelessWidget {
 }
 
 class _BannerPainter extends CustomPainter {
-  const _BannerPainter(this.seed);
+  const _BannerPainter(this.seed, this.phase) : super(repaint: phase);
 
   final int seed;
+  final ValueListenable<double>? phase;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -234,6 +245,10 @@ class _BannerPainter extends CustomPainter {
     // The seed's upper bits place the blooms, apart from the palette's choice.
     final drift = ((seed >> 8) & 0xff) / 255;
     final lean = ((seed >> 16) & 0xff) / 255;
+    // Each bloom goes once around where it sits in a loop, the two in
+    // opposite ways, and every banner starts somewhere else on its round.
+    final turn = 2 * math.pi * ((phase?.value ?? 0) + drift);
+    final sway = phase == null ? 0.0 : 1.0;
     void bloom(Offset center, double radius, Color color, double strength) {
       final circle = Rect.fromCircle(center: center, radius: radius);
       canvas.drawRect(
@@ -252,8 +267,8 @@ class _BannerPainter extends CustomPainter {
 
     bloom(
       Offset(
-        size.width * (0.55 + 0.4 * drift),
-        size.height * (0.12 + 0.28 * lean),
+        size.width * (0.55 + 0.4 * drift + sway * 0.2 * math.cos(turn)),
+        size.height * (0.12 + 0.28 * lean + sway * 0.13 * math.sin(turn)),
       ),
       size.width * 0.86,
       palette.glow,
@@ -261,8 +276,8 @@ class _BannerPainter extends CustomPainter {
     );
     bloom(
       Offset(
-        size.width * (0.05 + 0.4 * lean),
-        size.height * (0.82 + 0.14 * drift),
+        size.width * (0.05 + 0.4 * lean + sway * 0.22 * math.sin(turn)),
+        size.height * (0.82 + 0.14 * drift + sway * 0.1 * math.cos(turn)),
       ),
       size.width * 0.96,
       palette.depth,
@@ -290,5 +305,6 @@ class _BannerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_BannerPainter oldDelegate) => oldDelegate.seed != seed;
+  bool shouldRepaint(_BannerPainter oldDelegate) =>
+      oldDelegate.seed != seed || oldDelegate.phase != phase;
 }
