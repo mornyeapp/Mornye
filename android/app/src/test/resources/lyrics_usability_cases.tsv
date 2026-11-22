@@ -25,3 +25,5 @@ metadata_and_text	true	[ti:Title]\n[00:00.00]Actual lyric
 unicode_text	true	[00:00.00]<00:00.01> v1: 日本語の歌詞
 supplements_only	false	[x-romaji:1000:YQ==]\n[x-translation:1000:Yg==]
 supplements_and_text	true	[x-romaji:1000:YQ==]\n[x-translation:1000:Yg==]\n[00:01.00]Original
+readable_supplements_only	false	[x-romanized:1000:a ]b]\n[x-translated-words:1000:<00:01.00>c<00:02.00>]\n[x-translated:1000:c]
+readable_supplements_and_text	true	[00:01.00]Original\n[x-translated:1000:Translated line]

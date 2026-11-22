@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_translation_alignment.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/lyric_supplement_tags.dart';
 import 'package:mornye/utils/lyrics_draft.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:path_provider/path_provider.dart';
@@ -298,39 +299,17 @@ bool lyricsTranslationUnsaved(ParsedLyrics original, ParsedLyrics shown) {
   return false;
 }
 
-/// `[x-romaji-words:...]` and `[x-translation-words:...]` JSON for [words],
-/// as both lyrics parsers read it.
-/// Empty when a word cannot be given a valid time range.
-String lyricWordsSupplement(List<LyricWord> words) {
-  final rows = <Map<String, Object>>[];
-  for (var i = 0; i < words.length; i++) {
-    final word = words[i];
-    final start = word.time.inMilliseconds;
-    final end =
-        word.end?.inMilliseconds ??
-        (i + 1 < words.length ? words[i + 1].time.inMilliseconds : start);
-    if (word.text.trim().isEmpty ||
-        end < start ||
-        (rows.isNotEmpty && (rows.last['startTimeMs']! as int) > start)) {
-      return '';
-    }
-    rows.add({'text': word.text, 'startTimeMs': start, 'endTimeMs': end});
-  }
-  return rows.isEmpty ? '' : jsonEncode(rows);
-}
-
-/// The `-words` JSON for [words] timing [text], or empty when they do not
+/// The `-words` value for [words] timing [text], or empty when they do not
 /// spell it: both lyrics parsers drop such timing.
 String _timedSupplement(String text, List<LyricWord> words) =>
     text.isEmpty || words.map((word) => word.text).join() != text
     ? ''
-    : lyricWordsSupplement(words);
+    : encodeLyricWordsTag(words);
 
 /// The supplement tags a lyric line written as LRC carries for [line]'s
 /// translation and pronunciation, with their word timing, as
 /// (kind, payload) in the order they are written.
 List<(String, String)> lyricLineSupplements(LyricLine line) {
-  String encode(String text) => base64.encode(utf8.encode(text));
   final romanization = _supplementText(line.romanization);
   final romanizationWords = _timedSupplement(
     romanization,
@@ -339,18 +318,17 @@ List<(String, String)> lyricLineSupplements(LyricLine line) {
   final translation = _supplementText(line.translation);
   final translationWords = _timedSupplement(translation, line.translationWords);
   return [
-    if (romanizationWords.isNotEmpty)
-      ('romaji-words', encode(romanizationWords)),
-    if (romanization.isNotEmpty) ('romaji', encode(romanization)),
-    if (translationWords.isNotEmpty)
-      ('translation-words', encode(translationWords)),
-    if (translation.isNotEmpty) ('translation', encode(translation)),
+    if (romanizationWords.isNotEmpty) ('romaji-words', romanizationWords),
+    if (romanization.isNotEmpty) ('romaji', encodeLyricTextTag(romanization)),
+    if (translationWords.isNotEmpty) ('translation-words', translationWords),
+    if (translation.isNotEmpty)
+      ('translation', encodeLyricTextTag(translation)),
   ];
 }
 
 /// [raw] LRC with each timed line carrying the translation and
-/// pronunciation [shown] gives it, as the `[x-translation:<ms>:...]` and
-/// `[x-romaji:<ms>:...]` tags both lyrics parsers read back, with their
+/// pronunciation [shown] gives it, as the `[x-translated:<ms>:...]` and
+/// `[x-romanized:<ms>:...]` tags both lyrics parsers read back, with their
 /// `-words` timing, so they stay with the song's file alongside its own
 /// lyrics. Other lines, tags and supplements stay as they are. Null when
 /// [raw] is not synced LRC or already holds these.

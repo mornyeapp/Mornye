@@ -722,8 +722,7 @@ void main() {
       await tester.tap(find.text('Save Translation to File'));
       await tester.pumpAndSettle();
 
-      String tag(int ms, String text) =>
-          '[x-translation:$ms:${base64.encode(utf8.encode(text))}]';
+      String tag(int ms, String text) => '[x-translated:$ms:$text]';
       expect(saved, [
         (
           '/music/Album/song.flac',
@@ -752,8 +751,7 @@ void main() {
     });
   }
 
-  String tag(String kind, int key, String text) =>
-      '[x-$kind:$key:${base64.encode(utf8.encode(text))}]';
+  String tag(int key, String text) => '[x-translated:$key:$text]';
 
   Future<
     ({
@@ -870,11 +868,11 @@ void main() {
       expect(saved, isEmpty);
       expect(sidecar.files, {
         '/music/Album/song.flac':
-            '[x-mlrc:1]\n'
+            '[x-mlrc:2]\n'
             'Hello there\n'
-            '${tag('translation', 0, 'de:Hello there')}\n'
+            '${tag(0, 'de:Hello there')}\n'
             'Second line\n'
-            '${tag('translation', 1, 'de:Second line')}\n',
+            '${tag(1, 'de:Second line')}\n',
       });
       expect(metadata.lyrics.lines.map((line) => line.translation), [
         'de:Hello there',
@@ -917,11 +915,11 @@ void main() {
 
     expect(sidecar.files, {
       '/music/Album/song.flac':
-          '[x-mlrc:1]\n'
+          '[x-mlrc:2]\n'
           '[00:00.00]Hello there\n'
-          '${tag('translation', 0, 'de:Hello there')}\n'
+          '${tag(0, 'de:Hello there')}\n'
           '[00:03.00]Second line\n'
-          '${tag('translation', 3000, 'de:Second line')}\n',
+          '${tag(3000, 'de:Second line')}\n',
     });
     expect(saved, isEmpty);
     // An automatic save stays quiet.

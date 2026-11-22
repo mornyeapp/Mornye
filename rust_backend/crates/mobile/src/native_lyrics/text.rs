@@ -142,6 +142,96 @@ pub(super) fn decode_supplement(encoded: &str) -> Option<String> {
         .ok()?;
     Some(trim(&String::from_utf8(bytes).ok()?).into())
 }
+/// A readable tag value: `\n` is a line break, `\\` a backslash and `\<` a
+/// `<`. Mirrors lib/utils/lyric_supplement_tags.dart.
+pub(super) fn unescape_supplement(value: &str) -> String {
+    let mut out = String::new();
+    let mut chars = value.chars().peekable();
+    while let Some(c) = chars.next() {
+        match (c, chars.peek()) {
+            ('\\', Some(&next)) => {
+                chars.next();
+                push_unescaped(&mut out, next);
+            }
+            _ => out.push(c),
+        }
+    }
+    out
+}
+fn push_unescaped(out: &mut String, next: char) {
+    match next {
+        'n' => out.push('\n'),
+        '\\' | '<' => out.push(next),
+        _ => {
+            out.push('\\');
+            out.push(next);
+        }
+    }
+}
+/// Readable word timing: each word follows its start, a word ends where the
+/// next starts, and a time with no word after it ends the word before it.
+pub(super) fn supplement_words(value: &str) -> Vec<Word> {
+    let mut leading = String::new();
+    let mut segments: Vec<(i64, String)> = Vec::new();
+    let mut i = 0;
+    while let Some(c) = value[i..].chars().next() {
+        let text = match segments.last_mut() {
+            Some((_, text)) => text,
+            None => &mut leading,
+        };
+        if c == '\\'
+            && let Some(next) = value[i + 1..].chars().next()
+        {
+            push_unescaped(text, next);
+            i += 1 + next.len_utf8();
+            continue;
+        }
+        if c == '<'
+            && let Some(time) = WORD_TIME
+                .captures_at(value, i)
+                .filter(|time| time.get(0).unwrap().start() == i)
+        {
+            i = time.get(0).unwrap().end();
+            segments.push((duration(&time), String::new()));
+            continue;
+        }
+        text.push(c);
+        i += c.len_utf8();
+    }
+    if !leading.is_empty() {
+        return vec![];
+    }
+    let mut words: Vec<Word> = Vec::new();
+    for (time, text) in segments {
+        if text.is_empty() {
+            match words.last_mut() {
+                Some(word) if word.end_ms.is_none() => word.end_ms = Some(time),
+                _ => return vec![],
+            }
+            continue;
+        }
+        if trim(&text).is_empty() {
+            return vec![];
+        }
+        if let Some(previous) = words.last_mut() {
+            if previous.time_ms > time {
+                return vec![];
+            }
+            previous.end_ms.get_or_insert(time);
+        }
+        words.push(Word {
+            time_ms: time,
+            end_ms: None,
+            text,
+        });
+    }
+    for word in &mut words {
+        if *word.end_ms.get_or_insert(word.time_ms) < word.time_ms {
+            return vec![];
+        }
+    }
+    words
+}
 pub(super) fn romanization_words(raw: &str) -> Vec<Word> {
     let Ok(Value::Array(values)) = serde_json::from_str::<Value>(raw) else {
         return vec![];

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/utils/lyric_supplement_tags.dart';
 import 'package:xml/xml.dart';
 
 Uint8List _encodeLyricsInBackground(String raw) =>
@@ -207,10 +208,6 @@ class LyricsParser {
     r'^\[(ti|ar|al|by|offset|length|re|ve|tool|au|la|encoder|instrumental|x-[a-z0-9_-]+):.*\]$',
     caseSensitive: false,
   );
-  static final RegExp _supplementTag = RegExp(
-    r'^\[x-(romaji-words|romaji|translation-words|translation):(\d+):([^\]]*)\]$',
-    caseSensitive: false,
-  );
   static final RegExp _writerCredit = RegExp(
     r'^Written\s+by\s*:\s*(.+)$',
     caseSensitive: false,
@@ -385,26 +382,17 @@ class LyricsParser {
       final background = _backgroundLine.firstMatch(line.trim());
       if (background != null) line = background.group(1)!.trim();
 
-      final supplement = _supplementTag.firstMatch(line.trim());
+      final supplement = readLyricSupplementTag(line.trim());
       if (supplement != null) {
-        final time = int.tryParse(supplement.group(2)!);
-        try {
-          final value = utf8.decode(base64.decode(supplement.group(3)!)).trim();
-          if (time != null && value.isNotEmpty) {
-            final kind = supplement.group(1)!.toLowerCase();
-            if (kind.endsWith('-words')) {
-              final words = _parseSupplementWords(value);
-              if (words.isNotEmpty) {
-                (kind == 'romaji-words' ? romanizationWords : translationWords)
-                    .putIfAbsent(time, () => words);
-              }
-            } else {
-              final target = kind == 'romaji' ? romanization : translation;
-              target.putIfAbsent(time, () => value);
-            }
+        final (:kind, key: time, :text, :words) = supplement;
+        if (time != null) {
+          if (words.isNotEmpty) {
+            (kind == 'romaji-words' ? romanizationWords : translationWords)
+                .putIfAbsent(time, () => words);
+          } else if (text != null && text.isNotEmpty) {
+            final target = kind == 'romaji' ? romanization : translation;
+            target.putIfAbsent(time, () => text);
           }
-        } on FormatException {
-          // Optional corrupt metadata must not hide the original lyrics.
         }
         continue;
       }
@@ -582,37 +570,6 @@ class LyricsParser {
       }
     }
     return matched.map((time, match) => MapEntry(time, match.$2));
-  }
-
-  /// `[x-romaji-words:...]` and `[x-translation-words:...]` JSON.
-  static List<LyricWord> _parseSupplementWords(String raw) {
-    final value = jsonDecode(raw);
-    if (value is! List) return const [];
-    final words = <LyricWord>[];
-    for (final item in value) {
-      if (item case {
-        'text': final String text,
-        'startTimeMs': final int start,
-        'endTimeMs': final int end,
-      }) {
-        if (text.trim().isEmpty ||
-            start < 0 ||
-            end < start ||
-            (words.isNotEmpty && words.last.time.inMilliseconds > start)) {
-          return const [];
-        }
-        words.add(
-          LyricWord(
-            time: Duration(milliseconds: start),
-            end: Duration(milliseconds: end),
-            text: text,
-          ),
-        );
-      } else {
-        return const [];
-      }
-    }
-    return words;
   }
 
   static List<LyricWord> _shiftWords(List<LyricWord> words, int offsetMs) {

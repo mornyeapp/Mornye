@@ -96,8 +96,7 @@ http.Response _reply(http.Request request) {
 }
 
 /// The tag a saved translation of the line at [ms] takes.
-String _translation(int ms, String text) =>
-    '[x-translation:$ms:${base64Encode(utf8.encode(text))}]';
+String _translation(int ms, String text) => '[x-translated:$ms:$text]';
 
 /// Waits for work that includes real file IO.
 Future<void> _until(bool Function() done) async {
@@ -196,7 +195,7 @@ void main() {
     await _until(() => sidecar.writes.isNotEmpty);
 
     final mlrc = sidecar.writes[_song.source]!;
-    expect(mlrc, startsWith('[x-mlrc:1]'));
+    expect(mlrc, startsWith('[x-mlrc:2]'));
     expect(mlrc, contains(_translation(0, 'es:Hello')));
     expect(savedLyrics, isEmpty);
   });
@@ -230,7 +229,12 @@ void main() {
 
     final saved = savedLyrics[_song.source]!;
     expect(saved, contains(_translation(0, 'Hola amigo')));
-    expect(saved, contains('[x-translation-words:0:'));
+    expect(
+      saved,
+      contains(
+        '[x-translated-words:0:<00:00.00>Hola <00:00.50>amigo<00:01.00>]',
+      ),
+    );
     expect(requests, isEmpty);
   });
 
@@ -260,7 +264,7 @@ void main() {
   test('leaves lyrics that already carry a translation', () async {
     final (container: _, :translator, queue: _) = setUpTranslator(
       sidecar: _Sidecar(
-        existing: '[x-mlrc:1]\n$_lrc\n${_translation(0, 'Hola')}',
+        existing: '[x-mlrc:2]\n$_lrc\n${_translation(0, 'Hola')}',
       ),
     );
     expect(await translator.translate(_song), isNull);

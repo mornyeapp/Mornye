@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:audio_service/audio_service.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -127,13 +125,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    String tag(int ms, String text) =>
-        '[x-translation:$ms:${base64.encode(utf8.encode(text))}]';
     expect(saved, [
       (
         '/music/Album/song.flac',
         '[00:00.00]Hello there\n'
-            '${tag(0, 'سلام')}\n'
+            '[x-translated:0:سلام]\n'
             '[00:03.00]Second line',
       ),
     ]);
@@ -240,11 +236,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saved.length, 1);
-    expect(saved.single.$2, contains(base64.encode(utf8.encode('سلام تازه'))));
-    expect(
-      saved.single.$2,
-      isNot(contains(base64.encode(utf8.encode('سلام قدیمی')))),
-    );
+    expect(saved.single.$2, contains('[x-translated:0:سلام تازه]'));
+    expect(saved.single.$2, isNot(contains('سلام قدیمی')));
     // The cache now holds the edit, so the old AI text cannot come back.
     final stored = await cache.read(key);
     expect(stored?.translations, ['سلام تازه', 'خط دوم']);

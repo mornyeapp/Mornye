@@ -7,6 +7,7 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/saf_siblings.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/file_access.dart';
+import 'package:mornye/utils/lyric_supplement_tags.dart';
 import 'package:mornye/utils/lyrics_draft.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 
@@ -15,29 +16,25 @@ import 'package:mornye/utils/lyrics_parser.dart';
 /// TTML and lyrics without timing alike, and leaves the song's own file as
 /// it is.
 ///
-/// Version 1 is UTF-8 LRC:
-/// - The first line is `[x-mlrc:1]`.
+/// Version 2 is UTF-8 LRC:
+/// - The first line is `[x-mlrc:2]`.
 /// - The lyrics follow as LRC, with word timing as enhanced LRC, a singer as
 ///   a `v1:` prefix and backing vocals as `[bg:...]` rows.
-/// - A line's `[x-romaji-words:<key>:<base64 JSON>]`,
-///   `[x-romaji:<key>:<base64>]`, `[x-translation-words:<key>:<base64 JSON>]`
-///   and `[x-translation:<key>:<base64>]` tags follow it. The key is the
-///   line's time in milliseconds, so the file also reads as ordinary LRC; in
-///   lyrics without timing it is the line's index, counted from 0, and there
-///   is no word timing.
-/// - Word timing JSON is `[{"text", "startTimeMs", "endTimeMs"}]` in absolute
-///   milliseconds; the texts spell the line's pronunciation or translation.
+/// - A line's `[x-romanized-words:<key>:...]`, `[x-romanized:<key>:...]`,
+///   `[x-translated-words:<key>:...]` and `[x-translated:<key>:...]` tags
+///   follow it, in the readable form lyric_supplement_tags.dart describes.
+///   The key is the line's time in milliseconds, so the file also reads as
+///   ordinary LRC; in lyrics without timing it is the line's index, counted
+///   from 0, and there is no word timing.
+///
+/// Version 1 wrote the same tags with base64 values; it is still read.
 const mlrcExtension = 'mlrc';
 
 /// `.lrc`, the plain lyrics file other players also read next to a song.
 const lrcExtension = 'lrc';
-const _mlrcHeader = '[x-mlrc:1]';
+const _mlrcHeader = '[x-mlrc:2]';
 const _maxSidecarBytes = 8 * 1024 * 1024;
 
-final _supplementRow = RegExp(
-  r'^\[x-(romaji-words|romaji|translation-words|translation):(\d+):([^\]]*)\]$',
-  caseSensitive: false,
-);
 // The LRC ID tags the lyrics parsers drop.
 final _tagRow = RegExp(
   r'^\[(ti|ar|al|by|offset|length|re|ve|tool|au|la|encoder|instrumental|x-[a-z0-9_-]+):.*\]$',
@@ -85,7 +82,7 @@ String _lrcOf(ParsedLyrics lyrics) {
     for (final (index, line) in lines.indexed) {
       out.add(line.text);
       for (final (kind, payload) in lyricLineSupplements(line)) {
-        out.add('[x-$kind:$index:$payload]');
+        out.add(lyricSupplementRow(kind, index, payload));
       }
     }
     return out.join('\n');
@@ -100,7 +97,7 @@ String _lrcOf(ParsedLyrics lyrics) {
     final voice = line.voice == null ? '' : 'v${line.voice!.index + 1}: ';
     out.add('[${formatLyricsTime(line.time)}]$voice$content');
     for (final (kind, payload) in lyricLineSupplements(line)) {
-      out.add('[x-$kind:${line.time.inMilliseconds}:$payload]');
+      out.add(lyricSupplementRow(kind, line.time.inMilliseconds, payload));
     }
   }
   return out.join('\n');
@@ -144,17 +141,11 @@ Future<ParsedLyrics> readMlrc(
   for (final source in raw.split(RegExp(r'\r\n|\r|\n'))) {
     final row = source.trim();
     if (row.isEmpty) continue;
-    final supplement = _supplementRow.firstMatch(row);
+    final supplement = readLyricSupplementTag(row);
     if (supplement != null) {
-      try {
-        final value = utf8.decode(base64.decode(supplement.group(3)!)).trim();
-        final kind = supplement.group(1)!.toLowerCase();
-        final index = int.parse(supplement.group(2)!);
-        if (value.isNotEmpty && !kind.endsWith('-words')) {
-          (supplements[index] ??= {}).putIfAbsent(kind, () => value);
-        }
-      } on FormatException {
-        // A damaged tag must not hide the lyrics.
+      final (:kind, key: index, :text, words: _) = supplement;
+      if (index != null && text != null && text.isNotEmpty) {
+        (supplements[index] ??= {}).putIfAbsent(kind, () => text);
       }
       continue;
     }

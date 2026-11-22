@@ -1,8 +1,7 @@
 //! LRC lyrics parsing and helpers: timestamps, synced and plain text, and usability checks.
 
-use super::{LyricsLine, LyricsResponse};
+use super::{LyricsLine, LyricsResponse, LyricsWord};
 use crate::matching::lowercase;
-use base64::{Engine, engine::general_purpose::STANDARD};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -207,6 +206,50 @@ pub fn extract_source(raw: &str) -> String {
     String::new()
 }
 
+/// A readable tag value, as lib/utils/lyric_supplement_tags.dart writes it:
+/// `\n` for a line break, `\\` for a backslash and, in word timing, `\<`.
+fn escape_supplement(text: &str, words: bool) -> String {
+    let mut out = String::new();
+    for c in text.replace("\r\n", "\n").replace('\r', "\n").chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '<' if words => out.push_str("\\<"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// Word timing as enhanced LRC: each word after its start, a time with no
+/// word after it where a word ends before the next starts. None when a word
+/// has no valid time range.
+fn supplement_words(words: &[LyricsWord]) -> Option<String> {
+    let mut out = String::new();
+    let mut last: Option<(i64, i64)> = None;
+    for word in words {
+        let (start, end) = (word.start_time_ms, word.end_time_ms);
+        if word.text.trim().is_empty()
+            || start < 0
+            || end < start
+            || last.is_some_and(|(last_start, _)| last_start > start)
+        {
+            return None;
+        }
+        if let Some((_, last_end)) = last
+            && last_end != start
+        {
+            out.push_str(&format!("<{}>", timestamp_inline(last_end)));
+        }
+        out.push_str(&format!("<{}>", timestamp_inline(start)));
+        out.push_str(&escape_supplement(&word.text, true));
+        last = Some((start, end));
+    }
+    let (_, end) = last?;
+    out.push_str(&format!("<{}>", timestamp_inline(end)));
+    Some(out)
+}
+
 pub fn with_metadata(lyrics: &LyricsResponse, track: &str, artist: &str) -> String {
     if lyrics.lines().is_empty() {
         return String::new();
@@ -229,25 +272,25 @@ pub fn with_metadata(lyrics: &LyricsResponse, track: &str, artist: &str) -> Stri
     let synced = lyrics.is_synced();
     if synced {
         for line in lyrics.lines() {
-            if let Some(words) = &line.romanization_words
-                && !words.is_empty()
-                && let Ok(json) = serde_json::to_vec(words)
+            if let Some(words) = line
+                .romanization_words
+                .as_deref()
+                .and_then(supplement_words)
             {
                 output.push_str(&format!(
-                    "[x-romaji-words:{}:{}]\n",
-                    line.start_time_ms,
-                    STANDARD.encode(json)
+                    "[x-romanized-words:{}:{words}]\n",
+                    line.start_time_ms
                 ));
             }
             for (tag, text) in [
-                ("x-romaji", &line.romanization),
-                ("x-translation", &line.translation),
+                ("x-romanized", &line.romanization),
+                ("x-translated", &line.translation),
             ] {
                 if let Some(text) = text.as_deref().filter(|text| !text.trim().is_empty()) {
                     output.push_str(&format!(
                         "[{tag}:{}:{}]\n",
                         line.start_time_ms,
-                        STANDARD.encode(text.trim())
+                        escape_supplement(text.trim(), false)
                     ));
                 }
             }
@@ -439,13 +482,35 @@ mod tests {
     fn optional_text_is_safe_metadata_not_lyric_content() {
         let raw = "[x-romaji:1000:YQ==]\n[x-translation:1000:Yg==]";
         assert!(!has_usable_content(raw));
+        let raw = "[x-romanized:1000:a ]b]\n[x-translated:1000:<00:01.00>c]";
+        assert!(!has_usable_content(raw));
         let mut lyrics =
             LyricsResponse::from_text("[00:01.009]Original", "Apple Music", "Apple Music");
-        lyrics.lines.as_mut().unwrap()[0].translation = Some("Text ]\nnext line 日本語".into());
+        lyrics.lines.as_mut().unwrap()[0].translation = Some("Text ]\nnext \\ line 日本語".into());
         let lrc = with_metadata(&lyrics, "Track", "Artist");
-        let encoded = STANDARD.encode("Text ]\nnext line 日本語");
-        assert!(lrc.contains(&format!("[x-translation:1009:{encoded}]")));
+        assert!(lrc.contains("[x-translated:1009:Text ]\\nnext \\\\ line 日本語]"));
         assert!(lrc.contains("[00:01.009]Original"));
         assert!(has_usable_content(&lrc));
+    }
+
+    #[test]
+    fn word_timing_is_written_as_enhanced_lrc() {
+        let word = |text: &str, start_time_ms, end_time_ms| LyricsWord {
+            text: text.into(),
+            start_time_ms,
+            end_time_ms,
+        };
+        let words = [
+            word("Ro ", 1000, 1200),
+            word("<ma>", 1200, 1500),
+            word("ji", 1609, 2000),
+        ];
+        assert_eq!(
+            supplement_words(&words).as_deref(),
+            Some("<00:01.00>Ro <00:01.20>\\<ma><00:01.50><00:01.609>ji<00:02.00>")
+        );
+        assert_eq!(supplement_words(&[word("a", 2000, 1000)]), None);
+        assert_eq!(supplement_words(&[word(" ", 0, 1000)]), None);
+        assert_eq!(supplement_words(&[]), None);
     }
 }

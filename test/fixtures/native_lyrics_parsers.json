@@ -1627,5 +1627,163 @@
         }
       ]
     }
+  },
+  {
+    "name": "readable supplements follow the offset",
+    "request": {
+      "operation": "parse_lyrics",
+      "raw": "[offset:100]\n[00:01.00]Hola mundo\n[x-romanized:1000:o la mun do]\n[x-romanized-words:1000:<00:01.00>o la <00:01.20>mun do<00:01.50>]\n[x-translated-words:1000:<00:01.00>Hello <00:01.40><00:01.50>world<00:02.00>]\n[x-translated:1000:Hello world]\n[00:03.00]Otra\n[x-translated:3000:Another]"
+    },
+    "expected": {
+      "synced": true,
+      "wordSynced": false,
+      "plainText": "Hola mundo\nOtra",
+      "writers": null,
+      "provider": null,
+      "lines": [
+        {
+          "timeMs": 900,
+          "endMs": null,
+          "text": "Hola mundo",
+          "words": [],
+          "romanization": "o la mun do",
+          "romanizationWords": [
+            {
+              "timeMs": 900,
+              "endMs": 1100,
+              "text": "o la "
+            },
+            {
+              "timeMs": 1100,
+              "endMs": 1400,
+              "text": "mun do"
+            }
+          ],
+          "translation": "Hello world",
+          "translationWords": [
+            {
+              "timeMs": 900,
+              "endMs": 1300,
+              "text": "Hello "
+            },
+            {
+              "timeMs": 1400,
+              "endMs": 1900,
+              "text": "world"
+            }
+          ],
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 0
+        },
+        {
+          "timeMs": 2900,
+          "endMs": null,
+          "text": "Otra",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": "Another",
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "readable escapes, damaged timing and first tag wins",
+    "request": {
+      "operation": "parse_lyrics",
+      "raw": "[00:01]Uno\n[x-translated:1000:a ]b \\n c \\\\ d \\x <e>]\n[x-translation:1000:SWdub3JlZA==]\n[00:02]Dos\n[x-romanized-words:2000:lead<00:02.00>x]\n[x-romanized:2000:x]\n[00:03]Tres\n[x-translated-words:3000:<00:03.00><00:03.50>y]\n[x-translated:3000:y]\n[00:04]Cuatro\n[x-translated-words:4000:<00:04.50>b<00:04.00>a]\n[x-translated:4000:ba]\n[00:05]Cinco\n[x-translated-words:5000:<00:05.00>\\<z\\> <00:05.30> <00:05.40>w<00:05.90>]\n[x-translated:5000:<z\\>  w]\n[00:06]Seis\n[x-translated-words:6000:<00:06.00>p \\<00:06.20>q<00:06.80>]\n[x-translated:6000:p <00:06.20>q]"
+    },
+    "expected": {
+      "synced": true,
+      "wordSynced": false,
+      "plainText": "Uno\nDos\nTres\nCuatro\nCinco\nSeis",
+      "writers": null,
+      "provider": null,
+      "lines": [
+        {
+          "timeMs": 1000,
+          "endMs": null,
+          "text": "Uno",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": "a ]b \n c \\ d \\x <e>",
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 0
+        },
+        {
+          "timeMs": 2000,
+          "endMs": null,
+          "text": "Dos",
+          "words": [],
+          "romanization": "x",
+          "romanizationWords": [],
+          "translation": null,
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 1
+        },
+        {
+          "timeMs": 3000,
+          "endMs": null,
+          "text": "Tres",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": "y",
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 2
+        },
+        {
+          "timeMs": 4000,
+          "endMs": null,
+          "text": "Cuatro",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": "ba",
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 3
+        },
+        {
+          "timeMs": 5000,
+          "endMs": null,
+          "text": "Cinco",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": "<z\\>  w",
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 4
+        },
+        {
+          "timeMs": 6000,
+          "endMs": null,
+          "text": "Seis",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": "p <00:06.20>q",
+          "translationWords": [
+            {
+              "timeMs": 6000,
+              "endMs": 6800,
+              "text": "p <00:06.20>q"
+            }
+          ],
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 5
+        }
+      ]
+    }
   }
 ]

@@ -1,4 +1,5 @@
-import 'dart:convert';
+import 'package:mornye/utils/lyric_supplement_tags.dart';
+import 'package:mornye/utils/lyrics_parser.dart' show LyricWord;
 
 /// One line of a [LyricsDraft]: its time, its text, and the raw LRC that
 /// rides along with it (word timing, a singer prefix, translations and
@@ -39,8 +40,8 @@ class LyricsDraftLine {
   /// The line time [content]'s word timing was written for.
   final Duration? contentTime;
 
-  /// `[x-...:<ms>:...]` translation and pronunciation tags keyed to this
-  /// line, as (kind, payload).
+  /// Translation and pronunciation tags keyed to this line, as (kind,
+  /// payload) in the form [lyricSupplementRow] writes.
   final List<(String, String)> supplements;
 
   /// `[bg:...]` backing vocals sung with this line, as the raw content.
@@ -91,10 +92,6 @@ class LyricsDraft {
     r'^\[(ti|ar|al|by|offset|length|re|ve|tool|au|la|encoder|instrumental|x-[a-z0-9_-]+):.*\]$',
     caseSensitive: false,
   );
-  static final _supplement = RegExp(
-    r'^\[x-(romaji-words|romaji|translation-words|translation):(\d+):([^\]]*)\]$',
-    caseSensitive: false,
-  );
   static final _background = RegExp(r'^\[bg:(.*)\]$', caseSensitive: false);
   static final _credit = RegExp(r'^Written\s+by\s*:', caseSensitive: false);
 
@@ -137,13 +134,18 @@ class LyricsDraft {
         }
         continue;
       }
-      final supplement = _supplement.firstMatch(row);
+      final supplement = readLyricSupplementTag(row);
       if (supplement != null) {
-        final ms = int.parse(supplement.group(2)!);
-        (supplements[ms] ??= []).add((
-          supplement.group(1)!.toLowerCase(),
-          supplement.group(3)!,
-        ));
+        // Rewritten in the current form; damaged tags are dropped.
+        final (:kind, key: ms, :text, :words) = supplement;
+        final payload = words.isNotEmpty
+            ? encodeLyricWordsTag(words)
+            : text != null && text.isNotEmpty
+            ? encodeLyricTextTag(text)
+            : '';
+        if (ms != null && payload.isNotEmpty) {
+          (supplements[ms] ??= []).add((kind, payload));
+        }
         continue;
       }
       final tag = _idTag.firstMatch(row);
@@ -306,7 +308,7 @@ class LyricsDraft {
           ? line.supplements
           : _shiftSupplements(line.supplements, delta);
       for (final (kind, payload) in shifted) {
-        out.add('[x-$kind:${time.inMilliseconds}:$payload]');
+        out.add(lyricSupplementRow(kind, time.inMilliseconds, payload));
       }
       for (final row in line.background) {
         out.add('[bg:${_shiftWords(row, delta)}]');
@@ -351,33 +353,23 @@ class LyricsDraft {
     ];
   }
 
-  /// Pronunciation and translation word timing is absolute JSON; it moves
-  /// with its line.
+  /// Pronunciation and translation word timing is absolute; it moves with
+  /// its line.
   static String _shiftSupplementWords(String payload, int deltaMs) {
-    try {
-      final words = jsonDecode(utf8.decode(base64.decode(payload)));
-      if (words is! List) return payload;
-      int shift(Object? value) {
-        final ms = (value is int ? value : 0) + deltaMs;
-        return ms < 0 ? 0 : ms;
-      }
-
-      return base64.encode(
-        utf8.encode(
-          jsonEncode([
-            for (final word in words)
-              if (word is Map)
-                {
-                  ...word,
-                  'startTimeMs': shift(word['startTimeMs']),
-                  'endTimeMs': shift(word['endTimeMs']),
-                },
-          ]),
-        ),
-      );
-    } on FormatException {
-      return payload;
+    Duration shift(Duration time) {
+      final ms = time.inMilliseconds + deltaMs;
+      return Duration(milliseconds: ms < 0 ? 0 : ms);
     }
+
+    final shifted = encodeLyricWordsTag([
+      for (final word in decodeLyricWordsTag(payload))
+        LyricWord(
+          time: shift(word.time),
+          end: word.end == null ? null : shift(word.end!),
+          text: word.text,
+        ),
+    ]);
+    return shifted.isEmpty ? payload : shifted;
   }
 }
 

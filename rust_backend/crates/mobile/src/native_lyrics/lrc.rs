@@ -1,6 +1,7 @@
 use super::text::{
     LINE_TIME, Supplements, WORD_TIME, align, decode_supplement, duration, insert_first, parse_int,
-    parse_words, romanization_words, shift, shift_words, trim, trim_end, vocal_text,
+    parse_words, romanization_words, shift, shift_words, supplement_words, trim, trim_end,
+    unescape_supplement, vocal_text,
 };
 use super::{Line, Parsed, Word, has_usable_timing};
 use regex::Regex;
@@ -11,7 +12,7 @@ static ID_TAG: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^\[(ti|ar|al|by|offset|length|re|ve|tool|au|la|encoder|instrumental|x-[a-z0-9_-]+):.*\]$").unwrap()
 });
 static SUPPLEMENT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^\[x-(romaji-words|romaji|translation-words|translation):([0-9]+):([^\]]*)\]$")
+    Regex::new(r"(?i)^\[x-(romanized-words|romanized|translated-words|translated|romaji-words|romaji|translation-words|translation):([0-9]+):(.*)\]$")
         .unwrap()
 });
 static NEW_LINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\r\n|\r|\n").unwrap());
@@ -40,23 +41,47 @@ pub(super) fn parse_lrc(
             line = trim(c.get(1).unwrap().as_str());
         }
         if let Some(c) = SUPPLEMENT.captures(trim(line)) {
-            if let (Some(time), Some(value)) = (parse_int(&c[2]), decode_supplement(&c[3]))
-                && !value.is_empty()
-            {
-                match c[1].to_ascii_lowercase().as_str() {
-                    kind @ ("romaji-words" | "translation-words") => {
-                        let words = romanization_words(&value);
-                        if !words.is_empty() {
-                            let target = if kind == "romaji-words" {
-                                &mut romaji_words
-                            } else {
-                                &mut translation_words
-                            };
-                            insert_first(target, time, words);
-                        }
+            // Earlier versions wrote base64 under the old names.
+            let written = c[1].to_ascii_lowercase();
+            let (kind, readable) = match written.as_str() {
+                "romanized" => ("romaji", true),
+                "romanized-words" => ("romaji-words", true),
+                "translated" => ("translation", true),
+                "translated-words" => ("translation-words", true),
+                legacy => (legacy, false),
+            };
+            if let Some(time) = parse_int(&c[2]) {
+                if kind.ends_with("-words") {
+                    let words = if readable {
+                        supplement_words(&c[3])
+                    } else {
+                        decode_supplement(&c[3])
+                            .filter(|value| !value.is_empty())
+                            .map(|value| romanization_words(&value))
+                            .unwrap_or_default()
+                    };
+                    if !words.is_empty() {
+                        let target = if kind == "romaji-words" {
+                            &mut romaji_words
+                        } else {
+                            &mut translation_words
+                        };
+                        insert_first(target, time, words);
                     }
-                    "romaji" => insert_first(&mut romaji, time, value),
-                    _ => insert_first(&mut translation, time, value),
+                } else {
+                    let value = if readable {
+                        Some(trim(&unescape_supplement(&c[3])).to_string())
+                    } else {
+                        decode_supplement(&c[3])
+                    };
+                    if let Some(value) = value.filter(|value| !value.is_empty()) {
+                        let target = if kind == "romaji" {
+                            &mut romaji
+                        } else {
+                            &mut translation
+                        };
+                        insert_first(target, time, value);
+                    }
                 }
             }
             continue;

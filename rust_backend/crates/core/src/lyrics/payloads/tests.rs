@@ -214,7 +214,7 @@ fn supplements_follow_output_timestamps_in_both_apple_modes() {
             let start = if word_timing { 1010 } else { 1009 };
             assert_eq!(lyrics.lines()[0].start_time_ms, start);
             let exported = lrc::with_metadata(&lyrics, "Track", "Artist");
-            assert!(exported.contains(&format!("[x-romaji:{start}:Um9tYW5pemVk]")));
+            assert!(exported.contains(&format!("[x-romanized:{start}:Romanized]")));
             assert!(exported.contains(&lrc::timestamp(start)));
             if word_timing {
                 assert!(exported.contains("<00:01.307>"));
@@ -337,19 +337,17 @@ fn romanization_spans_keep_syllables_spaces_and_original_word_times() {
     assert_eq!(words[2].end_time_ms, 2497);
 
     let output = lrc::with_metadata(&lyrics, "Track", "Artist");
-    let encoded = output
+    let written = output
         .lines()
         .find_map(|line| {
-            line.strip_prefix("[x-romaji-words:1010:")
+            line.strip_prefix("[x-romanized-words:1010:")
                 .and_then(|line| line.strip_suffix(']'))
         })
         .unwrap();
-    use base64::Engine;
-    let decoded = base64::engine::general_purpose::STANDARD
-        .decode(encoded)
-        .unwrap();
-    let restored: Vec<LyricsWord> = serde_json::from_slice(&decoded).unwrap();
-    assert_eq!(&restored, words);
+    assert_eq!(
+        written,
+        "<00:01.009>Ro<00:01.107>ma <00:01.307><00:02.003>nized<00:02.497>"
+    );
 }
 
 #[test]

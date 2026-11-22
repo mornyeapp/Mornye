@@ -9,16 +9,14 @@ import 'package:mornye/services/lyrics_sidecar.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/lyric_supplement_tags.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 
 String _encoded(String text) => base64.encode(utf8.encode(text));
 
 Future<ParsedLyrics> _parse(String? raw) async => LyricsParser.parse(raw);
 
-final _translationWords = jsonEncode([
-  {'text': 'Hola ', 'startTimeMs': 1000, 'endTimeMs': 1400},
-  {'text': 'mundo', 'startTimeMs': 1400, 'endTimeMs': 2000},
-]);
+const _translationWords = '<00:01.00>Hola <00:01.40>mundo<00:02.00>';
 
 ParsedLyrics _translated(ParsedLyrics lyrics, List<String?> translations) =>
     applyLyricsTranslation(
@@ -73,12 +71,12 @@ void main() {
       final mlrc = buildMlrc(raw: raw, shown: shown);
       expect(
         mlrc,
-        '[x-mlrc:1]\n'
+        '[x-mlrc:2]\n'
         '[ti:Song]\n'
         '[00:01.00]Hola\n'
-        '[x-translation:1000:${_encoded('Hello')}]\n'
+        '[x-translated:1000:Hello]\n'
         '[00:02.00]Mundo\n'
-        '[x-translation:2000:${_encoded('World')}]\n',
+        '[x-translated:2000:World]\n',
       );
       final read = await readMlrc(mlrc, _parse);
       expect(read.lines.map((line) => line.translation), ['Hello', 'World']);
@@ -138,11 +136,11 @@ void main() {
       );
       expect(
         mlrc,
-        '[x-mlrc:1]\n'
+        '[x-mlrc:2]\n'
         '[00:01.00]v2: <00:01.00>Hello <00:01.50>world<00:02.00>\n'
-        '[x-romaji:1000:${_encoded('Hello world')}]\n'
-        '[x-translation-words:1000:${_encoded(_translationWords)}]\n'
-        '[x-translation:1000:${_encoded('Hola mundo')}]\n'
+        '[x-romanized:1000:Hello world]\n'
+        '[x-translated-words:1000:$_translationWords]\n'
+        '[x-translated:1000:Hola mundo]\n'
         '[bg:<00:01.20>ooh<00:01.60>]\n',
       );
       final read = await readMlrc(mlrc, _parse);
@@ -154,7 +152,7 @@ void main() {
       ]);
       expect(read.lines.first.translation, 'Hola mundo');
       expect(
-        lyricWordsSupplement(read.lines.first.translationWords),
+        encodeLyricWordsTag(read.lines.first.translationWords),
         _translationWords,
       );
       expect(read.lines.last.isBackground, isTrue);
@@ -173,11 +171,11 @@ void main() {
       final mlrc = buildMlrc(raw: 'Hola\n\nMundo', shown: shown);
       expect(
         mlrc,
-        '[x-mlrc:1]\n'
+        '[x-mlrc:2]\n'
         'Hola\n'
-        '[x-translation:0:${_encoded('Hello')}]\n'
+        '[x-translated:0:Hello]\n'
         'Mundo\n'
-        '[x-translation:1:${_encoded('World')}]\n',
+        '[x-translated:1:World]\n',
       );
       final read = await readMlrc(mlrc, _parse);
       expect(read.synced, isFalse);
@@ -364,8 +362,7 @@ void main() {
         _translated(metadata.lyrics, ['Hello']),
         preferSidecar: false,
       );
-      final tagged =
-          '[00:01.00]Hola\n[x-translation:1000:${_encoded('Hello')}]';
+      const tagged = '[00:01.00]Hola\n[x-translated:1000:Hello]';
       expect(target, LyricsSaveTarget.songFile);
       expect(lrcFile.files[_source], tagged);
       expect(metadata.rawLyrics, tagged);
@@ -378,6 +375,7 @@ void main() {
       expect(saved, isEmpty);
     });
 
+    // Version 1 files, with base64 tags, are still read.
     test('shows what the .mlrc file saved over the song', () async {
       final sidecar = _MemorySidecar()
         ..files[_source] =
@@ -433,12 +431,11 @@ void main() {
           _translated(metadata.lyrics, ['Hello']),
           preferSidecar: preferSidecar,
         );
-        final tagged =
-            '[00:01.00]Hola\n[x-translation:1000:${_encoded('Hello')}]';
+        const tagged = '[00:01.00]Hola\n[x-translated:1000:Hello]';
         if (preferSidecar) {
           expect(target, LyricsSaveTarget.sidecar);
           expect(saved, isEmpty);
-          expect(sidecar.files[_source], '[x-mlrc:1]\n$tagged\n');
+          expect(sidecar.files[_source], '[x-mlrc:2]\n$tagged\n');
           expect(metadata.rawLyrics, '[00:01.00]Hola');
         } else {
           expect(target, LyricsSaveTarget.songFile);
@@ -471,9 +468,9 @@ void main() {
         _translated(metadata.lyrics, ['New']),
         preferSidecar: false,
       );
-      final tagged = '[00:01.00]Hola\n[x-translation:1000:${_encoded('New')}]';
+      const tagged = '[00:01.00]Hola\n[x-translated:1000:New]';
       expect(saved, [tagged]);
-      expect(sidecar.files[_source], '[x-mlrc:1]\n$tagged\n');
+      expect(sidecar.files[_source], '[x-mlrc:2]\n$tagged\n');
       expect(metadata.lyrics.lines.single.translation, 'New');
     });
 
@@ -498,7 +495,7 @@ void main() {
           );
           expect(
             sidecar.files[_source],
-            '[x-mlrc:1]\nHola\n[x-translation:0:${_encoded('Hello')}]\n',
+            '[x-mlrc:2]\nHola\n[x-translated:0:Hello]\n',
           );
           expect(metadata.lyrics.lines.single.translation, 'Hello');
         } else {

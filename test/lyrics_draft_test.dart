@@ -12,7 +12,7 @@ void main() {
       '[ti:Example]',
       '[ar:Artist]',
       '[00:01.00]v1: <00:01.00>First <00:01.50>line',
-      '[x-translation:1000:${_b64('Primera')}]',
+      '[x-translated:1000:Primera]',
       '[bg:<00:01.20>(ooh)]',
       '[00:04.25]Second line',
       'Written by: Someone',
@@ -25,11 +25,34 @@ void main() {
     expect(draft.toLrc(), raw);
   });
 
+  test('base64 tags of earlier versions are written as readable text', () {
+    final draft = LyricsDraft.parse(
+      [
+        '[00:01.00]Line',
+        '[x-romaji:1000:${_b64('Rain')}]',
+        '[x-translation:1000:${_b64('Text ]\nnext \\ line')}]',
+        '[x-translation:1000:%%%]',
+      ].join('\n'),
+    );
+    expect(
+      draft.toLrc(),
+      [
+        '[00:01.00]Line',
+        '[x-romanized:1000:Rain]',
+        r'[x-translated:1000:Text ]\nnext \\ line]',
+      ].join('\n'),
+    );
+    expect(
+      LyricsParser.parse(draft.toLrc()).lines.single.translation,
+      'Text ]\nnext \\ line',
+    );
+  });
+
   test('a moved line carries its word timing and translation key', () {
     final draft = LyricsDraft.parse(
       [
         '[00:01.00]<00:01.00>First <00:01.50>line',
-        '[x-translation:1000:${_b64('Primera')}]',
+        '[x-translated:1000:Primera]',
         '[00:04.00]Second',
       ].join('\n'),
     );
@@ -43,7 +66,7 @@ void main() {
       moved.toLrc(),
       [
         '[00:02.00]<00:02.00>First <00:02.50>line',
-        '[x-translation:2000:${_b64('Primera')}]',
+        '[x-translated:2000:Primera]',
         '[00:04.00]Second',
       ].join('\n'),
     );
@@ -56,6 +79,7 @@ void main() {
   });
 
   test('a moved line carries its pronunciation and translation timing', () {
+    // Earlier versions' base64 JSON, written back readable.
     String words(int start) => _b64(
       jsonEncode([
         {'text': 'Pri', 'startTimeMs': start, 'endTimeMs': start + 300},
@@ -86,10 +110,10 @@ void main() {
       moved.toLrc(),
       [
         '[00:02.00]<00:02.00>First <00:02.50>line',
-        '[x-romaji-words:2000:${words(2000)}]',
-        '[x-romaji:2000:${_b64('Primera')}]',
-        '[x-translation-words:2000:${words(2000)}]',
-        '[x-translation:2000:${_b64('Primera')}]',
+        '[x-romanized-words:2000:<00:02.00>Pri<00:02.30>mera<00:02.60>]',
+        '[x-romanized:2000:Primera]',
+        '[x-translated-words:2000:<00:02.00>Pri<00:02.30>mera<00:02.60>]',
+        '[x-translated:2000:Primera]',
       ].join('\n'),
     );
     final line = LyricsParser.parse(moved.toLrc()).lines.single;
@@ -110,7 +134,8 @@ void main() {
       [
         '[offset:500]',
         '[00:02.00]<00:02.00>Line',
-        '[x-translation:2000:${_b64('Linea')}]',
+        '[x-translated-words:2000:<00:02.00>Li<00:02.20>nea<00:02.80>]',
+        '[x-translated:2000:Linea]',
       ].join('\n'),
     );
     expect(draft.lines.single.time, const Duration(milliseconds: 1500));
@@ -118,7 +143,8 @@ void main() {
       draft.toLrc(),
       [
         '[00:01.50]<00:01.50>Line',
-        '[x-translation:1500:${_b64('Linea')}]',
+        '[x-translated-words:1500:<00:01.50>Li<00:01.70>nea<00:02.30>]',
+        '[x-translated:1500:Linea]',
       ].join('\n'),
     );
   });
