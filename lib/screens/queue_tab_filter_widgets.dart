@@ -1101,6 +1101,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
         ?completenessLabel,
       ].join('. '),
       child: DesktopContextMenuRegion(
+        touch: true,
         onContextMenu: (position) => showContextMenu(
           context,
           position: position,

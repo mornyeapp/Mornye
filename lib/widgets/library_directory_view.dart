@@ -785,6 +785,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
     return Semantics(
       button: true,
       child: DesktopContextMenuRegion(
+        touch: true,
         onContextMenu: (position) => _showFolderMenu(folder, position),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,

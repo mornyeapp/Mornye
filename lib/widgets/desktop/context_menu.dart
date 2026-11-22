@@ -238,16 +238,21 @@ Offset? contextMenuPositionBelow(BuildContext context) {
 /// Opens [onContextMenu] on desktop on a right-click, a Control-click on
 /// macOS, or Shift+F10 and the Menu key while the item or its
 /// [DesktopListScope] has focus. Phones and tablets get [child] unchanged;
-/// their long press keeps the same actions.
+/// their long press keeps the same actions, or opens this menu with [touch].
 class DesktopContextMenuRegion extends StatefulWidget {
   const DesktopContextMenuRegion({
     super.key,
     required this.onContextMenu,
     required this.child,
+    this.touch = false,
   });
 
   /// Opens the item's menu at a global position. Null turns the region off.
   final ValueChanged<Offset>? onContextMenu;
+
+  /// Whether a long press opens the menu on phones and tablets, for items
+  /// with no long press of their own.
+  final bool touch;
   final Widget child;
 
   @override
@@ -276,7 +281,14 @@ class _DesktopContextMenuRegionState extends State<DesktopContextMenuRegion>
   Widget build(BuildContext context) {
     final onContextMenu = widget.onContextMenu;
     if ((!isDesktopPlatform && !isAndroidTv) || onContextMenu == null) {
-      return widget.child;
+      if (!widget.touch || onContextMenu == null) return widget.child;
+      return GestureDetector(
+        onLongPressStart: (details) {
+          HapticFeedback.mediumImpact();
+          onContextMenu(details.globalPosition);
+        },
+        child: widget.child,
+      );
     }
     return Focus(
       canRequestFocus: false,

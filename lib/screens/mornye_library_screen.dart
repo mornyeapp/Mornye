@@ -644,6 +644,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
                     return Column(
                       children: [
                         DesktopContextMenuRegion(
+                          touch: true,
                           onContextMenu: (position) => showContextMenu(
                             context,
                             position: position,
@@ -722,6 +723,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
                         itemBuilder: (context, index) {
                           final entry = _rows[index];
                           return DesktopContextMenuRegion(
+                            touch: true,
                             onContextMenu: (position) =>
                                 _showAlbumMenu(entry, position),
                             child: _buildAlbumTile(entry, colors),

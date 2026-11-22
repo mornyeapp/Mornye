@@ -744,7 +744,7 @@ class _BrowseRow extends StatelessWidget {
               songFile: entry.samplePath,
             ),
     );
-    return Padding(
+    final row = Padding(
       padding: EdgeInsets.fromLTRB(16, first ? 0 : 1, 16, last ? 4 : 1),
       child: Material(
         color: settingsGroupColor(context),
@@ -793,6 +793,34 @@ class _BrowseRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+    return Consumer(
+      builder: (context, ref, child) => DesktopContextMenuRegion(
+        touch: true,
+        onContextMenu: (position) => showContextMenu(
+          context,
+          position: position,
+          groups: [
+            [
+              ContextMenuAction(
+                icon: Icons.open_in_new,
+                label: context.l10n.desktopMenuOpen,
+                onSelected: onTap,
+              ),
+              homePinMenuAction(
+                context,
+                ref,
+                homePinOfBrowseEntry(
+                  entry,
+                  artist ? HomePinKind.artist : HomePinKind.genre,
+                ),
+              ),
+            ],
+          ],
+        ),
+        child: child!,
+      ),
+      child: row,
     );
   }
 }
