@@ -262,7 +262,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:${rootProject.extra["media3Version"]}")
     // NativeDownloadFinalizer imports FFmpegKit APIs directly. The Flutter
     // plugin owns the runtime AAR; compileOnly avoids packaging it twice here.
-    compileOnly("com.antonkarpenko:ffmpeg-kit-audio:2.2.3")
+    compileOnly("com.antonkarpenko:ffmpeg-kit-audio:2.3.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")

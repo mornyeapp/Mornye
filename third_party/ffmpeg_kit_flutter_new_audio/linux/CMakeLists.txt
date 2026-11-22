@@ -10,6 +10,7 @@ set(PLUGIN_NAME "ffmpeg_kit_flutter_new_audio_plugin")
 
 add_library(${PLUGIN_NAME} SHARED
   "ffmpeg_kit_flutter_plugin.cc"
+  "ffmpeg_kit_library_loader.cc"
 )
 
 # apply_standard_settings comes from the host application's linux/CMakeLists.txt.
@@ -73,8 +74,12 @@ endif()
 # never reached through a symlink. The cost is one download per build
 # configuration rather than one per machine.
 set(FFMPEGKIT_PREBUILT_DIR "${CMAKE_CURRENT_BINARY_DIR}/ffmpeg-kit")
-set(FFMPEGKIT_PACKAGE "audio" CACHE STRING "FFmpegKit variant: min, min-gpl, https, https-gpl, audio, video, full, full-gpl")
-set(FFMPEGKIT_VERSION "8.1.2" CACHE STRING "FFmpegKit release version")
+# The release this plugin version uses. Plain variables, not cache entries: a
+# cached value would outlive an upgrade of the plugin, or a switch to another of
+# its packages, in an existing build folder, which would then keep the old
+# release's libraries until `flutter clean`.
+set(FFMPEGKIT_PACKAGE "audio")
+set(FFMPEGKIT_VERSION "8.1.3")
 set(FFMPEGKIT_LOCAL_DIR "" CACHE PATH "Path to a locally-built bundle (a dir containing lib/) to use instead of downloading")
 
 if(NOT FFMPEGKIT_LOCAL_DIR AND DEFINED ENV{FFMPEGKIT_LOCAL_DIR})
@@ -98,6 +103,10 @@ if(FFMPEGKIT_LOCAL_DIR)
 else()
   set(FFMPEGKIT_WANT "${FFMPEGKIT_RELEASE_TAG}-${FFMPEGKIT_ARCH}")
 endif()
+# Bundle layout revision, recorded in the marker so build trees unpacked by an
+# older plugin re-fetch once. 2: libffmpegkit.so with the C API fixes from
+# ffmpeg-kit PR #5.
+string(APPEND FFMPEGKIT_WANT " layout=2")
 set(FFMPEGKIT_HAVE "")
 if(EXISTS "${FFMPEGKIT_MARKER}")
   file(READ "${FFMPEGKIT_MARKER}" FFMPEGKIT_HAVE)

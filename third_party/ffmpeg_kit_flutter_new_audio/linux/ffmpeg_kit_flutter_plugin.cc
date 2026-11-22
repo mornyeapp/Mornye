@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "ffmpeg_kit_library_loader.h"
+
 #define METHOD_CHANNEL_NAME "flutter.arthenica.com/ffmpeg_kit"
 #define EVENT_CHANNEL_NAME  "flutter.arthenica.com/ffmpeg_kit_event"
 
@@ -708,11 +710,9 @@ static FlMethodErrorResponse* cancel_cb(FlEventChannel* /*channel*/, FlValue* /*
 /* --- lifecycle -------------------------------------------------------------- */
 
 static gboolean load_native_library(FFmpegKitFlutterPlugin* self) {
-  /* Bundled next to the executable in lib/, which the Flutter Linux runner adds
-   * to the RPATH, so the bare soname resolves without an absolute path. */
-  self->lib = dlopen("libffmpegkit.so", RTLD_NOW | RTLD_GLOBAL);
+  self->lib = ffmpeg_kit_load_library();
   if (self->lib == NULL) {
-    g_warning("ffmpeg_kit: dlopen(libffmpegkit.so) failed: %s", dlerror());
+    g_warning("ffmpeg_kit: loading libffmpegkit.so failed: %s", dlerror());
     return FALSE;
   }
 

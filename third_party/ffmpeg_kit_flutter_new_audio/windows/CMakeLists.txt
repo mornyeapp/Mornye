@@ -104,8 +104,13 @@ message(STATUS "FFmpegKit prebuilt dir: ${FFMPEGKIT_PREBUILT_DIR} (arch: ${FFMPE
 #     `FFMPEGKIT_VARIANT=audio ./windows.sh` in ffmpeg-kit — consume a self-built bundle by setting
 #     FFMPEGKIT_LOCAL_DIR.
 # audio contains no GPL components and stays under the default LGPL 3.0 license.
-set(FFMPEGKIT_PACKAGE "audio" CACHE STRING "FFmpegKit variant: audio, video, min, https, full, ...")
-set(FFMPEGKIT_VERSION "8.1.2" CACHE STRING "FFmpegKit release version")
+#
+# The release this plugin version uses. Plain variables, not cache entries: a
+# cached value would outlive an upgrade of the plugin, or a switch to another of
+# its packages, in an existing build folder, which would then keep the old
+# release's libraries until `flutter clean`.
+set(FFMPEGKIT_PACKAGE "audio")
+set(FFMPEGKIT_VERSION "8.1.3")
 set(FFMPEGKIT_LOCAL_DIR "" CACHE PATH "Path to a locally-built bundle (dir containing bin/ [+ include/]) to use instead of downloading")
 
 # Allow pointing at a local bundle via the environment too, so it can be set
@@ -145,7 +150,9 @@ endif()
 # Bundle layout revision, recorded in the marker so build trees unpacked by an
 # older plugin re-fetch once. 2: the archive carries LICENSES/. 3: the DLLs are
 # no longer patched in place, so trees holding patched copies get fresh ones.
-string(APPEND FFMPEGKIT_WANT " layout=3")
+# 4: libffmpegkit.dll with working registered pipes (#175) and the C API fixes
+# from ffmpeg-kit PR #5.
+string(APPEND FFMPEGKIT_WANT " layout=4")
 if(FFMPEGKIT_DISABLE_ASLR)
   # The workaround rewrites the DLLs in place, so toggling it must re-fetch.
   string(APPEND FFMPEGKIT_WANT " aslr=off")
