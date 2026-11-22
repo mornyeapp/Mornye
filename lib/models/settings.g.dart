@@ -167,6 +167,9 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       const ['shuffle', 'equalizer', 'listeningStats', 'networkStorage'],
   homeContinueListening: json['homeContinueListening'] as bool? ?? true,
   homeRecommendations: json['homeRecommendations'] as bool? ?? true,
+  homeLayout: json['homeLayout'] == null
+      ? const HomeLayout()
+      : homeLayoutFromJson(json['homeLayout']),
   separateSingles: json['separateSingles'] as bool? ?? false,
   singleFilenameFormat:
       json['singleFilenameFormat'] as String? ?? '{title} - {artist}',
@@ -371,6 +374,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'homeShortcuts': instance.homeShortcuts,
   'homeContinueListening': instance.homeContinueListening,
   'homeRecommendations': instance.homeRecommendations,
+  'homeLayout': instance.homeLayout.toJson(),
   'separateSingles': instance.separateSingles,
   'singleFilenameFormat': instance.singleFilenameFormat,
   'albumFolderStructure': instance.albumFolderStructure,

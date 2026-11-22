@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/models/home_layout.dart';
 import 'package:mornye/models/home_shortcut.dart';
 import 'package:mornye/models/metadata_separators.dart';
 import 'package:mornye/models/automix_options.dart';
@@ -1081,6 +1082,31 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setHomeRecommendations(bool enabled) =>
       _commit(state.copyWith(homeRecommendations: enabled));
+
+  void setHomeLayout(HomeLayout layout) =>
+      _commit(state.copyWith(homeLayout: layout));
+
+  /// Shows or hides a Home section, through the switch it had before the
+  /// layout when it has one.
+  void setHomeSectionVisible(HomeSection section, bool visible) =>
+      _commit(switch (section) {
+        HomeSection.continueListening => state.copyWith(
+          homeContinueListening: visible,
+        ),
+        HomeSection.recommended => state.copyWith(homeRecommendations: visible),
+        _ => state.copyWith(
+          homeLayout: state.homeLayout.withVisible(section, visible),
+        ),
+      });
+
+  /// Home's sections as they ship: order and what shows.
+  void resetHomeLayout() => _commit(
+    state.copyWith(
+      homeLayout: const HomeLayout(),
+      homeContinueListening: true,
+      homeRecommendations: true,
+    ),
+  );
 
   void setDefaultLibraryView(String view) => _commit(
     state.copyWith(defaultLibraryView: _normalizeDefaultLibraryView(view)),

@@ -456,7 +456,9 @@ class _HomeSections extends ConsumerWidget {
         ? ref.watch(homeLibraryAlbumsProvider.select((s) => s.value)) ??
               const <LibraryBrowseEntry>[]
         : const <LibraryBrowseEntry>[];
-    final pickedAlbums = mornye
+    final layout = ref.watch(settingsProvider.select((s) => s.homeLayout));
+    // Hidden Top Picks leave their albums to From your Library.
+    final pickedAlbums = mornye && layout.shows(HomeSection.topPicks)
         ? dayAlbums.take(_homeTopPickLibraryAlbums).toList()
         : const <LibraryBrowseEntry>[];
     final libraryAlbums = recordsListening
@@ -495,19 +497,25 @@ class _HomeSections extends ConsumerWidget {
         (pickedAlbums.isNotEmpty ||
             pickedReleases.isNotEmpty ||
             _HomeTopPicksSection.hasPicks(ref, mixes: showPlayer));
-    final sections = <Widget>[
+    // What each section has to show now, before the person's order and
+    // their hidden sections apply.
+    final built = <HomeSection, Widget>{
       if (hasTopPicks)
-        _HomeTopPicksSection(
+        HomeSection.topPicks: _HomeTopPicksSection(
           inset: inset,
           mixes: showPlayer,
           libraryAlbums: pickedAlbums,
           releases: pickedReleases,
         ),
-      if (_homeDesktop(context))
-        _HomeDesktopTop(inset: inset, showContinue: showContinue)
-      else ...[
+      // The desktop top holds both; without Shortcuts the card stands alone.
+      if (_homeDesktop(context) && layout.shows(HomeSection.shortcuts))
+        HomeSection.shortcuts: _HomeDesktopTop(
+          inset: inset,
+          showContinue: showContinue,
+        )
+      else ...{
         if (recentlyPlayed.isNotEmpty)
-          _HomeSection(
+          HomeSection.recentlyPlayed: _HomeSection(
             title: l10n.homeRecentlyPlayed,
             inset: inset,
             shelf: true,
@@ -521,30 +529,30 @@ class _HomeSections extends ConsumerWidget {
             ),
           )
         else if (showContinue && !recentlyPlayedLoading)
-          _HomeSection(
+          HomeSection.continueListening: _HomeSection(
             title: l10n.homeContinueListening,
             inset: inset,
             child: const _HomeContinueListeningCard(),
           ),
         // Mornye exposes these tools in the player and Settings.
         if (!mornye)
-          _HomeSection(
+          HomeSection.shortcuts: _HomeSection(
             title: l10n.homeShortcuts,
             inset: inset,
             child: const _HomeShortcuts(),
           ),
-      ],
+      },
       // Built after startup settles when nothing is cached: the sections'
       // size animation opens its space rather than letting it jump in.
       if (!mornye && mixes != null && mixes.isNotEmpty)
-        _HomeSection(
+        HomeSection.mixes: _HomeSection(
           title: l10n.homeMixesForYou,
           inset: inset,
           shelf: true,
           child: _HomeMixesShelf(mixes: mixes, inset: inset),
         ),
       if (recentlyAdded != null && recentlyAdded.items.isNotEmpty)
-        _HomeSection(
+        HomeSection.recentlyAdded: _HomeSection(
           title: l10n.homeRecentlyAdded,
           inset: inset,
           shelf: true,
@@ -555,7 +563,7 @@ class _HomeSections extends ConsumerWidget {
           ),
         ),
       if (recommended.isNotEmpty)
-        _HomeSection(
+        HomeSection.recommended: _HomeSection(
           title: l10n.homeRecommendedForYou,
           inset: inset,
           shelf: true,
@@ -565,7 +573,7 @@ class _HomeSections extends ConsumerWidget {
           ),
         ),
       if (newReleases.isNotEmpty)
-        _HomeSection(
+        HomeSection.newReleases: _HomeSection(
           title: l10n.weeklyReleases,
           inset: inset,
           shelf: true,
@@ -579,7 +587,7 @@ class _HomeSections extends ConsumerWidget {
           ),
         ),
       if (onRepeat.isNotEmpty)
-        _HomeSection(
+        HomeSection.onRepeat: _HomeSection(
           title: l10n.homeOnRepeat,
           inset: inset,
           shelf: true,
@@ -589,7 +597,7 @@ class _HomeSections extends ConsumerWidget {
           ),
         )
       else if (libraryAlbums.isNotEmpty)
-        _HomeSection(
+        HomeSection.onRepeat: _HomeSection(
           title: l10n.homeFromYourLibrary,
           inset: inset,
           shelf: true,
@@ -598,14 +606,19 @@ class _HomeSections extends ConsumerWidget {
             inset: mornye ? inset + 8 : inset,
           ),
         ),
+    };
+    final sections = [
+      for (final section in layout.sections)
+        if (layout.shows(section)) ?built[section],
     ];
 
     // An empty Library with nothing played leaves Home without shelves (the
     // Material Home keeps its Shortcuts): say so, and lead to Search, once
-    // the Library shelves have answered.
-    final bare = mornye
-        ? sections.isEmpty
-        : !showContinue && sections.length == 1;
+    // the Library shelves have answered. Hidden sections do not count: a
+    // Home the person emptied is not a Library with nothing in it.
+    final bare =
+        !showContinue &&
+        built.keys.every((section) => section == HomeSection.shortcuts);
     Widget? nothingYet;
     if (bare) {
       final librarySettled = ref.watch(
@@ -642,10 +655,27 @@ class _HomeSections extends ConsumerWidget {
             section,
           ],
           ?nothingYet,
+          // Nothing to arrange while Home has nothing: Find music leads.
+          if (!bare) ...[const SizedBox(height: 28), const _HomeEditButton()],
         ],
       ),
     );
   }
+}
+
+/// The way from the end of Home to the page that arranges it.
+class _HomeEditButton extends StatelessWidget {
+  const _HomeEditButton();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: ExpressiveButton(
+      text: true,
+      onPressed: () => pushPage<void>(context, (_) => const HomeLayoutPage()),
+      icon: const Icon(Icons.tune),
+      child: Text(context.l10n.homeEdit),
+    ),
+  );
 }
 
 /// Continue listening and Shortcuts on the Material desktop Home: side by

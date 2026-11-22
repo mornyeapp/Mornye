@@ -10021,6 +10021,54 @@
   "@homeMixSaveAsPlaylist": {
     "description": "Action that saves a daily mix's songs into one of the user's playlists"
   },
+  "homeEdit": "Edit Home",
+  "@homeEdit": {
+    "description": "Button at the end of Home and settings row that open the page where Home's sections are reordered and hidden"
+  },
+  "homeEditSubtitle": "Which sections show, and in what order",
+  "@homeEditSubtitle": {
+    "description": "Subtitle of the Edit Home settings row"
+  },
+  "homeEditHint": "Drag to reorder. A section with nothing to show stays off Home.",
+  "@homeEditHint": {
+    "description": "Hint above the list of Home sections on the Edit Home page"
+  },
+  "homeSectionAboutTopPicks": "Today's mixes and playlists as banners",
+  "@homeSectionAboutTopPicks": {
+    "description": "Edit Home: what the Top Picks section shows"
+  },
+  "homeSectionAboutRecentlyPlayed": "Albums you played lately",
+  "@homeSectionAboutRecentlyPlayed": {
+    "description": "Edit Home: what the Recently Played section shows"
+  },
+  "homeSectionAboutShortcuts": "Quick ways into tools and collections",
+  "@homeSectionAboutShortcuts": {
+    "description": "Edit Home: what the Shortcuts section shows"
+  },
+  "homeSectionAboutMixes": "Daily mixes of your own songs",
+  "@homeSectionAboutMixes": {
+    "description": "Edit Home: what the Mixes for you section shows"
+  },
+  "homeSectionAboutRecentlyAdded": "The newest songs in your Library",
+  "@homeSectionAboutRecentlyAdded": {
+    "description": "Edit Home: what the Recently added section shows"
+  },
+  "homeSectionAboutNewReleases": "New music from your favorite artists",
+  "@homeSectionAboutNewReleases": {
+    "description": "Edit Home: what the new releases section shows"
+  },
+  "homeSectionAboutOnRepeat": "Your most played songs, or Library albums while listening is not recorded",
+  "@homeSectionAboutOnRepeat": {
+    "description": "Edit Home: what the On repeat section shows"
+  },
+  "homeReset": "Reset Home",
+  "@homeReset": {
+    "description": "Action on the Edit Home page and title of its confirmation"
+  },
+  "homeResetMessage": "Home's sections go back to the order they came in, and all of them show.",
+  "@homeResetMessage": {
+    "description": "Confirmation message before Home's sections are reset"
+  },
   "artistUpcomingConcerts": "Upcoming Concerts",
   "artistAllUpcomingConcerts": "All Upcoming Concerts",
   "artistNoUpcomingConcerts": "No upcoming concerts.",

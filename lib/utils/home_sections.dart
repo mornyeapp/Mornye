@@ -1,0 +1,43 @@
+import 'package:material_ui/material_ui.dart';
+import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/models/home_layout.dart';
+
+/// The title Home gives [section].
+String homeSectionName(AppLocalizations l10n, HomeSection section) =>
+    switch (section) {
+      HomeSection.topPicks => l10n.homeTopPicks,
+      HomeSection.recentlyPlayed => l10n.homeRecentlyPlayed,
+      HomeSection.continueListening => l10n.homeContinueListening,
+      HomeSection.shortcuts => l10n.homeShortcuts,
+      HomeSection.mixes => l10n.homeMixesForYou,
+      HomeSection.recentlyAdded => l10n.homeRecentlyAdded,
+      HomeSection.recommended => l10n.homeRecommendedForYou,
+      HomeSection.newReleases => l10n.weeklyReleases,
+      HomeSection.onRepeat => l10n.homeOnRepeat,
+    };
+
+/// One line on what [section] shows, for the page that arranges Home.
+String homeSectionAbout(AppLocalizations l10n, HomeSection section) =>
+    switch (section) {
+      HomeSection.topPicks => l10n.homeSectionAboutTopPicks,
+      HomeSection.recentlyPlayed => l10n.homeSectionAboutRecentlyPlayed,
+      HomeSection.continueListening => l10n.appearanceContinueListeningSubtitle,
+      HomeSection.shortcuts => l10n.homeSectionAboutShortcuts,
+      HomeSection.mixes => l10n.homeSectionAboutMixes,
+      HomeSection.recentlyAdded => l10n.homeSectionAboutRecentlyAdded,
+      HomeSection.recommended => l10n.appearanceRecommendationsSubtitle,
+      HomeSection.newReleases => l10n.homeSectionAboutNewReleases,
+      HomeSection.onRepeat => l10n.homeSectionAboutOnRepeat,
+    };
+
+IconData homeSectionIcon(HomeSection section) => switch (section) {
+  HomeSection.topPicks => Icons.auto_awesome_mosaic_outlined,
+  HomeSection.recentlyPlayed => Icons.history,
+  HomeSection.continueListening => Icons.play_circle_outline,
+  HomeSection.shortcuts => Icons.apps,
+  HomeSection.mixes => Icons.queue_music,
+  HomeSection.recentlyAdded => Icons.library_add_outlined,
+  HomeSection.recommended => Icons.auto_awesome_outlined,
+  HomeSection.newReleases => Icons.new_releases_outlined,
+  HomeSection.onRepeat => Icons.repeat,
+};

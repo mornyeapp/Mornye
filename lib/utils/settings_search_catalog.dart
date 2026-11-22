@@ -181,6 +181,22 @@ class SettingsSearchCatalog {
              keywords: const ['home', 'suggestions', 'discover', 'rekomendasi'],
            ),
            SettingsSearchEntry(
+             icon: Icons.tune,
+             title: l10n.homeEdit,
+             subtitle: l10n.homeEditSubtitle,
+             keywords: const [
+               'home',
+               'beranda',
+               'layout',
+               'reorder',
+               'order',
+               'hide',
+               'sections',
+               'customize',
+               'urutan',
+             ],
+           ),
+           SettingsSearchEntry(
              icon: Icons.language,
              title: l10n.appearanceLanguage,
              keywords: const ['locale', 'translation'],

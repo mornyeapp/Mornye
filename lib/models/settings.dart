@@ -1,9 +1,15 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:mornye/models/automix_options.dart';
+import 'package:mornye/models/home_layout.dart';
 import 'package:mornye/models/metadata_separators.dart';
 import 'package:mornye/utils/artist_utils.dart';
 
 part 'settings.g.dart';
+
+/// A saved Home layout, or the shipped one when there is none to read.
+HomeLayout homeLayoutFromJson(Object? value) => value is Map
+    ? HomeLayout.fromJson(Map<String, dynamic>.from(value))
+    : const HomeLayout();
 
 /// 'default' (a card) or 'fullscreen' once chosen, else empty for the app
 /// style's own ([AppSettings.playerCoverStyleFor]).
@@ -371,6 +377,11 @@ class AppSettings {
   /// Whether Home recommends songs outside the Library, asked from an
   /// extension with a few Library songs as the example.
   final bool homeRecommendations;
+
+  /// The order of Home's sections and the ones turned off. Read what shows
+  /// through [homeShows].
+  @JsonKey(fromJson: homeLayoutFromJson)
+  final HomeLayout homeLayout;
   final bool separateSingles;
   final String singleFilenameFormat;
   final String albumFolderStructure;
@@ -655,6 +666,7 @@ class AppSettings {
     ],
     this.homeContinueListening = true,
     this.homeRecommendations = true,
+    this.homeLayout = const HomeLayout(),
     this.separateSingles = false,
     this.singleFilenameFormat = '{title} - {artist}',
     this.albumFolderStructure = 'artist_album',
@@ -863,6 +875,7 @@ class AppSettings {
     List<String>? homeShortcuts,
     bool? homeContinueListening,
     bool? homeRecommendations,
+    HomeLayout? homeLayout,
     bool? separateSingles,
     String? singleFilenameFormat,
     String? albumFolderStructure,
@@ -1063,6 +1076,7 @@ class AppSettings {
       homeContinueListening:
           homeContinueListening ?? this.homeContinueListening,
       homeRecommendations: homeRecommendations ?? this.homeRecommendations,
+      homeLayout: homeLayout ?? this.homeLayout,
       separateSingles: separateSingles ?? this.separateSingles,
       singleFilenameFormat: singleFilenameFormat ?? this.singleFilenameFormat,
       albumFolderStructure: albumFolderStructure ?? this.albumFolderStructure,
@@ -1174,6 +1188,14 @@ class AppSettings {
           playerLyricSnippetTranslation ?? this.playerLyricSnippetTranslation,
     );
   }
+
+  /// Whether Home shows [section]. Continue listening and Recommended for
+  /// you keep the switches they had before the layout.
+  bool homeShows(HomeSection section) => switch (section) {
+    HomeSection.continueListening => homeContinueListening,
+    HomeSection.recommended => homeRecommendations,
+    _ => homeLayout.shows(section),
+  };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
     final settings = _$AppSettingsFromJson(json);

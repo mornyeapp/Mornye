@@ -6427,6 +6427,18 @@
   "@homeChangeSearchProviderTooltip": {
     "description": "Tooltip for the Home search provider picker"
   },
+  "homeEdit": "Atur Beranda",
+  "homeEditSubtitle": "Bagian mana yang tampil, dan urutannya",
+  "homeEditHint": "Seret untuk mengurutkan. Bagian yang belum ada isinya tidak tampil di Beranda.",
+  "homeSectionAboutTopPicks": "Mix dan playlist hari ini sebagai banner",
+  "homeSectionAboutRecentlyPlayed": "Album yang baru kamu putar",
+  "homeSectionAboutShortcuts": "Jalan cepat ke alat dan koleksi",
+  "homeSectionAboutMixes": "Mix harian dari lagumu sendiri",
+  "homeSectionAboutRecentlyAdded": "Lagu terbaru di Koleksimu",
+  "homeSectionAboutNewReleases": "Musik baru dari artis favoritmu",
+  "homeSectionAboutOnRepeat": "Lagu yang paling sering kamu putar, atau album dari Koleksi selama pemutaran tidak dicatat",
+  "homeReset": "Atur ulang Beranda",
+  "homeResetMessage": "Bagian Beranda kembali ke urutan semula, dan semuanya tampil.",
   "actionPaste": "Tempel",
   "@actionPaste": {
     "description": "Generic action - paste from clipboard"
