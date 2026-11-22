@@ -8,6 +8,7 @@ import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart'
     show headphoneResumeModes, loudVolumeLevels;
+import 'package:mornye/providers/home_recommendations_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/alsa_output_devices.dart';
@@ -131,7 +132,11 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
       destructive: true,
       filled: false,
     );
-    if (confirmed) await resetAutoplayLearning();
+    if (!confirmed) return;
+    await resetAutoplayLearning();
+    // The order of Home's recommended songs came from what was learned.
+    await forgetHomeRecommendationOrder();
+    if (mounted) ref.invalidate(homeRecommendationsProvider);
   }
 
   /// Analysis cannot be restored without analyzing every song again.

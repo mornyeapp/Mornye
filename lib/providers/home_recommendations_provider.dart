@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
@@ -25,6 +27,10 @@ const _cacheKey = 'home_recommendations_v1';
 
 /// How many songs of each kind recommendations start from.
 const _seedsPerKind = 15;
+
+/// How long the shelf waits on what learning knows before it keeps the
+/// extension's order.
+const _fitTimeout = Duration(seconds: 20);
 
 /// Reads the songs recommendations start from: the most played of the last
 /// four weeks, the newest in the Library and the loved ones.
@@ -136,39 +142,101 @@ final homeRecommendationFilterProvider =
     );
 
 /// What Home shows of [homeRecommendationCandidatesProvider]: its first
-/// songs in the order of [homeRecommendationFitProvider], or in the
-/// extension's order until that has a fit.
+/// songs, in the order stored for them. With learning off that is the
+/// extension's order.
 final homeRecommendationsProvider = FutureProvider<List<Track>>((ref) async {
   final tracks = await ref.watch(homeRecommendationCandidatesProvider.future);
-  final fit = ref.watch(homeRecommendationFitProvider).value;
-  return orderHomeRecommendations(
-    tracks,
-    homeRecommendationFits(tracks, fit),
-  ).take(homeRecommendationCount).toList(growable: false);
+  List<Track> first(List<Track> songs) =>
+      songs.take(homeRecommendationCount).toList(growable: false);
+  final learning = ref.watch(
+    settingsProvider.select(
+      (s) => s.autoplayPersonalization && s.usesBuiltInPlayer,
+    ),
+  );
+  if (tracks.isEmpty || !learning) return first(tracks);
+
+  final prefs = await SharedPreferences.getInstance();
+  var order = HomeRecommendationOrder.decode(
+    prefs.getString(homeRecommendationOrderKey),
+  );
+  if (order == null || !order.covers(tracks)) {
+    // New songs wait for their fit, so the shelf takes its order once; the
+    // songs before them stay up meanwhile.
+    final fit = await ref.watch(homeRecommendationFitProvider.future);
+    final fits = homeRecommendationFits(tracks, fit);
+    final byFit =
+        fit != null &&
+        await ref.watch(homeRecommendationOrdersByFitProvider.future);
+    order = HomeRecommendationOrder.of(
+      byFit ? orderHomeRecommendations(tracks, fits) : tracks,
+      tracks,
+      fits,
+    );
+    await prefs.setString(homeRecommendationOrderKey, order.encode());
+  }
+  final fits = order.fits;
+  if (fits.isNotEmpty) {
+    // What the outcome log keeps of a song beside where it shows.
+    ref
+        .read(musicPlayerRuntimeProvider)
+        .suggestionOutcomes
+        .placeRecommendations({
+          for (final (index, track) in tracks.indexed)
+            homeRecommendationKey(track): (
+              sourceRank: index,
+              fit: fits[homeRecommendationKey(track)],
+            ),
+        });
+  }
+  return first(order.apply(tracks));
+});
+
+/// Forgets the shelf's stored order, as resetting learning forgets what it
+/// came from.
+Future<void> forgetHomeRecommendationOrder() async =>
+    (await SharedPreferences.getInstance()).remove(homeRecommendationOrderKey);
+
+/// Whether today's shelf takes the order of its songs' fits: not on a
+/// control day, and not once the outcomes say the fit does not tell what
+/// the listener acts on.
+final homeRecommendationOrdersByFitProvider = FutureProvider<bool>((ref) async {
+  if (homeRecommendationControlDay(listeningDay(DateTime.now()))) return false;
+  final outcomes = ref.read(musicPlayerRuntimeProvider).suggestionOutcomes;
+  await outcomes.refresh();
+  return outcomes.summary.value?.fit.helps ?? true;
 });
 
 /// How well recommended songs fit the listener, from what Autoplay learned.
-/// Null, so the extension's order stays, while learning is off, before
-/// startup settles and before the models know enough.
+/// Null, so the extension's order stays, while learning is off and before
+/// the models know enough. Read once startup has settled.
 final homeRecommendationFitProvider = FutureProvider<HomeRecommendationFit?>((
   ref,
 ) async {
-  // The lasting taste reads the taste log: not before startup settles, as
-  // the Library mixes wait.
-  if (!ref.watch(libraryMixesStartupProvider)) return null;
   if (!ref.watch(settingsProvider.select((s) => s.autoplayPersonalization))) {
     return null;
+  }
+  // The lasting taste reads the taste log: not before startup settles, as
+  // the Library mixes wait.
+  if (!ref.watch(libraryMixesStartupProvider)) {
+    return Completer<HomeRecommendationFit?>().future;
   }
   final runtime = ref.read(musicPlayerRuntimeProvider);
   final learning = runtime.personalization;
   if (!learning.enabled) return null;
-  await learning.ensureLoaded();
-  final taste = await runtime.taste.profile();
-  return homeRecommendationFit(
-    preference: learning.rankingSnapshot,
-    taste: taste,
-    at: DateTime.now(),
-  );
+  try {
+    return await () async {
+      await learning.ensureLoaded();
+      final taste = await runtime.taste.profile();
+      return homeRecommendationFit(
+        preference: learning.rankingSnapshot,
+        taste: taste,
+        at: DateTime.now(),
+      );
+    }().timeout(_fitTimeout);
+  } on Object catch (error) {
+    _log.w('Could not read the fit of Home recommendations: $error');
+    return null;
+  }
 });
 
 /// Songs outside the Library like the ones a person plays, adds and loves,

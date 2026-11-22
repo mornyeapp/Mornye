@@ -5,6 +5,8 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
 import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/collection_suggestions.dart';
+import 'package:mornye/services/suggestion_outcomes.dart'
+    show suggestionSongKey;
 import 'package:mornye/utils/artist_utils.dart' show splitArtistTagValues;
 
 /// How many recommended songs Home shows.
@@ -158,6 +160,98 @@ List<Track> homeRecommendationPool({
 int homeRecommendationRound(String day) {
   final date = DateTime.tryParse('${day}T00:00:00Z');
   return date == null ? 0 : date.difference(DateTime.utc(2020)).inDays;
+}
+
+/// Whether [day] keeps the extension's order though the songs have a fit:
+/// one day in four, so how well the fit tells what the listener acts on is
+/// measured where a song's place owes nothing to it.
+bool homeRecommendationControlDay(String day) =>
+    homeRecommendationRound(day) % 4 == 0;
+
+/// Where the shelf's order is stored.
+const homeRecommendationOrderKey = 'home_recommendation_order_v1';
+
+/// The key a recommended song is ordered and logged under.
+int homeRecommendationKey(Track track) =>
+    suggestionSongKey(track.artistName, track.name);
+
+/// The order the shelf shows its songs in, decided once for a set of songs
+/// so it does not move between launches: their keys in that order, and the
+/// fit of each song that has one.
+class HomeRecommendationOrder {
+  const HomeRecommendationOrder({required this.keys, this.fits = const {}});
+
+  /// [ordered] as the order of [tracks], whose fits are [fits] one by one.
+  factory HomeRecommendationOrder.of(
+    List<Track> ordered,
+    List<Track> tracks,
+    List<double?> fits,
+  ) => HomeRecommendationOrder(
+    keys: [for (final track in ordered) homeRecommendationKey(track)],
+    fits: {
+      for (final (index, track) in tracks.indexed)
+        if (fits[index] case final fit? when fit.isFinite)
+          homeRecommendationKey(track): fit,
+    },
+  );
+
+  final List<int> keys;
+  final Map<int, double> fits;
+
+  /// Whether every one of [tracks] has its place.
+  bool covers(List<Track> tracks) {
+    final known = keys.toSet();
+    return tracks.every(
+      (track) => known.contains(homeRecommendationKey(track)),
+    );
+  }
+
+  /// [tracks] in this order. A song without a place goes last.
+  List<Track> apply(List<Track> tracks) {
+    final places = <int, int>{};
+    for (final (index, key) in keys.indexed) {
+      places.putIfAbsent(key, () => index);
+    }
+    int place(int index) =>
+        places[homeRecommendationKey(tracks[index])] ?? keys.length;
+    final indexes = List.generate(tracks.length, (index) => index)
+      ..sort((a, b) {
+        final order = place(a).compareTo(place(b));
+        return order != 0 ? order : a.compareTo(b);
+      });
+    return [for (final index in indexes) tracks[index]];
+  }
+
+  String encode() => jsonEncode({
+    'keys': keys,
+    'fits': {for (final entry in fits.entries) '${entry.key}': entry.value},
+  });
+
+  static HomeRecommendationOrder? decode(String? value) {
+    if (value == null) return null;
+    try {
+      final json = jsonDecode(value);
+      if (json is! Map) return null;
+      final keys = json['keys'], fits = json['fits'];
+      if (keys is! List || fits is! Map) return null;
+      return HomeRecommendationOrder(
+        keys: [
+          for (final key in keys)
+            if (key is int) key,
+        ],
+        fits: {
+          for (final entry in fits.entries)
+            if ((int.tryParse('${entry.key}'), entry.value) case (
+              final key?,
+              final num fit,
+            ) when fit.isFinite)
+              key: fit.toDouble(),
+        },
+      );
+    } on Object {
+      return null;
+    }
+  }
 }
 
 /// A day's recommendations as stored, with the extension they came from.

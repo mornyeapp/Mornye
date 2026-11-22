@@ -16,6 +16,7 @@ RecommendationImpression _shown(
   int song, {
   required int rank,
   int? sourceRank,
+  double? fit,
   bool acted = false,
   DateTime? at,
 }) => RecommendationImpression(
@@ -24,25 +25,24 @@ RecommendationImpression _shown(
   at: at ?? _start,
   rank: rank,
   sourceRank: sourceRank ?? rank,
+  fit: fit,
   actions: acted ? const {SuggestionAction.downloaded} : const {},
 );
 
-/// [days] shelves of four songs where the extension's order puts the acted
-/// on song last and the shown order puts it [shownRank].
-List<RecommendationImpression> _shelves(int days, {required int shownRank}) => [
-  for (var day = 0; day < days; day++)
-    for (var song = 0; song < 4; song++)
-      _shown(
-        'd$day',
-        day * 10 + song,
-        // Song 3 is the one acted on.
-        sourceRank: song,
-        rank: song == 3
-            ? shownRank
-            : (song < shownRank ? song : song + 1).clamp(0, 3),
-        acted: song == 3,
-      ),
-];
+/// [days] shelves of four songs in the extension's order, the last one
+/// acted on and fitting as [actedFit] against 0.5 for the others.
+List<RecommendationImpression> _shelves(int days, {required double actedFit}) =>
+    [
+      for (var day = 0; day < days; day++)
+        for (var song = 0; song < 4; song++)
+          _shown(
+            'd$day',
+            day * 10 + song,
+            rank: song,
+            fit: song == 3 ? actedFit : 0.5,
+            acted: song == 3,
+          ),
+    ];
 
 AutoplayFeedback _feedback(
   String source, {
@@ -99,78 +99,56 @@ void main() {
     expect((share.hits, share.total), (1, 3));
   });
 
-  test('order AUC pairs songs within a day, ties counting half', () {
+  test('the fit is measured on shelves in the extension\'s order, pairs '
+      'within a day and ties counting half', () {
     final now = _start.add(const Duration(days: 8));
-    // Day a: acted on first, so both pairs are right.
-    // Day b: acted on between two ignored, and one tie.
-    final impressions = [
-      _shown('a', 1, rank: 0, acted: true),
-      _shown('a', 2, rank: 1),
-      _shown('a', 3, rank: 2),
-      _shown('b', 4, rank: 0),
-      _shown('b', 5, rank: 1, acted: true),
-      _shown('b', 6, rank: 2),
-      _shown('b', 7, rank: 1),
+    final evaluation = evaluateRecommendationFit([
+      // Day a: the acted on song fits best, so both pairs are right.
+      _shown('a', 1, rank: 0, fit: 0.9, acted: true),
+      _shown('a', 2, rank: 1, fit: 0.2),
+      _shown('a', 3, rank: 2, fit: 0.1),
+      // Day b: one pair wrong, one tie; a song without a fit has no pair.
+      _shown('b', 4, rank: 0, fit: 0.8),
+      _shown('b', 5, rank: 1, fit: 0.4, acted: true),
+      _shown('b', 6, rank: 2, fit: 0.4),
+      _shown('b', 7, rank: 3),
       // A day without an ignored song has no pair.
-      _shown('c', 8, rank: 5, acted: true),
-    ];
-    expect(
-      recommendationOrderAuc(impressions, (i) => i.rank, now: now),
-      (2 + 0 + 1 + 0.5) / 5,
-    );
-    expect(
-      recommendationOrderAuc(
-        impressions.where((i) => !i.actedOn),
-        (i) => i.rank,
-        now: now,
-      ),
-      isNull,
-    );
+      _shown('c', 8, rank: 0, fit: 0.9, acted: true),
+      // A shelf put in the order of its fits is not measured.
+      _shown('d', 9, rank: 0, sourceRank: 1, fit: 0.9, acted: true),
+      _shown('d', 10, rank: 1, sourceRank: 0, fit: 0.1),
+    ], now: now);
+    expect((evaluation.actedOn, evaluation.ignored), (2, 4));
+    expect(evaluation.auc, (2 + 0 + 0.5) / 4);
+    expect(evaluation.helps, isNull);
   });
 
-  test('the shown order is judged only with enough evidence', () {
+  test('the fit is judged only with enough evidence', () {
     final now = _start.add(const Duration(days: 8));
     // Nine acted on songs are not enough.
     expect(
-      compareRecommendationOrders(
-        _shelves(9, shownRank: 0),
-        now: now,
-      ).shownAtLeastAsGood,
+      evaluateRecommendationFit(_shelves(9, actedFit: 0.9), now: now).helps,
       isNull,
     );
-    final better = compareRecommendationOrders(
-      _shelves(10, shownRank: 0),
+    final better = evaluateRecommendationFit(
+      _shelves(10, actedFit: 0.9),
       now: now,
     );
     expect((better.actedOn, better.ignored), (10, 30));
-    expect((better.shown, better.source), (1.0, 0.0));
-    expect(better.shownAtLeastAsGood, isTrue);
-    // The same order ranks as well as itself.
+    expect(better.auc, 1);
+    expect(better.helps, isTrue);
+    // A fit that tells nothing is no worse than the extension's order.
     expect(
-      compareRecommendationOrders(
-        _shelves(10, shownRank: 3),
-        now: now,
-      ).shownAtLeastAsGood,
+      evaluateRecommendationFit(_shelves(10, actedFit: 0.5), now: now).helps,
       isTrue,
     );
-    final worse = compareRecommendationOrders([
-      for (final impression in _shelves(10, shownRank: 3))
-        RecommendationImpression(
-          day: impression.day,
-          song: impression.song,
-          at: impression.at,
-          rank: impression.rank,
-          sourceRank: 3 - impression.sourceRank,
-          actions: impression.actions,
-        ),
-    ], now: now);
-    expect(worse.shownAtLeastAsGood, isFalse);
+    expect(
+      evaluateRecommendationFit(_shelves(10, actedFit: 0.1), now: now).helps,
+      isFalse,
+    );
     // Unsettled shelves are not evidence yet.
     expect(
-      compareRecommendationOrders(
-        _shelves(10, shownRank: 0),
-        now: _start,
-      ).shownAtLeastAsGood,
+      evaluateRecommendationFit(_shelves(10, actedFit: 0.1), now: _start).helps,
       isNull,
     );
   });
@@ -307,6 +285,25 @@ void main() {
       ],
     );
     expect(rows.first.day, '2026-11-01');
+  });
+
+  test('a shown song takes the place and fit the shelf gave it', () async {
+    final db = await _database();
+    final outcomes = SuggestionOutcomes(open: () async => db)..enabled = true;
+    outcomes.placeRecommendations({
+      suggestionSongKey('Artist', 'Song'): (sourceRank: 5, fit: 0.7),
+      suggestionSongKey('Artist', 'Plain'): (sourceRank: 1, fit: null),
+    });
+    outcomes.recommendationShown(artist: 'Artist', title: 'Song', rank: 0);
+    outcomes.recommendationShown(artist: 'Artist', title: 'Plain', rank: 1);
+    outcomes.recommendationShown(artist: 'Artist', title: 'Unplaced', rank: 2);
+    expect(
+      [
+        for (final row in await outcomes.readImpressions())
+          (row.rank, row.sourceRank, row.fit),
+      ],
+      [(0, 5, 0.7), (1, 1, null), (2, 2, null)],
+    );
   });
 
   test('nothing is logged while learning is off', () async {

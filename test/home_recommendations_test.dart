@@ -20,6 +20,7 @@ import 'package:mornye/services/collection_suggestions.dart';
 import 'package:mornye/services/home_recommendations.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/music_player_runtime.dart';
+import 'package:mornye/services/suggestion_outcomes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -66,6 +67,18 @@ class _History extends DownloadHistoryNotifier {
   DownloadHistoryState build() => DownloadHistoryState();
 }
 
+Future<Database> _outcomesDatabase() async {
+  sqfliteFfiInit();
+  final directory = await Directory.systemTemp.createTemp('home-outcomes-');
+  addTearDown(() => directory.delete(recursive: true));
+  final db = await SuggestionOutcomes.openWithFactory(
+    databaseFactoryFfi,
+    '${directory.path}/outcomes.db',
+  );
+  addTearDown(db.close);
+  return db;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel('com.zarz.mornye/backend');
@@ -91,9 +104,14 @@ void main() {
   });
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
+  // [fit] stands for what learning knows of the songs, nothing unless a
+  // test says so; [learns] reads it from the real provider instead.
   ProviderContainer container({
     AppSettings settings = const AppSettings(),
     List<Track>? seeds,
+    FutureOr<HomeRecommendationFit?> Function(Ref ref)? fit,
+    bool learns = false,
+    bool byFit = true,
     List<Override> overrides = const [],
   }) {
     final result = ProviderContainer(
@@ -101,6 +119,9 @@ void main() {
       retry: (_, _) => null,
       overrides: [
         ...overrides,
+        if (!learns)
+          homeRecommendationFitProvider.overrideWith(fit ?? (ref) => null),
+        homeRecommendationOrdersByFitProvider.overrideWith((ref) => byFit),
         settingsProvider.overrideWith(() => FixedSettingsNotifier(settings)),
         extensionProvider.overrideWith(_Extensions.new),
         downloadHistoryProvider.overrideWith(_History.new),
@@ -271,21 +292,37 @@ void main() {
   test('a fit orders the shelf, while the day keeps the extension\'s '
       'order', () async {
     answer = [for (var i = 0; i < 15; i++) _result('Song $i')];
+    final db = await _outcomesDatabase();
+    final outcomes = SuggestionOutcomes(open: () async => db)..enabled = true;
+    final runtime = MusicPlayerRuntime(
+      dependencies: PlaybackDependencies(
+        createSuggestionOutcomes: () => outcomes,
+      ),
+    );
+    addTearDown(runtime.dispose);
     final read = container(
-      overrides: [
-        homeRecommendationFitProvider.overrideWith(
-          (ref) async =>
-              (Track track) => double.parse(track.name.split(' ').last),
-        ),
-      ],
+      fit: (ref) =>
+          (Track track) => double.parse(track.name.split(' ').last),
+      overrides: [musicPlayerRuntimeProvider.overrideWithValue(runtime)],
     );
-    // Until the fit is read, the shelf keeps the extension's order.
-    await read.read(homeRecommendationFitProvider.future);
     final shown = await read.read(homeRecommendationsProvider.future);
+    final byFit = [for (var i = 14; i >= 3; i--) 'Song $i'];
+    expect([for (final track in shown) track.name], byFit);
+    // The outcome log learns where the extension put a song, and its fit.
+    outcomes.recommendationShown(artist: 'Someone', title: 'Song 14', rank: 0);
     expect(
-      [for (final track in shown) track.name],
-      [for (var i = 14; i >= 3; i--) 'Song $i'],
+      [
+        for (final row in await outcomes.readImpressions())
+          (row.rank, row.sourceRank, row.fit),
+      ],
+      [(0, 14, 14.0)],
     );
+    // The order is stored: the next launch shows it before any fit is read.
+    final again = container(fit: (ref) => Completer<Never>().future);
+    expect([
+      for (final track in await again.read(homeRecommendationsProvider.future))
+        track.name,
+    ], byFit);
     final extension = [for (var i = 0; i < 15; i++) 'Song $i'];
     expect([
       for (final track in await read.read(
@@ -302,25 +339,15 @@ void main() {
     ], extension);
   });
 
-  test('a fit that arrives later orders the shelf then', () async {
+  test('new songs wait for their fit and show once, in its order', () async {
     answer = [_result('Low'), _result('High')];
     final fit = Completer<HomeRecommendationFit?>();
-    final read = container(
-      overrides: [
-        homeRecommendationFitProvider.overrideWith((ref) => fit.future),
-      ],
-    );
+    final read = container(fit: (ref) => fit.future);
     final shelf = read.listen(homeRecommendationsProvider, (_, _) {});
     addTearDown(shelf.close);
-    expect(
-      [
-        for (final track in await read.read(homeRecommendationsProvider.future))
-          track.name,
-      ],
-      ['Low', 'High'],
-    );
+    await pumpEventQueue();
+    expect(shelf.read().hasValue, isFalse);
     fit.complete((Track track) => track.name == 'High' ? 1.0 : 0.0);
-    await read.read(homeRecommendationFitProvider.future);
     expect(
       [
         for (final track in await read.read(homeRecommendationsProvider.future))
@@ -331,16 +358,63 @@ void main() {
     expect(requests, hasLength(1));
   });
 
-  test('before startup settles or with learning off there is no fit and the '
-      'extension\'s order stays', () async {
+  test('a control day, or a fit that tells nothing, keeps the extension\'s '
+      'order and the fits', () async {
+    answer = [_result('Low'), _result('High')];
+    final read = container(
+      byFit: false,
+      fit: (ref) =>
+          (Track track) => track.name == 'High' ? 1.0 : 0.0,
+    );
+    expect(
+      [
+        for (final track in await read.read(homeRecommendationsProvider.future))
+          track.name,
+      ],
+      ['Low', 'High'],
+    );
+    final prefs = await SharedPreferences.getInstance();
+    final order = HomeRecommendationOrder.decode(
+      prefs.getString(homeRecommendationOrderKey),
+    )!;
+    expect(order.fits.values, unorderedEquals([0.0, 1.0]));
+  });
+
+  test('songs without a fit keep the extension\'s order without waiting '
+      'again', () async {
+    answer = [_result('One'), _result('Two')];
+    expect(
+      [
+        for (final track in await container().read(
+          homeRecommendationsProvider.future,
+        ))
+          track.name,
+      ],
+      ['One', 'Two'],
+    );
+    final again = container(fit: (ref) => Completer<Never>().future);
+    expect(
+      [
+        for (final track in await again.read(
+          homeRecommendationsProvider.future,
+        ))
+          track.name,
+      ],
+      ['One', 'Two'],
+    );
+  });
+
+  test('the fit is read once startup has settled, and with learning off the '
+      'extension\'s order shows at once', () async {
     answer = [for (var i = 0; i < 15; i++) _result('Song $i')];
-    final unsettled = container();
-    expect(await unsettled.read(homeRecommendationFitProvider.future), isNull);
+    final unsettled = container(learns: true);
+    final fit = unsettled.listen(homeRecommendationFitProvider, (_, _) {});
+    addTearDown(fit.close);
+    await pumpEventQueue();
+    expect(fit.read().isLoading, isTrue);
     final off = container(
       settings: const AppSettings(autoplayPersonalization: false),
-      overrides: [
-        libraryMixesStartupProvider.overrideWithBuild((ref, notifier) => true),
-      ],
+      learns: true,
     );
     expect(await off.read(homeRecommendationFitProvider.future), isNull);
     expect(
@@ -350,6 +424,8 @@ void main() {
       ],
       [for (var i = 0; i < homeRecommendationCount; i++) 'Song $i'],
     );
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString(homeRecommendationOrderKey), isNull);
   });
 
   test('once learning knows the listener, songs of their artists have a '
@@ -401,6 +477,7 @@ void main() {
     await taste.train();
 
     final read = container(
+      learns: true,
       overrides: [
         libraryMixesStartupProvider.overrideWithBuild((ref, notifier) => true),
         musicPlayerRuntimeProvider.overrideWithValue(runtime),

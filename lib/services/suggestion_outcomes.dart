@@ -20,7 +20,7 @@ const recommendationIgnoredAfter = Duration(days: 7);
 /// Outcomes a share needs before Settings shows it.
 const suggestionShareMinimum = 20;
 
-/// Acted on and ignored songs each needed before two orders are compared.
+/// Acted on and ignored songs each needed before the taste fit is judged.
 const recommendationOrderMinimum = 10;
 
 // Writes waiting on a store that keeps failing; the oldest go first.
@@ -153,77 +153,65 @@ Map<String, List<RecommendationImpression>> _comparableDays(
   return days;
 }
 
-/// Within each day's shelf, the share of acted on and ignored pairs that
-/// [position] puts acted on first (lower first), ties counting half: the
-/// ranker's AUC for an order. Null without such a pair.
-double? recommendationOrderAuc(
-  Iterable<RecommendationImpression> impressions,
-  int Function(RecommendationImpression impression) position, {
-  required DateTime now,
-}) {
-  var right = 0.0;
-  var pairs = 0;
-  for (final shelf in _comparableDays(impressions, now).values) {
-    for (final acted in shelf.where((impression) => impression.actedOn)) {
-      for (final ignored in shelf.where((impression) => !impression.actedOn)) {
-        pairs++;
-        final a = position(acted), b = position(ignored);
-        right += a < b ? 1 : (a == b ? 0.5 : 0);
-      }
-    }
-  }
-  return pairs == 0 ? null : right / pairs;
-}
-
-/// How the shown order ranks the songs acted on against the order the
-/// extension gave, on the settled shelves that had both kinds of song.
-class RecommendationOrderComparison {
-  const RecommendationOrderComparison({
+/// Whether the taste fit tells the songs acted on from the ignored ones:
+/// measured on the settled shelves shown in the extension's order, where a
+/// song's place owes nothing to its fit.
+class RecommendationFitEvaluation {
+  const RecommendationFitEvaluation({
     this.actedOn = 0,
     this.ignored = 0,
-    this.shown,
-    this.source,
+    this.auc,
   });
 
-  /// Settled songs counted, on the shelves compared.
+  /// Songs with a fit counted, on the shelves measured.
   final int actedOn, ignored;
 
-  /// [recommendationOrderAuc] by `rank` and by `sourceRank`.
-  final double? shown, source;
+  /// The share of acted on and ignored pairs of one shelf where the acted
+  /// on song fits better, ties counting half. Null without such a pair.
+  final double? auc;
 
-  /// Whether the shown order ranks acted on songs at least as well as the
-  /// source order; null until each kind has [recommendationOrderMinimum].
-  bool? get shownAtLeastAsGood {
-    final shown = this.shown, source = this.source;
+  /// Whether ordering by fit helps; null until each kind has
+  /// [recommendationOrderMinimum].
+  bool? get helps {
+    final auc = this.auc;
     if (actedOn < recommendationOrderMinimum ||
         ignored < recommendationOrderMinimum ||
-        shown == null ||
-        source == null) {
+        auc == null) {
       return null;
     }
-    return shown >= source;
+    return auc >= 0.5;
   }
 }
 
-RecommendationOrderComparison compareRecommendationOrders(
+RecommendationFitEvaluation evaluateRecommendationFit(
   Iterable<RecommendationImpression> impressions, {
   required DateTime now,
 }) {
-  final shelves = _comparableDays(impressions, now).values;
-  final counted = [for (final shelf in shelves) ...shelf];
-  return RecommendationOrderComparison(
-    actedOn: counted.where((impression) => impression.actedOn).length,
-    ignored: counted.where((impression) => !impression.actedOn).length,
-    shown: recommendationOrderAuc(
-      counted,
-      (impression) => impression.rank,
-      now: now,
-    ),
-    source: recommendationOrderAuc(
-      counted,
-      (impression) => impression.sourceRank,
-      now: now,
-    ),
+  var right = 0.0;
+  var pairs = 0, actedOn = 0, ignored = 0;
+  for (final shelf in _comparableDays(impressions, now).values) {
+    // A shelf put in the order of its fits says little about them: songs
+    // shown first are acted on more wherever they come from.
+    if (shelf.any((impression) => impression.rank != impression.sourceRank)) {
+      continue;
+    }
+    final fitted = shelf.where((impression) => impression.fit != null);
+    final acted = [...fitted.where((impression) => impression.actedOn)];
+    final rest = [...fitted.where((impression) => !impression.actedOn)];
+    if (acted.isEmpty || rest.isEmpty) continue;
+    actedOn += acted.length;
+    ignored += rest.length;
+    for (final a in acted) {
+      for (final b in rest) {
+        pairs++;
+        right += a.fit! > b.fit! ? 1 : (a.fit == b.fit ? 0.5 : 0);
+      }
+    }
+  }
+  return RecommendationFitEvaluation(
+    actedOn: actedOn,
+    ignored: ignored,
+    auc: pairs == 0 ? null : right / pairs,
   );
 }
 
@@ -233,13 +221,13 @@ class SuggestionOutcomeSummary {
     this.mixes = const OutcomeShare(0, 0),
     this.mixKinds = const {},
     this.recommendations = const OutcomeShare(0, 0),
-    this.order = const RecommendationOrderComparison(),
+    this.fit = const RecommendationFitEvaluation(),
   });
 
   final OutcomeShare mixes;
   final Map<LibraryMixKind, OutcomeShare> mixKinds;
   final OutcomeShare recommendations;
-  final RecommendationOrderComparison order;
+  final RecommendationFitEvaluation fit;
 }
 
 SuggestionOutcomeSummary summarizeSuggestionOutcomes(
@@ -250,7 +238,7 @@ SuggestionOutcomeSummary summarizeSuggestionOutcomes(
   mixes: mixPlayedShare(mixes),
   mixKinds: mixPlayedShareByKind(mixes),
   recommendations: recommendationActedShare(impressions, now: now),
-  order: compareRecommendationOrders(impressions, now: now),
+  fit: evaluateRecommendationFit(impressions, now: now),
 );
 
 String _key(String value) {
@@ -299,6 +287,7 @@ class SuggestionOutcomes {
   final _summary = ValueNotifier<SuggestionOutcomeSummary?>(null);
   final _shownToday = <int>{};
   String? _shownDay;
+  Map<int, ({int sourceRank, double? fit})> _places = const {};
   _MixPlay? _mix;
   Future<void> _writing = Future<void>.value();
   Future<void>? _loading;
@@ -402,9 +391,15 @@ class SuggestionOutcomes {
     );
   }
 
+  /// Where the extension put the shelf's songs and how well each fits, by
+  /// [suggestionSongKey]: what [recommendationShown] logs for a song whose
+  /// caller knows only where it shows.
+  void placeRecommendations(Map<int, ({int sourceRank, double? fit})> places) =>
+      _places = places;
+
   /// Logs a recommended song the shelf showed, once a day per song: at
   /// [rank] as shown and [sourceRank] as the extension gave it (the same
-  /// when null), with the taste [fit] the order used, if any.
+  /// when neither it nor its place is known), with its taste [fit], if any.
   void recommendationShown({
     required String artist,
     required String title,
@@ -421,6 +416,8 @@ class SuggestionOutcomes {
     }
     final song = suggestionSongKey(artist, title);
     if (!_shownToday.add(song)) return;
+    final place = _places[song];
+    fit ??= place?.fit;
     _add(
       _pendingShown,
       RecommendationImpression(
@@ -428,7 +425,7 @@ class SuggestionOutcomes {
         song: song,
         at: at,
         rank: rank,
-        sourceRank: sourceRank ?? rank,
+        sourceRank: sourceRank ?? place?.sourceRank ?? rank,
         fit: fit != null && fit.isFinite ? fit : null,
       ),
     );
@@ -595,6 +592,7 @@ class SuggestionOutcomes {
     _pendingActions.clear();
     _shownToday.clear();
     _shownDay = null;
+    _places = const {};
     _summary.value = const SuggestionOutcomeSummary();
     await (_writing = _writing.then((_) async {
       try {

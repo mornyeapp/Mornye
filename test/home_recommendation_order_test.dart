@@ -146,4 +146,39 @@ void main() {
     );
     expect(_names(ordered), ['Three', 'Two', 'One']);
   });
+
+  test('a stored order reads back and places its songs', () {
+    final tracks = [_track('One'), _track('Two'), _track('Three')];
+    final order = HomeRecommendationOrder.decode(
+      HomeRecommendationOrder.of(
+        [tracks[2], tracks[0], tracks[1]],
+        tracks,
+        [0.1, null, double.nan],
+      ).encode(),
+    )!;
+    expect(order.fits, {homeRecommendationKey(tracks[0]): 0.1});
+    expect(order.covers(tracks), isTrue);
+    expect(_names(order.apply(tracks)), ['Three', 'One', 'Two']);
+    // A song that left the shelf leaves the others in their order.
+    expect(_names(order.apply([tracks[1], tracks[2]])), ['Three', 'Two']);
+    // A new song has no place yet, so the order is decided again.
+    final more = [...tracks, _track('Four')];
+    expect(order.covers(more), isFalse);
+    expect(_names(order.apply(more)), ['Three', 'One', 'Two', 'Four']);
+    expect(HomeRecommendationOrder.decode('broken'), isNull);
+    expect(HomeRecommendationOrder.decode(null), isNull);
+  });
+
+  test('one day in four keeps the extension\'s order', () {
+    final days = [
+      for (var day = 1; day <= 28; day++)
+        '2026-11-${day.toString().padLeft(2, '0')}',
+    ];
+    final control = days.where(homeRecommendationControlDay).toList();
+    expect(control, hasLength(7));
+    expect(
+      homeRecommendationRound(control[1]) - homeRecommendationRound(control[0]),
+      4,
+    );
+  });
 }
