@@ -125,7 +125,7 @@ pub fn read_library_metadata_from_descriptor(
     check()?;
     let mut file = open_audio_file(&path)?;
     let format = tags::library_extension(&path, &hint);
-    let (metadata, mut artwork) = if include_cover && format == "flac" {
+    let (metadata, mut artwork) = if include_cover && (format == "flac" || format == "mp3") {
         tags::read_library_metadata_with_cover(&mut file, &path, &hint, &scan_time, 0, &check)?
     } else {
         let metadata = tags::read_library_metadata(&mut file, &path, &hint, &scan_time, 0, &check)?;

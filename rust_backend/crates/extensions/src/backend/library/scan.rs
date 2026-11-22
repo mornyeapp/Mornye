@@ -28,6 +28,7 @@ pub(in crate::backend) struct ScanState {
     owner: Mutex<()>,
     // Pausing is scan-wide rather than per run so a pause requested just
     // before the native scan starts still holds it at its first checkpoint.
+    paused_flag: AtomicBool,
     paused: Mutex<bool>,
     resumed: Condvar,
     /// The CUE sheets each folder's last scan found, so an unchanged sheet is
@@ -45,6 +46,7 @@ struct KnownCue {
 #[derive(Default)]
 struct Run {
     cancelled: AtomicBool,
+    failed: AtomicBool,
     failure: Mutex<Option<String>>,
     progress: Mutex<Progress>,
 }
@@ -69,6 +71,8 @@ struct AudioFile {
     size: u64,
     /// The folder image this file falls back to without embedded artwork.
     folder_image: Option<Arc<FolderImage>>,
+    /// Whether the directory listing contained a matching `.lrc` sidecar.
+    has_lrc_sidecar: bool,
 }
 
 impl AudioFile {
@@ -138,16 +142,24 @@ impl Backend {
     }
 
     fn set_library_scan_paused(&self, paused: bool) {
-        *self
+        let mut guard = self
             .library_scan
             .paused
             .lock()
-            .expect("library scan pause lock") = paused;
+            .expect("library scan pause lock");
+        *guard = paused;
+        self.library_scan
+            .paused_flag
+            .store(paused, Ordering::Release);
+        drop(guard);
         self.library_scan.resumed.notify_all();
     }
 
     fn wait_while_library_scan_paused(&self, run: &Run, check: Check<'_>) -> Result<(), String> {
         let state = &self.library_scan;
+        if !state.paused_flag.load(Ordering::Acquire) {
+            return Ok(());
+        }
         let mut paused = state.paused.lock().expect("library scan pause lock");
         while *paused && !run.cancelled.load(Ordering::Acquire) {
             paused = state
@@ -346,10 +358,10 @@ impl Backend {
         // cards, USB drives and network mounts each of those is a round trip.
         // The last field carries a folder image: the one a file uses, or for
         // a directory, the image of its parent.
-        let mut pending: Vec<(String, bool, Option<Arc<FolderImage>>)> =
-            vec![(folder.to_owned(), false, None)];
+        let mut pending: Vec<(String, bool, Option<Arc<FolderImage>>, bool)> =
+            vec![(folder.to_owned(), false, None, false)];
         let mut collected = Vec::new();
-        while let Some((path, parent_validated, inherited)) = pending.pop() {
+        while let Some((path, parent_validated, inherited, has_lrc_sidecar)) = pending.pop() {
             check()?;
             let input = files.resolve_legacy(&path)?;
             let metadata = if parent_validated {
@@ -370,6 +382,17 @@ impl Backend {
                 let entries = input
                     .entries()
                     .map_err(|error| format!("walk library path {path}: {error}"))?;
+                // Record matching `.lrc` sidecar stems from the listing so
+                // tracks without sidecars skip two failed open probes each.
+                let mut lrc_stems = BTreeSet::new();
+                for (name, directory) in &entries {
+                    if !*directory
+                        && let Some((stem, ext)) = name.rsplit_once('.')
+                        && ext.eq_ignore_ascii_case("lrc")
+                    {
+                        lrc_stems.insert(stem.to_lowercase());
+                    }
+                }
                 // Folder images come from this listing, so songs never list
                 // their folder. A disc folder without one uses its parent's.
                 let own = folder_image(&files, &path, &entries);
@@ -384,6 +407,11 @@ impl Backend {
                     if !directory && (!supported(&name) || staging(&name)) {
                         continue;
                     }
+                    let has_lrc = !directory
+                        && !lrc_stems.is_empty()
+                        && name
+                            .rsplit_once('.')
+                            .is_some_and(|(stem, _)| lrc_stems.contains(&stem.to_lowercase()));
                     pending.push((
                         crate::files::clean(&Path::new(&path).join(name))
                             .to_string_lossy()
@@ -394,6 +422,7 @@ impl Backend {
                         } else {
                             image.clone()
                         },
+                        has_lrc,
                     ));
                 }
             } else if supported(&path) && !staging(&path) {
@@ -402,6 +431,7 @@ impl Backend {
                     modified: modified_time(&metadata),
                     size: metadata.len(),
                     folder_image: inherited,
+                    has_lrc_sidecar,
                 });
             }
         }
@@ -444,11 +474,14 @@ impl Backend {
         }
         let check = || {
             // Wait before taking the failure lock so paused workers do not
-            // serialize on it.
+            // serialize on it. In the common running/unfailed case this path
+            // stays completely lock-free across parallel scan workers.
             self.wait_while_library_scan_paused(&run, check)?;
-            let mut failure = run.failure.lock().expect("scan failure lock");
-            if let Some(error) = failure.as_ref() {
-                return Err(error.clone());
+            if run.failed.load(Ordering::Acquire) {
+                let failure = run.failure.lock().expect("scan failure lock");
+                if let Some(error) = failure.as_ref() {
+                    return Err(error.clone());
+                }
             }
             let result = self.check().and_then(|()| {
                 if run.cancelled.load(Ordering::Acquire) {
@@ -458,7 +491,11 @@ impl Backend {
                 }
             });
             if let Err(error) = &result {
-                *failure = Some(error.clone());
+                let mut failure = run.failure.lock().expect("scan failure lock");
+                if failure.is_none() {
+                    *failure = Some(error.clone());
+                    run.failed.store(true, Ordering::Release);
+                }
             }
             result
         };
@@ -654,6 +691,7 @@ impl Backend {
                                 file.modified,
                                 Some(covers),
                                 file.folder_image.as_deref(),
+                                Some(file.has_lrc_sidecar),
                                 check,
                             )
                         });

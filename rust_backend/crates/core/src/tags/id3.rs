@@ -59,7 +59,33 @@ impl<R: Read + Seek> Input<'_, R> {
 }
 
 pub(super) fn read(reader: &mut (impl Read + Seek)) -> Result<AudioMetadata, String> {
-    let mut metadata = v2(reader).unwrap_or_default();
+    read_inner(reader, None)
+}
+
+pub(super) fn read_with_cover(
+    reader: &mut (impl Read + Seek),
+    cover: &mut Option<CoverArt>,
+) -> Result<AudioMetadata, String> {
+    read_inner(reader, Some(cover))
+}
+
+fn read_inner(
+    reader: &mut (impl Read + Seek),
+    cover: Option<&mut Option<CoverArt>>,
+) -> Result<AudioMetadata, String> {
+    let mut metadata = match cover {
+        Some(slot) => match v2_with_cover(reader, true) {
+            Ok((metadata, artwork)) => {
+                *slot = artwork;
+                metadata
+            }
+            Err(_) => {
+                *slot = None;
+                AudioMetadata::default()
+            }
+        },
+        None => v2(reader).unwrap_or_default(),
+    };
     if (metadata.title.is_empty() || metadata.artist.is_empty())
         && let Ok(old) = v1(reader)
     {

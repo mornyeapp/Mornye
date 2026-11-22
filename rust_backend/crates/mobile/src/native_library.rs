@@ -445,7 +445,9 @@ fn import(request: &Value, delta: Option<&Value>, check: Check<'_>) -> Result<Va
                 .map_err(|e| error("stage Library row", e))?;
             let id = text(&row, "id")?;
             transaction
-                .execute("DELETE FROM native_library_keys WHERE item_id = ?", [id])
+                .prepare_cached("DELETE FROM native_library_keys WHERE item_id = ?")
+                .map_err(|e| error("prepare replace staged keys", e))?
+                .execute([id])
                 .map_err(|e| error("replace staged keys", e))?;
             for key in path_keys::build(text(&row, "filePath")?, android)? {
                 transaction

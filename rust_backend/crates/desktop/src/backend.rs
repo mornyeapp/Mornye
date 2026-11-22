@@ -585,11 +585,19 @@ impl Backend {
         let raw = args
             .opt_string("request_json")
             .ok_or_else(|| failure("Missing native data job request"))?;
+        let bytes = args.bytes("bytes").unwrap_or_default().to_vec();
+        // Fast pass-through when Dart supplies the operation name and no host
+        // path rewriting is required, avoiding full JSON parse + re-encode.
+        if let Some(operation) = args.opt_string("operation")
+            && operation != "library_scan_incremental"
+        {
+            return mornye_mobile::run_native_data_job(raw.to_owned(), bytes, Some(lease))
+                .or_fail();
+        }
         let mut request: Value = serde_json::from_str(raw).or_fail()?;
         if !request.is_object() {
             return Err(failure("Missing native data job request"));
         }
-        let bytes = args.bytes("bytes").unwrap_or_default().to_vec();
         if request["operation"].as_str() != Some("library_scan_incremental") {
             return mornye_mobile::run_native_data_job(raw.to_owned(), bytes, Some(lease))
                 .or_fail();

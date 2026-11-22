@@ -15,6 +15,7 @@ struct Table {
     name: &'static str,
     columns: &'static [&'static str],
     keys: &'static str,
+    insert_sql: &'static str,
 }
 
 const TABLES: &[Table] = &[
@@ -23,30 +24,35 @@ const TABLES: &[Table] = &[
         name: "wishlist_tracks",
         columns: &["track_key", "track_json", "added_at"],
         keys: "track_key",
+        insert_sql: "INSERT OR REPLACE INTO restore_wishlist_tracks(track_key,track_json,added_at) VALUES(?,?,?)",
     },
     Table {
         kind: "loved",
         name: "loved_tracks",
         columns: &["track_key", "track_json", "added_at"],
         keys: "track_key",
+        insert_sql: "INSERT OR REPLACE INTO restore_loved_tracks(track_key,track_json,added_at) VALUES(?,?,?)",
     },
     Table {
         kind: "artist",
         name: "favorite_artists",
         columns: &["artist_key", "artist_json", "added_at"],
         keys: "artist_key",
+        insert_sql: "INSERT OR REPLACE INTO restore_favorite_artists(artist_key,artist_json,added_at) VALUES(?,?,?)",
     },
     Table {
         kind: "playlist",
         name: "playlists",
         columns: &["id", "name", "cover_image_path", "created_at", "updated_at"],
         keys: "id",
+        insert_sql: "INSERT OR REPLACE INTO restore_playlists(id,name,cover_image_path,created_at,updated_at) VALUES(?,?,?,?,?)",
     },
     Table {
         kind: "playlist_track",
         name: "playlist_tracks",
         columns: &["playlist_id", "track_key", "track_json", "added_at"],
         keys: "playlist_id,track_key",
+        insert_sql: "INSERT OR REPLACE INTO restore_playlist_tracks(playlist_id,track_key,track_json,added_at) VALUES(?,?,?,?)",
     },
 ];
 
@@ -84,14 +90,8 @@ fn stage_batch(db: &mut Connection, rows: &[Value], check: Check<'_>) -> Result<
                 .execute([&fields[0]])
                 .map_err(|e| err("stage collection member reset", e))?;
         }
-        let statement = format!(
-            "INSERT OR REPLACE INTO restore_{}({}) VALUES({})",
-            table.name,
-            table.columns.join(","),
-            vec!["?"; table.columns.len()].join(","),
-        );
         transaction
-            .prepare_cached(&statement)
+            .prepare_cached(table.insert_sql)
             .map_err(|e| err("prepare collection restore", e))?
             .execute(params_from_iter(fields))
             .map_err(|e| err("stage collection restore", e))?;

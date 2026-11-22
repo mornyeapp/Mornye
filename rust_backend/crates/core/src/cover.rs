@@ -84,29 +84,129 @@ pub fn resize<'a>(
     // an RGBA destination alongside a second RGB copy during encoding.
     let channels = if png { 4 } else { 3 };
     let mut pixels = vec![0; dw as usize * dh as usize * channels];
+    let x_neighbors: Vec<(usize, usize, f64)> = (0..dw)
+        .map(|x| {
+            let (x0, x1, fx) = neighbors(x, width, dw);
+            (x0 as usize, x1 as usize, fx)
+        })
+        .collect();
     // Match x/image/draw ApproxBiLinear: sample four neighbors at pixel centers
     // in premultiplied 16-bit space, then truncate into a premultiplied RGBA8
     // destination. See NOTICE.
-    for y in 0..dh {
-        let (y0, y1, fy) = neighbors(y, height, dh);
-        for x in 0..dw {
-            if x % 1024 == 0 {
-                check()?;
+    let w = width as usize;
+    let dst_w = dw as usize;
+    match &source {
+        Pixels::Rgb(image) => {
+            let raw = image.as_raw();
+            for y in 0..dh {
+                if y % 16 == 0 {
+                    check()?;
+                }
+                let (y0, y1, fy) = neighbors(y, height, dh);
+                let row0 = &raw[y0 as usize * w * 3..(y0 as usize + 1) * w * 3];
+                let row1 = &raw[y1 as usize * w * 3..(y1 as usize + 1) * w * 3];
+                let dst_row =
+                    &mut pixels[y as usize * dst_w * channels..(y as usize + 1) * dst_w * channels];
+                for (x, &(x0, x1, fx)) in x_neighbors.iter().enumerate() {
+                    let i0 = x0 * 3;
+                    let i1 = x1 * 3;
+                    let off = x * channels;
+                    let inv_fx = 1.0 - fx;
+                    let inv_fy = 1.0 - fy;
+                    for c in 0..3 {
+                        let s00 = f64::from(u32::from(row0[i0 + c]) * 0x101);
+                        let s10 = f64::from(u32::from(row0[i1 + c]) * 0x101);
+                        let s01 = f64::from(u32::from(row1[i0 + c]) * 0x101);
+                        let s11 = f64::from(u32::from(row1[i1 + c]) * 0x101);
+                        let top = inv_fx * s00 + fx * s10;
+                        let bottom = inv_fx * s01 + fx * s11;
+                        dst_row[off + c] = ((inv_fy * top + fy * bottom) as u32 >> 8) as u8;
+                    }
+                    if channels == 4 {
+                        dst_row[off + 3] = 255;
+                    }
+                }
             }
-            let (x0, x1, fx) = neighbors(x, width, dw);
-            let samples = [
-                source.at(x0, y0),
-                source.at(x1, y0),
-                source.at(x0, y1),
-                source.at(x1, y1),
-            ];
-            let offset = (y as usize * dw as usize + x as usize) * channels;
-            for channel in 0..channels {
-                let top = (1.0 - fx) * f64::from(samples[0][channel])
-                    + fx * f64::from(samples[1][channel]);
-                let bottom = (1.0 - fx) * f64::from(samples[2][channel])
-                    + fx * f64::from(samples[3][channel]);
-                pixels[offset + channel] = (((1.0 - fy) * top + fy * bottom) as u32 >> 8) as u8;
+        }
+        Pixels::Eight(image) => {
+            let raw = image.as_raw();
+            let sample8 = |row: &[u8], idx: usize| -> [u32; 4] {
+                let a = u32::from(row[idx + 3]) * 0x101;
+                if a == 0xffff {
+                    [
+                        u32::from(row[idx]) * 0x101,
+                        u32::from(row[idx + 1]) * 0x101,
+                        u32::from(row[idx + 2]) * 0x101,
+                        0xffff,
+                    ]
+                } else {
+                    [
+                        u32::from(row[idx]) * 0x101 * a / 0xffff,
+                        u32::from(row[idx + 1]) * 0x101 * a / 0xffff,
+                        u32::from(row[idx + 2]) * 0x101 * a / 0xffff,
+                        a,
+                    ]
+                }
+            };
+            for y in 0..dh {
+                if y % 16 == 0 {
+                    check()?;
+                }
+                let (y0, y1, fy) = neighbors(y, height, dh);
+                let row0 = &raw[y0 as usize * w * 4..(y0 as usize + 1) * w * 4];
+                let row1 = &raw[y1 as usize * w * 4..(y1 as usize + 1) * w * 4];
+                let dst_row =
+                    &mut pixels[y as usize * dst_w * channels..(y as usize + 1) * dst_w * channels];
+                for (x, &(x0, x1, fx)) in x_neighbors.iter().enumerate() {
+                    let s00 = sample8(row0, x0 * 4);
+                    let s10 = sample8(row0, x1 * 4);
+                    let s01 = sample8(row1, x0 * 4);
+                    let s11 = sample8(row1, x1 * 4);
+                    let off = x * channels;
+                    let inv_fx = 1.0 - fx;
+                    let inv_fy = 1.0 - fy;
+                    for c in 0..channels {
+                        let top = inv_fx * f64::from(s00[c]) + fx * f64::from(s10[c]);
+                        let bottom = inv_fx * f64::from(s01[c]) + fx * f64::from(s11[c]);
+                        dst_row[off + c] = ((inv_fy * top + fy * bottom) as u32 >> 8) as u8;
+                    }
+                }
+            }
+        }
+        Pixels::Sixteen(image) => {
+            let raw = image.as_raw();
+            let sample16 = |row: &[u16], idx: usize| -> [u32; 4] {
+                let a = u32::from(row[idx + 3]);
+                [
+                    u32::from(row[idx]) * a / 0xffff,
+                    u32::from(row[idx + 1]) * a / 0xffff,
+                    u32::from(row[idx + 2]) * a / 0xffff,
+                    a,
+                ]
+            };
+            for y in 0..dh {
+                if y % 16 == 0 {
+                    check()?;
+                }
+                let (y0, y1, fy) = neighbors(y, height, dh);
+                let row0 = &raw[y0 as usize * w * 4..(y0 as usize + 1) * w * 4];
+                let row1 = &raw[y1 as usize * w * 4..(y1 as usize + 1) * w * 4];
+                let dst_row =
+                    &mut pixels[y as usize * dst_w * channels..(y as usize + 1) * dst_w * channels];
+                for (x, &(x0, x1, fx)) in x_neighbors.iter().enumerate() {
+                    let s00 = sample16(row0, x0 * 4);
+                    let s10 = sample16(row0, x1 * 4);
+                    let s01 = sample16(row1, x0 * 4);
+                    let s11 = sample16(row1, x1 * 4);
+                    let off = x * channels;
+                    let inv_fx = 1.0 - fx;
+                    let inv_fy = 1.0 - fy;
+                    for c in 0..channels {
+                        let top = inv_fx * f64::from(s00[c]) + fx * f64::from(s10[c]);
+                        let bottom = inv_fx * f64::from(s01[c]) + fx * f64::from(s11[c]);
+                        dst_row[off + c] = ((inv_fy * top + fy * bottom) as u32 >> 8) as u8;
+                    }
+                }
             }
         }
     }
@@ -170,27 +270,6 @@ impl Pixels {
             | image::ColorType::Rgba16 => Self::Sixteen(image.into_rgba16()),
             _ => Self::Eight(image.into_rgba8()),
         }
-    }
-
-    fn at(&self, x: u32, y: u32) -> [u32; 4] {
-        let mut pixel = match self {
-            Self::Rgb(image) => {
-                let [r, g, b] = image
-                    .get_pixel(x, y)
-                    .0
-                    .map(|value| u32::from(value) * 0x101);
-                return [r, g, b, 0xffff];
-            }
-            Self::Eight(image) => image
-                .get_pixel(x, y)
-                .0
-                .map(|value| u32::from(value) * 0x101),
-            Self::Sixteen(image) => image.get_pixel(x, y).0.map(u32::from),
-        };
-        for channel in 0..3 {
-            pixel[channel] = pixel[channel] * pixel[3] / 0xffff;
-        }
-        pixel
     }
 }
 
