@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -136,12 +137,72 @@ String normalizeLookupText(String? value) {
   return (value ?? '').trim().toLowerCase();
 }
 
+/// The writer queue shared by every connection that write-locks history.db.
+const historyWriterQueue = 'history.db';
+
+/// How long a write waits for its turn before it goes to SQLite anyway, so a
+/// stuck holder cannot stop every later write.
+@visibleForTesting
+Duration writerQueueWait = const Duration(minutes: 2);
+
+final _writerQueues = <String, _WriterQueue>{};
+final _writerQueueOf = Expando<_WriterQueue>();
+
+/// Makes [db]'s [transactionWithBusyRetry] calls take turns with every other
+/// connection that joined [name]. BEGIN IMMEDIATE write-locks each attached
+/// database too, and SQLite would settle that race with a timeout only.
+void joinWriterQueue(Database db, String name) {
+  _writerQueueOf[db] = _writerQueues.putIfAbsent(name, _WriterQueue.new);
+}
+
+class _WriterQueue {
+  Future<void> _tail = Future<void>.value();
+  Object? _holder;
+
+  Future<T> run<T>(Future<T> Function() action) async {
+    // A write made inside the holder's own transaction cannot wait for it.
+    final inherited = Zone.current[this];
+    if (inherited != null && identical(inherited, _holder)) return action();
+    final previous = _tail;
+    final done = Completer<void>();
+    _tail = done.future;
+    final turn = Object();
+    try {
+      await previous.timeout(
+        writerQueueWait,
+        onTimeout: () => _log.w('Writer queue still held; trying SQLite'),
+      );
+      _holder = turn;
+      return await runZoned(action, zoneValues: {this: turn});
+    } finally {
+      if (identical(_holder, turn)) _holder = null;
+      done.complete();
+    }
+  }
+}
+
 /// Retry only lock contention while acquiring BEGIN, before the callback runs.
 /// History download writers can also lock transactions on an attached Library
 /// connection. Never replay a body or COMMIT failure: it may have side effects
 /// or an already durable result. Persistent locks still surface once
 /// [retryDelays] run out (two quick retries by default).
 Future<T> transactionWithBusyRetry<T>(
+  Database db,
+  Future<T> Function(Transaction txn) action, {
+  bool? exclusive,
+  List<Duration>? retryDelays,
+}) {
+  Future<T> run() => _transactionRetryingBegin(
+    db,
+    action,
+    exclusive: exclusive,
+    retryDelays: retryDelays,
+  );
+  final queue = _writerQueueOf[db];
+  return queue == null ? run() : queue.run(run);
+}
+
+Future<T> _transactionRetryingBegin<T>(
   Database db,
   Future<T> Function(Transaction txn) action, {
   bool? exclusive,

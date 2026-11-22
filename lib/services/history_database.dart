@@ -117,8 +117,8 @@ class HistoryDatabase {
 
   HistoryDatabase._init();
 
-  /// Library write transactions lock the attached history.db for their whole
-  /// length, so a history write retries BEGIN long enough to outlast a merge.
+  /// For lock holders outside the writer queue (plain Library transactions,
+  /// native code): retry BEGIN long enough to outlast them.
   static const List<Duration> _writeRetryDelays = [
     Duration(milliseconds: 100),
     Duration(milliseconds: 200),
@@ -143,6 +143,7 @@ class HistoryDatabase {
   static void debugReplaceDatabaseForTest(Database? db) {
     _database.reset();
     if (db != null) {
+      sqlite.joinWriterQueue(db, sqlite.historyWriterQueue);
       _database.getOrCreate(() async => db);
     }
   }
@@ -170,6 +171,7 @@ class HistoryDatabase {
       // opening an existing database in case an earlier setup was
       // interrupted; unsupported SQLite builds remain on the LIKE fallback.
       _searchFtsAvailable ??= await HistorySchema.createSearchFts(db);
+      sqlite.joinWriterQueue(db, sqlite.historyWriterQueue);
       return db;
     });
   }

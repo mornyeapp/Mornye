@@ -217,6 +217,8 @@ class LibraryDatabase {
         rethrow;
       }
     }
+    // From here every write transaction on this connection locks history.db.
+    sqlite.joinWriterQueue(db, sqlite.historyWriterQueue);
     _historyAttached = true;
   }
 
