@@ -226,4 +226,40 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('under a sheet edge the text adds no space above itself', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(393, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    Future<({double top, double height})> text({required bool edge}) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(),
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topCenter,
+              child: AlbumDescription(
+                title: 'Album',
+                description: 'A short description.',
+                underSheetEdge: edge,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final rect = tester.getRect(find.text('A short description.'));
+      return (top: rect.top, height: rect.height);
+    }
+
+    final plain = await text(edge: false);
+    final tight = await text(edge: true);
+    expect(plain.top, 8);
+    // No padding above, and the first line gives up its own space above.
+    expect(tight.top, 0);
+    expect(tight.height, lessThan(plain.height));
+    expect(tester.takeException(), isNull);
+  });
 }

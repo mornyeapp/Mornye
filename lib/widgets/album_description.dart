@@ -12,10 +12,15 @@ class AlbumDescription extends StatefulWidget {
     super.key,
     required this.title,
     required this.description,
+    this.underSheetEdge = false,
   });
 
   final String title;
   final String description;
+
+  /// Whether it is the first thing on the sheet a Material header rounds
+  /// off. The round edge is its space above, so it adds none of its own.
+  final bool underSheetEdge;
 
   @override
   State<AlbumDescription> createState() => _AlbumDescriptionState();
@@ -222,7 +227,10 @@ class _AlbumDescriptionState extends State<AlbumDescription> {
                     ? () => _showFullDescription(context, text)
                     : null,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: EdgeInsets.only(
+                    top: widget.underSheetEdge ? 0 : 8,
+                    bottom: 8,
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -232,6 +240,12 @@ class _AlbumDescriptionState extends State<AlbumDescription> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: previewStyle,
+                          // The line's own space above would add to the edge.
+                          textHeightBehavior: widget.underSheetEdge
+                              ? const TextHeightBehavior(
+                                  applyHeightToFirstAscent: false,
+                                )
+                              : null,
                         ),
                       ),
                       if (hasMore) ...[

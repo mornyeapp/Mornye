@@ -495,6 +495,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
             child: AlbumDescription(
               title: widget.albumName,
               description: _description!,
+              underSheetEdge: !context.isMornye && !isDesktopPlatform,
             ),
           ),
         if (_isLoading || (_error == null && tracks.isNotEmpty))
