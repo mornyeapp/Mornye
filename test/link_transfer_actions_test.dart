@@ -16,6 +16,7 @@ import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/link_transfers.dart';
+import 'package:mornye/widgets/header_toolbar_actions.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/link/link_transfers_view.dart';
@@ -135,6 +136,13 @@ void main() {
     ),
   );
 
+  /// A Library album's toolbar holding only the transfer actions.
+  Widget transferButtons(List<UnifiedLibraryItem> items, {Key? key}) =>
+      HeaderToolbarActions(
+        key: key,
+        actions: (context, ref) => linkTransferActions(context, ref, items),
+      );
+
   ProviderContainer containerOf(WidgetTester tester) =>
       ProviderScope.containerOf(tester.element(find.byType(Scaffold)));
 
@@ -148,11 +156,7 @@ void main() {
       'connected, for the songs each one applies to', (tester) async {
     client.connectionState = LinkConnectionState.disconnected;
     await tester.pumpWidget(
-      app(
-        LinkTransferButtons(
-          items: [_phoneSong('Mine'), _desktopSong('l:1', 'Theirs')],
-        ),
-      ),
+      app(transferButtons([_phoneSong('Mine'), _desktopSong('l:1', 'Theirs')])),
     );
     await settle(tester);
     expect(findByTooltip('Send to Studio PC'), findsNothing);
@@ -163,9 +167,7 @@ void main() {
     expect(findByTooltip('Send to Studio PC'), findsOneWidget);
     expect(findByTooltip('Save to this phone'), findsOneWidget);
 
-    await tester.pumpWidget(
-      app(LinkTransferButtons(items: [_phoneSong('Mine')])),
-    );
+    await tester.pumpWidget(app(transferButtons([_phoneSong('Mine')])));
     await settle(tester);
     expect(findByTooltip('Send to Studio PC'), findsOneWidget);
     expect(findByTooltip('Save to this phone'), findsNothing);
@@ -174,9 +176,7 @@ void main() {
   testWidgets('sending to another phone is not drawn as a computer', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      app(LinkTransferButtons(items: [_phoneSong('Mine')])),
-    );
+    await tester.pumpWidget(app(transferButtons([_phoneSong('Mine')])));
     await settle(tester);
     expect(findAppIcon(Icons.computer), findsOneWidget);
     expect(findAppIcon(Icons.send_to_mobile), findsNothing);
@@ -186,10 +186,9 @@ void main() {
     );
     await tester.pumpWidget(
       app(
-        LinkTransferButtons(
-          key: const ValueKey('phone-host'),
-          items: [_phoneSong('Mine')],
-        ),
+        transferButtons([
+          _phoneSong('Mine'),
+        ], key: const ValueKey('phone-host')),
       ),
     );
     await settle(tester);
@@ -201,7 +200,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      app(LinkTransferButtons(items: [_desktopSong('l:7', 'Theirs')])),
+      app(transferButtons([_desktopSong('l:7', 'Theirs')])),
     );
     await settle(tester);
     await tester.tap(findByTooltip('Save to this phone'));

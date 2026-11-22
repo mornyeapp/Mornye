@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/controllers/track_history_snapshot.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/header_toolbar_actions.dart';
 import 'package:mornye/widgets/collection_header_actions.dart';
 import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
@@ -379,10 +380,16 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       appBarActions: ref.watch(linkPhoneClientProvider) == null
           ? null
           : [
-              LinkDownloadOnDesktopButton(
-                tracks: _tracks,
-                service: _recommendedDownloadService(),
-                playlistName: _playlistName,
+              HeaderToolbarActions(
+                actions: (context, ref) => [
+                  ?linkDownloadOnDesktopAction(
+                    context,
+                    ref,
+                    _tracks,
+                    service: _recommendedDownloadService(),
+                    playlistName: _playlistName,
+                  ),
+                ],
               ),
             ],
       actions: CollectionHeaderActions(

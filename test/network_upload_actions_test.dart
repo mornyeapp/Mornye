@@ -10,6 +10,7 @@ import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/network_library_upload.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/header_toolbar_actions.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/network_upload_actions.dart';
 
@@ -67,7 +68,11 @@ void main() {
             body: Column(
               children: [
                 LibrarySelectionPlaybackActions(items: items, onClose: () {}),
-                NetworkUploadButton(items: items),
+                HeaderToolbarActions(
+                  actions: (context, ref) => [
+                    ?networkUploadAction(context, ref, items),
+                  ],
+                ),
               ],
             ),
           ),

@@ -59,6 +59,7 @@ import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/disc_separator_chip.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/header_toolbar_actions.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
@@ -486,14 +487,20 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
       ),
       meta: _buildLocalHeaderMeta(context, qualityLabelMode),
       appBarActions: [
-        AlbumTrackSortButton(
-          albumKey: _sortKey,
-          songs: [for (final track in _sortedTracksCache) track.trackName],
+        HeaderToolbarActions(
+          sort: AlbumTrackSortButton(
+            albumKey: _sortKey,
+            songs: [for (final track in _sortedTracksCache) track.trackName],
+          ),
+          actions: (context, ref) {
+            final items = _albumItems();
+            return [
+              ?networkOfflineItemsAction(context, ref, items),
+              ?networkUploadAction(context, ref, items),
+              ...linkTransferActions(context, ref, items),
+            ];
+          },
         ),
-        NetworkOfflineButton(items: _albumItems()),
-        NetworkUploadButton(items: _albumItems()),
-        if (ref.watch(linkPhoneClientProvider) != null)
-          LinkTransferButtons(items: _albumItems()),
       ],
       actions: Consumer(
         builder: (context, ref, _) {

@@ -21,6 +21,7 @@ import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/header_toolbar_actions.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -1068,6 +1069,22 @@ class _LibraryTracksFolderScreenState
             placeholder: (_) => Container(color: colorScheme.surface),
           )
         : coverFallback;
+    final toolbarActions = <Widget>[
+      if (_editingOrder)
+        ExpressiveButton(
+          key: const ValueKey('collection-order-save'),
+          text: true,
+          onPressed: !_orderChanged || _savingOrder || _draggingOrder
+              ? null
+              : _saveOrder,
+          child: Text(context.l10n.dialogSave),
+        ),
+      if (!_editingOrder && !isSelectionMode && entries.length > 1)
+        CollectionTrackSortButton(sortKey: _sortKey),
+      // The desktop header adds its own from [moreMenu].
+      if (moreMenu != null && !isDesktopPlatform)
+        HeaderMoreButton(groups: moreMenu),
+    ];
 
     return AlbumDetailHeader(
       title: title,
@@ -1140,20 +1157,8 @@ class _LibraryTracksFolderScreenState
             )
           : null,
       appBarActions: [
-        if (_editingOrder)
-          ExpressiveButton(
-            key: const ValueKey('collection-order-save'),
-            text: true,
-            onPressed: !_orderChanged || _savingOrder || _draggingOrder
-                ? null
-                : _saveOrder,
-            child: Text(context.l10n.dialogSave),
-          ),
-        if (!_editingOrder && !isSelectionMode && entries.length > 1)
-          CollectionTrackSortButton(sortKey: _sortKey),
-        // The desktop header adds its own from [moreMenu].
-        if (moreMenu != null && !isDesktopPlatform)
-          HeaderMoreButton(groups: moreMenu),
+        if (toolbarActions.isNotEmpty)
+          HeaderToolbarGroup(children: toolbarActions),
       ],
       moreMenu: moreMenu,
       // Centered so the tight leading slot cannot stretch it.

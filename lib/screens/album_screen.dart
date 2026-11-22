@@ -21,6 +21,8 @@ import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/controllers/track_history_snapshot.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/desktop/context_menu.dart';
+import 'package:mornye/widgets/header_toolbar_actions.dart';
 import 'package:mornye/widgets/collection_header_actions.dart';
 import 'package:mornye/widgets/album_description.dart';
 import 'package:mornye/utils/editorial_notes.dart';
@@ -692,15 +694,21 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
       appBarActions: isSelectionMode
           ? const []
           : [
-              if (ref.watch(linkPhoneClientProvider) != null)
-                LinkDownloadOnDesktopButton(
-                  tracks: tracks,
-                  service: _recommendedDownloadService(),
-                ),
-              HeaderCircleButton(
-                icon: Icons.open_in_new_rounded,
-                tooltip: context.l10n.openInOtherServices,
-                onPressed: () => _showShareSheet(context, tracks, artistName),
+              HeaderToolbarActions(
+                actions: (toolbar, ref) => [
+                  ?linkDownloadOnDesktopAction(
+                    toolbar,
+                    ref,
+                    tracks,
+                    service: _recommendedDownloadService(),
+                  ),
+                  ContextMenuAction(
+                    icon: Icons.open_in_new_rounded,
+                    label: context.l10n.openInOtherServices,
+                    onSelected: () =>
+                        _showShareSheet(context, tracks, artistName),
+                  ),
+                ],
               ),
             ],
     );

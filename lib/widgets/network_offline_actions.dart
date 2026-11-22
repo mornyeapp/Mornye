@@ -18,7 +18,6 @@ import 'package:mornye/utils/file_access.dart' show deleteFile, fileExists;
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/providers/network_offline_provider.dart';
 import 'package:mornye/services/network_offline_saver.dart';
-import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
@@ -275,21 +274,19 @@ class _OfflineProgressState extends ConsumerState<_OfflineProgress> {
   }
 }
 
-class NetworkOfflineButton extends ConsumerWidget {
-  const NetworkOfflineButton({super.key, required this.items});
-  final List<UnifiedLibraryItem> items;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (!items.any((item) => networkOfflineOrigin(item) != null)) {
-      return const SizedBox.shrink();
-    }
-    return HeaderCircleButton(
-      icon: Icons.download_for_offline_outlined,
-      tooltip: context.l10n.offlineSave,
-      onPressed: () => saveNetworkOffline(context, ref, items),
-    );
-  }
+/// The header action that keeps [items] offline, or null when none of them
+/// is on network storage.
+ContextMenuAction? networkOfflineItemsAction(
+  BuildContext context,
+  WidgetRef ref,
+  List<UnifiedLibraryItem> items,
+) {
+  if (!items.any((item) => networkOfflineOrigin(item) != null)) return null;
+  return ContextMenuAction(
+    icon: Icons.download_for_offline_outlined,
+    label: context.l10n.offlineSave,
+    onSelected: () => saveNetworkOffline(context, ref, items),
+  );
 }
 
 ContextMenuAction networkOfflineTracksAction(

@@ -52,6 +52,7 @@ import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/network_upload_actions.dart';
 import 'package:mornye/widgets/disc_separator_chip.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/header_toolbar_actions.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
@@ -479,30 +480,25 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
           ? _buildDownloadedHeaderMeta(context, tracks, commonQuality)
           : null,
       appBarActions: [
-        if (tracks.isNotEmpty)
-          AlbumTrackSortButton(
-            albumKey: _sortKey,
-            songs: [for (final track in tracks) track.trackName],
-          ),
-        NetworkOfflineButton(
-          items: [
-            for (final track in tracks)
-              UnifiedLibraryItem.fromDownloadHistory(track),
-          ],
-        ),
-        NetworkUploadButton(
-          items: [
-            for (final track in tracks)
-              UnifiedLibraryItem.fromDownloadHistory(track),
-          ],
-        ),
-        if (ref.watch(linkPhoneClientProvider) != null)
-          LinkTransferButtons(
-            items: [
+        HeaderToolbarActions(
+          sort: tracks.isNotEmpty
+              ? AlbumTrackSortButton(
+                  albumKey: _sortKey,
+                  songs: [for (final track in tracks) track.trackName],
+                )
+              : null,
+          actions: (context, ref) {
+            final items = [
               for (final track in tracks)
                 UnifiedLibraryItem.fromDownloadHistory(track),
-            ],
-          ),
+            ];
+            return [
+              ?networkOfflineItemsAction(context, ref, items),
+              ?networkUploadAction(context, ref, items),
+              ...linkTransferActions(context, ref, items),
+            ];
+          },
+        ),
       ],
       actions: tracks.isNotEmpty
           ? AlbumPlayActions(

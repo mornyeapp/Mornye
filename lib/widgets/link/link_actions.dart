@@ -20,7 +20,6 @@ import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/utils/logger.dart';
-import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -326,39 +325,32 @@ final linkTransferOfferNoticesProvider = Provider<void>((ref) {
 });
 
 /// The app bar action of an album or playlist that queues its [tracks] on
-/// the paired desktop. Empty while no desktop is paired.
-class LinkDownloadOnDesktopButton extends ConsumerWidget {
-  const LinkDownloadOnDesktopButton({
-    super.key,
-    required this.tracks,
-    this.service,
-    this.playlistName,
-  });
-
-  final List<Track> tracks;
-  final String? service;
-  final String? playlistName;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final client = ref.watch(linkPhoneClientProvider);
-    if (client == null || !client.server.supports(LinkHostFeatures.downloads)) {
-      return const SizedBox.shrink();
-    }
-    return HeaderCircleButton(
-      icon: Icons.computer,
-      tooltip: context.l10n.linkDownloadOnDesktop(linkDesktopName(client)),
-      onPressed: tracks.isEmpty
-          ? null
-          : () => linkDownloadTracksOnDesktop(
-              context,
-              ref,
-              tracks,
-              service: service,
-              playlistName: playlistName,
-            ),
-    );
+/// the paired desktop, disabled without tracks. Null while no desktop is
+/// paired. Call it in a build: it watches the pairing.
+ContextMenuAction? linkDownloadOnDesktopAction(
+  BuildContext context,
+  WidgetRef ref,
+  List<Track> tracks, {
+  String? service,
+  String? playlistName,
+}) {
+  final client = ref.watch(linkPhoneClientProvider);
+  if (client == null || !client.server.supports(LinkHostFeatures.downloads)) {
+    return null;
   }
+  return ContextMenuAction(
+    icon: Icons.computer,
+    label: context.l10n.linkDownloadOnDesktop(linkDesktopName(client)),
+    onSelected: tracks.isEmpty
+        ? null
+        : () => linkDownloadTracksOnDesktop(
+            context,
+            ref,
+            tracks,
+            service: service,
+            playlistName: playlistName,
+          ),
+  );
 }
 
 /// This phone's own songs among [items], which it can send to the desktop.
@@ -377,41 +369,33 @@ IconData linkSendToHostIcon(LinkClientApi client) =>
 
 /// The app bar actions of a Library album: "Send to (desktop)" when [items]
 /// hold this phone's own songs and "Save to this phone" when they hold the
-/// paired desktop's, while that desktop is connected. Empty otherwise.
-class LinkTransferButtons extends ConsumerWidget {
-  const LinkTransferButtons({super.key, required this.items});
-
-  final List<UnifiedLibraryItem> items;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final client = ref.watch(linkPhoneClientProvider);
-    if (client == null || !_watchConnected(ref)) {
-      return const SizedBox.shrink();
-    }
-    final phoneSongs = linkPhoneSongItemsOf(items);
-    final desktopSongs = linkOfflineSongs([
-      for (final item in items) ?item.localItem,
-    ], client.server);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      spacing: 8,
-      children: [
-        if (phoneSongs.isNotEmpty)
-          HeaderCircleButton(
-            icon: linkSendToHostIcon(client),
-            tooltip: context.l10n.linkSendToDesktop(linkDesktopName(client)),
-            onPressed: () => linkSendSongsToDesktop(context, ref, phoneSongs),
-          ),
-        if (desktopSongs.isNotEmpty)
-          HeaderCircleButton(
-            icon: Icons.phone_android,
-            tooltip: context.l10n.linkSaveToPhone,
-            onPressed: () => linkSaveSongsToPhone(context, ref, desktopSongs),
-          ),
-      ],
-    );
-  }
+/// paired desktop's, while that desktop is connected. Empty otherwise. Call
+/// it in a build: it watches the connection.
+List<ContextMenuAction> linkTransferActions(
+  BuildContext context,
+  WidgetRef ref,
+  List<UnifiedLibraryItem> items,
+) {
+  final client = ref.watch(linkPhoneClientProvider);
+  if (client == null || !_watchConnected(ref)) return const [];
+  final phoneSongs = linkPhoneSongItemsOf(items);
+  final desktopSongs = linkOfflineSongs([
+    for (final item in items) ?item.localItem,
+  ], client.server);
+  return [
+    if (phoneSongs.isNotEmpty)
+      ContextMenuAction(
+        icon: linkSendToHostIcon(client),
+        label: context.l10n.linkSendToDesktop(linkDesktopName(client)),
+        onSelected: () => linkSendSongsToDesktop(context, ref, phoneSongs),
+      ),
+    if (desktopSongs.isNotEmpty)
+      ContextMenuAction(
+        icon: Icons.phone_android,
+        label: context.l10n.linkSaveToPhone,
+        onSelected: () => linkSaveSongsToPhone(context, ref, desktopSongs),
+      ),
+  ];
 }
 
 /// The More menu action of a Library playlist: a sheet that sends this
