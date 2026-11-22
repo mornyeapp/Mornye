@@ -6,6 +6,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/services/library_database.dart';
@@ -16,6 +17,7 @@ import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_metadata_row.dart';
+import 'package:mornye/widgets/network_offline_actions.dart';
 
 void main() {
   for (final useFileUri in [false, true]) {
@@ -338,4 +340,130 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('a row\'s server mark fades off the cover in flight and never '
+      'lands on the header', (tester) async {
+    final cover = await tester.runAsync(() async {
+      final directory = await Directory.systemTemp.createTemp('marked-cover-');
+      addTearDown(() => directory.delete(recursive: true));
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawColor(Colors.red, BlendMode.src);
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(32, 32);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      picture.dispose();
+      return File('${directory.path}/cover.png')
+        ..writeAsBytesSync(bytes!.buffer.asUint8List());
+    });
+    LocalLibraryItem song(String filePath) => LocalLibraryItem(
+      id: 'marked-track',
+      filePath: filePath,
+      coverPath: cover!.path,
+      trackName: 'Track',
+      artistName: 'Artist',
+      albumName: 'Album',
+      scannedAt: DateTime(2026),
+    );
+    // The row marks the song as a server's; the page is given a missing
+    // file, so it asks no server for anything.
+    final onServer = UnifiedLibraryItem.fromLocalLibrary(
+      song('network://server/marked-track.flac'),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Align(
+                alignment: Alignment.bottomLeft,
+                child: GestureDetector(
+                  key: const ValueKey('row'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => TrackMetadataScreen(
+                        localItem: song('/missing/marked-track.flac'),
+                      ),
+                    ),
+                  ),
+                  child: Hero(
+                    tag: 'cover_lib_marked-track',
+                    child: OfflineAvailabilityCover(
+                      item: onServer,
+                      child: const SizedBox.square(
+                        dimension: 48,
+                        child: ColoredBox(
+                          key: ValueKey('row-picture'),
+                          color: Colors.green,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final mark = find.byType(OfflineAvailabilityBadge);
+    bool inRow() => find
+        .descendant(of: find.byKey(const ValueKey('row')), matching: mark)
+        .evaluate()
+        .isNotEmpty;
+    // How much of the mark shows on each frame it is in flight.
+    Future<List<double>> flight() async {
+      final seen = <double>[];
+      for (var frame = 0; frame < 300; frame++) {
+        await tester.pump(const Duration(milliseconds: 10));
+        if (mark.evaluate().isEmpty || inRow()) {
+          if (seen.isNotEmpty) break;
+          continue;
+        }
+        seen.add(
+          tester
+              .widget<FadeTransition>(
+                find
+                    .ancestor(of: mark, matching: find.byType(FadeTransition))
+                    .first,
+              )
+              .opacity
+              .value,
+        );
+      }
+      return seen;
+    }
+
+    expect(inRow(), isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('row')));
+    await tester.pump();
+    final leaving = await flight();
+    expect(leaving.first, greaterThan(0.7));
+    expect(leaving.where((shown) => shown > 0.1 && shown < 0.9), isNotEmpty);
+    expect(leaving, [...leaving]..sort((a, b) => b.compareTo(a)));
+    // Gone well before the cover is at the header.
+    expect(leaving.sublist(leaving.length ~/ 2), everyElement(0));
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    // The header's own picture is never decoded here, so it still shows the
+    // row's: the picture alone, without the row's mark.
+    expect(find.byKey(const ValueKey('row-picture')), findsOneWidget);
+    expect(mark, findsNothing);
+
+    Navigator.of(tester.element(find.byType(TrackMetadataScreen))).pop();
+    await tester.pump();
+    final returning = await flight();
+    expect(returning.first, 0);
+    expect(returning.last, greaterThan(0.7));
+    expect(returning, [...returning]..sort());
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    expect(inRow(), isTrue);
+    expect(tester.takeException(), isNull);
+  });
 }

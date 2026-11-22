@@ -31,7 +31,8 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
     BuildContext from,
     BuildContext to,
   ) {
-    final header = direction == HeroFlightDirection.push ? to : from;
+    final push = direction == HeroFlightDirection.push;
+    final header = push ? to : from;
     // The desktop Mornye header clips with continuous corners instead.
     final headerCorners =
         header.findAncestorWidgetOfExactType<ClipRRect>()?.borderRadius ??
@@ -40,12 +41,17 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
       begin: flight.tokens.borderRadiusThumb,
       end: headerCorners?.resolve(Directionality.of(flight)),
     ).animate(animation);
-    if (direction == HeroFlightDirection.push) {
+    // A row may lay a mark over its picture (where a server's song is
+    // kept). The mark is the row's: it never rides on to the header.
+    final rowCover = ((push ? from : to).widget as Hero).child;
+    final marked = rowCover is OfflineAvailabilityCover ? rowCover : null;
+    final rowPicture = marked?.child ?? rowCover;
+    if (push) {
       // Kept for the landing: the flight can end before the decode does.
-      _flownCover = (from.widget as Hero).child;
+      _flownCover = rowPicture;
       _flownCoverItem = _itemId;
     }
-    return AnimatedBuilder(
+    final cover = AnimatedBuilder(
       animation: corners,
       builder: (context, cover) => ClipRRect(
         borderRadius: corners.value ?? BorderRadius.zero,
@@ -53,15 +59,30 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
       ),
       // Opening, this page's cover may still be decoding and would fly as
       // nothing: the row's own picture flies under it until it is there.
-      child: direction == HeroFlightDirection.push
+      child: push
           ? Stack(
               fit: StackFit.expand,
-              children: [
-                (from.widget as Hero).child,
-                (header.widget as Hero).child,
-              ],
+              children: [rowPicture, (header.widget as Hero).child],
             )
           : (header.widget as Hero).child,
+    );
+    if (marked == null) return cover;
+    // The mark fades over the flight's row end, out on the way to the header
+    // and in on the way back, instead of being cut with the row's cover.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        cover,
+        FadeTransition(
+          opacity: animation.drive(
+            Tween<double>(
+              begin: 1,
+              end: 0,
+            ).chain(CurveTween(curve: const Interval(0, 0.4))),
+          ),
+          child: Stack(children: [marked.badge]),
+        ),
+      ],
     );
   }
 

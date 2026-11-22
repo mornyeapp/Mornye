@@ -324,38 +324,57 @@ class OfflineAvailabilityCover extends StatelessWidget {
   /// source and play overlays on a grid card.
   final double inset;
 
+  /// The badge alone, placed in a [Stack] as it sits over [child]. A cover
+  /// in flight carries the picture and lets this go, apart from each other.
+  Widget get badge => OfflineAvailabilityBadge(item: item, inset: inset);
+
   @override
   Widget build(BuildContext context) {
     final label = offlineAvailabilityLabel(context, item);
     if (label == null) return child;
-    final local = item.historyItem?.originFilePath != null;
-    final colors = Theme.of(context).colorScheme;
     return Tooltip(
       message: label,
-      child: Stack(
-        children: [
-          child,
-          PositionedDirectional(
-            bottom: inset,
-            start: inset,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.secondaryContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(3),
-                child: AppIcon.adaptive(
-                  local ? Icons.offline_pin : Icons.cloud,
-                  size: 14,
-                  fill: 1,
-                  color: colors.onSecondaryContainer,
-                  semanticLabel: label,
-                ),
-              ),
-            ),
+      child: Stack(children: [child, badge]),
+    );
+  }
+}
+
+/// Where a song of a server is kept, as a small mark in a cover's bottom
+/// start corner. Nothing for a song that is only on this device.
+class OfflineAvailabilityBadge extends StatelessWidget {
+  const OfflineAvailabilityBadge({
+    super.key,
+    required this.item,
+    this.inset = 0,
+  });
+
+  final UnifiedLibraryItem item;
+  final double inset;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = offlineAvailabilityLabel(context, item);
+    if (label == null) return const SizedBox.shrink();
+    final local = item.historyItem?.originFilePath != null;
+    final colors = Theme.of(context).colorScheme;
+    return PositionedDirectional(
+      bottom: inset,
+      start: inset,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.secondaryContainer,
+          shape: BoxShape.circle,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(3),
+          child: AppIcon.adaptive(
+            local ? Icons.offline_pin : Icons.cloud,
+            size: 14,
+            fill: 1,
+            color: colors.onSecondaryContainer,
+            semanticLabel: label,
           ),
-        ],
+        ),
       ),
     );
   }
