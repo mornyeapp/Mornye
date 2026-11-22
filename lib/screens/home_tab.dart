@@ -55,6 +55,7 @@ import 'package:mornye/providers/home_context_provider.dart';
 import 'package:mornye/providers/home_recommendations_provider.dart';
 import 'package:mornye/providers/home_status_provider.dart';
 import 'package:mornye/providers/home_top_picks_provider.dart';
+import 'package:mornye/providers/home_unfinished_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/providers/weekly_releases_provider.dart';
 import 'package:mornye/screens/weekly_releases_screen.dart';
@@ -82,6 +83,7 @@ import 'package:mornye/screens/music_recognition_screen.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/screens/queue_tab.dart';
+import 'package:mornye/services/album_completeness.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_mixes.dart' show stableTextHash;
 import 'package:mornye/services/listening_statistics.dart';
@@ -143,6 +145,7 @@ part 'home_tab_intro.dart';
 part 'home_tab_search_results.dart';
 part 'home_tab_search_wide.dart';
 part 'home_tab_status.dart';
+part 'home_tab_unfinished.dart';
 part 'home_tab_widgets.dart';
 
 /// Home is the person's own page ([browse]): the player, shortcuts and

@@ -23,6 +23,9 @@ enum HomeSection {
   /// The Material mixes shelf; Mornye shows the mixes in [topPicks].
   mixes,
   recentlyAdded,
+
+  /// Loose ends of the collection: wishlist, albums with gaps and the like.
+  unfinished,
   recommended,
   newReleases,
 

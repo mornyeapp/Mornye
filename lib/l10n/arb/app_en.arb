@@ -9883,6 +9883,67 @@
   "@homeFromYourLibrary": {
     "description": "Home section header for the day's albums from the Library, shown in On repeat's place while listening is not recorded"
   },
+  "homeUnfinishedTitle": "Finish your collection",
+  "@homeUnfinishedTitle": {
+    "description": "Home section header for loose ends of the collection: Wishlist, incomplete albums, recognized songs and failed downloads"
+  },
+  "homeUnfinishedWishlist": "{count, plural, =1{1 song on your wishlist} other{{count} songs on your wishlist}}",
+  "@homeUnfinishedWishlist": {
+    "description": "Home row that opens the Wishlist, with the number of songs on it",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeUnfinishedAlbums": "{count, plural, =1{1 album is missing songs} other{{count} albums are missing songs}}",
+  "@homeUnfinishedAlbums": {
+    "description": "Home row that lists the Library albums the Incomplete albums filter finds",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeUnfinishedRecognized": "{count, plural, =1{1 recognized song is not in your Library} other{{count} recognized songs are not in your Library}}",
+  "@homeUnfinishedRecognized": {
+    "description": "Home row that opens the music recognition history, with the number of recognized songs that have no file in the Library",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeUnfinishedFailed": "{count, plural, =1{1 download failed} other{{count} downloads failed}}",
+  "@homeUnfinishedFailed": {
+    "description": "Home row that opens the downloads queue, with the number of failed downloads",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeUnfinishedAlbumProgress": "{present} of {expected} {expected, plural, =1{song} other{songs}}",
+  "@homeUnfinishedAlbumProgress": {
+    "description": "Subtitle of an incomplete album: how many of its songs are in the Library",
+    "placeholders": {
+      "present": {
+        "type": "int"
+      },
+      "expected": {
+        "type": "int"
+      }
+    }
+  },
+  "homeUnfinishedAlbumSomeMissing": "{count, plural, =1{1 song, more missing} other{{count} songs, more missing}}",
+  "@homeUnfinishedAlbumSomeMissing": {
+    "description": "Subtitle of an incomplete album whose full song count is not known, such as one missing a disc",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "homeShortcuts": "Shortcuts",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
@@ -10152,6 +10213,10 @@
   "homeSectionAboutRecentlyAdded": "The newest songs in your Library",
   "@homeSectionAboutRecentlyAdded": {
     "description": "Edit Home: what the Recently added section shows"
+  },
+  "homeSectionAboutUnfinished": "Wishlist songs, albums missing songs and failed downloads",
+  "@homeSectionAboutUnfinished": {
+    "description": "Edit Home: what the Finish your collection section shows"
   },
   "homeSectionAboutNewReleases": "New music from your favorite artists",
   "@homeSectionAboutNewReleases": {

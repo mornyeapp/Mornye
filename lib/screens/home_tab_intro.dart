@@ -572,6 +572,8 @@ class _HomeSections extends ConsumerWidget {
             inset: mornye ? inset + 8 : inset,
           ),
         ),
+      if (_HomeUnfinishedSection.hasContent(ref))
+        HomeSection.unfinished: _HomeUnfinishedSection(inset: inset),
       if (recommended.isNotEmpty && !offline)
         HomeSection.recommended: _HomeSection(
           title: l10n.homeRecommendedForYou,

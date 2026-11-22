@@ -6439,6 +6439,7 @@
   "homeSectionAboutHiRes": "Album Hi-Res milikmu, selama DAC atau output eksklusif memutar",
   "homeSectionAboutMixes": "Mix harian dari lagumu sendiri",
   "homeSectionAboutRecentlyAdded": "Lagu terbaru di Koleksimu",
+  "homeSectionAboutUnfinished": "Lagu wishlist, album yang lagunya kurang, dan unduhan gagal",
   "homeSectionAboutNewReleases": "Musik baru dari artis favoritmu",
   "homeSectionAboutOnRepeat": "Lagu yang paling sering kamu putar, atau album dari Koleksi selama pemutaran tidak dicatat",
   "homeReset": "Atur ulang Beranda",
@@ -8413,6 +8414,13 @@
   "@homeFromYourLibrary": {
     "description": "Home section header for the day's albums from the Library, shown in On repeat's place while listening is not recorded"
   },
+  "homeUnfinishedTitle": "Lengkapi koleksimu",
+  "homeUnfinishedWishlist": "{count, plural, other{{count} lagu di wishlist}}",
+  "homeUnfinishedAlbums": "{count, plural, other{{count} album belum lengkap}}",
+  "homeUnfinishedRecognized": "{count, plural, other{{count} lagu yang dikenali belum ada di Koleksi}}",
+  "homeUnfinishedFailed": "{count, plural, other{{count} download gagal}}",
+  "homeUnfinishedAlbumProgress": "{present} dari {expected} lagu",
+  "homeUnfinishedAlbumSomeMissing": "{count, plural, other{{count} lagu, sebagian belum ada}}",
   "homeShortcuts": "Pintasan",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
