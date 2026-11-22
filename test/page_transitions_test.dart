@@ -151,10 +151,13 @@ void main() {
     final width = tester.getSize(find.byType(Scaffold)).width;
     _push('page');
     await tester.pump();
-    await _frames(tester, 3);
+    // Faint while it moves fastest: its opacity follows its way in.
+    await _frames(tester, 2);
+    expect(_opacityAbove(tester, 'page'), inExclusiveRange(0, 0.25));
+    await _frames(tester, 1);
 
     expect(find.byType(SnapshotWidget), findsNothing);
-    expect(_opacityAbove(tester, 'page'), inExclusiveRange(0, 1));
+    expect(_opacityAbove(tester, 'page'), inExclusiveRange(0.25, 1));
     final arriving = tester.getTopLeft(find.byType(Scaffold).last).dx;
     expect(arriving, inExclusiveRange(0, width / 3));
     // The page it covers moves the other way.

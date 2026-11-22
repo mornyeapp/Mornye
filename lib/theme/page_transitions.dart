@@ -174,9 +174,23 @@ class DesktopCupertinoPageTransitionsBuilder extends PageTransitionsBuilder {
   }
 }
 
+/// The opacity of the arriving phone page: it follows the page's own way in,
+/// so the page is faint while it moves fastest and solid before it lands.
+class _ArrivingFade extends Curve {
+  const _ArrivingFade();
+
+  @override
+  double transformInternal(double t) {
+    final way = Easing.standard.transform(t);
+    final opacity = way / MaterialPhonePageTransitionsBuilder._solidAt;
+    return opacity < 1 ? opacity : 1;
+  }
+}
+
 /// The Material phone push. The new page comes from a third of the width
-/// away and is solid within a tenth of a second, so two pages are never read
-/// through each other; the page it covers moves aside under a scrim.
+/// away, fading in with its own way in: solid within an eighth of a second,
+/// so two pages are not read through each other for long. The page it covers
+/// moves aside under a scrim.
 ///
 /// Going back, the page leaves as a card: it draws in and rounds its corners
 /// first, then slides off over the page below, which is already back.
@@ -203,8 +217,11 @@ class MaterialPhonePageTransitionsBuilder extends PageTransitionsBuilder {
     end: Offset.zero,
   ).chain(_move);
 
+  /// How much of its way in the arriving page has made when it is solid.
+  static const double _solidAt = 0.75;
+
   static final Animatable<double> _solid = CurveTween(
-    curve: const Interval(0, 0.3, curve: Curves.easeOut),
+    curve: const _ArrivingFade(),
   );
 
   static final Animatable<double> _uncover = Tween<double>(
