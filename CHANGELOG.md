@@ -1,5 +1,52 @@
 # Changelog
 
+Notes for the people who use the app, in plain words: what is new, what works
+better and what was fixed. A release puts the section named after its version
+(`Unreleased` while there is none) at the top of its notes, in the app's
+update dialog and in the Telegram post, with the full commit list folded
+under it. Write list items only, since the update dialog shows nothing else,
+and keep a section near 2000 characters, where the dialog stops.
+
+Versions 4.9.7 to 5.4.0 have their notes on the
+[releases page](https://github.com/mornyeapp/Mornye/releases).
+
+## [Unreleased]
+
+### New
+
+- **Parametric equalizer**: Shape the sound with your own filters, or import a filter list. On Android this needs the new playback engine.
+- **Home and Search**: Home shows your own music and recommended songs. Browsing moved to the Search tab.
+- **Profile**: Your listening record, taste and collection on one page.
+- **Download focus**: With an external player, the built-in player's controls stay out of the way.
+- **Lyrics**: Edit translations by hand, and pick the shape, text size and alignment of a shared lyrics card.
+- **Select by sliding**: Hold a song, then slide over the others to select them.
+- **Player**: Show the whole cover in the full screen style and choose how far its fade reaches.
+- **AutoMix**: Choose how often songs are mixed on their beats.
+- **Animation speed**: Make the app's motion slower or faster.
+- **Library**: A Simple audio quality label, one cover for all selected songs and Re-download for a single song.
+- **Home mixes**: More kinds of mixes, changing every day.
+
+### Improved
+
+- **Motion**: Pages, sheets and the player move more smoothly, and Material pages follow the back swipe.
+- **Material lists**: Songs, menus and sheet options sit together as connected groups.
+- **Speed**: A faster start and a lighter Library, also during scans and downloads.
+- **Accessibility**: Larger small text, bigger touch targets and right-to-left layouts.
+- **USB DAC**: A song at a rate the DAC refuses is resampled to one it accepts.
+
+### Fixed
+
+- Cast did not start the next song on the TV.
+- A song started from an album or playlist did not continue with the rest.
+- Song previews that no longer played.
+- Failed downloads left the queue after a restart.
+- The last session was lost when the system stopped playback.
+- A black screen after closing the player.
+- The player widget crashed before Android 12.
+- A database error while History and the Library were both saving.
+- iOS: songs stopped loading after the app had been suspended.
+- Desktop: a blank window on some Linux systems and a crash while the window moved between screens.
+
 ## [4.9.6] - 2026-09-07
 
 ### Added

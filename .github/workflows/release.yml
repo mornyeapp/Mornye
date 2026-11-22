@@ -1006,9 +1006,11 @@ jobs:
           CURRENT_REF=$(git rev-list -n 1 "$VERSION" 2>/dev/null || git rev-parse HEAD)
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${CURRENT_REF}^" 2>/dev/null || true)
 
-          # Start with git-cliff changelog, but replace its compare footer with a
-          # deterministic previous-tag lookup from git.
-          sed '/^## [0-9][0-9.[:alpha:]-]*$/d; /^\*\*Full Changelog\*\*/d' /tmp/changelog.txt > /tmp/release_body.txt
+          # The notes written in CHANGELOG.md lead and git-cliff's commit list
+          # is folded under them; without notes the list stands alone. Its
+          # compare footer gives way to a previous-tag lookup from git.
+          python3 scripts/release_notes.py body --version "$VERSION" \
+            --commits /tmp/changelog.txt --output /tmp/release_body.txt
 
           if [ -n "$PREVIOUS_TAG" ]; then
             printf '\n**Full Changelog**: [%s...%s](https://github.com/%s/%s/compare/%s...%s)\n' \
@@ -1107,7 +1109,8 @@ jobs:
           CURRENT_REF=$(git rev-list -n 1 "$VERSION" 2>/dev/null || git rev-parse HEAD)
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${CURRENT_REF}^" 2>/dev/null || true)
 
-          sed '/^## [0-9][0-9.[:alpha:]-]*$/d; /^\*\*Full Changelog\*\*/d' /tmp/changelog.txt > /tmp/release_body.txt
+          python3 scripts/release_notes.py body --version "$VERSION" \
+            --commits /tmp/changelog.txt --output /tmp/release_body.txt
 
           # The source and its history live in the main repository.
           if [ -n "$PREVIOUS_TAG" ]; then
@@ -1292,30 +1295,13 @@ jobs:
 
       - name: Convert changelog for Telegram
         id: changelog
+        env:
+          VERSION: ${{ needs.get-version.outputs.version }}
         run: |
-          if [ ! -s /tmp/cliff_tg.txt ]; then
-            echo "See release notes on GitHub for details." > /tmp/changelog.txt
-          else
-            # Convert Markdown to Telegram HTML
-            CHANGELOG=$(cat /tmp/cliff_tg.txt | \
-              sed '/^## [0-9][0-9.[:alpha:]-]*$/d' | \
-              sed '/^\*\*Full Changelog\*\*/d' | \
-              sed 's/ by \[@[^]]*\](https:\/\/github\.com\/[^)]*)//g' | \
-              sed 's/ by @[A-Za-z0-9_-]\+//g' | \
-              sed 's/\[#\([0-9]*\)\]([^)]*)/#\1/g' | \
-              sed 's/\[@\([^]]*\)\]([^)]*)/@\1/g' | \
-              sed 's/&/\&amp;/g' | \
-              sed 's/</\&lt;/g' | \
-              sed 's/>/\&gt;/g' | \
-              sed 's/\*\*\([^*]*\)\*\*/<b>\1<\/b>/g' | \
-              sed 's/^### \(.*\)$/<b>\1<\/b>/g' | \
-              sed 's/^## \(.*\)$/<b>\1<\/b>/g' | \
-              sed 's/^- /• /g')
-
-            # Truncate for Telegram 4096 char limit
-            CHANGELOG=$(echo "$CHANGELOG" | head -c 2500 | sed '$d')
-            echo "$CHANGELOG" > /tmp/changelog.txt
-          fi
+          # The notes written in CHANGELOG.md, else the commit list, as
+          # Telegram HTML kept under the message limit.
+          python3 scripts/release_notes.py telegram --version "$VERSION" \
+            --commits /tmp/cliff_tg.txt --output /tmp/changelog.txt
 
           echo "Telegram changelog:"
           cat /tmp/changelog.txt
