@@ -6444,7 +6444,7 @@
   "homeSectionAboutNewReleases": "Musik baru dari artis favoritmu",
   "homeSectionAboutOnRepeat": "Lagu yang paling sering kamu putar, atau album dari Koleksi selama pemutaran tidak dicatat",
   "homeReset": "Atur ulang Beranda",
-  "homeResetMessage": "Bagian Beranda kembali ke urutan semula, semuanya tampil, dan pintasan bawaan kembali. Yang kamu sematkan tetap ada.",
+  "homeResetMessage": "Bagian Beranda kembali ke urutan semula, tampil atau tersembunyi seperti awalnya, dan pintasan bawaan kembali. Yang kamu sematkan tetap ada.",
   "actionPaste": "Tempel",
   "@actionPaste": {
     "description": "Generic action - paste from clipboard"

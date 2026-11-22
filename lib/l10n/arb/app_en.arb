@@ -10279,7 +10279,7 @@
   "@homeReset": {
     "description": "Action on the Edit Home page and title of its confirmation"
   },
-  "homeResetMessage": "Home's sections go back to the order they came in, all of them show, and the original shortcuts return. What you pinned stays.",
+  "homeResetMessage": "Home's sections go back to the order they came in and to showing or hiding as they did at first, and the original shortcuts return. What you pinned stays.",
   "@homeResetMessage": {
     "description": "Confirmation message before Home's sections are reset"
   },

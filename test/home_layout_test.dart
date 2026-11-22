@@ -124,7 +124,34 @@ void main() {
       const layout = HomeLayout();
       expect(layout.isDefault, isTrue);
       expect(layout.sections, HomeSection.values);
-      expect(HomeSection.values.every(layout.shows), isTrue);
+      expect(
+        {
+          for (final section in HomeSection.values)
+            if (!layout.shows(section)) section,
+        },
+        {HomeSection.unfinished, HomeSection.onRepeat},
+      );
+    });
+
+    test('a section that ships off shows once turned on', () {
+      final on = const HomeLayout().withVisible(HomeSection.onRepeat, true);
+      expect(on.shows(HomeSection.onRepeat), isTrue);
+      expect(on.shows(HomeSection.unfinished), isFalse);
+      expect(on.isDefault, isFalse);
+      expect(HomeLayout.fromJson(on.toJson()), on);
+      expect(
+        on.withOrder([HomeSection.onRepeat]).shows(HomeSection.onRepeat),
+        isTrue,
+      );
+
+      final off = on.withVisible(HomeSection.onRepeat, false);
+      expect(off, const HomeLayout());
+      // A layout saved before the section shipped off never named it.
+      final older = HomeLayout.fromJson({
+        'order': <String>[],
+        'hidden': <String>[],
+      });
+      expect(older.shows(HomeSection.onRepeat), isFalse);
     });
 
     test('a saved order leads and the rest land where they ship', () {

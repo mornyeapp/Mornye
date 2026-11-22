@@ -57,7 +57,14 @@ enum HomeSection {
 /// How the person arranged Home. The default value is Home as it ships.
 @immutable
 class HomeLayout {
-  const HomeLayout({this.order = const [], this.hidden = const {}});
+  const HomeLayout({
+    this.order = const [],
+    this.hidden = const {},
+    this.shown = const {},
+  });
+
+  /// Sections that ship turned off; Edit Home turns them on.
+  static const offByDefault = {HomeSection.unfinished, HomeSection.onRepeat};
 
   /// Section names in the person's order. Sections missing from it keep
   /// their shipped place; see [sections].
@@ -66,7 +73,10 @@ class HomeLayout {
   /// Names of the sections the person turned off.
   final Set<String> hidden;
 
-  bool get isDefault => order.isEmpty && hidden.isEmpty;
+  /// Names of the [offByDefault] sections the person turned on.
+  final Set<String> shown;
+
+  bool get isDefault => order.isEmpty && hidden.isEmpty && shown.isEmpty;
 
   /// Every section in the person's order. A section the saved order does
   /// not name (a new one, or one a backup lacks) goes after the section it
@@ -93,19 +103,31 @@ class HomeLayout {
     return ordered;
   }
 
-  bool shows(HomeSection section) => !hidden.contains(section.name);
+  bool shows(HomeSection section) => offByDefault.contains(section)
+      ? shown.contains(section.name)
+      : !hidden.contains(section.name);
 
   HomeLayout withOrder(List<HomeSection> sections) => HomeLayout(
     order: [for (final section in sections) section.name],
     hidden: hidden,
+    shown: shown,
   );
 
-  HomeLayout withVisible(HomeSection section, bool visible) => HomeLayout(
-    order: order,
-    hidden: visible
-        ? ({...hidden}..remove(section.name))
-        : {...hidden, section.name},
-  );
+  HomeLayout withVisible(HomeSection section, bool visible) {
+    Set<String> having(Set<String> names, bool has) =>
+        has ? {...names, section.name} : ({...names}..remove(section.name));
+    return offByDefault.contains(section)
+        ? HomeLayout(
+            order: order,
+            hidden: hidden,
+            shown: having(shown, visible),
+          )
+        : HomeLayout(
+            order: order,
+            hidden: having(hidden, !visible),
+            shown: shown,
+          );
+  }
 
   /// Reads a saved layout. Anything unreadable is left out, so a damaged or
   /// newer backup still gives a usable Home.
@@ -118,21 +140,27 @@ class HomeLayout {
     return HomeLayout(
       order: names(json['order']),
       hidden: names(json['hidden']).toSet(),
+      shown: names(json['shown']).toSet(),
     );
   }
 
   Map<String, dynamic> toJson() => {
     'order': order,
     'hidden': hidden.toList()..sort(),
+    'shown': shown.toList()..sort(),
   };
 
   @override
   bool operator ==(Object other) =>
       other is HomeLayout &&
       listEquals(order, other.order) &&
-      setEquals(hidden, other.hidden);
+      setEquals(hidden, other.hidden) &&
+      setEquals(shown, other.shown);
 
   @override
-  int get hashCode =>
-      Object.hash(Object.hashAll(order), Object.hashAllUnordered(hidden));
+  int get hashCode => Object.hash(
+    Object.hashAll(order),
+    Object.hashAllUnordered(hidden),
+    Object.hashAllUnordered(shown),
+  );
 }

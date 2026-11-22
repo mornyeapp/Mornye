@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/models/home_layout.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
@@ -54,6 +55,11 @@ Widget _home({
         AppSettings(
           homeFeedProvider: AppSettings.homeFeedProviderOff,
           listeningStatisticsEnabled: recordListening,
+          // The shelf sits in On repeat, which ships turned off.
+          homeLayout: const HomeLayout().withVisible(
+            HomeSection.onRepeat,
+            true,
+          ),
         ),
       ),
     ),

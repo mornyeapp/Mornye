@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/download_item.dart';
+import 'package:mornye/models/home_layout.dart';
 import 'package:mornye/models/recognized_song.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
@@ -196,6 +197,16 @@ void main() {
       expect(find.text(_title), findsNothing);
     });
 
+    testWidgets('the $style Home leaves the section out until Edit Home '
+        'turns it on', (tester) async {
+      await _open(
+        tester,
+        _Harness(mornye: mornye, wishlist: [_wish(0)], turnedOn: false),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text(_title), findsNothing);
+    });
+
     testWidgets('the $style Home shows only rows with something', (
       tester,
     ) async {
@@ -339,10 +350,14 @@ class _Harness {
     this.incompleteAlbums = 0,
     this.recognized = 0,
     this.albums = const [],
+    this.turnedOn = true,
   }) : collections = _Collections(wishlist),
        queue = _Queue(failed);
 
   final bool mornye;
+
+  /// The section ships turned off; Edit Home turns it on.
+  final bool turnedOn;
   final _Collections collections;
   final _Queue queue;
   final int incompleteAlbums;
@@ -356,7 +371,13 @@ class _Harness {
       ),
       settingsProvider.overrideWith(
         () => FixedSettingsNotifier(
-          const AppSettings(homeFeedProvider: AppSettings.homeFeedProviderOff),
+          AppSettings(
+            homeFeedProvider: AppSettings.homeFeedProviderOff,
+            homeLayout: const HomeLayout().withVisible(
+              HomeSection.unfinished,
+              turnedOn,
+            ),
+          ),
         ),
       ),
       extensionProvider.overrideWith(_Extensions.new),
