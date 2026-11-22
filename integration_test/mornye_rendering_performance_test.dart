@@ -8,7 +8,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_easy/liquid_glass_easy.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show LiquidGlassWidgets;
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
@@ -41,7 +42,7 @@ void main() {
       });
       await tester.pumpWidget(fixture.app(clarity));
       await tester.runAsync(() async {
-        await LiquidGlassShaders.ensureLoaded();
+        await LiquidGlassWidgets.initialize(enablePerformanceMonitor: false);
         await ui.FragmentProgram.fromAsset(
           'assets/shaders/mornye_selection_mask.frag',
         );

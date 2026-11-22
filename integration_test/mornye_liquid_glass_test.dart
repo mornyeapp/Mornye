@@ -6,7 +6,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:liquid_glass_easy/liquid_glass_easy.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show AdaptiveGlass, GlassBackdropGroup, LiquidGlassWidgets;
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/widgets/mornye_liquid_backdrop.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
@@ -46,7 +47,7 @@ void main() {
       ),
     );
     await tester.runAsync(() async {
-      await LiquidGlassShaders.ensureLoaded();
+      await LiquidGlassWidgets.initialize(enablePerformanceMonitor: false);
       await ui.FragmentProgram.fromAsset(
         'assets/shaders/mornye_selection_mask.frag',
       );
@@ -99,7 +100,7 @@ void main() {
           image.dispose();
         }
       }))!;
-      // The package's edge blur can soften RGB values. A clipped foreground
+      // The lens's edge refraction can soften RGB values. A clipped foreground
       // would expose the white fixture instead of red on either curved edge.
       for (final pixel in pixels.take(2)) {
         expect(pixel.a, 1);
@@ -125,7 +126,7 @@ void main() {
         MaterialApp(
           home: RepaintBoundary(
             key: key,
-            child: LiquidGlassBatch(
+            child: GlassBackdropGroup(
               child: Stack(
                 children: [
                   const Positioned.fill(
@@ -157,7 +158,8 @@ void main() {
                             borderRadius: BorderRadius.circular(40),
                             child: MornyeLiquidBackdrop(
                               borderRadius: BorderRadius.circular(40),
-                              clarity: 1,
+                              // Untinted, so the pixels show the lens alone.
+                              tint: Colors.transparent,
                               blurSigma: 2,
                               child: const Center(
                                 child: SizedBox(
@@ -178,9 +180,19 @@ void main() {
         ),
       );
       // Asset compilation completes outside the fake widget-test clock.
-      await tester.runAsync(() => LiquidGlassShaders.ensureLoaded());
+      await tester.runAsync(
+        () => LiquidGlassWidgets.initialize(enablePerformanceMonitor: false),
+      );
       await tester.pumpAndSettle();
       expect(tester.binding.hasScheduledFrame, isFalse);
+      final lenses = find.byType(AdaptiveGlass).evaluate();
+      expect(lenses, hasLength(2));
+      // Both lenses share the group's backdrop read.
+      expect(GlassBackdropGroup.keyOf(lenses.first), isNotNull);
+      expect(
+        GlassBackdropGroup.keyOf(lenses.first),
+        same(GlassBackdropGroup.keyOf(lenses.last)),
+      );
       final boundary =
           key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
       final pixelRatio = tester.view.devicePixelRatio;
@@ -307,16 +319,14 @@ void main() {
       () => Future<void>.delayed(const Duration(milliseconds: 500)),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(LiquidGlassLens), findsOneWidget);
-    final pill = find.descendant(
-      of: find
-          .descendant(
-            of: find.byType(MornyeSelectionPill),
-            matching: find.byType(AnimatedAlign),
-          )
-          .first,
-      matching: find.byType(FractionallySizedBox),
-    );
+    expect(find.byType(AdaptiveGlass), findsOneWidget);
+    // The resting pill comes first; the held lens adds a second box later.
+    final pill = find
+        .descendant(
+          of: find.byType(MornyeSelectionPill),
+          matching: find.byType(FractionallySizedBox),
+        )
+        .first;
     final restingSurface = find.descendant(
       of: pill,
       matching: find.byType(DecoratedBox),
@@ -341,7 +351,7 @@ void main() {
     expectSingleContour();
     await tester.pumpAndSettle();
     expect(tester.widget<MornyeLiquidBackdrop>(lens).progress, 1);
-    expect(find.byType(LiquidGlassLens), findsNWidgets(2));
+    expect(find.byType(AdaptiveGlass), findsNWidgets(2));
     expectSingleContour();
     final heldRestingDecoration =
         tester.widget<DecoratedBox>(restingSurface).decoration as BoxDecoration;
@@ -387,9 +397,10 @@ void main() {
     expectSingleContour();
     await tester.pumpAndSettle();
     expect(changes, [2]);
-    expect(tester.widget<MornyeLiquidBackdrop>(lens).progress, 0);
-    expectSingleContour();
-    expect(find.byType(LiquidGlassLens), findsOneWidget);
+    // At rest the pill builds no held lens at all.
+    expect(lens, findsNothing);
+    expect([for (final icon in icons.evaluate()) icon.size], iconSizes);
+    expect(find.byType(AdaptiveGlass), findsOneWidget);
     final cancel = await tester.startGesture(
       tester.getCenter(find.text('Search')),
     );

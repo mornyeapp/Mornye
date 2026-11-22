@@ -7,7 +7,14 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:liquid_glass_easy/liquid_glass_easy.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show
+        AdaptiveGlass,
+        GlassBackdropGroup,
+        GlassQuality,
+        LiquidGlassLayer,
+        LiquidGlassSettings,
+        LiquidGlassWidgets;
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
@@ -106,12 +113,20 @@ void main() {
       await tester.runAsync(() => binding.takeScreenshot('settle_$name'));
       (binding.reportData!['screenshots']! as List<dynamic>).removeLast();
       final histogram = <String, int>{};
+      // Backdrop keys go into the report as small numbers, in order seen.
+      final keyIds = <BackdropKey, int>{};
+      int? keyId(BackdropKey? key) =>
+          key == null ? null : keyIds.putIfAbsent(key, () => keyIds.length);
+      final layerKeys = <int?>[];
       void visit(Layer layer) {
         histogram.update(
           layer.runtimeType.toString(),
           (count) => count + 1,
           ifAbsent: () => 1,
         );
+        if (layer is BackdropFilterLayer) {
+          layerKeys.add(keyId(layer.backdropKey));
+        }
         if (layer is ContainerLayer) {
           for (
             var child = layer.firstChild;
@@ -126,13 +141,20 @@ void main() {
       // Profile builds need the retained layer, since debugLayer is debug-only.
       // ignore: invalid_use_of_protected_member
       visit(tester.binding.renderViews.first.layer!);
-      // Batched lenses compose their blur, so no stock blur layer remains.
-      // Each batch key costs one read; an excluded lens takes its own.
+      // Every lens takes the package's premium path, and no surface falls
+      // back to a stock blur or to the package's frosted fallback.
+      final lenses = find.byType(AdaptiveGlass).evaluate().toList();
+      expect(
+        find.byType(LiquidGlassLayer),
+        findsNWidgets(lenses.length),
+        reason: name,
+      );
+      expect(find.byType(BackdropFilter), findsNothing, reason: name);
+      // Each group key shares one blur and frost read; a lens outside any
+      // group reads alone.
       final lensKeys = [
-        for (final lens in find.byType(LiquidGlassLens).evaluate())
-          LiquidGlassBatch.backdropIdOf(lens),
+        for (final lens in lenses) GlassBackdropGroup.keyOf(lens),
       ];
-      expect(histogram['BackdropFilterLayer'] ?? 0, 0, reason: name);
       expect(
         lensKeys.nonNulls.toSet().length +
             lensKeys.where((key) => key == null).length,
@@ -143,10 +165,10 @@ void main() {
         ...details,
         'collapseProgress': fold().value,
         'controllerProgress': fold().parent.value,
-        'shaderBackdrops': histogram['_ImpellerShaderBackdropLayer'] ?? 0,
-        'stockBlurLayers': histogram['BackdropFilterLayer'] ?? 0,
-        'batchBlurLayers': histogram['LiquidGlassBatchBackdropLayer'] ?? 0,
-        'lensBatchKeys': lensKeys,
+        'backdropFilterLayers': histogram['BackdropFilterLayer'] ?? 0,
+        // A layer with a lens's group key took the group's shared read.
+        'backdropFilterLayerKeys': layerKeys,
+        'lensGroupKeys': [for (final key in lensKeys) keyId(key)],
         'attachedLayerTypes': histogram,
       };
       await tester.runAsync(() => binding.takeScreenshot(name));
@@ -246,7 +268,7 @@ void main() {
         ),
       );
       await tester.runAsync(() async {
-        await LiquidGlassShaders.ensureLoaded();
+        await LiquidGlassWidgets.initialize(enablePerformanceMonitor: false);
         await ui.FragmentProgram.fromAsset(
           'assets/shaders/mornye_selection_mask.frag',
         );
@@ -260,12 +282,22 @@ void main() {
       final player = tester.state(find.byType(MiniPlayer));
       final prefix =
           '${brightness.name}_clarity_${(clarity * 100).round()}_outlines_$outlines';
-      final lenses = tester.widgetList<LiquidGlassLens>(
-        find.byType(LiquidGlassLens),
-      );
+      final lenses = find.byType(AdaptiveGlass).evaluate();
       expect(lenses, isNotEmpty);
+      // The outlines setting lights the rim, scaled by each surface's
+      // highlight; without it the rim is off.
       for (final lens in lenses) {
-        expect(lens.style.specular?.thickness, outlines ? 0.75 * 5.4 : 0);
+        final glass = lens.widget as AdaptiveGlass;
+        final backdrop = lens
+            .findAncestorWidgetOfExactType<MornyeLiquidBackdrop>()!;
+        expect(glass.quality, GlassQuality.premium);
+        final base = backdrop.interaction
+            ? LiquidGlassSettings.ios27Indicator
+            : MornyeLiquidBackdrop.material(brightness);
+        final rim = outlines ? backdrop.highlightIntensity : 0.0;
+        expect(glass.settings.rimLight, closeTo(base.rimLight * rim, 1e-9));
+        expect(glass.settings.rimShade, closeTo(base.rimShade * rim, 1e-9));
+        if (outlines) expect(glass.settings.rimLight, greaterThan(0));
       }
       // Folding capsules cross the tabs and sample on their own. At rest
       // they share the player's read.

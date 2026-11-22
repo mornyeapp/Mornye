@@ -5,7 +5,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_easy/liquid_glass_easy.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show LiquidGlassWidgets;
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/controllers/mornye_glass_warmup.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -185,7 +186,10 @@ void main() {
           ),
         );
         if (preloadGlass) {
-          await tester.runAsync(() => LiquidGlassShaders.ensureLoaded());
+          await tester.runAsync(
+            () =>
+                LiquidGlassWidgets.initialize(enablePerformanceMonitor: false),
+          );
         }
         if (traceFirstOpen) {
           await tester.runAsync(() => binding.enableTimeline());
@@ -206,7 +210,10 @@ void main() {
             reason: 'Multiple callers must share one preparation',
           );
         }
-        final shadersLoadedBeforeOpen = LiquidGlassShaders.isLoaded;
+        // The package has no loaded flag. Either path awaits its shader
+        // precache, so true means loaded; false means not known.
+        final shadersLoadedBeforeOpen =
+            preloadGlass || MornyeGlassWarmup.isReady;
         Future<void> open() async {
           await tester.tap(find.text('Open download'));
           await probe.wait(const Duration(milliseconds: 500));
