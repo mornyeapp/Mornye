@@ -17,6 +17,7 @@ import 'package:mornye/services/link/link_source_presence.dart';
 import 'package:mornye/services/link/sync/link_sound_sync_runner.dart';
 import 'package:mornye/services/link/sync/link_sync_runner.dart';
 import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/app_scroll_physics.dart';
 import 'package:mornye/theme/dynamic_color_wrapper.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -76,14 +77,22 @@ final _routerProvider = Provider<GoRouter>((ref) {
 });
 
 /// iOS-style fluid scroll on mobile and macOS: momentum glide + bounce instead
-/// of the Android clamping stop. Widgets that set explicit physics (queue filter
-/// PageView, bottom sheets) are unaffected.
+/// of the Android clamping stop. With [androidGlide] the bounce stays and the
+/// glide between the ends is Android's. Widgets that set explicit physics
+/// (queue filter PageView, bottom sheets) are unaffected.
 class _FluidScrollBehavior extends _VerticalScrollbarBehavior {
-  const _FluidScrollBehavior();
+  const _FluidScrollBehavior({this.androidGlide = false});
+
+  final bool androidGlide;
 
   @override
-  ScrollPhysics getScrollPhysics(BuildContext context) =>
-      const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  ScrollPhysics getScrollPhysics(BuildContext context) => androidGlide
+      ? const AndroidGlideScrollPhysics(parent: AlwaysScrollableScrollPhysics())
+      : const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+
+  @override
+  bool shouldNotify(_FluidScrollBehavior oldDelegate) =>
+      androidGlide != oldDelegate.androidGlide;
 }
 
 /// Desktop scrollbars mark long vertical content only. Rows that scroll
@@ -103,16 +112,24 @@ class _VerticalScrollbarBehavior extends MaterialScrollBehavior {
 }
 
 /// Mobile and macOS use the fluid bounce. Windows and Linux keep Material's
-/// desktop behavior: clamping physics with scrollbars.
+/// desktop behavior: clamping physics with scrollbars. The Material style on
+/// Android ([materialStyle]) bounces too, but a flick carries a list as far
+/// as it does in Android's own lists.
 @visibleForTesting
-ScrollBehavior appScrollBehavior({required bool disableOverscrollEffects}) {
+ScrollBehavior appScrollBehavior({
+  required bool disableOverscrollEffects,
+  bool materialStyle = false,
+}) {
   if (disableOverscrollEffects) {
     return const _VerticalScrollbarBehavior().copyWith(overscroll: false);
   }
   if (isDesktopPlatform && defaultTargetPlatform != TargetPlatform.macOS) {
     return const _VerticalScrollbarBehavior();
   }
-  return const _FluidScrollBehavior();
+  return _FluidScrollBehavior(
+    androidGlide:
+        materialStyle && defaultTargetPlatform == TargetPlatform.android,
+  );
 }
 
 /// Fades the app content in on phones and tablets after an orientation change
@@ -286,10 +303,6 @@ class MornyeApp extends ConsumerWidget {
     MotionPace.speed = ref.watch(
       settingsProvider.select((s) => s.animationSpeed),
     );
-    final scrollBehavior = appScrollBehavior(
-      disableOverscrollEffects: disableOverscrollEffects,
-    );
-
     final locale = localeFromSetting(localeString);
 
     return DynamicColorWrapper(
@@ -307,7 +320,10 @@ class MornyeApp extends ConsumerWidget {
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: themeMode,
-          scrollBehavior: scrollBehavior,
+          scrollBehavior: appScrollBehavior(
+            disableOverscrollEffects: disableOverscrollEffects,
+            materialStyle: !isMornye,
+          ),
           themeAnimationDuration: themeMotion.duration,
           themeAnimationCurve: themeMotion.curve,
           builder: (context, child) => buildAppContent(

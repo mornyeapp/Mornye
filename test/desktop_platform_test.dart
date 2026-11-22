@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/app.dart';
 import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/theme_provider.dart';
+import 'package:mornye/theme/app_scroll_physics.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -80,6 +81,37 @@ void main() {
     testWidgets('bounces on mobile', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       expect(await physicsFor(tester), isA<BouncingScrollPhysics>());
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets('the Material style glides the Android way on Android only', (
+      tester,
+    ) async {
+      Future<ScrollPhysics> material(WidgetTester tester) async {
+        late ScrollPhysics physics;
+        final behavior = appScrollBehavior(
+          disableOverscrollEffects: false,
+          materialStyle: true,
+        );
+        await tester.pumpWidget(
+          Builder(
+            builder: (context) {
+              physics = behavior.getScrollPhysics(context);
+              return const SizedBox.shrink();
+            },
+          ),
+        );
+        return physics;
+      }
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      expect(await material(tester), isA<AndroidGlideScrollPhysics>());
+      // The Mornye style keeps the plain bounce there.
+      expect(await physicsFor(tester), isNot(isA<AndroidGlideScrollPhysics>()));
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final onIPhone = await material(tester);
+      expect(onIPhone, isA<BouncingScrollPhysics>());
+      expect(onIPhone, isNot(isA<AndroidGlideScrollPhysics>()));
       debugDefaultTargetPlatformOverride = null;
     });
 
