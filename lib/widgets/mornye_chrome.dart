@@ -2,6 +2,7 @@ import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -185,9 +186,12 @@ class MornyeGlass extends ConsumerWidget {
       ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
   ];
 
-  // The lens softens the backdrop with its frost; this only adds to it as
-  // the clarity setting falls.
-  static const _lensBlurSigmas = [0.6, 0.6, 2.0, 6.0];
+  // The lens softens the backdrop with its frost; this blur adds to it as the
+  // clarity setting falls below its default.
+  static const _tintedLensBlur = 6.0;
+
+  // How much of the material's frost and color the clearest setting drops.
+  static const _thinnedShare = 0.3;
 
   /// Host tests cannot run shader filters; this lets them build the lens.
   @visibleForTesting
@@ -302,12 +306,24 @@ class MornyeGlass extends ConsumerWidget {
         : clarity >= 0.6
         ? 2
         : 3;
-    final clearFill = (dark ? const Color(0xff999999) : Colors.white)
-        .withValues(alpha: dark ? 0.17 : 0.46);
+    // At the default clarity the lens is the glass package's iOS 27 material
+    // untouched. Lower clarity lays Mornye's tint into it, higher thins it.
+    final material = MornyeLiquidBackdrop.material(scheme.brightness);
+    const rest = kDefaultMornyeGlassClarity;
+    final tinted = ((rest - clarity) / (rest - 0.2)).clamp(0.0, 1.0);
+    final thinned = ((clarity - rest) / (1 - rest)).clamp(0.0, 1.0);
+    final ownMaterial = useLens && !strongTint;
+    final density = ownMaterial ? 1 - _thinnedShare * thinned : 1.0;
     final fill = Color.lerp(
       scheme.surfaceContainerHigh,
-      useLens && !strongTint
-          ? Color.lerp(tint, clearFill, ((clarity - 0.2) / 0.8).clamp(0, 1))
+      ownMaterial
+          ? Color.lerp(
+              material.glassColor.withValues(
+                alpha: material.glassColor.a * density,
+              ),
+              tint,
+              tinted,
+            )
           : tint,
       reveal,
     )!;
@@ -320,23 +336,36 @@ class MornyeGlass extends ConsumerWidget {
           : BoxDecoration(color: fill, borderRadius: shape),
       child: content,
     );
-    final shadows = firstInGroup && lastInGroup
-        ? [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: dark ? 0.14 : 0.08),
-              blurRadius: 8,
-              blurStyle: BlurStyle.outer,
-              offset: const Offset(0, 2),
-            ),
-          ]
-        : null;
+    final ownShadows = [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: dark ? 0.14 : 0.08),
+        blurRadius: 8,
+        blurStyle: BlurStyle.outer,
+        offset: const Offset(0, 2),
+      ),
+    ];
+    // The lens takes its material's shadow, which the dark material lacks.
+    final shadows = !firstInGroup || !lastInGroup
+        ? null
+        : !useLens
+        ? ownShadows
+        : BoxShadow.lerpList(ownShadows, [
+            for (final shadow in material.shadow ?? const <BoxShadow>[])
+              BoxShadow(
+                color: shadow.color,
+                blurRadius: shadow.blurRadius,
+                blurStyle: BlurStyle.outer,
+                offset: shadow.offset,
+              ),
+          ], reveal);
     // The lens tints, blurs and clips by itself, and reads the backdrop with
     // its group (`GlassBackdropGroup`) or alone.
     final lens = useLens
         ? MornyeLiquidBackdrop(
             borderRadius: shape,
-            tint: fill,
-            blurSigma: _lensBlurSigmas[filterIndex],
+            tint: ownMaterial && tinted == 0 && reveal == 1 ? null : fill,
+            blurSigma: lerpDouble(material.blur, _tintedLensBlur, tinted),
+            density: density,
             refractionDepth: refractionDepth * reveal,
             smoothCorners: squircle,
             highlightIntensity: highlightIntensity * reveal,

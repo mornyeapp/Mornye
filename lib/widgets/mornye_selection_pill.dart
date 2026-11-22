@@ -388,7 +388,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
                 // The lens must sample the foreground as well as the page.
                 // Below the icons it would look like a rim on a flat backdrop.
                 if (lensEnabled && selected >= 0 && selected < count)
-                  _interactionLens(count, isDark),
+                  _interactionLens(count),
               ],
             ),
           ),
@@ -477,7 +477,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
     );
   }
 
-  Widget _interactionLens(int count, bool isDark) => Positioned.fill(
+  Widget _interactionLens(int count) => Positioned.fill(
     child: IgnorePointer(
       child: AnimatedBuilder(
         animation: _visualChanges,
@@ -499,12 +499,8 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
                     enabled: false,
                     child: MornyeLiquidBackdrop(
                       borderRadius: BorderRadius.circular(_pillRadius),
-                      tint: Colors.white.withValues(
-                        alpha: isDark ? 0.08 : 0.24,
-                      ),
                       interaction: true,
                       progress: progress,
-                      blurSigma: 0,
                       child: const SizedBox.expand(),
                     ),
                   ),

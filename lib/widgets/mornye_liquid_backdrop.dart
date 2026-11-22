@@ -10,9 +10,10 @@ class MornyeLiquidBackdrop extends StatelessWidget {
   const MornyeLiquidBackdrop({
     super.key,
     required this.borderRadius,
-    required this.tint,
-    required this.blurSigma,
     required this.child,
+    this.tint,
+    this.blurSigma,
+    this.density = 1,
     this.interaction = false,
     this.progress = 1,
     this.refractionDepth = 0.30,
@@ -35,9 +36,16 @@ class MornyeLiquidBackdrop extends StatelessWidget {
 
   final BorderRadius borderRadius;
 
-  /// The glass's own color, laid over the backdrop exactly as given.
-  final Color tint;
-  final double blurSigma;
+  /// Mornye's own color for the glass, laid over the backdrop exactly as
+  /// given. Null keeps the material's color and body.
+  final Color? tint;
+
+  /// Null keeps the material's blur.
+  final double? blurSigma;
+
+  /// How much of the material's frost and color stays: 1 is the material as
+  /// calibrated, less is clearer glass.
+  final double density;
   final Widget child;
 
   /// A lens held over other glass, such as a selection under a finger. It
@@ -56,6 +64,7 @@ class MornyeLiquidBackdrop extends StatelessWidget {
         ? LiquidGlassSettings.ios27Indicator
         : material(Theme.of(context).brightness);
     final rim = MornyeTheme.glassOutlinesOf(context) ? highlightIntensity : 0.0;
+    final tint = this.tint;
     return GlassWindowSpace(
       builder: (context, scale) {
         final radius = borderRadius.topLeft.x * scale;
@@ -69,12 +78,16 @@ class MornyeLiquidBackdrop extends StatelessWidget {
                 : LiquidRoundedRectangle(borderRadius: radius),
             settings: base.copyWith(
               visibility: effect,
-              glassColor: tint,
+              glassColor:
+                  tint ??
+                  base.glassColor.withValues(
+                    alpha: base.glassColor.a * density,
+                  ),
               // The adaptive body keeps the backdrop's brightness under a
               // tint, which would undo the dimming that keeps labels readable.
-              bodyMode: GlassBodyMode.clear,
-              blur: blurSigma * scale,
-              frost: base.frost * scale,
+              bodyMode: tint == null ? base.bodyMode : GlassBodyMode.clear,
+              blur: (blurSigma ?? base.blur) * scale,
+              frost: base.frost * density * scale,
               thickness: base.thickness * scale * refractionDepth / 0.30,
               rimLight: base.rimLight * rim,
               rimShade: base.rimShade * rim,

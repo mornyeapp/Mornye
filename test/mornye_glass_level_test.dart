@@ -4,7 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
-    show AdaptiveGlass, GlassBackdropGroup;
+    show AdaptiveGlass, GlassBackdropGroup, GlassBodyMode, LiquidGlassSettings;
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
@@ -461,6 +461,65 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'the default clarity is the iOS 27 material (${brightness.name})',
+      (tester) async {
+        MornyeGlass.debugShaderFilterSupport = true;
+        addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
+        Future<LiquidGlassSettings> lensAt(double clarity) async {
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                mornyeGlassLevelProvider.overrideWithValue(
+                  MornyeGlassLevel.liquid,
+                ),
+              ],
+              child: MaterialApp(
+                theme: MornyeTheme.build(brightness, glassClarity: clarity),
+                home: Scaffold(
+                  body: Center(
+                    child: MornyeGlass.navigation(
+                      blurEnabled: true,
+                      child: const SizedBox(width: 80, height: 40),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          // A changed theme is animated in.
+          await tester.pumpAndSettle();
+          return tester
+              .widget<AdaptiveGlass>(find.byType(AdaptiveGlass))
+              .settings;
+        }
+
+        final material = brightness == Brightness.dark
+            ? LiquidGlassSettings.ios27Dark
+            : LiquidGlassSettings.ios27Light;
+        // Only the shadow differs: the app draws the material's own.
+        expect(
+          await lensAt(kDefaultMornyeGlassClarity),
+          material.copyWith(shadow: const []),
+        );
+
+        final tinted = await lensAt(0.4);
+        expect(tinted.glassColor.a, greaterThan(material.glassColor.a));
+        expect(tinted.blur, greaterThan(material.blur));
+        expect(tinted.frost, material.frost);
+        expect(tinted.bodyMode, GlassBodyMode.clear);
+
+        final thinned = await lensAt(1);
+        expect(thinned.glassColor.a, lessThan(material.glassColor.a));
+        expect(thinned.frost, lessThan(material.frost));
+        expect(thinned.blur, material.blur);
+        expect(thinned.bodyMode, material.bodyMode);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('lenses share a backdrop read only inside one group', (
     tester,
