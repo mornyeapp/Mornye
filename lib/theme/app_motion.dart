@@ -111,7 +111,7 @@ double curveTimeFor(Curve curve, double value) {
 ///
 /// A new page's first frames are its heaviest, and a ticker counts the time
 /// they took: the next frame would show the transition already well under
-/// way. Here a late frame near the start counts as one frame, so the
+/// way. Here a late frame among a run's first counts as one frame, so the
 /// transition starts late and plays whole.
 class SteadyStartTicks implements TickerProvider {
   const SteadyStartTicks(this.vsync);
@@ -121,9 +121,9 @@ class SteadyStartTicks implements TickerProvider {
   /// A frame is late when it brings more than this many frames at once.
   static const double _late = 2.5;
 
-  /// Late frames are left out only this far into a run; a later one barely
-  /// shows, and the run keeps its time.
-  static const Duration _window = Duration(milliseconds: 150);
+  /// Only this many frames of a run can be late. Frames that stay slow
+  /// after them are the device's pace, and waiting for each would drag.
+  static const int _first = 3;
 
   static Duration get _frame {
     final views = WidgetsBinding.instance.platformDispatcher.views;
@@ -135,17 +135,19 @@ class SteadyStartTicks implements TickerProvider {
   Ticker createTicker(TickerCallback onTick) {
     var last = Duration.zero;
     var leftOut = Duration.zero;
+    var frames = 0;
     return vsync.createTicker((elapsed) {
       // A run that starts again counts from zero.
       if (elapsed < last) {
         last = Duration.zero;
         leftOut = Duration.zero;
+        frames = 0;
       }
       final frame = _frame;
       final step = elapsed - last;
-      final shown = last - leftOut;
       last = elapsed;
-      if (step > frame * _late && shown < _window) leftOut += step - frame;
+      if (step > Duration.zero) frames++;
+      if (frames <= _first && step > frame * _late) leftOut += step - frame;
       onTick(elapsed - leftOut);
     });
   }

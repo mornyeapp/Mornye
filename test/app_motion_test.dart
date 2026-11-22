@@ -193,6 +193,17 @@ void main() {
       controller.dispose();
     });
 
+    testWidgets('frames that stay slow are not waited for', (tester) async {
+      final controller = run(tester)..forward();
+      await tester.pump();
+      // A device at 20 frames a second: only the first three count as late.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(controller.value, near(frame * 3 + 0.05 * 7));
+      controller.dispose();
+    });
+
     testWidgets('each run counts from its own start', (tester) async {
       final controller = run(tester)..forward();
       await tester.pump();
