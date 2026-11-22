@@ -1,9 +1,126 @@
 import 'dart:math' as math;
 
-/// Portable graphic EQ settings. Gains are independent of the system volume.
+enum EqualizerFilterType {
+  peak('peak'),
+  lowShelf('lowshelf'),
+  highShelf('highshelf');
+
+  const EqualizerFilterType(this.nativeName);
+
+  /// The name in saved settings and in the native configuration.
+  final String nativeName;
+}
+
+/// One filter of the parametric equalizer: a second order section from the
+/// Audio EQ Cookbook (https://www.w3.org/TR/audio-eq-cookbook/).
+class EqualizerFilter {
+  const EqualizerFilter({
+    this.type = EqualizerFilterType.peak,
+    this.frequency = 1000,
+    this.gain = 0,
+    this.q = 1,
+    this.enabled = true,
+  });
+
+  static const minFrequency = 20.0, maxFrequency = 20000.0;
+  static const maxGain = 24.0;
+  static const minQ = 0.1, maxQ = 20.0;
+
+  /// The Q of a shelf that names none: the steepest without overshoot.
+  static const shelfQ = 0.707;
+
+  final EqualizerFilterType type;
+  final double frequency, gain, q;
+  final bool enabled;
+
+  /// Gain in dB at [hz], from the analog prototype. The digital filter
+  /// differs only close to half the sample rate.
+  double responseAt(double hz) {
+    if (!enabled || gain == 0) return 0;
+    final a = math.pow(10, gain / 40).toDouble();
+    final w = hz / frequency, w2 = w * w;
+    switch (type) {
+      case EqualizerFilterType.peak:
+        final pass = (1 - w2) * (1 - w2);
+        return 10 *
+            math.log(
+              (pass + math.pow(a * w / q, 2)) /
+                  (pass + math.pow(w / (a * q), 2)),
+            ) /
+            math.ln10;
+      case EqualizerFilterType.lowShelf:
+      case EqualizerFilterType.highShelf:
+        final damping = a * w2 / (q * q);
+        final low = math.pow(a - w2, 2) + damping;
+        final high = math.pow(1 - a * w2, 2) + damping;
+        final ratio = type == EqualizerFilterType.lowShelf
+            ? low / high
+            : high / low;
+        return 10 * math.log(a * a * ratio) / math.ln10;
+    }
+  }
+
+  EqualizerFilter copyWith({
+    EqualizerFilterType? type,
+    double? frequency,
+    double? gain,
+    double? q,
+    bool? enabled,
+  }) => EqualizerFilter(
+    type: type ?? this.type,
+    frequency: frequency ?? this.frequency,
+    gain: gain ?? this.gain,
+    q: q ?? this.q,
+    enabled: enabled ?? this.enabled,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'type': type.nativeName,
+    'frequency': frequency,
+    'gain': gain,
+    'q': q,
+    'enabled': enabled,
+  };
+
+  /// Null for an entry that is not a filter. Values are brought into range.
+  static EqualizerFilter? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final frequency = json['frequency'], gain = json['gain'], q = json['q'];
+    if (frequency is! num || gain is! num || q is! num) return null;
+    if (!frequency.isFinite || !gain.isFinite || !q.isFinite) return null;
+    return EqualizerFilter(
+      type: EqualizerFilterType.values.firstWhere(
+        (type) => type.nativeName == json['type'],
+        orElse: () => EqualizerFilterType.peak,
+      ),
+      frequency: frequency.toDouble().clamp(minFrequency, maxFrequency),
+      gain: gain.toDouble().clamp(-maxGain, maxGain),
+      q: q.toDouble().clamp(minQ, maxQ),
+      enabled: json['enabled'] != false,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is EqualizerFilter &&
+      other.type == type &&
+      other.frequency == frequency &&
+      other.gain == gain &&
+      other.q == q &&
+      other.enabled == enabled;
+
+  @override
+  int get hashCode => Object.hash(type, frequency, gain, q, enabled);
+}
+
+/// Portable EQ settings: a graphic equalizer of fixed bands, or the
+/// [filters] of a parametric one while [parametric] is set. Gains are
+/// independent of the system volume.
 class EqualizerSettings {
   const EqualizerSettings({
     this.enabled = false,
+    this.parametric = false,
+    this.filters = const [],
     this.gains = const [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     this.preamp = 0,
     this.bass = 0,
@@ -19,7 +136,16 @@ class EqualizerSettings {
   });
 
   static const bandCounts = [5, 10, 15, 31];
+
+  /// The most parametric filters kept.
+  static const maxFilters = 20;
+
   final bool enabled, autoHeadroom, limiter, compressor;
+
+  /// Whether [filters] shape the sound in place of [gains], [bass] and
+  /// [treble], which are kept for the way back.
+  final bool parametric;
+  final List<EqualizerFilter> filters;
   final List<double> gains;
   final double preamp, bass, treble, balance;
   final double threshold, ratio, attack, release;
@@ -90,12 +216,37 @@ class EqualizerSettings {
           .clamp(-24.0, 24.0),
   ];
 
-  double get headroom =>
-      autoHeadroom ? effectiveGains.fold(0.0, math.max).clamp(0.0, 24.0) : 0;
+  /// Gain in dB at [hz] of the curve that plays: the filters together, or
+  /// the bands with the tone controls.
+  double responseAt(double hz) => parametric
+      ? filters.fold(0.0, (sum, filter) => sum + filter.responseAt(hz))
+      : gainAt(hz, includeTone: true);
+
+  /// The highest point of the parametric curve, looked for on a grid of 24
+  /// points an octave and at every filter's own frequency.
+  double get _filterPeak {
+    var peak = 0.0;
+    for (var step = 0; step <= 240; step++) {
+      peak = math.max(peak, responseAt(20 * math.pow(2, step / 24).toDouble()));
+    }
+    for (final filter in filters) {
+      peak = math.max(peak, responseAt(filter.frequency));
+    }
+    return peak;
+  }
+
+  double get headroom => !autoHeadroom
+      ? 0
+      : (parametric ? _filterPeak : effectiveGains.fold(0.0, math.max)).clamp(
+          0.0,
+          24.0,
+        );
   double get inputGain => (preamp - headroom).clamp(-48.0, 12.0);
 
   EqualizerSettings copyWith({
     bool? enabled,
+    bool? parametric,
+    List<EqualizerFilter>? filters,
     List<double>? gains,
     double? preamp,
     double? bass,
@@ -110,6 +261,10 @@ class EqualizerSettings {
     double? release,
   }) => EqualizerSettings(
     enabled: enabled ?? this.enabled,
+    parametric: parametric ?? this.parametric,
+    filters: filters == null
+        ? this.filters
+        : List.unmodifiable(filters.take(maxFilters)),
     gains: gains == null ? this.gains : List.unmodifiable(gains),
     preamp: preamp ?? this.preamp,
     bass: bass ?? this.bass,
@@ -133,6 +288,9 @@ class EqualizerSettings {
   /// A preset carries a sound; headroom, limiting, compression and balance
   /// stay as the listener set them.
   EqualizerSettings withToneOf(EqualizerSettings preset) => copyWith(
+    parametric: preset.parametric,
+    // A graphic preset leaves the listener's filters for the way back.
+    filters: preset.parametric ? preset.filters : null,
     gains: preset.gains,
     preamp: preset.preamp,
     bass: preset.bass,
@@ -157,6 +315,8 @@ class EqualizerSettings {
 
   Map<String, dynamic> toJson() => {
     'enabled': enabled,
+    'parametric': parametric,
+    'filters': [for (final filter in filters) filter.toJson()],
     'gains': gains,
     'preamp': preamp,
     'bass': bass,
@@ -171,11 +331,25 @@ class EqualizerSettings {
     'release': release,
   };
 
+  /// The configuration a native equalizer takes. With `filters` set it plays
+  /// those in place of the bands, which are then sent flat.
   Map<String, dynamic> toNative() => {
     ...toJson(),
-    'frequencies': frequencies,
-    'gains': effectiveGains,
+    'frequencies': parametric ? _centers[10] : frequencies,
+    'gains': parametric ? List.filled(10, 0.0) : effectiveGains,
     'inputGain': inputGain,
+    'filters': parametric
+        ? [
+            for (final filter in filters)
+              if (filter.enabled && filter.gain != 0)
+                {
+                  'type': filter.type.nativeName,
+                  'frequency': filter.frequency,
+                  'gain': filter.gain,
+                  'q': filter.q,
+                },
+          ]
+        : null,
   };
 
   factory EqualizerSettings.fromJson(Map<String, dynamic> json) {
@@ -191,8 +365,16 @@ class EqualizerSettings {
         raw.any((v) => v is! num || !v.isFinite)) {
       throw const FormatException('Invalid equalizer bands');
     }
+    final filters = json['filters'];
     return EqualizerSettings(
       enabled: json['enabled'] == true,
+      parametric: json['parametric'] == true,
+      filters: List.unmodifiable(
+        (filters is List ? filters : const <Object?>[])
+            .map(EqualizerFilter.fromJson)
+            .nonNulls
+            .take(maxFilters),
+      ),
       gains: List.unmodifiable(
         raw.map((v) => (v as num).toDouble().clamp(-15.0, 15.0)),
       ),

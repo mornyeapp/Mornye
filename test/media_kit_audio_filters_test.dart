@@ -88,6 +88,59 @@ void main() {
     });
   });
 
+  test('parametric filters replace the bands with their own sections', () {
+    final settings = const EqualizerSettings(enabled: true).copyWith(
+      parametric: true,
+      gains: [6, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      bass: 4,
+      filters: const [
+        EqualizerFilter(frequency: 105, gain: -2.1, q: 0.7),
+        EqualizerFilter(
+          type: EqualizerFilterType.lowShelf,
+          frequency: 80,
+          gain: 4,
+          q: 0.71,
+        ),
+        EqualizerFilter(
+          type: EqualizerFilterType.highShelf,
+          frequency: 30000,
+          gain: -3,
+          q: 0.5,
+        ),
+        EqualizerFilter(frequency: 500, gain: 0),
+        EqualizerFilter(frequency: 900, gain: 5, enabled: false),
+      ],
+    );
+    final chain = MpvAudioFilterChain.fromEqualizer(
+      settings,
+      sampleRate: 48000,
+    );
+    final sections = chain.filters
+        .where((f) => f.id.startsWith('filter'))
+        .map((f) => f.spec)
+        .toList();
+    expect(sections, [
+      'equalizer@filter0=f=105:t=q:w=0.7:g=-2.1',
+      'lowshelf@filter1=f=80:t=q:w=0.71:g=4',
+      // Kept below 45% of the sample rate, like a band.
+      'highshelf@filter2=f=21600:t=q:w=0.5:g=-3',
+    ]);
+    expect(chain.filters.any((f) => f.id.startsWith('band')), isFalse);
+    // The headroom is the filters' own peak, not the waiting bands': the
+    // shelf's 4 dB less what the cut beside it takes off.
+    expect(chain.filters.first.options['volume'], '-3.8297dB');
+
+    final bare = MpvAudioFilterChain.fromEqualizer(
+      settings,
+      sampleRate: 48000,
+      unavailable: const {'lowshelf', 'highshelf'},
+    );
+    expect(
+      bare.filters.where((f) => f.id.startsWith('filter')).map((f) => f.name),
+      ['equalizer'],
+    );
+  });
+
   test('filters missing from libmpv are left out', () {
     final settings = const EqualizerSettings(
       enabled: true,

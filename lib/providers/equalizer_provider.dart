@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mornye/models/equalizer_filter_text.dart';
 import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/services/playback_equalizer.dart';
 
@@ -137,6 +138,38 @@ class EqualizerController extends Notifier<EqualizerState> {
         'version': 1,
         ...EqualizerPreset(name, state.settings).toJson(),
       });
+
+  /// The filters playing now as a plain text filter list.
+  String exportFilters() => EqualizerFilterText.format(state.settings);
+
+  /// Takes a preset file of the app or a plain text filter list. Returns how
+  /// many filters of the list were of a kind the equalizer has none of.
+  int importFile(String source) {
+    if (source.trimLeft().startsWith('{')) {
+      importPreset(source);
+      return 0;
+    }
+    return importFilters(source);
+  }
+
+  /// Plays the filters of a plain text filter list. A list that names its
+  /// own preamp carries its headroom, so none is added on top.
+  int importFilters(String source) {
+    if (source.length > 65536) {
+      throw const FormatException('Preset file is too large.');
+    }
+    final text = EqualizerFilterText.parse(source);
+    final preamp = text.preamp;
+    update(
+      state.settings.copyWith(
+        parametric: true,
+        filters: text.filters,
+        preamp: preamp?.clamp(-24.0, 12.0),
+        autoHeadroom: preamp == null ? null : false,
+      ),
+    );
+    return text.skipped;
+  }
 
   void importPreset(String source) {
     if (source.length > 65536) {

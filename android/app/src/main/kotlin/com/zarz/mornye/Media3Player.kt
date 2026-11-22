@@ -53,15 +53,20 @@ import io.flutter.plugin.common.MethodChannel
  *
  * Buffer size: see [MAX_BUFFERED_SPEED].
  */
-internal fun media3AudioRenderers(context: Context, skipSilence: () -> Boolean) =
-    RenderersFactory { handler, _, audioListener, _, _ ->
-        val sink = DefaultAudioSink.Builder(context)
-            .setEnableFloatOutput(true)
-            .setEnableAudioOutputPlaybackParameters(true)
-            .setAudioTrackBufferSizeProvider(cappedSpeedBufferSize)
-            .build()
-        arrayOf(Media3AudioRenderer(context, handler, audioListener, sink, skipSilence))
-    }
+internal fun media3AudioRenderers(
+    context: Context,
+    parametric: ParametricEqualizerDsp,
+    skipSilence: () -> Boolean,
+) = RenderersFactory { handler, _, audioListener, _, _ ->
+    val sink = DefaultAudioSink.Builder(context)
+        .setEnableFloatOutput(true)
+        .setEnableAudioOutputPlaybackParameters(true)
+        .setAudioTrackBufferSizeProvider(cappedSpeedBufferSize)
+        .build()
+    arrayOf(
+        Media3AudioRenderer(context, handler, audioListener, ParametricEqualizerSink(sink, parametric), skipSilence),
+    )
+}
 
 /**
  * media3 asks every decoder for float PCM once the sink takes float, the
@@ -208,6 +213,9 @@ internal class Media3Player(
     private var lastDurationMs: Long? = null
     private var nextItem = 0L
     private var equalizer: PlaybackEqualizer? = null
+
+    /** The parametric filters, which the platform equalizer cannot hold. */
+    private val parametric = ParametricEqualizerDsp()
     private var released = false
 
     /** Read by the renderer on media3's playback thread. */
@@ -217,7 +225,7 @@ internal class Media3Player(
     private var spatialAudio = true
 
     init {
-        exo = ExoPlayer.Builder(appContext, media3AudioRenderers(appContext) { skipSilence })
+        exo = ExoPlayer.Builder(appContext, media3AudioRenderers(appContext, parametric) { skipSilence })
             .setLooper(looper)
             // The app owns focus (audio_session) and becoming-noisy handling.
             .setAudioAttributes(media3AudioAttributes(spatialAudio), false)
@@ -500,17 +508,23 @@ internal class Media3Player(
     }
 
     private fun setEqualizer(configuration: Map<String, Any?>) {
-        if (Build.VERSION.SDK_INT < 28) {
-            check(configuration["enabled"] != true) { "Equalizer requires Android 9 or later" }
-            return
-        }
-        if (configuration["enabled"] == true && equalizer == null) {
-            equalizer = PlaybackEqualizer(sessionId)
-        }
         try {
-            equalizer?.configure(configuration)
+            if (Build.VERSION.SDK_INT < 28) {
+                check(configuration["enabled"] != true) { "Equalizer requires Android 9 or later" }
+                parametric.disable()
+                return
+            }
+            parametric.configure(configuration)
+            // Its filters take the input gain with them, ahead of the
+            // platform effect: a boost must not clip integer PCM first.
+            val platform = if (parametric.active) configuration + ("inputGain" to 0.0) else configuration
+            if (configuration["enabled"] == true && equalizer == null) {
+                equalizer = PlaybackEqualizer(sessionId)
+            }
+            equalizer?.configure(platform)
         } catch (error: Exception) {
-            equalizer?.close()
+            parametric.disable()
+            if (Build.VERSION.SDK_INT >= 28) equalizer?.close()
             equalizer = null
             throw error
         }

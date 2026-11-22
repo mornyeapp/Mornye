@@ -174,14 +174,29 @@ class _EqualizerCurve extends CustomPainter {
         plot.center.dy - gain.clamp(-_range, _range) / _range * plot.height / 2;
 
     final curve = settings.copyWith(gains: settings.effectiveGains);
-    final points = <Offset>[Offset(plot.left, y(curve.gains.first))];
-    for (var i = 0; i < curve.gains.length; i++) {
-      final point = Offset(x(settings.frequencies[i]), y(curve.gains[i]));
-      if (point.dx > points.last.dx + 0.5 && point.dx < plot.right - 0.5) {
-        points.add(point);
+    final points = <Offset>[];
+    if (settings.parametric) {
+      // The filters' own response, which has no bands to pass through.
+      const steps = 120;
+      for (var i = 0; i <= steps; i++) {
+        final hz = _minHz * math.pow(_maxHz / _minHz, i / steps);
+        points.add(
+          Offset(
+            plot.left + plot.width * i / steps,
+            y(settings.responseAt(hz.toDouble())),
+          ),
+        );
       }
+    } else {
+      points.add(Offset(plot.left, y(curve.gains.first)));
+      for (var i = 0; i < curve.gains.length; i++) {
+        final point = Offset(x(settings.frequencies[i]), y(curve.gains[i]));
+        if (point.dx > points.last.dx + 0.5 && point.dx < plot.right - 0.5) {
+          points.add(point);
+        }
+      }
+      points.add(Offset(plot.right, y(curve.gains.last)));
     }
-    points.add(Offset(plot.right, y(curve.gains.last)));
     final line = _monotoneSpline(points);
     final area = Path.from(line)
       ..lineTo(plot.right, plot.center.dy)
@@ -213,6 +228,18 @@ class _EqualizerCurve extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
     final dot = Paint()..color = color;
+    if (settings.parametric) {
+      // One dot a filter, on the curve at the filter's frequency.
+      for (final filter in settings.filters) {
+        if (!filter.enabled) continue;
+        canvas.drawCircle(
+          Offset(x(filter.frequency), y(settings.responseAt(filter.frequency))),
+          4,
+          dot,
+        );
+      }
+      return;
+    }
     final effective = curve.gains;
     for (var i = 0; i < effective.length; i++) {
       final hz = settings.frequencies[i];

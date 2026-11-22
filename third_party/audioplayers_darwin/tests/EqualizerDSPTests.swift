@@ -64,6 +64,21 @@ import Foundation
         assert(frame.allSatisfy { $0.isFinite && abs($0) <= pow(10, -0.5 / 20) + 1e-9 })
       }
     }
-    print("PASS: flat, gain, preamp, compressor, limiter, pan, mono, bypass and 31-band multi-rate stability")
+    // Parametric filters play in place of the bands, which are sent flat.
+    func level(_ filters: [[String: Any]], at frequency: Double) -> Double {
+      20 * log10(rms(engine(["filters": filters]), amplitude: 0.1, frequency: frequency) / flat)
+    }
+    let peak: [String: Any] = ["type": "peak", "frequency": 1000.0, "gain": 6.0, "q": 1.4]
+    assert(abs(level([peak], at: 1000) - 6) < 0.02 && abs(level([peak], at: 60)) < 0.05)
+    let low: [String: Any] = ["type": "lowshelf", "frequency": 200.0, "gain": -5.0, "q": 0.707]
+    assert(abs(level([low], at: 30) + 5) < 0.05 && abs(level([low], at: 200) + 2.5) < 0.05)
+    assert(abs(level([low], at: 5000)) < 0.02)
+    let high: [String: Any] = ["type": "highshelf", "frequency": 4000.0, "gain": 4.0, "q": 0.707]
+    assert(abs(level([high], at: 100)) < 0.02 && abs(level([high], at: 4000) - 2) < 0.05)
+    assert(abs(level([high], at: 18000) - 4) < 0.1)
+    assert(abs(level([], at: 1000)) < 1e-6, "No filters must play flat, not the bands")
+    let invalid = engine(["filters": [["type": "notch", "frequency": 1000.0, "gain": 3.0, "q": 1.0]]])
+    assert(!invalid.enabled, "An unknown filter must turn the equalizer off")
+    print("PASS: flat, gain, preamp, compressor, limiter, pan, mono, bypass, 31-band multi-rate stability and parametric filters")
   }
 }

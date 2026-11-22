@@ -36,7 +36,10 @@ other userInfo values are omitted so playback errors cannot expose NAS credentia
 - EqualizerDSP.swift (new) processes decoded PCM with cascaded RBJ peaking
   biquads, plus input gain, balance, a compressor and a limiter. It accepts 5, 10,
   15 or 31 bands with gains from -24 to 24 dB, the same limits as the
-  Android fork.
+  Android fork. With a `filters` list in the configuration (the parametric
+  equalizer: up to 20 entries of `type` `peak`, `lowshelf` or `highshelf`
+  with `frequency`, `gain` and `q`) it plays those cookbook sections in
+  place of the bands; an entry it cannot read turns the equalizer off.
 
 ### External playback
 

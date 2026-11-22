@@ -1015,6 +1015,18 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
         'balance',
       if (settings.compressor && _missingFilters.contains('acompressor'))
         'compressor',
+      for (final (type, name) in const [
+        (EqualizerFilterType.lowShelf, 'lowshelf'),
+        (EqualizerFilterType.highShelf, 'highshelf'),
+      ])
+        if (settings.parametric &&
+            _missingFilters.contains(name) &&
+            settings.filters.any(
+              (filter) => filter.enabled && filter.type == type,
+            ))
+          type == EqualizerFilterType.lowShelf
+              ? 'low shelf filter'
+              : 'high shelf filter',
     ];
     if (missing.isEmpty) return null;
     return 'The ${missing.join(' and ')} is not available in this system '

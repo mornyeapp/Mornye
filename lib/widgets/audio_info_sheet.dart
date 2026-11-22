@@ -627,7 +627,9 @@ class _AudioFacts {
         ? l10n.audioInfoBypassed
         : [
             l10n.audioInfoOn,
-            l10n.audioInfoBands(equalizer.gains.length),
+            equalizer.parametric
+                ? l10n.equalizerFilterCount(equalizer.filters.length)
+                : l10n.audioInfoBands(equalizer.gains.length),
             if (equalizer.inputGain != 0)
               '${l10n.equalizerPreamp} ${_db(equalizer.inputGain)}',
             if (equalizer.compressor) l10n.equalizerCompressor,

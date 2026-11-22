@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/providers/equalizer_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/playback_equalizer.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
@@ -36,6 +37,7 @@ import 'package:mornye/widgets/slider_value_header.dart';
 
 part 'equalizer_widgets.dart';
 part 'equalizer_curve.dart';
+part 'equalizer_filters.dart';
 
 class EqualizerScreen extends ConsumerStatefulWidget {
   const EqualizerScreen({super.key});
@@ -44,7 +46,7 @@ class EqualizerScreen extends ConsumerStatefulWidget {
   ConsumerState<EqualizerScreen> createState() => _EqualizerScreenState();
 }
 
-enum _PresetAction { manage, import, export }
+enum _PresetAction { manage, import, export, exportFilters }
 
 final _selectedEqualizerPresetProvider = Provider<EqualizerPreset?>(
   (ref) => _matchingPreset(ref.watch(equalizerProvider)),
@@ -76,14 +78,18 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
     try {
       final file = await FilePicker.pickFile(
         type: FileType.custom,
-        allowedExtensions: ['json'],
+        allowedExtensions: ['json', 'txt'],
       );
       if (file == null) return;
       if ((await file.length() ?? 65537) > 65536) throw const FormatException();
       final source = utf8.decode(await file.readAsBytes());
       if (!mounted) return;
-      ref.read(equalizerProvider.notifier).importPreset(source);
-      _message(context.l10n.equalizerSaved);
+      final skipped = ref.read(equalizerProvider.notifier).importFile(source);
+      _message(
+        skipped == 0
+            ? context.l10n.equalizerSaved
+            : context.l10n.equalizerImportSkipped(skipped),
+      );
     } catch (_) {
       if (mounted) _message(context.l10n.equalizerImportInvalid);
     } finally {
@@ -91,10 +97,13 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
     }
   }
 
-  Future<void> _export() async {
-    final source = ref
-        .read(equalizerProvider.notifier)
-        .exportPreset('Custom EQ');
+  /// Shares the app's own preset file, or with [filters] the plain text
+  /// list of the parametric filters that other tools read.
+  Future<void> _export({bool filters = false}) async {
+    final notifier = ref.read(equalizerProvider.notifier);
+    final source = filters
+        ? notifier.exportFilters()
+        : notifier.exportPreset('Custom EQ');
     final box = context.findRenderObject() as RenderBox?;
     try {
       await SharePlus.instance.share(
@@ -102,10 +111,12 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
           files: [
             XFile.fromData(
               Uint8List.fromList(utf8.encode(source)),
-              mimeType: 'application/json',
+              mimeType: filters ? 'text/plain' : 'application/json',
             ),
           ],
-          fileNameOverrides: ['mornye-equalizer.json'],
+          fileNameOverrides: [
+            filters ? 'mornye-filters.txt' : 'mornye-equalizer.json',
+          ],
           sharePositionOrigin: box == null
               ? null
               : box.localToGlobal(Offset.zero) & box.size,
@@ -205,10 +216,15 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
       ),
     );
     if (mounted && accepted == true) {
-      final enabled = ref.read(equalizerProvider).settings.enabled;
+      final current = ref.read(equalizerProvider).settings;
       ref
           .read(equalizerProvider.notifier)
-          .update(EqualizerSettings(enabled: enabled));
+          .update(
+            EqualizerSettings(
+              enabled: current.enabled,
+              parametric: current.parametric,
+            ),
+          );
     }
   }
 
@@ -224,6 +240,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
       equalizerProvider.select(
         (state) => (
           enabled: state.settings.enabled,
+          parametric: state.settings.parametric,
           autoHeadroom: state.settings.autoHeadroom,
           limiter: state.settings.limiter,
           compressor: state.settings.compressor,
@@ -302,8 +319,14 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                   _ActionRow(
                     label: l10n.equalizerExport,
                     onTap: _export,
-                    last: true,
+                    last: !settings.parametric,
                   ),
+                  if (settings.parametric)
+                    _ActionRow(
+                      label: l10n.equalizerExportFilters,
+                      onTap: () => _export(filters: true),
+                      last: true,
+                    ),
                 ],
               ),
             ),
@@ -331,12 +354,35 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                   _PresetAction.manage => _presets(),
                   _PresetAction.import => _import(),
                   _PresetAction.export => _export(),
+                  _PresetAction.exportFilters => _export(filters: true),
                 },
               ),
             ),
           ],
-          section(SettingsSectionHeader(title: l10n.equalizerBands)),
-          section(SettingsGroup(children: [const _BandEditor()])),
+          section(
+            SettingsSectionHeader(
+              title: settings.parametric
+                  ? l10n.equalizerFilters
+                  : l10n.equalizerBands,
+            ),
+          ),
+          section(
+            SettingsGroup(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _ModePicker(),
+                    if (settings.parametric)
+                      const _FilterList()
+                    else
+                      const _BandEditor(),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          section(const _EngineNotice()),
           section(SettingsSectionHeader(title: l10n.equalizerTone)),
           section(
             SettingsGroup(
@@ -351,26 +397,30 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                   step: 0.5,
                   unit: 'dB',
                 ),
-                _SliderTile(
-                  icon: Icons.speaker_outlined,
-                  title: l10n.equalizerBass,
-                  control: _ToneControl.bass,
-                  min: -12,
-                  max: 12,
-                  step: 0.5,
-                  unit: 'dB',
-                  centered: true,
-                ),
-                _SliderTile(
-                  icon: Icons.music_note_outlined,
-                  title: l10n.equalizerTreble,
-                  control: _ToneControl.treble,
-                  min: -12,
-                  max: 12,
-                  step: 0.5,
-                  unit: 'dB',
-                  centered: true,
-                ),
+                // Bass and treble belong to the bands; a shelf filter is
+                // the parametric way to the same.
+                if (!settings.parametric) ...[
+                  _SliderTile(
+                    icon: Icons.speaker_outlined,
+                    title: l10n.equalizerBass,
+                    control: _ToneControl.bass,
+                    min: -12,
+                    max: 12,
+                    step: 0.5,
+                    unit: 'dB',
+                    centered: true,
+                  ),
+                  _SliderTile(
+                    icon: Icons.music_note_outlined,
+                    title: l10n.equalizerTreble,
+                    control: _ToneControl.treble,
+                    min: -12,
+                    max: 12,
+                    step: 0.5,
+                    unit: 'dB',
+                    centered: true,
+                  ),
+                ],
                 _SliderTile(
                   icon: Icons.surround_sound_outlined,
                   title: l10n.equalizerBalance,
@@ -500,6 +550,14 @@ EqualizerPreset? _matchingPreset(EqualizerState state) {
   final current = state.settings;
   for (final preset in [...EqualizerPreset.builtIn, ...state.presets]) {
     final tone = preset.settings;
+    if (current.parametric != tone.parametric) continue;
+    if (current.parametric) {
+      if (same(current.preamp, tone.preamp) &&
+          listEquals(current.filters, tone.filters)) {
+        return preset;
+      }
+      continue;
+    }
     if (same(current.preamp, tone.preamp) &&
         same(current.bass, tone.bass) &&
         same(current.treble, tone.treble) &&

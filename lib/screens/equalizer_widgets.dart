@@ -181,7 +181,7 @@ class _EqualizerOverview extends ConsumerWidget {
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            '${settings.gains.length} ${l10n.equalizerBands.toLowerCase()} · ${l10n.equalizerPreamp} ${_signed(settings.inputGain)} dB',
+                            '${settings.parametric ? l10n.equalizerFilterCount(settings.filters.length) : '${settings.gains.length} ${l10n.equalizerBands.toLowerCase()}'} · ${l10n.equalizerPreamp} ${_signed(settings.inputGain)} dB',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodyMedium?.copyWith(
@@ -281,6 +281,9 @@ class _PresetBar extends ConsumerWidget {
     );
     final presets = [...EqualizerPreset.builtIn, ...custom];
     final selected = ref.watch(_selectedEqualizerPresetProvider);
+    final parametric = ref.watch(
+      equalizerProvider.select((state) => state.settings.parametric),
+    );
     final l10n = context.l10n;
     final tokens = context.tokens;
     return LayoutBuilder(
@@ -366,6 +369,12 @@ class _PresetBar extends ConsumerWidget {
                         label: l10n.equalizerExport,
                         leading: const AppIcon(Icons.ios_share),
                       ),
+                      if (parametric)
+                        AppMenuItem(
+                          value: _PresetAction.exportFilters,
+                          label: l10n.equalizerExportFilters,
+                          leading: const AppIcon(Icons.description_outlined),
+                        ),
                     ],
                   ),
                 ],

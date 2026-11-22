@@ -25,6 +25,21 @@ final class EqualizerDSP {
         a2: (1 - alpha / a) / divisor)
     }
 
+    /// A shelf of the cookbook; `high` turns it around the frequency.
+    static func shelf(high: Bool, frequency: Double, gain: Double, q: Double, rate: Double) -> Biquad {
+      let w = 2 * Double.pi * min(frequency, rate * 0.45) / rate
+      let a = pow(10, gain / 40)
+      let cosine = high ? -cos(w) : cos(w)
+      let slope = 2 * sqrt(a) * sin(w) / (2 * q)
+      let divisor = (a + 1) + (a - 1) * cosine + slope
+      let sign = high ? -1.0 : 1.0
+      return Biquad(b0: a * ((a + 1) - (a - 1) * cosine + slope) / divisor,
+        b1: sign * 2 * a * ((a - 1) - (a + 1) * cosine) / divisor,
+        b2: a * ((a + 1) - (a - 1) * cosine - slope) / divisor,
+        a1: sign * -2 * ((a - 1) + (a + 1) * cosine) / divisor,
+        a2: ((a + 1) + (a - 1) * cosine - slope) / divisor)
+    }
+
     mutating func process(_ input: Double) -> Double {
       if ramp > 0 {
         let step = 1 / Double(ramp)
@@ -93,11 +108,31 @@ final class EqualizerDSP {
     }
     let step = pow(frequencies.last! / frequencies.first!, 1 / Double(gains.count - 1))
     let q = sqrt(step) / (step - 1)
+    var sections = zip(frequencies, gains).map {
+      Biquad.peak(frequency: $0.0, gain: $0.1, q: q, rate: rate)
+    }
+    // Parametric: the listener's own filters play in place of the bands.
+    if let parametric = configuration["filters"] as? [[String: Any]] {
+      guard parametric.count <= 20 else { enabled = false; return }
+      sections = []
+      for filter in parametric {
+        guard let type = filter["type"] as? String,
+          let frequency = (filter["frequency"] as? NSNumber)?.doubleValue,
+          let gain = (filter["gain"] as? NSNumber)?.doubleValue,
+          let width = (filter["q"] as? NSNumber)?.doubleValue,
+          ["peak", "lowshelf", "highshelf"].contains(type),
+          frequency.isFinite, frequency >= 10, frequency <= 24000,
+          gain.isFinite, abs(gain) <= 24, width.isFinite, width >= 0.05, width <= 40
+        else { enabled = false; return }
+        sections.append(type == "peak"
+          ? Biquad.peak(frequency: frequency, gain: gain, q: width, rate: rate)
+          : Biquad.shelf(high: type == "highshelf", frequency: frequency, gain: gain, q: width, rate: rate))
+      }
+    }
     for channel in filters.indices {
       let old = filters[channel]
-      filters[channel] = zip(frequencies, gains).enumerated().map { index, band in
-        let next = Biquad.peak(frequency: band.0, gain: band.1, q: q, rate: rate)
-        guard old.count == gains.count else { return next }
+      filters[channel] = sections.enumerated().map { index, next in
+        guard old.count == sections.count else { return next }
         var filter = old[index]
         filter.retarget(next, frames: Int(rate * 0.005))
         return filter

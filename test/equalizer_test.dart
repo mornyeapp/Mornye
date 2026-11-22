@@ -103,9 +103,10 @@ void main() {
         );
         await tester.pumpAndSettle();
         final page = tester.widget<Scaffold>(find.byType(Scaffold));
-        final picker = find.byType(
-          mornye ? MornyeSegmentedControl : M3EButtonGroup,
-        );
+        // The band count, under the Graphic or Parametric choice.
+        final picker = find
+            .byType(mornye ? MornyeSegmentedControl : M3EButtonGroup)
+            .last;
         final bandPicker = tester.widget(picker);
         Widget bass() => mornye
             ? tester
@@ -417,8 +418,11 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        final picker = find.byType(
-          mornye ? MornyeSegmentedControl : M3EButtonGroup,
+        // The band count, not the Graphic or Parametric choice above it.
+        final picker = find.byWidgetPredicate(
+          (widget) => mornye
+              ? widget is MornyeSegmentedControl && widget.labels.length == 4
+              : widget is M3EButtonGroup && widget.actions.length == 4,
         );
         await tester.scrollUntilVisible(
           picker,

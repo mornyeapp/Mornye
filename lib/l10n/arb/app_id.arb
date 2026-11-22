@@ -8700,7 +8700,7 @@
   "appearanceCustomFontInvalid": "Font tidak dapat dimuat. Pilih file TTF atau OTF yang valid, maksimal 10 MB.",
   "appearanceCustomFontReset": "Gunakan font tema",
   "equalizerTitle": "Equalizer",
-  "equalizerDescription": "5–31 band, kontrol nada, preamp, dan dinamika",
+  "equalizerDescription": "5–31 band atau filter parametrik, preamp, dan dinamika",
   "equalizerEnable": "Aktifkan equalizer",
   "equalizerBands": "Band",
   "equalizerTone": "Nada & stereo",
@@ -8724,7 +8724,7 @@
   "equalizerPresetName": "Nama preset",
   "equalizerImport": "Impor preset",
   "equalizerExport": "Bagikan preset",
-  "equalizerImportInvalid": "Pilih preset equalizer Mornye yang valid (JSON, maksimal 64 KB).",
+  "equalizerImportInvalid": "Pilih preset equalizer Mornye (JSON) atau daftar filter (teks), maksimal 64 KB.",
   "equalizerSaved": "Preset disimpan",
   "equalizerResetTitle": "Reset equalizer?",
   "equalizerResetDescription": "Kembalikan kurva datar serta pengaturan nada dan dinamika bawaan. Preset tersimpan tetap disimpan.",
@@ -8735,6 +8735,49 @@
   "equalizerDeletePreset": "Hapus preset",
   "equalizerCustom": "Kustom",
   "equalizerManagePresets": "Kelola preset",
+  "equalizerModeGraphic": "Grafis",
+  "equalizerModeParametric": "Parametrik",
+  "equalizerFilters": "Filter",
+  "equalizerFilterCount": "{count, plural, other{{count} filter}}",
+  "@equalizerFilterCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "equalizerFilterNumber": "Filter {number}",
+  "@equalizerFilterNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "equalizerAddFilter": "Tambah filter",
+  "equalizerRemoveFilter": "Hapus filter",
+  "equalizerFiltersEmpty": "Belum ada filter. Tambahkan satu, atau impor daftar filter.",
+  "equalizerFilterPeak": "Peak",
+  "equalizerFilterLowShelf": "Low shelf",
+  "equalizerFilterHighShelf": "High shelf",
+  "equalizerFilterFrequency": "Frekuensi",
+  "equalizerFilterGain": "Gain",
+  "equalizerFilterQ": "Q",
+  "@equalizerFilterQ": {
+    "description": "The quality factor (width) of a parametric equalizer filter; keep the letter Q"
+  },
+  "equalizerFilterTypeValue": "Ketik nilainya",
+  "equalizerNeedsEngine": "Filter parametrik diputar lewat mesin pemutar baru. Aktifkan untuk mendengarnya. Berlaku mulai lagu berikutnya.",
+  "equalizerNeedsEngineAction": "Aktifkan",
+  "equalizerExportFilters": "Bagikan daftar filter",
+  "equalizerImportSkipped": "{count, plural, other{Diimpor. {count} filter dari jenis yang tidak didukung dilewati.}}",
+  "@equalizerImportSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "lyricsShareTitle": "Bagikan lirik",
   "@lyricsShareTitle": {
     "description": "Screen that turns selected lyric lines into an image for stories"

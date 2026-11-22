@@ -403,7 +403,8 @@ void main() {
     final probes = engine.filterWrites
         .where((call) => call[2].startsWith('@mornye_probe'))
         .length;
-    expect(probes, 4);
+    // Volume, balance, compressor, limiter and the two shelves.
+    expect(probes, 6);
     final other = FakeMpvEngine()..missingFilters = engine.missingFilters;
     final second = MediaKitPlaybackDeck(playerId: 'mpv-other', engine: other);
     await _settle();

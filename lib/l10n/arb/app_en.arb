@@ -10222,7 +10222,7 @@
   "appearanceCustomFontInvalid": "Could not load this font. Choose a valid TTF or OTF file up to 10 MB.",
   "appearanceCustomFontReset": "Use theme font",
   "equalizerTitle": "Equalizer",
-  "equalizerDescription": "5–31 bands, tone controls, preamp and dynamics",
+  "equalizerDescription": "5–31 bands or parametric filters, preamp and dynamics",
   "equalizerEnable": "Enable equalizer",
   "equalizerBands": "Bands",
   "equalizerTone": "Tone & stereo",
@@ -10246,7 +10246,7 @@
   "equalizerPresetName": "Preset name",
   "equalizerImport": "Import preset",
   "equalizerExport": "Share preset",
-  "equalizerImportInvalid": "Choose a valid Mornye equalizer preset (JSON, up to 64 KB).",
+  "equalizerImportInvalid": "Choose a Mornye equalizer preset (JSON) or a filter list (text), up to 64 KB.",
   "equalizerSaved": "Preset saved",
   "equalizerResetTitle": "Reset equalizer?",
   "equalizerResetDescription": "Restore a flat curve, default tone and dynamics settings. Saved presets are kept.",
@@ -10257,6 +10257,49 @@
   "equalizerDeletePreset": "Delete preset",
   "equalizerCustom": "Custom",
   "equalizerManagePresets": "Manage presets",
+  "equalizerModeGraphic": "Graphic",
+  "equalizerModeParametric": "Parametric",
+  "equalizerFilters": "Filters",
+  "equalizerFilterCount": "{count, plural, =1{1 filter} other{{count} filters}}",
+  "@equalizerFilterCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "equalizerFilterNumber": "Filter {number}",
+  "@equalizerFilterNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "equalizerAddFilter": "Add filter",
+  "equalizerRemoveFilter": "Remove filter",
+  "equalizerFiltersEmpty": "No filters yet. Add one, or import a filter list.",
+  "equalizerFilterPeak": "Peak",
+  "equalizerFilterLowShelf": "Low shelf",
+  "equalizerFilterHighShelf": "High shelf",
+  "equalizerFilterFrequency": "Frequency",
+  "equalizerFilterGain": "Gain",
+  "equalizerFilterQ": "Q",
+  "@equalizerFilterQ": {
+    "description": "The quality factor (width) of a parametric equalizer filter; keep the letter Q"
+  },
+  "equalizerFilterTypeValue": "Type the value",
+  "equalizerNeedsEngine": "Parametric filters play through the new playback engine. Turn it on to hear them. Applies from the next song.",
+  "equalizerNeedsEngineAction": "Turn on",
+  "equalizerExportFilters": "Share filter list",
+  "equalizerImportSkipped": "{count, plural, =1{Imported. 1 filter of an unsupported kind was left out.} other{Imported. {count} filters of an unsupported kind were left out.}}",
+  "@equalizerImportSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "lyricsShareTitle": "Share lyrics",
   "@lyricsShareTitle": {
     "description": "Screen that turns selected lyric lines into an image for stories"

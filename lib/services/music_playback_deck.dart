@@ -342,7 +342,15 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
           .invokeMethod<void>('setEqualizer', {
             'playerId': _ordinary.playerId,
             'configuration': settings
-                .copyWith(enabled: settings.enabled && !_direct)
+                .copyWith(
+                  enabled:
+                      settings.enabled &&
+                      !_direct &&
+                      // Android's own equalizer is a bank of fixed bands:
+                      // the filters need the media3 deck's DSP.
+                      !(settings.parametric &&
+                          defaultTargetPlatform == TargetPlatform.android),
+                )
                 .toNative(),
           })
           .timeout(const Duration(seconds: 3));

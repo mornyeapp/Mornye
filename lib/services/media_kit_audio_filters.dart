@@ -64,6 +64,8 @@ class MpvAudioFilterChain {
     'stereotools',
     'acompressor',
     'alimiter',
+    'lowshelf',
+    'highshelf',
   };
 
   /// Sample rate assumed before the decoder reports one. Bands above 45% of
@@ -108,17 +110,32 @@ class MpvAudioFilterChain {
               'volume': '${_number(settings.inputGain)}dB',
             },
           ),
-        for (var i = 0; i < gains.length; i++)
-          MpvAudioFilter(
-            'band$i',
-            'equalizer',
-            options: {
-              'f': _number(math.min(frequencies[i], rate * 0.45)),
-              't': 'q',
-              'w': _number(q),
-              'g': _number(gains[i]),
-            },
-          ),
+        if (settings.parametric) ...[
+          // The same cookbook sections as the other platforms' own DSP.
+          for (final (i, filter) in settings.filters.indexed)
+            if (filter.enabled && filter.gain != 0 && has(_filterName(filter)))
+              MpvAudioFilter(
+                'filter$i',
+                _filterName(filter),
+                options: {
+                  'f': _number(math.min(filter.frequency, rate * 0.45)),
+                  't': 'q',
+                  'w': _number(filter.q),
+                  'g': _number(filter.gain),
+                },
+              ),
+        ] else
+          for (var i = 0; i < gains.length; i++)
+            MpvAudioFilter(
+              'band$i',
+              'equalizer',
+              options: {
+                'f': _number(math.min(frequencies[i], rate * 0.45)),
+                't': 'q',
+                'w': _number(q),
+                'g': _number(gains[i]),
+              },
+            ),
         // Applied only when set: the filter converts its input to stereo.
         if (settings.balance != 0 && has('stereotools'))
           MpvAudioFilter(
@@ -160,6 +177,12 @@ class MpvAudioFilterChain {
       ],
     );
   }
+
+  static String _filterName(EqualizerFilter filter) => switch (filter.type) {
+    EqualizerFilterType.peak => 'equalizer',
+    EqualizerFilterType.lowShelf => 'lowshelf',
+    EqualizerFilterType.highShelf => 'highshelf',
+  };
 
   MpvAudioFilterChain withTempo(MpvTempo tempo) => MpvAudioFilterChain(
     [...filters, ...tempo.filters],
