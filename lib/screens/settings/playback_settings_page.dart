@@ -43,6 +43,7 @@ import 'package:mornye/widgets/lastfm_settings.dart';
 import 'package:mornye/widgets/scrobble_settings.dart';
 import 'package:mornye/widgets/automix_settings.dart';
 import 'package:mornye/widgets/autoplay_randomness_slider.dart';
+import 'package:mornye/widgets/slider_value_header.dart';
 import 'package:mornye/widgets/music_haptics_settings.dart';
 import 'package:mornye/widgets/playback_normalization_settings.dart';
 import 'package:mornye/widgets/playback_tempo_sheet.dart';
@@ -481,21 +482,61 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
           ...settingsSectionSlivers(
             title: 'Headset & Remote Controls',
             children: [
-              _HeadsetRemoteControlsGroup(
-                settings: settings,
-                onTimeoutChanged: (timeout) => ref
+              _HeadsetTimeoutSlider(
+                timeoutMs: settings.headsetTimeoutMs,
+                onChanged: (timeout) => ref
                     .read(settingsProvider.notifier)
                     .setHeadsetTimeoutMs(timeout),
-                onSingleClickActionChanged: (action) => ref
-                    .read(settingsProvider.notifier)
-                    .setHeadsetSingleClickAction(action),
-                onDoubleClickActionChanged: (action) => ref
-                    .read(settingsProvider.notifier)
-                    .setHeadsetDoubleClickAction(action),
-                onTripleClickActionChanged: (action) => ref
-                    .read(settingsProvider.notifier)
-                    .setHeadsetTripleClickAction(action),
-                onVibrateChanged: (vibrate) => ref
+              ),
+              SettingsItem(
+                title: 'Single Tap Action',
+                subtitle: _headsetActionLabel(settings.headsetSingleClickAction),
+                trailing: const AppIcon(Icons.chevron_right),
+                showDivider: true,
+                onTap: () => _showHeadsetActionPicker(
+                  context,
+                  title: 'Single Tap Action',
+                  current: settings.headsetSingleClickAction,
+                  onSelected: (action) => ref
+                      .read(settingsProvider.notifier)
+                      .setHeadsetSingleClickAction(action),
+                ),
+              ),
+              SettingsItem(
+                title: 'Double Tap Action',
+                subtitle: _headsetActionLabel(settings.headsetDoubleClickAction),
+                trailing: const AppIcon(Icons.chevron_right),
+                showDivider: true,
+                onTap: () => _showHeadsetActionPicker(
+                  context,
+                  title: 'Double Tap Action',
+                  current: settings.headsetDoubleClickAction,
+                  onSelected: (action) => ref
+                      .read(settingsProvider.notifier)
+                      .setHeadsetDoubleClickAction(action),
+                ),
+              ),
+              SettingsItem(
+                title: 'Triple Tap Action',
+                subtitle: _headsetActionLabel(settings.headsetTripleClickAction),
+                trailing: const AppIcon(Icons.chevron_right),
+                showDivider: true,
+                onTap: () => _showHeadsetActionPicker(
+                  context,
+                  title: 'Triple Tap Action',
+                  current: settings.headsetTripleClickAction,
+                  onSelected: (action) => ref
+                      .read(settingsProvider.notifier)
+                      .setHeadsetTripleClickAction(action),
+                ),
+              ),
+              SettingsSwitchItem(
+                title: 'Vibrate on Click',
+                subtitle:
+                    'Subtle haptic feedback when a headset click is registered',
+                value: settings.headsetVibrateOnClick,
+                showDivider: false,
+                onChanged: (vibrate) => ref
                     .read(settingsProvider.notifier)
                     .setHeadsetVibrateOnClick(vibrate),
               ),
@@ -1151,170 +1192,92 @@ class _SpatialAudioItemState extends ConsumerState<_SpatialAudioItem>
   }
 }
 
-class _HeadsetRemoteControlsGroup extends StatelessWidget {
-  const _HeadsetRemoteControlsGroup({
-    required this.settings,
-    required this.onTimeoutChanged,
-    required this.onSingleClickActionChanged,
-    required this.onDoubleClickActionChanged,
-    required this.onTripleClickActionChanged,
-    required this.onVibrateChanged,
+String _headsetActionLabel(String action) {
+  switch (action) {
+    case 'play_pause':
+      return 'Play / Pause';
+    case 'next':
+      return 'Next Track';
+    case 'previous':
+      return 'Previous Track';
+    case 'fast_forward':
+      return 'Fast Forward';
+    case 'rewind':
+      return 'Rewind';
+    case 'none':
+      return 'None';
+    default:
+      return 'Play / Pause';
+  }
+}
+
+Future<void> _showHeadsetActionPicker(
+  BuildContext context, {
+  required String title,
+  required String current,
+  required ValueChanged<String> onSelected,
+}) async {
+  const actions = ['play_pause', 'next', 'previous', 'none'];
+  final colorScheme = Theme.of(context).colorScheme;
+  final action = await showAppBottomSheet<String>(
+    context: context,
+    title: title,
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: SettingsGroup(
+        children: [
+          for (final act in actions)
+            SettingsItem(
+              title: _headsetActionLabel(act),
+              selected: act == current,
+              trailing: act == current
+                  ? AppIcon(Icons.check, color: colorScheme.primary)
+                  : null,
+              showDivider: act != actions.last,
+              onTap: () => Navigator.pop(sheetContext, act),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (action != null) onSelected(action);
+}
+
+class _HeadsetTimeoutSlider extends StatelessWidget {
+  const _HeadsetTimeoutSlider({
+    required this.timeoutMs,
+    required this.onChanged,
   });
 
-  final AppSettings settings;
-  final ValueChanged<int> onTimeoutChanged;
-  final ValueChanged<String> onSingleClickActionChanged;
-  final ValueChanged<String> onDoubleClickActionChanged;
-  final ValueChanged<String> onTripleClickActionChanged;
-  final ValueChanged<bool> onVibrateChanged;
-
-  static String actionLabel(String action) {
-    switch (action) {
-      case 'play_pause':
-        return 'Play / Pause';
-      case 'next':
-        return 'Next Track';
-      case 'previous':
-        return 'Previous Track';
-      case 'fast_forward':
-        return 'Fast Forward';
-      case 'rewind':
-        return 'Rewind';
-      case 'none':
-        return 'None';
-      default:
-        return 'Play / Pause';
-    }
-  }
-
-  static Future<void> _showActionPicker(
-    BuildContext context, {
-    required String title,
-    required String current,
-    required ValueChanged<String> onSelected,
-  }) async {
-    const actions = ['play_pause', 'next', 'previous', 'none'];
-    final colorScheme = Theme.of(context).colorScheme;
-    final action = await showAppBottomSheet<String>(
-      context: context,
-      title: title,
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: SettingsGroup(
-          children: [
-            for (final act in actions)
-              SettingsItem(
-                title: actionLabel(act),
-                selected: act == current,
-                trailing: act == current
-                    ? AppIcon(Icons.check, color: colorScheme.primary)
-                    : null,
-                showDivider: act != actions.last,
-                onTap: () => Navigator.pop(sheetContext, act),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (action != null) onSelected(action);
-  }
+  final int timeoutMs;
+  final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return SettingsGroup(
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: context.tokens.rowPaddingH,
-            vertical: context.tokens.rowPaddingVCompact,
+    final tokens = context.tokens;
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: tokens.rowPaddingH,
+        vertical: tokens.rowPaddingVCompact,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SliderValueHeader(
+            title: 'Multi-click Detection Window',
+            subtitle: 'Detection timeout for double and triple clicks',
+            value: '$timeoutMs ms',
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Multi-click Detection Window',
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                  Text(
-                    '${settings.headsetTimeoutMs} ms',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Detection timeout for double and triple clicks',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              AppSlider(
-                value: settings.headsetTimeoutMs.toDouble(),
-                min: 200,
-                max: 600,
-                divisions: 8,
-                label: '${settings.headsetTimeoutMs} ms',
-                onChanged: (val) => onTimeoutChanged(val.round()),
-              ),
-            ],
+          AppSlider(
+            value: timeoutMs.toDouble(),
+            min: 200,
+            max: 600,
+            divisions: 8,
+            label: '$timeoutMs ms',
+            onChanged: (val) => onChanged(val.round()),
           ),
-        ),
-        SettingsItem(
-          title: 'Single Tap Action',
-          subtitle: actionLabel(settings.headsetSingleClickAction),
-          trailing: const AppIcon(Icons.chevron_right),
-          showDivider: true,
-          onTap: () => _showActionPicker(
-            context,
-            title: 'Single Tap Action',
-            current: settings.headsetSingleClickAction,
-            onSelected: onSingleClickActionChanged,
-          ),
-        ),
-        SettingsItem(
-          title: 'Double Tap Action',
-          subtitle: actionLabel(settings.headsetDoubleClickAction),
-          trailing: const AppIcon(Icons.chevron_right),
-          showDivider: true,
-          onTap: () => _showActionPicker(
-            context,
-            title: 'Double Tap Action',
-            current: settings.headsetDoubleClickAction,
-            onSelected: onDoubleClickActionChanged,
-          ),
-        ),
-        SettingsItem(
-          title: 'Triple Tap Action',
-          subtitle: actionLabel(settings.headsetTripleClickAction),
-          trailing: const AppIcon(Icons.chevron_right),
-          showDivider: true,
-          onTap: () => _showActionPicker(
-            context,
-            title: 'Triple Tap Action',
-            current: settings.headsetTripleClickAction,
-            onSelected: onTripleClickActionChanged,
-          ),
-        ),
-        SettingsSwitchItem(
-          title: 'Vibrate on Click',
-          subtitle: 'Subtle haptic feedback when a headset click is registered',
-          value: settings.headsetVibrateOnClick,
-          showDivider: false,
-          onChanged: onVibrateChanged,
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
