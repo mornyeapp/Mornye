@@ -254,6 +254,54 @@ class _ExpressiveMenuAnchorState<T extends Object>
   );
 }
 
+/// A width that fits the longest label, and a theme with a raised cap when
+/// that width passes the default 280dp; both null when the width the menu
+/// takes from [anchor] already fits. Never wider than the screen.
+({double? width, M3EMenuTheme? theme}) _menuFittingLabels<T extends Object>(
+  BuildContext context,
+  List<AppMenuItem<T>> items,
+  Rect anchor,
+) {
+  final m3e = M3ETheme.of(context);
+  final theme = m3e.menuTheme.metricsFor(M3EMenuVariant.vertical);
+  final style = m3e.typeScale.labelLarge;
+  final scaler = MediaQuery.textScalerOf(context);
+  final direction = Directionality.of(context);
+  var widest = 0.0;
+  for (final item in items) {
+    final painter = TextPainter(
+      text: TextSpan(text: item.label, style: style),
+      textDirection: direction,
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    final leading = item.leading == null ? 0.0 : theme.iconSize + theme.iconGap;
+    final width =
+        painter.width +
+        leading +
+        2 *
+            (theme.contentHorizontalPadding +
+                theme.entryHorizontalPadding +
+                theme.stateLayerInset +
+                // The popup pads its list by twice the elevation for the
+                // shadow.
+                theme.elevation * 2) +
+        // Rounding slack, so a label that just fits is not cut.
+        4;
+    painter.dispose();
+    if (width > widest) widest = width;
+  }
+  // The package's own choice: the anchor plus 176dp, within its caps.
+  final natural = (anchor.width + 176).clamp(theme.minWidth, theme.maxWidth);
+  if (widest <= natural) return (width: null, theme: null);
+  final screen = MediaQuery.sizeOf(context).width - 2 * theme.screenEdgePadding;
+  final width = widest.clamp(natural, screen).toDouble();
+  return (
+    width: width,
+    theme: width > theme.maxWidth ? theme.copyWith(maxWidth: width) : null,
+  );
+}
+
 /// Opens a Material 3 Expressive menu popup anchored to [context]'s render
 /// box, falling back to [showMenu] when expressive motion is off.
 Future<T?> showAppMenuPopup<T extends Object>({
@@ -355,11 +403,14 @@ Future<T?> showAppMenuPopup<T extends Object>({
     (false, true) => M3EMenuAnchorPosition.bottomStart,
     (false, false) => M3EMenuAnchorPosition.bottomEnd,
   };
+  final fit = _menuFittingLabels(context, items, anchor);
   final popup = M3EMenuPopup<T>(
     anchor: anchor,
     historyRoute: ModalRoute.of(context),
     position: popupPosition,
     selectedValue: selectedValue,
+    preferredWidth: fit.width,
+    themeOverride: fit.theme,
     children: [
       for (final item in items)
         if (item.selected != null)
