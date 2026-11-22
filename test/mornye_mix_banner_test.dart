@@ -1,3 +1,6 @@
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/mornye_mix_banner.dart';
@@ -29,6 +32,21 @@ Widget _banner({ValueNotifier<double>? drift}) => MaterialApp(
   );
 }
 
+/// The color field's pixels.
+Future<List<int>> _field(WidgetTester tester) async {
+  final boundary = _layers(tester).$2 as RenderRepaintBoundary;
+  return (await tester.runAsync(() async {
+    final image = await boundary.toImage();
+    try {
+      return (await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!.buffer.asUint8List().toList(growable: false);
+    } finally {
+      image.dispose();
+    }
+  }))!;
+}
+
 void main() {
   testWidgets('a drift repaints the color field, not the text over it', (
     tester,
@@ -47,6 +65,24 @@ void main() {
     expect(text.debugNeedsPaint, isFalse);
     await tester.pump();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a field at rest is the banner as drawn without a drift', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_banner());
+    await tester.pump(const Duration(seconds: 1));
+    final still = await _field(tester);
+
+    final drift = ValueNotifier<double>(0);
+    addTearDown(drift.dispose);
+    await tester.pumpWidget(_banner(drift: drift));
+    await tester.pump();
+    expect(await _field(tester), still);
+
+    drift.value = 0.5;
+    await tester.pump();
+    expect(await _field(tester), isNot(still));
   });
 
   testWidgets('without a drift the field is still', (tester) async {

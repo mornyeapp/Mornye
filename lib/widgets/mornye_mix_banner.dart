@@ -245,10 +245,13 @@ class _BannerPainter extends CustomPainter {
     // The seed's upper bits place the blooms, apart from the palette's choice.
     final drift = ((seed >> 8) & 0xff) / 255;
     final lean = ((seed >> 16) & 0xff) / 255;
-    // Each bloom goes once around where it sits in a loop, the two in
-    // opposite ways, and every banner starts somewhere else on its round.
-    final turn = 2 * math.pi * ((phase?.value ?? 0) + drift);
-    final sway = phase == null ? 0.0 : 1.0;
+    // Each bloom goes once around in a loop, the two in opposite ways, and
+    // every banner starts somewhere else on its round. The round starts
+    // where the bloom sits, so a field at rest is the banner as drawn still.
+    final rest = 2 * math.pi * drift;
+    final turn = rest + 2 * math.pi * (phase?.value ?? 0);
+    final across = math.cos(turn) - math.cos(rest);
+    final along = math.sin(turn) - math.sin(rest);
     void bloom(Offset center, double radius, Color color, double strength) {
       final circle = Rect.fromCircle(center: center, radius: radius);
       canvas.drawRect(
@@ -267,8 +270,8 @@ class _BannerPainter extends CustomPainter {
 
     bloom(
       Offset(
-        size.width * (0.55 + 0.4 * drift + sway * 0.2 * math.cos(turn)),
-        size.height * (0.12 + 0.28 * lean + sway * 0.13 * math.sin(turn)),
+        size.width * (0.55 + 0.4 * drift + 0.2 * across),
+        size.height * (0.12 + 0.28 * lean + 0.13 * along),
       ),
       size.width * 0.86,
       palette.glow,
@@ -276,8 +279,8 @@ class _BannerPainter extends CustomPainter {
     );
     bloom(
       Offset(
-        size.width * (0.05 + 0.4 * lean + sway * 0.22 * math.sin(turn)),
-        size.height * (0.82 + 0.14 * drift + sway * 0.1 * math.cos(turn)),
+        size.width * (0.05 + 0.4 * lean + 0.22 * along),
+        size.height * (0.82 + 0.14 * drift + 0.1 * across),
       ),
       size.width * 0.96,
       palette.depth,
