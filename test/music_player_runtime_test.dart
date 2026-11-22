@@ -37,6 +37,8 @@ import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/media_library_browser.dart';
+import 'package:mornye/services/music_playback_deck.dart'
+    show UsbAudioStatus, usbAudioStatus;
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/network_metadata_service.dart';
 import 'package:mornye/services/network_playback_cache.dart';
@@ -95,7 +97,7 @@ class _Deck implements PlaybackDeck {
   Future<void> Function()? beforeDispose;
 
   @override
-  bool get isDirect => false;
+  bool isDirect = false;
   @override
   PlaybackTempoSupport get tempoSupport => PlaybackTempoSupport.full;
   @override
@@ -740,6 +742,7 @@ MusicPlayerRuntime _runtime({
   NetworkPlaybackCache? networkCache,
   Future<Map<String, dynamic>> Function(String)? readNetworkMetadata,
   CoverStore? coverStore,
+  Future<bool> Function()? callActive,
 }) {
   if (isAndroid) {
     const channel = MethodChannel(
@@ -783,6 +786,7 @@ MusicPlayerRuntime _runtime({
       readNetworkMetadata:
           readNetworkMetadata ?? NetworkMetadataService.instance.read,
       coverStore: coverStore,
+      callActive: callActive ?? () async => false,
       sessionDatabase: sessionDatabase ?? _SessionStore(),
       libraryDatabase: libraryDatabase,
       historyDatabase: historyDatabase,
@@ -3021,6 +3025,76 @@ void main() {
       expect(decks.single.state, PlaybackDeckState.playing);
     },
   );
+
+  group('another app taking focus while Direct USB plays', () {
+    const active = UsbAudioStatus(reason: 'active', driver: 'usb_direct');
+    tearDown(() => usbAudioStatus.value = const UsbAudioStatus());
+
+    Future<(MusicPlayerHandler, _Deck)> playing(
+      _Session session,
+      Future<bool> Function() callActive,
+    ) async {
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        session: session,
+        decks: decks,
+        callActive: callActive,
+      ).initialize();
+      await handler.setQueueAndPlay([_track]);
+      decks.single.isDirect = true;
+      usbAudioStatus.value = active;
+      return (handler, decks.single);
+    }
+
+    test('keeps playing, and a paused song still pauses', () async {
+      final time = VirtualTime();
+      await time.run(() async {
+        final session = _Session();
+        var asked = 0;
+        final (handler, deck) = await playing(session, () async {
+          asked++;
+          return false;
+        });
+        session.interruptions.add(
+          AudioInterruptionEvent(true, AudioInterruptionType.unknown),
+        );
+        await Future<void>.delayed(const Duration(seconds: 2));
+        expect(deck.state, PlaybackDeckState.playing);
+        expect(handler.playbackState.value.playing, isTrue);
+        expect(asked, 2);
+
+        usbAudioStatus.value = const UsbAudioStatus(reason: 'unsupported');
+        session.interruptions.add(
+          AudioInterruptionEvent(true, AudioInterruptionType.pause),
+        );
+        await _settle();
+        expect(deck.state, PlaybackDeckState.paused);
+      });
+    });
+
+    test('a call that starts a second later pauses and resumes', () async {
+      final time = VirtualTime();
+      await time.run(() async {
+        final session = _Session();
+        var asked = 0;
+        final (handler, deck) = await playing(session, () async => ++asked > 1);
+        session.interruptions.add(
+          AudioInterruptionEvent(true, AudioInterruptionType.pause),
+        );
+        await _settle();
+        expect(deck.state, PlaybackDeckState.playing);
+        await Future<void>.delayed(const Duration(seconds: 2));
+        expect(deck.state, PlaybackDeckState.paused);
+        expect(handler.playbackState.value.playing, isFalse);
+
+        session.interruptions.add(
+          AudioInterruptionEvent(false, AudioInterruptionType.pause),
+        );
+        await _settle();
+        expect(deck.state, PlaybackDeckState.playing);
+      });
+    });
+  });
 
   test('pause cancels a resume awaiting foreground promotion', () async {
     final session = _Session();

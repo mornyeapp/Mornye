@@ -90,6 +90,7 @@ class PlaybackDependencies {
     this.createRanker = AutoplayRanker.new,
     this.createSongAnalysis = _createSongAnalysis,
     this.convertAudio = _convertAudio,
+    this.callActive = AudioplayersPlaybackDeck.callActive,
     this.playbackCopies,
     AppStateDatabase? sessionDatabase,
     LibraryDatabase? libraryDatabase,
@@ -169,6 +170,9 @@ class PlaybackDependencies {
   /// Runs FFmpeg with these arguments; true when it succeeded. Makes the
   /// FLAC copies AVPlayer plays in place of formats it cannot open.
   final Future<bool> Function(List<String> arguments) convertAudio;
+
+  /// Whether the phone rings or a call is under way.
+  final Future<bool> Function() callActive;
 
   /// Where those copies go, emptied before the first; a folder in the
   /// system temporary directory when null.

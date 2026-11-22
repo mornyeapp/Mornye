@@ -278,6 +278,18 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     } on MissingPluginException catch (_) {}
   }
 
+  /// Whether the phone rings or a call is under way, in any app. False when
+  /// the platform cannot say.
+  static Future<bool> callActive() async {
+    try {
+      return await _channel.invokeMethod<bool>('callActive') ?? false;
+    } on PlatformException catch (_) {
+      return false;
+    } on MissingPluginException catch (_) {
+      return false;
+    }
+  }
+
   /// Whether the output a bit-perfect song would open is connected. True
   /// when the platform cannot say.
   static Future<bool> bitPerfectOutputPresent({

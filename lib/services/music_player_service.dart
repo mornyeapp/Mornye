@@ -202,6 +202,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   bool _pausedByInterruption = false;
   bool _interruptionActive = false;
+  int _usbFocusCheck = 0;
   bool _userPaused = false;
   // Position saved with the restored session; applied on the first play().
   Duration? _pendingRestorePosition;
@@ -720,6 +721,10 @@ class MusicPlayerHandler extends BaseAudioHandler
             if (event.type == AudioInterruptionType.duck) {
               return;
             }
+            if (_holdsUsbDac) {
+              unawaited(_keepPlayingOnUsbDac());
+              return;
+            }
 
             _interruptionActive = true;
             _pausedByInterruption =
@@ -844,6 +849,31 @@ class MusicPlayerHandler extends BaseAudioHandler
       _interruptionActive ||
       _userPaused ||
       _playbackError != null;
+
+  /// Direct USB playing on a DAC that Android's mixer no longer reaches.
+  /// Another app cannot sound through it, so its focus does not pause.
+  bool get _holdsUsbDac =>
+      _player.isDirect &&
+      _player.state == PlaybackDeckState.playing &&
+      usbAudioStatus.value.driver == 'usb_direct' &&
+      usbAudioStatus.value.reason == 'active';
+
+  /// Keeps playing through a lost focus, unless a call takes it. A call can
+  /// set its mode just after taking focus, so it is asked again a second on.
+  Future<void> _keepPlayingOnUsbDac() async {
+    final check = ++_usbFocusCheck;
+    _log.i('Audio interruption ignored: Direct USB holds the DAC');
+    for (final wait in const [Duration.zero, Duration(seconds: 1)]) {
+      if (wait > Duration.zero) await Future<void>.delayed(wait);
+      if (_disposed || check != _usbFocusCheck || !_holdsUsbDac) return;
+      if (!await _dependencies.callActive()) continue;
+      if (_disposed || check != _usbFocusCheck || !_holdsUsbDac) return;
+      _interruptionActive = true;
+      _pausedByInterruption = true;
+      await _pauseForFocusLoss(reason: 'a call');
+      return;
+    }
+  }
 
   Future<void> _pauseForFocusLoss({
     required String reason,
