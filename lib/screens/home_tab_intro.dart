@@ -446,15 +446,22 @@ class _HomeSections extends ConsumerWidget {
         ? ref.watch(homeOnRepeatProvider.select((s) => s.value)) ??
               const <HomeRepeatTrack>[]
         : const <HomeRepeatTrack>[];
-    // Read only without a listening record, when they take On repeat's place.
-    final libraryAlbums =
+    final mornye = context.isMornye;
+    // Without a listening record the day's albums take On repeat's place.
+    // Mornye's Top Picks offer the first of them either way.
+    final recordsListening =
         showPlayer &&
-            ref.watch(
-              settingsProvider.select((s) => s.listeningStatisticsEnabled),
-            )
+        ref.watch(settingsProvider.select((s) => s.listeningStatisticsEnabled));
+    final dayAlbums = mornye || !recordsListening
+        ? ref.watch(homeLibraryAlbumsProvider.select((s) => s.value)) ??
+              const <LibraryBrowseEntry>[]
+        : const <LibraryBrowseEntry>[];
+    final pickedAlbums = mornye
+        ? dayAlbums.take(_homeTopPickLibraryAlbums).toList()
+        : const <LibraryBrowseEntry>[];
+    final libraryAlbums = recordsListening
         ? const <LibraryBrowseEntry>[]
-        : ref.watch(homeLibraryAlbumsProvider.select((s) => s.value)) ??
-              const <LibraryBrowseEntry>[];
+        : dayAlbums.skip(pickedAlbums.length).toList();
     final mixes = showPlayer
         ? ref.watch(libraryMixesProvider.select((s) => s.value))
         : null;
@@ -468,7 +475,6 @@ class _HomeSections extends ConsumerWidget {
         (hasMediaItem || hasResume) &&
         ref.watch(settingsProvider.select((s) => s.homeContinueListening));
 
-    final mornye = context.isMornye;
     final recentlyPlayed = mornye && showPlayer
         ? ref.watch(homeRecentlyPlayedProvider.select((s) => s.value)) ??
               const <HomeRepeatTrack>[]
@@ -481,10 +487,22 @@ class _HomeSections extends ConsumerWidget {
         ref.watch(
           homeRecentlyPlayedProvider.select((s) => !s.hasValue && !s.hasError),
         );
+    final pickedReleases = mornye
+        ? newReleases.take(_homeTopPickReleases).toList()
+        : const <WeeklyRelease>[];
     final hasTopPicks =
-        mornye && _HomeTopPicksSection.hasPicks(ref, mixes: showPlayer);
+        mornye &&
+        (pickedAlbums.isNotEmpty ||
+            pickedReleases.isNotEmpty ||
+            _HomeTopPicksSection.hasPicks(ref, mixes: showPlayer));
     final sections = <Widget>[
-      if (hasTopPicks) _HomeTopPicksSection(inset: inset, mixes: showPlayer),
+      if (hasTopPicks)
+        _HomeTopPicksSection(
+          inset: inset,
+          mixes: showPlayer,
+          libraryAlbums: pickedAlbums,
+          releases: pickedReleases,
+        ),
       if (_homeDesktop(context))
         _HomeDesktopTop(inset: inset, showContinue: showContinue)
       else ...[
@@ -1658,36 +1676,60 @@ class _HomeLibraryAlbumsShelf extends StatelessWidget {
                       fallbackIconSize: 32,
                       colorScheme: colorScheme,
                     ),
-              onTap: () => _open(context, album),
+              onTap: () => _openHomeLibraryAlbum(context, album),
             );
           },
         );
       },
     );
   }
+}
 
-  void _open(BuildContext context, LibraryBrowseEntry album) {
-    pushPage<void>(
-      context,
-      (_) => album.source == 'local'
-          ? LocalAlbumScreen(
-              albumName: album.name,
-              artistName: album.artist,
-              coverPath: album.cover,
-              loadTracks: () async => [
-                for (final row
-                    in await LibraryDatabase.instance
-                        .getQueueLocalAlbumTracksByKey(album.key))
-                  LocalLibraryItem.fromJson(row),
-              ],
-            )
-          : DownloadedAlbumScreen(
-              albumName: album.name,
-              artistName: album.artist,
-              coverUrl: album.cover,
-            ),
-    );
-  }
+void _openHomeLibraryAlbum(BuildContext context, LibraryBrowseEntry album) {
+  pushPage<void>(
+    context,
+    (_) => album.source == 'local'
+        ? LocalAlbumScreen(
+            albumName: album.name,
+            artistName: album.artist,
+            coverPath: album.cover,
+            loadTracks: () async => [
+              for (final row
+                  in await LibraryDatabase.instance
+                      .getQueueLocalAlbumTracksByKey(album.key))
+                LocalLibraryItem.fromJson(row),
+            ],
+          )
+        : DownloadedAlbumScreen(
+            albumName: album.name,
+            artistName: album.artist,
+            coverUrl: album.cover,
+          ),
+  );
+}
+
+/// A Library album's cover for a card that draws it itself: a scanned
+/// album's stored picture, or a download's embedded cover with its online
+/// cover as fallback.
+class _LibraryAlbumArt extends StatelessWidget {
+  const _LibraryAlbumArt({required this.album, required this.builder});
+
+  final LibraryBrowseEntry album;
+  final Widget Function(BuildContext context, String? artUri) builder;
+
+  @override
+  Widget build(BuildContext context) => album.source == 'local'
+      ? LocalLibraryArtworkBuilder(
+          coverPath: album.cover,
+          filePath: album.samplePath,
+          builder: builder,
+        )
+      : _DownloadedCoverSource(
+          downloadedFilePath: album.samplePath,
+          remoteUrl: album.cover,
+          builder: (context, embedded) =>
+              builder(context, embedded ?? album.cover),
+        );
 }
 
 void _homePlayRepeatTracks(
@@ -1740,46 +1782,175 @@ class _HomeMixesShelf extends StatelessWidget {
   }
 }
 
-/// Mornye's first shelf: the day's mixes as tall banners, a little over three
-/// to the pane on desktop and one with its neighbor peeking on phones.
-class _HomeTopPicksShelf extends StatelessWidget {
+/// The most Library albums and new releases Mornye's Top Picks offer.
+const _homeTopPickLibraryAlbums = 3;
+const _homeTopPickReleases = 2;
+
+/// The items of [lists] by turns, one of each list a round, until all are
+/// taken. A shelf built so shows every kind of card early.
+@visibleForTesting
+List<T> homeTakeByTurns<T>(List<List<T>> lists) {
+  final longest = lists.fold(
+    0,
+    (length, list) => math.max(length, list.length),
+  );
+  return [
+    for (var index = 0; index < longest; index++)
+      for (final list in lists)
+        if (index < list.length) list[index],
+  ];
+}
+
+/// One card of Top Picks.
+sealed class _TopPick {
+  const _TopPick();
+}
+
+final class _MixPick extends _TopPick {
+  const _MixPick(this.view);
+
+  final LibraryMixView view;
+}
+
+final class _PlaylistPick extends _TopPick {
+  const _PlaylistPick(this.item);
+
+  final ExploreItem item;
+}
+
+/// An album of the Library, offered again.
+final class _LibraryAlbumPick extends _TopPick {
+  const _LibraryAlbumPick(this.album);
+
+  final LibraryBrowseEntry album;
+}
+
+/// A new album by a favorite artist.
+final class _ReleasePick extends _TopPick {
+  const _ReleasePick(this.release);
+
+  final WeeklyRelease release;
+}
+
+/// An album of the extension's feed.
+final class _FeedAlbumPick extends _TopPick {
+  const _FeedAlbumPick(this.item);
+
+  final ExploreItem item;
+}
+
+/// Mornye's first shelf: tall cards, a little over three to the pane on
+/// desktop and one with its neighbor peeking on phones. Mixes and playlists
+/// are banners drawn here, whose color fields move; albums show their cover.
+class _HomeTopPicksShelf extends StatefulWidget {
   const _HomeTopPicksShelf({
     required this.mixes,
-    required this.playlists,
+    required this.picks,
+    required this.libraryAlbums,
+    required this.releases,
     required this.inset,
+    required this.drift,
   });
 
-  static const _gap = 16.0;
-
   final List<LibraryMixView> mixes;
-  final List<ExploreItem> playlists;
+
+  /// The day's playlists and albums of the extension's feed.
+  final List<ExploreItem> picks;
+  final List<LibraryBrowseEntry> libraryAlbums;
+  final List<WeeklyRelease> releases;
   final double inset;
 
-  /// One card: mixes and playlists share the banner, so the whole shelf reads
-  /// as Mornye's own whichever service a playlist came from.
+  /// Whether the banners' color fields move.
+  final bool drift;
+
+  @override
+  State<_HomeTopPicksShelf> createState() => _HomeTopPicksShelfState();
+}
+
+class _HomeTopPicksShelfState extends State<_HomeTopPicksShelf> {
+  static const _gap = 16.0;
+
+  /// One slow round that every banner's blooms follow.
+  final _drift = DecorativePhase(const Duration(seconds: 32));
+  bool _motion = false;
+  bool _onScreen = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _motion =
+        !MediaQuery.disableAnimationsOf(context) &&
+        TickerMode.valuesOf(context).enabled;
+    _syncDrift();
+  }
+
+  @override
+  void didUpdateWidget(_HomeTopPicksShelf oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.drift != widget.drift) _syncDrift();
+  }
+
+  /// The fields stand still on another tab, under reduced motion, and while
+  /// the page has scrolled the shelf away.
+  void _syncDrift() {
+    if (widget.drift && _motion && _onScreen) {
+      _drift.start();
+    } else {
+      _drift.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _drift.dispose();
+    super.dispose();
+  }
+
+  /// A mix, then another pick, by turns, the other picks an album and a
+  /// playlist by turns.
+  List<_TopPick> get _order {
+    final releases = widget.releases;
+    return homeTakeByTurns<_TopPick>([
+      [for (final view in widget.mixes) _MixPick(view)],
+      homeTakeByTurns<_TopPick>([
+        homeTakeByTurns<_TopPick>([
+          [for (final release in releases) _ReleasePick(release)],
+          [for (final album in widget.libraryAlbums) _LibraryAlbumPick(album)],
+          [
+            for (final item in widget.picks)
+              // A new release the feed has too is offered once.
+              if (item.type == 'album' &&
+                  !releases.any(
+                    (release) =>
+                        release.id == item.id &&
+                        release.providerId == item.providerId,
+                  ))
+                _FeedAlbumPick(item),
+          ],
+        ]),
+        [
+          for (final item in widget.picks)
+            if (item.type != 'album') _PlaylistPick(item),
+        ],
+      ]),
+    ]);
+  }
+
+  /// One card: its art under a round clip, pressed as a whole.
   Widget _card({
-    required int seed,
-    required String title,
-    required String eyebrow,
-    required String subtitle,
-    required double width,
+    required String label,
+    required Widget child,
     required VoidCallback onTap,
   }) {
     return Semantics(
       button: true,
-      label: subtitle.isEmpty ? title : '$title, $subtitle',
+      label: label,
       excludeSemantics: true,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Stack(
           children: [
-            MornyeMixBanner(
-              seed: seed,
-              title: title,
-              eyebrow: eyebrow,
-              subtitle: subtitle,
-              width: width,
-            ),
+            child,
             Positioned.fill(
               child: Material(
                 color: Colors.transparent,
@@ -1792,15 +1963,147 @@ class _HomeTopPicksShelf extends StatelessWidget {
     );
   }
 
+  /// Mixes and playlists share the banner, so they read as Mornye's own
+  /// whichever service a playlist came from.
+  Widget _banner({
+    required int seed,
+    required String title,
+    required String eyebrow,
+    required String subtitle,
+    required double width,
+    required VoidCallback onTap,
+  }) => _card(
+    label: subtitle.isEmpty ? title : '$title, $subtitle',
+    onTap: onTap,
+    child: MornyeMixBanner(
+      seed: seed,
+      title: title,
+      eyebrow: eyebrow,
+      subtitle: subtitle,
+      width: width,
+      drift: widget.drift ? _drift : null,
+    ),
+  );
+
+  Widget _pick(BuildContext context, _TopPick pick, int? seed, double width) {
+    final l10n = context.l10n;
+    switch (pick) {
+      case _MixPick(:final view):
+        return _banner(
+          seed: seed!,
+          title: libraryMixTitle(l10n, view.mix),
+          eyebrow: l10n.homeMadeForYou,
+          subtitle: libraryMixSubtitle(l10n, view.mix),
+          width: width,
+          onTap: () =>
+              pushPage<void>(context, (_) => LibraryMixScreen(view: view)),
+        );
+      case _PlaylistPick(:final item):
+        return _banner(
+          seed: seed!,
+          title: item.name,
+          eyebrow: l10n.collectionPlaylist,
+          subtitle: item.artists.isNotEmpty
+              ? item.artists
+              : item.description ?? '',
+          width: width,
+          onTap: () => pushPage<void>(
+            context,
+            (_) => ExtensionPlaylistScreen(
+              extensionId: item.providerId ?? '',
+              playlistId: item.id,
+              playlistName: item.name,
+              coverUrl: item.coverUrl,
+            ),
+          ),
+        );
+      case _LibraryAlbumPick(:final album):
+        return _card(
+          label: l10n.a11yOpenAlbum(album.name),
+          onTap: () => _openHomeLibraryAlbum(context, album),
+          child: _LibraryAlbumArt(
+            album: album,
+            builder: (context, artUri) => MornyeAlbumPick(
+              artUri: artUri,
+              title: album.name,
+              eyebrow: l10n.homeFromYourLibrary,
+              subtitle: album.artist,
+              width: width,
+            ),
+          ),
+        );
+      case _ReleasePick(:final release):
+        return _card(
+          label: l10n.a11yOpenAlbum(release.name),
+          onTap: () => navigateToAlbum(
+            context,
+            albumName: release.name,
+            albumId: release.id,
+            artistName: release.artist,
+            coverUrl: release.coverUrl,
+            extensionId: release.providerId,
+          ),
+          child: MornyeAlbumPick(
+            artUri: release.coverUrl,
+            title: release.name,
+            eyebrow: l10n.homeNewRelease,
+            subtitle: release.artist,
+            width: width,
+          ),
+        );
+      case _FeedAlbumPick(:final item):
+        return _card(
+          label: l10n.a11yOpenAlbum(item.name),
+          onTap: () => pushPage<void>(
+            context,
+            (_) => ExtensionAlbumScreen(
+              extensionId: item.providerId ?? '',
+              albumId: item.id,
+              albumName: item.name,
+              coverUrl: item.coverUrl,
+            ),
+          ),
+          child: MornyeAlbumPick(
+            artUri: item.coverUrl,
+            title: item.name,
+            eyebrow: l10n.recentTypeAlbum,
+            subtitle: item.artists,
+            width: width,
+          ),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final order = _order;
+    // Banners beside each other never share a palette, with or without an
+    // album between them.
     final seeds = mornyeBannerSeeds([
-      for (final view in mixes) '${view.mix.kind.name}/${view.mix.key}',
-      for (final item in playlists) 'playlist/${item.providerId}/${item.id}',
+      for (final pick in order)
+        if (pick case _MixPick(:final view))
+          '${view.mix.kind.name}/${view.mix.key}'
+        else if (pick case _PlaylistPick(:final item))
+          'playlist/${item.providerId}/${item.id}',
     ]);
+    var banners = 0;
+    final seedOf = [
+      for (final pick in order)
+        pick is _MixPick || pick is _PlaylistPick ? seeds[banners++] : null,
+    ];
+    return OnScreenListener(
+      onChanged: (onScreen) {
+        _onScreen = onScreen;
+        _syncDrift();
+      },
+      child: _shelf(order, seedOf),
+    );
+  }
+
+  Widget _shelf(List<_TopPick> order, List<int?> seedOf) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final inset = widget.inset;
         final content = constraints.maxWidth - 2 * inset;
         final width = isDesktopPlatform
             ? ((content + _gap) / 4.6 - _gap).clamp(180.0, 320.0)
@@ -1812,43 +2115,10 @@ class _HomeTopPicksShelf extends StatelessWidget {
               controller: controller,
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.symmetric(horizontal: inset),
-              itemCount: mixes.length + playlists.length,
+              itemCount: order.length,
               separatorBuilder: (_, _) => const SizedBox(width: _gap),
-              itemBuilder: (context, index) {
-                if (index >= mixes.length) {
-                  final item = playlists[index - mixes.length];
-                  return _card(
-                    seed: seeds[index],
-                    title: item.name,
-                    eyebrow: l10n.collectionPlaylist,
-                    subtitle: item.artists.isNotEmpty
-                        ? item.artists
-                        : item.description ?? '',
-                    width: width,
-                    onTap: () => pushPage<void>(
-                      context,
-                      (_) => ExtensionPlaylistScreen(
-                        extensionId: item.providerId ?? '',
-                        playlistId: item.id,
-                        playlistName: item.name,
-                        coverUrl: item.coverUrl,
-                      ),
-                    ),
-                  );
-                }
-                final view = mixes[index];
-                return _card(
-                  seed: seeds[index],
-                  title: libraryMixTitle(l10n, view.mix),
-                  eyebrow: l10n.homeMadeForYou,
-                  subtitle: libraryMixSubtitle(l10n, view.mix),
-                  width: width,
-                  onTap: () => pushPage<void>(
-                    context,
-                    (_) => LibraryMixScreen(view: view),
-                  ),
-                );
-              },
+              itemBuilder: (context, index) =>
+                  _pick(context, order[index], seedOf[index], width),
             ),
           ),
         );
@@ -1857,14 +2127,24 @@ class _HomeTopPicksShelf extends StatelessWidget {
   }
 }
 
-/// Mornye's first section: the day's mixes, then random extension playlists.
+/// Mornye's first section: the day's mixes, with albums and the extension's
+/// playlists between them.
 class _HomeTopPicksSection extends ConsumerWidget {
-  const _HomeTopPicksSection({required this.inset, required this.mixes});
+  const _HomeTopPicksSection({
+    required this.inset,
+    required this.mixes,
+    required this.libraryAlbums,
+    required this.releases,
+  });
 
   final double inset;
 
   /// Whether the day's mixes lead the shelf; they need the built-in player.
   final bool mixes;
+
+  /// The Library's albums and the favorite artists' new ones offered today.
+  final List<LibraryBrowseEntry> libraryAlbums;
+  final List<WeeklyRelease> releases;
 
   static bool hasPicks(WidgetRef ref, {required bool mixes}) =>
       (mixes &&
@@ -1884,9 +2164,12 @@ class _HomeTopPicksSection extends ConsumerWidget {
       mixes: mixes
           ? ref.watch(libraryMixesProvider.select((s) => s.value)) ?? const []
           : const [],
-      playlists:
-          ref.watch(homeTopPicksProvider.select((s) => s.value)) ?? const [],
+      picks: ref.watch(homeTopPicksProvider.select((s) => s.value)) ?? const [],
+      libraryAlbums: libraryAlbums,
+      releases: releases,
       inset: inset + 8,
+      // A slow device keeps its frames for scrolling.
+      drift: !ref.watch(lowEndDeviceProvider),
     ),
   );
 }

@@ -9827,6 +9827,10 @@
   "@homeMadeForYou": {
     "description": "Mornye Home: small label on a mix banner"
   },
+  "homeNewRelease": "New release",
+  "@homeNewRelease": {
+    "description": "Mornye Home: small label on a Top Picks album card, for a new album by a favorite artist"
+  },
   "homeMixesForYou": "Mixes for you",
   "@homeMixesForYou": {
     "description": "Home section header for daily mixes made from the user's own Library songs"

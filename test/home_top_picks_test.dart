@@ -37,25 +37,77 @@ void main() {
     ExploreSection(uri: 'b', title: 'B', items: [_item('p0')]),
   ];
 
-  test('picks covered playlists once and leaves the rest out', () {
-    final picks = pickTopPickPlaylists(sections, '2026-11-04', count: 20);
+  test('picks covered playlists and albums once and leaves the rest out', () {
+    final picks = pickTopPicks(sections, '2026-11-04', count: 20);
     expect(picks.map((item) => item.id).toSet(), {
       for (var i = 0; i < 12; i++) 'p$i',
+      'album',
     });
-    expect(picks, hasLength(12));
+    expect(picks, hasLength(13));
   });
 
   test('holds for the day, changes with the next and caps the count', () {
     List<String> ids(String day) => [
-      for (final item in pickTopPickPlaylists(sections, day, count: 5)) item.id,
+      for (final item in pickTopPicks(sections, day, count: 5)) item.id,
     ];
     expect(ids('2026-11-04'), hasLength(5));
     expect(ids('2026-11-04'), ids('2026-11-04'));
     expect(ids('2026-11-05'), isNot(ids('2026-11-04')));
   });
 
+  group('albums', () {
+    List<ExploreSection> feed({required int albums, required int playlists}) =>
+        [
+          ExploreSection(
+            uri: 'feed',
+            title: 'Feed',
+            items: [
+              for (var i = 0; i < albums; i++) _item('a$i', type: 'album'),
+              for (var i = 0; i < playlists; i++) _item('p$i'),
+              _item('song', type: 'track'),
+              _item('bare', type: 'album', cover: null),
+            ],
+          ),
+        ];
+
+    List<String> types(List<ExploreSection> sections, {int count = 9}) => [
+      for (final item in pickTopPicks(
+        sections,
+        '2026-11-04',
+        count: count,
+        albums: 4,
+      ))
+        item.type,
+    ];
+
+    test('take their share and come by turns with the playlists', () {
+      expect(types(feed(albums: 10, playlists: 10)), [
+        'album',
+        'playlist',
+        'album',
+        'playlist',
+        'album',
+        'playlist',
+        'album',
+        'playlist',
+        'playlist',
+      ]);
+    });
+
+    test('take what too few playlists leave', () {
+      final picked = types(feed(albums: 10, playlists: 2));
+      expect(picked.where((type) => type == 'album'), hasLength(7));
+      expect(picked.where((type) => type == 'playlist'), hasLength(2));
+      expect(picked.take(4), ['album', 'playlist', 'album', 'playlist']);
+    });
+
+    test('a feed without them stays all playlists', () {
+      expect(types(feed(albums: 0, playlists: 12)), List.filled(9, 'playlist'));
+    });
+  });
+
   test('playlist IDs are scoped to their provider', () {
-    final picks = pickTopPickPlaylists([
+    final picks = pickTopPicks([
       ExploreSection(
         uri: 'example:playlists',
         title: 'Playlists',
@@ -74,7 +126,7 @@ void main() {
   });
 
   test('leaves charts out, by their name or their section', () {
-    final picks = pickTopPickPlaylists([
+    final picks = pickTopPicks([
       ExploreSection(
         uri: 'a',
         title: 'Updated Playlists',

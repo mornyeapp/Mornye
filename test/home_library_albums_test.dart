@@ -19,6 +19,7 @@ import 'package:mornye/screens/home_tab.dart';
 import 'package:mornye/services/weekly_releases.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/mornye_album_pick.dart';
 
 import 'support/fixed_settings.dart';
 
@@ -152,17 +153,26 @@ void main() {
         _home(
           mornye: mornye,
           recordListening: false,
-          albums: [_album(0), _album(1)],
+          albums: [for (var index = 0; index < 5; index++) _album(index)],
         ),
       );
       expect(tester.takeException(), isNull);
 
-      expect(find.text(_title), findsOneWidget);
+      expect(_shelfTitles(), 1);
       expect(find.text('Album 0'), findsOneWidget);
       expect(find.text('On repeat'), findsNothing);
+      if (mornye) {
+        // The first three are offered among Top Picks, and the shelf goes
+        // on after them.
+        expect(_picked('Album 0'), findsOneWidget);
+        expect(find.text('Album 3'), findsOneWidget);
+        expect(_picked('Album 3'), findsNothing);
+      } else {
+        expect(find.byType(MornyeAlbumPick), findsNothing);
+      }
     });
 
-    testWidgets('the $style Home leaves them out while listening is '
+    testWidgets('the $style Home leaves the shelf out while listening is '
         'recorded', (tester) async {
       await _open(
         tester,
@@ -174,10 +184,24 @@ void main() {
       );
       expect(tester.takeException(), isNull);
 
-      expect(find.text(_title), findsNothing);
+      expect(_shelfTitles(), 0);
+      // Mornye's Top Picks offer them whatever is recorded.
+      expect(find.text('Album 0'), mornye ? findsOneWidget : findsNothing);
+      expect(_picked('Album 0'), mornye ? findsOneWidget : findsNothing);
     });
   }
 }
+
+/// [text] on an album card of Mornye's Top Picks.
+Finder _picked(String text) => find.descendant(
+  of: find.byType(MornyeAlbumPick),
+  matching: find.text(text),
+);
+
+/// How often the shelf's header shows. An album card of Mornye's Top Picks
+/// carries the same words as its small label.
+int _shelfTitles() =>
+    find.text(_title).evaluate().length - _picked(_title).evaluate().length;
 
 class _Extensions extends ExtensionNotifier {
   @override

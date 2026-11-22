@@ -546,33 +546,27 @@ class _CollectionItemWidget extends StatelessWidget {
   }
 }
 
-class _DownloadedOrRemoteCover extends StatefulWidget {
-  final String? downloadedFilePath;
-  final String? imageUrl;
-  final double width;
-  final double height;
-  final BorderRadius borderRadius;
-  final IconData fallbackIcon;
-  final double fallbackIconSize;
-  final ColorScheme colorScheme;
-
-  const _DownloadedOrRemoteCover({
+/// The cover a downloaded file carries, for whatever draws it: its path once
+/// the resolver has it, null while the file has none or is not read yet.
+class _DownloadedCoverSource extends StatefulWidget {
+  const _DownloadedCoverSource({
     required this.downloadedFilePath,
-    required this.imageUrl,
-    required this.width,
-    required this.height,
-    required this.borderRadius,
-    required this.fallbackIcon,
-    required this.colorScheme,
-    this.fallbackIconSize = 24,
+    required this.builder,
+    this.remoteUrl,
   });
 
+  final String? downloadedFilePath;
+
+  /// The cover's online address; a change of it asks the resolver again.
+  final String? remoteUrl;
+  final Widget Function(BuildContext context, String? embeddedCoverPath)
+  builder;
+
   @override
-  State<_DownloadedOrRemoteCover> createState() =>
-      _DownloadedOrRemoteCoverState();
+  State<_DownloadedCoverSource> createState() => _DownloadedCoverSourceState();
 }
 
-class _DownloadedOrRemoteCoverState extends State<_DownloadedOrRemoteCover> {
+class _DownloadedCoverSourceState extends State<_DownloadedCoverSource> {
   String? _embeddedCoverPath;
   bool _refreshScheduled = false;
 
@@ -594,10 +588,10 @@ class _DownloadedOrRemoteCoverState extends State<_DownloadedOrRemoteCover> {
   }
 
   @override
-  void didUpdateWidget(covariant _DownloadedOrRemoteCover oldWidget) {
+  void didUpdateWidget(covariant _DownloadedCoverSource oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.downloadedFilePath != widget.downloadedFilePath ||
-        oldWidget.imageUrl != widget.imageUrl) {
+        oldWidget.remoteUrl != widget.remoteUrl) {
       final nextPath = _resolveEmbeddedCoverPath();
       if (nextPath != _embeddedCoverPath) {
         setState(() => _embeddedCoverPath = nextPath);
@@ -627,52 +621,85 @@ class _DownloadedOrRemoteCoverState extends State<_DownloadedOrRemoteCover> {
     });
   }
 
+  @override
+  Widget build(BuildContext context) =>
+      widget.builder(context, _embeddedCoverPath);
+}
+
+class _DownloadedOrRemoteCover extends StatelessWidget {
+  final String? downloadedFilePath;
+  final String? imageUrl;
+  final double width;
+  final double height;
+  final BorderRadius borderRadius;
+  final IconData fallbackIcon;
+  final double fallbackIconSize;
+  final ColorScheme colorScheme;
+
+  const _DownloadedOrRemoteCover({
+    required this.downloadedFilePath,
+    required this.imageUrl,
+    required this.width,
+    required this.height,
+    required this.borderRadius,
+    required this.fallbackIcon,
+    required this.colorScheme,
+    this.fallbackIconSize = 24,
+  });
+
   Widget _fallback() {
     return Container(
-      width: widget.width,
-      height: widget.height,
-      color: widget.colorScheme.surfaceContainerHighest,
+      width: width,
+      height: height,
+      color: colorScheme.surfaceContainerHighest,
       child: Icon(
-        widget.fallbackIcon,
-        color: widget.colorScheme.onSurfaceVariant,
-        size: widget.fallbackIconSize,
+        fallbackIcon,
+        color: colorScheme.onSurfaceVariant,
+        size: fallbackIconSize,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final cacheWidth = (widget.width * 2).round();
-    final cacheHeight = (widget.height * 2).round();
+    final cacheWidth = (width * 2).round();
+    final cacheHeight = (height * 2).round();
+    final remote = imageUrl;
 
-    Widget child;
-    if (_embeddedCoverPath != null) {
-      child = Image.file(
-        File(_embeddedCoverPath!),
-        width: widget.width,
-        height: widget.height,
-        fit: BoxFit.cover,
-        cacheWidth: cacheWidth,
-        cacheHeight: cacheHeight,
-        gaplessPlayback: true,
-        filterQuality: FilterQuality.low,
-        errorBuilder: (_, _, _) => _fallback(),
-      );
-    } else if (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) {
-      child = CachedCoverImage(
-        imageUrl: widget.imageUrl!,
-        width: widget.width,
-        height: widget.height,
-        fit: BoxFit.cover,
-        memCacheWidth: cacheWidth,
-        memCacheHeight: cacheHeight,
-        errorWidget: (_, _, _) => _fallback(),
-      );
-    } else {
-      child = _fallback();
-    }
+    return _DownloadedCoverSource(
+      downloadedFilePath: downloadedFilePath,
+      remoteUrl: remote,
+      builder: (context, embeddedCoverPath) {
+        Widget child;
+        if (embeddedCoverPath != null) {
+          child = Image.file(
+            File(embeddedCoverPath),
+            width: width,
+            height: height,
+            fit: BoxFit.cover,
+            cacheWidth: cacheWidth,
+            cacheHeight: cacheHeight,
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.low,
+            errorBuilder: (_, _, _) => _fallback(),
+          );
+        } else if (remote != null && remote.isNotEmpty) {
+          child = CachedCoverImage(
+            imageUrl: remote,
+            width: width,
+            height: height,
+            fit: BoxFit.cover,
+            memCacheWidth: cacheWidth,
+            memCacheHeight: cacheHeight,
+            errorWidget: (_, _, _) => _fallback(),
+          );
+        } else {
+          child = _fallback();
+        }
 
-    return ClipRRect(borderRadius: widget.borderRadius, child: child);
+        return ClipRRect(borderRadius: borderRadius, child: child);
+      },
+    );
   }
 }
 

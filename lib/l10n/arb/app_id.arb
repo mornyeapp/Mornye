@@ -8359,6 +8359,10 @@
   "@homeOnRepeat": {
     "description": "Home section header for the most played tracks of the last four weeks"
   },
+  "homeNewRelease": "Rilis baru",
+  "@homeNewRelease": {
+    "description": "Mornye Home: small label on a Top Picks album card, for a new album by a favorite artist"
+  },
   "homeFromYourLibrary": "Dari Koleksimu",
   "@homeFromYourLibrary": {
     "description": "Home section header for the day's albums from the Library, shown in On repeat's place while listening is not recorded"

@@ -13,39 +13,67 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 final _log = AppLogger('HomeTopPicks');
 
-const _cacheKey = 'home_top_picks_v2';
+const _cacheKey = 'home_top_picks_v3';
 
-/// The most extension playlists Top Picks show after the mixes.
-const homeTopPickPlaylists = 9;
+/// The most extension playlists and albums Top Picks show beside the mixes.
+const homeTopPicks = 9;
+
+/// The most of those that are albums.
+const homeTopPickAlbums = 4;
 
 /// Exclude chart playlists and sections from the daily selection.
 final _chartName = RegExp(r'\b(top \d+|charts?)\b', caseSensitive: false);
 
-/// Up to [count] playlists of [sections] with a cover, each once, in an order
-/// that holds for the [day] and changes with the next. Charts are left out.
+/// Up to [count] playlists and albums of [sections] with a cover, each once,
+/// at most [albums] of them albums while playlists are left to take. The
+/// order holds for the [day] and changes with the next: an album, then a
+/// playlist, by turns. Charts are left out.
 @visibleForTesting
-List<ExploreItem> pickTopPickPlaylists(
+List<ExploreItem> pickTopPicks(
   List<ExploreSection> sections,
   String day, {
-  int count = homeTopPickPlaylists,
+  int count = homeTopPicks,
+  int albums = homeTopPickAlbums,
 }) {
-  final playlists = <(String?, String), ExploreItem>{};
+  final found = {
+    for (final type in const ['album', 'playlist'])
+      type: <(String?, String), ExploreItem>{},
+  };
   for (final section in sections) {
     if (_chartName.hasMatch(section.title)) continue;
     for (final item in section.items) {
-      if (item.type != 'playlist' || item.id.isEmpty) continue;
+      final ofType = found[item.type];
+      if (ofType == null || item.id.isEmpty) continue;
       if (_chartName.hasMatch(item.name)) continue;
       if (item.coverUrl?.trim().isNotEmpty != true) continue;
-      playlists.putIfAbsent((item.providerId, item.id), () => item);
+      ofType.putIfAbsent((item.providerId, item.id), () => item);
     }
   }
-  final ordered = playlists.values.toList()
+  final seed = int.tryParse(day.replaceAll('-', '')) ?? 0;
+  List<ExploreItem> ordered(String type) => found[type]!.values.toList()
     ..sort((a, b) {
       final provider = (a.providerId ?? '').compareTo(b.providerId ?? '');
       return provider != 0 ? provider : a.id.compareTo(b.id);
     })
-    ..shuffle(Random(int.tryParse(day.replaceAll('-', '')) ?? 0));
-  return ordered.take(count).toList(growable: false);
+    ..shuffle(Random(seed));
+  final allAlbums = ordered('album'), allPlaylists = ordered('playlist');
+  // Albums take their share, and what playlists leave of the rest.
+  final albumCount = min(
+    count,
+    min(allAlbums.length, max(albums, count - allPlaylists.length)),
+  );
+  final pickedAlbums = allAlbums.take(albumCount).toList();
+  final pickedPlaylists = allPlaylists.take(count - albumCount).toList();
+  return [
+    for (
+      var index = 0;
+      index < max(pickedAlbums.length, pickedPlaylists.length);
+      index++
+    ) ...[
+      if (index < pickedAlbums.length) pickedAlbums[index],
+      if (index < pickedPlaylists.length) pickedPlaylists[index],
+    ],
+  ];
 }
 
 /// Respect the Home feed selection. Auto uses the first available extension;
@@ -71,8 +99,9 @@ final homeTopPicksExtensionProvider = Provider<String?>((ref) {
   ], homeFeed);
 });
 
-/// A day's random extension playlists, kept for that day. A failed read falls
-/// back on the last day's picks and is tried again on the next launch.
+/// A day's random extension playlists and albums, kept for that day. A failed
+/// read falls back on the last day's picks and is tried again on the next
+/// launch.
 final homeTopPicksProvider = FutureProvider<List<ExploreItem>>((ref) async {
   final extensionId = ref.watch(homeTopPicksExtensionProvider);
   if (extensionId == null) return const [];
@@ -93,7 +122,9 @@ final homeTopPicksProvider = FutureProvider<List<ExploreItem>>((ref) async {
     // with an Exception, not an Error, has Riverpod try again in a moment.
     throw Exception('Top Picks have no playlists yet');
   }
-  final items = pickTopPickPlaylists(sections, day);
+  final items = pickTopPicks(sections, day);
+  // The picks kept before albums were among them.
+  await prefs.remove('home_top_picks_v2');
   await prefs.setString(
     _cacheKey,
     jsonEncode({
