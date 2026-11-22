@@ -8286,18 +8286,6 @@
       }
     }
   },
-  "homeTaglineListening": "무엇을 듣고 있나요?",
-  "@homeTaglineListening": {
-    "description": "Rotating Home prompt under the greeting"
-  },
-  "homeTaglineLink": "링크가 있으신가요? 검색창에 넣어주세요",
-  "@homeTaglineLink": {
-    "description": "Rotating Home prompt explaining that links can be pasted into search"
-  },
-  "homeTaglineDiscover": "다음으로 좋아하는 앨범을 찾아보세요",
-  "@homeTaglineDiscover": {
-    "description": "Rotating Home prompt under the greeting"
-  },
   "homeContinueListening": "계속 듣기",
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"

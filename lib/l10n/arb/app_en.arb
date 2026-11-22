@@ -9416,7 +9416,7 @@
   "mornyeSearch": "Search",
   "searchMovedHint": "Search is here now",
   "@searchMovedHint": {
-    "description": "Hint above the Search tab, shown once per launch when someone taps where Home's search field used to be"
+    "description": "Hint above the Search tab, shown once after an update to people who had the search field on Home"
   },
   "mornyeContinuePlaying": "Continue Playing",
   "metadataCopyAll": "Copy all metadata",
@@ -9766,18 +9766,6 @@
         "type": "String"
       }
     }
-  },
-  "homeTaglineListening": "What are we listening to?",
-  "@homeTaglineListening": {
-    "description": "Rotating Home prompt under the greeting"
-  },
-  "homeTaglineLink": "Got a link? Drop it in the search",
-  "@homeTaglineLink": {
-    "description": "Rotating Home prompt explaining that links can be pasted into search"
-  },
-  "homeTaglineDiscover": "Find your next favorite album",
-  "@homeTaglineDiscover": {
-    "description": "Rotating Home prompt under the greeting"
   },
   "homeContinueListening": "Continue listening",
   "@homeContinueListening": {

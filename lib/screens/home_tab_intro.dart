@@ -418,23 +418,8 @@ final _homeShelfMemoProvider = Provider<_HomeShelfMemo>(
   (ref) => _HomeShelfMemo(),
 );
 
-/// The prompt under the Home greeting, picked again on each launch.
-class _HomeTagline extends StatelessWidget {
-  const _HomeTagline();
-
-  @override
-  Widget build(BuildContext context) => Text(
-    homeTagline(context.l10n),
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
-    ),
-  );
-}
-
-/// Everything under the search bar on the Material Home. Sections without
-/// content leave no gap behind.
+/// Everything under the Home header. Sections without content leave no gap
+/// behind.
 class _HomeSections extends ConsumerWidget {
   const _HomeSections({required this.inset});
 

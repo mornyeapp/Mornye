@@ -8312,18 +8312,6 @@
       }
     }
   },
-  "homeTaglineListening": "Mau dengar apa hari ini?",
-  "@homeTaglineListening": {
-    "description": "Rotating Home prompt under the greeting"
-  },
-  "homeTaglineLink": "Punya link? Tempel saja di pencarian",
-  "@homeTaglineLink": {
-    "description": "Rotating Home prompt explaining that links can be pasted into search"
-  },
-  "homeTaglineDiscover": "Temukan album favoritmu berikutnya",
-  "@homeTaglineDiscover": {
-    "description": "Rotating Home prompt under the greeting"
-  },
   "homeContinueListening": "Lanjutkan mendengarkan",
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"

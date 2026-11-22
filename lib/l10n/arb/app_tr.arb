@@ -8286,18 +8286,6 @@
       }
     }
   },
-  "homeTaglineListening": "Ne dinliyoruz?",
-  "@homeTaglineListening": {
-    "description": "Rotating Home prompt under the greeting"
-  },
-  "homeTaglineLink": "Bir bağlantın mı var? Aramaya bırak",
-  "@homeTaglineLink": {
-    "description": "Rotating Home prompt explaining that links can be pasted into search"
-  },
-  "homeTaglineDiscover": "Bir sonraki favori albümünü bul",
-  "@homeTaglineDiscover": {
-    "description": "Rotating Home prompt under the greeting"
-  },
   "homeContinueListening": "Dinlemeye devam et",
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"

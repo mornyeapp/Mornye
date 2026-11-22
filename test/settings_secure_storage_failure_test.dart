@@ -39,7 +39,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({
       'app_settings': savedJson,
-      'settings_migration_version': 15,
+      'settings_migration_version': 16,
     });
     secrets = {
       retiredKey: 'retired-secret',

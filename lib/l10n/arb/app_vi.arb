@@ -8286,18 +8286,6 @@
       }
     }
   },
-  "homeTaglineListening": "Hôm nay nghe gì nào?",
-  "@homeTaglineListening": {
-    "description": "Rotating Home prompt under the greeting"
-  },
-  "homeTaglineLink": "Có sẵn liên kết nhạc? Dán ngay vào ô tìm kiếm nhé",
-  "@homeTaglineLink": {
-    "description": "Rotating Home prompt explaining that links can be pasted into search"
-  },
-  "homeTaglineDiscover": "Khám phá album yêu thích tiếp theo của bạn",
-  "@homeTaglineDiscover": {
-    "description": "Rotating Home prompt under the greeting"
-  },
   "homeContinueListening": "Tiếp tục thưởng thức",
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"

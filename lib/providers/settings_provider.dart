@@ -24,7 +24,11 @@ import 'package:mornye/utils/logger.dart';
 const _settingsKey = 'app_settings';
 const _settingsCorruptBackupKey = 'app_settings_corrupt_backup';
 const _migrationVersionKey = 'settings_migration_version';
-const _currentMigrationVersion = 15;
+const _currentMigrationVersion = 16;
+
+/// Set while someone who had the search field on Home has not yet seen the
+/// pointer to the Search tab.
+const searchMovedHintOwedKey = 'search_moved_hint_owed';
 
 /// Marked the removed rebrand tour as seen.
 const _retiredUpgradeIntroSeenKey = 'upgrade_intro_mornye_seen';
@@ -364,6 +368,11 @@ class SettingsNotifier extends Notifier<AppSettings> {
       // Migration 15: the rebrand tour is gone, and so is its flag.
       if (lastMigration < 15) {
         await prefs.remove(_retiredUpgradeIntroSeenKey);
+      }
+      // Migration 16: Search left Home for its own tab. An install that ran
+      // an earlier build is owed one pointer to it; a new install is not.
+      if (lastMigration > 0 && lastMigration < 16 && !state.isFirstLaunch) {
+        await prefs.setBool(searchMovedHintOwedKey, true);
       }
       await prefs.setInt(_migrationVersionKey, _currentMigrationVersion);
       await _saveSettings();

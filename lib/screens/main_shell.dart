@@ -302,6 +302,7 @@ class _MainShellState extends ConsumerState<MainShell>
       );
       _initialSafRepairComplete = true;
       if (!mounted) return;
+      unawaited(_pointAtMovedSearch());
       unawaited(_restorePlayback());
       // Off the startup path: waits for extensions, then fills the Store
       // badge and installs updates without the Store tab being opened.
@@ -319,6 +320,17 @@ class _MainShellState extends ConsumerState<MainShell>
         await _checkAppAnnouncement();
       }
     });
+  }
+
+  /// Shows the pointer to the Search tab over Home when it is owed. The
+  /// migration that notes it runs with the settings load.
+  Future<void> _pointAtMovedSearch() async {
+    try {
+      await ref.read(settingsProvider.notifier).ensureLoaded();
+      if (mounted && _currentIndex == 0) await SearchMovedHint.showIfOwed();
+    } on Object catch (error) {
+      _log.w('Could not show the Search hint: $error');
+    }
   }
 
   /// Restores the last session, then its song's cover from the file once
@@ -1354,7 +1366,7 @@ class _MainShellState extends ConsumerState<MainShell>
         )
       else ...[
         NavigationDestination(
-          // Home's search field moved here; a tap where it was points here.
+          // Home's search field moved here; people who had it are shown once.
           icon: const SearchMovedHintAnchor(child: AppIcon(Icons.search)),
           selectedIcon: BouncingIcon(child: const AppIcon(Icons.search)),
           label: l10n.mornyeSearch,

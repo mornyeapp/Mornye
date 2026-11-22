@@ -43,15 +43,3 @@ String homeGreeting(
   // A full name reads stiff in a headline.
   return l10n.homeGreetingNamed(phrase, trimmed.split(RegExp(r'\s+')).first);
 }
-
-/// The prompt under the Home greeting. Like the greeting, it holds for the
-/// whole launch.
-String homeTagline(AppLocalizations l10n, {int? variant}) {
-  final options = [
-    l10n.homeTaglineListening,
-    l10n.homeTaglineLink,
-    l10n.homeTaglineDiscover,
-  ];
-  // Offset from the greeting's pick so the two do not always pair up.
-  return options[((variant ?? _sessionVariant) ~/ 3) % options.length];
-}

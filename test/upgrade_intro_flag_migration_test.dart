@@ -30,6 +30,6 @@ void main() {
 
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.containsKey('upgrade_intro_mornye_seen'), isFalse);
-    expect(preferences.getInt('settings_migration_version'), 15);
+    expect(preferences.getInt('settings_migration_version'), 16);
   });
 }
