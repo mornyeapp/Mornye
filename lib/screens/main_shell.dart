@@ -77,6 +77,7 @@ import 'package:mornye/utils/saf_download_tree.dart';
 part 'main_shell_startup_prompts.dart';
 
 final _log = AppLogger('MainShell');
+final _materialBottomBarBlur = ImageFilter.blur(sigmaX: 10, sigmaY: 10);
 
 /// The badge counts on Library (queued downloads) and Store (extension
 /// updates). Only the navigation chrome watches them, so a finished
@@ -1562,7 +1563,7 @@ class _MainShellState extends ConsumerState<MainShell>
                 }
                 return ClipRect(
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    filter: _materialBottomBarBlur,
                     blendMode: BlendMode.src,
                     child: bottomBar,
                   ),

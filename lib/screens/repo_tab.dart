@@ -39,6 +39,10 @@ class _RepoTabState extends ConsumerState<RepoTab> {
   final _searchController = TextEditingController();
   final _repoUrlController = TextEditingController();
   bool _isInitialized = false;
+  List<RepoExtension>? _cachedRawExtensions;
+  String? _cachedCategory;
+  String? _cachedSearchQuery;
+  List<RepoExtension>? _cachedFilteredExtensions;
 
   /// Why the first repository could not be added.
   String? _setupError;
@@ -94,11 +98,23 @@ class _RepoTabState extends ConsumerState<RepoTab> {
     final showRepository = ref.watch(
       repoProvider.select((s) => s.hasMultipleRepositories),
     );
-    final filteredExtensions = RepoState(
-      extensions: extensions,
-      selectedCategory: selectedCategory,
-      searchQuery: searchQuery,
-    ).filteredExtensions;
+    final List<RepoExtension> filteredExtensions;
+    if (identical(_cachedRawExtensions, extensions) &&
+        _cachedCategory == selectedCategory &&
+        _cachedSearchQuery == searchQuery &&
+        _cachedFilteredExtensions != null) {
+      filteredExtensions = _cachedFilteredExtensions!;
+    } else {
+      filteredExtensions = RepoState(
+        extensions: extensions,
+        selectedCategory: selectedCategory,
+        searchQuery: searchQuery,
+      ).filteredExtensions;
+      _cachedRawExtensions = extensions;
+      _cachedCategory = selectedCategory;
+      _cachedSearchQuery = searchQuery;
+      _cachedFilteredExtensions = filteredExtensions;
+    }
     if (_searchController.text != searchQuery) {
       _searchController.value = TextEditingValue(
         text: searchQuery,

@@ -124,6 +124,7 @@ class ThemeNotifier extends Notifier<ThemeSettings> {
   late Future<void> _loadFuture;
   Future<void> _saveChain = Future<void>.value();
   final _loadingEdits = <ThemeSettings Function(ThemeSettings)>[];
+  ThemeSettings? _persistedSnapshot;
   bool _loaded = false;
 
   @override
@@ -135,11 +136,13 @@ class ThemeNotifier extends Notifier<ThemeSettings> {
   Future<void> _loadFromStorage() async {
     try {
       final prefs = await _prefs;
-      var loaded = loadBootstrapThemeSettings(prefs);
+      final stored = loadBootstrapThemeSettings(prefs);
+      _persistedSnapshot = stored;
+      var loaded = stored;
       for (final edit in _loadingEdits) {
         loaded = edit(loaded);
       }
-      if (ref.mounted) state = loaded;
+      if (ref.mounted && state != loaded) state = loaded;
     } catch (e) {
       debugPrint('Error loading theme settings: $e');
     } finally {
@@ -159,26 +162,74 @@ class ThemeNotifier extends Notifier<ThemeSettings> {
       final prefs = await _prefs;
       if (!ref.mounted) return;
       final snapshot = state;
-      await prefs.setString(kThemeModeKey, snapshot.themeMode.name);
-      await prefs.setBool(kUseDynamicColorKey, snapshot.useDynamicColor);
-      await prefs.setInt(kSeedColorKey, snapshot.seedColorValue);
-      await prefs.setBool(kUseAmoledKey, snapshot.useAmoled);
-      await prefs.setString(kThemeStyleKey, snapshot.style.name);
-      await prefs.setString(kMornyeAccentKey, snapshot.mornyeAccent.name);
-      await prefs.setBool(kUseSystemFontKey, snapshot.useSystemFont);
-      await prefs.setString(kCustomFontIdKey, snapshot.customFontId);
-      await prefs.setString(kCustomFontNameKey, snapshot.customFontName);
-      await prefs.setDouble(kLyricsTextScaleKey, snapshot.lyricsTextScale);
-      await prefs.setDouble(kLyricsBlurKey, snapshot.lyricsBlur);
-      await prefs.setInt(kLyricsOffsetKey, snapshot.lyricsOffsetMs);
-      await prefs.setDouble(
-        kMornyeGlassClarityKey,
-        snapshot.mornyeGlassClarity,
-      );
-      await prefs.setBool(
-        kMornyeGlassOutlinesKey,
-        snapshot.mornyeGlassOutlines,
-      );
+      final previous = _persistedSnapshot;
+      final writes = <Future<bool>>[];
+      if (previous == null || previous.themeMode != snapshot.themeMode) {
+        writes.add(prefs.setString(kThemeModeKey, snapshot.themeMode.name));
+      }
+      if (previous == null ||
+          previous.useDynamicColor != snapshot.useDynamicColor) {
+        writes.add(
+          prefs.setBool(kUseDynamicColorKey, snapshot.useDynamicColor),
+        );
+      }
+      if (previous == null ||
+          previous.seedColorValue != snapshot.seedColorValue) {
+        writes.add(prefs.setInt(kSeedColorKey, snapshot.seedColorValue));
+      }
+      if (previous == null || previous.useAmoled != snapshot.useAmoled) {
+        writes.add(prefs.setBool(kUseAmoledKey, snapshot.useAmoled));
+      }
+      if (previous == null || previous.style != snapshot.style) {
+        writes.add(prefs.setString(kThemeStyleKey, snapshot.style.name));
+      }
+      if (previous == null || previous.mornyeAccent != snapshot.mornyeAccent) {
+        writes.add(
+          prefs.setString(kMornyeAccentKey, snapshot.mornyeAccent.name),
+        );
+      }
+      if (previous == null ||
+          previous.useSystemFont != snapshot.useSystemFont) {
+        writes.add(prefs.setBool(kUseSystemFontKey, snapshot.useSystemFont));
+      }
+      if (previous == null || previous.customFontId != snapshot.customFontId) {
+        writes.add(prefs.setString(kCustomFontIdKey, snapshot.customFontId));
+      }
+      if (previous == null ||
+          previous.customFontName != snapshot.customFontName) {
+        writes.add(
+          prefs.setString(kCustomFontNameKey, snapshot.customFontName),
+        );
+      }
+      if (previous == null ||
+          previous.lyricsTextScale != snapshot.lyricsTextScale) {
+        writes.add(
+          prefs.setDouble(kLyricsTextScaleKey, snapshot.lyricsTextScale),
+        );
+      }
+      if (previous == null || previous.lyricsBlur != snapshot.lyricsBlur) {
+        writes.add(prefs.setDouble(kLyricsBlurKey, snapshot.lyricsBlur));
+      }
+      if (previous == null ||
+          previous.lyricsOffsetMs != snapshot.lyricsOffsetMs) {
+        writes.add(prefs.setInt(kLyricsOffsetKey, snapshot.lyricsOffsetMs));
+      }
+      if (previous == null ||
+          previous.mornyeGlassClarity != snapshot.mornyeGlassClarity) {
+        writes.add(
+          prefs.setDouble(kMornyeGlassClarityKey, snapshot.mornyeGlassClarity),
+        );
+      }
+      if (previous == null ||
+          previous.mornyeGlassOutlines != snapshot.mornyeGlassOutlines) {
+        writes.add(
+          prefs.setBool(kMornyeGlassOutlinesKey, snapshot.mornyeGlassOutlines),
+        );
+      }
+      if (writes.isNotEmpty) {
+        await Future.wait(writes);
+        _persistedSnapshot = snapshot;
+      }
     } catch (e) {
       debugPrint('Error saving theme settings: $e');
     }

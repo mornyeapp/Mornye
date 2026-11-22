@@ -361,269 +361,267 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = widget.colorScheme;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => AppScaffoldMessenger(
-          key: _sheetMessengerKey,
-          child: Scaffold(
-            backgroundColor: Colors.transparent,
-            resizeToAvoidBottomInset: false,
-            body: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 8),
-                  child: const AppSheetHandle(),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          context.l10n.trackEditMetadata,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.bold),
+    final sheet = DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => AppScaffoldMessenger(
+        key: _sheetMessengerKey,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          resizeToAvoidBottomInset: false,
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: const AppSheetHandle(),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        context.l10n.trackEditMetadata,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      if (_saving)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
-                          child: SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: AppLoadingIndicator(
-                              size: 22,
-                              strokeWidth: 2,
-                            ),
-                          ),
-                        )
-                      else
-                        AppActionButton(
-                          onPressed: _fetching || _fetchingMusicBrainz
-                              ? null
-                              : _save,
-                          icon: const Icon(Icons.check, size: 18),
-                          label: Text(context.l10n.dialogSave),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 12,
-                            ),
+                    ),
+                    if (_saving)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: AppLoadingIndicator(size: 22, strokeWidth: 2),
+                        ),
+                      )
+                    else
+                      AppActionButton(
+                        onPressed: _fetching || _fetchingMusicBrainz
+                            ? null
+                            : _save,
+                        icon: const Icon(Icons.check, size: 18),
+                        label: Text(context.l10n.dialogSave),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 12,
                           ),
                         ),
+                      ),
+                  ],
+                ),
+              ),
+              if (context.isMornye)
+                Divider(
+                  height: 1,
+                  color: cs.outlineVariant.withValues(alpha: 0.5),
+                ),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
+                  children: [
+                    if (widget.saveTags == null) ...[
+                      _buildCoverEditor(cs),
+                      _buildAutoFillSection(cs),
                     ],
-                  ),
-                ),
-                if (context.isMornye)
-                  Divider(
-                    height: 1,
-                    color: cs.outlineVariant.withValues(alpha: 0.5),
-                  ),
-                Expanded(
-                  child: ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
-                    children: [
-                      if (widget.saveTags == null) ...[
-                        _buildCoverEditor(cs),
-                        _buildAutoFillSection(cs),
-                      ],
-                      MetadataEditorSectionCard(
-                        colorScheme: widget.colorScheme,
-                        icon: Icons.info_outline,
-                        title: context.l10n.trackMetadata,
-                        children: [
-                          MetadataTextField(
-                            cs,
-                            context.l10n.editMetadataFieldTitle,
-                            _form['title']!,
-                          ),
-                          MetadataTextField(
-                            cs,
-                            context.l10n.editMetadataFieldArtist,
-                            _form['artist']!,
-                          ),
-                          MetadataTextField(
-                            cs,
-                            context.l10n.editMetadataFieldAlbum,
-                            _form['album']!,
-                          ),
-                          MetadataTextField(
-                            cs,
-                            context.l10n.editMetadataFieldAlbumArtist,
-                            _form['album_artist']!,
-                          ),
-                          MetadataTextField(
-                            cs,
-                            context.l10n.editMetadataFieldDate,
-                            _form['date']!,
-                            hint: context.l10n.editMetadataFieldDateHint,
-                          ),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: MetadataTextField(
-                                  cs,
-                                  context.l10n.editMetadataFieldTrackNum,
-                                  _form['track_number']!,
-                                  keyboard: TextInputType.number,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: MetadataTextField(
-                                  cs,
-                                  context.l10n.editMetadataFieldTrackTotal,
-                                  _form['total_tracks']!,
-                                  keyboard: TextInputType.number,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: MetadataTextField(
-                                  cs,
-                                  context.l10n.editMetadataFieldDiscNum,
-                                  _form['disc_number']!,
-                                  keyboard: TextInputType.number,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: MetadataTextField(
-                                  cs,
-                                  context.l10n.editMetadataFieldDiscTotal,
-                                  _form['total_discs']!,
-                                  keyboard: TextInputType.number,
-                                ),
-                              ),
-                            ],
-                          ),
-                          MetadataTextField(
-                            cs,
-                            context.l10n.editMetadataFieldGenre,
-                            _form['genre']!,
-                          ),
-                          MetadataTextField(
-                            cs,
-                            context.l10n.editMetadataFieldIsrc,
-                            _form['isrc']!,
-                          ),
-                        ],
-                      ),
-                      MetadataEditorSectionCard(
-                        colorScheme: widget.colorScheme,
-                        icon: Icons.lyrics_outlined,
-                        title: context.l10n.trackLyrics,
-                        children: [
-                          MetadataTextField(
-                            cs,
-                            context.l10n.trackLyrics,
-                            _form['lyrics']!,
-                            maxLines: 8,
-                            keyboard: TextInputType.multiline,
-                          ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: AppActionButton(
-                              key: const ValueKey('find-lyrics-online'),
-                              outlined: true,
-                              glass: false,
-                              tonal: true,
-                              onPressed: _fetching || _saving
-                                  ? null
-                                  : _findLyricsOnline,
-                              style: OutlinedButton.styleFrom(
-                                backgroundColor: cs.surfaceContainerHigh,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              icon: const Icon(Icons.manage_search),
-                              label: Text(
-                                context.l10n.editMetadataLyricsSearch,
+                    MetadataEditorSectionCard(
+                      colorScheme: widget.colorScheme,
+                      icon: Icons.info_outline,
+                      title: context.l10n.trackMetadata,
+                      children: [
+                        MetadataTextField(
+                          cs,
+                          context.l10n.editMetadataFieldTitle,
+                          _form['title']!,
+                        ),
+                        MetadataTextField(
+                          cs,
+                          context.l10n.editMetadataFieldArtist,
+                          _form['artist']!,
+                        ),
+                        MetadataTextField(
+                          cs,
+                          context.l10n.editMetadataFieldAlbum,
+                          _form['album']!,
+                        ),
+                        MetadataTextField(
+                          cs,
+                          context.l10n.editMetadataFieldAlbumArtist,
+                          _form['album_artist']!,
+                        ),
+                        MetadataTextField(
+                          cs,
+                          context.l10n.editMetadataFieldDate,
+                          _form['date']!,
+                          hint: context.l10n.editMetadataFieldDateHint,
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: MetadataTextField(
+                                cs,
+                                context.l10n.editMetadataFieldTrackNum,
+                                _form['track_number']!,
+                                keyboard: TextInputType.number,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      MetadataEditorSectionCard(
-                        colorScheme: widget.colorScheme,
-                        icon: Icons.tune,
-                        title: context.l10n.editMetadataAdvanced,
-                        onHeaderTap: () =>
-                            setState(() => _showAdvanced = !_showAdvanced),
-                        expanded: _showAdvanced,
-                        children: [
-                          if (_showAdvanced) ...[
-                            MetadataTextField(
-                              cs,
-                              context.l10n.editMetadataFieldLabel,
-                              _form['label']!,
-                            ),
-                            MetadataTextField(
-                              cs,
-                              context.l10n.editMetadataFieldCopyright,
-                              _form['copyright']!,
-                            ),
-                            MetadataTextField(
-                              cs,
-                              context.l10n.editMetadataFieldComposer,
-                              _form['composer']!,
-                            ),
-                            MetadataTextField(
-                              cs,
-                              context.l10n.trackAlbumType,
-                              _form['album_type']!,
-                              hint: context.l10n.editMetadataFieldAlbumTypeHint,
-                            ),
-                            MetadataEditorSwitchField(
-                              colorScheme: widget.colorScheme,
-                              label: context.l10n.editMetadataFieldExplicit,
-                              subtitle:
-                                  context.l10n.editMetadataFieldExplicitHint,
-                              value: _form.explicit,
-                              onChanged: (value) =>
-                                  setState(() => _form.explicit = value),
-                            ),
-                            MetadataTextField(
-                              cs,
-                              context.l10n.editMetadataFieldUpc,
-                              _form['upc']!,
-                              hint: context.l10n.editMetadataFieldUpcHint,
-                              keyboard: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(18),
-                              ],
-                            ),
-                            MetadataTextField(
-                              cs,
-                              context.l10n.editMetadataFieldComment,
-                              _form['comment']!,
-                              maxLines: 3,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: MetadataTextField(
+                                cs,
+                                context.l10n.editMetadataFieldTrackTotal,
+                                _form['total_tracks']!,
+                                keyboard: TextInputType.number,
+                              ),
                             ),
                           ],
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: MetadataTextField(
+                                cs,
+                                context.l10n.editMetadataFieldDiscNum,
+                                _form['disc_number']!,
+                                keyboard: TextInputType.number,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: MetadataTextField(
+                                cs,
+                                context.l10n.editMetadataFieldDiscTotal,
+                                _form['total_discs']!,
+                                keyboard: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                        MetadataTextField(
+                          cs,
+                          context.l10n.editMetadataFieldGenre,
+                          _form['genre']!,
+                        ),
+                        MetadataTextField(
+                          cs,
+                          context.l10n.editMetadataFieldIsrc,
+                          _form['isrc']!,
+                        ),
+                      ],
+                    ),
+                    MetadataEditorSectionCard(
+                      colorScheme: widget.colorScheme,
+                      icon: Icons.lyrics_outlined,
+                      title: context.l10n.trackLyrics,
+                      children: [
+                        MetadataTextField(
+                          cs,
+                          context.l10n.trackLyrics,
+                          _form['lyrics']!,
+                          maxLines: 8,
+                          keyboard: TextInputType.multiline,
+                        ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: AppActionButton(
+                            key: const ValueKey('find-lyrics-online'),
+                            outlined: true,
+                            glass: false,
+                            tonal: true,
+                            onPressed: _fetching || _saving
+                                ? null
+                                : _findLyricsOnline,
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: cs.surfaceContainerHigh,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(Icons.manage_search),
+                            label: Text(context.l10n.editMetadataLyricsSearch),
+                          ),
+                        ),
+                      ],
+                    ),
+                    MetadataEditorSectionCard(
+                      colorScheme: widget.colorScheme,
+                      icon: Icons.tune,
+                      title: context.l10n.editMetadataAdvanced,
+                      onHeaderTap: () =>
+                          setState(() => _showAdvanced = !_showAdvanced),
+                      expanded: _showAdvanced,
+                      children: [
+                        if (_showAdvanced) ...[
+                          MetadataTextField(
+                            cs,
+                            context.l10n.editMetadataFieldLabel,
+                            _form['label']!,
+                          ),
+                          MetadataTextField(
+                            cs,
+                            context.l10n.editMetadataFieldCopyright,
+                            _form['copyright']!,
+                          ),
+                          MetadataTextField(
+                            cs,
+                            context.l10n.editMetadataFieldComposer,
+                            _form['composer']!,
+                          ),
+                          MetadataTextField(
+                            cs,
+                            context.l10n.trackAlbumType,
+                            _form['album_type']!,
+                            hint: context.l10n.editMetadataFieldAlbumTypeHint,
+                          ),
+                          MetadataEditorSwitchField(
+                            colorScheme: widget.colorScheme,
+                            label: context.l10n.editMetadataFieldExplicit,
+                            subtitle:
+                                context.l10n.editMetadataFieldExplicitHint,
+                            value: _form.explicit,
+                            onChanged: (value) =>
+                                setState(() => _form.explicit = value),
+                          ),
+                          MetadataTextField(
+                            cs,
+                            context.l10n.editMetadataFieldUpc,
+                            _form['upc']!,
+                            hint: context.l10n.editMetadataFieldUpcHint,
+                            keyboard: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(18),
+                            ],
+                          ),
+                          MetadataTextField(
+                            cs,
+                            context.l10n.editMetadataFieldComment,
+                            _form['comment']!,
+                            maxLines: 3,
+                          ),
                         ],
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+    return Builder(
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: sheet,
       ),
     );
   }

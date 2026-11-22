@@ -175,16 +175,30 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet>
     }
   }
 
+  late Listenable _factsListenable = _buildFactsListenable();
+
+  Listenable _buildFactsListenable() => Listenable.merge([
+    widget.metadata,
+    usbAudioStatus,
+    playbackEqualizer,
+    playbackExclusiveStatus,
+    playbackExclusiveOutput,
+    playbackOutputVolume,
+  ]);
+
+  @override
+  void didUpdateWidget(covariant _AudioInfoSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.metadata, widget.metadata)) {
+      oldWidget.metadata.removeListener(_load);
+      widget.metadata.addListener(_load);
+      _factsListenable = _buildFactsListenable();
+    }
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: Listenable.merge([
-      widget.metadata,
-      usbAudioStatus,
-      playbackEqualizer,
-      playbackExclusiveStatus,
-      playbackExclusiveOutput,
-      playbackOutputVolume,
-    ]),
+    listenable: _factsListenable,
     builder: (context, _) {
       final facts = _AudioFacts(
         l10n: context.l10n,

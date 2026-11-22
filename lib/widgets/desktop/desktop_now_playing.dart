@@ -377,7 +377,7 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
                 opacity: size,
                 child: Transform.translate(
                   offset: Offset(slide * (rtl ? -1 : 1), 0),
-                  child: panels,
+                  child: RepaintBoundary(child: panels),
                 ),
               ),
             ),

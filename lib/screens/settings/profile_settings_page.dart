@@ -905,7 +905,15 @@ class _Collection extends ConsumerWidget {
         )
         .value;
     final genres = ref.watch(libraryGenresProvider).value;
-    final collections = ref.watch(libraryCollectionsProvider);
+    final collections = ref.watch(
+      libraryCollectionsProvider.select(
+        (s) => (
+          lovedCount: s.lovedCount,
+          playlistCount: s.playlistCount,
+          favoriteArtistCount: s.favoriteArtistCount,
+        ),
+      ),
+    );
     String count(int? value) => value == null ? '' : _count(context, value);
     return _StatGrid(
       stats: [

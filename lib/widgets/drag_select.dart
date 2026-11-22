@@ -118,9 +118,11 @@ class DragSelectController {
     final box = scrollable?.context.findRenderObject();
     if (scrollable == null || box is! RenderBox || !box.hasSize) return null;
     if (scrollable.position.axis != Axis.vertical) return null;
-    // Bars the list runs under are not part of it.
-    final media = MediaQuery.of(row.context);
+    // Bars the list runs under are not part of it. Read without registering a
+    // permanent MediaQuery dependency on the row element during pointer moves.
+    final media = row.context.getInheritedWidgetOfExactType<MediaQuery>()?.data;
     final rect = box.localToGlobal(Offset.zero) & box.size;
+    if (media == null) return (scrollable.position, rect);
     return (
       scrollable.position,
       Rect.fromLTRB(

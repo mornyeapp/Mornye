@@ -127,8 +127,14 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
       await pending;
     } else {
       try {
-        await ref.read(settingsProvider.notifier).ensureLoaded();
-        final storage = await ExtensionStorageService.prepare();
+        final storageFuture = ExtensionStorageService.prepare();
+        try {
+          await ref.read(settingsProvider.notifier).ensureLoaded();
+        } catch (_) {
+          storageFuture.ignore();
+          rethrow;
+        }
+        final storage = await storageFuture;
         await initialize(
           storage.extensionsDir,
           storage.dataDir,
@@ -209,8 +215,10 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
       if (!loaded) {
         throw StateError(loadError ?? 'Failed to load installed extensions');
       }
-      await loadProviderPriority();
-      await loadMetadataProviderPriority();
+      await Future.wait([
+        loadProviderPriority(),
+        loadMetadataProviderPriority(),
+      ]);
       if (Platform.isAndroid || isDesktopPlatform) {
         // Exchange a cold-start browser callback before restored downloads can
         // bootstrap a replacement challenge and invalidate its original state.

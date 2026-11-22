@@ -33,7 +33,7 @@ final homeNewReleasesProvider = StreamProvider.autoDispose<List<WeeklyRelease>>(
         .take(_homeReleaseLimit)
         .toList(growable: false);
     final prefs = await SharedPreferences.getInstance();
-    yield recent(WeeklyReleaseService.saved(prefs, favorites));
+    yield recent(await WeeklyReleaseService.savedAsync(prefs, favorites));
     if (checked != null) yield recent(await checked);
   },
 );

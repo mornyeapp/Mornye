@@ -96,11 +96,13 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
         widget.controlsHeldOpen ||
         !_actionsVisible ||
         _audioOutputOpen ||
-        _accessibilityBlocksAutoHide) {
+        _accessibilityBlocksAutoHide ||
+        !TickerMode.valuesOf(context).enabled) {
       return;
     }
     _hideTimer = Timer(const Duration(seconds: 5), () {
       if (!mounted) return;
+      if (!TickerMode.valuesOf(context).enabled) return;
       if (ModalRoute.of(context)?.isCurrent == false) {
         _scheduleHide();
         return;

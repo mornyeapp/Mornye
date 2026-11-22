@@ -56,7 +56,7 @@ class LyricLineScroller extends StatefulWidget {
 }
 
 class _LyricLineScrollerState extends State<LyricLineScroller>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   /// How far across its space the singing reaches before the line slides.
   static const _lead = 0.6;
 
@@ -85,15 +85,39 @@ class _LyricLineScrollerState extends State<LyricLineScroller>
   );
   Timer? _wait;
   _LineLayout? _layout;
+  bool _tickerEnabled = true;
 
   /// When the line starts and stops sliding, in milliseconds, or null while
   /// it fits.
   ({double from, double until})? _window;
 
+  bool get _visible =>
+      _tickerEnabled &&
+      switch (WidgetsBinding.instance.lifecycleState) {
+        null || AppLifecycleState.resumed || AppLifecycleState.inactive => true,
+        _ => false,
+      };
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _clock.value = _ms(widget.position);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final enabled = TickerMode.valuesOf(context).enabled;
+    if (enabled != _tickerEnabled) {
+      _tickerEnabled = enabled;
+      _sync();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _sync();
   }
 
   @override
@@ -112,6 +136,7 @@ class _LyricLineScrollerState extends State<LyricLineScroller>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _wait?.cancel();
     _clock.dispose();
     super.dispose();
@@ -129,6 +154,7 @@ class _LyricLineScrollerState extends State<LyricLineScroller>
     final now = _ms(widget.position);
     final window = _window;
     final advancing =
+        _visible &&
         window != null &&
         widget.advancing &&
         widget.speed.isFinite &&
@@ -259,7 +285,7 @@ class _LyricLineScrollerState extends State<LyricLineScroller>
         if (window == null) return widget.child;
         return AnimatedBuilder(
           animation: _clock,
-          child: widget.child,
+          child: RepaintBoundary(child: widget.child),
           builder: (context, child) {
             var offset =
                 (layout.smoothXAt(_clock.value, _ease) - viewport * _lead)
@@ -315,30 +341,54 @@ class _LyricLineScrollerState extends State<LyricLineScroller>
 /// A line's width and where its singing is along it over time: pairs of
 /// milliseconds and distance from the start of the line, both increasing.
 class _LineLayout {
-  const _LineLayout({
+  _LineLayout({
     required this.direction,
     required this.scaler,
     required this.width,
     required this.knots,
-  });
+  }) : _prefixAreas = _computePrefixAreas(knots);
 
   final TextDirection direction;
   final TextScaler scaler;
   final double width;
   final List<(double, double)> knots;
+  final List<double> _prefixAreas;
+
+  static List<double> _computePrefixAreas(List<(double, double)> knots) {
+    final areas = List<double>.filled(knots.length, 0.0);
+    for (var i = 1; i < knots.length; i++) {
+      final (t1, x1) = knots[i];
+      final (t0, x0) = knots[i - 1];
+      areas[i] = areas[i - 1] + (t1 - t0) * (x0 + x1) / 2;
+    }
+    return areas;
+  }
+
+  /// First knot index whose time is strictly greater than [ms], or
+  /// `knots.length` when [ms] is at or after the last knot.
+  int _upperBoundTime(double ms) {
+    var low = 1;
+    var high = knots.length;
+    while (low < high) {
+      final mid = (low + high) >> 1;
+      if (knots[mid].$1 <= ms) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return low;
+  }
 
   /// How far the singing has come at [ms].
   double xAt(double ms) {
     if (ms <= knots.first.$1) return knots.first.$2;
-    for (var index = 1; index < knots.length; index++) {
-      final (time, x) = knots[index];
-      if (ms < time) {
-        final (previousTime, previousX) = knots[index - 1];
-        return previousX +
-            (x - previousX) * (ms - previousTime) / (time - previousTime);
-      }
-    }
-    return knots.last.$2;
+    final index = _upperBoundTime(ms);
+    if (index >= knots.length) return knots.last.$2;
+    final (time, x) = knots[index];
+    final (previousTime, previousX) = knots[index - 1];
+    return previousX +
+        (x - previousX) * (ms - previousTime) / (time - previousTime);
   }
 
   /// The mean of [xAt] over [ms] ± [half].
@@ -349,34 +399,37 @@ class _LineLayout {
   double _area(double ms) {
     final (firstTime, firstX) = knots.first;
     if (ms <= firstTime) return (ms - firstTime) * firstX;
-    var area = 0.0;
-    for (var index = 1; index < knots.length; index++) {
-      final (time, x) = knots[index];
-      final (previousTime, previousX) = knots[index - 1];
-      if (ms < time) {
-        final at =
-            previousX +
-            (x - previousX) * (ms - previousTime) / (time - previousTime);
-        return area + (ms - previousTime) * (previousX + at) / 2;
-      }
-      area += (time - previousTime) * (previousX + x) / 2;
+    final index = _upperBoundTime(ms);
+    if (index >= knots.length) {
+      final (lastTime, lastX) = knots.last;
+      return _prefixAreas.last + (ms - lastTime) * lastX;
     }
-    final (lastTime, lastX) = knots.last;
-    return area + (ms - lastTime) * lastX;
+    final (time, x) = knots[index];
+    final (previousTime, previousX) = knots[index - 1];
+    final at =
+        previousX +
+        (x - previousX) * (ms - previousTime) / (time - previousTime);
+    return _prefixAreas[index - 1] + (ms - previousTime) * (previousX + at) / 2;
   }
 
   /// When the singing reaches [x].
   double timeAt(double x) {
     if (x <= knots.first.$2) return knots.first.$1;
-    for (var index = 1; index < knots.length; index++) {
-      final (time, position) = knots[index];
-      if (x <= position) {
-        final (previousTime, previousX) = knots[index - 1];
-        if (position <= previousX) return time;
-        return previousTime +
-            (time - previousTime) * (x - previousX) / (position - previousX);
+    var low = 1;
+    var high = knots.length;
+    while (low < high) {
+      final mid = (low + high) >> 1;
+      if (knots[mid].$2 < x) {
+        low = mid + 1;
+      } else {
+        high = mid;
       }
     }
-    return knots.last.$1;
+    if (low >= knots.length) return knots.last.$1;
+    final (time, position) = knots[low];
+    final (previousTime, previousX) = knots[low - 1];
+    if (position <= previousX) return time;
+    return previousTime +
+        (time - previousTime) * (x - previousX) / (position - previousX);
   }
 }

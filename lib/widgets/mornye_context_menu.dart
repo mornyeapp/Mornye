@@ -42,7 +42,8 @@ Future<T?> showMornyeContextMenu<T>({
       // Opacity layers isolate a BackdropFilter from the underlying artwork.
       transitionBuilder: (_, _, _, child) => child,
       pageBuilder: (context, animation, _) {
-        final media = MediaQuery.of(context);
+        final padding = MediaQuery.paddingOf(context);
+        final viewInsets = MediaQuery.viewInsetsOf(context);
         return Semantics(
           scopesRoute: true,
           namesRoute: true,
@@ -54,8 +55,8 @@ Future<T?> showMornyeContextMenu<T>({
               preferAbove: preferAbove,
               maxWidth: maxWidth,
               textDirection: Directionality.of(context),
-              padding: media.padding.copyWith(
-                bottom: math.max(media.padding.bottom, media.viewInsets.bottom),
+              padding: padding.copyWith(
+                bottom: math.max(padding.bottom, viewInsets.bottom),
               ),
             ),
             child: _MenuFlight(

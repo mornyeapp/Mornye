@@ -223,6 +223,12 @@ class _SoftVideo extends StatelessWidget {
   final Size videoSize;
   final double artworkHeight;
 
+  static final _softBlur = ui.ImageFilter.blur(
+    sigmaX: MornyeMotionGlow.softSigma,
+    sigmaY: MornyeMotionGlow.softSigma,
+    tileMode: TileMode.clamp,
+  );
+
   @override
   Widget build(BuildContext context) => ShaderMask(
     blendMode: BlendMode.dstIn,
@@ -230,11 +236,7 @@ class _SoftVideo extends StatelessWidget {
     // The blur spreads past its box, where the mask would not reach it.
     child: ClipRect(
       child: ImageFiltered(
-        imageFilter: ui.ImageFilter.blur(
-          sigmaX: MornyeMotionGlow.softSigma,
-          sigmaY: MornyeMotionGlow.softSigma,
-          tileMode: TileMode.clamp,
-        ),
+        imageFilter: _softBlur,
         child: ClipRect(
           child: LayoutBuilder(
             builder: (context, constraints) => OverflowBox(

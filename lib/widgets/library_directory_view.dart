@@ -845,12 +845,12 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
     List<UnifiedLibraryItem> items,
     UnifiedLibraryItem item,
   ) {
-    final qualityMode = ref.watch(
-      settingsProvider.select((s) => s.libraryQualityLabelMode),
-    );
-    final quality = item.qualityForMode(qualityMode);
     return Consumer(
       builder: (context, ref, _) {
+        final qualityMode = ref.watch(
+          settingsProvider.select((s) => s.libraryQualityLabelMode),
+        );
+        final quality = item.qualityForMode(qualityMode);
         final playback = ref.watch(
           mediaItemPlaybackUiProvider(_playbackKey(item)),
         );

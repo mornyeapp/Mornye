@@ -55,6 +55,7 @@ class _ScrollEdgeFadeState extends State<ScrollEdgeFade> {
       ),
     );
     if (widget.fadeContent) {
+      final textDirection = Directionality.of(context);
       return TweenAnimationBuilder<double>(
         tween: Tween(end: _hasMore ? 1 : 0),
         duration: fade.duration,
@@ -68,14 +69,10 @@ class _ScrollEdgeFadeState extends State<ScrollEdgeFade> {
                 : (1 - widget.size / extent).clamp(0.0, 1.0);
             return LinearGradient(
               begin: horizontal
-                  ? AlignmentDirectional.centerStart.resolve(
-                      Directionality.of(context),
-                    )
+                  ? AlignmentDirectional.centerStart.resolve(textDirection)
                   : Alignment.topCenter,
               end: horizontal
-                  ? AlignmentDirectional.centerEnd.resolve(
-                      Directionality.of(context),
-                    )
+                  ? AlignmentDirectional.centerEnd.resolve(textDirection)
                   : Alignment.bottomCenter,
               stops: [start, 1],
               colors: [

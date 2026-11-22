@@ -289,7 +289,6 @@ class _LyricsTranslationEditorSheetState
 
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
     Widget body = AppScaffoldMessenger(
       key: _messengerKey,
       child: Scaffold(
@@ -305,13 +304,19 @@ class _LyricsTranslationEditorSheetState
       ),
     );
     // On phones the sheet takes most of the screen and rises with the
-    // keyboard; the desktop dialog brings its own height cap.
+    // keyboard; isolate viewInsets so keyboard animation frames do not rebuild
+    // the translation line list.
     if (!isDesktopPlatform) {
+      final inner = body;
       body = SizedBox(
-        height: media.size.height * 0.92,
-        child: Padding(
-          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-          child: body,
+        height: MediaQuery.sizeOf(context).height * 0.92,
+        child: Builder(
+          builder: (context) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: inner,
+          ),
         ),
       );
     }

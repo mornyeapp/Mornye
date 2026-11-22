@@ -44,12 +44,27 @@ class QueueSwipeActions {
 /// TV keep their pointer and remote menus only.
 bool get queueSwipeOffered => !isDesktopPlatform && !isAndroidTv;
 
+/// Shared derived provider for whether song rows accept the queue swipe, so
+/// scrolling row consumers share one subscription to [settingsProvider]
+/// instead of registering a fresh selector closure per row.
+final queueSwipeEnabledProvider = Provider<bool>(
+  (ref) =>
+      queueSwipeOffered &&
+      ref.watch(settingsProvider.select((s) => s.swipeToQueue)) &&
+      ref.watch(playerUiEnabledProvider),
+);
+
+/// Shared derived provider for whether play-queue rows accept the play-next
+/// swipe.
+final queueEntrySwipeEnabledProvider = Provider<bool>(
+  (ref) =>
+      ref.watch(queueSwipeEnabledProvider) &&
+      ref.watch(activeRemotePlaybackProvider) == null,
+);
+
 /// Whether song rows take the queue swipe: where it is offered, with the
 /// setting on, while the menus offer Play next and Add to queue.
-bool queueSwipeEnabled(WidgetRef ref) =>
-    queueSwipeOffered &&
-    ref.watch(settingsProvider.select((s) => s.swipeToQueue)) &&
-    ref.watch(playerUiEnabledProvider);
+bool queueSwipeEnabled(WidgetRef ref) => ref.watch(queueSwipeEnabledProvider);
 
 /// The swipe for a library song, running the menus' own queue actions.
 QueueSwipeActions? libraryItemQueueSwipe(
@@ -76,7 +91,7 @@ QueueSwipeActions? resolvedLibraryItemQueueSwipe(
 /// Whether the play queue's rows take the swipe to play a copy next: as
 /// song rows do ([queueSwipeEnabled]), while this device plays the queue.
 bool queueEntrySwipeEnabled(WidgetRef ref) =>
-    queueSwipeEnabled(ref) && ref.watch(activeRemotePlaybackProvider) == null;
+    ref.watch(queueEntrySwipeEnabledProvider);
 
 /// The swipe for [item], an entry of the play queue: toward the end of the
 /// row it queues a copy of the song right after the playing one, leaving
@@ -224,7 +239,9 @@ class _QueueSwipeState extends State<QueueSwipe>
   }
 
   bool _allowStart(Offset position) {
-    final media = MediaQuery.maybeOf(context);
+    // Read without registering a permanent MediaQuery dependency from an
+    // imperative gesture callback.
+    final media = context.getInheritedWidgetOfExactType<MediaQuery>()?.data;
     if (media == null) return true;
     final left = math.max(
       QueueSwipe.edgeExclusion,

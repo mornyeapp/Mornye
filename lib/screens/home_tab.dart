@@ -815,18 +815,22 @@ class _HomeTabState extends ConsumerState<HomeTab>
     final searchError = _showsSearch
         ? ref.watch(trackProvider.select((s) => s.error))
         : null;
-    final explicitSearchProvider = ref.watch(
-      settingsProvider.select((s) => s.searchProvider),
-    );
-    final defaultSearchTab = ref.watch(
-      settingsProvider.select((s) => s.defaultSearchTab),
-    );
-    final extensions = ref.watch(extensionProvider.select((s) => s.extensions));
-    final extensionReadiness = ref.watch(
-      extensionProvider.select(
-        (s) => (isInitialized: s.isInitialized, error: s.error),
-      ),
-    );
+    final explicitSearchProvider = _showsSearch
+        ? ref.watch(settingsProvider.select((s) => s.searchProvider))
+        : null;
+    final defaultSearchTab = _showsSearch
+        ? ref.watch(settingsProvider.select((s) => s.defaultSearchTab))
+        : '';
+    final extensions = _showsSearch
+        ? ref.watch(extensionProvider.select((s) => s.extensions))
+        : const <Extension>[];
+    final extensionReadiness = _showsSearch
+        ? ref.watch(
+            extensionProvider.select(
+              (s) => (isInitialized: s.isInitialized, error: s.error),
+            ),
+          )
+        : (isInitialized: true, error: null);
 
     // The feed belongs to Search: Home is the person's own page.
     final hasExploreContent =

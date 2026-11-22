@@ -32,12 +32,39 @@ extension _QueueTabFilterWidgets on _QueueTabState {
     );
   }
 
+  DownloadHistoryItem? _lookupCompletionBridgeHistory(
+    DownloadItem item,
+    DownloadHistoryState historyState,
+    List<DownloadHistoryItem> inMemoryHistoryItems,
+  ) {
+    final filePath = item.filePath?.trim();
+    if (filePath != null && filePath.isNotEmpty) {
+      final hit = historyState.getByFilePath(filePath);
+      if (hit != null) return hit;
+    }
+    final byId = historyState.getById(item.id);
+    if (byId != null) return byId;
+    final trackId = item.track.id.trim();
+    if (trackId.isNotEmpty) {
+      final byTrack = historyState.getBySpotifyId(trackId);
+      if (byTrack != null) return byTrack;
+    }
+    final isrc = item.track.isrc?.trim();
+    if (isrc != null && isrc.isNotEmpty) {
+      final byIsrc = historyState.getByIsrc(isrc);
+      if (byIsrc != null) return byIsrc;
+    }
+    return _historyItemForCompletionBridge(item, inMemoryHistoryItems);
+  }
+
   Widget _buildFilterContent({
     required BuildContext context,
     required ColorScheme colorScheme,
     required String filterMode,
     required String historyViewMode,
     required bool hasQueueItems,
+    required List<String> notCompletedItemIds,
+    required bool listeningStatisticsEnabled,
     required _FilterContentData filterData,
     required LibraryCollectionsState collectionState,
     required bool hasMoreLibrary,
@@ -57,27 +84,24 @@ extension _QueueTabFilterWidgets on _QueueTabState {
 
     final activeDownloadIds = !hasQueueItems || filterMode == 'albums'
         ? const <String>[]
-        : ref
-              .watch(
-                downloadQueueLookupProvider.select(
-                  (lookup) => lookup.notCompletedItemIds,
-                ),
-              )
-              .reversed
-              .toList(growable: false);
+        : notCompletedItemIds.reversed.toList(growable: false);
 
-    final bridgeHistoryById = <String, DownloadHistoryItem?>{
-      for (final entry in _completionBridge.entries)
-        entry.key: _historyItemForCompletionBridge(
-          entry.value,
-          inMemoryHistoryItems,
-        ),
-    };
+    Map<String, DownloadHistoryItem?> bridgeHistoryById = const {};
     List<String> bridgeIds = const [];
     if (hasQueueItems &&
         filterMode != 'albums' &&
         _completionBridge.isNotEmpty) {
+      final historyState = ref.read(downloadHistoryProvider);
+      bridgeHistoryById = <String, DownloadHistoryItem?>{
+        for (final entry in _completionBridge.entries)
+          entry.key: _lookupCompletionBridgeHistory(
+            entry.value,
+            historyState,
+            inMemoryHistoryItems,
+          ),
+      };
       final libIdSet = _loadedSongs(filterMode, allFilteredUnifiedItems).ids;
+      final activeDownloadIdSet = activeDownloadIds.toSet();
       final now = DateTime.now();
       final stale = <String>[];
       final pending = <String>[];
@@ -92,7 +116,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
             addedAt == null || now.difference(addedAt).inSeconds >= 6;
         if (shouldRetainCompletionBridge(
           queueItemExists: queueItems.containsKey(id),
-          isRequeued: activeDownloadIds.contains(id),
+          isRequeued: activeDownloadIdSet.contains(id),
           hasActiveDownloads: hasActiveDownloads,
           libraryRowLanded: landed,
           hasHistoryItem: historyItem != null,
@@ -421,9 +445,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
             _searchQuery.isEmpty &&
             !context.isMornye &&
             !_isSelectionMode &&
-            ref.watch(
-              settingsProvider.select((s) => s.listeningStatisticsEnabled),
-            ))
+            listeningStatisticsEnabled)
           SliverToBoxAdapter(
             child: ListeningRewindBanner(
               margin: EdgeInsets.fromLTRB(edge, 8, edge, 4),

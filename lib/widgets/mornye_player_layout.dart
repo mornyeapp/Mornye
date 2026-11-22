@@ -104,8 +104,6 @@ class MornyePlayerLayout extends ConsumerWidget {
     // Opening a panel moves the cover and the panels as content, in step
     // with the background behind them.
     final motion = mornyePlayerPanelMotion(context);
-    final queue = ref.watch(playQueueProvider).value ?? const <MediaItem>[];
-    final currentIndex = ref.watch(currentQueueIndexProvider);
     final showVolume = ref.watch(
       settingsProvider.select((s) => s.playerShowVolume),
     );
@@ -404,24 +402,22 @@ class MornyePlayerLayout extends ConsumerWidget {
           final landscapeVolume = showVolume
               ? const PlayerVolumeControl()
               : null;
-          final autoHideLyricsControls = ref.watch(
-            settingsProvider.select(
-              (settings) => settings.autoHideLyricsControls,
-            ),
-          );
-          final autoHideLyricsControlsWithAccessibility = ref.watch(
-            settingsProvider.select(
-              (settings) => settings.autoHideLyricsControlsWithAccessibility,
-            ),
-          );
           return RepaintBoundary(
             child: Consumer(
               builder: (context, ref, _) => MornyeLandscapePlayer(
                 page: page,
                 isPlaying: ref.watch(playbackPlayingProvider),
-                autoHideLyricsControls: autoHideLyricsControls,
-                autoHideLyricsControlsWithAccessibility:
-                    autoHideLyricsControlsWithAccessibility,
+                autoHideLyricsControls: ref.watch(
+                  settingsProvider.select(
+                    (settings) => settings.autoHideLyricsControls,
+                  ),
+                ),
+                autoHideLyricsControlsWithAccessibility: ref.watch(
+                  settingsProvider.select(
+                    (settings) =>
+                        settings.autoHideLyricsControlsWithAccessibility,
+                  ),
+                ),
                 controlsHeldOpen: lyricsOptionsOpen,
                 onPageChanged: onPageChanged,
                 artwork: landscapeArtwork,
@@ -502,15 +498,21 @@ class MornyePlayerLayout extends ConsumerWidget {
         return RepaintBoundary(child: content());
       },
     );
-    return PlayerTrackSwipe(
-      queue: queue,
-      currentIndex: currentIndex,
-      onSelected: (item) async {
-        final latest = ref.read(playQueueProvider).value ?? const <MediaItem>[];
-        final index = latest.indexWhere((entry) => identical(entry, item));
-        if (index >= 0) await controller.jumpTo(index);
-      },
+    // Isolate playQueueProvider and currentQueueIndexProvider here so queue
+    // mutations do not rebuild the entire player layout tree.
+    return Consumer(
       child: body,
+      builder: (context, ref, child) => PlayerTrackSwipe(
+        queue: ref.watch(playQueueProvider).value ?? const <MediaItem>[],
+        currentIndex: ref.watch(currentQueueIndexProvider),
+        onSelected: (item) async {
+          final latest =
+              ref.read(playQueueProvider).value ?? const <MediaItem>[];
+          final index = latest.indexWhere((entry) => identical(entry, item));
+          if (index >= 0) await controller.jumpTo(index);
+        },
+        child: child!,
+      ),
     );
   }
 

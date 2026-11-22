@@ -35,6 +35,7 @@ class LibraryViewToggle extends StatelessWidget {
             labels: labels,
             selectedIndex: selected,
             onChanged: onChanged,
+            samplesBackdrop: false,
             compact: isDesktopPlatform,
           );
           if (constraints.hasBoundedWidth) return control;

@@ -280,8 +280,8 @@ class TrackCard extends StatelessWidget {
           );
 
     // The current row's shapes morph on the spatial spring; reduced motion
-    // switches them in place. A clip applies only while the row is, or is
-    // leaving, the current track.
+    // switches them in place. Non-current rows allocate no AnimationController
+    // or Ticker while keeping ClipPath in place so ink ripples never remount.
     final shapeMotion = AppMotion.spatial(
       context,
       const AppMotionSpec(Duration.zero, Curves.linear),
@@ -292,22 +292,13 @@ class TrackCard extends StatelessWidget {
       required ShapeBorder from,
       required ShapeBorder to,
       EdgeInsets inset = EdgeInsets.zero,
-    }) => TweenAnimationBuilder<double>(
-      tween: Tween(end: current ? 1 : 0),
-      duration: shapeMotion.duration,
-      curve: shapeMotion.curve,
-      builder: (context, t, child) {
-        final progress = t.clamp(0.0, 1.0);
-        return ClipPath(
-          clipper: _InsetShapeClipper(
-            shape: ShapeBorder.lerp(from, to, progress)!,
-            inset: inset,
-            textDirection: textDirection,
-          ),
-          clipBehavior: progress > 0 ? Clip.antiAlias : Clip.none,
-          child: child,
-        );
-      },
+    }) => _LazyShapeMorph(
+      active: current,
+      motion: shapeMotion,
+      from: from,
+      to: to,
+      inset: inset,
+      textDirection: textDirection,
       child: child,
     );
 
@@ -736,6 +727,114 @@ class TrackCoverPlaceholder extends StatelessWidget {
         color: colorScheme.onSurfaceVariant,
         size: size == null ? null : size! * 0.45,
       ),
+    );
+  }
+}
+
+/// Morphs a row's clip shape between [from] and [to] without creating an
+/// [AnimationController] or [Ticker] for non-current rows, while keeping
+/// [ClipPath] at a stable tree slot so ink ripples never remount.
+class _LazyShapeMorph extends StatefulWidget {
+  const _LazyShapeMorph({
+    required this.active,
+    required this.motion,
+    required this.from,
+    required this.to,
+    required this.inset,
+    required this.textDirection,
+    required this.child,
+  });
+
+  final bool active;
+  final AppMotionSpec motion;
+  final ShapeBorder from;
+  final ShapeBorder to;
+  final EdgeInsets inset;
+  final TextDirection textDirection;
+  final Widget child;
+
+  @override
+  State<_LazyShapeMorph> createState() => _LazyShapeMorphState();
+}
+
+// Each morph makes a new controller, so this provides more than one ticker.
+class _LazyShapeMorphState extends State<_LazyShapeMorph>
+    with TickerProviderStateMixin {
+  AnimationController? _controller;
+  late double _resting = widget.active ? 1.0 : 0.0;
+
+  @override
+  void didUpdateWidget(_LazyShapeMorph oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active == widget.active) return;
+    final target = widget.active ? 1.0 : 0.0;
+    if (widget.motion.duration == Duration.zero) {
+      _disposeController();
+      _resting = target;
+      return;
+    }
+    final controller = _controller ??= AnimationController(
+      vsync: this,
+      value: _resting,
+    )..addStatusListener(_onStatus);
+    controller.animateTo(
+      target,
+      duration: widget.motion.duration,
+      curve: widget.motion.curve,
+    );
+  }
+
+  void _onStatus(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed && !widget.active) {
+      _resting = 0.0;
+      _disposeController();
+      if (mounted) setState(() {});
+    } else if (status == AnimationStatus.completed && widget.active) {
+      _resting = 1.0;
+      _disposeController();
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _disposeController() {
+    final controller = _controller;
+    if (controller == null) return;
+    _controller = null;
+    controller
+      ..removeStatusListener(_onStatus)
+      ..dispose();
+  }
+
+  @override
+  void dispose() {
+    _disposeController();
+    super.dispose();
+  }
+
+  Widget _clip(double progress) {
+    if (progress <= 0) {
+      return ClipPath(clipBehavior: Clip.none, child: widget.child);
+    }
+    return ClipPath(
+      clipper: _InsetShapeClipper(
+        shape: progress >= 1
+            ? widget.to
+            : ShapeBorder.lerp(widget.from, widget.to, progress)!,
+        inset: widget.inset,
+        textDirection: widget.textDirection,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: widget.child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (controller == null) return _clip(_resting);
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) => _clip(controller.value.clamp(0.0, 1.0)),
     );
   }
 }

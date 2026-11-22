@@ -464,74 +464,76 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
     );
     final song = hit.kind == LibrarySearchKind.songs;
     final key = ValueKey('${hit.kind.name}:${hit.source}:${hit.id}');
-    final swipe = song
-        ? resolvedLibraryItemQueueSwipe(ref, () => _resolve(hit))
-        : null;
     VoidCallback play(MediaPlaybackUi? playback) => playback?.isCurrent ?? false
         ? () => ref
               .read(musicPlayerControllerProvider)
               .togglePlayPause(playback!.isPlaying)
         : () => _open(hit, play: true);
-    Widget card({MediaPlaybackUi? playback}) => TrackCard(
-      key: playback == null ? key : null,
-      style: collectionTrackCardStyle(context),
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(
-          hit.kind == LibrarySearchKind.artists ? 28 : 8,
-        ),
-        child: SizedBox.square(
-          dimension: 52,
-          child: hit.cover?.isNotEmpty == true
-              ? LocalOrNetworkCoverImage(
-                  url: hit.cover!,
-                  placeholder: fallback,
-                  songFile: hit.samplePath,
+    Widget card({MediaPlaybackUi? playback, QueueSwipeActions? swipe}) =>
+        TrackCard(
+          key: playback == null ? key : null,
+          style: collectionTrackCardStyle(context),
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(
+              hit.kind == LibrarySearchKind.artists ? 28 : 8,
+            ),
+            child: SizedBox.square(
+              dimension: 52,
+              child: hit.cover?.isNotEmpty == true
+                  ? LocalOrNetworkCoverImage(
+                      url: hit.cover!,
+                      placeholder: fallback,
+                      songFile: hit.samplePath,
+                    )
+                  : fallback(context),
+            ),
+          ),
+          title: hit.title,
+          subtitle: Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          isCurrent: playback?.isCurrent ?? false,
+          isPlaying: playback?.isPlaying ?? false,
+          leadingArtwork: song,
+          trailing: song
+              ? SongRowButton(
+                  playButton: AppIconButton(
+                    tooltip: playback?.isPlaying ?? false
+                        ? context.l10n.actionPause
+                        : context.l10n.tooltipPlay,
+                    icon: Icon(
+                      playback?.isPlaying ?? false
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                    ),
+                    onPressed: play(playback),
+                  ),
+                  onOpenDetails: () => _open(hit),
+                  path: hit.samplePath,
                 )
-              : fallback(context),
-        ),
-      ),
-      title: hit.title,
-      subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-      isCurrent: playback?.isCurrent ?? false,
-      isPlaying: playback?.isPlaying ?? false,
-      leadingArtwork: song,
-      trailing: song
-          ? SongRowButton(
-              playButton: AppIconButton(
-                tooltip: playback?.isPlaying ?? false
-                    ? context.l10n.actionPause
-                    : context.l10n.tooltipPlay,
-                icon: Icon(
-                  playback?.isPlaying ?? false
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
-                ),
-                onPressed: play(playback),
-              ),
-              onOpenDetails: () => _open(hit),
-              path: hit.samplePath,
-            )
-          : const Icon(Icons.chevron_right),
-      // Long-press selects songs for the Library batch actions; while
-      // selecting, song taps toggle and other results stay inert.
-      isSelectionMode: song && _selecting,
-      isSelected: song && _selected.containsKey(_itemId(hit)),
-      onTap: !_selecting
-          ? song
-                ? songRowTap(
-                    ref,
-                    path: hit.samplePath,
-                    openDetails: () => _open(hit),
-                    play: play(playback),
-                  )
-                : () => _open(hit)
-          : song
-          ? () => _toggleSelection(hit)
-          : null,
-      onLongPress: song ? () => _toggleSelection(hit) : null,
-      onContextMenu: (position) => _showHitMenu(hit, position),
-      queueSwipe: swipe,
-    );
+              : const Icon(Icons.chevron_right),
+          // Long-press selects songs for the Library batch actions; while
+          // selecting, song taps toggle and other results stay inert.
+          isSelectionMode: song && _selecting,
+          isSelected: song && _selected.containsKey(_itemId(hit)),
+          onTap: !_selecting
+              ? song
+                    ? songRowTap(
+                        ref,
+                        path: hit.samplePath,
+                        openDetails: () => _open(hit),
+                        play: play(playback),
+                      )
+                    : () => _open(hit)
+              : song
+              ? () => _toggleSelection(hit)
+              : null,
+          onLongPress: song ? () => _toggleSelection(hit) : null,
+          onContextMenu: (position) => _showHitMenu(hit, position),
+          queueSwipe: swipe,
+        );
     if (!song) return card();
     // Song rows follow the file they play, so a track change rebuilds only
     // the rows involved.
@@ -541,6 +543,7 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
         playback: ref.watch(
           mediaItemPlaybackUiProvider((id: hit.id, path: hit.samplePath)),
         ),
+        swipe: resolvedLibraryItemQueueSwipe(ref, () => _resolve(hit)),
       ),
     );
   }

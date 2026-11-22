@@ -106,9 +106,11 @@ class PlatformBridge {
       state.dispatched = true;
       Object? result;
       try {
+        final operation = request['operation'];
         result = await _channel.invokeMethod('runNativeDataJob', {
           'request_json': encoded,
           'request_id': id,
+          if (operation is String) 'operation': operation,
           'bytes': ?bytes,
         });
       } finally {
@@ -2705,10 +2707,15 @@ class PlatformBridge {
   static Future<Map<String, dynamic>> scanLibraryFolderIncremental(
     String folderPath,
     Map<String, int> existingFiles,
-  ) async => _invokeMap('scanLibraryFolderIncremental', {
-    'folder_path': folderPath,
-    'existing_files': jsonEncode(existingFiles),
-  });
+  ) async {
+    final encoded = existingFiles.length > 256
+        ? await compute(_encodeJsonInBackground, existingFiles)
+        : jsonEncode(existingFiles);
+    return _invokeMap('scanLibraryFolderIncremental', {
+      'folder_path': folderPath,
+      'existing_files': encoded,
+    });
+  }
 
   static Future<LibraryScanNDJSONFile> scanSafTreeToNDJSONFile(
     String treeUri, {
@@ -2809,16 +2816,20 @@ class PlatformBridge {
     Map<String, int> existingFiles,
   ) async {
     _ensureBackendEventHandler();
+    final encoded = existingFiles.length > 256
+        ? await compute(_encodeJsonInBackground, existingFiles)
+        : jsonEncode(existingFiles);
     return _invokeMap('scanSafTreeIncremental', {
       'tree_uri': treeUri,
-      'existing_files': jsonEncode(existingFiles),
+      'existing_files': encoded,
     });
   }
 
   static Future<Map<String, int>> getSafFileModTimes(List<String> uris) async {
-    final map = await _invokeMap('getSafFileModTimes', {
-      'uris': jsonEncode(uris),
-    });
+    final encoded = uris.length > 256
+        ? await compute(_encodeJsonInBackground, uris)
+        : jsonEncode(uris);
+    final map = await _invokeMap('getSafFileModTimes', {'uris': encoded});
     return map.map((key, value) => MapEntry(key, (value as num).toInt()));
   }
 

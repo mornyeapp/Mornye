@@ -212,23 +212,37 @@ class _EqualizerOverview extends ConsumerWidget {
             label: l10n.equalizerCurveDescription,
             child: SizedBox(
               height: 152,
-              child: TweenAnimationBuilder<Color?>(
-                tween: ColorTween(end: curveColor),
-                duration: recolor.duration,
-                curve: recolor.curve,
-                builder: (context, color, _) => RepaintBoundary(
-                  child: CustomPaint(
-                    size: Size.infinite,
-                    painter: _EqualizerCurve(
-                      settings: settings,
-                      color: color ?? curveColor,
-                      grid: colors.outlineVariant,
-                      label: colors.onSurfaceVariant,
-                      labelStyle: theme.textTheme.labelSmall!,
-                      textScaler: MediaQuery.textScalerOf(context),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  RepaintBoundary(
+                    child: CustomPaint(
+                      size: Size.infinite,
+                      painter: _EqualizerGridPainter(
+                        grid: colors.outlineVariant,
+                        label: colors.onSurfaceVariant,
+                        labelStyle: theme.textTheme.labelSmall!,
+                        textScaler: MediaQuery.textScalerOf(context),
+                      ),
                     ),
                   ),
-                ),
+                  TweenAnimationBuilder<Color?>(
+                    tween: ColorTween(end: curveColor),
+                    duration: recolor.duration,
+                    curve: recolor.curve,
+                    builder: (context, color, _) => RepaintBoundary(
+                      child: CustomPaint(
+                        size: Size.infinite,
+                        painter: _EqualizerCurve(
+                          settings: settings,
+                          color: color ?? curveColor,
+                          labelStyle: theme.textTheme.labelSmall!,
+                          textScaler: MediaQuery.textScalerOf(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

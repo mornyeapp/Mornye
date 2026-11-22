@@ -42,7 +42,7 @@ class PlayerLyricsControlsCollapse extends StatelessWidget {
               child: Opacity(opacity: shown.clamp(0, 1), child: child),
             ),
           ),
-          child: child,
+          child: TickerMode(enabled: !hidden, child: child),
         ),
       ),
     );

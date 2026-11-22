@@ -50,6 +50,8 @@ class ScrobbleTrack {
   };
 }
 
+final _scrobbleIsrcPattern = RegExp(r'^[A-Za-z]{2}[A-Za-z0-9]{3}\d{7}$');
+
 /// An ISRC or track number from the song's tags, when the player has them.
 ({String? isrc, int? trackNumber}) _identifiers(MediaItem? item) {
   final tags = item?.extras?['displayMetadata'];
@@ -59,9 +61,7 @@ class ScrobbleTrack {
     '${tags['track_number'] ?? tags['track'] ?? ''}'.split('/').first.trim(),
   );
   return (
-    isrc: RegExp(r'^[A-Za-z]{2}[A-Za-z0-9]{3}\d{7}$').hasMatch(isrc)
-        ? isrc.toUpperCase()
-        : null,
+    isrc: _scrobbleIsrcPattern.hasMatch(isrc) ? isrc.toUpperCase() : null,
     trackNumber: number != null && number > 0 ? number : null,
   );
 }

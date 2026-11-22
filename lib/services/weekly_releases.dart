@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/utils/string_utils.dart';
 
 class WeeklyRelease {
+  static final _isoDatePrefix = RegExp(r'^\d{4}-\d{2}-\d{2}(?:$|T)');
+
   const WeeklyRelease({
     required this.id,
     required this.name,
@@ -37,7 +40,7 @@ class WeeklyRelease {
   }) {
     final rawDate = metadata['release_date']?.toString() ?? '';
     // Year/month-only dates are not precise enough for a weekly feed.
-    if (!RegExp(r'^\d{4}-\d{2}-\d{2}(?:$|T)').hasMatch(rawDate)) return null;
+    if (!_isoDatePrefix.hasMatch(rawDate)) return null;
     final parsed = DateTime.tryParse(rawDate);
     if (parsed == null) return null;
     final date = DateTime(parsed.year, parsed.month, parsed.day);
@@ -98,10 +101,44 @@ class WeeklyReleaseService {
     SharedPreferences prefs,
     List<CollectionArtistEntry> artists,
   ) {
-    final releases = <String, WeeklyRelease>{};
+    final entries = <(String, String)>[];
     for (final artist in artists) {
-      for (final release in _savedCatalog(prefs, artist).catalog) {
-        releases['${release.providerId}:${release.id}'] = release;
+      final raw = prefs.getString(_cacheKey(artist));
+      if (raw != null) entries.add((artist.name, raw));
+    }
+    return _decodeSavedEntries(entries);
+  }
+
+  /// Like [saved], offloading JSON decoding to a background isolate when more
+  /// than a few favorite artists have cached catalogs.
+  static Future<WeeklyReleaseFeed> savedAsync(
+    SharedPreferences prefs,
+    List<CollectionArtistEntry> artists,
+  ) async {
+    final entries = <(String, String)>[];
+    for (final artist in artists) {
+      final raw = prefs.getString(_cacheKey(artist));
+      if (raw != null) entries.add((artist.name, raw));
+    }
+    if (entries.length <= 5) return _decodeSavedEntries(entries);
+    return Isolate.run(() => _decodeSavedEntries(entries));
+  }
+
+  static WeeklyReleaseFeed _decodeSavedEntries(List<(String, String)> entries) {
+    final releases = <String, WeeklyRelease>{};
+    for (final (artistName, raw) in entries) {
+      try {
+        final json = jsonDecode(raw) as Map<String, dynamic>;
+        final catalog = _parseCatalog(
+          json,
+          artistName,
+          json['provider_id']?.toString() ?? '',
+        );
+        for (final release in catalog) {
+          releases['${release.providerId}:${release.id}'] = release;
+        }
+      } catch (_) {
+        // An invalid cache is rebuilt; it must not break other artists.
       }
     }
     return WeeklyReleaseFeed(_newestFirst(releases.values));

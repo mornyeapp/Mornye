@@ -612,10 +612,17 @@ class _MiniPlayerWave extends StatefulWidget {
   State<_MiniPlayerWave> createState() => _MiniPlayerWaveState();
 }
 
-class _MiniPlayerWaveState extends State<_MiniPlayerWave> {
+class _MiniPlayerWaveState extends State<_MiniPlayerWave>
+    with WidgetsBindingObserver {
   // The package's wave travels one wavelength per second.
   final _phase = DecorativePhase(const Duration(seconds: 1));
   bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   @override
   void didChangeDependencies() {
@@ -625,16 +632,32 @@ class _MiniPlayerWaveState extends State<_MiniPlayerWave> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _sync();
+  }
+
+  @override
   void didUpdateWidget(_MiniPlayerWave oldWidget) {
     super.didUpdateWidget(oldWidget);
     _sync();
   }
 
-  void _sync() =>
-      _visible && widget.amplitude > 0 ? _phase.start() : _phase.stop();
+  void _sync() {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    final active =
+        lifecycle == null ||
+        lifecycle == AppLifecycleState.resumed ||
+        lifecycle == AppLifecycleState.inactive;
+    if (_visible && active && widget.amplitude > 0) {
+      _phase.start();
+    } else {
+      _phase.stop();
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _phase.dispose();
     super.dispose();
   }
@@ -662,7 +685,7 @@ class _MiniPlayerWaveState extends State<_MiniPlayerWave> {
             linear.wavyContainerHeight,
           ),
           width: double.infinity,
-          child: ValueListenableBuilder(
+          child: ValueListenableBuilder<double>(
             valueListenable: _phase,
             builder: (context, phase, _) => CustomPaint(
               painter: M3ELinearProgressPainter(

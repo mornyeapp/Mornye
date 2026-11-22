@@ -454,6 +454,7 @@ class _InteractiveSearchExampleState extends State<_InteractiveSearchExample> {
             controller: _controller,
             hintText: context.l10n.tutorialSearchHint,
             clearTooltip: context.l10n.dialogClear,
+            samplesBackdrop: false,
             onClear: () => setState(() => _showResult = false),
             onChanged: (value) {
               setState(() {

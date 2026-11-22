@@ -122,8 +122,10 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
     final colorScheme = widget.colorScheme;
     final embedded = widget.embedded;
     final queue = ref.watch(playQueueProvider).value ?? const [];
-    final current = ref.watch(currentMediaItemProvider).value;
-    if (queue.isNotEmpty && current != null) _openAtPlayingSong();
+    final currentId = ref.watch(
+      currentMediaItemProvider.select((s) => s.value?.id),
+    );
+    if (queue.isNotEmpty && currentId != null) _openAtPlayingSong();
     // A queue that got shorter leaves room its sheet gives back.
     ref.listen(playQueueProvider.select((state) => state.value?.length), (
       _,
@@ -264,7 +266,7 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
                     height: _passedRowHeight,
                   );
                 }
-                final isCurrent = current?.id == item.id;
+                final isCurrent = currentId == item.id;
                 final radius = connectedRowRadius(
                   context,
                   first: i == 0,
@@ -293,16 +295,11 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
                           start: 16,
                           end: 4,
                         ),
-                        leading: TweenAnimationBuilder<double>(
-                          tween: Tween(end: expressive && isCurrent ? 22 : 8),
-                          duration: artworkMotion.duration,
-                          curve: artworkMotion.curve,
-                          builder: (context, radius, child) => ClipRRect(
-                            borderRadius: BorderRadius.circular(
-                              radius.clamp(0.0, 22.0),
-                            ),
-                            child: child,
-                          ),
+                        leading: _LazyArtworkRadiusMorph(
+                          active: expressive && isCurrent,
+                          motion: artworkMotion,
+                          restingRadius: 8,
+                          activeRadius: 22,
                           child: SizedBox.square(
                             dimension: 44,
                             child: Stack(
@@ -410,5 +407,102 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
         ),
       );
     }
+  }
+}
+
+/// Morphs a queue row's artwork corner radius lazily so non-current rows avoid
+/// allocating an [AnimationController] or [Ticker].
+class _LazyArtworkRadiusMorph extends StatefulWidget {
+  const _LazyArtworkRadiusMorph({
+    required this.active,
+    required this.motion,
+    required this.restingRadius,
+    required this.activeRadius,
+    required this.child,
+  });
+
+  final bool active;
+  final AppMotionSpec motion;
+  final double restingRadius;
+  final double activeRadius;
+  final Widget child;
+
+  @override
+  State<_LazyArtworkRadiusMorph> createState() =>
+      _LazyArtworkRadiusMorphState();
+}
+
+// Each morph makes a new controller, so this provides more than one ticker.
+class _LazyArtworkRadiusMorphState extends State<_LazyArtworkRadiusMorph>
+    with TickerProviderStateMixin {
+  AnimationController? _controller;
+  late double _resting = widget.active ? 1.0 : 0.0;
+
+  @override
+  void didUpdateWidget(_LazyArtworkRadiusMorph oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active == widget.active) return;
+    final target = widget.active ? 1.0 : 0.0;
+    if (widget.motion.duration == Duration.zero) {
+      _disposeController();
+      _resting = target;
+      return;
+    }
+    final controller = _controller ??= AnimationController(
+      vsync: this,
+      value: _resting,
+    )..addStatusListener(_onStatus);
+    controller.animateTo(
+      target,
+      duration: widget.motion.duration,
+      curve: widget.motion.curve,
+    );
+  }
+
+  void _onStatus(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed && !widget.active) {
+      _resting = 0.0;
+      _disposeController();
+      if (mounted) setState(() {});
+    } else if (status == AnimationStatus.completed && widget.active) {
+      _resting = 1.0;
+      _disposeController();
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _disposeController() {
+    final controller = _controller;
+    if (controller == null) return;
+    _controller = null;
+    controller
+      ..removeStatusListener(_onStatus)
+      ..dispose();
+  }
+
+  @override
+  void dispose() {
+    _disposeController();
+    super.dispose();
+  }
+
+  Widget _clip(double progress) {
+    final radius =
+        widget.restingRadius +
+        (widget.activeRadius - widget.restingRadius) * progress;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius.clamp(0.0, 22.0)),
+      child: widget.child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (controller == null) return _clip(_resting);
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) => _clip(controller.value.clamp(0.0, 1.0)),
+    );
   }
 }

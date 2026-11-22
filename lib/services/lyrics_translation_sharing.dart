@@ -6,6 +6,7 @@ import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_alignment.dart';
 
 final _sourceHash = RegExp(r'^[0-9a-f]{64}$');
+final _languageTag = RegExp(r'^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$');
 
 bool isLyricsTranslationHash(Object? value) =>
     value is String && _sourceHash.hasMatch(value);
@@ -58,7 +59,7 @@ class SharedLyricsTranslation {
         );
     if (!isLyricsTranslationHash(hash) ||
         language is! String ||
-        !RegExp(r'^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$').hasMatch(language) ||
+        !_languageTag.hasMatch(language) ||
         updated is! int ||
         updated < 0 ||
         !validLines(translations) ||
@@ -140,11 +141,63 @@ class LyricsTranslationSharing {
     _outgoing.add(update);
   }
 
+  static bool _sameStringList(List<String?> a, List<String?> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  static bool _sameAlignments(
+    bool aSynced,
+    List<List<LyricsTranslationChunk>> a,
+    bool bSynced,
+    List<List<LyricsTranslationChunk>> b,
+  ) {
+    if (aSynced != bSynced) return false;
+    if (!aSynced) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final x = a[i];
+      final y = b[i];
+      if (x.length != y.length) return false;
+      for (var j = 0; j < x.length; j++) {
+        if (x[j].source != y[j].source || x[j].text != y[j].text) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  static bool _sameUpdate(
+    SharedLyricsTranslation a,
+    SharedLyricsTranslation b,
+  ) =>
+      a.sourceHash == b.sourceHash &&
+      a.language == b.language &&
+      a.updatedMs == b.updatedMs &&
+      _sameStringList(a.result.translations, b.result.translations) &&
+      _sameStringList(a.result.romanizations, b.result.romanizations) &&
+      _sameAlignments(
+        a.result.wordSynced,
+        a.result.alignments,
+        b.result.wordSynced,
+        b.result.alignments,
+      ) &&
+      _sameAlignments(
+        a.result.romanizationWordSynced,
+        a.result.romanizationAlignments,
+        b.result.romanizationWordSynced,
+        b.result.romanizationAlignments,
+      );
+
   bool receive(SharedLyricsTranslation update) {
     final previous = lookup(update.sourceHash);
     if (previous != null &&
         (previous.updatedMs > update.updatedMs ||
-            jsonEncode(previous.toJson()) == jsonEncode(update.toJson()))) {
+            _sameUpdate(previous, update))) {
       return false;
     }
     _remember(update);

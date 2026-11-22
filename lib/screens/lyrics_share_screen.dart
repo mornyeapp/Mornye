@@ -1184,29 +1184,49 @@ class LyricsShareCard extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final base = DefaultTextStyle.of(context).style;
+        final directions = [
+          for (final line in lines)
+            strongTextDirection(line.text) ?? cardDirection,
+        ];
+        final painter = TextPainter();
         double heightAt(double size) {
           var height = 0.0;
-          for (final line in lines) {
-            final painter = TextPainter(
-              text: TextSpan(
+          for (var i = 0; i < lines.length; i++) {
+            final line = lines[i];
+            painter
+              ..text = TextSpan(
                 text: line.text,
                 style: base.merge(style(line, size)),
-              ),
-              textDirection: strongTextDirection(line.text) ?? cardDirection,
-            )..layout(maxWidth: width);
+              )
+              ..textDirection = directions[i]
+              ..layout(maxWidth: width);
             height += painter.height + 6;
-            painter.dispose();
           }
           return height;
         }
 
         // A long quote takes smaller type before the block is shrunk as a
-        // whole, so its lines keep the card's full width.
+        // whole, so its lines keep the card's full width. Binary search the
+        // exact 1-pt step where the block fits instead of stepping linearly.
+        final rawSteps = (wanted - wanted * 0.5).ceil();
+        final maxSteps = rawSteps > 0 ? rawSteps : 0;
         var fontSize = wanted;
-        while (fontSize > wanted * 0.5 &&
-            heightAt(fontSize) > constraints.maxHeight) {
-          fontSize -= 1;
+        if (lines.isNotEmpty &&
+            maxSteps > 0 &&
+            heightAt(wanted) > constraints.maxHeight) {
+          var low = 1;
+          var high = maxSteps;
+          while (low < high) {
+            final mid = (low + high) >> 1;
+            if (heightAt(wanted - mid) <= constraints.maxHeight) {
+              high = mid;
+            } else {
+              low = mid + 1;
+            }
+          }
+          fontSize = wanted - low;
         }
+        painter.dispose();
         return FittedBox(
           fit: BoxFit.scaleDown,
           alignment: alignment,
@@ -1278,30 +1298,34 @@ class LyricsShareCard extends StatelessWidget {
         ),
       );
 
+  static final _artworkBlur = ImageFilter.blur(
+    sigmaX: 36,
+    sigmaY: 36,
+    tileMode: TileMode.mirror,
+  );
+
   Widget _background(ColorScheme scheme) {
     switch (background) {
       case LyricsCardBackground.artwork:
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            const ColoredBox(color: Color(0xFF1B1B1F)),
-            ImageFiltered(
-              imageFilter: ImageFilter.blur(
-                sigmaX: 36,
-                sigmaY: 36,
-                tileMode: TileMode.mirror,
-              ),
-              child: Transform.scale(
-                scale: 1.3,
-                child: PlayerArtwork(
-                  artUri: artUri,
-                  colorScheme: scheme,
-                  cacheWidth: 360,
+        return RepaintBoundary(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const ColoredBox(color: Color(0xFF1B1B1F)),
+              ImageFiltered(
+                imageFilter: _artworkBlur,
+                child: Transform.scale(
+                  scale: 1.3,
+                  child: PlayerArtwork(
+                    artUri: artUri,
+                    colorScheme: scheme,
+                    cacheWidth: 360,
+                  ),
                 ),
               ),
-            ),
-            const ColoredBox(color: Color(0x47000000)),
-          ],
+              const ColoredBox(color: Color(0x47000000)),
+            ],
+          ),
         );
       case LyricsCardBackground.color:
         final hsl = HSLColor.fromColor(coverColor ?? scheme.primary);

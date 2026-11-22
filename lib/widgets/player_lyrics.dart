@@ -1044,6 +1044,22 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
 
   @override
   Widget build(BuildContext context) {
+    // Watch providers in build() rather than inside TweenAnimationBuilder so
+    // animation frames never leak duplicate Riverpod .select() subscriptions.
+    final loading = _visible
+        ? ref.watch(playbackLoadingProvider)
+        : ref.read(playbackLoadingProvider);
+    final mornye = context.isMornye;
+    final highContrast = MediaQuery.highContrastOf(context);
+    final blurStrength = ref.watch(
+      themeProvider.select((theme) => theme.lyricsBlur),
+    );
+    final blurLyrics =
+        mornye &&
+        !highContrast &&
+        blurStrength > 0 &&
+        // Defocused lines are filtered on every frame while their focus eases.
+        ref.watch(mornyeLiquidGlassProvider);
     // Turning pronunciation or translation on resizes every line, so the
     // lines below move: Material's slow spatial spring stops at the new
     // size, and Mornye moves them as content, on its standard spring.
@@ -1062,29 +1078,31 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
         ),
         duration: supplements.duration,
         curve: supplements.curve,
-        builder: (context, visibility, _) => _buildLyrics(context, visibility),
+        builder: (context, visibility, _) => _buildLyrics(
+          context,
+          visibility,
+          loading: loading,
+          mornye: mornye,
+          highContrast: highContrast,
+          blurStrength: blurStrength,
+          blurLyrics: blurLyrics,
+        ),
       ),
     );
   }
 
-  Widget _buildLyrics(BuildContext context, Offset visibility) {
+  Widget _buildLyrics(
+    BuildContext context,
+    Offset visibility, {
+    required bool loading,
+    required bool mornye,
+    required bool highContrast,
+    required double blurStrength,
+    required bool blurLyrics,
+  }) {
     final lines = _lines;
     final active = _active;
     final rowVisibility = _rowVisibility;
-    final loading = _visible
-        ? ref.watch(playbackLoadingProvider)
-        : ref.read(playbackLoadingProvider);
-    final mornye = context.isMornye;
-    final highContrast = MediaQuery.highContrastOf(context);
-    final blurStrength = ref.watch(
-      themeProvider.select((theme) => theme.lyricsBlur),
-    );
-    final blurLyrics =
-        mornye &&
-        !highContrast &&
-        blurStrength > 0 &&
-        // Defocused lines are filtered on every frame while their focus eases.
-        ref.watch(mornyeLiquidGlassProvider);
     // Line emphasis eases over most of the scroll, so the new line brightens
     // as it arrives instead of switching ahead of the movement.
     final motion = MediaQuery.disableAnimationsOf(context)
@@ -1251,13 +1269,16 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
             _rowInputs = rowInputs;
             _rowsRevision++;
           }
+          final creditsHeight = mornye && widget.credits != null
+              ? widget.credits!.heightFor(context, contentWidth)
+              : null;
           final list = _lyricList(
             revision: _rowsRevision,
             controller: _scroll,
             itemExtentBuilder: mornye
                 ? (index, _) => index < lines.length
                       ? _lineExtents![index]
-                      : widget.credits!.heightFor(context, contentWidth)
+                      : creditsHeight!
                 : null,
             padding: EdgeInsets.fromLTRB(
               inset,

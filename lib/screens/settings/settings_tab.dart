@@ -908,6 +908,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                 focusNode: _searchFocusNode,
                 hintText: context.l10n.settingsSearchHint,
                 clearTooltip: context.l10n.dialogClear,
+                samplesBackdrop: false,
                 onChanged: (value) => setState(() => _query = value),
                 onClear: () => setState(() => _query = ''),
               ),

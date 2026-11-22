@@ -557,9 +557,11 @@ class _SeekRow extends ConsumerWidget {
 
   // Time runs left to right in right-to-left layouts too.
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Directionality(
-    textDirection: TextDirection.ltr,
-    child: _buildRow(context, ref),
+  Widget build(BuildContext context, WidgetRef ref) => RepaintBoundary(
+    child: Directionality(
+      textDirection: TextDirection.ltr,
+      child: _buildRow(context, ref),
+    ),
   );
 
   Widget _buildRow(BuildContext context, WidgetRef ref) {
@@ -567,12 +569,19 @@ class _SeekRow extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final mornye = context.isMornye;
     final duration = item?.duration ?? Duration.zero;
+    final visible = TickerMode.valuesOf(context).enabled;
     final position = item == null
         ? Duration.zero
-        : ref.watch(playbackPositionProvider);
+        : (visible
+              ? ref.watch(playbackPositionProvider)
+              : ref.read(playbackPositionProvider));
     final playing =
-        ref.watch(playbackPlayingProvider) &&
-        !ref.watch(playbackLoadingProvider);
+        (visible
+            ? ref.watch(playbackPlayingProvider)
+            : ref.read(playbackPlayingProvider)) &&
+        !(visible
+            ? ref.watch(playbackLoadingProvider)
+            : ref.read(playbackLoadingProvider));
     final timeStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
       color: colorScheme.onSurfaceVariant,
       fontFeatures: const [FontFeature.tabularFigures()],

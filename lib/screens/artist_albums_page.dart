@@ -47,10 +47,10 @@ class _ArtistAlbumsPage extends StatelessWidget {
                     slivers: [
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                        sliver: SliverLayoutBuilder(
-                          builder: (context, constraints) {
+                        sliver: SliverLayoutInfoBuilder<double>(
+                          select: (constraints) => constraints.crossAxisExtent,
+                          builder: (context, width) {
                             const gap = 12.0;
-                            final width = constraints.crossAxisExtent;
                             final fit =
                                 (width + gap) ~/ (searchCoverMinExtent + gap);
                             final count = fit < 2 ? 2 : fit;

@@ -63,6 +63,7 @@ import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 import 'package:mornye/widgets/cross_extension_share_sheet.dart';
 import 'package:mornye/widgets/view_queue_snackbar_action.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
@@ -582,7 +583,13 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
   }
 
   void _requestMoreAlbums() {
-    if (_isLoadingDiscography) return;
+    if (_isLoadingDiscography ||
+        _isLoadingMoreAlbums ||
+        _albumsNext == null ||
+        _albumsNext!.isEmpty ||
+        _directMetadataProviderId() == null) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadMoreAlbums();
     });

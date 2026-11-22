@@ -13,18 +13,45 @@ String _frequency(double hz) => hz >= 1000
     ? '${(hz / 1000).toStringAsFixed(hz >= 10000 ? 0 : 1)}k'
     : hz.toStringAsFixed(0);
 
-class _EqualizerCurve extends CustomPainter {
-  _EqualizerCurve({
-    required this.settings,
-    required this.color,
+/// Cached `(gutter, bottomInset)` of the equalizer plot for a given label style.
+(TextStyle, TextScaler, double, double)? _equalizerInsetsCache;
+
+(double gutter, double bottomInset) _equalizerPlotInsets(
+  TextStyle labelStyle,
+  TextScaler textScaler,
+) {
+  final clamped = textScaler.clamp(maxScaleFactor: 1.3);
+  final cached = _equalizerInsetsCache;
+  if (cached != null && cached.$1 == labelStyle && cached.$2 == clamped) {
+    return (cached.$3, cached.$4);
+  }
+  final freq = TextPainter(
+    text: TextSpan(text: _frequency(100.0), style: labelStyle),
+    textDirection: TextDirection.ltr,
+    textScaler: clamped,
+  )..layout();
+  final gain = TextPainter(
+    text: TextSpan(text: '+12', style: labelStyle),
+    textDirection: TextDirection.ltr,
+    textScaler: clamped,
+  )..layout();
+  final gutter = gain.width + 8;
+  final bottomInset = freq.height + 6;
+  freq.dispose();
+  gain.dispose();
+  _equalizerInsetsCache = (labelStyle, clamped, gutter, bottomInset);
+  return (gutter, bottomInset);
+}
+
+class _EqualizerGridPainter extends CustomPainter {
+  _EqualizerGridPainter({
     required this.grid,
     required this.label,
     required this.labelStyle,
     required this.textScaler,
   });
 
-  final EqualizerSettings settings;
-  final Color color, grid, label;
+  final Color grid, label;
   final TextStyle labelStyle;
   final TextScaler textScaler;
 
@@ -101,57 +128,6 @@ class _EqualizerCurve extends CustomPainter {
       for (final (hz, painter) in freqLabels) {
         painter.paint(canvas, Offset(x(hz) - painter.width / 2, bottom + 6));
       }
-
-      final curve = settings.copyWith(gains: settings.effectiveGains);
-      final points = <Offset>[Offset(plot.left, y(curve.gains.first))];
-      for (var i = 0; i < curve.gains.length; i++) {
-        final point = Offset(x(settings.frequencies[i]), y(curve.gains[i]));
-        if (point.dx > points.last.dx + 0.5 && point.dx < plot.right - 0.5) {
-          points.add(point);
-        }
-      }
-      points.add(Offset(plot.right, y(curve.gains.last)));
-      final line = _monotoneSpline(points);
-      final area = Path.from(line)
-        ..lineTo(plot.right, plot.center.dy)
-        ..lineTo(plot.left, plot.center.dy)
-        ..close();
-      canvas.save();
-      canvas.clipRect(plot);
-      canvas.drawPath(
-        area,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              color.withValues(alpha: 0.42),
-              color.withValues(alpha: 0.12),
-              color.withValues(alpha: 0.42),
-            ],
-          ).createShader(plot),
-      );
-      canvas.restore();
-      canvas.drawPath(
-        line,
-        Paint()
-          ..color = color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3
-          ..strokeJoin = StrokeJoin.round
-          ..strokeCap = StrokeCap.round,
-      );
-      final dot = Paint()..color = color;
-      final effective = curve.gains;
-      for (var i = 0; i < effective.length; i++) {
-        final hz = settings.frequencies[i];
-        if (hz < _minHz || hz > _maxHz) continue;
-        canvas.drawCircle(
-          Offset(x(hz), y(effective[i])),
-          effective.length > 15 ? 2.5 : 4,
-          dot,
-        );
-      }
     } finally {
       for (final (_, painter) in freqLabels) {
         painter.dispose();
@@ -159,6 +135,93 @@ class _EqualizerCurve extends CustomPainter {
       for (final (_, painter) in gainLabels) {
         painter.dispose();
       }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_EqualizerGridPainter oldDelegate) =>
+      oldDelegate.grid != grid ||
+      oldDelegate.label != label ||
+      oldDelegate.labelStyle != labelStyle ||
+      oldDelegate.textScaler != textScaler;
+}
+
+class _EqualizerCurve extends CustomPainter {
+  _EqualizerCurve({
+    required this.settings,
+    required this.color,
+    required this.labelStyle,
+    required this.textScaler,
+  });
+
+  final EqualizerSettings settings;
+  final Color color;
+  final TextStyle labelStyle;
+  final TextScaler textScaler;
+
+  static const _range = 18.0;
+  static const _minHz = 20.0, _maxHz = 20000.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final (gutter, bottomInset) = _equalizerPlotInsets(labelStyle, textScaler);
+    final bottom = size.height - bottomInset;
+    final plot = Rect.fromLTRB(gutter, 4, size.width, bottom);
+    double x(double hz) =>
+        plot.left +
+        math.log(hz / _minHz) / math.log(_maxHz / _minHz) * plot.width;
+    double y(double gain) =>
+        plot.center.dy - gain.clamp(-_range, _range) / _range * plot.height / 2;
+
+    final curve = settings.copyWith(gains: settings.effectiveGains);
+    final points = <Offset>[Offset(plot.left, y(curve.gains.first))];
+    for (var i = 0; i < curve.gains.length; i++) {
+      final point = Offset(x(settings.frequencies[i]), y(curve.gains[i]));
+      if (point.dx > points.last.dx + 0.5 && point.dx < plot.right - 0.5) {
+        points.add(point);
+      }
+    }
+    points.add(Offset(plot.right, y(curve.gains.last)));
+    final line = _monotoneSpline(points);
+    final area = Path.from(line)
+      ..lineTo(plot.right, plot.center.dy)
+      ..lineTo(plot.left, plot.center.dy)
+      ..close();
+    canvas.save();
+    canvas.clipRect(plot);
+    canvas.drawPath(
+      area,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            color.withValues(alpha: 0.42),
+            color.withValues(alpha: 0.12),
+            color.withValues(alpha: 0.42),
+          ],
+        ).createShader(plot),
+    );
+    canvas.restore();
+    canvas.drawPath(
+      line,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeJoin = StrokeJoin.round
+        ..strokeCap = StrokeCap.round,
+    );
+    final dot = Paint()..color = color;
+    final effective = curve.gains;
+    for (var i = 0; i < effective.length; i++) {
+      final hz = settings.frequencies[i];
+      if (hz < _minHz || hz > _maxHz) continue;
+      canvas.drawCircle(
+        Offset(x(hz), y(effective[i])),
+        effective.length > 15 ? 2.5 : 4,
+        dot,
+      );
     }
   }
 
@@ -215,8 +278,6 @@ class _EqualizerCurve extends CustomPainter {
   bool shouldRepaint(_EqualizerCurve oldDelegate) =>
       oldDelegate.settings != settings ||
       oldDelegate.color != color ||
-      oldDelegate.grid != grid ||
-      oldDelegate.label != label ||
       oldDelegate.labelStyle != labelStyle ||
       oldDelegate.textScaler != textScaler;
 }

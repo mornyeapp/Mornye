@@ -214,17 +214,21 @@ class ExtensionStorageService {
     // held app storage, so nothing there may be moved.
     if (!isDesktopPlatform) {
       final documentsDir = await getApplicationDocumentsDirectory();
-      await _migrateDirectory(
-        Directory(p.join(documentsDir.path, 'extensions')),
-        extensionsDir,
-      );
-      await _migrateDirectory(
-        Directory(p.join(documentsDir.path, 'extension_data')),
-        dataDir,
-      );
+      await Future.wait([
+        _migrateDirectory(
+          Directory(p.join(documentsDir.path, 'extensions')),
+          extensionsDir,
+        ),
+        _migrateDirectory(
+          Directory(p.join(documentsDir.path, 'extension_data')),
+          dataDir,
+        ),
+      ]);
     }
-    await extensionsDir.create(recursive: true);
-    await dataDir.create(recursive: true);
+    await Future.wait([
+      extensionsDir.create(recursive: true),
+      dataDir.create(recursive: true),
+    ]);
 
     return ExtensionStoragePaths(
       extensionsDir: extensionsDir.path,

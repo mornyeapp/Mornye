@@ -154,11 +154,11 @@ class _MornyePlaybackTimeState extends State<MornyePlaybackTime> {
         : digit.curve!.transform(value);
     final direction = _increasing ? 0.7 : -0.7;
     final begin = digit.digit == current ? direction : -direction;
-    return Opacity(
+    return FractionalTranslation(
       key: ObjectKey(digit),
-      opacity: curved,
-      child: FractionalTranslation(
-        translation: Offset(0, begin * (1 - curved)),
+      translation: Offset(0, begin * (1 - curved)),
+      child: Opacity(
+        opacity: curved,
         child: Text(digit.digit, style: style),
       ),
     );

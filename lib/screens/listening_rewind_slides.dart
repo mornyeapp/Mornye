@@ -454,9 +454,21 @@ class _RewindBackdrop extends StatefulWidget {
 
 class _RewindBackdropState extends State<_RewindBackdrop> {
   final _ambient = DecorativePhase(const Duration(seconds: 24));
+  late Listenable _backdropListenable = Listenable.merge([
+    widget.pages,
+    _ambient,
+  ]);
   // One instance per artwork keeps its settled blur across the drift ticks.
   final _artwork = <String, Widget>{};
   ColorScheme? _artworkColors;
+
+  @override
+  void didUpdateWidget(covariant _RewindBackdrop oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.pages, widget.pages)) {
+      _backdropListenable = Listenable.merge([widget.pages, _ambient]);
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -492,7 +504,7 @@ class _RewindBackdropState extends State<_RewindBackdrop> {
   Widget build(BuildContext context) => ExcludeSemantics(
     child: RepaintBoundary(
       child: AnimatedBuilder(
-        animation: Listenable.merge([widget.pages, _ambient]),
+        animation: _backdropListenable,
         builder: (context, _) {
           final last = widget.palettes.length - 1;
           final page = _page.clamp(0.0, last.toDouble());

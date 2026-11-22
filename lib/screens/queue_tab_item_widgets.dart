@@ -1295,8 +1295,11 @@ extension _QueueTabItemWidgets on _QueueTabState {
         );
       },
     );
-    final swipe = libraryItemQueueSwipe(ref, item);
-    Widget card({bool current = false, bool playing = false}) => TrackCard(
+    Widget card({
+      bool current = false,
+      bool playing = false,
+      QueueSwipeActions? swipe,
+    }) => TrackCard(
       isSelectionMode: _isSelectionMode,
       isSelected: isSelected,
       isCurrent: current,
@@ -1326,11 +1329,15 @@ extension _QueueTabItemWidgets on _QueueTabState {
       label: context.l10n.a11yTrackByArtist(item.trackName, item.artistName),
       selected: isSelected,
       // Rows follow their own file, so a track change rebuilds only the rows
-      // involved.
+      // involved, and queueSwipe subscribes on this leaf Consumer's ref.
       child: Consumer(
         builder: (context, ref, _) {
           final playback = ref.watch(mediaItemPlaybackUiProvider(playbackKey));
-          return card(current: playback.isCurrent, playing: playback.isPlaying);
+          return card(
+            current: playback.isCurrent,
+            playing: playback.isPlaying,
+            swipe: libraryItemQueueSwipe(ref, item),
+          );
         },
       ),
     );

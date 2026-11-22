@@ -1029,6 +1029,58 @@ extension _DownloadQueueNativeWorker on DownloadQueueNotifier {
       return;
     }
     final workerRunning = snapshot['is_running'] == true;
+    final pendingReplacements = <int, DownloadItem>{};
+    final finalizingItems = <DownloadItem>[];
+
+    void flushPendingReplacements() {
+      if (pendingReplacements.isEmpty) return;
+      state = state.withItemReplacements(pendingReplacements);
+      pendingReplacements.clear();
+      if (Platform.isAndroid && finalizingItems.isNotEmpty) {
+        final queueCount = state.lookup.queuedCount;
+        for (final next in finalizingItems) {
+          PlatformBridge.clearItemProgress(next.id).catchError((_) {});
+          _maybeUpdateAndroidDownloadService(
+            trackName: next.track.name,
+            artistName: _notificationService.embeddingMetadataLabel,
+            progress: 100,
+            total: 100,
+            queueCount: queueCount,
+            status: 'finalizing',
+          );
+        }
+        finalizingItems.clear();
+      }
+    }
+
+    void stageItemStatus(
+      String itemId,
+      DownloadStatus nextStatus, {
+      required double progress,
+    }) {
+      final index = state.lookup.indexByItemId[itemId] ?? -1;
+      if (index == -1) return;
+      final current = pendingReplacements[index] ?? state.items[index];
+      // As updateItemStatus does: a live status drops the old path and error.
+      final next = current.copyWith(
+        status: nextStatus,
+        progress: progress,
+        filePath: null,
+        error: null,
+        errorType: null,
+      );
+      if (current.status == next.status &&
+          current.progress == next.progress &&
+          current.filePath == next.filePath &&
+          current.error == next.error &&
+          current.errorType == next.errorType) {
+        return;
+      }
+      pendingReplacements[index] = next;
+      if (nextStatus == DownloadStatus.finalizing) {
+        finalizingItems.add(next);
+      }
+    }
 
     for (final itemSnapshot in itemSnapshots) {
       final itemId = itemSnapshot['item_id']?.toString() ?? '';
@@ -1052,32 +1104,32 @@ extension _DownloadQueueNativeWorker on DownloadQueueNotifier {
       }
 
       if (status == 'queued') {
-        updateItemStatus(itemId, DownloadStatus.queued, progress: 0.0);
+        stageItemStatus(itemId, DownloadStatus.queued, progress: 0.0);
         continue;
       }
 
       if (status == 'preparing') {
-        updateItemStatus(itemId, DownloadStatus.downloading, progress: 0.0);
+        stageItemStatus(itemId, DownloadStatus.downloading, progress: 0.0);
         continue;
       }
 
       if (status == 'downloading') {
-        updateItemStatus(
-          itemId,
-          DownloadStatus.downloading,
-          progress: progress,
-        );
+        stageItemStatus(itemId, DownloadStatus.downloading, progress: progress);
         continue;
       }
 
       if (status == 'finalizing') {
-        updateItemStatus(
+        stageItemStatus(
           itemId,
           DownloadStatus.finalizing,
           progress: nativeWorkerFinalizingProgress(progress),
         );
         continue;
       }
+
+      // Flush accumulated progress updates before running async terminal
+      // reconciliation so indices and state stay consistent.
+      flushPendingReplacements();
 
       if (status == 'completed') {
         final result = itemSnapshot['result'];
@@ -1201,6 +1253,7 @@ extension _DownloadQueueNativeWorker on DownloadQueueNotifier {
         }
       }
     }
+    flushPendingReplacements();
 
     final releasableIds = contexts.keys
         .where(reconciledIds.contains)

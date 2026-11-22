@@ -81,12 +81,14 @@ class _OpenOnPlatformSheetState extends State<OpenOnPlatformSheet> {
     'boomplay': 'Boomplay',
   };
 
+  static final _camelBoundary = RegExp(r'([a-z])([A-Z])');
+
   static String _displayName(String platformId) {
     final known = _platformNames[platformId];
     if (known != null) return known;
     // Humanize unknown camelCase IDs ("someNewService" -> "Some New Service").
     final spaced = platformId.replaceAllMapped(
-      RegExp(r'([a-z])([A-Z])'),
+      _camelBoundary,
       (m) => '${m[1]} ${m[2]}',
     );
     return spaced.isEmpty

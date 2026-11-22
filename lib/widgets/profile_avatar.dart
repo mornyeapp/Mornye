@@ -58,6 +58,8 @@ class ProfileAvatar extends StatelessWidget {
               ),
       ),
     );
+    final decodeWidth = (diameter * MediaQuery.devicePixelRatioOf(context))
+        .ceil();
     return ExcludeSemantics(
       child: ClipOval(
         child: SizedBox.square(
@@ -66,15 +68,14 @@ class ProfileAvatar extends StatelessWidget {
               ? Image.memory(
                   photo!,
                   fit: BoxFit.cover,
+                  cacheWidth: decodeWidth,
                   errorBuilder: (_, _, _) => fallback,
                 )
               : photoPath != null
               ? Image.file(
                   File(photoPath!),
                   fit: BoxFit.cover,
-                  cacheWidth:
-                      (diameter * MediaQuery.devicePixelRatioOf(context))
-                          .ceil(),
+                  cacheWidth: decodeWidth,
                   errorBuilder: (_, _, _) => fallback,
                 )
               : fallback,

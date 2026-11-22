@@ -919,23 +919,25 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       return Stack(
         fit: StackFit.expand,
         children: [
-          MaterialPlayerBackdrop(
-            mediaItem: mediaItem,
-            colorScheme: colorScheme,
-            showArtwork: materialFullScreen && _currentPage != 1,
-            fadeStart: playerCoverFadeStart(
-              MaterialPlayerBackdrop.mediumFadeStart,
-              coverFade,
+          RepaintBoundary(
+            child: MaterialPlayerBackdrop(
+              mediaItem: mediaItem,
+              colorScheme: colorScheme,
+              showArtwork: materialFullScreen && _currentPage != 1,
+              fadeStart: playerCoverFadeStart(
+                MaterialPlayerBackdrop.mediumFadeStart,
+                coverFade,
+              ),
+              wholeCover: wholeCover,
+              playsMotionArtwork: true,
+              videoUrl: motionArtwork?.source,
+              resolvingVideo: motionState?.isLoading == true,
+              onVideoError: () {
+                if (mounted) {
+                  setState(() => _failedMotionSource = motionArtwork?.source);
+                }
+              },
             ),
-            wholeCover: wholeCover,
-            playsMotionArtwork: true,
-            videoUrl: motionArtwork?.source,
-            resolvingVideo: motionState?.isLoading == true,
-            onVideoError: () {
-              if (mounted) {
-                setState(() => _failedMotionSource = motionArtwork?.source);
-              }
-            },
           ),
           _lyricsPointerListener(player),
         ],
@@ -1155,7 +1157,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         _lyricsOptionsOpen ||
         _audioOutputOpen ||
         _lyricsControlsHidden ||
-        _lyricsPointers.isNotEmpty) {
+        _lyricsPointers.isNotEmpty ||
+        !TickerMode.valuesOf(context).enabled) {
       _lyricsIdleTimer?.cancel();
       if (_currentPage == 1 && !_lyricsControlsHidden) {
         _logLyricsAutoHideBlockers();
@@ -1168,6 +1171,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _lyricsIdleTimer?.cancel();
     _lyricsIdleTimer = Timer(const Duration(seconds: 5), () {
       if (!mounted) return;
+      if (!TickerMode.valuesOf(context).enabled) return;
       if (!_canAutoHideLyricsControls) {
         _logLyricsAutoHideBlockers();
         return;

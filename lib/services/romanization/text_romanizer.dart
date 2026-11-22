@@ -175,6 +175,21 @@ class TextRomanizer {
   /// as it is.
   bool readsAsWritten(String text) => writtenIn(text, readerScripts);
 
+  /// Ranges that hold no letter outside the Latin alphabet, so the regular
+  /// expression has nothing to find there.
+  static bool _isKnownLatinOrPunctuation(int rune) =>
+      // Latin-1 Supplement to Latin Extended-B, without the micro sign.
+      (rune >= 0x0080 && rune <= 0x024F && rune != 0x00B5) ||
+      // Punctuation, superscripts and currency.
+      (rune >= 0x2000 && rune <= 0x20FF) ||
+      // Number forms, arrows and symbols, after the letterlike symbols.
+      (rune >= 0x2150 && rune <= 0x2BFF) ||
+      // Chinese and Japanese punctuation, without its iteration marks.
+      (rune >= 0x3000 && rune <= 0x3004) ||
+      (rune >= 0x3008 && rune <= 0x3030) ||
+      // Full-width Latin letters and punctuation.
+      (rune >= 0xFF01 && rune <= 0xFF60);
+
   /// Whether every letter of [text] outside the Latin alphabet romanizes
   /// here. With [assumePinyin], Chinese counts before [pinyin] is loaded.
   bool canRomanize(String text, {bool assumePinyin = false}) {
@@ -192,7 +207,8 @@ class TextRomanizer {
         continue;
       }
       if (script == null &&
-          _nonLatinLetter.hasMatch(String.fromCharCodes([rune]))) {
+          !_isKnownLatinOrPunctuation(rune) &&
+          _nonLatinLetter.hasMatch(String.fromCharCode(rune))) {
         return false;
       }
     }

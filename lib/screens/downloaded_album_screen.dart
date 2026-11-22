@@ -775,7 +775,7 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
               playback: mediaItemPlaybackUiProvider(_playbackKey(track)),
               trailing: _TrackPlaybackBuilder(
                 playbackKey: _playbackKey(track),
-                builder: (context, playback, toggle) => AlbumTrackPlayButton(
+                builder: (context, _, playback, toggle) => AlbumTrackPlayButton(
                   isPlaying: playback.isPlaying,
                   onPlay: playback.isCurrent
                       ? toggle
@@ -850,7 +850,7 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
       track.id,
       _TrackPlaybackBuilder(
         playbackKey: _playbackKey(track),
-        builder: (context, playback, toggle) => AlbumTrackTile(
+        builder: (context, rowRef, playback, toggle) => AlbumTrackTile(
           trackNumber: track.trackNumber,
           trackName: track.trackName,
           subtitle: subtitle,
@@ -869,7 +869,7 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
               ? toggle
               : () => _openFile(track, queueItems: navigationItems),
           queueSwipe: libraryItemQueueSwipe(
-            ref,
+            rowRef,
             UnifiedLibraryItem.fromDownloadHistory(track),
           ),
         ),
@@ -955,6 +955,7 @@ class _TrackPlaybackBuilder extends ConsumerWidget {
   final PlaybackRowKey playbackKey;
   final Widget Function(
     BuildContext context,
+    WidgetRef ref,
     MediaPlaybackUi playback,
     VoidCallback toggle,
   )
@@ -965,6 +966,7 @@ class _TrackPlaybackBuilder extends ConsumerWidget {
     final playback = ref.watch(mediaItemPlaybackUiProvider(playbackKey));
     return builder(
       context,
+      ref,
       playback,
       () => ref
           .read(musicPlayerControllerProvider)

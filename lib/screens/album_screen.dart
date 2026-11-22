@@ -770,6 +770,9 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
                 : (tracks.first.albumArtist ?? tracks.first.artistName)),
       );
     }
+    final hasLosslessTrait = _audioTraits.any(
+      (trait) => trait.toLowerCase().contains('lossless'),
+    );
     return SliverPadding(
       // A disc label brings its own space above the first run.
       padding: EdgeInsets.symmetric(
@@ -810,9 +813,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
                       ),
                   clickableArtist: true,
                   showQualityBadges: context.isMornye
-                      ? !_audioTraits.any(
-                          (trait) => trait.toLowerCase().contains('lossless'),
-                        )
+                      ? !hasLosslessTrait
                       : commonQualityTrack == null ||
                             _qualitySignature(track) !=
                                 _qualitySignature(commonQualityTrack),

@@ -134,22 +134,44 @@ class ShimmerLoading extends StatefulWidget {
   State<ShimmerLoading> createState() => _ShimmerLoadingState();
 }
 
-class _ShimmerLoadingState extends State<ShimmerLoading> {
+class _ShimmerLoadingState extends State<ShimmerLoading>
+    with WidgetsBindingObserver {
   final _phase = DecorativePhase(const Duration(milliseconds: 1200));
+  bool _motionAllowed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context) ||
-        !TickerMode.valuesOf(context).enabled) {
-      _phase.stop();
-    } else {
+    _motionAllowed =
+        !MediaQuery.disableAnimationsOf(context) &&
+        TickerMode.valuesOf(context).enabled;
+    _syncPhase();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _syncPhase();
+  }
+
+  void _syncPhase() {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    final resumed = lifecycle == null || lifecycle == AppLifecycleState.resumed;
+    if (_motionAllowed && resumed) {
       _phase.start();
+    } else {
+      _phase.stop();
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _phase.dispose();
     super.dispose();
   }
@@ -170,30 +192,34 @@ class _ShimmerLoadingState extends State<ShimmerLoading> {
         ? Color.alphaBlend(Colors.white.withValues(alpha: 0.14), surface)
         : Color.alphaBlend(Colors.black.withValues(alpha: 0.01), surface);
 
-    return AnimatedBuilder(
-      animation: _phase,
-      builder: (context, child) {
-        final phase = _phase.value;
-        return ShaderMask(
-          shaderCallback: (bounds) {
-            return LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [baseColor, highlightColor, baseColor],
-              stops: [
-                (phase - 0.3).clamp(0.0, 1.0),
-                phase,
-                (phase + 0.3).clamp(0.0, 1.0),
-              ],
-              tileMode: TileMode.clamp,
-            ).createShader(bounds);
-          },
-          blendMode: BlendMode.srcATop,
-          child: child,
-        );
-      },
-      // The mask moves every frame; the skeleton beneath it does not.
-      child: RepaintBoundary(child: content),
+    // Outer RepaintBoundary keeps 30Hz shimmer ticks from dirtying enclosing
+    // grids/lists; inner RepaintBoundary keeps the static skeleton cached.
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _phase,
+        builder: (context, child) {
+          final phase = _phase.value;
+          return ShaderMask(
+            shaderCallback: (bounds) {
+              return LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [baseColor, highlightColor, baseColor],
+                stops: [
+                  (phase - 0.3).clamp(0.0, 1.0),
+                  phase,
+                  (phase + 0.3).clamp(0.0, 1.0),
+                ],
+                tileMode: TileMode.clamp,
+              ).createShader(bounds);
+            },
+            blendMode: BlendMode.srcATop,
+            child: child,
+          );
+        },
+        // The mask moves every frame; the skeleton beneath it does not.
+        child: RepaintBoundary(child: content),
+      ),
     );
   }
 }
@@ -226,20 +252,23 @@ class SkeletonBox extends StatelessWidget {
     this.borderRadius = 8,
   });
 
-  @override
-  Widget build(BuildContext context) {
+  static Color colorFor(BuildContext context) {
     final surface =
         _SkeletonSurface.maybeOf(context) ??
         Theme.of(context).colorScheme.surface;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = isDark
+    return isDark
         ? Color.alphaBlend(Colors.white.withValues(alpha: 0.08), surface)
         : Color.alphaBlend(Colors.black.withValues(alpha: 0.06), surface);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: color,
+        color: colorFor(context),
         borderRadius: BorderRadius.circular(borderRadius),
       ),
     );
@@ -662,18 +691,22 @@ class _CollectionHeaderSkeleton extends StatelessWidget {
               left: 0,
               right: 0,
               child: Center(
-                child: ShaderMask(
-                  blendMode: BlendMode.dstIn,
-                  shaderCallback: (bounds) => const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: [0, 0.48, 1],
-                    colors: [Colors.white, Colors.white, Colors.transparent],
-                  ).createShader(bounds),
-                  child: SkeletonBox(
-                    width: coverSize,
-                    height: coverSize,
-                    borderRadius: 0,
+                child: SizedBox(
+                  width: coverSize,
+                  height: coverSize,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0, 0.48, 1],
+                        colors: [
+                          SkeletonBox.colorFor(context),
+                          SkeletonBox.colorFor(context),
+                          SkeletonBox.colorFor(context).withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -866,22 +899,20 @@ class ArtistScreenSkeleton extends StatelessWidget {
                   builder: (context, constraints) => Stack(
                     children: [
                       Positioned.fill(
-                        child: ShaderMask(
-                          blendMode: BlendMode.dstIn,
-                          shaderCallback: (bounds) => const LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            stops: [0, 0.48, 1],
-                            colors: [
-                              Colors.white,
-                              Colors.white,
-                              Colors.transparent,
-                            ],
-                          ).createShader(bounds),
-                          child: const SkeletonBox(
-                            width: double.infinity,
-                            height: double.infinity,
-                            borderRadius: 0,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: const [0, 0.48, 1],
+                              colors: [
+                                SkeletonBox.colorFor(context),
+                                SkeletonBox.colorFor(context),
+                                SkeletonBox.colorFor(
+                                  context,
+                                ).withValues(alpha: 0),
+                              ],
+                            ),
                           ),
                         ),
                       ),

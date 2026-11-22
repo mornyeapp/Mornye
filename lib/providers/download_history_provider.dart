@@ -667,6 +667,42 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
     return DownloadHistoryItem.fromJson(json);
   }
 
+  /// Checks existence for many tracks in one batched SQLite CTE lookup after
+  /// hitting the in-memory indexes first.
+  Future<List<bool>> hasExistingBatchAsync(
+    List<HistoryLookupRequest> requests,
+  ) async {
+    if (requests.isEmpty) return const [];
+    final hits = List<bool>.filled(requests.length, false);
+    final missIndices = <int>[];
+    final missRequests = <HistoryLookupRequest>[];
+    for (var i = 0; i < requests.length; i++) {
+      final request = requests[i];
+      if (state.getBySpotifyId(request.spotifyId) != null) {
+        hits[i] = true;
+        continue;
+      }
+      final isrc = request.isrc?.trim();
+      if (isrc != null && isrc.isNotEmpty && state.getByIsrc(isrc) != null) {
+        hits[i] = true;
+        continue;
+      }
+      if (state.findByTrackAndArtist(request.trackName, request.artistName) !=
+          null) {
+        hits[i] = true;
+        continue;
+      }
+      missIndices.add(i);
+      missRequests.add(request);
+    }
+    if (missRequests.isEmpty) return hits;
+    final dbMatches = await _db.findExistingTracks(missRequests);
+    for (var i = 0; i < missIndices.length; i++) {
+      if (dbMatches[i] != null) hits[missIndices[i]] = true;
+    }
+    return hits;
+  }
+
   Future<({DownloadHistoryItem item, int index})?> _historyItemForUpdate(
     String id,
   ) async {
@@ -1199,20 +1235,32 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       missingIds: result.orphanedIds.toSet(),
       previousSuspectIds: previousSuspectIds,
     );
+    final prefWrites = <Future<bool>>[];
     for (final id in checkedIds) {
       final key = '$_startupOrphanSuspectPrefix$id';
-      await prefs.remove('$_legacyStartupOrphanSuspectPrefix$id');
+      final legacyKey = '$_legacyStartupOrphanSuspectPrefix$id';
+      if (prefs.containsKey(legacyKey)) {
+        prefWrites.add(prefs.remove(legacyKey));
+      }
       if (decision.pendingIds.contains(id)) {
-        await prefs.setBool(key, true);
+        if (prefs.getBool(key) != true) {
+          prefWrites.add(prefs.setBool(key, true));
+        }
         _historyLog.d(
           'Deferring orphan removal until next pass: $id (${result.pathById[id] ?? ''})',
         );
-      } else {
-        await prefs.remove(key);
+      } else if (prefs.containsKey(key)) {
+        prefWrites.add(prefs.remove(key));
       }
     }
     for (final replacement in result.replacementPaths.entries) {
-      await prefs.remove('$_startupOrphanSuspectPrefix${replacement.key}');
+      final key = '$_startupOrphanSuspectPrefix${replacement.key}';
+      if (prefs.containsKey(key)) {
+        prefWrites.add(prefs.remove(key));
+      }
+    }
+    if (prefWrites.isNotEmpty) {
+      await Future.wait(prefWrites);
     }
 
     final confirmedOrphanIds = decision.confirmedIds.toList(growable: false);

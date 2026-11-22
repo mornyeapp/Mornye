@@ -467,6 +467,8 @@ class _BlurredCoverState extends State<_BlurredCover>
     if (mounted) setState(() => _blurSize = null);
   }
 
+  static final _liveBlur = ui.ImageFilter.blur(sigmaX: _sigma, sigmaY: _sigma);
+
   static Widget _image(ui.Image? image) => RawImage(
     image: image,
     fit: BoxFit.fill,
@@ -482,7 +484,7 @@ class _BlurredCoverState extends State<_BlurredCover>
     if (art == null) {
       // Blur live while the cover decodes and for the placeholder.
       blurred = ImageFiltered(
-        imageFilter: ui.ImageFilter.blur(sigmaX: _sigma, sigmaY: _sigma),
+        imageFilter: _liveBlur,
         child: PlayerArtwork(
           artUri: widget.artUri,
           colorScheme: widget.colorScheme,

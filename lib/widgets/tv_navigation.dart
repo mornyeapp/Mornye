@@ -247,15 +247,26 @@ class _TvNavigationState extends ConsumerState<TvNavigation> {
           _routeChanged();
           return false;
         },
-        child: CustomPaint(
+        child: Stack(
           key: _viewportKey,
-          foregroundPainter: _TvFocusPainter(
-            viewportKey: _viewportKey,
-            idle: _idle,
-            color: Theme.of(context).colorScheme.primary,
-            repaint: _repaint,
-          ),
-          child: widget.child,
+          fit: StackFit.passthrough,
+          children: [
+            widget.child,
+            Positioned.fill(
+              child: IgnorePointer(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _TvFocusPainter(
+                      viewportKey: _viewportKey,
+                      idle: _idle,
+                      color: Theme.of(context).colorScheme.primary,
+                      repaint: _repaint,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     ),

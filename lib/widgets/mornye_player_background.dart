@@ -193,24 +193,30 @@ class MornyeControlsDim extends StatelessWidget {
     final end = ((start + artworkHeight / size.height) / 2).clamp(start, 1.0);
     final motion = mornyePlayerPanelMotion(context);
     return IgnorePointer(
-      child: AnimatedOpacity(
-        opacity: strength.clamp(0.0, 1.0),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: strength.clamp(0.0, 1.0)),
         duration: motion.duration,
         curve: motion.curve,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              stops: [start, end],
-              colors: [
-                Colors.black.withValues(alpha: 0),
-                // 4.5:1 for white over a white frame mid-fade.
-                Colors.black.withValues(alpha: mornyeControlsDimAlpha),
-              ],
+        builder: (context, value, _) {
+          final alpha = value.clamp(0.0, 1.0);
+          if (alpha <= 0) return const SizedBox.shrink();
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: [start, end],
+                colors: [
+                  Colors.black.withValues(alpha: 0),
+                  // 4.5:1 for white over a white frame mid-fade.
+                  Colors.black.withValues(
+                    alpha: mornyeControlsDimAlpha * alpha,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

@@ -86,12 +86,14 @@ List<int> mornyeBannerSeeds(Iterable<String> keys) {
   return seeds;
 }
 
+final _mornyeBannerWhitespace = RegExp(r'\s+');
+
 /// The title's size for a banner [width]: as large as the longest word allows
 /// on one line, so a line never breaks inside a word, and the whole title in
 /// its three lines, words wrapping short of each line's end.
 double mornyeBannerTitleSize(String title, double width) {
   final longest = title
-      .split(RegExp(r'\s+'))
+      .split(_mornyeBannerWhitespace)
       .fold<int>(1, (length, word) => math.max(length, word.length));
   final line = (width - 40) / 0.58;
   return math.max(
@@ -128,80 +130,82 @@ class MornyeMixBanner extends StatelessWidget {
     final logoWidth = width * 0.3;
     // Pointer layouts use a compact caption.
     final captionSize = isDesktopPlatform ? 12.0 : null;
-    return MediaQuery.withClampedTextScaling(
-      maxScaleFactor: 1.2,
-      child: SizedBox(
-        width: width,
-        height: width / aspectRatio,
-        child: CustomPaint(
-          painter: _BannerPainter(seed),
-          child: Stack(
-            children: [
-              PositionedDirectional(
-                top: 16,
-                end: 16,
-                child: ExcludeSemantics(
-                  child: Image.asset(
-                    mornyeLockupAsset,
-                    width: logoWidth,
-                    cacheWidth: (logoWidth * pixelRatio).round(),
-                    filterQuality: FilterQuality.medium,
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Center(
-                    child: Text(
-                      title,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: textTheme.displaySmall?.copyWith(
-                        color: Colors.white,
-                        fontSize: mornyeBannerTitleSize(title, width),
-                        fontWeight: FontWeight.w700,
-                        height: 1.04,
-                        letterSpacing: -0.6,
-                      ),
+    return RepaintBoundary(
+      child: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.2,
+        child: SizedBox(
+          width: width,
+          height: width / aspectRatio,
+          child: CustomPaint(
+            painter: _BannerPainter(seed),
+            child: Stack(
+              children: [
+                PositionedDirectional(
+                  top: 16,
+                  end: 16,
+                  child: ExcludeSemantics(
+                    child: Image.asset(
+                      mornyeLockupAsset,
+                      width: logoWidth,
+                      cacheWidth: (logoWidth * pixelRatio).round(),
+                      filterQuality: FilterQuality.medium,
                     ),
                   ),
                 ),
-              ),
-              PositionedDirectional(
-                start: 16,
-                end: 16,
-                bottom: 16,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      eyebrow,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.82),
-                        fontSize: captionSize,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    if (subtitle.isNotEmpty)
-                      Text(
-                        subtitle,
-                        maxLines: 2,
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Center(
+                      child: Text(
+                        title,
+                        maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium?.copyWith(
+                        textAlign: TextAlign.center,
+                        style: textTheme.displaySmall?.copyWith(
                           color: Colors.white,
+                          fontSize: mornyeBannerTitleSize(title, width),
+                          fontWeight: FontWeight.w700,
+                          height: 1.04,
+                          letterSpacing: -0.6,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                PositionedDirectional(
+                  start: 16,
+                  end: 16,
+                  bottom: 16,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        eyebrow,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.82),
                           fontSize: captionSize,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                  ],
+                      if (subtitle.isNotEmpty)
+                        Text(
+                          subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: Colors.white,
+                            fontSize: captionSize,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

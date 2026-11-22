@@ -148,7 +148,14 @@ class DesktopInspector extends ConsumerWidget {
     final mornye = context.isMornye;
     final glass = mornye && overlay;
     final l10n = context.l10n;
-    final mediaItem = ref.watch(currentMediaItemProvider).value;
+    final (:hasTrack, :artUri) = ref.watch(
+      currentMediaItemProvider.select(
+        (s) => (
+          hasTrack: s.value != null,
+          artUri: mornye && !overlay ? s.value?.artUri : null,
+        ),
+      ),
+    );
     final title = switch (panel) {
       DesktopInspectorPanel.lyrics => l10n.nowPlayingTabLyrics,
       DesktopInspectorPanel.upNext => l10n.nowPlayingUpNext,
@@ -184,7 +191,7 @@ class DesktopInspector extends ConsumerWidget {
         ),
       );
       final Widget body;
-      if (mediaItem == null) {
+      if (!hasTrack) {
         body = Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -247,7 +254,7 @@ class DesktopInspector extends ConsumerWidget {
             : Stack(
                 fit: StackFit.expand,
                 children: [
-                  MornyePlayerBackground(artUri: mediaItem?.artUri),
+                  MornyePlayerBackground(artUri: artUri),
                   overlayContent,
                 ],
               ),

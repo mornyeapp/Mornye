@@ -1014,23 +1014,45 @@ class _ResidualTimelineState extends State<_ResidualTimeline> {
                     _select(details.localPosition, width),
                 onHorizontalDragUpdate: (details) =>
                     _select(details.localPosition, width),
-                child: RepaintBoundary(
-                  child: CustomPaint(
-                    size: Size(width, height),
-                    painter: _ResidualTimelinePainter(
-                      values: values,
-                      duration: result.durationSeconds,
-                      minDb: range.$1,
-                      maxDb: range.$2,
-                      selected: selected,
-                      accent: cs.primary,
-                      muted: cs.outlineVariant,
-                      grid: cs.outlineVariant.withValues(alpha: 0.5),
-                      label: cs.onSurfaceVariant,
-                      labelStyle:
-                          theme.textTheme.labelSmall ??
-                          const TextStyle(fontSize: 11),
-                    ),
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          size: Size(width, height),
+                          painter: _ResidualTimelinePainter(
+                            values: values,
+                            duration: result.durationSeconds,
+                            minDb: range.$1,
+                            maxDb: range.$2,
+                            accent: cs.primary,
+                            muted: cs.outlineVariant,
+                            grid: cs.outlineVariant.withValues(alpha: 0.5),
+                            label: cs.onSurfaceVariant,
+                            labelStyle:
+                                theme.textTheme.labelSmall ??
+                                const TextStyle(fontSize: 11),
+                          ),
+                        ),
+                      ),
+                      if (selected != null)
+                        RepaintBoundary(
+                          child: CustomPaint(
+                            size: Size(width, height),
+                            painter: _ResidualTimelineSelectionPainter(
+                              values: values,
+                              minDb: range.$1,
+                              maxDb: range.$2,
+                              selected: selected,
+                              accent: cs.primary,
+                              label: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -1118,7 +1140,6 @@ class _ResidualTimelinePainter extends CustomPainter {
     required this.duration,
     required this.minDb,
     required this.maxDb,
-    required this.selected,
     required this.accent,
     required this.muted,
     required this.grid,
@@ -1133,7 +1154,6 @@ class _ResidualTimelinePainter extends CustomPainter {
   final double duration;
   final double minDb;
   final double maxDb;
-  final int? selected;
   final Color accent;
   final Color muted;
   final Color grid;
@@ -1224,20 +1244,6 @@ class _ResidualTimelinePainter extends CustomPainter {
           ..strokeJoin = StrokeJoin.round,
       );
       canvas.restore();
-
-      final index = selected;
-      if (index != null && index < values.length) {
-        final x = plot.left + (index + 0.5) / values.length * plot.width;
-        final y = yFor(values[index]);
-        canvas.drawLine(
-          Offset(x, plot.top),
-          Offset(x, plot.bottom),
-          Paint()
-            ..color = label
-            ..strokeWidth = 1,
-        );
-        canvas.drawCircle(Offset(x, y), 4, Paint()..color = accent);
-      }
     }
   }
 
@@ -1269,10 +1275,64 @@ class _ResidualTimelinePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ResidualTimelinePainter old) =>
       !identical(old.values, values) ||
-      old.selected != selected ||
+      old.duration != duration ||
       old.minDb != minDb ||
       old.maxDb != maxDb ||
       old.accent != accent ||
       old.muted != muted ||
+      old.grid != grid ||
+      old.label != label ||
+      old.labelStyle != labelStyle;
+}
+
+class _ResidualTimelineSelectionPainter extends CustomPainter {
+  _ResidualTimelineSelectionPainter({
+    required this.values,
+    required this.minDb,
+    required this.maxDb,
+    required this.selected,
+    required this.accent,
+    required this.label,
+  });
+
+  final List<double> values;
+  final double minDb;
+  final double maxDb;
+  final int selected;
+  final Color accent;
+  final Color label;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (selected < 0 || selected >= values.length) return;
+    final plot = Rect.fromLTRB(
+      _ResidualTimelinePainter.leftGutter,
+      4,
+      size.width,
+      size.height - _ResidualTimelinePainter.bottomGutter,
+    );
+    if (plot.width <= 0 || plot.height <= 0) return;
+    final x = plot.left + (selected + 0.5) / values.length * plot.width;
+    final y =
+        plot.bottom -
+        ((values[selected].clamp(minDb, maxDb) - minDb) / (maxDb - minDb)) *
+            plot.height;
+    canvas.drawLine(
+      Offset(x, plot.top),
+      Offset(x, plot.bottom),
+      Paint()
+        ..color = label
+        ..strokeWidth = 1,
+    );
+    canvas.drawCircle(Offset(x, y), 4, Paint()..color = accent);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ResidualTimelineSelectionPainter old) =>
+      !identical(old.values, values) ||
+      old.selected != selected ||
+      old.minDb != minDb ||
+      old.maxDb != maxDb ||
+      old.accent != accent ||
       old.label != label;
 }

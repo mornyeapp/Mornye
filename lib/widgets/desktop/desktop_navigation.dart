@@ -555,16 +555,18 @@ class _DesktopContentArea extends StatelessWidget {
   /// drag moves the window.
   final bool titleBarDrag;
 
+  static final Listenable _chromeListenable = Listenable.merge([
+    desktopInspectorPanel,
+    desktopWindowFullScreen,
+  ]);
+
   @override
   Widget build(BuildContext context) {
     final player = floatingPlayer;
     final playerInset = player == null ? 0.0 : DesktopPlayerBar.floatingInset;
     final mornye = context.isMornye;
     return ListenableBuilder(
-      listenable: Listenable.merge([
-        desktopInspectorPanel,
-        desktopWindowFullScreen,
-      ]),
+      listenable: _chromeListenable,
       builder: (context, _) {
         final panel = showPlayer ? desktopInspectorPanel.value : null;
         final overlayInspector = desktopInspectorOverlays(

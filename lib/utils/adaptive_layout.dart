@@ -98,10 +98,11 @@ class _AdaptiveUiScalerState extends State<AdaptiveUiScaler> {
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
+    // Check size alone before subscribing to the full MediaQueryData so the
+    // default unscaled root does not rebuild on every keyboard inset frame.
+    final size = MediaQuery.sizeOf(context);
     final scale =
-        (isAndroidTv ? 1.15 : adaptiveUiScaleForSize(mediaQuery.size)) *
-        widget.userScale;
+        (isAndroidTv ? 1.15 : adaptiveUiScaleForSize(size)) * widget.userScale;
     final content = AdaptiveUiScale(
       key: _contentKey,
       scale: scale,
@@ -109,6 +110,7 @@ class _AdaptiveUiScalerState extends State<AdaptiveUiScaler> {
     );
     if (scale == 1) return content;
 
+    final mediaQuery = MediaQuery.of(context);
     final scaledSize = Size(
       mediaQuery.size.width / scale,
       mediaQuery.size.height / scale,

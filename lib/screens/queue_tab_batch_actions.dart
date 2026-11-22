@@ -62,15 +62,19 @@ extension _QueueTabBatchActions on _QueueTabState {
         }
         _suppressSelectionOverlay = false;
         if (didStartConversion) return;
+        final bottomPadding =
+            this.context
+                .getInheritedWidgetOfExactType<MediaQuery>()
+                ?.data
+                .padding
+                .bottom ??
+            0;
         if (_isSelectionMode) {
-          _syncSelectionOverlay(
-            items: allItems,
-            bottomPadding: MediaQuery.of(this.context).padding.bottom,
-          );
+          _syncSelectionOverlay(items: allItems, bottomPadding: bottomPadding);
         } else if (_isPlaylistSelectionMode) {
           _syncPlaylistSelectionOverlay(
             playlists: ref.read(libraryCollectionsProvider).playlists,
-            bottomPadding: MediaQuery.of(this.context).padding.bottom,
+            bottomPadding: bottomPadding,
           );
         }
       },

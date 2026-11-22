@@ -37,17 +37,24 @@ class LyricBlur extends StatelessWidget {
         child: FadeTransition(opacity: animation, child: child),
       );
 
+  static final _zeroBlur = ui.ImageFilter.blur(sigmaX: 0, sigmaY: 0);
+
   @override
-  Widget build(BuildContext context) => ImageFiltered(
-    enabled: sigma > 0 && !settled,
-    imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-    child: _BlurSnapshot(
-      sigma: settled ? sigma : 0,
-      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-      source: child,
-      child: child,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final live = sigma > 0 && !settled;
+    return ImageFiltered(
+      enabled: live,
+      imageFilter: live
+          ? ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma)
+          : _zeroBlur,
+      child: _BlurSnapshot(
+        sigma: settled ? sigma : 0,
+        devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+        source: child,
+        child: child,
+      ),
+    );
+  }
 }
 
 class _BlurSnapshot extends SingleChildRenderObjectWidget {

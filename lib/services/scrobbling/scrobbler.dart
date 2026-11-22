@@ -206,12 +206,21 @@ abstract class Scrobbler<S extends ScrobbleAccount> extends ChangeNotifier {
     if (unknownTitle != null) _unknownTitle = unknownTitle;
     if (unknownArtist != null) _unknownArtist = unknownArtist;
     if (handler != null) {
-      void update(Object? _) {
-        if (identical(handler, _handler)) _updateListening();
-      }
-
-      _subscriptions.add(handler.mediaItem.listen(update));
-      _subscriptions.add(handler.playbackState.listen(update));
+      _subscriptions.add(
+        handler.mediaItem.listen((_) {
+          if (identical(handler, _handler)) _updateListening();
+        }),
+      );
+      // Ignore steady 2 Hz position-only ticks; scrobble thresholds only
+      // depend on transport state changes and are timed by _scheduleTick().
+      _subscriptions.add(
+        handler.playbackState
+            .map((s) => (s.playing, s.speed, s.processingState))
+            .distinct()
+            .listen((_) {
+              if (identical(handler, _handler)) _updateListening();
+            }),
+      );
     }
     unawaited(initialize());
     _updateListening();

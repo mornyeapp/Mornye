@@ -144,26 +144,23 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
     if (confirmed) await _songAnalysis.clear();
   }
 
+  late final Listenable _analysisListenable = Listenable.merge([
+    _songAnalysis.progress,
+    _rankEvaluation,
+  ]);
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _refreshOutputStatus();
-    _songAnalysis.progress.addListener(_onAnalysisProgress);
-    _rankEvaluation.addListener(_onAnalysisProgress);
     unawaited(_songAnalysis.refreshProgress());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _songAnalysis.progress.removeListener(_onAnalysisProgress);
-    _rankEvaluation.removeListener(_onAnalysisProgress);
     super.dispose();
-  }
-
-  void _onAnalysisProgress() {
-    if (mounted) setState(() {});
   }
 
   /// How far ranking has learned the listener, and whether that ranks their
@@ -208,13 +205,6 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
     final chargingOption = settings.songAnalysis && Platform.isAndroid;
     final androidAudio =
         debugAndroidAudioSettingsOverride ?? Platform.isAndroid;
-    final progress = _songAnalysis.progress.value;
-    final analysis =
-        progress != null &&
-            progress.total > 0 &&
-            (settings.songAnalysis || progress.completed > 0)
-        ? progress
-        : null;
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -347,86 +337,109 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
             ),
             const SliverToBoxAdapter(child: AutoMixSettings()),
           ],
-          ...settingsSectionSlivers(
-            title: context.l10n.autoplayFromLibrary,
-            children: [
-              SettingsSwitchItem(
-                icon: Icons.playlist_play_rounded,
-                title: context.l10n.autoplayFromLibrary,
-                subtitle: context.l10n.autoplayDescription,
-                value: settings.autoplay,
-                enabled: settings.playerMode == 'internal',
-                onChanged: (value) =>
-                    ref.read(settingsProvider.notifier).setAutoplay(value),
-              ),
-              const AutoplayRandomnessSlider(),
-              SettingsSwitchItem(
-                icon: Icons.auto_awesome_outlined,
-                title: context.l10n.autoplayPersonalization,
-                subtitle: context.l10n.autoplayPersonalizationDescription,
-                value: settings.autoplayPersonalization,
-                enabled: settings.playerMode == 'internal',
-                onChanged: (value) => ref
-                    .read(settingsProvider.notifier)
-                    .setAutoplayPersonalization(value),
-              ),
-              if (settings.autoplayPersonalization)
-                SettingsItem(
-                  icon: Icons.restart_alt,
-                  title: context.l10n.autoplayResetLearning,
-                  subtitle: _learningSummary(),
-                  onTap: _confirmResetLearning,
-                ),
-              SettingsSwitchItem(
-                icon: Icons.multitrack_audio,
-                title: context.l10n.songAnalysis,
-                subtitle: context.l10n.songAnalysisDescription,
-                value: settings.songAnalysis,
-                enabled: settings.playerMode == 'internal',
-                onChanged: (value) =>
-                    ref.read(settingsProvider.notifier).setSongAnalysis(value),
-                showDivider: chargingOption || analysis != null,
-              ),
-              if (chargingOption)
-                SettingsSwitchItem(
-                  icon: Icons.battery_charging_full,
-                  title: context.l10n.songAnalysisOnlyWhileCharging,
-                  subtitle:
-                      context.l10n.songAnalysisOnlyWhileChargingDescription,
-                  value: settings.songAnalysisOnlyWhileCharging,
-                  enabled: settings.playerMode == 'internal',
-                  onChanged: (value) => ref
-                      .read(settingsProvider.notifier)
-                      .setSongAnalysisOnlyWhileCharging(value),
-                  showDivider: analysis != null,
-                ),
-              if (analysis != null)
-                SettingsItem(
-                  icon: Icons.delete_outline,
-                  title: context.l10n.songAnalysisClear,
-                  subtitle: analysis.skipped > 0
-                      ? context.l10n.songAnalysisProgressWithSkipped(
-                          analysis.analyzed,
-                          analysis.total,
-                          analysis.skipped,
-                        )
-                      : context.l10n.songAnalysisProgress(
-                          analysis.analyzed,
-                          analysis.total,
-                        ),
-                  footer:
-                      settings.songAnalysis &&
-                          analysis.completed < analysis.total
-                      ? AppProgressIndicator.linear(
-                          value: analysis.completed / analysis.total,
-                          trackColor: colorScheme.surfaceContainerHighest,
-                          wavy: false,
-                        )
-                      : null,
-                  onTap: analysis.completed > 0 ? _confirmClearAnalysis : null,
-                  showDivider: false,
-                ),
-            ],
+          SliverToBoxAdapter(
+            child: SettingsSectionHeader(
+              title: context.l10n.autoplayFromLibrary,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: ListenableBuilder(
+              listenable: _analysisListenable,
+              builder: (context, _) {
+                final progress = _songAnalysis.progress.value;
+                final analysis =
+                    progress != null &&
+                        progress.total > 0 &&
+                        (settings.songAnalysis || progress.completed > 0)
+                    ? progress
+                    : null;
+                return SettingsGroup(
+                  children: [
+                    SettingsSwitchItem(
+                      icon: Icons.playlist_play_rounded,
+                      title: context.l10n.autoplayFromLibrary,
+                      subtitle: context.l10n.autoplayDescription,
+                      value: settings.autoplay,
+                      enabled: settings.playerMode == 'internal',
+                      onChanged: (value) => ref
+                          .read(settingsProvider.notifier)
+                          .setAutoplay(value),
+                    ),
+                    const AutoplayRandomnessSlider(),
+                    SettingsSwitchItem(
+                      icon: Icons.auto_awesome_outlined,
+                      title: context.l10n.autoplayPersonalization,
+                      subtitle: context.l10n.autoplayPersonalizationDescription,
+                      value: settings.autoplayPersonalization,
+                      enabled: settings.playerMode == 'internal',
+                      onChanged: (value) => ref
+                          .read(settingsProvider.notifier)
+                          .setAutoplayPersonalization(value),
+                    ),
+                    if (settings.autoplayPersonalization)
+                      SettingsItem(
+                        icon: Icons.restart_alt,
+                        title: context.l10n.autoplayResetLearning,
+                        subtitle: _learningSummary(),
+                        onTap: _confirmResetLearning,
+                      ),
+                    SettingsSwitchItem(
+                      icon: Icons.multitrack_audio,
+                      title: context.l10n.songAnalysis,
+                      subtitle: context.l10n.songAnalysisDescription,
+                      value: settings.songAnalysis,
+                      enabled: settings.playerMode == 'internal',
+                      onChanged: (value) => ref
+                          .read(settingsProvider.notifier)
+                          .setSongAnalysis(value),
+                      showDivider: chargingOption || analysis != null,
+                    ),
+                    if (chargingOption)
+                      SettingsSwitchItem(
+                        icon: Icons.battery_charging_full,
+                        title: context.l10n.songAnalysisOnlyWhileCharging,
+                        subtitle: context
+                            .l10n
+                            .songAnalysisOnlyWhileChargingDescription,
+                        value: settings.songAnalysisOnlyWhileCharging,
+                        enabled: settings.playerMode == 'internal',
+                        onChanged: (value) => ref
+                            .read(settingsProvider.notifier)
+                            .setSongAnalysisOnlyWhileCharging(value),
+                        showDivider: analysis != null,
+                      ),
+                    if (analysis != null)
+                      SettingsItem(
+                        icon: Icons.delete_outline,
+                        title: context.l10n.songAnalysisClear,
+                        subtitle: analysis.skipped > 0
+                            ? context.l10n.songAnalysisProgressWithSkipped(
+                                analysis.analyzed,
+                                analysis.total,
+                                analysis.skipped,
+                              )
+                            : context.l10n.songAnalysisProgress(
+                                analysis.analyzed,
+                                analysis.total,
+                              ),
+                        footer:
+                            settings.songAnalysis &&
+                                analysis.completed < analysis.total
+                            ? AppProgressIndicator.linear(
+                                value: analysis.completed / analysis.total,
+                                trackColor: colorScheme.surfaceContainerHighest,
+                                wavy: false,
+                              )
+                            : null,
+                        onTap: analysis.completed > 0
+                            ? _confirmClearAnalysis
+                            : null,
+                        showDivider: false,
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
           ...settingsSectionSlivers(
             title: context.l10n.sectionPlaybackQueue,

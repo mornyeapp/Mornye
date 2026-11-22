@@ -57,9 +57,7 @@ final homeRecommendationSeedsProvider =
                 source: 'local',
               ),
           ],
-          added: [
-            for (final row in added) ?_libraryTrack(row),
-          ],
+          added: [for (final row in added) ?_libraryTrack(row)],
           loved: [
             for (final entry
                 in ref
@@ -110,21 +108,27 @@ final homeRecommendationFilterProvider =
                       ),
                   ])
             : null;
-        final history = ref.read(downloadHistoryProvider.notifier);
-        final outside = <Track>[];
+        final candidates = <Track>[];
         for (final (index, track) in tracks.indexed) {
           if (local != null && local[index] != null) continue;
-          final downloaded = await history.findExistingTrackAsync(
-            HistoryLookupRequest(
-              spotifyId: track.id,
-              isrc: track.isrc,
-              trackName: track.name,
-              artistName: track.artistName,
-            ),
-          );
-          if (downloaded == null) outside.add(track);
+          candidates.add(track);
         }
-        return outside;
+        if (candidates.isEmpty) return const [];
+        final historyHits = await ref
+            .read(downloadHistoryProvider.notifier)
+            .hasExistingBatchAsync([
+              for (final track in candidates)
+                HistoryLookupRequest(
+                  spotifyId: track.id,
+                  isrc: track.isrc,
+                  trackName: track.name,
+                  artistName: track.artistName,
+                ),
+            ]);
+        return [
+          for (var i = 0; i < candidates.length; i++)
+            if (!historyHits[i]) candidates[i],
+        ];
       },
     );
 
@@ -135,9 +139,12 @@ final homeRecommendationsProvider = FutureProvider<List<Track>>((ref) async {
   if (!ref.watch(settingsProvider.select((s) => s.homeRecommendations))) {
     return const [];
   }
-  // A song that joins the Library leaves the shelf.
-  watchLibrarySongs(ref);
   final ready = ref.watch(extensionProvider.select((s) => s.isInitialized));
+  // A song that joins the Library leaves the shelf. Avoid forcing both Library
+  // databases open on Frame 1 before extensions finish starting.
+  if (ready) {
+    watchLibrarySongs(ref);
+  }
   ref.watch(extensionProvider.select(collectionSuggestionSourceKey));
   final outsideLibrary = ref.watch(homeRecommendationFilterProvider);
   final readSeeds = ref.watch(homeRecommendationSeedsProvider);

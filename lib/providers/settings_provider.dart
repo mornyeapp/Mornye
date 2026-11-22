@@ -34,6 +34,7 @@ const searchMovedHintOwedKey = 'search_moved_hint_owed';
 const _retiredUpgradeIntroSeenKey = 'upgrade_intro_mornye_seen';
 const _legacyDefaultLyricsProviders = ['apple_music', 'lrclib'];
 const _spotifyClientSecretKey = 'spotify_client_secret';
+const _retiredSpotifyCleanupDoneKey = 'retired_spotify_secret_cleanup_v1';
 const _retiredBuiltInProviderIds = {'deezer', 'qobuz', 'tidal', 'youtube'};
 final _log = AppLogger('SettingsProvider');
 
@@ -244,7 +245,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
       }
     }
 
-    await _cleanupRetiredSpotifySettings();
+    await _cleanupRetiredSpotifySettings(prefs);
 
     LogBuffer.loggingEnabled = state.enableLogging;
 
@@ -552,7 +553,8 @@ class SettingsNotifier extends Notifier<AppSettings> {
     return result;
   }
 
-  Future<void> _cleanupRetiredSpotifySettings() async {
+  Future<void> _cleanupRetiredSpotifySettings(SharedPreferences prefs) async {
+    if (prefs.getBool(_retiredSpotifyCleanupDoneKey) == true) return;
     try {
       final storedSecret = await _secureStorage.read(
         key: _spotifyClientSecretKey,
@@ -560,6 +562,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
       if (storedSecret != null && storedSecret.isNotEmpty) {
         await _secureStorage.delete(key: _spotifyClientSecretKey);
       }
+      await prefs.setBool(_retiredSpotifyCleanupDoneKey, true);
     } catch (e) {
       // The retired secret is optional; active credentials share this vault.
       _log.w(

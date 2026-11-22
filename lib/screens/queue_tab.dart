@@ -803,14 +803,27 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     final hasQueueItems = ref.watch(
       downloadQueueLookupProvider.select((lookup) => lookup.itemIds.isNotEmpty),
     );
+    // Watch here in build() rather than inside PageView.builder's itemBuilder,
+    // which would leak a Riverpod .select() subscription per page build.
+    final notCompletedItemIds = hasQueueItems
+        ? ref.watch(
+            downloadQueueLookupProvider.select(
+              (lookup) => lookup.notCompletedItemIds,
+            ),
+          )
+        : const <String>[];
+    final listeningStatisticsEnabled = ref.watch(
+      settingsProvider.select((s) => s.listeningStatisticsEnabled),
+    );
     final historyTotalCount = ref.watch(
       downloadHistoryProvider.select((state) => state.totalCount),
     );
     // Completion-bridge cells need the finalized in-memory history record
     // immediately, before the database-backed Library page refresh lands.
-    final inMemoryHistoryItems = ref.watch(
-      downloadHistoryProvider.select((state) => state.items),
-    );
+    // Only subscribe while the queue or bridge is active.
+    final inMemoryHistoryItems = hasQueueItems || _completionBridge.isNotEmpty
+        ? ref.watch(downloadHistoryProvider.select((state) => state.items))
+        : const <DownloadHistoryItem>[];
     final localLibraryTotalCount = localLibraryEnabled
         ? ref.watch(localLibraryProvider.select((state) => state.totalCount))
         : 0;
@@ -1187,6 +1200,8 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                       hasMoreLibrary: hasMoreLibrary,
                       isPageLoading: isLibraryPageLoading,
                       inMemoryHistoryItems: inMemoryHistoryItems,
+                      notCompletedItemIds: notCompletedItemIds,
+                      listeningStatisticsEnabled: listeningStatisticsEnabled,
                     )
                   : NotificationListener<ScrollEndNotification>(
                       onNotification: (notification) {
@@ -1233,6 +1248,9 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                             filterMode: filterMode,
                             historyViewMode: historyViewMode,
                             hasQueueItems: hasQueueItems,
+                            notCompletedItemIds: notCompletedItemIds,
+                            listeningStatisticsEnabled:
+                                listeningStatisticsEnabled,
                             filterData: filterData,
                             collectionState: collectionState,
                             hasMoreLibrary: filterMode == historyFilterMode

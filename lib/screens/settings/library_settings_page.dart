@@ -856,7 +856,14 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
             SliverToBoxAdapter(
               child: Consumer(
                 builder: (context, ref, _) {
-                  final libraryState = ref.watch(localLibraryProvider);
+                  final (:isScanning, :hasLibraryItems) = ref.watch(
+                    localLibraryProvider.select(
+                      (s) => (
+                        isScanning: s.isScanning,
+                        hasLibraryItems: s.totalCount > 0,
+                      ),
+                    ),
+                  );
                   final hasDownloads = ref.watch(
                     downloadHistoryProvider.select(
                       (state) => state.totalCount > 0,
@@ -869,30 +876,51 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                   final canCleanup =
                       !_isCleaningMissingFiles &&
                       !_isFindingMovedDownloads &&
-                      !libraryState.isScanning &&
-                      (libraryState.totalCount > 0 ||
+                      !isScanning &&
+                      (hasLibraryItems ||
                           hasDownloads ||
                           librarySources.isNotEmpty);
                   final canReEnrich =
-                      !_isLoadingReEnrich &&
-                      (libraryState.totalCount > 0 || hasDownloads);
-                  final artwork = ref.watch(libraryAlbumArtworkProvider);
-                  final canFindArtwork =
-                      !artwork.running && libraryState.totalCount > 0;
+                      !_isLoadingReEnrich && (hasLibraryItems || hasDownloads);
+                  final (:artworkRunning, :bulkArtworkRunning) = ref.watch(
+                    libraryAlbumArtworkProvider.select(
+                      (s) => (
+                        artworkRunning: s.running,
+                        bulkArtworkRunning: s.running && s.albumKey == null,
+                      ),
+                    ),
+                  );
+                  final canFindArtwork = !artworkRunning && hasLibraryItems;
                   return SettingsGroup(
                     connected: true,
                     children: [
-                      if (libraryState.isScanning)
-                        _ScanProgressTile(
-                          isFinalizing: libraryState.scanIsFinalizing,
-                          isPaused: libraryState.scanIsPaused,
-                          progress: libraryState.scanProgress,
-                          currentFile: libraryState.scanCurrentFile,
-                          scannedFiles: libraryState.scannedFiles,
-                          totalFiles: libraryState.scanTotalFiles,
-                          onPause: _pauseScan,
-                          onResume: _resumeScan,
-                          onCancel: _cancelScan,
+                      if (isScanning)
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final scan = ref.watch(
+                              localLibraryProvider.select(
+                                (s) => (
+                                  isFinalizing: s.scanIsFinalizing,
+                                  isPaused: s.scanIsPaused,
+                                  progress: s.scanProgress,
+                                  currentFile: s.scanCurrentFile,
+                                  scannedFiles: s.scannedFiles,
+                                  totalFiles: s.scanTotalFiles,
+                                ),
+                              ),
+                            );
+                            return _ScanProgressTile(
+                              isFinalizing: scan.isFinalizing,
+                              isPaused: scan.isPaused,
+                              progress: scan.progress,
+                              currentFile: scan.currentFile,
+                              scannedFiles: scan.scannedFiles,
+                              totalFiles: scan.totalFiles,
+                              onPause: _pauseScan,
+                              onResume: _resumeScan,
+                              onCancel: _cancelScan,
+                            );
+                          },
                         )
                       else ...[
                         Opacity(
@@ -936,14 +964,27 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                             onTap: canReEnrich ? _reEnrichAll : null,
                           ),
                         ),
-                        if (artwork.running && artwork.albumKey == null)
-                          _ArtworkProgressTile(
-                            done: artwork.done,
-                            total: artwork.total,
-                            stopping: artwork.cancelling,
-                            onStop: ref
-                                .read(libraryAlbumArtworkProvider.notifier)
-                                .cancel,
+                        if (bulkArtworkRunning)
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final artwork = ref.watch(
+                                libraryAlbumArtworkProvider.select(
+                                  (s) => (
+                                    done: s.done,
+                                    total: s.total,
+                                    cancelling: s.cancelling,
+                                  ),
+                                ),
+                              );
+                              return _ArtworkProgressTile(
+                                done: artwork.done,
+                                total: artwork.total,
+                                stopping: artwork.cancelling,
+                                onStop: ref
+                                    .read(libraryAlbumArtworkProvider.notifier)
+                                    .cancel,
+                              );
+                            },
                           )
                         else
                           Opacity(
@@ -952,7 +993,7 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                               icon: Icons.image_search_outlined,
                               title: context.l10n.libraryFindArtwork,
                               subtitle: context.l10n.libraryFindArtworkSubtitle,
-                              trailing: artwork.running
+                              trailing: artworkRunning
                                   ? const AppLoadingIndicator(
                                       size: 20,
                                       strokeWidth: 2,
@@ -999,14 +1040,12 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                         ),
                       ),
                       Opacity(
-                        opacity: libraryState.totalCount > 0 ? 1.0 : 0.5,
+                        opacity: hasLibraryItems ? 1.0 : 0.5,
                         child: SettingsItem(
                           icon: Icons.delete_outline,
                           title: context.l10n.libraryClear,
                           subtitle: context.l10n.libraryClearSubtitle,
-                          onTap: libraryState.totalCount > 0
-                              ? _clearLibrary
-                              : null,
+                          onTap: hasLibraryItems ? _clearLibrary : null,
                           showDivider: false,
                         ),
                       ),
