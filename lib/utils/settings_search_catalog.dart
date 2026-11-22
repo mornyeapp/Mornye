@@ -433,6 +433,13 @@ class SettingsSearchCatalog {
              subtitle: l10n.autoplayPersonalizationDescription,
              keywords: const ['machine learning', 'recommendation', 'personal'],
            ),
+           // Shown under the switch once there is something to measure.
+           SettingsSearchEntry(
+             icon: Icons.insights_outlined,
+             title: l10n.suggestionOutcomesTitle,
+             keywords: const ['mix', 'recommendation', 'skipped', 'statistics'],
+             targetLabel: l10n.autoplayPersonalization,
+           ),
            SettingsSearchEntry(
              icon: Icons.multitrack_audio,
              title: l10n.songAnalysis,

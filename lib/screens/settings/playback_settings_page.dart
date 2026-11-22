@@ -18,6 +18,7 @@ import 'package:mornye/services/music_player_service.dart'
     show resetAutoplayLearning;
 import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/services/spatial_audio.dart';
+import 'package:mornye/services/suggestion_outcomes.dart';
 import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/theme/app_tokens.dart';
@@ -76,6 +77,8 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
       .read(musicPlayerRuntimeProvider)
       .ranker
       .evaluation;
+  late final ValueListenable<SuggestionOutcomeSummary?> _suggestionOutcomes =
+      ref.read(musicPlayerRuntimeProvider).suggestionOutcomes.summary;
 
   Future<bool> _confirmAudioVolume(String message) => showAppConfirmDialog(
     context,
@@ -147,6 +150,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
   late final Listenable _analysisListenable = Listenable.merge([
     _songAnalysis.progress,
     _rankEvaluation,
+    _suggestionOutcomes,
   ]);
 
   @override
@@ -186,6 +190,24 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
             learnedPercent,
             startingPercent,
           );
+  }
+
+  /// How the mixes and recommendations go, one line each; null until
+  /// either has [suggestionShareMinimum] outcomes.
+  String? _suggestionSummary() {
+    final summary = _suggestionOutcomes.value;
+    if (summary == null) return null;
+    int? percent(OutcomeShare outcomes) =>
+        outcomes.total >= suggestionShareMinimum
+        ? (outcomes.share! * 100).round()
+        : null;
+    final lines = [
+      if (percent(summary.mixes) case final mixes?)
+        context.l10n.suggestionOutcomesMixes(mixes),
+      if (percent(summary.recommendations) case final recommendations?)
+        context.l10n.suggestionOutcomesRecommendations(recommendations),
+    ];
+    return lines.isEmpty ? null : lines.join('\n');
   }
 
   @override
@@ -364,6 +386,9 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                           (settings.songAnalysis || progress.completed > 0)
                       ? progress
                       : null;
+                  final suggestions = settings.autoplayPersonalization
+                      ? _suggestionSummary()
+                      : null;
                   return SettingsGroup(
                     children: [
                       SettingsSwitchItem(
@@ -394,6 +419,12 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                           title: context.l10n.autoplayResetLearning,
                           subtitle: _learningSummary(),
                           onTap: _confirmResetLearning,
+                        ),
+                      if (suggestions != null)
+                        SettingsItem(
+                          icon: Icons.insights_outlined,
+                          title: context.l10n.suggestionOutcomesTitle,
+                          subtitle: suggestions,
                         ),
                       SettingsSwitchItem(
                         icon: Icons.multitrack_audio,

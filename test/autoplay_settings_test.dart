@@ -11,11 +11,14 @@ import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/settings/playback_settings_page.dart';
+import 'package:mornye/services/autoplay_personalization.dart';
 import 'package:mornye/services/autoplay_ranker.dart';
+import 'package:mornye/services/library_mixes.dart' show LibraryMixKind;
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/services/song_analysis_store.dart';
 import 'package:mornye/services/song_features.dart';
+import 'package:mornye/services/suggestion_outcomes.dart';
 import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -182,6 +185,121 @@ void main() {
         find.text(
           'Tuned to you: 71% accurate on your latest songs '
           '(standard 64%)',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('mixes and recommendations show how they go ($mornye)', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      sqfliteFfiInit();
+      final db = (await tester.runAsync(
+        () => SuggestionOutcomes.openWithFactory(
+          databaseFactoryFfi,
+          inMemoryDatabasePath,
+        ),
+      ))!;
+      addTearDown(() => tester.runAsync(db.close));
+      final shownAt = DateTime(2026, 11, 1, 9);
+      var now = shownAt;
+      final outcomes = SuggestionOutcomes(open: () async => db, now: () => now);
+      await tester.runAsync(() async {
+        outcomes.summary;
+        await outcomes.refresh();
+      });
+      final container = ProviderContainer(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(const AppSettings()),
+          musicPlayerRuntimeProvider.overrideWithValue(
+            MusicPlayerRuntime(
+              dependencies: PlaybackDependencies(
+                createSuggestionOutcomes: () => outcomes,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark, accent: MornyeAccent.blue)
+                : AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const PlaybackSettingsPage(),
+          ),
+        ),
+      );
+      final reset = find.text('Reset recommendation learning');
+      await tester.scrollUntilVisible(
+        reset,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      // Nothing measured yet: no row.
+      expect(find.text('Mixes and recommendations'), findsNothing);
+
+      await tester.runAsync(() async {
+        final sources = [for (var i = 0; i < 20; i++) '/$i.flac'];
+        outcomes.followMix(
+          LibraryMixKind.genre,
+          sources,
+          queue: 1,
+          since: shownAt,
+        );
+        for (final (index, source) in sources.indexed) {
+          outcomes.recordPlay(
+            AutoplayFeedback(
+              kind: index < 15
+                  ? AutoplayFeedbackKind.listened
+                  : AutoplayFeedbackKind.skipped,
+              track: AutoplayLearningTrack(
+                source: source,
+                title: source,
+                artist: 'Artist',
+              ),
+              previous: null,
+              at: shownAt,
+              reward: index < 15 ? 1 : 0,
+            ),
+            queue: 1,
+          );
+        }
+        for (var i = 0; i < 20; i++) {
+          outcomes.recommendationShown(
+            artist: 'Artist',
+            title: 'Song $i',
+            rank: i,
+          );
+        }
+        for (final i in [3, 8]) {
+          outcomes.recommendationActed(
+            artist: 'Artist',
+            title: 'Song $i',
+            action: SuggestionAction.previewed,
+          );
+        }
+        // A week on, the songs shown that day are settled.
+        now = shownAt.add(const Duration(days: 8));
+        await outcomes.refresh();
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('Mixes and recommendations'), findsOneWidget);
+      expect(
+        find.text(
+          'Mixes: 75% of songs played rather than skipped\n'
+          'Recommended for you: 10% of songs previewed, opened or saved',
         ),
         findsOneWidget,
       );

@@ -9614,6 +9614,28 @@
       }
     }
   },
+  "suggestionOutcomesTitle": "Mixes and recommendations",
+  "@suggestionOutcomesTitle": {
+    "description": "Settings row under Reset recommendation learning that shows how Home's mixes and Recommended for you songs are received"
+  },
+  "suggestionOutcomesMixes": "Mixes: {percent}% of songs played rather than skipped",
+  "@suggestionOutcomesMixes": {
+    "description": "Share of songs from Home's mixes that the listener played on instead of skipping",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "suggestionOutcomesRecommendations": "Recommended for you: {percent}% of songs previewed, opened or saved",
+  "@suggestionOutcomesRecommendations": {
+    "description": "Share of songs shown in Home's Recommended for you that the listener previewed, opened the album of, downloaded or saved within a week",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
   "songAnalysis": "Song analysis",
   "@songAnalysis": {
     "description": "Switch that analyzes how each Library song sounds, on the device, for Autoplay"
