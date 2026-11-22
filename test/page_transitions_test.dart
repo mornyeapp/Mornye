@@ -101,8 +101,51 @@ void main() {
     }
     expect(
       _builderFor(material, TargetPlatform.android),
-      isA<FadeForwardsPageTransitionsBuilder>(),
+      isA<MaterialPhonePageTransitionsBuilder>(),
     );
+  });
+
+  testWidgets('Material Android pushes a solid page and pops it as a card', (
+    tester,
+  ) async {
+    await _pumpApp(tester, material.copyWith(platform: TargetPlatform.android));
+    final width = tester.getSize(find.byType(Scaffold)).width;
+    _push('page');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.byType(SnapshotWidget), findsNothing);
+    expect(_opacityAbove(tester, 'page'), inExclusiveRange(0, 1));
+    final arriving = tester.getTopLeft(find.byType(Scaffold).last).dx;
+    expect(arriving, inExclusiveRange(0, width / 3));
+    // The page it covers moves the other way.
+    expect(tester.getTopLeft(find.byType(Scaffold).first).dx, lessThan(0));
+
+    // Solid long before it lands: no two pages read through each other.
+    await tester.pump(const Duration(milliseconds: 70));
+    expect(_opacityAbove(tester, 'page'), 1);
+    expect(tester.getTopLeft(find.byType(Scaffold).last).dx, greaterThan(0));
+
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.byType(Scaffold).last).dx, 0);
+
+    _navigatorKey.currentState!.pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    // The card has drawn in but hardly moved, and stays solid.
+    final card = tester.getRect(find.byType(Scaffold).last);
+    expect(card.width, lessThan(width));
+    expect(card.center.dx, lessThan(width * 0.6));
+    expect(_opacityAbove(tester, 'page'), 1);
+    // A third of the way in time, the page below is most of the way back.
+    expect(
+      tester.getTopLeft(find.byType(Scaffold).first).dx,
+      inInclusiveRange(-width * 0.25 * 0.3, 0),
+    );
+
+    await tester.pumpAndSettle();
+    expect(find.text('page'), findsNothing);
+    expect(tester.getTopLeft(find.byType(Scaffold)).dx, 0);
   });
 
   for (final platform in [TargetPlatform.windows, TargetPlatform.linux]) {
