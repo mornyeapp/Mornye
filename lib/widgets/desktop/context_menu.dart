@@ -12,6 +12,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/app_menu_button.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 
@@ -166,6 +167,11 @@ Future<bool> _showExpressiveContextMenu(
           ),
     ],
   ];
+  final anchor = Rect.fromLTWH(point.dx, point.dy, 0, 0);
+  // A point anchor gives the narrowest menu, which cuts longer labels.
+  final fit = menuFittingLabels(context, [
+    for (final action in actions) (label: action.label, leading: true),
+  ], anchor);
   late final OverlayEntry entry;
   // Once dismissed, the closing menu lets clicks through to the page.
   var closing = false;
@@ -186,9 +192,11 @@ Future<bool> _showExpressiveContextMenu(
               context,
             ).copyWith(scrollbars: false),
             child: M3EMenuPopup<int>(
-              anchor: Rect.fromLTWH(point.dx, point.dy, 0, 0),
+              anchor: anchor,
               historyRoute: route,
               position: M3EMenuAnchorPosition.bottomStart,
+              preferredWidth: fit.width,
+              themeOverride: fit.theme,
               children: children,
               onSelected: (value) {
                 close();

@@ -256,10 +256,11 @@ class _ExpressiveMenuAnchorState<T extends Object>
 
 /// A width that fits the longest label, and a theme with a raised cap when
 /// that width passes the default 280dp; both null when the width the menu
-/// takes from [anchor] already fits. Never wider than the screen.
-({double? width, M3EMenuTheme? theme}) _menuFittingLabels<T extends Object>(
+/// takes from [anchor] already fits. Never wider than the screen. Each of
+/// [rows] is a label and whether an icon leads it.
+({double? width, M3EMenuTheme? theme}) menuFittingLabels(
   BuildContext context,
-  List<AppMenuItem<T>> items,
+  Iterable<({String label, bool leading})> rows,
   Rect anchor,
 ) {
   final m3e = M3ETheme.of(context);
@@ -268,14 +269,14 @@ class _ExpressiveMenuAnchorState<T extends Object>
   final scaler = MediaQuery.textScalerOf(context);
   final direction = Directionality.of(context);
   var widest = 0.0;
-  for (final item in items) {
+  for (final row in rows) {
     final painter = TextPainter(
-      text: TextSpan(text: item.label, style: style),
+      text: TextSpan(text: row.label, style: style),
       textDirection: direction,
       textScaler: scaler,
       maxLines: 1,
     )..layout();
-    final leading = item.leading == null ? 0.0 : theme.iconSize + theme.iconGap;
+    final leading = row.leading ? theme.iconSize + theme.iconGap : 0.0;
     final width =
         painter.width +
         leading +
@@ -403,7 +404,10 @@ Future<T?> showAppMenuPopup<T extends Object>({
     (false, true) => M3EMenuAnchorPosition.bottomStart,
     (false, false) => M3EMenuAnchorPosition.bottomEnd,
   };
-  final fit = _menuFittingLabels(context, items, anchor);
+  final fit = menuFittingLabels(context, [
+    for (final item in items)
+      (label: item.label, leading: item.leading != null),
+  ], anchor);
   final popup = M3EMenuPopup<T>(
     anchor: anchor,
     historyRoute: ModalRoute.of(context),
