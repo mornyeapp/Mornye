@@ -11,11 +11,14 @@ from typing import Optional, Tuple
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SECTION = re.compile(r"^## \[?([^\]\s]+)\]?")
+TRAILING_RULE = re.compile(r"(\n[ \t]*-{3,}[ \t]*)+\s*$")
 # What git-cliff adds around its list; the workflow writes its own footer.
 COMMIT_NOISE = re.compile(r"^## [0-9][0-9.A-Za-z-]*$|^\*\*Full Changelog\*\*")
 CREDIT = re.compile(r" by (\[@[^\]]*\]\([^)]*\)|@[A-Za-z0-9_-]+)")
 LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
 BOLD = re.compile(r"\*\*([^*]*)\*\*")
+ITALIC = re.compile(r"(?<![*\w])\*([^*\s][^*]*)\*(?![*\w])")
+CODE = re.compile(r"`([^`]+)`")
 TELEGRAM_LIMIT = 2500
 NO_NOTES = "See release notes on GitHub for details."
 
@@ -33,7 +36,8 @@ def written_notes(changelog: str, version: str) -> Optional[Tuple[str, str]]:
         elif current is not None:
             current.append(line)
     for name in (version.lstrip("v").lower(), "unreleased"):
-        text = "\n".join(sections.get(name, [])).strip()
+        # A rule that closes the section is the file's, not the notes'.
+        text = TRAILING_RULE.sub("", "\n".join(sections.get(name, []))).strip()
         if text:
             return name, text
     return None
@@ -64,6 +68,7 @@ def telegram(notes: Optional[str], commits: str) -> str:
         if not line:
             continue
         line = BOLD.sub(r"<b>\1</b>", html.escape(line, quote=False))
+        line = CODE.sub(r"<code>\1</code>", ITALIC.sub(r"<i>\1</i>", line))
         heading = re.match(r"^#{2,3} (.*)$", line)
         if heading:
             lines += ["", f"<b>{heading.group(1)}</b>"]

@@ -1,52 +1,58 @@
 # Changelog
 
-Notes for the people who use the app, in plain words: what is new, what works
-better and what was fixed. A release puts the section named after its version
-(`Unreleased` while there is none) at the top of its notes, in the app's
-update dialog and in the Telegram post, with the full commit list folded
-under it. Write list items only, since the update dialog shows nothing else,
-and keep a section short: the dialog stops at 2000 characters in versions up
-to 5.4 and at 8096 in later ones.
+Notes for the people who use the app: what was added, what works better and
+what was fixed. A release puts the section named after its version (or
+`Unreleased`) at the top of its notes, in the app's update dialog and in the
+Telegram post, with the full commit list folded under it. Write list items
+only, since the update dialog shows nothing else, and put what matters most
+first: the dialog stops at 2000 characters in versions before 5.4.5 and at
+8096 from 5.4.5 on, and the Telegram post at 2500. GitHub shows it whole.
 
 Versions 4.9.7 to 5.4.0 have their notes on the
 [releases page](https://github.com/mornyeapp/Mornye/releases).
 
-## [Unreleased]
+## [5.4.5] - Unreleased
 
-### New
+### Added
 
-- **Parametric equalizer**: Shape the sound with your own filters, or import a filter list. On Android this needs the new playback engine.
-- **Home and Search**: Home shows your own music and recommended songs. Browsing moved to the Search tab.
-- **Profile**: Your listening record, taste and collection on one page.
-- **Download focus**: With an external player, the built-in player's controls stay out of the way.
-- **Lyrics**: Edit translations by hand, and pick the shape, text size and alignment of a shared lyrics card.
-- **Select by sliding**: Hold a song, then slide over the others to select them.
-- **Player**: Show the whole cover in the full screen style and choose how far its fade reaches.
-- **AutoMix**: Choose how often songs are mixed on their beats.
-- **Animation speed**: Make the app's motion slower or faster.
-- **Library**: A Simple audio quality label, one cover for all selected songs and Re-download for a single song.
-- **Home mixes**: More kinds of mixes, changing every day.
+- **Parametric Equalizer**: Switch between Graphic and Parametric modes with up to 20 custom filters (peak, low shelf, and high shelf; 20 Hz to 20 kHz, +/-24 dB, Q 0.1 to 20), exact numeric entry, and import/export of plain-text AutoEQ-style filter lists (`Preamp` and `Filter` lines). Supported on Desktop, iOS, and Android (via the new playback engine DSP).
+- **Personal Home & Dedicated Search Tab**: Home is now always your personal page in both Material and Mornye styles, while Search becomes its own tab/destination opening directly on the extension feed (*Search feed*). On Material Home, the old gray search prompt row was removed so the greeting leads straight into your sections, with a one-time tooltip for existing installs.
+- **Recommended for You**: Added a daily cached *"Recommended for you"* shelf on Home suggesting tracks outside your Library based on your most played, recently added, and loved songs.
+- **Expanded Home Mixes**: Added **Deep Cuts** and **Year Mix**, daily rotating Artist Mixes and extra genres, balanced variety across mix types, and up to 12 mixes on Home. *On repeat* falls back to Library albums when there is no listening history yet.
+- **Full Profile Page**: Tapping your profile in Settings now opens a complete listener profile with *All time* totals and streaks, *Last 30 days* activity, *Music taste* by genre, *Listening habits*, *Top artists/albums/tracks*, and collection counts (profile editing moved to *Edit profile*).
+- **Download Focus Mode (External Player)**: Selecting *External player* hides built-in-player-only UI across Home, Library, Profile, and Settings without deleting your queue, listening history, or preferences, focusing the app on downloading and file management.
+- **Manual Lyrics Translation Editor & Readable Tags**: Add and edit lyrics translations by hand directly from the player. Saved translations and romanizations now write as readable plain-text tags (`[x-translated:...]`, `[x-romanized:...]`, `[x-translated-words:...]`) in `.mlrc` (`[x-mlrc:2]`) and embedded tags while staying backward-compatible with legacy base64 tags.
+- **Customizable Share Lyrics Cards**: Added a *Style* pane with card shapes (**Story** 1080x1920, **Square** 1080x1080, **Wide** 1920x1080), text sizes (**Small / Auto / Large**), alignment options, and a **Save** button to export as PNG without storage permissions.
+- **Lock Screen Lyrics Title Option**: Added *"Keep the song title"* under *Lyrics on lock screen* so the active lyric line replaces the artist field while keeping the song title visible.
+- **Full-Screen Cover Controls**: Added **Whole cover** (keeps full-screen artwork square at full width without side cropping) and **Cover fade** (**Short / Medium / Long**). On Mornye, still full-screen covers now end with a soft blur transitioning into a matching solid edge color.
+- **Direct USB DAC Resampling & Rate Cap**: Automatically resamples tracks whose native sample rate a DAC rejects using a Kaiser windowed sinc polyphase filter (130 dB stopband, triangular dither for 16-bit output), reads UAC2 clock ranges, remembers working rates per DAC, and adds a **Highest sample rate** setting in Direct USB.
+- **AutoMix Beat Matching**: Added a *Beat matching* setting (**Standard**, **More often**, **Most often**) controlling how often AutoMix aligns beats between tracks, synced across devices via Link.
+- **Simple Audio Quality Label**: Added a **Simple** audio quality badge mode (*Hi-Res*, *Lossless*, *Dolby*, or format name) for the Library and full player.
+- **Multi-Track Authenticity Chart**: Batch Hi-Res / authenticity checks now overlay average spectra on one shared chart with color-blind-safe per-track colors.
+- **Drag-to-Select Songs**: After a long press selects a song, slide your finger up or down to select or deselect multiple songs with automatic edge scrolling.
+- **CSV Import with Track Links**: Supports `URL`, `Link`, `Track URL`, and `Track Link` columns (including album and playlist links) via matching extensions, with ISRC and stricter title/artist fallbacks.
+- **Library, Queue & Desktop Actions**: Apply one cover image to all selected songs in *Set common values*; added *Re-download* and *Copy title* on track details; added copy/open-album actions for downloads and desktop library items, delete on the desktop album selection bar, desktop scroll arrows for Home shelves and Equalizer band faders, and extension names on verification prompts.
+- **Animation Speed Setting**: Added *Settings > Appearance > Animation speed* (0.5x to 2x) governing page transitions, player motion, sheets, snackbars, banners, and UI animations.
 
 ### Improved
 
-- **Motion**: Pages, sheets and the player move more smoothly, and Material pages follow the back swipe.
-- **Material lists**: Songs, menus and sheet options sit together as connected groups.
-- **Speed**: A faster start and a lighter Library, also during scans and downloads.
-- **Accessibility**: Larger small text, bigger touch targets and right-to-left layouts.
-- **USB DAC**: A song at a rate the DAC refuses is resampled to one it accepts.
+- **Material 3 Motion & Scrolling**: Material pages now push solidly with distance-driven fade, pop as a receding card, follow the Android **predictive back gesture** live, and cache scaled transition frames as pictures to eliminate glyph-atlas jank. The Material full-screen player expands and collapses as one solid expressive spring surface, and Android Material lists use native Android fling physics while keeping bounce at both ends.
+- **Mornye / Apple HIG Liquid Glass Alignment**: Removed Liquid Glass from content surfaces (reserving it for navigation and controls), adopted Cupertino buttons, menus, activity indicators, grouped settings lists, and expanded Cupertino icons, unified Liquid Glass springs, and removed staggered row delays on Mornye lists.
+- **Material 3 Expressive Consistency**: Connected option rows across song lists, search results, artists, albums, playlists, menus, loading skeletons, track details, and all bottom sheets; solid container colors without extra outlines; auto-widened menus and content-sized sheets; start-aligned plain lyrics and cleaner instant-apply search sorting.
+- **Accessibility & RTL**: Enforced an 11 pt minimum text floor, full touch targets, and proper RTL mirroring for navigation, sliders, and Rewind taps.
+- **Smaller Packages Across Platforms**: Icon tree-shaking, stripped unused font axes, compact binary pinyin data, trimmed concert timezone data, deduplicated LGPL license text, desktop code compiled out of mobile builds, Android resource/asset shrinking, dropped FFmpegKit plugin on macOS/Linux desktop, and size-optimized Rust builds (keeping FLAC decoding and the extension JS engine at full speed, without UniFFI on desktop, and with trimmed SQLite).
+- **Runtime Performance**: Overlapped startup and deferred storage checks; fewer rebuilds, repaints, and preference writes; cached squircle paths and lens shaders; stopped hidden controls from tracking playback position; indexed History/Library queries and partial Library updates; cheaper Rust cover resizing, MP3 tag reads, and scans; off-main-thread scan progress parsing; fewer Android SAF/Binder IPC queries and disk writes; and serialized writes to prevent `history.db` lock contention.
+- **Dependencies & Toolchains**: Updated Flutter to 3.50.1, FFmpegKit to 3.0.0 (FFmpeg 8.1.3), Android Gradle Plugin to 9.5.2, Gradle to 9.9.2, AndroidX Lifecycle to 2.11.1, and Rust and Dart dependencies.
 
 ### Fixed
 
-- Cast did not start the next song on the TV.
-- A song started from an album or playlist did not continue with the rest.
-- Song previews that no longer played.
-- Failed downloads left the queue after a restart.
-- The last session was lost when the system stopped playback.
-- A black screen after closing the player.
-- The player widget crashed before Android 12.
-- A database error while History and the Library were both saving.
-- iOS: songs stopped loading after the app had been suspended.
-- Desktop: a blank window on some Linux systems and a crash while the window moved between screens.
+- **Playback, Previews & Cast**: Re-fetches expired preview URLs and falls back across extensions; respects *Metadata Priority* when opening artists or albums; eliminated cover flicker/blink when opening track details or collections; falls back to embedded artwork when web covers fail; preserves the last session when the system stops playback; fixes continuing through an album or playlist from a local tap; keeps Android awake and advances cleanly to the next track on Cast; fixes black screen from lingering touches after closing the player; keeps Mornye player corners rounded while moving; and aligns album descriptions under the sheet's rounded top edge.
+- **Direct USB DAC**: Releases idle DACs so other apps retain audio, restores initial DAC volume on exit, downloads network tracks fully before USB playback, and handles smaller USB endpoints reliably.
+- **Lyrics & Translations**: Lyric lines follow the sung language direction while translations follow their own setting; aligned translation editor rows and icon; fixed Android pinyin data loading.
+- **Network & Link**: Automatically rebinds the local playback proxy after iOS closes its listener, and keeps manually typed computer addresses in Link instead of overwriting them with discovery results.
+- **Downloads & Platforms**: Keeps failed downloads in the queue across restarts; allows absolute Windows download directories in the extension sandbox; fixes the Android player widget prior to Android 12; fixes dragged row offset under UI scaling; releases desktop audio devices cleanly on exit and keeps outputs open across gapless track changes; fixes desktop crashes when moving windows across displays; disables Impeller automatically on Linux with NVIDIA drivers and aligns the Linux system unwinder.
+
+---
 
 ## [4.9.6] - 2026-09-07
 

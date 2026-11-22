@@ -465,7 +465,8 @@ void main() {
                   updateInfo: UpdateInfo(
                     version: '5.5.0',
                     changelog:
-                        "## What's New\n\n### New\n\n$notes\n\n---\n\n"
+                        "## What's New\n\n### New\n\n$notes\n"
+                        '- A *Style* pane, `URL` columns and 2 * 3 * 4\n\n---\n\n'
                         '<details>\n<summary>All changes</summary>\n\n'
                         '### New Features\n\n- **scope**: A commit subject\n\n'
                         '</details>\n\n---\n\n### Downloads\n',
@@ -490,7 +491,8 @@ void main() {
     expect(shown.length, greaterThan(4000));
     expect(shown, startsWith('New\n• Item 0: a change'));
     expect(shown, contains('• Item 59: '));
-    expect(shown, isNot(endsWith('...')));
+    // Emphasis and code marks are dropped, a lone asterisk stays.
+    expect(shown, endsWith('• A Style pane, URL columns and 2 * 3 * 4'));
     expect(shown, isNot(contains('commit subject')));
     expect(tester.takeException(), isNull);
   });

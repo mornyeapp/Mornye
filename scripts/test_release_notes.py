@@ -62,6 +62,13 @@ class ReleaseNotesTest(unittest.TestCase):
         self.assertEqual(name, "unreleased")
         self.assertIn("Upcoming", text)
 
+    def test_a_rule_that_closes_a_section_is_left_out(self):
+        changelog = "## [5.4.5] - Unreleased\n\n### Added\n\n- One\n\n---\n\n## [5.4.0]\n"
+        name, text = notes.written_notes(changelog, "v5.4.5")
+        self.assertEqual((name, text), ("5.4.5", "### Added\n\n- One"))
+        self.assertEqual(notes.body(text, "- commit").count("\n---\n"), 1)
+        self.assertIsNone(notes.written_notes("## [5.4.5]\n\n---\n\n## [5.4.0]\n", "v5.4.5"))
+
     def test_an_empty_section_is_no_notes(self):
         self.assertIsNone(notes.written_notes("## [5.4.0]\n\n## [5.3.0]\n- x", "v5.4.0"))
         self.assertIsNone(notes.written_notes("", "v5.4.0"))
@@ -101,6 +108,10 @@ class ReleaseNotesTest(unittest.TestCase):
         self.assertIn("• <b>equalizer</b>: Parametric filters (#12)\n", fallback)
         self.assertIn("Shelves &lt;b&gt; &amp; more", fallback)
         self.assertEqual(notes.telegram(None, ""), notes.NO_NOTES)
+        self.assertEqual(
+            notes.telegram("- **Cards**: A *Style* pane, `URL` columns and 2 * 3 * 4", ""),
+            "• <b>Cards</b>: A <i>Style</i> pane, <code>URL</code> columns and 2 * 3 * 4",
+        )
 
     def test_long_telegram_text_ends_on_a_whole_line(self):
         text = "\n".join(f"- **Item {index}**: " + "word " * 20 for index in range(60))

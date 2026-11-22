@@ -59,6 +59,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
   static final RegExp _listPattern = RegExp(r'^[-*]\s+(.+)$');
   static final RegExp _subListPattern = RegExp(r'^\s+[-*]\s+(.+)$');
   static final RegExp _boldPattern = RegExp(r'\*\*([^*]+)\*\*');
+  // *Emphasis*, but not a lone asterisk such as in "2 * 3".
+  static final RegExp _emphasisPattern = RegExp(
+    r'(?<![*\w])\*([^*\s][^*]*)\*(?![*\w])',
+  );
   static final RegExp _codePattern = RegExp(r'`([^`]+)`');
 
   /// Set once a desktop update needs one more step from the user: quitting
@@ -597,6 +601,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
         var itemText = listMatch.group(1) ?? '';
         itemText = itemText.replaceAllMapped(
           _boldPattern,
+          (m) => m.group(1) ?? '',
+        );
+        itemText = itemText.replaceAllMapped(
+          _emphasisPattern,
           (m) => m.group(1) ?? '',
         );
         itemText = itemText.replaceAllMapped(
