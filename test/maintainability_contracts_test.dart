@@ -17,18 +17,23 @@ void main() {
     required String id,
     required String name,
     String artist = 'Artist',
+    String album = 'Album',
     int duration = 180,
     String? releaseDate,
     String? itemType,
+    int? number,
+    int? disc,
   }) {
     return Track(
       id: id,
       name: name,
       artistName: artist,
-      albumName: 'Album',
+      albumName: album,
       duration: duration,
       releaseDate: releaseDate,
       itemType: itemType,
+      trackNumber: number,
+      discNumber: disc,
     );
   }
 
@@ -89,6 +94,84 @@ void main() {
       expect(identical(sorted, results), isFalse);
       expect(sorted.map((item) => item.id), ['earlier', 'later']);
       expect(results.first.id, 'later');
+    });
+
+    test('sorts search results by release date, then album, undated last', () {
+      final results = [
+        track(
+          id: 'a',
+          name: 'Zebra',
+          album: 'Blue',
+          releaseDate: '2026-05-20',
+          number: 2,
+        ),
+        track(
+          id: 'b',
+          name: 'apple 10',
+          album: 'Blue',
+          releaseDate: '2026-05-20',
+          number: 1,
+        ),
+        track(
+          id: 'c',
+          name: 'Apple 2',
+          album: 'Red',
+          releaseDate: '2026-03-10',
+        ),
+        track(
+          id: 'd',
+          name: 'Song',
+          album: 'Green',
+          releaseDate: '2026-07-01',
+          number: 1,
+        ),
+        track(
+          id: 'e',
+          name: 'Song',
+          album: 'Green',
+          releaseDate: '2026-07-01',
+          number: 2,
+        ),
+        track(id: 'f', name: 'Song', album: 'Yellow'),
+        track(
+          id: 'g',
+          name: 'Song',
+          album: 'Amber',
+          releaseDate: '2026-05-20',
+          number: 1,
+        ),
+      ];
+      List<String> sorted(HomeSearchSortOption option) => sortHomeSearchItems(
+        items: results,
+        option: option,
+        nameOf: (item) => item.name,
+        artistOf: (item) => item.artistName,
+        durationOf: (item) => item.duration,
+        dateOf: (item) => item.releaseDate,
+        albumOf: (item) => item.albumName,
+        discOf: (item) => item.discNumber,
+        trackOf: (item) => item.trackNumber,
+      ).map((item) => item.id).toList();
+
+      expect(sorted(HomeSearchSortOption.releaseAlbumOldest), [
+        'c',
+        'g',
+        'b',
+        'a',
+        'd',
+        'e',
+        'f',
+      ]);
+      expect(sorted(HomeSearchSortOption.releaseAlbumNewest), [
+        'd',
+        'e',
+        'g',
+        'b',
+        'a',
+        'c',
+        'f',
+      ]);
+      expect(results.first.id, 'a');
     });
 
     test('recognizes URLs and Spotify URIs without treating text as a URL', () {

@@ -14,6 +14,11 @@ String confirmedMissingLyricsSqlPredicate({
 String missingReplayGainSqlPredicate({required String hasReplayGainExpr}) =>
     'COALESCE($hasReplayGainExpr, 0) = 0';
 
+/// The release-date-then-album sort modes: a release timeline whose albums
+/// stay whole, newest or oldest first.
+bool isReleaseAlbumSort(String mode) =>
+    mode == 'release-album-newest' || mode == 'release-album-oldest';
+
 class _QueueOrderTerm {
   final String column;
   final bool descending;
@@ -55,6 +60,8 @@ class LibraryQueueStore {
           switch (request.sortMode) {
             'album-asc' => 'a-z',
             'album-desc' => 'z-a',
+            'release-album-newest' => 'release-newest',
+            'release-album-oldest' => 'release-oldest',
             final sortMode => sortMode,
           },
           'sort_album',
@@ -511,6 +518,7 @@ class LibraryQueueStore {
           ${_releaseSortColumn(request.sortMode, 'h')},
           h.sort_added
           ${_trackSizeColumns(request.sortMode)}
+          ${_releaseAlbumOrderColumns(request.sortMode, 'h')}
         FROM history_db.history h
         ${_sizeJoin(request.sortMode, 'history_db', 'h')}
         ${where.isEmpty ? '' : 'WHERE ${where.join(' AND ')}'}
@@ -591,6 +599,7 @@ class LibraryQueueStore {
           ${_releaseSortColumn(request.sortMode, 'l')},
           l.sort_added
           ${_trackSizeColumns(request.sortMode)}
+          ${_releaseAlbumOrderColumns(request.sortMode, 'l')}
         FROM ${LibrarySchema.visibleView} l
         ${_sizeJoin(request.sortMode, 'main', 'l')}
         ${where.isEmpty ? '' : 'WHERE ${where.join(' AND ')}'}
@@ -656,6 +665,7 @@ class LibraryQueueStore {
           NULL AS sort_release,
           NULL AS sort_added
           ${isLibrarySizeSort(request.sortMode) ? ', NULL AS file_size_bytes, 1 AS sort_size_unknown, 0 AS sort_size' : ''}
+          ${isReleaseAlbumSort(request.sortMode) ? ', 0 AS sort_disc, 999 AS sort_track_number' : ''}
         WHERE 0
       ''';
     }
@@ -1220,6 +1230,15 @@ class LibraryQueueStore {
             'COALESCE(file_sizes.size_bytes, 0) AS sort_size'
       : '';
 
+  /// Disc and track numbers as non-null sort keys for the release-album
+  /// modes, so an album's songs stay in track order and the keyset cursor
+  /// keeps working. A missing track number sorts after the numbered tracks.
+  String _releaseAlbumOrderColumns(String sortMode, String alias) =>
+      isReleaseAlbumSort(sortMode)
+      ? ', COALESCE($alias.disc_number, 0) AS sort_disc, '
+            'COALESCE($alias.track_number, 999) AS sort_track_number'
+      : '';
+
   String _albumSizeColumns(String sortMode) => isLibrarySizeSort(sortMode)
       ? ', (COUNT(file_sizes.size_bytes) < COUNT(*)) AS sort_size_unknown, '
             'COALESCE(SUM(file_sizes.size_bytes), 0) AS sort_size'
@@ -1230,6 +1249,18 @@ class LibraryQueueStore {
     String alias, {
     bool album = false,
   }) {
+    if (isReleaseAlbumSort(sortMode)) {
+      // Undated items sort after every dated one in both directions: the
+      // newest-first run ends on '', the oldest-first run on a date no real
+      // release can reach.
+      final unknown = sortMode == 'release-album-oldest'
+          ? "'9999-12-31'"
+          : "''";
+      final dated = "NULLIF(TRIM($alias.sort_release), '')";
+      return album
+          ? 'COALESCE(MAX($dated), $unknown) AS sort_release'
+          : 'COALESCE($dated, $unknown) AS sort_release';
+    }
     if (sortMode != 'year-asc' && sortMode != 'year-desc') {
       return album
           ? "COALESCE(MAX($alias.release_date), '') AS sort_release"
@@ -1281,6 +1312,16 @@ class LibraryQueueStore {
             'sort_release',
             descending: sortMode == 'release-newest' || sortMode == 'year-desc',
           ),
+          name,
+        ],
+        'release-album-newest' || 'release-album-oldest' => [
+          _QueueOrderTerm(
+            'sort_release',
+            descending: sortMode == 'release-album-newest',
+          ),
+          const _QueueOrderTerm('sort_album'),
+          const _QueueOrderTerm('sort_disc'),
+          const _QueueOrderTerm('sort_track_number'),
           name,
         ],
         'genre-asc' || 'genre-desc' => [

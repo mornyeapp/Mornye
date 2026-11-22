@@ -315,6 +315,9 @@ extension _HomeTabSearchWideUI on _HomeTabState {
       artistOf: (item) => item.artistName,
       durationOf: (item) => item.duration,
       dateOf: (item) => item.releaseDate,
+      albumOf: (item) => item.albumName,
+      discOf: (item) => item.discNumber,
+      trackOf: (item) => item.trackNumber,
     );
   }
 

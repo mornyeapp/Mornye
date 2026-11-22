@@ -171,6 +171,10 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
         return context.l10n.searchSortDateOldest;
       case HomeSearchSortOption.dateDesc:
         return context.l10n.searchSortDateNewest;
+      case HomeSearchSortOption.releaseAlbumNewest:
+        return context.l10n.libraryFilterSortReleaseAlbumNewest;
+      case HomeSearchSortOption.releaseAlbumOldest:
+        return context.l10n.libraryFilterSortReleaseAlbumOldest;
     }
   }
 
@@ -283,6 +287,9 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
       artistOf: (p) => p.$1.artistName,
       durationOf: (p) => p.$1.duration,
       dateOf: (p) => p.$1.releaseDate,
+      albumOf: (p) => p.$1.albumName,
+      discOf: (p) => p.$1.discNumber,
+      trackOf: (p) => p.$1.trackNumber,
     );
     final sortedTracks = sortedPairs.map((p) => p.$1).toList(growable: false);
     final sortedIndexes = sortedPairs.map((p) => p.$2).toList(growable: false);
