@@ -205,6 +205,10 @@ class MornyeGlass extends ConsumerWidget {
   @visibleForTesting
   static bool? debugShaderFilterSupport;
 
+  /// Whether this device can draw a lens, honoring the test override.
+  static bool get shaderFiltersSupported =>
+      debugShaderFilterSupport ?? ImageFilter.isShaderFilterSupported;
+
   final Widget child;
   final bool blurEnabled;
   final double radius;
@@ -304,7 +308,7 @@ class MornyeGlass extends ConsumerWidget {
         firstInGroup &&
         lastInGroup &&
         level == MornyeGlassLevel.liquid &&
-        (debugShaderFilterSupport ?? ImageFilter.isShaderFilterSupported);
+        shaderFiltersSupported;
     // Clear glass softens the backdrop less. Keep the mid-range fallback at
     // its small blur budget, and reuse these filters in the lens renderer too.
     final filterIndex = level == MornyeGlassLevel.frosted

@@ -17,6 +17,8 @@ class MornyeLiquidBackdrop extends StatelessWidget {
     this.interaction = false,
     this.progress = 1,
     this.refractionDepth = 0.30,
+    this.refractiveIndex,
+    this.pinch = 0,
     this.smoothCorners = false,
     this.highlightIntensity = 1,
   });
@@ -55,6 +57,12 @@ class MornyeLiquidBackdrop extends StatelessWidget {
   final bool interaction;
   final double progress;
   final double refractionDepth;
+
+  /// Null keeps the material's refractive index.
+  final double? refractiveIndex;
+
+  /// How far a held lens draws its backdrop in from its ends, from 0 to 1.
+  final double pinch;
   final bool smoothCorners;
   final double highlightIntensity;
 
@@ -70,6 +78,21 @@ class MornyeLiquidBackdrop extends StatelessWidget {
     return GlassWindowSpace(
       builder: (context, scale) {
         final radius = borderRadius.topLeft.x * scale;
+        final settings = base.copyWith(
+          visibility: effect,
+          glassColor: tint,
+          // The adaptive body keeps the backdrop's brightness under a
+          // tint, which would undo the dimming that keeps labels readable.
+          bodyMode: tint == null ? base.bodyMode : GlassBodyMode.clear,
+          blur: (blurSigma ?? base.blur) * scale,
+          frost: base.frost * density * scale,
+          thickness: base.thickness * scale * refractionDepth / 0.30,
+          refractiveIndex: refractiveIndex,
+          rimLight: base.rimLight * rim,
+          rimShade: base.rimShade * rim,
+          // The caller draws one shadow for every glass level.
+          shadow: const [],
+        );
         // The caller has already weighed contrast against the user's settings.
         return GlassAccessibilityScope(
           reduceTransparency: false,
@@ -78,20 +101,8 @@ class MornyeLiquidBackdrop extends StatelessWidget {
             shape: smoothCorners
                 ? LiquidRoundedSuperellipse(borderRadius: radius)
                 : LiquidRoundedRectangle(borderRadius: radius),
-            settings: base.copyWith(
-              visibility: effect,
-              glassColor: tint,
-              // The adaptive body keeps the backdrop's brightness under a
-              // tint, which would undo the dimming that keeps labels readable.
-              bodyMode: tint == null ? base.bodyMode : GlassBodyMode.clear,
-              blur: (blurSigma ?? base.blur) * scale,
-              frost: base.frost * density * scale,
-              thickness: base.thickness * scale * refractionDepth / 0.30,
-              rimLight: base.rimLight * rim,
-              rimShade: base.rimShade * rim,
-              // The caller draws one shadow for every glass level.
-              shadow: const [],
-            ),
+            // The package's own switch pinches its lens the same way.
+            settings: pinch > 0 ? settings.copyWithPinch(pinch) : settings,
             child: GlassWindowSpace.content(child: child),
           ),
         );

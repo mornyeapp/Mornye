@@ -1,11 +1,17 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoColors;
 import 'package:flutter/physics.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show GlassBackdropGroup;
 import 'package:material_3_expressive/material_3_expressive.dart';
+import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/mornye_liquid_backdrop.dart';
 
 /// One switch style for settings, extension controls and editing sheets.
 /// Mornye keeps its wide oval thumb even when glass or motion is disabled.
@@ -63,9 +69,16 @@ class _MornyeSwitch extends StatefulWidget {
 }
 
 class _MornyeSwitchState extends State<_MornyeSwitch>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   /// How far the thumb travels, from off to on.
   static const double _travel = 22;
+
+  /// The held lens at iOS 27's size: 58 x 38.33 around the 37 x 24 thumb.
+  static const double _heldWidthGrowth = 21;
+  static const double _heldHeightGrowth = 43 / 3;
+
+  /// The iOS 27 switch lens bends more than the selection lens.
+  static const double _heldRefractiveIndex = 1.38;
 
   double? _dragPosition;
   bool _dragCancelled = false;
@@ -85,10 +98,37 @@ class _MornyeSwitchState extends State<_MornyeSwitch>
   /// The finger's velocity, in thumb travels a second, for the next move.
   double? _releaseVelocity;
 
+  /// How far a held thumb has turned to glass.
+  late final AnimationController _press = AnimationController.unbounded(
+    vsync: this,
+  );
+  late final Listenable _thumbChanges = Listenable.merge([_thumb, _press]);
+
+  @override
+  void didUpdateWidget(_MornyeSwitch oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.onChanged == null && _press.value != 0) _press.value = 0;
+  }
+
   @override
   void dispose() {
     _thumb.dispose();
+    _press.dispose();
     super.dispose();
+  }
+
+  /// The lens lifts within about 120 ms and settles more slowly, as on iOS 27.
+  void _hold(bool held) {
+    if (!held && _press.value == 0 && !_press.isAnimating) return;
+    _press.animateWith(
+      SpringSimulation(
+        held ? MornyeMotion.effectsFastSpring : MornyeMotion.fastSpring,
+        _press.value,
+        held ? 1 : 0,
+        _press.velocity,
+        snapToEnd: true,
+      ),
+    );
   }
 
   /// Sends the thumb to the current value's side unless a drag holds it.
@@ -125,6 +165,69 @@ class _MornyeSwitchState extends State<_MornyeSwitch>
 
   @override
   Widget build(BuildContext context) {
+    // Only a device that draws shader lenses reads the glass settings.
+    final lensPossible =
+        MornyeGlass.shaderFiltersSupported &&
+        !MediaQuery.disableAnimationsOf(context);
+    if (!lensPossible) return _build(context, lens: false);
+    return Consumer(
+      builder: (context, ref, _) => _build(
+        context,
+        // Where MornyeGlass would draw a lens: liquid level, clarity above
+        // its lens threshold, no contrast request.
+        lens:
+            widget.onChanged != null &&
+            ref.watch(mornyeLiquidGlassProvider) &&
+            ref.watch(mornyeBlurEnabledProvider) &&
+            MornyeTheme.glassClarityOf(context) > 0.2 &&
+            !ref.watch(
+              mornyeGlassContrastBlockedProvider(
+                MediaQuery.highContrastOf(context),
+              ),
+            ),
+      ),
+    );
+  }
+
+  /// The thumb as a clear lens, grown around its resting center.
+  Widget _heldThumb(double held) {
+    final height = 24 + _heldHeightGrowth * held;
+    final radius = BorderRadius.circular(height / 2);
+    return SizedBox(
+      width: 37,
+      height: 24,
+      child: OverflowBox(
+        minWidth: 37 + _heldWidthGrowth * held,
+        maxWidth: 37 + _heldWidthGrowth * held,
+        minHeight: height,
+        maxHeight: height,
+        // A held lens lies over the track and reads it, even inside a group.
+        child: GlassBackdropGroup(
+          enabled: false,
+          child: MornyeLiquidBackdrop(
+            borderRadius: radius,
+            interaction: true,
+            progress: held,
+            refractiveIndex: 1 + (_heldRefractiveIndex - 1) * held,
+            pinch: 1 - (1 - held) * (1 - held),
+            // The white thumb fills the growing lens and fades as it lifts.
+            child: Opacity(
+              opacity: (1 - held * 1.4).clamp(0.0, 1.0),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: radius,
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _build(BuildContext context, {required bool lens}) {
     final value = widget.value;
     final onChanged = widget.onChanged;
     final scheme = Theme.of(context).colorScheme;
@@ -150,15 +253,18 @@ class _MornyeSwitchState extends State<_MornyeSwitch>
         borderRadius: BorderRadius.circular(14),
       ),
       child: AnimatedBuilder(
-        animation: _thumb,
+        animation: _thumbChanges,
         // The thumb stays inside the track when the spring runs past a side.
-        builder: (context, child) => Align(
-          alignment: AlignmentDirectional(
-            -1 + _thumb.value.clamp(0.0, 1.0) * 2,
-            0,
-          ),
-          child: child,
-        ),
+        builder: (context, child) {
+          final held = lens ? _press.value.clamp(0.0, 1.0) : 0.0;
+          return Align(
+            alignment: AlignmentDirectional(
+              -1 + _thumb.value.clamp(0.0, 1.0) * 2,
+              0,
+            ),
+            child: held > 0 ? _heldThumb(held) : child,
+          );
+        },
         child: Container(
           width: 37,
           height: 24,
@@ -172,7 +278,11 @@ class _MornyeSwitchState extends State<_MornyeSwitch>
 
     return Listener(
       onPointerDown: (_) => _dragCancelled = false,
-      onPointerCancel: (_) => _dragCancelled = true,
+      onPointerUp: (_) => _hold(false),
+      onPointerCancel: (_) {
+        _dragCancelled = true;
+        _hold(false);
+      },
       child: Semantics(
         label: widget.semanticLabel,
         toggled: value,
@@ -188,6 +298,11 @@ class _MornyeSwitchState extends State<_MornyeSwitch>
               // thumb uses only paint/layout, even on a page of switches.
               child: ExcludeSemantics(
                 child: GestureDetector(
+                  // The thumb turns to glass as the finger lands, and back
+                  // when a scroll or a tap takes the pointer.
+                  onHorizontalDragDown: enabled && lens
+                      ? (_) => _hold(true)
+                      : null,
                   // A drag picks the thumb up where it is, also mid-move.
                   onHorizontalDragStart: enabled
                       ? (_) =>
@@ -224,11 +339,15 @@ class _MornyeSwitchState extends State<_MornyeSwitch>
                                 direction /
                                 _travel;
                           });
+                          _hold(false);
                           if (!_dragCancelled && next != value) onChanged(next);
                         }
                       : null,
                   onHorizontalDragCancel: enabled
-                      ? () => setState(() => _dragPosition = null)
+                      ? () {
+                          setState(() => _dragPosition = null);
+                          _hold(false);
+                        }
                       : null,
                   child: SizedBox(
                     width: 71,

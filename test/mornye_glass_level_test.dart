@@ -463,6 +463,231 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  group('switch thumb lens', () {
+    final lens = find.descendant(
+      of: find.byType(AppSwitch),
+      matching: find.byType(AdaptiveGlass),
+    );
+
+    Future<List<bool>> pumpSwitch(
+      WidgetTester tester, {
+      MornyeGlassLevel level = MornyeGlassLevel.liquid,
+      double clarity = kDefaultMornyeGlassClarity,
+      bool highContrast = false,
+      bool reduceMotion = false,
+      bool enabled = true,
+      double scale = 1,
+    }) async {
+      var value = false;
+      final changes = <bool>[];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsProvider.overrideWith(_Settings.new),
+            mornyeGlassLevelProvider.overrideWithValue(level),
+          ],
+          child: MaterialApp(
+            theme: MornyeTheme.build(Brightness.light, glassClarity: clarity),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                highContrast: highContrast,
+                disableAnimations: reduceMotion,
+              ),
+              child: AdaptiveUiScaler(userScale: scale, child: child!),
+            ),
+            home: Scaffold(
+              // A settings page: the switch sits in a scrolling list.
+              body: ListView(
+                children: [
+                  const SizedBox(height: 200),
+                  Center(
+                    child: StatefulBuilder(
+                      builder: (context, setState) => AppSwitch(
+                        value: value,
+                        onChanged: enabled
+                            ? (next) {
+                                changes.add(next);
+                                setState(() => value = next);
+                              }
+                            : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 2000),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return changes;
+    }
+
+    testWidgets('appears only while a finger holds the thumb', (tester) async {
+      MornyeGlass.debugShaderFilterSupport = true;
+      addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
+      final changes = await pumpSwitch(tester);
+      expect(lens, findsNothing);
+      expect(find.byType(BackdropFilter), findsNothing);
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(AppSwitch)),
+      );
+      await tester.pumpAndSettle();
+      expect(lens, findsOneWidget);
+      final settings = tester.widget<AdaptiveGlass>(lens).settings;
+      expect(settings.visibility, 1);
+      expect(settings.refractiveIndex, closeTo(1.38, 0.0001));
+      expect(settings.pinchStrength, closeTo(1, 0.0001));
+      expect(settings.blur, 0);
+      expect(settings.frost, 0);
+      // The 37 x 24 thumb has become the 58 x 38.33 lens of iOS 27, in
+      // window pixels under the window's own interface scale.
+      final scale = AdaptiveUiScale.of(tester.element(find.byType(AppSwitch)));
+      expect(tester.getSize(lens).width, closeTo(58 * scale, 0.01));
+      expect(tester.getSize(lens).height, closeTo(115 / 3 * scale, 0.01));
+      expect(changes, isEmpty);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(changes, [true]);
+      expect(lens, findsNothing);
+      expect(find.byType(BackdropFilter), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('follows a drag and toggles once on release', (tester) async {
+      MornyeGlass.debugShaderFilterSupport = true;
+      addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
+      final changes = await pumpSwitch(tester);
+      final center = tester.getCenter(find.byType(AppSwitch));
+      final gesture = await tester.startGesture(center);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      final start = tester.getCenter(lens).dx;
+      for (var step = 0; step < 10; step++) {
+        await gesture.moveBy(const Offset(5, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      // The whole 22 dp travel, under the finger.
+      final scale = AdaptiveUiScale.of(tester.element(find.byType(AppSwitch)));
+      expect(tester.getCenter(lens).dx, closeTo(start + 22 * scale, 0.01));
+      expect(changes, isEmpty);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(changes, [true]);
+      expect(lens, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('drops when a scroll takes the finger', (tester) async {
+      MornyeGlass.debugShaderFilterSupport = true;
+      addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
+      final changes = await pumpSwitch(tester);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(AppSwitch)),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(lens, findsOneWidget);
+      // The list wins the pointer while the finger stays down.
+      for (var step = 0; step < 6; step++) {
+        await gesture.moveBy(const Offset(0, -10));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pumpAndSettle();
+      expect(lens, findsNothing);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(changes, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final (name, setup) in <(String, Map<String, Object>)>[
+      ('no shader filters', {'shaders': false}),
+      ('frosted level', {'level': MornyeGlassLevel.frosted}),
+      ('flat level', {'level': MornyeGlassLevel.flat}),
+      ('clarity at the lens threshold', {'clarity': 0.2}),
+      ('high contrast', {'highContrast': true}),
+      ('reduced motion', {'reduceMotion': true}),
+      ('disabled', {'enabled': false}),
+    ]) {
+      testWidgets('stays a plain thumb when held: $name', (tester) async {
+        MornyeGlass.debugShaderFilterSupport =
+            setup['shaders'] as bool? ?? true;
+        addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
+        await pumpSwitch(
+          tester,
+          level: setup['level'] as MornyeGlassLevel? ?? MornyeGlassLevel.liquid,
+          clarity: setup['clarity'] as double? ?? kDefaultMornyeGlassClarity,
+          highContrast: setup['highContrast'] as bool? ?? false,
+          reduceMotion: setup['reduceMotion'] as bool? ?? false,
+          enabled: setup['enabled'] as bool? ?? true,
+        );
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byType(AppSwitch)),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(lens, findsNothing);
+        expect(find.byType(BackdropFilter), findsNothing);
+        final thumb = find.descendant(
+          of: find.byType(AppSwitch),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Container &&
+                widget.decoration is BoxDecoration &&
+                (widget.decoration! as BoxDecoration).color == Colors.white,
+          ),
+        );
+        expect(tester.getSize(thumb), const Size(37, 24));
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('measures the window under an interface scale', (tester) async {
+      MornyeGlass.debugShaderFilterSupport = true;
+      addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
+      tester.view.devicePixelRatio = 2;
+      tester.view.physicalSize = const Size(800, 1600);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      for (final scale in [0.8, 1.0, 1.3]) {
+        await pumpSwitch(tester, scale: scale);
+        final control = tester.getRect(find.byType(AppSwitch));
+        expect(control.width, closeTo(71 * scale, 0.001), reason: '$scale');
+        final gesture = await tester.startGesture(control.center);
+        await tester.pumpAndSettle();
+        final window = MediaQuery.of(tester.element(lens));
+        expect(window.size.width, closeTo(400, 0.001), reason: '$scale');
+        expect(window.devicePixelRatio, closeTo(2, 0.001), reason: '$scale');
+        final box = tester.renderObject<RenderBox>(lens);
+        expect(
+          box.getTransformTo(null).getMaxScaleOnAxis(),
+          closeTo(1, 0.000001),
+          reason: '$scale',
+        );
+        // Centered on the resting thumb: 11 app pixels before the middle.
+        final shown = tester.getRect(lens);
+        expect(shown.width, closeTo(58 * scale, 0.01), reason: '$scale');
+        expect(shown.height, closeTo(115 / 3 * scale, 0.01), reason: '$scale');
+        expect(
+          shown.center.dx,
+          closeTo(control.center.dx - 11 * scale, 0.01),
+          reason: '$scale',
+        );
+        expect(shown.center.dy, closeTo(control.center.dy, 0.01));
+        await gesture.up();
+        await tester.pumpAndSettle();
+      }
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   for (final brightness in Brightness.values) {
     testWidgets(
       'the default clarity is the iOS 27 material (${brightness.name})',
