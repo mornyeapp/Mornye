@@ -439,4 +439,59 @@ void main() {
     expect(find.text('Download & Install'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('written notes show whole, without the folded commit list', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final notes = [
+      for (var index = 0; index < 60; index++)
+        '- **Item $index**: ${'a change described in plain words ' * 2}',
+    ].join('\n');
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [lowEndDeviceProvider.overrideWithValue(false)],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showUpdateDialog(
+                  context,
+                  updateInfo: UpdateInfo(
+                    version: '5.5.0',
+                    changelog:
+                        "## What's New\n\n### New\n\n$notes\n\n---\n\n"
+                        '<details>\n<summary>All changes</summary>\n\n'
+                        '### New Features\n\n- **scope**: A commit subject\n\n'
+                        '</details>\n\n---\n\n### Downloads\n',
+                    downloadUrl: 'https://example.test/releases/v5.5.0',
+                    installKind: UpdateInstallKind.releasePage,
+                  ),
+                  onDisableUpdates: () {},
+                ),
+                child: const Text('Check now'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Check now'));
+    await tester.pumpAndSettle();
+    final shown = tester
+        .widget<Text>(find.textContaining('Item 0: a change'))
+        .data!;
+    // Well past the 2000 characters older versions stopped at.
+    expect(shown.length, greaterThan(4000));
+    expect(shown, startsWith('New\n• Item 0: a change'));
+    expect(shown, contains('• Item 59: '));
+    expect(shown, isNot(endsWith('...')));
+    expect(shown, isNot(contains('commit subject')));
+    expect(tester.takeException(), isNull);
+  });
 }

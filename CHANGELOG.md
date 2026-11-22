@@ -5,7 +5,8 @@ better and what was fixed. A release puts the section named after its version
 (`Unreleased` while there is none) at the top of its notes, in the app's
 update dialog and in the Telegram post, with the full commit list folded
 under it. Write list items only, since the update dialog shows nothing else,
-and keep a section near 2000 characters, where the dialog stops.
+and keep a section short: the dialog stops at 2000 characters in versions up
+to 5.4 and at 8096 in later ones.
 
 Versions 4.9.7 to 5.4.0 have their notes on the
 [releases page](https://github.com/mornyeapp/Mornye/releases).

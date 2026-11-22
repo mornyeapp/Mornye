@@ -44,6 +44,9 @@ class _UpdateDialogState extends State<UpdateDialog> {
   bool _isDownloading = false;
   double _progress = 0;
   String _statusText = '';
+
+  /// Room for a release's written notes; a bare commit list is cut here.
+  static const int _changelogLimit = 8096;
   static final RegExp _whatsNewPattern = RegExp(
     r"###?\s*What'?s\s*New\s*\n",
     caseSensitive: false,
@@ -617,8 +620,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
     }
 
     var formatted = formattedLines.join('\n').trim();
-    if (formatted.length > 2000) {
-      formatted = '${formatted.substring(0, 2000)}...';
+    if (formatted.length > _changelogLimit) {
+      formatted = '${formatted.substring(0, _changelogLimit)}...';
     }
 
     return formatted.isEmpty ? emptyFallback : formatted;
