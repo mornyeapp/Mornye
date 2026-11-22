@@ -5,7 +5,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_easy/liquid_glass_easy.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show AdaptiveGlass, GlassBackdropGroup;
 import 'package:mornye/widgets/mornye_selection_pill.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -192,17 +193,17 @@ void main() {
         MornyeGlass.debugShaderFilterSupport = true;
         addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
         await pumpShell(tester, blur: true, withPlayer: withPlayer);
-        // Every painted lens carries a batch key, so each takes the single
-        // composed pass, and lenses with the same key share one read.
+        // Every lens of the bar sits in a backdrop group, and lenses with the
+        // same key share one read.
         List<Element> lenses() => find
             .descendant(
               of: find.byType(MornyeBottomBar),
-              matching: find.byType(LiquidGlassLens),
+              matching: find.byType(AdaptiveGlass),
             )
             .evaluate()
             .toList();
-        List<int> keys(List<Element> lenses) => [
-          for (final lens in lenses) LiquidGlassBatch.backdropIdOf(lens)!,
+        List<BackdropKey> keys(List<Element> lenses) => [
+          for (final lens in lenses) GlassBackdropGroup.keyOf(lens)!,
         ];
 
         final expanded = keys(lenses());
@@ -226,7 +227,7 @@ void main() {
         final resting = lenses();
         expect(resting, hasLength(withPlayer ? 3 : 2));
         expect(keys(resting).toSet(), expanded.toSet());
-        // Switching batches reparents the search capsule's lens instead of
+        // Switching groups reparents the search capsule's lens instead of
         // rebuilding it. The leading circle takes over from the bar only here.
         expect(resting.where(folding.contains), hasLength(withPlayer ? 2 : 1));
 

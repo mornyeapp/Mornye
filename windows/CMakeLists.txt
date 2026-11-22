@@ -180,10 +180,6 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
   PATTERN "packages/media_kit/assets/web/*" EXCLUDE
   PATTERN "packages/record_web/*" EXCLUDE
   PATTERN "packages/flutter_local_notifications_web/*" EXCLUDE
-  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/metaball_*" EXCLUDE
-  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_border.frag" EXCLUDE
-  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/liquid_glass.frag" EXCLUDE
-  PATTERN "packages/liquid_glass_easy/lib/assets/shaders/liquid_glass_geometry.frag" EXCLUDE
   PATTERN "assets/licenses/usb.txt" EXCLUDE
   PATTERN "assets/licenses/oboe.txt" EXCLUDE
   PATTERN "assets/licenses/wavpack.txt" EXCLUDE

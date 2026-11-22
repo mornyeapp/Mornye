@@ -3,7 +3,8 @@ import 'dart:ui' as ui;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_easy/liquid_glass_easy.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show AdaptiveGlass, GlassBackdropGroup;
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
@@ -461,7 +462,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('every lens composes into exactly one batch read', (
+  testWidgets('lenses share a backdrop read only inside one group', (
     tester,
   ) async {
     MornyeGlass.debugShaderFilterSupport = true;
@@ -490,7 +491,7 @@ void main() {
                   selectedIndex: 0,
                   onChanged: (_) {},
                 ),
-                LiquidGlassBatch(
+                GlassBackdropGroup(
                   child: Row(children: [glass('chip-a'), glass('chip-b')]),
                 ),
               ],
@@ -500,32 +501,26 @@ void main() {
       ),
     );
 
-    final lenses = find.byType(LiquidGlassLens).evaluate().toList();
+    final lenses = find.byType(AdaptiveGlass).evaluate().toList();
     // The nested glass paints on its parent's surface without a lens.
     expect(lenses, hasLength(7));
-    for (final lens in lenses) {
-      expect(
-        find.ancestor(
-          of: find.byWidget(lens.widget),
-          matching: find.byType(LiquidGlassBatch),
-        ),
-        findsOneWidget,
-      );
-    }
-    int keyOf(String glass) => LiquidGlassBatch.backdropIdOf(
+    BackdropKey? keyOf(String glass) => GlassBackdropGroup.keyOf(
       tester.element(
         find.descendant(
           of: find.byKey(ValueKey(glass)),
-          matching: find.byType(LiquidGlassLens),
+          matching: find.byType(AdaptiveGlass),
         ),
       ),
-    )!;
-    expect(keyOf('chip-a'), keyOf('chip-b'));
-    final keys = {
-      for (final lens in lenses) LiquidGlassBatch.backdropIdOf(lens)!,
-    };
-    expect(keys, hasLength(6));
-    expect(keyOf('back'), isNot(keyOf('front')));
+    );
+    expect(keyOf('chip-a'), isNotNull);
+    expect(keyOf('chip-a'), same(keyOf('chip-b')));
+    // Glass outside a group reads alone, so overlapping glass sees glass.
+    expect(keyOf('back'), isNull);
+    expect(keyOf('front'), isNull);
+    expect(
+      lenses.where((lens) => GlassBackdropGroup.keyOf(lens) != null),
+      hasLength(2),
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -567,13 +562,32 @@ void main() {
     for (final scale in [0.8, 1.0, 1.3]) {
       await pumpAt(scale);
       // The lens turns its place in the window into pixels with these two.
-      final lens = MediaQuery.of(tester.element(find.byType(LiquidGlassLens)));
+      final glass = find.byType(AdaptiveGlass);
+      final lens = MediaQuery.of(tester.element(glass));
       expect(lens.size.width, closeTo(400, 0.001), reason: '$scale');
       expect(lens.size.height, closeTo(800, 0.001), reason: '$scale');
       expect(lens.devicePixelRatio, closeTo(2, 0.001), reason: '$scale');
-      // What sits on the glass still lays out in the scaled viewport.
+      // It is laid out in window pixels, and nothing scales it on the way
+      // to the screen: its shaders assume as much.
+      final box = tester.renderObject<RenderBox>(glass);
+      expect(box.size.width, closeTo(80 * scale, 0.001), reason: '$scale');
+      expect(
+        box.getTransformTo(null).getMaxScaleOnAxis(),
+        closeTo(1, 0.000001),
+        reason: '$scale',
+      );
+      // What sits on the glass still lays out in the scaled viewport, and
+      // covers the glass.
       expect(content!.size.width, closeTo(400 / scale, 0.001));
       expect(content!.devicePixelRatio, closeTo(2 * scale, 0.001));
+      final onGlass = find.byWidgetPredicate(
+        (widget) => widget is SizedBox && widget.width == 80,
+      );
+      expect(tester.getSize(onGlass), const Size(80, 40));
+      final shown = tester.getRect(onGlass);
+      final surface = tester.getRect(glass);
+      expect(shown.left, closeTo(surface.left, 0.001), reason: '$scale');
+      expect(shown.width, closeTo(surface.width, 0.001), reason: '$scale');
     }
     expect(tester.takeException(), isNull);
   });
@@ -613,7 +627,7 @@ void main() {
         ),
       ),
     );
-    final lens = tester.widget<LiquidGlassLens>(find.byType(LiquidGlassLens));
+    final lens = tester.widget<AdaptiveGlass>(find.byType(AdaptiveGlass));
     expect(content!.viewInsets.bottom, 0);
 
     tester.view.viewInsets = const FakeViewPadding(bottom: 600);
@@ -621,11 +635,11 @@ void main() {
 
     // A lens rebuild repaints its glass.
     expect(
-      tester.widget<LiquidGlassLens>(find.byType(LiquidGlassLens)),
+      tester.widget<AdaptiveGlass>(find.byType(AdaptiveGlass)),
       same(lens),
     );
     expect(content!.viewInsets.bottom, closeTo(300 / 0.9, 0.001));
-    final window = MediaQuery.of(tester.element(find.byType(LiquidGlassLens)));
+    final window = MediaQuery.of(tester.element(find.byType(AdaptiveGlass)));
     expect(window.size.width, closeTo(400, 0.001));
     expect(window.devicePixelRatio, closeTo(2, 0.001));
     expect(tester.takeException(), isNull);

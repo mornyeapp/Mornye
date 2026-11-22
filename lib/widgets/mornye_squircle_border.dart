@@ -1,7 +1,6 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:liquid_glass_easy/liquid_glass_easy.dart';
 
-/// Uses the same outline as the optical lens, including its continuous corners.
+/// The outline of the glass lens: Flutter's continuous-corner superellipse.
 /// The fill, shadow, clip and rim must agree to avoid cutting off the glass edge.
 class MornyeSquircleBorder extends ShapeBorder {
   const MornyeSquircleBorder(this.radius);
@@ -24,7 +23,9 @@ class MornyeSquircleBorder extends ShapeBorder {
     if (_pathCache.length >= _maxCacheEntries) {
       _pathCache.remove(_pathCache.keys.first);
     }
-    final path = liquidGlassSquirclePath(size, radius, 1);
+    final path = RoundedSuperellipseBorder(
+      borderRadius: BorderRadius.circular(radius),
+    ).getOuterPath(Offset.zero & size);
     _pathCache[key] = path;
     return path;
   }

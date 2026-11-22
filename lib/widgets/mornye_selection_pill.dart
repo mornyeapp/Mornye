@@ -5,7 +5,8 @@ import 'dart:ui' as ui;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart';
-import 'package:liquid_glass_easy/liquid_glass_easy.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show GlassBackdropGroup;
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_liquid_backdrop.dart';
@@ -387,7 +388,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
                 // The lens must sample the foreground as well as the page.
                 // Below the icons it would look like a rim on a flat backdrop.
                 if (lensEnabled && selected >= 0 && selected < count)
-                  _interactionLens(count, isDark, outlines),
+                  _interactionLens(count, isDark),
               ],
             ),
           ),
@@ -476,63 +477,45 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
     );
   }
 
-  Widget _interactionLens(int count, bool isDark, bool outlines) =>
-      Positioned.fill(
-        child: IgnorePointer(
-          child: AnimatedBuilder(
-            animation: _visualChanges,
-            builder: (context, _) {
-              final progress = _press.value.clamp(0.0, 1.0);
-              if (progress <= 0) return const SizedBox.shrink();
-              return Align(
-                alignment: AlignmentDirectional(_shownAlignment, 0),
-                child: FractionallySizedBox(
-                  widthFactor: 1 / count,
-                  heightFactor: 1,
-                  child: Transform.scale(
-                    scaleX: 1 + _heldWidthGrowth * progress,
-                    scaleY: 1 + _heldHeightGrowth * progress,
-                    child: ClipRRect(
+  Widget _interactionLens(int count, bool isDark) => Positioned.fill(
+    child: IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _visualChanges,
+        builder: (context, _) {
+          final progress = _press.value.clamp(0.0, 1.0);
+          if (progress <= 0) return const SizedBox.shrink();
+          return Align(
+            alignment: AlignmentDirectional(_shownAlignment, 0),
+            child: FractionallySizedBox(
+              widthFactor: 1 / count,
+              heightFactor: 1,
+              child: Transform.scale(
+                scaleX: 1 + _heldWidthGrowth * progress,
+                scaleY: 1 + _heldHeightGrowth * progress,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(_pillRadius),
+                  // The held lens lies over its bar's glass and reads it.
+                  child: GlassBackdropGroup(
+                    enabled: false,
+                    child: MornyeLiquidBackdrop(
                       borderRadius: BorderRadius.circular(_pillRadius),
-                      child: LiquidGlassBatch.exclude(
-                        child: MornyeLiquidBackdrop(
-                          borderRadius: BorderRadius.circular(_pillRadius),
-                          clarity: 1,
-                          interaction: true,
-                          progress: progress,
-                          blurSigma: 0,
-                          // A broader bevel makes the held lens visible as it
-                          // crosses the icons, while leaving its center
-                          // undistorted.
-                          refractionDepth: 0.18,
-                          refractionWidth: 18,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(_pillRadius),
-                              color: Colors.white.withValues(
-                                alpha: progress * (isDark ? 0.08 : 0.24),
-                              ),
-                              border: outlines
-                                  ? Border.all(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.6 * progress,
-                                      ),
-                                      width: 0.75,
-                                    )
-                                  : null,
-                            ),
-                            child: const SizedBox.expand(),
-                          ),
-                        ),
+                      tint: Colors.white.withValues(
+                        alpha: isDark ? 0.08 : 0.24,
                       ),
+                      interaction: true,
+                      progress: progress,
+                      blurSigma: 0,
+                      child: const SizedBox.expand(),
                     ),
                   ),
                 ),
-              );
-            },
-          ),
-        ),
-      );
+              ),
+            ),
+          );
+        },
+      ),
+    ),
+  );
 }
 
 /// Paint only icons and labels with the sliding selection color. Badge fills

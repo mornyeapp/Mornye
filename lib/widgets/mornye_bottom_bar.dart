@@ -3,7 +3,8 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:liquid_glass_easy/liquid_glass_easy.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show GlassBackdropGroup;
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
@@ -342,7 +343,7 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
                                 // and needs a backdrop sample of its own.
                                 child: amount == 1
                                     ? surface
-                                    : LiquidGlassBatch(child: surface),
+                                    : GlassBackdropGroup(child: surface),
                               ),
                             ),
                           ),
@@ -387,7 +388,7 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
             // Only non-overlapping surfaces share a backdrop: the player, the
             // tabs and, at rest, the side capsules. Frosted capsules stay out
             // of the blur group, since they cross the tab bar while folding.
-            return LiquidGlassBatch(
+            return GlassBackdropGroup(
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [

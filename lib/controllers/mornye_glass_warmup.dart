@@ -4,7 +4,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:liquid_glass_easy/liquid_glass_easy.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show LiquidGlassWidgets;
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
@@ -31,11 +32,9 @@ class MornyeGlassWarmup {
   static Future<void> _prepare(ui.FlutterView view) async {
     // GLES needs the view's initialized graphics context. A first-frame
     // callback only means painting was submitted, not that rasterization ran.
-    // Mornye only mounts LiquidGlassLens (never LiquidGlassBlender/Morph), so
-    // warm only the lens shader pipeline and skip unused metaball shaders.
     await Future.wait<void>([
-      // ignore: invalid_use_of_internal_member
-      LiquidGlassShaders.ensureLensLoaded(),
+      // The package's monitor reports slow frames as errors in debug builds.
+      LiquidGlassWidgets.initialize(enablePerformanceMonitor: false),
       WidgetsBinding.instance.waitUntilFirstFrameRasterized,
     ]);
     // Do not compete with an entrance, theme switch or scrolling animation.
