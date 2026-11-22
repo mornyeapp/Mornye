@@ -485,7 +485,6 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                 MornyeGlassPress(
                   radius: 32,
                   child: MornyeGlass.navigation(
-                    strongTint: true,
                     tintOpacity: MornyeTheme.chromeOpacity(context),
                     blurEnabled: ref.watch(mornyeBlurEnabledProvider),
                     child: swipeable,

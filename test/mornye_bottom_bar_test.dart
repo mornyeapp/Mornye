@@ -20,6 +20,7 @@ import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/mornye_bottom_bar.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/mornye_liquid_backdrop.dart';
 
 import 'support/tooltip_finder.dart';
 
@@ -209,6 +210,17 @@ void main() {
         final expanded = keys(lenses());
         expect(expanded, hasLength(withPlayer ? 2 : 1));
         expect(expanded.toSet(), hasLength(1));
+        // At the default clarity the bar and the player are the material's
+        // own glass, not a tint of the app's.
+        for (final lens in lenses()) {
+          final settings = (lens.widget as AdaptiveGlass).settings;
+          final material = MornyeLiquidBackdrop.material(
+            Theme.of(lens).brightness,
+          );
+          expect(settings.glassColor, material.glassColor);
+          expect(settings.bodyMode, material.bodyMode);
+          expect(settings.frost, material.frost);
+        }
 
         chrome.value = true;
         await tester.pump();

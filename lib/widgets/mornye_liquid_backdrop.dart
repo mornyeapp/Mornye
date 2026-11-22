@@ -23,9 +23,11 @@ class MornyeLiquidBackdrop extends StatelessWidget {
 
   /// The package's material for resting glass, calibrated against iOS 27.
   static LiquidGlassSettings material(Brightness brightness) =>
-      brightness == Brightness.dark
-      ? LiquidGlassSettings.ios27Dark
-      : LiquidGlassSettings.ios27Light;
+      brightness == Brightness.dark ? _dark : LiquidGlassSettings.ios27Light;
+
+  // iOS turns the labels on dark glass dark over a bright backdrop. Mornye's
+  // stay white, so its dark glass pulls a bright backdrop down further.
+  static final _dark = LiquidGlassSettings.ios27Dark.copyWith(bodyShade: 0.55);
 
   /// The package keeps Windows and Linux off its refracting shaders, which
   /// their graphics layers compile slowly or not at all.
@@ -43,8 +45,8 @@ class MornyeLiquidBackdrop extends StatelessWidget {
   /// Null keeps the material's blur.
   final double? blurSigma;
 
-  /// How much of the material's frost and color stays: 1 is the material as
-  /// calibrated, less is clearer glass.
+  /// How much of the material's frost stays: 1 is the material as calibrated,
+  /// less is clearer glass. Its color stays, which keeps labels readable.
   final double density;
   final Widget child;
 
@@ -78,11 +80,7 @@ class MornyeLiquidBackdrop extends StatelessWidget {
                 : LiquidRoundedRectangle(borderRadius: radius),
             settings: base.copyWith(
               visibility: effect,
-              glassColor:
-                  tint ??
-                  base.glassColor.withValues(
-                    alpha: base.glassColor.a * density,
-                  ),
+              glassColor: tint,
               // The adaptive body keeps the backdrop's brightness under a
               // tint, which would undo the dimming that keeps labels readable.
               bodyMode: tint == null ? base.bodyMode : GlassBodyMode.clear,

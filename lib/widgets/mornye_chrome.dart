@@ -190,8 +190,8 @@ class MornyeGlass extends ConsumerWidget {
   // clarity setting falls below its default.
   static const _tintedLensBlur = 6.0;
 
-  // How much of the material's frost and color the clearest setting drops.
-  static const _thinnedShare = 0.3;
+  // How much of the material's frost the clearest setting drops.
+  static const _thinnedShare = 0.5;
 
   /// Host tests cannot run shader filters; this lets them build the lens.
   @visibleForTesting
@@ -316,15 +316,7 @@ class MornyeGlass extends ConsumerWidget {
     final density = ownMaterial ? 1 - _thinnedShare * thinned : 1.0;
     final fill = Color.lerp(
       scheme.surfaceContainerHigh,
-      ownMaterial
-          ? Color.lerp(
-              material.glassColor.withValues(
-                alpha: material.glassColor.a * density,
-              ),
-              tint,
-              tinted,
-            )
-          : tint,
+      ownMaterial ? Color.lerp(material.glassColor, tint, tinted) : tint,
       reveal,
     )!;
     final squircle = smoothCorners && firstInGroup && lastInGroup;
@@ -706,7 +698,6 @@ class MornyeTabBar extends ConsumerWidget {
                           ),
                           child: MornyeGlass.navigation(
                             blurEnabled: blurEnabled,
-                            strongTint: true,
                             tintOpacity: MornyeTheme.navigationOpacity(context),
                             refractionDepth: 0.45 + 0.15 * progress,
                             radius: lerpDouble(32, foldedSize / 2, amount)!,

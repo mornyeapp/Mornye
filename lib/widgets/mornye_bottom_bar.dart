@@ -219,7 +219,6 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
       key: key,
       child: MornyeGlass.navigation(
         blurEnabled: blurEnabled,
-        strongTint: true,
         tintOpacity: MornyeTheme.navigationOpacity(context),
         radius: 26,
         child: const SizedBox.expand(),

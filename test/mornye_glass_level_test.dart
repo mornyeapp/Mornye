@@ -14,6 +14,7 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/app_switch.dart';
 import 'package:mornye/widgets/extension_repo_card.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/mornye_liquid_backdrop.dart';
 import 'package:mornye/widgets/mornye_selection_pill.dart';
 
 class _Settings extends SettingsNotifier {
@@ -496,9 +497,12 @@ void main() {
               .settings;
         }
 
+        // Mornye's labels on dark glass stay white, so its dark glass pulls
+        // a bright backdrop down further. Nothing else leaves the preset.
         final material = brightness == Brightness.dark
-            ? LiquidGlassSettings.ios27Dark
+            ? LiquidGlassSettings.ios27Dark.copyWith(bodyShade: 0.55)
             : LiquidGlassSettings.ios27Light;
+        expect(MornyeLiquidBackdrop.material(brightness), material);
         // Only the shadow differs: the app draws the material's own.
         expect(
           await lensAt(kDefaultMornyeGlassClarity),
@@ -512,7 +516,8 @@ void main() {
         expect(tinted.bodyMode, GlassBodyMode.clear);
 
         final thinned = await lensAt(1);
-        expect(thinned.glassColor.a, lessThan(material.glassColor.a));
+        // The color is what keeps labels readable, so only the frost thins.
+        expect(thinned.glassColor, material.glassColor);
         expect(thinned.frost, lessThan(material.frost));
         expect(thinned.blur, material.blur);
         expect(thinned.bodyMode, material.bodyMode);
