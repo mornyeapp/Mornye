@@ -173,7 +173,8 @@ pub(super) fn embedded(data: &[u8]) -> Result<AudioMetadata, String> {
             4 => syncsafe(&body[..4]),
             _ => 0,
         };
-        let skip = if size + 4 <= body.len() as u64 {
+        // Only the v2.3 size excludes its own 4 bytes.
+        let skip = if version == 3 && size + 4 <= body.len() as u64 {
             size + 4
         } else {
             size
