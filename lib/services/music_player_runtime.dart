@@ -733,6 +733,7 @@ class MusicPlayerRuntime {
   Future<void> showRemote(RemotePlayback? remote) async {
     if (identical(remote, _remote)) return;
     _remote = remote;
+    _handler?.refreshPlaybackOutput();
     if (remote != null) {
       try {
         await initialize();
@@ -763,7 +764,11 @@ class MusicPlayerRuntime {
   set soundsBesideRemote(bool value) {
     _soundsBesideRemote = value;
     _remoteSession?.ownVolume = value;
+    _handler?.refreshPlaybackOutput();
   }
+
+  /// Whether a remote device plays in this one's place.
+  bool get playsElsewhere => _remote != null && !_soundsBesideRemote;
 
   /// The default runtime lives for the app lifetime. Scoped runtimes close
   /// subscriptions and reject new initialization when their owner disposes.

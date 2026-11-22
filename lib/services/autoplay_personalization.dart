@@ -30,6 +30,27 @@ class AutoplayLearningTrack {
   final Duration? duration;
 }
 
+/// The kind of output music plays on. Only the kind enters the model, never
+/// a device's name or address; [unknown] adds no features.
+enum AutoplayOutput {
+  unknown(null),
+  speaker('speaker'),
+  wired('wired'),
+  bluetooth('bluetooth'),
+
+  /// A USB DAC, or a computer's output held in exclusive mode.
+  dac('dac'),
+  car('car'),
+
+  /// Another device plays: a Cast receiver, AirPlay or a Link device.
+  remote('remote');
+
+  const AutoplayOutput(this.token);
+
+  /// Hashed into the model, so it never changes once released.
+  final String? token;
+}
+
 enum AutoplayFeedbackKind {
   /// Played on, through at least half of the song.
   listened,
@@ -56,6 +77,7 @@ class AutoplayFeedback {
     required this.at,
     required this.reward,
     this.weight = 1,
+    this.output = AutoplayOutput.unknown,
   });
 
   final AutoplayFeedbackKind kind;
@@ -63,6 +85,9 @@ class AutoplayFeedback {
   final AutoplayLearningTrack? previous;
   final DateTime at;
   final double reward, weight;
+
+  /// Where the song played, as it played.
+  final AutoplayOutput output;
 }
 
 String _text(String value) {
@@ -145,6 +170,7 @@ class AutoplayPreferenceModel {
     AutoplayLearningTrack track,
     AutoplayLearningTrack? previous,
     DateTime at,
+    AutoplayOutput output,
   ) {
     final artist = _text(track.artist), album = _text(track.album);
     final genres = _genres(track.genre);
@@ -173,14 +199,30 @@ class AutoplayPreferenceModel {
       if (track.duration != null && track.duration! > Duration.zero)
         'duration:${min(5, track.duration!.inSeconds ~/ 90)}',
     ];
+    // Where and on which kind of day it plays. An unknown output adds
+    // nothing, so the features stay as they were before this context.
+    final route = output.token;
+    final day = at.weekday >= DateTime.saturday ? 'weekend' : 'weekday';
+    final context = <String>[
+      if (route != null) ...[
+        if (artist.isNotEmpty) 'output:$route|artist:$artist',
+        for (final genre in genres) 'output:$route|genre:$genre',
+        for (final genre in genres) 'day:$day|genre:$genre',
+      ],
+    ];
     final features = <int, double>{};
-    for (final token in tokens) {
+    void add(String token) {
       final hash = _hash(token);
       final index = hash & (dimensions - 1);
       final sign = (hash & 0x80000000) == 0 ? 1.0 : -1.0;
       features[index] = (features[index] ?? 0) + sign;
     }
+
+    tokens.forEach(add);
+    // The context takes the same scale as the other tokens without
+    // joining the norm, so learned weights keep their effect.
     final norm = sqrt(features.values.fold(0.0, (sum, v) => sum + v * v));
+    context.forEach(add);
     if (norm > 0) features.updateAll((_, value) => value / norm);
     return features;
   }
@@ -197,16 +239,18 @@ class AutoplayPreferenceModel {
     AutoplayLearningTrack track, {
     AutoplayLearningTrack? previous,
     required DateTime at,
-  }) => _probability(_features(track, previous, at));
+    AutoplayOutput output = AutoplayOutput.unknown,
+  }) => _probability(_features(track, previous, at, output));
 
   double rankAdjustment(
     AutoplayLearningTrack track, {
     required AutoplayLearningTrack previous,
     required DateTime at,
+    AutoplayOutput output = AutoplayOutput.unknown,
   }) =>
       20 *
       min(1.0, _observations / 20) *
-      (preference(track, previous: previous, at: at) - 0.5);
+      (preference(track, previous: previous, at: at, output: output) - 0.5);
 
   void learn(
     AutoplayLearningTrack track, {
@@ -214,9 +258,10 @@ class AutoplayPreferenceModel {
     required DateTime at,
     required double reward,
     double weight = 1,
+    AutoplayOutput output = AutoplayOutput.unknown,
   }) {
     if (!reward.isFinite || !weight.isFinite || weight <= 0) return;
-    final features = _features(track, previous, at);
+    final features = _features(track, previous, at, output);
     if (features.isEmpty) return;
     final last = _updatedAt;
     if (last != null) {
@@ -405,10 +450,11 @@ class AutoplayExploration {
 }
 
 class _LearningSession {
-  _LearningSession(this.track, this.previous, this.at);
+  _LearningSession(this.track, this.previous, this.at, this.output);
   AutoplayLearningTrack track;
   final AutoplayLearningTrack? previous;
   final DateTime at;
+  AutoplayOutput output;
   Duration listened = Duration.zero;
   Duration? lastElapsed;
   bool playing = false;
@@ -439,10 +485,24 @@ class AutoplayPersonalization {
   Timer? _saveTimer;
   _LearningSession? _session;
   AutoplayLearningTrack? _previous;
+  AutoplayOutput _output = AutoplayOutput.unknown;
   final _pending = <AutoplayFeedback>[];
   final _feedback = StreamController<AutoplayFeedback>.broadcast();
 
   int get observations => _model.observations;
+
+  /// The kind of output music plays on now, which a refill ranks with.
+  AutoplayOutput get output => _output;
+
+  /// A song keeps the output it began on; one that began before the output
+  /// was known takes the first known one.
+  set output(AutoplayOutput value) {
+    _output = value;
+    final session = _session;
+    if (session != null && session.output == AutoplayOutput.unknown) {
+      session.output = value;
+    }
+  }
 
   /// Whether learning is on, by its setting and the player mode.
   bool get enabled => _enabled && !_disposed;
@@ -500,7 +560,7 @@ class AutoplayPersonalization {
   void begin(AutoplayLearningTrack track) {
     if (!_enabled || _disposed) return;
     finish();
-    _session = _LearningSession(track, _previous, _now());
+    _session = _LearningSession(track, _previous, _now(), _output);
     _session!.lastElapsed = _elapsed();
     _previous = track;
   }
@@ -590,6 +650,7 @@ class AutoplayPersonalization {
         at: session.at,
         reward: reward,
         weight: weight,
+        output: session.output,
       ),
     );
   }
@@ -602,7 +663,8 @@ class AutoplayPersonalization {
   }
 
   /// The listener chose [track] outright, such as by loving it: a stronger
-  /// signal than letting it play. The current song keeps its context.
+  /// signal than letting it play. The current song keeps its context; any
+  /// other song did not play, so it has no output.
   void endorse(AutoplayLearningTrack track, AutoplayFeedbackKind kind) {
     if (!_enabled || _disposed) return;
     final session = _session;
@@ -618,6 +680,7 @@ class AutoplayPersonalization {
         at: _now(),
         reward: 1,
         weight: kind == AutoplayFeedbackKind.loved ? 2 : 1.5,
+        output: current ? session.output : AutoplayOutput.unknown,
       ),
     );
   }
@@ -638,6 +701,7 @@ class AutoplayPersonalization {
       at: feedback.at,
       reward: feedback.reward,
       weight: feedback.weight,
+      output: feedback.output,
     );
     if (!_feedback.isClosed) _feedback.add(feedback);
     _dirty = true;
@@ -656,7 +720,7 @@ class AutoplayPersonalization {
     DateTime at,
   ) => !_enabled || !_loaded || _disposed
       ? 0
-      : _model.rankAdjustment(track, previous: seed, at: at);
+      : _model.rankAdjustment(track, previous: seed, at: at, output: _output);
 
   Future<void> flush() {
     _saveTimer?.cancel();

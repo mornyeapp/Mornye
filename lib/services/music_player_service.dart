@@ -161,6 +161,12 @@ class MusicPlayerHandler extends BaseAudioHandler
   StreamSubscription<Set<AudioDevice>>? _automationDevicesSubscription;
   bool _headphoneMonitoringRequested = false;
   int _headphoneMonitoringRevision = 0;
+  // The connected outputs learning reads its output kind from.
+  StreamSubscription<Set<AudioDevice>>? _outputDevicesSubscription;
+  Set<AudioDevice>? _outputDevices;
+  bool _outputMonitoringRequested = false;
+  int _outputMonitoringRevision = 0;
+  bool _exclusiveHeld = false;
   final List<PlayableMedia> _media = [];
   final List<MediaItem> _queueItems = [];
   late final ContentUriPlaybackCache _sourceCache;
@@ -453,6 +459,8 @@ class MusicPlayerHandler extends BaseAudioHandler
     _refreshPlaybackAutomation();
     playbackSpeed.addListener(_tempoChanged);
     playbackTempoSupportRevision.addListener(_tempoChanged);
+    usbAudioStatus.addListener(refreshPlaybackOutput);
+    playbackExclusiveStatus.addListener(refreshPlaybackOutput);
 
     _listenToPlayer(_player);
     _cast.initialize();
@@ -533,6 +541,76 @@ class MusicPlayerHandler extends BaseAudioHandler
             state.processingState == AudioProcessingState.ready,
       );
     }
+    _refreshOutputMonitoring();
+  }
+
+  /// Reads the connected outputs while learning is on. audio_session lists
+  /// them on Android and iOS; elsewhere only the player's own state counts.
+  void _refreshOutputMonitoring() {
+    final session = _audioSession;
+    final watch =
+        !_disposed && session != null && _runtime.personalization.enabled;
+    if (watch && !_outputMonitoringRequested) {
+      _outputMonitoringRequested = true;
+      unawaited(_startOutputMonitoring(session, ++_outputMonitoringRevision));
+    } else if (!watch && _outputMonitoringRequested) {
+      _outputMonitoringRequested = false;
+      _outputMonitoringRevision++;
+      _outputDevices = null;
+      final subscription = _outputDevicesSubscription;
+      _outputDevicesSubscription = null;
+      if (subscription != null) unawaited(subscription.cancel());
+    }
+    refreshPlaybackOutput();
+  }
+
+  Future<void> _startOutputMonitoring(
+    AudioSession session,
+    int revision,
+  ) async {
+    void changed(Set<AudioDevice> devices) {
+      if (_disposed || revision != _outputMonitoringRevision) return;
+      _outputDevices = devices;
+      refreshPlaybackOutput();
+    }
+
+    try {
+      changed(await session.getDevices());
+      if (_disposed || revision != _outputMonitoringRevision) return;
+      _outputDevicesSubscription = session.devicesChangedEventStream
+          .asyncMap((_) => session.getDevices())
+          .listen(
+            changed,
+            onError: (Object error) =>
+                _log.w('Could not read the audio output: $error'),
+          );
+    } catch (error) {
+      _log.w('Could not read the audio output: $error');
+    }
+  }
+
+  /// Tells learning the kind of output music plays on now. Only the kind,
+  /// never a device's name or address.
+  void refreshPlaybackOutput() {
+    if (_disposed) return;
+    final usb = usbAudioStatus.value;
+    final exclusive = isDesktopPlatform && _settings.exclusiveOutput;
+    // Each new song reports pending before it opens the device again.
+    _exclusiveHeld = switch (playbackExclusiveStatus.value) {
+      _ when !exclusive => false,
+      ExclusiveOutputStatus.active => true,
+      ExclusiveOutputStatus.unavailable => false,
+      ExclusiveOutputStatus.pending => _exclusiveHeld,
+    };
+    _runtime.personalization.output = playbackOutputKind(
+      devices: _outputDevices,
+      dac:
+          _exclusiveHeld ||
+          (_settings.usbBitPerfect &&
+              usb.driver == 'usb_direct' &&
+              usb.reason == 'active'),
+      elsewhere: _cast.active || _runtime.playsElsewhere,
+    );
   }
 
   /// Recover system controls without reloading, seeking or restarting audio.
@@ -819,6 +897,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       _automationDevicesSubscription = null;
       if (subscription != null) unawaited(subscription.cancel());
     }
+    _refreshOutputMonitoring();
   }
 
   Future<void> _startHeadphoneMonitoring(
@@ -3085,6 +3164,8 @@ class MusicPlayerHandler extends BaseAudioHandler
     _disposed = true;
     playbackSpeed.removeListener(_tempoChanged);
     playbackTempoSupportRevision.removeListener(_tempoChanged);
+    usbAudioStatus.removeListener(refreshPlaybackOutput);
+    playbackExclusiveStatus.removeListener(refreshPlaybackOutput);
     await _autoplay.history.flush();
     await _cast.dispose();
     _runtime.personalization.finish();
@@ -3103,6 +3184,8 @@ class MusicPlayerHandler extends BaseAudioHandler
     _headphoneMonitoringRevision++;
     await _automationVolumeSubscription?.cancel();
     await _automationDevicesSubscription?.cancel();
+    _outputMonitoringRevision++;
+    await _outputDevicesSubscription?.cancel();
     await _playbackAutomation.dispose();
     await _player.cancelPreparation();
     await _sourceChangeTail;

@@ -6,6 +6,8 @@ import 'dart:async';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/services/autoplay_personalization.dart'
+    show AutoplayOutput;
 import 'package:mornye/services/playback_automation.dart';
 
 AudioDevice device(String id, AudioDeviceType type, {bool output = true}) =>
@@ -552,5 +554,73 @@ void main() {
     await transport.automation.volumeChanged(0.5);
     expect(transport.pauses, 0);
     expect(transport.plays, 0);
+  });
+
+  group('output kind', () {
+    final speaker = device('speaker', AudioDeviceType.builtInSpeaker);
+    final earpiece = device('earpiece', AudioDeviceType.builtInEarpiece);
+    final a2dp = device('a2dp', AudioDeviceType.bluetoothA2dp);
+    final sco = device('sco', AudioDeviceType.bluetoothSco);
+    final wired = device('wired', AudioDeviceType.wiredHeadphones);
+    final usb = device('usb', AudioDeviceType.usbAudio);
+    AutoplayOutput kind(Set<AudioDevice> devices) =>
+        playbackOutputKind(devices: devices);
+
+    test('the connected outputs name where music plays', () {
+      expect(kind({speaker, earpiece}), AutoplayOutput.speaker);
+      // A headset brings its call route along.
+      expect(kind({speaker, earpiece, a2dp, sco}), AutoplayOutput.bluetooth);
+      expect(kind({speaker, wired}), AutoplayOutput.wired);
+      expect(
+        kind({speaker, device('mic', AudioDeviceType.wiredHeadset)}),
+        AutoplayOutput.wired,
+      );
+      expect(kind({speaker, usb}), AutoplayOutput.dac);
+      expect(
+        kind({device('car', AudioDeviceType.carAudio)}),
+        AutoplayOutput.car,
+      );
+      expect(
+        kind({device('air', AudioDeviceType.airPlay)}),
+        AutoplayOutput.remote,
+      );
+      // Inputs never count.
+      expect(
+        kind({
+          speaker,
+          device('mic', AudioDeviceType.bluetoothA2dp, output: false),
+        }),
+        AutoplayOutput.speaker,
+      );
+    });
+
+    test('an output it cannot tell stays unknown', () {
+      expect(playbackOutputKind(), AutoplayOutput.unknown);
+      expect(kind({}), AutoplayOutput.unknown);
+      expect(kind({earpiece}), AutoplayOutput.unknown);
+      // Two possible routes: the system's choice is not known.
+      expect(kind({speaker, a2dp, wired}), AutoplayOutput.unknown);
+      // A newer Android type the plugin does not name.
+      expect(
+        kind({speaker, device('le', AudioDeviceType.unknown)}),
+        AutoplayOutput.unknown,
+      );
+      expect(
+        kind({speaker, device('tv', AudioDeviceType.hdmi)}),
+        AutoplayOutput.unknown,
+      );
+    });
+
+    test('another device playing and a held DAC come first', () {
+      expect(
+        playbackOutputKind(devices: {speaker, a2dp}, dac: true),
+        AutoplayOutput.dac,
+      );
+      expect(playbackOutputKind(dac: true), AutoplayOutput.dac);
+      expect(
+        playbackOutputKind(devices: {speaker, usb}, dac: true, elsewhere: true),
+        AutoplayOutput.remote,
+      );
+    });
   });
 }

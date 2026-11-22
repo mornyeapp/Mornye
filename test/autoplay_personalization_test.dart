@@ -252,6 +252,161 @@ void main() {
     );
   });
 
+  test('learns which genres the listener likes on which output', () {
+    const headphones = AutoplayOutput.wired, speaker = AutoplayOutput.speaker;
+    final model = AutoplayPreferenceModel();
+    for (var i = 0; i < 100; i++) {
+      for (final (song, liked) in [(_jazz, headphones), (_rock, speaker)]) {
+        model.learn(song, at: _at, reward: 1, output: liked);
+        model.learn(
+          song,
+          at: _at,
+          reward: 0,
+          output: liked == headphones ? speaker : headphones,
+        );
+      }
+    }
+    double on(AutoplayLearningTrack song, AutoplayOutput output) =>
+        model.preference(song, previous: _rock, at: _at, output: output);
+    expect(on(_jazz, headphones), greaterThan(0.7));
+    expect(on(_jazz, speaker), lessThan(0.3));
+    expect(on(_rock, speaker), greaterThan(0.7));
+    expect(on(_rock, headphones), lessThan(0.3));
+    // An artist never heard follows its genre on each output.
+    const unseenJazz = AutoplayLearningTrack(
+      source: '/new',
+      title: 'New',
+      artist: 'Unseen Artist',
+      genre: 'Jazz',
+    );
+    expect(on(unseenJazz, headphones), greaterThan(on(unseenJazz, speaker)));
+    // A refill ranks with the output in effect now.
+    expect(
+      model.rankAdjustment(_jazz, previous: _rock, at: _at, output: headphones),
+      greaterThan(0),
+    );
+    expect(
+      model.rankAdjustment(_jazz, previous: _rock, at: _at, output: speaker),
+      lessThan(0),
+    );
+  });
+
+  test('learns which genres belong to the weekend', () {
+    final weekday = DateTime(2026, 10, 14, 9),
+        weekend = DateTime(2026, 10, 17, 9);
+    expect(weekend.weekday, DateTime.saturday);
+    final model = AutoplayPreferenceModel();
+    for (var i = 0; i < 100; i++) {
+      for (final (at, reward) in [(weekend, 1.0), (weekday, 0.0)]) {
+        model.learn(
+          _jazz,
+          at: at,
+          reward: reward,
+          output: AutoplayOutput.bluetooth,
+        );
+      }
+    }
+    double on(DateTime at) =>
+        model.preference(_jazz, at: at, output: AutoplayOutput.bluetooth);
+    expect(on(weekend), greaterThan(on(weekday) + 0.3));
+    // Without a known output the context stays out of the features.
+    expect(
+      model.preference(_jazz, at: weekend),
+      model.preference(_jazz, at: weekday),
+    );
+  });
+
+  test('an unknown output keeps the features, scores and stored models', () {
+    const songs = [
+      _rock,
+      _jazz,
+      AutoplayLearningTrack(
+        source: '/ballad.flac',
+        title: 'Ballad',
+        artist: 'Singer',
+        album: 'First',
+        genre: 'Pop; Soul',
+        duration: Duration(seconds: 200),
+      ),
+      AutoplayLearningTrack(
+        source: '/ambient.flac',
+        title: 'Calm',
+        artist: '',
+        genre: 'Ambient',
+      ),
+    ];
+    AutoplayPreferenceModel trained({AutoplayOutput? output}) {
+      final model = AutoplayPreferenceModel();
+      for (var i = 0; i < 40; i++) {
+        final song = songs[i % 4];
+        final previous = i == 0 ? null : songs[(i - 1) % 4];
+        final at = DateTime(2026, 10, 11 + i ~/ 8, i * 5 % 24);
+        final reward = i * 7 % 5 / 4, weight = 1 + i % 3 / 2;
+        if (output == null) {
+          model.learn(
+            song,
+            previous: previous,
+            at: at,
+            reward: reward,
+            weight: weight,
+          );
+        } else {
+          model.learn(
+            song,
+            previous: previous,
+            at: at,
+            reward: reward,
+            weight: weight,
+            output: output,
+          );
+        }
+      }
+      return model;
+    }
+
+    final probes = [DateTime(2026, 10, 14, 9), DateTime(2026, 10, 17, 21)];
+    List<double> scores(
+      AutoplayPreferenceModel model, {
+      AutoplayOutput? output,
+    }) => [
+      for (final song in songs)
+        for (final at in probes)
+          output == null
+              ? model.preference(song, previous: _jazz, at: at)
+              : model.preference(song, previous: _jazz, at: at, output: output),
+    ];
+    // Scores of this training before the output existed.
+    const before = [
+      0.4958447599265778,
+      0.5018290290611104,
+      0.49776866822696214,
+      0.5026565958565331,
+      0.526142532090059,
+      0.506230663649623,
+      0.4901051039480653,
+      0.4907212011822417,
+    ];
+    final legacy = trained();
+    final unknown = trained(output: AutoplayOutput.unknown);
+    expect(scores(legacy), before);
+    expect(scores(unknown, output: AutoplayOutput.unknown), before);
+    expect(unknown.encode(), legacy.encode());
+    // A stored model, from either format, scores as it did.
+    final raw = legacy.encode();
+    expect(scores(AutoplayPreferenceModel.decode(raw)), before);
+    final older = jsonDecode(raw) as Map<String, dynamic>
+      ..['version'] = 1
+      ..remove('arms');
+    final upgraded = AutoplayPreferenceModel.decode(jsonEncode(older));
+    expect(upgraded.observations, 40);
+    expect(scores(upgraded, output: AutoplayOutput.unknown), before);
+    // A known output does add features.
+    expect(
+      trained(output: AutoplayOutput.bluetooth).encode(),
+      isNot(legacy.encode()),
+    );
+  });
+
   test('learns how much variety the listener plays through', () {
     final model = AutoplayPreferenceModel();
     AutoplayLearningTrack song(String artist, int i, {String genre = 'Pop'}) =>
@@ -562,6 +717,50 @@ void main() {
     expect(feedback.single.track.source, _rock.source);
     expect(feedback.single.previous?.source, _jazz.source);
     expect(feedback.single.weight, 1.5);
+  });
+
+  test('feedback carries the output each song played on', () async {
+    var elapsed = Duration.zero;
+    final service = AutoplayPersonalization(
+      load: () async => null,
+      save: (_) async {},
+      elapsed: () => elapsed,
+      now: () => _at,
+    );
+    addTearDown(service.dispose);
+    final feedback = <AutoplayFeedback>[];
+    service.feedback.listen(feedback.add);
+    service.setEnabled(true);
+    await service.ensureLoaded();
+    void play(AutoplayLearningTrack song, int seconds) {
+      service.updatePlayback(source: song.source, playing: true);
+      elapsed += Duration(seconds: seconds);
+    }
+
+    // The output became known only after the song began.
+    service.begin(_rock);
+    service.output = AutoplayOutput.bluetooth;
+    play(_rock, 60);
+    // A later change belongs to the songs after it.
+    service.output = AutoplayOutput.speaker;
+    play(_rock, 60);
+    service.begin(_jazz);
+    play(_jazz, 5);
+    service.endorse(_jazz, AutoplayFeedbackKind.loved);
+    service.endorse(_rock, AutoplayFeedbackKind.playlisted);
+    service.finish(skipped: true);
+    await pumpEventQueue();
+    expect(
+      [for (final item in feedback) (item.track.source, item.output)],
+      [
+        (_rock.source, AutoplayOutput.bluetooth),
+        (_jazz.source, AutoplayOutput.speaker),
+        // A song that is not playing has no output.
+        (_rock.source, AutoplayOutput.unknown),
+        (_jazz.source, AutoplayOutput.speaker),
+      ],
+    );
+    expect(service.output, AutoplayOutput.speaker);
   });
 
   test('duration updates and long listening yield positive feedback', () async {

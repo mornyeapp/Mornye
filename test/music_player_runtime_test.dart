@@ -46,6 +46,7 @@ import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_notification.dart';
+import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/android_tv.dart';
@@ -311,6 +312,8 @@ class _HandoffDeck extends _TickingDeck {
     await super.resume();
   }
 }
+
+class _FakeRemote extends Fake implements RemotePlayback {}
 
 class _Session implements AudioSession {
   int configurations = 0;
@@ -2808,6 +2811,57 @@ void main() {
       handler.playbackState.value.errorMessage,
       contains('Audio file is unavailable'),
     );
+  });
+
+  test('learning follows the kind of output music plays on', () async {
+    // ignore: experimental_member_use
+    AudioDevice output(String id, AudioDeviceType type) =>
+        // ignore: experimental_member_use
+        AudioDevice(
+          id: id,
+          name: id,
+          isInput: false,
+          isOutput: true,
+          type: type,
+        );
+    // ignore: experimental_member_use
+    final speaker = output('speaker', AudioDeviceType.builtInSpeaker);
+    // ignore: experimental_member_use
+    final headset = output('headset', AudioDeviceType.bluetoothA2dp);
+    final session = _Session()..devices = {speaker, headset};
+    final learning = AutoplayPersonalization(
+      load: () async => null,
+      save: (_) async {},
+    );
+    final runtime = _runtime(
+      settings: const AppSettings(
+        pauseOnMute: false,
+        autoplayPersonalization: true,
+      ),
+      session: session,
+      createPersonalization: () => learning,
+    );
+    await runtime.initialize();
+    await _settle();
+    expect(learning.output, AutoplayOutput.bluetooth);
+    session.route({speaker});
+    await _settle();
+    await _settle();
+    expect(learning.output, AutoplayOutput.speaker);
+    // A remote device playing in this one's place.
+    await runtime.showRemote(_FakeRemote());
+    expect(learning.output, AutoplayOutput.remote);
+    runtime.soundsBesideRemote = true;
+    expect(learning.output, AutoplayOutput.speaker);
+    runtime.soundsBesideRemote = false;
+    await runtime.showRemote(null);
+    expect(learning.output, AutoplayOutput.speaker);
+    // Learning off: the outputs are no longer read.
+    runtime.configure(
+      const AppSettings(pauseOnMute: false, autoplayPersonalization: false),
+    );
+    await _settle();
+    expect(learning.output, AutoplayOutput.unknown);
   });
 
   group('resume when headphones reconnect', () {

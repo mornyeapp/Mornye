@@ -3,6 +3,56 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:audio_session/audio_session.dart';
+import 'package:mornye/services/autoplay_personalization.dart'
+    show AutoplayOutput;
+
+/// The kind of output music plays on. Another device playing comes first,
+/// then a DAC the player holds, then the connected [devices] (null where
+/// the platform cannot list them). Two possible routes leave it unknown.
+AutoplayOutput playbackOutputKind({
+  Set<AudioDevice>? devices,
+  bool dac = false,
+  bool elsewhere = false,
+}) {
+  if (elsewhere) return AutoplayOutput.remote;
+  if (dac) return AutoplayOutput.dac;
+  if (devices == null) return AutoplayOutput.unknown;
+  final routes = <AutoplayOutput>{};
+  var speaker = false;
+  for (final device in devices) {
+    if (!device.isOutput) continue;
+    switch (device.type) {
+      case AudioDeviceType.builtInSpeaker:
+        speaker = true;
+      // Call and system routes, never music's.
+      case AudioDeviceType.builtInEarpiece ||
+          AudioDeviceType.builtInSpeakerSafe ||
+          AudioDeviceType.bluetoothSco ||
+          AudioDeviceType.telephony ||
+          AudioDeviceType.remoteSubmix ||
+          AudioDeviceType.fm:
+        break;
+      case AudioDeviceType.wiredHeadset || AudioDeviceType.wiredHeadphones:
+        routes.add(AutoplayOutput.wired);
+      case AudioDeviceType.bluetoothA2dp ||
+          AudioDeviceType.bluetoothLe ||
+          AudioDeviceType.hearingAid:
+        routes.add(AutoplayOutput.bluetooth);
+      case AudioDeviceType.usbAudio:
+        routes.add(AutoplayOutput.dac);
+      case AudioDeviceType.carAudio:
+        routes.add(AutoplayOutput.car);
+      case AudioDeviceType.airPlay:
+        routes.add(AutoplayOutput.remote);
+      default:
+        routes.add(AutoplayOutput.unknown);
+    }
+  }
+  if (routes.length == 1) return routes.single;
+  return routes.isEmpty && speaker
+      ? AutoplayOutput.speaker
+      : AutoplayOutput.unknown;
+}
 
 /// How long a pause from a lost headphone or Bluetooth route stays resumable
 /// when an output connects again. Long enough for a car or a charging case,
