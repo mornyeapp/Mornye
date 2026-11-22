@@ -190,7 +190,7 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
         // this bar and shrinks back into it. Reduced motion opens at once.
         morph: mornye || isDesktopPlatform
             ? null
-            : AppMotion.spatialSlow(
+            : AppMotion.spatial(
                 context,
                 const AppMotionSpec(Duration.zero, Curves.linear),
               ),
@@ -335,6 +335,12 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                   children: [
                     Hero(
                       tag: kNowPlayingArtworkHeroTag,
+                      // Back from the Material player the cover keeps step
+                      // with the shrinking surface.
+                      createRectTween: mornye || isDesktopPlatform
+                          ? null
+                          : (begin, end) =>
+                                PlayerCoverRectTween(begin: begin, end: end),
                       child: ClipRRect(
                         key: _artworkKey,
                         borderRadius: BorderRadius.circular(mornye ? 6 : 12),

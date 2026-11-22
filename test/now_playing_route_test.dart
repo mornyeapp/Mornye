@@ -459,7 +459,10 @@ void main() {
       expect(growing.top, inExclusiveRange(0, mini.top));
       expect(growing.bottom, inInclusiveRange(mini.bottom, 800));
       expect(growing.height, greaterThan(mini.height));
+      // The content shows by how far open the surface is.
+      expect(content.value, inExclusiveRange(0, 0.2));
       await tester.pumpAndSettle();
+      expect(content.value, 1);
       expect(find.byKey(surface), findsNothing);
       expect(
         tester.getRect(find.byKey(_sheet)),
@@ -470,44 +473,48 @@ void main() {
       await tester.pump();
       // The shrink only moves toward the mini player, never past it, at
       // the pace of the entrance: still well short of the bar after a
-      // tenth of a second, and done in about half a second.
+      // tenth of a second, and done in under half a second.
       var previousTop = 0.0;
+      var previousContent = 1.0;
       var elapsed = Duration.zero;
       while (find.byKey(minimize).evaluate().isNotEmpty) {
         final top = tester.getRect(find.byKey(minimize)).top;
         expect(top, greaterThanOrEqualTo(previousTop));
         expect(top, lessThanOrEqualTo(mini.top + 0.01));
         if (elapsed == const Duration(milliseconds: 96)) {
-          expect(top, lessThan(mini.top * 0.6));
+          expect(top, lessThan(mini.top * 0.65));
         }
-        // The content stays with the page instead of fading on the spring.
-        expect(content.value, 1);
-        // The player is still on screen most of the way down.
-        if (elapsed == const Duration(milliseconds: 144)) {
-          final opacity = tester
-              .widget<Opacity>(
-                find
-                    .descendant(
-                      of: find.byKey(minimize),
-                      matching: find.byType(Opacity),
-                    )
-                    .first,
-              )
-              .opacity;
-          expect(opacity, greaterThan(0.25));
-        }
+        // The content leaves with the surface and never comes back.
+        expect(content.value, lessThanOrEqualTo(previousContent));
+        previousContent = content.value;
+        // The surface is solid until a fifth of the way from the bar, so
+        // the page below is never read through a whole screen of it.
+        final opacity = tester
+            .widget<Opacity>(
+              find
+                  .descendant(
+                    of: find.byKey(minimize),
+                    matching: find.byType(Opacity),
+                  )
+                  .first,
+            )
+            .opacity;
+        if (top < mini.top * 0.8 - 0.01) expect(opacity, 1);
         previousTop = top;
         await tester.pump(const Duration(milliseconds: 16));
         elapsed += const Duration(milliseconds: 16);
       }
       expect(previousTop, greaterThan(mini.top - 20));
-      expect(elapsed, greaterThan(const Duration(milliseconds: 450)));
-      expect(elapsed, lessThan(const Duration(milliseconds: 650)));
+      expect(previousContent, 0);
+      expect(elapsed, greaterThan(const Duration(milliseconds: 380)));
+      expect(elapsed, lessThan(const Duration(milliseconds: 560)));
       expect(find.byKey(_sheet), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the grow fades in on the effects spring', (tester) async {
+    testWidgets('the growing surface is solid within its first frames', (
+      tester,
+    ) async {
       final navigator = await pumpApp(tester);
       navigator.currentState!.push(route());
       await tester.pump();
@@ -520,15 +527,44 @@ void main() {
             ),
           )
           .opacity;
-      await tester.pump(const Duration(milliseconds: 100));
-      final early = opacity();
-      // The surface is fully opaque well before it stops growing.
-      await tester.pump(const Duration(milliseconds: 220));
-      expect(early, inExclusiveRange(0, 1));
+      // Under a fifth of the way open the mini player still hands over.
+      await tester.pump(const Duration(milliseconds: 48));
+      expect(opacity(), inExclusiveRange(0, 1));
+      await tester.pump(const Duration(milliseconds: 64));
       expect(opacity(), 1);
-      expect(find.byKey(surface), findsOneWidget);
+      // Solid while most of the way is still ahead of it.
+      expect(
+        tester.getRect(find.byKey(surface)).top,
+        greaterThan(mini.top * 0.7),
+      );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+    });
+
+    test('the cover flight keeps step with the surface', () {
+      const begin = Rect.fromLTWH(12, 714, 44, 44);
+      const end = Rect.fromLTWH(0, 0, 400, 400);
+      const curve = Curves.easeOutBack;
+      final opening = PlayerCoverRectTween(
+        begin: begin,
+        end: end,
+        curve: curve,
+      );
+      final closing = PlayerCoverRectTween(begin: end, end: begin);
+      for (final time in [0.0, 0.1, 0.35, 0.6, 0.9, 1.0]) {
+        // A Hero hands its tween the route's time on its own ease, which
+        // Flutter evaluates to a thousandth: a few pixels of a screen.
+        final eased = Curves.fastOutSlowIn.transform(time);
+        final opened = opening.lerp(eased)!;
+        final surface = Rect.lerp(begin, end, curve.transform(time))!;
+        expect(opened.top, moreOrLessEquals(surface.top, epsilon: 4));
+        expect(opened.width, moreOrLessEquals(surface.width, epsilon: 4));
+        final closed = closing.lerp(eased)!;
+        expect(
+          closed.top,
+          moreOrLessEquals(Rect.lerp(end, begin, time)!.top, epsilon: 4),
+        );
+      }
     });
 
     testWidgets('reduced motion opens and closes at once', (tester) async {

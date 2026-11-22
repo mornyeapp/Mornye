@@ -84,6 +84,7 @@ class MaterialPlayerLayout extends StatelessWidget {
                 child: PlayerArtworkDragRegion(
                   child: Hero(
                     tag: kNowPlayingArtworkHeroTag,
+                    createRectTween: NowPlayingRoute.coverFlightOf(context),
                     child: Consumer(
                       builder: (context, ref, artwork) {
                         final resting =

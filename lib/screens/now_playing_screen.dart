@@ -574,7 +574,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final contentOpacity = mornye
         ? kAlwaysCompleteAnimation
         : route is NowPlayingRoute
-        // Holds through the shrink back to the mini player.
+        // Follows the surface of a player that grows out of the mini player.
         ? route.contentOpacity(contentFade)
         : routeAnimation.drive(contentFade);
 

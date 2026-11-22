@@ -99,6 +99,7 @@ class MaterialPlayerBackdrop extends StatelessWidget {
             curve: motion.curve,
             child: Hero(
               tag: kNowPlayingArtworkHeroTag,
+              createRectTween: NowPlayingRoute.coverFlightOf(context),
               // The flying cover must keep its fade in the route overlay.
               child: _FadedArtwork(
                 fadeStart: fadeStart,

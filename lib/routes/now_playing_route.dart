@@ -11,6 +11,38 @@ import 'package:mornye/theme/mornye_theme.dart';
 /// the cover visually expands when the player opens.
 const kNowPlayingArtworkHeroTag = 'now-playing-artwork';
 
+/// A cover flight in step with the player's surface. A Hero flies on its own
+/// ease over the route's time: this undoes that ease and applies [curve],
+/// the surface's own (none on the way back, which a spring drives).
+class PlayerCoverRectTween extends RectTween {
+  PlayerCoverRectTween({super.begin, super.end, this.curve});
+
+  final Curve? curve;
+
+  @override
+  Rect? lerp(double t) {
+    final time = _timeOf(t);
+    return Rect.lerp(begin, end, curve?.transform(time) ?? time);
+  }
+
+  // The Hero's ease only rises, so bisecting finds the time it was given.
+  static double _timeOf(double eased) {
+    if (eased <= 0) return 0;
+    if (eased >= 1) return 1;
+    var low = 0.0;
+    var high = 1.0;
+    for (var i = 0; i < 24; i++) {
+      final middle = (low + high) / 2;
+      if (Curves.fastOutSlowIn.transform(middle) < eased) {
+        low = middle;
+      } else {
+        high = middle;
+      }
+    }
+    return (low + high) / 2;
+  }
+}
+
 /// Slide-up route for the full player. Supports live drag-to-dismiss: the
 /// page follows the finger (via [startDrag]/[updateDrag]/[endDrag]) and
 /// settles open or pops based on release position and velocity. Either way
@@ -41,6 +73,21 @@ class NowPlayingRoute extends PageRoute<void> {
   /// mini player before the person lets go.
   static const _backGesturePreview = 0.25;
 
+  /// The growing surface is solid once a fifth of the way open, and the
+  /// player's content shows from a quarter of the way.
+  static const _solidBy = 0.2;
+  static const _contentFrom = 0.25;
+
+  /// The cover flight of a player that grows out of the mini player, for
+  /// the player's own Hero. Null keeps the default flight.
+  static CreateRectTween? coverFlightOf(BuildContext context) {
+    final route = ModalRoute.of(context);
+    final curve = route is NowPlayingRoute ? route.morph?.curve : null;
+    if (curve == null) return null;
+    return (begin, end) =>
+        PlayerCoverRectTween(begin: begin, end: end, curve: curve);
+  }
+
   /// The mini player's bounds while the player grows out of them.
   ({Rect surface, Rect artwork})? _openFrom;
   Size? _openSize;
@@ -54,6 +101,9 @@ class NowPlayingRoute extends PageRoute<void> {
   Rect? _dismissStart;
   Size? _dismissSize;
   double _dismissStartValue = 1;
+
+  /// How far open the surface was when its dismissal began.
+  double _dismissOpen = 1;
 
   bool _interactiveTransition = false;
   int _dragGeneration = 0;
@@ -150,14 +200,11 @@ class NowPlayingRoute extends PageRoute<void> {
       ? Duration.zero
       : MotionPace.duration(const Duration(milliseconds: 300));
 
-  /// Moves the Material shrink on the spring of the entrance, the slow
-  /// spatial one for full-screen surfaces, kept critically damped so the
-  /// surface never passes the mini player. It settles in about 520ms. A
-  /// spring more than twice as stiff had the player gone in an eighth of a
-  /// second, in a handful of frames.
+  /// Moves the Material shrink at the stiffness of the entrance, critically
+  /// damped so the surface never passes the mini player: about 430ms.
   static final _exitSpring = SpringDescription.withDampingRatio(
     mass: 1,
-    stiffness: M3EMotion.expressiveSpatialSlow.stiffness,
+    stiffness: M3EMotion.expressiveSpatialDefault.stiffness,
     ratio: 1,
   );
 
@@ -311,13 +358,32 @@ class NowPlayingRoute extends PageRoute<void> {
   /// Where the route was when it was popped, from a finger or settled.
   double? _poppedAt;
 
-  /// The player's own [fade] over the route's animation: it comes in behind
-  /// the growing surface and follows a finger. Once the route is popped it
-  /// holds where it was, because the page fades as a whole on the way out;
-  /// left on the closing spring, which covers most of its way early, the
-  /// content was gone in a tenth of a second.
-  Animation<double> contentOpacity(Animatable<double> fade) =>
-      animation!.drive(_HeldAfterPop(this, fade));
+  /// How far open the growing surface is for a controller [value]: its own
+  /// progress while it opens or shrinks, fully open otherwise.
+  double _openFraction(double value) {
+    if (_dismissTarget != null) {
+      return (_dismissOpen * value / _dismissStartValue).clamp(0.0, 1.0);
+    }
+    if (_openFrom != null && controller?.status == AnimationStatus.forward) {
+      return morph!.curve.transform(value).clamp(0.0, 1.0);
+    }
+    return 1;
+  }
+
+  double _solid(double open) => (open / _solidBy).clamp(0.0, 1.0);
+
+  double _contentShown(double value) =>
+      ((_openFraction(value) - _contentFrom) / (1 - _contentFrom)).clamp(
+        0.0,
+        1.0,
+      );
+
+  /// The player's own content over the route's animation. A player that
+  /// grows out of the mini player shows it by how far open the surface is,
+  /// both ways; a sliding one runs [fade] and holds it from the pop.
+  Animation<double> contentOpacity(Animatable<double> fade) => animation!.drive(
+    morph == null ? _HeldAfterPop(this, fade) : _SurfaceContent(this),
+  );
 
   bool get _reduceMotion {
     final context = navigator?.context;
@@ -340,6 +406,7 @@ class NowPlayingRoute extends PageRoute<void> {
     if (target == null || target.surface.isEmpty) return false;
     final size = MediaQuery.sizeOf(context);
     _dismissStartValue = controller!.value;
+    _dismissOpen = _openFraction(_dismissStartValue);
     final opening = _openFrom != null && _openSize == size
         ? _openRect(size, _dismissStartValue)
         : null;
@@ -470,9 +537,11 @@ class NowPlayingRoute extends PageRoute<void> {
             bounds: bounds,
             size: size,
             radius: _pageRadius(context, bounds.top),
-            // Gone only as it reaches the mini player: fading out sooner
-            // hides most of the spring's travel and reads as a cut.
-            opacity: 1 - const Interval(0.3, 1).transform(progress),
+            // Solid for most of the way, so the page below is never read
+            // through it; it fades as it closes onto the mini player.
+            opacity: context.isMornye
+                ? 1 - const Interval(0.3, 1).transform(progress)
+                : _solid(_dismissOpen * (1 - progress)),
             child: child,
           ),
           if (cover != null)
@@ -508,33 +577,19 @@ class NowPlayingRoute extends PageRoute<void> {
     if (_openFrom != null &&
         _openSize == size &&
         animation.status == AnimationStatus.forward) {
-      final morph = this.morph!;
-      final progress = morph.curve.transform(animation.value);
-      // The surface moves on the spatial spring; it fades in on the effects
-      // spring, over that spring's own settle time from the start.
-      final fade = AppMotion.effects(
-        context,
-        const AppMotionSpec(Duration(milliseconds: 200), Curves.easeOut),
-      );
-      final fadeShare = morph.duration > Duration.zero
-          ? (fade.duration.inMicroseconds / morph.duration.inMicroseconds)
-                .clamp(0.0, 1.0)
-          : 1.0;
+      // The spatial spring may pass its end; only the surface follows it.
+      final open = morph!.curve.transform(animation.value).clamp(0.0, 1.0);
       return Stack(
         fit: StackFit.expand,
         children: [
-          _scrim(scrim * progress),
+          _scrim(scrim * open),
           _surface(
             key: const ValueKey('player-expand-surface'),
             bounds: _openRect(size, animation.value),
             size: size,
             radius: 0,
-            // The mini player shows through until the surface covers it.
-            opacity: Interval(
-              0,
-              fadeShare,
-              curve: fade.curve,
-            ).transform(animation.value),
+            // The mini player hands over in the surface's first frames.
+            opacity: _solid(open),
             child: child,
           ),
         ],
@@ -631,6 +686,15 @@ class _HeldAfterPop extends Animatable<double> {
 
   @override
   double transform(double t) => fade.transform(route._poppedAt ?? t);
+}
+
+class _SurfaceContent extends Animatable<double> {
+  _SurfaceContent(this.route);
+
+  final NowPlayingRoute route;
+
+  @override
+  double transform(double t) => route._contentShown(t);
 }
 
 /// Feeds Android's predictive back to the player route while it is the
