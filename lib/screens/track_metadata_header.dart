@@ -40,6 +40,11 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
       begin: flight.tokens.borderRadiusThumb,
       end: headerCorners?.resolve(Directionality.of(flight)),
     ).animate(animation);
+    if (direction == HeroFlightDirection.push) {
+      // Kept for the landing: the flight can end before the decode does.
+      _flownCover = (from.widget as Hero).child;
+      _flownCoverItem = _itemId;
+    }
     return AnimatedBuilder(
       animation: corners,
       builder: (context, cover) => ClipRRect(
@@ -93,10 +98,13 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
       ),
     );
 
+    // [landing] is the cover a list row's picture flies into: until its own
+    // picture is decoded it shows the row's, read when it is built.
     Widget artworkImage({
       required int cacheWidth,
       int? cacheHeight,
       required double iconSize,
+      bool landing = false,
     }) {
       final source = artworkSource;
       if (source == null) return placeholder(iconSize);
@@ -106,7 +114,9 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
           fit: BoxFit.cover,
           memCacheWidth: cacheWidth,
           memCacheHeight: cacheHeight,
-          placeholder: (_, _) => ColoredBox(color: colorScheme.surface),
+          placeholder: (_, _) =>
+              (landing ? _landedCover : null) ??
+              ColoredBox(color: colorScheme.surface),
           errorWidget: (_, _, _) => placeholder(iconSize),
         );
       }
@@ -119,6 +129,10 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
         cacheHeight: cacheHeight,
         gaplessPlayback: true,
         filterQuality: FilterQuality.low,
+        frameBuilder: landing
+            ? (_, picture, frame, _) =>
+                  frame == null ? _landedCover ?? picture : picture
+            : null,
         errorBuilder: (_, _, _) => placeholder(iconSize),
       );
     }
@@ -154,7 +168,11 @@ extension _TrackMetadataHeader on _TrackMetadataScreenState {
         flightShuttleBuilder: _coverFlight,
         child: SizedBox.square(
           dimension: coverSize,
-          child: artworkImage(cacheWidth: coverCacheWidth, iconSize: 48),
+          child: artworkImage(
+            cacheWidth: coverCacheWidth,
+            iconSize: 48,
+            landing: true,
+          ),
         ),
       ),
       // Built inside the header, so it reads the header's artwork scheme.

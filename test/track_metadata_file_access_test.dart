@@ -9,6 +9,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
+import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -274,6 +275,86 @@ void main() {
 
       await tester.pumpAndSettle();
       expect(find.byKey(rowCover), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the row picture stays on a cover that is not decoded when '
+        'the flight lands (Mornye=$mornye)', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
+        channel,
+        (call) async => call.method == 'safStat' ? {'exists': false} : null,
+      );
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      const row = Key('row');
+      const rowCover = Key('row-cover');
+      // Never decoded here: a test reads no file outside runAsync.
+      final item = LocalLibraryItem(
+        id: 'landing-track',
+        trackName: 'Track',
+        artistName: 'Artist',
+        albumName: 'Album',
+        filePath: 'content://provider/music/landing.flac',
+        coverPath: '${cache.path}/landing-cover.png',
+        scannedAt: DateTime(2026),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: GestureDetector(
+                    key: row,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => TrackMetadataScreen(
+                          localItem: item,
+                          coverHeroTag: 'row',
+                        ),
+                      ),
+                    ),
+                    child: const SizedBox.square(
+                      dimension: 56,
+                      child: Hero(
+                        tag: 'row',
+                        child: ColoredBox(
+                          key: rowCover,
+                          color: Color(0xFF336699),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      Finder inRow() =>
+          find.descendant(of: find.byKey(row), matching: find.byKey(rowCover));
+      Finder onPage() => find.descendant(
+        of: find.byType(TrackMetadataScreen),
+        matching: find.byKey(rowCover),
+      );
+
+      await tester.tap(find.byKey(row));
+      await tester.pumpAndSettle();
+      // Landed with no picture of its own yet, the cover keeps the row's
+      // instead of going empty.
+      expect(onPage(), findsOneWidget);
+      expect(tester.getSize(onPage()).width, greaterThan(56));
+
+      Navigator.of(tester.element(find.byType(TrackMetadataScreen))).pop();
+      await tester.pumpAndSettle();
+      expect(inRow(), findsOneWidget);
+      expect(find.byKey(rowCover), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

@@ -270,6 +270,13 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
   static final RegExp _leadingOrTrailingDots = RegExp(r'^\.+|\.+$');
   String get _coverCacheKey => _itemId;
 
+  /// The picture of the list row the cover flew in from, and its song.
+  Widget? _flownCover;
+  String? _flownCoverItem;
+
+  /// What the header's cover shows until its own picture is decoded.
+  Widget? get _landedCover => _flownCoverItem == _itemId ? _flownCover : null;
+
   /// Shared by the lyrics box and its scrollbar.
   final _lyricsScrollController = ScrollController();
 
