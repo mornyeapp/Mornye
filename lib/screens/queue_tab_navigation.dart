@@ -379,7 +379,7 @@ extension _QueueTabNavigation on _QueueTabState {
 
   void _openWishlistFolder() {
     _navigateWithUnfocus(
-      MaterialPageRoute(
+      SteadyPageRoute(
         builder: (_) => const LibraryTracksFolderScreen(
           mode: LibraryTracksFolderMode.wishlist,
         ),
@@ -389,7 +389,7 @@ extension _QueueTabNavigation on _QueueTabState {
 
   void _openLovedFolder() {
     _navigateWithUnfocus(
-      MaterialPageRoute(
+      SteadyPageRoute(
         builder: (_) => const LibraryTracksFolderScreen(
           mode: LibraryTracksFolderMode.loved,
         ),
@@ -399,13 +399,13 @@ extension _QueueTabNavigation on _QueueTabState {
 
   void _openFavoriteArtistsFolder() {
     _navigateWithUnfocus(
-      MaterialPageRoute(builder: (_) => const FavoriteArtistsScreen()),
+      SteadyPageRoute(builder: (_) => const FavoriteArtistsScreen()),
     );
   }
 
   void _openPlaylistById(String playlistId) {
     _navigateWithUnfocus(
-      MaterialPageRoute(
+      SteadyPageRoute(
         builder: (_) => LibraryTracksFolderScreen(
           mode: LibraryTracksFolderMode.playlist,
           playlistId: playlistId,

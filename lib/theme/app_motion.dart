@@ -1,4 +1,5 @@
 import 'package:flutter/physics.dart';
+import 'package:flutter/scheduler.dart' show Ticker, TickerCallback;
 import 'package:flutter/widgets.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/material_expressive.dart';
@@ -104,6 +105,62 @@ double curveTimeFor(Curve curve, double value) {
     }
   }
   return (low + high) / 2;
+}
+
+/// Ticks that leave out the time a transition's first frames took.
+///
+/// A new page's first frames are its heaviest, and a ticker counts the time
+/// they took: the next frame would show the transition already well under
+/// way. Here a late frame near the start counts as one frame, so the
+/// transition starts late and plays whole.
+class SteadyStartTicks implements TickerProvider {
+  const SteadyStartTicks(this.vsync);
+
+  final TickerProvider vsync;
+
+  /// A frame is late when it brings more than this many frames at once.
+  static const double _late = 2.5;
+
+  /// Late frames are left out only this far into a run; a later one barely
+  /// shows, and the run keeps its time.
+  static const Duration _window = Duration(milliseconds: 150);
+
+  static Duration get _frame {
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    final rate = views.isEmpty ? 0.0 : views.first.display.refreshRate;
+    return Duration(microseconds: (1e6 / (rate > 0 ? rate : 60)).round());
+  }
+
+  @override
+  Ticker createTicker(TickerCallback onTick) {
+    var last = Duration.zero;
+    var leftOut = Duration.zero;
+    return vsync.createTicker((elapsed) {
+      // A run that starts again counts from zero.
+      if (elapsed < last) {
+        last = Duration.zero;
+        leftOut = Duration.zero;
+      }
+      final frame = _frame;
+      final step = elapsed - last;
+      final shown = last - leftOut;
+      last = elapsed;
+      if (step > frame * _late && shown < _window) leftOut += step - frame;
+      onTick(elapsed - leftOut);
+    });
+  }
+}
+
+/// A route whose transition waits out its own slow first frames, on
+/// [SteadyStartTicks].
+mixin SteadyStartRoute<T> on TransitionRoute<T> {
+  @override
+  AnimationController createAnimationController() => AnimationController(
+    duration: transitionDuration,
+    reverseDuration: reverseTransitionDuration,
+    debugLabel: debugLabel,
+    vsync: SteadyStartTicks(navigator!),
+  );
 }
 
 /// Apple-style springs for the Mornye theme.

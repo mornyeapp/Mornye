@@ -1034,7 +1034,7 @@ class _MainShellState extends ConsumerState<MainShell>
           ShellNavigationService.activeBackNavigator() ?? Navigator.of(context);
       unawaited(
         navigator.push(
-          MaterialPageRoute<void>(
+          SteadyPageRoute<void>(
             builder: (_) => MornyeSettingsTheme(
               child: ProfileSettingsPage(profile: profile),
             ),

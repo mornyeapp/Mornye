@@ -34,7 +34,7 @@ class PlayerCoverRectTween extends RectTween {
 /// With [morph], the player instead grows out of the mini player's bounds
 /// and shrinks back into them on close, and Android's predictive back
 /// previews that shrink.
-class NowPlayingRoute extends PageRoute<void> {
+class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
   NowPlayingRoute({required this.child, this.miniPlayerGeometry, this.morph})
     : super(
         fullscreenDialog: true,

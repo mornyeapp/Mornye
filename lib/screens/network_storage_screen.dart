@@ -19,6 +19,7 @@ import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/page_transitions.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
@@ -219,7 +220,7 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
 
   Future<void> _edit([NetworkConnection? connection]) async {
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+      SteadyPageRoute<void>(
         builder: (_) =>
             _NetworkConnectionForm(service: service, connection: connection),
       ),
@@ -235,7 +236,7 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
     String? displayName,
   ]) async {
     final picked = await Navigator.of(context).push(
-      MaterialPageRoute<String>(
+      SteadyPageRoute<String>(
         builder: (_) => NetworkStorageScreen(
           connection: connection,
           path: path,
@@ -1124,7 +1125,7 @@ Future<String?> browseNetworkUploadFolder(
   NetworkConnection connection, {
   NetworkStorageService? service,
 }) => Navigator.of(context).push(
-  MaterialPageRoute<String>(
+  SteadyPageRoute<String>(
     builder: (_) => NetworkStorageScreen(
       connection: connection,
       service: service,

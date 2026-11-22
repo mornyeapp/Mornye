@@ -133,6 +133,94 @@ void main() {
     }
   });
 
+  group('a steady start', () {
+    // One second at the test display's 60 frames a second.
+    const frame = 1 / 60;
+
+    // The caller disposes it: a test checks its tickers before tear down.
+    AnimationController run(WidgetTester tester) => AnimationController(
+      vsync: SteadyStartTicks(tester),
+      duration: const Duration(seconds: 1),
+    );
+
+    Future<void> onTime(WidgetTester tester, int frames) async {
+      for (var i = 0; i < frames; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+    }
+
+    Matcher near(double value) => moreOrLessEquals(value, epsilon: 1e-5);
+
+    testWidgets('follows frames that come on time', (tester) async {
+      final controller = run(tester)..forward();
+      await tester.pump();
+      for (var i = 1; i <= 20; i++) {
+        await onTime(tester, 1);
+        expect(controller.value, near(0.016 * i));
+      }
+      controller.dispose();
+    });
+
+    testWidgets('a late frame near the start counts as one frame', (
+      tester,
+    ) async {
+      final controller = run(tester)..forward();
+      await tester.pump();
+      // The first frame took a fifth of the run, and the next one as long.
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(controller.value, near(frame));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(controller.value, near(frame * 2));
+      await onTime(tester, 10);
+      expect(controller.value, near(frame * 2 + 0.16));
+      // The run plays whole: it is not over when its own time is.
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(controller.isAnimating, isTrue);
+      expect(controller.value, near(frame * 2 + 0.96));
+      await onTime(tester, 1);
+      expect(controller.isCompleted, isTrue);
+      controller.dispose();
+    });
+
+    testWidgets('a late frame further in keeps the time it took', (
+      tester,
+    ) async {
+      final controller = run(tester)..forward();
+      await tester.pump();
+      await onTime(tester, 10);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(controller.value, near(0.36));
+      controller.dispose();
+    });
+
+    testWidgets('each run counts from its own start', (tester) async {
+      final controller = run(tester)..forward();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await onTime(tester, 10);
+      await tester.pump(const Duration(milliseconds: 1000));
+      expect(controller.isCompleted, isTrue);
+      controller.reverse();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(controller.value, near(1 - frame));
+      await onTime(tester, 1);
+      expect(controller.value, near(1 - frame - 0.016));
+      controller.dispose();
+    });
+
+    testWidgets('a value set by hand is not a late frame', (tester) async {
+      final controller = run(tester);
+      controller.value = 0.4;
+      expect(controller.value, 0.4);
+      controller.forward();
+      await tester.pump();
+      await onTime(tester, 1);
+      expect(controller.value, near(0.416));
+      controller.dispose();
+    });
+  });
+
   group('Animation speed', () {
     tearDown(() => MotionPace.speed = 1);
 

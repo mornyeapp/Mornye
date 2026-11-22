@@ -14,6 +14,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/cover_palette.dart';
+import 'package:mornye/theme/page_transitions.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/text_direction.dart';
@@ -213,7 +214,7 @@ Future<void> openLyricsShare(
   }
   if (!navigator.mounted) return;
   await navigator.push(
-    MaterialPageRoute<void>(
+    SteadyPageRoute<void>(
       fullscreenDialog: true,
       builder: (_) => LyricsShareScreen(
         mediaItem: mediaItem,

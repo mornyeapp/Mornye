@@ -30,7 +30,7 @@ Future<void> _pumpApp(
 
 void _push(String label) {
   _navigatorKey.currentState!.push(
-    MaterialPageRoute<void>(
+    SteadyPageRoute<void>(
       builder: (_) => Scaffold(body: Center(child: Text(label))),
     ),
   );
@@ -40,6 +40,13 @@ PageTransitionsBuilder _builderFor(ThemeData theme, TargetPlatform platform) {
   final builder = theme.pageTransitionsTheme.builders[platform];
   expect(builder, isA<ReducedMotionPageTransitionsBuilder>());
   return (builder! as ReducedMotionPageTransitionsBuilder).builder;
+}
+
+/// Frames that come on time: a longer step reads as a late frame.
+Future<void> _frames(WidgetTester tester, int count) async {
+  for (var i = 0; i < count; i++) {
+    await tester.pump(const Duration(milliseconds: 16));
+  }
 }
 
 double _opacityAbove(WidgetTester tester, String label) => tester
@@ -105,6 +112,38 @@ void main() {
     );
   });
 
+  testWidgets('a Material Android push that starts late does not leap in', (
+    tester,
+  ) async {
+    await _pumpApp(tester, material.copyWith(platform: TargetPlatform.android));
+    final width = tester.getSize(find.byType(Scaffold)).width;
+    _push('page');
+    await tester.pump();
+    // The page's first frame took a third of the transition.
+    await tester.pump(const Duration(milliseconds: 120));
+    final first = tester.getTopLeft(find.byType(Scaffold).last).dx;
+    // Shown one frame in, with the page below it one frame out.
+    expect(first, greaterThan(width / 3 * 0.95));
+    expect(_opacityAbove(tester, 'page'), inExclusiveRange(0, 0.6));
+    expect(
+      tester.getTopLeft(find.byType(Scaffold).first).dx,
+      inExclusiveRange(-width * 0.25 * 0.05, 0),
+    );
+    // Then it moves every frame, and plays whole: it is still arriving when
+    // the transition's own time is over.
+    var last = first;
+    for (var frame = 0; frame < 15; frame++) {
+      await _frames(tester, 1);
+      final left = tester.getTopLeft(find.byType(Scaffold).last).dx;
+      expect(left, lessThan(last));
+      last = left;
+    }
+    expect(last, greaterThan(0));
+    await _frames(tester, 8);
+    expect(tester.getTopLeft(find.byType(Scaffold).last).dx, 0);
+    expect(tester.binding.hasScheduledFrame, isFalse);
+  });
+
   testWidgets('Material Android pushes a solid page and pops it as a card', (
     tester,
   ) async {
@@ -112,7 +151,7 @@ void main() {
     final width = tester.getSize(find.byType(Scaffold)).width;
     _push('page');
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+    await _frames(tester, 3);
 
     expect(find.byType(SnapshotWidget), findsNothing);
     expect(_opacityAbove(tester, 'page'), inExclusiveRange(0, 1));
@@ -122,7 +161,7 @@ void main() {
     expect(tester.getTopLeft(find.byType(Scaffold).first).dx, lessThan(0));
 
     // Solid long before it lands: no two pages read through each other.
-    await tester.pump(const Duration(milliseconds: 70));
+    await _frames(tester, 5);
     expect(_opacityAbove(tester, 'page'), 1);
     expect(tester.getTopLeft(find.byType(Scaffold).last).dx, greaterThan(0));
 
@@ -131,7 +170,7 @@ void main() {
 
     _navigatorKey.currentState!.pop();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 120));
+    await _frames(tester, 8);
     // The card has drawn in but hardly moved, and stays solid.
     final card = tester.getRect(find.byType(Scaffold).last);
     expect(card.width, lessThan(width));
@@ -170,7 +209,7 @@ void main() {
 
       _navigatorKey.currentState!.pop();
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 210));
+      await _frames(tester, 13);
       expect(find.text('page'), findsNothing);
       expect(find.text('home'), findsOneWidget);
     });

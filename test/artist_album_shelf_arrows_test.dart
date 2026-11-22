@@ -163,7 +163,10 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await tester.tap(showAll.first);
       await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
+      // Frames that come on time: one long step would read as a late frame.
+      for (var i = 0; i < 50; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
       await tester.pump(const Duration(seconds: 1));
       expect(albums, findsNothing);
 

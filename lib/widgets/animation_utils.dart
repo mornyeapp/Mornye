@@ -8,6 +8,7 @@ import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/theme/page_transitions.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/decorative_phase.dart';
@@ -115,7 +116,7 @@ class StaggeredListItem extends StatelessWidget {
 /// theme so Android predictive back and platform-default animations remain
 /// intact.
 Route<T> slidePageRoute<T>({required Widget page}) {
-  return MaterialPageRoute<T>(builder: (context) => page);
+  return SteadyPageRoute<T>(builder: (context) => page);
 }
 
 /// A shimmer effect widget that can wrap skeleton placeholders. Its sweep

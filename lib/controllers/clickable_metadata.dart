@@ -12,6 +12,7 @@ import 'package:mornye/screens/album_screen.dart';
 import 'package:mornye/screens/extension_collection_screens.dart'
     show ExtensionArtistScreen, ExtensionAlbumScreen;
 import 'package:mornye/services/shell_navigation_service.dart';
+import 'package:mornye/theme/page_transitions.dart';
 import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/string_utils.dart';
@@ -572,7 +573,7 @@ void pushViaPreferredNavigator(
 
   void push(NavigatorState navigator) {
     if (page != null && DetailPage._isOnTop(navigator, page)) return;
-    navigator.push(MaterialPageRoute<void>(builder: builder));
+    navigator.push(SteadyPageRoute<void>(builder: builder));
   }
 
   final shouldRouteToTabNavigator =
@@ -600,7 +601,7 @@ void pushViaPreferredNavigator(
 }
 
 Future<T?> pushPage<T>(BuildContext context, WidgetBuilder builder) =>
-    Navigator.push(context, MaterialPageRoute<T>(builder: builder));
+    Navigator.push(context, SteadyPageRoute<T>(builder: builder));
 
 void _showLoadingSnackBar(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(

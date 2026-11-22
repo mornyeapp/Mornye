@@ -371,7 +371,10 @@ void main() {
 
     navigator.currentState!.pop();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    // Frames that come on time: one long step would read as a late frame.
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
     expect(tester.getTopLeft(find.byKey(minimize)).dy, greaterThan(32));
     expect(clip(minimize).borderRadius, BorderRadius.circular(32));
     await tester.pumpAndSettle();
@@ -418,6 +421,13 @@ void main() {
       morph: spec,
     );
 
+    // Frames that come on time: a longer step reads as a late frame.
+    Future<void> frames(WidgetTester tester, int count) async {
+      for (var i = 0; i < count; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+    }
+
     Future<void> backGesture(
       WidgetTester tester,
       String method, [
@@ -454,7 +464,7 @@ void main() {
         CurveTween(curve: const Interval(0.4, 1)),
       );
       expect(content.value, 0);
-      await tester.pump(const Duration(milliseconds: 150));
+      await frames(tester, 9);
       final growing = tester.getRect(find.byKey(surface));
       expect(growing.top, inExclusiveRange(0, mini.top));
       expect(growing.bottom, inInclusiveRange(mini.bottom, 800));
@@ -512,6 +522,37 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('an opening that starts late does not leap open', (
+      tester,
+    ) async {
+      final navigator = await pumpApp(tester);
+      final player = route();
+      navigator.currentState!.push(player);
+      await tester.pump();
+      await tester.pump();
+      // The player's first frame took a fifth of the opening.
+      await tester.pump(const Duration(milliseconds: 100));
+      final first = tester.getRect(find.byKey(surface)).top;
+      expect(first, greaterThan(mini.top * 0.95));
+      // Then it grows every frame, and plays whole: it is still growing
+      // when the opening's own time is over.
+      var last = first;
+      for (var elapsed = 116; elapsed < 500; elapsed += 16) {
+        await frames(tester, 1);
+        final top = tester.getRect(find.byKey(surface)).top;
+        expect(top, lessThan(last));
+        last = top;
+      }
+      expect(last, greaterThan(0));
+      await frames(tester, 8);
+      expect(find.byKey(surface), findsNothing);
+      expect(
+        tester.getRect(find.byKey(_sheet)),
+        const Rect.fromLTWH(0, 0, 400, 800),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('the growing surface is solid within its first frames', (
       tester,
     ) async {
@@ -528,9 +569,9 @@ void main() {
           )
           .opacity;
       // Under a fifth of the way open the mini player still hands over.
-      await tester.pump(const Duration(milliseconds: 48));
+      await frames(tester, 3);
       expect(opacity(), inExclusiveRange(0, 1));
-      await tester.pump(const Duration(milliseconds: 64));
+      await frames(tester, 4);
       expect(opacity(), 1);
       // Solid while most of the way is still ahead of it.
       expect(

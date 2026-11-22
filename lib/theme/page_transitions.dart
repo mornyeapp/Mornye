@@ -12,6 +12,17 @@ import 'package:mornye/theme/app_motion.dart';
 // gesture observer; [PageBackSwipe] is the one observer, and it asks the
 // navigators in the order a back press does.
 
+/// The material route the app pushes its pages on: its transition waits out
+/// the page's slow first frames instead of leaping in.
+class SteadyPageRoute<T> extends MaterialPageRoute<T> with SteadyStartRoute<T> {
+  SteadyPageRoute({
+    required super.builder,
+    super.settings,
+    super.requestFocus,
+    super.fullscreenDialog,
+  });
+}
+
 /// Material page transitions: Android phones push a solid page and pop it as
 /// a card, and the desktops share one light builder.
 const PageTransitionsTheme materialPageTransitionsTheme = PageTransitionsTheme(
