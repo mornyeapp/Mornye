@@ -1,9 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/material_expressive.dart';
+import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/mornye_slider.dart';
 
 /// Settings slider with the Material 3 Expressive track and handle.
-/// Mornye and reduced motion keep the standard [Slider].
+/// Mornye draws its iOS slider ([MornyeSlider]); Material under reduced
+/// motion keeps the standard [Slider].
 class AppSlider extends StatelessWidget {
   const AppSlider({
     super.key,
@@ -60,6 +63,20 @@ class AppSlider extends StatelessWidget {
   }
 
   Widget _buildSlider(BuildContext context) {
+    if (context.isMornye) {
+      return MornyeSlider(
+        value: value,
+        min: min,
+        max: max,
+        divisions: divisions,
+        label: label,
+        semanticFormatterCallback: semanticFormatterCallback,
+        centered: centered,
+        vertical: vertical,
+        onChanged: onChanged,
+        onChangeEnd: onChangeEnd,
+      );
+    }
     if (!materialExpressiveEnabled(context)) {
       final slider = Slider(
         value: value,
