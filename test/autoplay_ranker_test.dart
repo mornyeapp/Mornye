@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -203,5 +204,75 @@ void main() {
     expect(ranker.weights, isEmpty);
     expect(ranker.evaluation.value?.outcomes, 0);
     expect(await ranker.readOutcomes(), isEmpty);
+  });
+
+  test('stored rows read as outcomes, unreadable parts dropping out', () {
+    final at = _start.millisecondsSinceEpoch;
+    Map<String, Object?> row(int id, Object? parts) => {
+      'id': id,
+      'at': at + id,
+      'reward': id.isEven ? 1 : 0,
+      'weight': 1.5,
+      'parts': parts,
+    };
+    final outcomes = autoplayRankOutcomesFromRows([
+      row(1, '{"genre":4,"fatigue":-2}'),
+      row(2, 'not json'),
+      row(3, '[1,2]'),
+      row(4, '{"genre":"high","signal:sound":1.5}'),
+      row(5, null),
+      row(6, '{}'),
+    ]);
+    expect(
+      [for (final outcome in outcomes) outcome.parts],
+      [
+        {'genre': 4.0, 'fatigue': -2.0},
+        {'signal:sound': 1.5},
+        <String, double>{},
+      ],
+    );
+    expect([for (final outcome in outcomes) outcome.reward], [0.0, 1.0, 1.0]);
+    expect(outcomes.first.weight, 1.5);
+    expect(outcomes.first.at, DateTime.fromMillisecondsSinceEpoch(at + 1));
+    expect(autoplayRankOutcomesFromRows(const []), isEmpty);
+  });
+
+  test('learning on the worker from stored rows matches learning from the '
+      'outcomes read here', () async {
+    final db = await _database();
+    final batch = db.batch();
+    for (final outcome in _listener({
+      'genre': 2.5,
+      'fatigue': 0.3,
+    }, count: 160)) {
+      batch.insert('outcomes', {
+        'at': outcome.at.millisecondsSinceEpoch,
+        'reward': outcome.reward,
+        'weight': outcome.weight,
+        'parts': jsonEncode(outcome.parts),
+      });
+    }
+    batch.insert('outcomes', {
+      'at': _start.millisecondsSinceEpoch,
+      'reward': 1,
+      'weight': 1,
+      'parts': '{broken',
+    });
+    await batch.commit(noResult: true);
+    final ranker = AutoplayRanker(open: () async => db);
+    addTearDown(ranker.dispose);
+    await ranker.train();
+    final outcomes = await ranker.readOutcomes();
+    expect(outcomes, hasLength(160));
+    final expected = trainAutoplayRanker(outcomes);
+    expect(expected.weights, isNotEmpty);
+    expect(ranker.weights, expected.weights);
+    final evaluation = ranker.evaluation.value!;
+    expect(evaluation.outcomes, expected.evaluation.outcomes);
+    expect(evaluation.tested, expected.evaluation.tested);
+    expect(evaluation.starting, expected.evaluation.starting);
+    expect(evaluation.learned, expected.evaluation.learned);
+    final rows = await db.query('outcomes', orderBy: 'id');
+    expect(trainAutoplayRankerOnRows(rows).weights, expected.weights);
   });
 }

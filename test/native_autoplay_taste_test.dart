@@ -8,6 +8,7 @@ import 'package:mornye/services/backend/ffi_backend_transport.dart';
 import 'package:mornye/services/backend/rust_ffi_backend.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'support/autoplay_taste_fixture.dart';
 
@@ -49,6 +50,41 @@ void main() {
       expect(called, isTrue);
     },
   );
+
+  test('learning from the stored log sends the native host the same request '
+      'as its plays', () async {
+    sqfliteFfiInit();
+    final directory = await Directory.systemTemp.createTemp('taste-rows-');
+    addTearDown(() => directory.delete(recursive: true));
+    final db = await AutoplayTaste.openWithFactory(
+      databaseFactoryFfi,
+      '${directory.path}/taste.db',
+    );
+    addTearDown(db.close);
+    final batch = db.batch();
+    for (final play in autoplayTasteFixture(80)) {
+      batch.insert('plays', {
+        'at': play.at.millisecondsSinceEpoch,
+        'kind': play.kind.name,
+        'reward': play.reward,
+        'song': play.song,
+        'artist': play.artist,
+      });
+    }
+    await batch.commit(noResult: true);
+    final taste = AutoplayTaste(open: () async => db);
+    addTearDown(taste.dispose);
+    final plays = await taste.readLog();
+    final expected = trainAutoplayTaste(plays);
+    Object? sent;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      sent = jsonDecode((call.arguments as Map)['request_json'] as String);
+      return jsonEncode(_model(expected));
+    });
+    await taste.train();
+    expect(sent, autoplayTasteFixtureRequest(plays));
+    expect(_model(taste.model!), _model(expected));
+  });
 
   test('missing native host retains isolated compatibility trainer', () async {
     final plays = autoplayTasteFixture(12);

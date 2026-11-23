@@ -499,6 +499,76 @@ void main() {
     },
   );
 
+  test('stored rows read as plays, unknown kinds dropping out', () {
+    final at = _start.millisecondsSinceEpoch;
+    final plays = autoplayTastePlaysFromRows([
+      {
+        'id': 1,
+        'at': at,
+        'kind': 'listened',
+        'reward': 1,
+        'song': 'a|x',
+        'artist': 'a',
+      },
+      {
+        'id': 2,
+        'at': at + 1,
+        'kind': 'hummed',
+        'reward': 0.5,
+        'song': 'a|y',
+        'artist': 'a',
+      },
+      {
+        'id': 3,
+        'at': at + 2,
+        'kind': 'skipped',
+        'reward': 0.25,
+        'song': 'b|z',
+        'artist': 'b',
+      },
+    ]);
+    expect(
+      [for (final play in plays) (play.id, play.song, play.kind)],
+      [
+        (1, 'a|x', AutoplayFeedbackKind.listened),
+        (3, 'b|z', AutoplayFeedbackKind.skipped),
+      ],
+    );
+    expect(plays.first.reward, 1.0);
+    expect(plays.first.at, DateTime.fromMillisecondsSinceEpoch(at));
+    expect(autoplayTastePlaysFromRows(const []), isEmpty);
+  });
+
+  test('a log of only unknown kinds keeps the stored model', () async {
+    final db = await _database(await _directory());
+    addTearDown(db.close);
+    final taste = AutoplayTaste(open: () async => db);
+    addTearDown(taste.dispose);
+    for (final feedback in _clusters()) {
+      taste.record(feedback);
+    }
+    await taste.train();
+    final stored = await db.query('vectors');
+    expect(stored, isNotEmpty);
+    await db.delete('plays');
+    await db.insert('plays', {
+      'at': _start.millisecondsSinceEpoch,
+      'kind': 'hummed',
+      'reward': 1,
+      'song': 'a|x',
+      'artist': 'a',
+    });
+    for (final later in [
+      AutoplayTaste(open: () async => db),
+      _taste(db, trainings: []),
+    ]) {
+      addTearDown(later.dispose);
+      await later.train();
+      expect(later.model, isNull);
+      expect(await db.query('vectors'), stored);
+    }
+  });
+
   test('training 5000 plays stays cheap', () {
     // Eight groups of six artists; sessions mostly within one group, with
     // skips, loves and some songs from elsewhere.

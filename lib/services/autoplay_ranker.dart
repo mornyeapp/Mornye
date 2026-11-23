@@ -118,6 +118,41 @@ AutoplayRankTraining trainAutoplayRanker(List<AutoplayRankOutcome> outcomes) {
   );
 }
 
+/// The outcomes of stored `outcomes` [rows], in their order. A row whose
+/// parts cannot be read drops out.
+List<AutoplayRankOutcome> autoplayRankOutcomesFromRows(
+  List<Map<String, Object?>> rows,
+) => [
+  for (final row in rows)
+    if (_parts(row['parts']) case final parts?)
+      AutoplayRankOutcome(
+        at: DateTime.fromMillisecondsSinceEpoch(row['at'] as int),
+        parts: parts,
+        reward: (row['reward'] as num).toDouble(),
+        weight: (row['weight'] as num).toDouble(),
+      ),
+];
+
+Map<String, double>? _parts(Object? raw) {
+  try {
+    final decoded = raw is String ? jsonDecode(raw) : null;
+    if (decoded is! Map) return null;
+    return {
+      for (final MapEntry(:key, :value) in decoded.entries)
+        if (key is String && value is num && value.isFinite)
+          key: value.toDouble(),
+    };
+  } on FormatException {
+    return null;
+  }
+}
+
+/// [trainAutoplayRanker] on stored rows, read where it runs: on the worker,
+/// each row's parts are decoded off the UI isolate.
+AutoplayRankTraining trainAutoplayRankerOnRows(
+  List<Map<String, Object?>> rows,
+) => trainAutoplayRanker(autoplayRankOutcomesFromRows(rows));
+
 /// Logistic regression of keeping a song on its score parts, each part's
 /// weight a multiplier with a Gaussian prior at 1, fitted by Newton's
 /// method. Parts no outcome has keep their starting weight.
@@ -263,10 +298,12 @@ class AutoplayRanker {
     Future<Database> Function()? open,
     Future<AutoplayRankTraining> Function(List<AutoplayRankOutcome>)? train,
   }) : _open = open ?? _openShared,
-       _trainer = train ?? _trainOnWorker;
+       _trainer = train == null
+           ? _trainOnWorker
+           : ((rows) => train(autoplayRankOutcomesFromRows(rows)));
 
   final Future<Database> Function() _open;
-  final Future<AutoplayRankTraining> Function(List<AutoplayRankOutcome>)
+  final Future<AutoplayRankTraining> Function(List<Map<String, Object?>> rows)
   _trainer;
   // Source to the parts of its score, oldest pick first.
   final _remembered = <String, Map<String, double>>{};
@@ -313,8 +350,8 @@ class AutoplayRanker {
   );
 
   static Future<AutoplayRankTraining> _trainOnWorker(
-    List<AutoplayRankOutcome> outcomes,
-  ) => compute(trainAutoplayRanker, outcomes, debugLabel: 'autoplay-ranker');
+    List<Map<String, Object?>> rows,
+  ) => compute(trainAutoplayRankerOnRows, rows, debugLabel: 'autoplay-ranker');
 
   /// Multipliers of the score parts by name; empty for the starting ones.
   Map<String, double> get weights {
@@ -388,33 +425,12 @@ class AutoplayRanker {
   }
 
   /// The stored outcomes, oldest first.
-  Future<List<AutoplayRankOutcome>> readOutcomes() async {
-    await flush();
-    final rows = await (await _open()).query('outcomes', orderBy: 'id');
-    return [
-      for (final row in rows)
-        if (_parts(row['parts']) case final parts?)
-          AutoplayRankOutcome(
-            at: DateTime.fromMillisecondsSinceEpoch(row['at'] as int),
-            parts: parts,
-            reward: (row['reward'] as num).toDouble(),
-            weight: (row['weight'] as num).toDouble(),
-          ),
-    ];
-  }
+  Future<List<AutoplayRankOutcome>> readOutcomes() async =>
+      autoplayRankOutcomesFromRows(await _readRows());
 
-  static Map<String, double>? _parts(Object? raw) {
-    try {
-      final decoded = raw is String ? jsonDecode(raw) : null;
-      if (decoded is! Map) return null;
-      return {
-        for (final MapEntry(:key, :value) in decoded.entries)
-          if (key is String && value is num && value.isFinite)
-            key: value.toDouble(),
-      };
-    } on FormatException {
-      return null;
-    }
+  Future<List<Map<String, Object?>>> _readRows() async {
+    await flush();
+    return (await _open()).query('outcomes', orderBy: 'id');
   }
 
   Future<void> _ensureLoaded() =>
@@ -443,9 +459,9 @@ class AutoplayRanker {
     final generation = _generation;
     _sinceTraining = 0;
     try {
-      final outcomes = await readOutcomes();
+      final rows = await _readRows();
       if (generation != _generation || _disposed) return;
-      final training = await _trainer(outcomes);
+      final training = await _trainer(rows);
       if (generation != _generation || _disposed) return;
       _weights = training.weights;
       _evaluation.value = training.evaluation;

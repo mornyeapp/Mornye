@@ -404,6 +404,59 @@ Future<AutoplayTasteModel> trainAutoplayTasteInBackground(
   List<AutoplayTastePlay> plays,
 ) async => (await _trainNativePackedTaste(plays)).model;
 
+/// A training run's model and how many plays it learned from.
+typedef _TasteRun = ({_PackedTaste taste, int plays});
+
+/// The plays of stored `plays` [rows], in their order. A row of a kind this
+/// build does not know drops out.
+List<AutoplayTastePlay> autoplayTastePlaysFromRows(
+  List<Map<String, Object?>> rows,
+) {
+  final kinds = AutoplayFeedbackKind.values.asNameMap();
+  return [
+    for (final row in rows)
+      if (kinds[row['kind']] case final kind?)
+        AutoplayTastePlay(
+          id: row['id'] as int,
+          song: row['song'] as String,
+          artist: row['artist'] as String,
+          at: DateTime.fromMillisecondsSinceEpoch(row['at'] as int),
+          kind: kind,
+          reward: (row['reward'] as num).toDouble(),
+        ),
+  ];
+}
+
+Map<String, dynamic> _tasteTrainingRequestFromRows(
+  List<Map<String, Object?>> rows,
+) => _tasteTrainingRequest(autoplayTastePlaysFromRows(rows));
+
+_TasteRun? _trainPackedTasteFromRows(List<Map<String, Object?>> rows) {
+  final plays = autoplayTastePlaysFromRows(rows);
+  if (plays.isEmpty) return null;
+  return (taste: _trainPackedTaste(plays), plays: plays.length);
+}
+
+/// As [_trainNativePackedTaste], with the rows read into plays on the worker
+/// that already runs. Null when no row holds a play.
+Future<_TasteRun?> _trainNativeTasteFromRows(
+  List<Map<String, Object?>> rows,
+) async {
+  try {
+    final request = await compute(_tasteTrainingRequestFromRows, rows);
+    final plays = (request['plays'] as List).length;
+    if (plays == 0) return null;
+    final result = await PlatformBridge.runNativeDataJob(request);
+    return (taste: await compute(_hydrateNativeTaste, result), plays: plays);
+  } on MissingPluginException {
+    return compute(
+      _trainPackedTasteFromRows,
+      rows,
+      debugLabel: 'autoplay-taste',
+    );
+  }
+}
+
 class _Position {
   _Position(this.song, this.artist, this.weight);
   final String song, artist;
@@ -890,10 +943,17 @@ class AutoplayTaste {
   }) : _open = open ?? _openShared,
        _trainer = train == null
            ? _trainOnWorker
-           : ((plays) async => _packTaste(await train(plays)));
+           : ((rows) async {
+               final plays = autoplayTastePlaysFromRows(rows);
+               if (plays.isEmpty) return null;
+               return (
+                 taste: _packTaste(await train(plays)),
+                 plays: plays.length,
+               );
+             });
 
   final Future<Database> Function() _open;
-  final Future<_PackedTaste> Function(List<AutoplayTastePlay>) _trainer;
+  final Future<_TasteRun?> Function(List<Map<String, Object?>> rows) _trainer;
   final _pending = <AutoplayTastePlay>[];
   AutoplayTasteModel? _model;
   Future<void>? _loading, _training, _queued;
@@ -952,8 +1012,8 @@ class AutoplayTaste {
     options: OpenDatabaseOptions(version: _schema, onCreate: _create),
   );
 
-  static Future<_PackedTaste> _trainOnWorker(List<AutoplayTastePlay> plays) =>
-      _trainNativePackedTaste(plays);
+  static Future<_TasteRun?> _trainOnWorker(List<Map<String, Object?>> rows) =>
+      _trainNativeTasteFromRows(rows);
 
   /// The model autoplay uses now, if any.
   @visibleForTesting
@@ -1014,22 +1074,12 @@ class AutoplayTaste {
   }
 
   /// The stored log, oldest first.
-  Future<List<AutoplayTastePlay>> readLog() async {
+  Future<List<AutoplayTastePlay>> readLog() async =>
+      autoplayTastePlaysFromRows(await _readRows());
+
+  Future<List<Map<String, Object?>>> _readRows() async {
     await flush();
-    final rows = await (await _open()).query('plays', orderBy: 'id');
-    final kinds = AutoplayFeedbackKind.values.asNameMap();
-    return [
-      for (final row in rows)
-        if (kinds[row['kind']] case final kind?)
-          AutoplayTastePlay(
-            id: row['id'] as int,
-            song: row['song'] as String,
-            artist: row['artist'] as String,
-            at: DateTime.fromMillisecondsSinceEpoch(row['at'] as int),
-            kind: kind,
-            reward: (row['reward'] as num).toDouble(),
-          ),
-    ];
+    return (await _open()).query('plays', orderBy: 'id');
   }
 
   /// Loads the cached model, and learns again when the log is newer.
@@ -1075,16 +1125,18 @@ class AutoplayTaste {
     final generation = _generation;
     _sinceTraining = 0;
     try {
-      final plays = await readLog();
-      if (plays.isEmpty || generation != _generation || _disposed) return;
+      final rows = await _readRows();
+      if (rows.isEmpty || generation != _generation || _disposed) return;
       final clock = Stopwatch()..start();
-      final trained = await _trainer(plays);
-      if (generation != _generation || _disposed) return;
+      // Null when no row holds a play this build knows.
+      final run = await _trainer(rows);
+      if (run == null || generation != _generation || _disposed) return;
+      final trained = run.taste;
       final model = trained.model;
       _model = model;
       _log.d(
         'Learned ${model.tokens.length} songs and artists from '
-        '${plays.length} plays in ${clock.elapsedMilliseconds} ms',
+        '${run.plays} plays in ${clock.elapsedMilliseconds} ms',
       );
       await (_writing = _writing.then((_) async {
         try {
