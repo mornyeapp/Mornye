@@ -153,6 +153,25 @@ void main() {
     expect(edge, findsNothing);
   });
 
+  testWidgets('docking and leaving the toolbar keep the header and its '
+      'settled blur', (tester) async {
+    _phone(tester);
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(_collection(controller));
+    await tester.pump(const Duration(milliseconds: 16));
+    final blur = find.byType(SettledBlur);
+    final settled = tester.renderObject<RenderSettledBlur>(blur);
+    final image = _image(tester);
+    expect(image, isNotNull);
+    for (final offset in [600.0, 0.0, 600.0, 100.0]) {
+      controller.jumpTo(offset);
+      await tester.pump();
+      expect(tester.renderObject<RenderSettledBlur>(blur), same(settled));
+    }
+    expect(_image(tester), same(image));
+  });
+
   testWidgets('a loading header can leave the shadow off its cover', (
     tester,
   ) async {

@@ -578,8 +578,11 @@ class AlbumDetailHeader extends StatelessWidget {
             ),
             stretchModes: const [StretchMode.zoomBackground],
           );
-          if (rise == 0) return bar;
-          return Stack(fit: StackFit.expand, children: [bar, sheet]);
+          // One Stack either way, so docking keeps the bar's subtree.
+          return Stack(
+            fit: StackFit.expand,
+            children: [bar, if (rise > 0) sheet],
+          );
         },
       ),
       leadingWidth: kToolbarHeight + iosEdgeInset,
