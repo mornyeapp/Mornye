@@ -517,7 +517,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       videoUrl: motionArtwork?.source,
       resolvingVideo: motion.resolving,
       onAspectRatioChanged: (ratio) {
+        // A saved ratio already shapes the layout; the measured one is unused.
         if (!mounted ||
+            motionArtwork?.aspectRatio != null ||
             (_measuredMotionSource == motionArtwork?.source &&
                 _motionAspectRatio == ratio)) {
           return;
@@ -528,7 +530,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         });
       },
       onError: () {
-        if (mounted) {
+        // Every artwork placement reports the same failure.
+        if (mounted && _failedMotionSource != motionArtwork?.source) {
           setState(() => _failedMotionSource = motionArtwork?.source);
         }
       },
@@ -1075,10 +1078,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final (:artwork, :resolving) = ref.watch(
       songMotionArtworkProvider(song).select((state) {
         final lookingUp = state.isLoading && !state.hasValue;
-        // A lookup only holds a video that is on screen.
+        final artwork = lookingUp ? shown : state.value;
+        // A lookup only holds a video that is on screen, and only matters
+        // while no usable video shows, so the same video again is no change.
+        final usable = artwork != null && artwork.source != _failedMotionSource;
         return (
-          artwork: lookingUp ? shown : state.value,
-          resolving: shown != null && state.isLoading,
+          artwork: artwork,
+          resolving: !usable && shown != null && state.isLoading,
         );
       }),
     );

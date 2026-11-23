@@ -19,6 +19,16 @@ class MotionArtwork {
 
   final String source;
   final double? aspectRatio;
+
+  // Each lookup makes a new one; the same video again changes nothing.
+  @override
+  bool operator ==(Object other) =>
+      other is MotionArtwork &&
+      other.source == source &&
+      other.aspectRatio == aspectRatio;
+
+  @override
+  int get hashCode => Object.hash(source, aspectRatio);
 }
 
 /// Durable, album-scoped artwork. Relative filenames survive iOS reinstalls

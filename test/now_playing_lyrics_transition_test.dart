@@ -872,6 +872,66 @@ void main() {
     container.invalidate(playerMotionArtworkProvider);
     await settlePlayer(tester);
     expect(artworkVideo(), 'file:///one.mp4');
+
+    // The same video found again, as for the next song of its album.
+    final withVideo = player();
+    container.invalidate(playerMotionArtworkProvider);
+    await settlePlayer(tester);
+    expect(player(), same(withVideo));
+    expect(artworkVideo(), 'file:///one.mp4');
+
+    // Another video still replaces it.
+    video = 'file:///two.mp4';
+    container.invalidate(playerMotionArtworkProvider);
+    await settlePlayer(tester);
+    expect(artworkVideo(), 'file:///two.mp4');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a saved motion cover ratio or a repeated failure keeps the '
+      'Mornye player', (tester) async {
+    await pumpNowPlaying(
+      tester,
+      theme: MornyeTheme.build(Brightness.dark),
+      size: const Size(390, 844),
+      motionArtworkOf: (_) =>
+          const MotionArtwork('file:///one.mp4', aspectRatio: 1),
+    );
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+    Scaffold player() => tester.widget<Scaffold>(
+      find
+          .descendant(
+            of: find.byType(NowPlayingScreen),
+            matching: find.byType(Scaffold),
+          )
+          .first,
+    );
+    final artwork = tester.widget<MornyePlayerArtwork>(
+      find.byType(MornyePlayerArtwork).first,
+    );
+    expect(artwork.videoUrl, 'file:///one.mp4');
+    final before = player();
+
+    artwork.onAspectRatioChanged!(16 / 9);
+    await settlePlayer(tester);
+    expect(player(), same(before));
+
+    // A failure falls back to the still cover once, however many
+    // placements report it.
+    artwork.onError!();
+    await settlePlayer(tester);
+    final failed = player();
+    expect(failed, isNot(same(before)));
+    expect(
+      tester
+          .widget<MornyePlayerArtwork>(find.byType(MornyePlayerArtwork).first)
+          .videoUrl,
+      isNull,
+    );
+    artwork.onError!();
+    await settlePlayer(tester);
+    expect(player(), same(failed));
     expect(tester.takeException(), isNull);
   });
 
