@@ -193,7 +193,7 @@ class _TraitsSection extends ConsumerWidget {
             for (final (index, fact) in traits.indexed)
               SettingsItem(
                 icon: profileTraitIcon(fact.trait),
-                title: profileTraitName(context, fact.trait),
+                title: profileTraitName(context, fact),
                 subtitle: profileTraitBody(context, fact),
                 showDivider: index < traits.length - 1,
               ),

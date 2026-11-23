@@ -9859,6 +9859,135 @@
       }
     }
   },
+  "profileTraitDailyRitual": "Daily ritual",
+  "profileTraitDailyRitualBody": "Music on {percent} of days since you started",
+  "@profileTraitDailyRitualBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitMarathon": "Marathon listener",
+  "profileTraitMarathonBody": "{duration} of music in a single day",
+  "@profileTraitMarathonBody": {
+    "description": "duration is a listening time such as 6.5 h",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitOnTheRise": "On the rise",
+  "profileTraitOnTheRiseBody": "{percent} more listening than the 30 days before",
+  "@profileTraitOnTheRiseBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitLosslessPurist": "Lossless purist",
+  "profileTraitLosslessPuristBody": "{percent} of your listening is lossless",
+  "@profileTraitLosslessPuristBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitDaytime": "Daytime listener",
+  "profileTraitDaytimeBody": "{percent} of your songs play in the afternoon",
+  "@profileTraitDaytimeBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitSunset": "Sunset listener",
+  "profileTraitSunsetBody": "{percent} of your songs play in the evening",
+  "@profileTraitSunsetBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitWorkday": "Workday soundtrack",
+  "profileTraitWorkdayBody": "{percent} of your listening falls on weekdays",
+  "@profileTraitWorkdayBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitDevotee": "{genre} at heart",
+  "@profileTraitDevotee": {
+    "description": "A listener type for someone whose listening is mostly one genre, such as Jazz at heart",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitDevoteeBody": "{percent} of your listening is {genre}",
+  "@profileTraitDevoteeBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      },
+      "genre": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitSongHunter": "Song hunter",
+  "profileTraitSongHunterBody": "{count, plural, =1{1 different song in the last 30 days} other{{count} different songs in the last 30 days}}",
+  "@profileTraitSongHunterBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileTraitThrowback": "Throwback lover",
+  "profileTraitThrowbackBody": "{percent} of your listening came out before 2000",
+  "@profileTraitThrowbackBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitFreshEars": "Fresh ears",
+  "profileTraitFreshEarsBody": "{percent} of your listening came out in the last two years",
+  "@profileTraitFreshEarsBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitPatient": "Lets it play",
+  "profileTraitPatientBody": "{percent} of your songs play without a skip",
+  "@profileTraitPatientBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitQuickSkipper": "Quick skipper",
+  "profileTraitQuickSkipperBody": "You skip {percent} of your songs",
+  "@profileTraitQuickSkipperBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
   "profileDecades": "Decades",
   "profileDecade": "{decade}s",
   "@profileDecade": {

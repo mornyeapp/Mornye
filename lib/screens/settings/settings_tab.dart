@@ -6,9 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/profile_overview_provider.dart'
+    show profileTraitsProvider;
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/screens/settings/profile_settings_page.dart';
+import 'package:mornye/screens/settings/profile_share_screen.dart'
+    show profileTraitLine;
 import 'package:mornye/screens/settings/about_page.dart';
 import 'package:mornye/screens/settings/app_settings_page.dart';
 import 'package:mornye/screens/settings/appearance_settings_page.dart';
@@ -856,6 +860,10 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
         builder: (context, ref, _) {
           final profile = ref.watch(userProfileProvider).value;
           final named = profile?.name.isNotEmpty == true;
+          final traits = profileTraitLine(
+            context,
+            ref.watch(profileTraitsProvider).value ?? const [],
+          );
           return _CategoryRow(
             key: const ValueKey('settings-category:profile'),
             leading: ProfileAvatar(
@@ -864,7 +872,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
               size: mornye ? 36 : 40,
             ),
             title: named ? profile!.name : context.l10n.profileSetUp,
-            subtitle: context.l10n.profileEdit,
+            subtitle: traits ?? context.l10n.profileEdit,
             selected: _selected == _profileSelection,
             onTap: profile == null ? null : () => _select(_profileSelection),
           );
@@ -1041,6 +1049,10 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
             child: Consumer(
               builder: (context, ref, _) {
                 final profile = ref.watch(userProfileProvider).value;
+                final traits = profileTraitLine(
+                  context,
+                  ref.watch(profileTraitsProvider).value ?? const [],
+                );
                 return SettingsGroup(
                   margin: margin,
                   children: [
@@ -1062,9 +1074,14 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      subtitle:
-                          profile?.name.isNotEmpty == true ||
-                              profile?.photoPath?.isNotEmpty == true
+                      subtitle: traits != null
+                          ? Text(
+                              traits,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : profile?.name.isNotEmpty == true ||
+                                profile?.photoPath?.isNotEmpty == true
                           ? null
                           : Text(context.l10n.profileEdit),
                       trailing: const AppIcon.adaptive(Icons.chevron_right),

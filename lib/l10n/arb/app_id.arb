@@ -8440,6 +8440,133 @@
       }
     }
   },
+  "profileTraitDailyRitual": "Ritual harian",
+  "profileTraitDailyRitualBody": "Musik di {percent} hari sejak Anda mulai",
+  "@profileTraitDailyRitualBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitMarathon": "Maraton musik",
+  "profileTraitMarathonBody": "{duration} musik dalam satu hari",
+  "@profileTraitMarathonBody": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitOnTheRise": "Makin rajin",
+  "profileTraitOnTheRiseBody": "{percent} lebih banyak dari 30 hari sebelumnya",
+  "@profileTraitOnTheRiseBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitLosslessPurist": "Penjaga lossless",
+  "profileTraitLosslessPuristBody": "{percent} dari waktu mendengarkan Anda lossless",
+  "@profileTraitLosslessPuristBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitDaytime": "Pendengar siang",
+  "profileTraitDaytimeBody": "{percent} lagu Anda diputar pada siang hari",
+  "@profileTraitDaytimeBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitSunset": "Pendengar senja",
+  "profileTraitSunsetBody": "{percent} lagu Anda diputar pada sore hari",
+  "@profileTraitSunsetBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitWorkday": "Teman hari kerja",
+  "profileTraitWorkdayBody": "{percent} dari waktu mendengarkan Anda jatuh pada hari kerja",
+  "@profileTraitWorkdayBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitDevotee": "Jiwa {genre}",
+  "@profileTraitDevotee": {
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitDevoteeBody": "{percent} dari waktu mendengarkan Anda adalah {genre}",
+  "@profileTraitDevoteeBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      },
+      "genre": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitSongHunter": "Pemburu lagu",
+  "profileTraitSongHunterBody": "{count} lagu berbeda dalam 30 hari terakhir",
+  "@profileTraitSongHunterBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileTraitThrowback": "Pecinta lagu lawas",
+  "profileTraitThrowbackBody": "{percent} dari waktu mendengarkan Anda rilis sebelum 2000",
+  "@profileTraitThrowbackBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitFreshEars": "Selalu kekinian",
+  "profileTraitFreshEarsBody": "{percent} dari waktu mendengarkan Anda rilis dalam dua tahun terakhir",
+  "@profileTraitFreshEarsBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitPatient": "Sabar mendengar",
+  "profileTraitPatientBody": "{percent} lagu Anda diputar tanpa dilewati",
+  "@profileTraitPatientBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTraitQuickSkipper": "Cepat pindah",
+  "profileTraitQuickSkipperBody": "Anda melewati {percent} lagu Anda",
+  "@profileTraitQuickSkipperBody": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
   "profileDecades": "Dekade",
   "profileDecade": "{decade}-an",
   "@profileDecade": {

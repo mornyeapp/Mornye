@@ -331,6 +331,13 @@ void main() {
     );
     expect(sound.decadeMilliseconds, 880 * minute);
     expect(sound.era?.decade, 1990);
+    expect(sound.before(2000), closeTo(600 / 880, 1e-9));
+    // Nothing came out in 2025 or 2026.
+    expect(sound.recentMilliseconds, 0);
+    expect(
+      listeningSound(_songs, _files, now: DateTime(2020, 6)).recentMilliseconds,
+      40 * minute,
+    );
     expect(sound.quality, {
       ProfileQuality.hiRes: 600 * minute,
       ProfileQuality.lossy: 240 * minute,
@@ -368,22 +375,57 @@ void main() {
   });
 
   test('traits follow what the record bears out', () {
-    final traits = profileTraits(_overview(), rhythm: _rhythm);
+    final traits = profileTraits(
+      _overview(),
+      rhythm: _rhythm,
+      now: DateTime(2026, 11, 19),
+    );
+    // The most marked first: 84% for one artist is far past its 25%.
     expect(
       [for (final fact in traits) fact.trait],
       [
-        ProfileTrait.audiophile,
-        ProfileTrait.nightOwl,
-        ProfileTrait.weekender,
         ProfileTrait.loyal,
+        ProfileTrait.nightOwl,
+        ProfileTrait.devotee,
+        ProfileTrait.throwback,
+        ProfileTrait.weekender,
       ],
     );
+    expect(traits.first.subject, 'Example Artist');
     expect(traits[1].share, closeTo(0.75, 1e-9));
-    expect(traits.last.subject, 'Example Artist');
+    expect(traits[2].subject, 'Pop');
+    expect(traits[3].share, closeTo(600 / 880, 1e-9));
+    final all = [
+      for (final fact in profileTraits(
+        _overview(),
+        rhythm: _rhythm,
+        limit: ProfileTrait.values.length,
+        now: DateTime(2026, 11, 19),
+      ))
+        fact.trait,
+    ];
+    expect(all, containsAll([ProfileTrait.audiophile, ProfileTrait.onTheRise]));
+    // 80% played through is neither patient nor quick to skip.
+    expect(all, isNot(contains(ProfileTrait.patient)));
+    expect(all, isNot(contains(ProfileTrait.quickSkipper)));
     // Without sessions there is nothing to say about the hours.
     expect([
       for (final fact in profileTraits(_overview())) fact.trait,
     ], isNot(contains(ProfileTrait.nightOwl)));
+
+    // Afternoons with most songs skipped.
+    final skipping = ProfileRhythm.of([
+      for (var i = 0; i < 10; i++) _play(14, AutoplayFeedbackKind.listened),
+      for (var i = 0; i < 20; i++) _play(15, AutoplayFeedbackKind.skipped),
+    ]);
+    expect([
+      for (final fact in profileTraits(
+        _overview(),
+        rhythm: skipping,
+        limit: ProfileTrait.values.length,
+      ))
+        fact.trait,
+    ], containsAll([ProfileTrait.daytime, ProfileTrait.quickSkipper]));
     expect(profileArtistsForHalf(_overview().allTime.topArtists), 1);
     expect(profileArtistsForHalf(const []), 0);
   });
@@ -464,8 +506,12 @@ void main() {
     expect(find.text('Last 12 months'), findsOneWidget);
     expect(find.text('Best month'), findsOneWidget);
     expect(find.text('Listener type'), findsOneWidget);
-    expect(find.text('Audiophile'), findsOneWidget);
+    // The two leading types sit under the name too.
+    expect(find.text('Loyal fan · Night owl'), findsOneWidget);
+    expect(find.text('Loyal fan'), findsOneWidget);
     expect(find.text('Night owl'), findsOneWidget);
+    expect(find.text('Pop at heart'), findsOneWidget);
+    expect(find.text('Throwback lover'), findsOneWidget);
     expect(find.text('Weekend listener'), findsOneWidget);
     expect(
       find.text('Example Artist takes 84% of your listening'),
@@ -521,10 +567,15 @@ void main() {
     expect(find.byType(ProfileShareScreen), findsOneWidget);
     final card = tester.widget<ProfileShareCard>(find.byType(ProfileShareCard));
     expect(card.style.parts, ProfileCardStyle.defaultParts);
-    // The card carries three traits, the most telling first.
+    // The card carries four traits, the most telling first.
     expect(
       [for (final fact in card.traits) fact.trait],
-      [ProfileTrait.audiophile, ProfileTrait.nightOwl, ProfileTrait.weekender],
+      [
+        ProfileTrait.loyal,
+        ProfileTrait.nightOwl,
+        ProfileTrait.devotee,
+        ProfileTrait.throwback,
+      ],
     );
     expect(tester.takeException(), isNull);
   });
@@ -556,7 +607,7 @@ void main() {
           home: ProfileShareScreen(
             profile: const UserProfile(name: 'Example: Name'),
             overview: overview,
-            traits: profileTraits(overview, rhythm: _rhythm, limit: 3),
+            traits: profileTraits(overview, rhythm: _rhythm, limit: 4),
             style: ProfileCardStyle(shape: shape),
             saveImage: (name, png) async {
               saved.add((name, png.length));
@@ -585,12 +636,30 @@ void main() {
         find.descendant(of: card, matching: find.text('Example: Name')),
         findsOneWidget,
       );
+      // The leading type is the headline; the others share one line.
       expect(
-        find.descendant(of: card, matching: find.text('Night owl')),
+        find.descendant(of: card, matching: find.text('Loyal fan')),
         findsOneWidget,
       );
       expect(
-        find.descendant(of: card, matching: find.text('Pop 88%')),
+        find.descendant(
+          of: card,
+          matching: find.text('Example Artist takes 84% of your listening'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.text('Night owl · Pop at heart · Throwback lover'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.text('Pop 88%', findRichText: true),
+        ),
         findsOneWidget,
       );
       expect((await ProfileCardStyle.load()).parts, {

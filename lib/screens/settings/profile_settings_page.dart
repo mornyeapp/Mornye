@@ -63,7 +63,13 @@ class ProfileSettingsPage extends ConsumerWidget {
             AppSliverHeader.page(title: l10n.profileTitle),
             SliverList.list(
               children: [
-                _Header(profile: profile, overview: heard ? data : null),
+                _Header(
+                  profile: profile,
+                  overview: heard ? data : null,
+                  traits: heard
+                      ? ref.watch(profileTraitsProvider).value ?? const []
+                      : const [],
+                ),
                 const _NowPlaying(),
                 if (!player)
                   const SizedBox.shrink()
@@ -263,12 +269,19 @@ class _Inset extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.profile, required this.overview});
+  const _Header({
+    required this.profile,
+    required this.overview,
+    this.traits = const [],
+  });
 
   final UserProfile profile;
 
   /// Null while nothing was heard or the record is not shown.
   final ProfileOverview? overview;
+
+  /// The listener type, most marked first, for a short line under the name.
+  final List<ProfileTraitFact> traits;
 
   /// One line for the taste: the leading genre when it takes half of the
   /// listening, a mix otherwise.
@@ -295,6 +308,7 @@ class _Header extends StatelessWidget {
     final name = profile.name.trim();
     final taste = _taste(context);
     final since = overview?.since;
+    final type = profileTraitLine(context, traits);
     return _Inset(
       child: Padding(
         padding: const EdgeInsets.only(top: 16, bottom: 8),
@@ -315,6 +329,30 @@ class _Header extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (type != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppIcon(
+                    profileTraitIcon(traits.first.trait),
+                    size: 16,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      type,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (taste != null) ...[
               const SizedBox(height: 4),
               Text(taste, textAlign: TextAlign.center, style: muted),

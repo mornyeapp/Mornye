@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/library_song_reads.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -54,10 +56,23 @@ class ProfileSound {
     this.quality = const {},
     this.qualityMilliseconds = 0,
     this.formats = const [],
+    this.recentMilliseconds = 0,
   });
 
   /// Decades by listening time, oldest first.
   final List<ProfileDecade> decades;
+
+  /// Listening time of the songs that came out this year or last year.
+  final int recentMilliseconds;
+
+  /// The share of dated listening released before [year].
+  double before(int year) {
+    if (decadeMilliseconds <= 0) return 0;
+    final old = decades
+        .where((decade) => decade.decade < year)
+        .fold(0, (sum, decade) => sum + decade.milliseconds);
+    return old / decadeMilliseconds;
+  }
 
   /// Listening time of the songs whose year is known.
   final int decadeMilliseconds;
@@ -90,6 +105,8 @@ ProfileSound listeningSound(
   DateTime? now,
 }) {
   final latest = (now ?? DateTime.now()).year + 1;
+  // Last year onward.
+  final recentFrom = latest - 2;
   final years = <String, int>{};
   final tiers = <String, ProfileQuality>{};
   final formatOf = <String, String>{};
@@ -120,6 +137,7 @@ ProfileSound listeningSound(
   final formats = <String, int>{};
   var dated = 0;
   var rated = 0;
+  var recent = 0;
   for (final total in tracks) {
     final key = profileSongKey(total.track);
     final year = years[key];
@@ -127,6 +145,7 @@ ProfileSound listeningSound(
       final decade = year - year % 10;
       decades[decade] = (decades[decade] ?? 0) + total.milliseconds;
       dated += total.milliseconds;
+      if (year >= recentFrom) recent += total.milliseconds;
     }
     final tier = tiers[key];
     if (tier != null) {
@@ -154,6 +173,7 @@ ProfileSound listeningSound(
         (decade: decade, milliseconds: decades[decade]!),
     ],
     decadeMilliseconds: dated,
+    recentMilliseconds: recent,
     quality: quality,
     qualityMilliseconds: rated,
     formats: [
@@ -281,14 +301,27 @@ int profileArtistsForHalf(List<MapEntry<String, int>> artists) {
 /// A word for a listener that the record bears out.
 enum ProfileTrait {
   onAStreak,
+  dailyRitual,
+  marathon,
+  onTheRise,
   audiophile,
+  losslessPurist,
   nightOwl,
   earlyBird,
+  daytime,
+  sunset,
   weekender,
+  workday,
   loyal,
+  devotee,
   explorer,
+  songHunter,
   eclectic,
+  throwback,
+  freshEars,
   onRepeat,
+  patient,
+  quickSkipper,
 }
 
 /// A trait with what bears it out: a [share] of the listening, a [count] or
@@ -300,73 +333,242 @@ typedef ProfileTraitFact = ({
   String subject,
 });
 
-/// The traits [overview] and [rhythm] bear out, in [ProfileTrait] order, at
-/// most [limit].
+/// The traits [overview] and [rhythm] bear out, at most [limit], the most
+/// marked first. [now] is today.
 List<ProfileTraitFact> profileTraits(
   ProfileOverview overview, {
   ProfileRhythm? rhythm,
-  int limit = 4,
+  int limit = 5,
+  DateTime? now,
 }) {
-  final traits = <ProfileTraitFact>[];
+  final found = <(ProfileTraitFact, double)>[];
+  // A trait holds from [threshold]; its rank grows from 1 there to 2 at
+  // [full], so traits with different measures compare fairly.
   void add(
-    ProfileTrait trait, {
+    ProfileTrait trait,
+    num value, {
+    required num threshold,
+    required num full,
     double share = 0,
     int count = 0,
     String subject = '',
-  }) =>
-      traits.add((trait: trait, share: share, count: count, subject: subject));
+  }) {
+    if (value < threshold) return;
+    final rank = 1 + ((value - threshold) / (full - threshold)).clamp(0.0, 1.0);
+    found.add((
+      (trait: trait, share: share, count: count, subject: subject),
+      rank,
+    ));
+  }
+
+  const hour = 3600000;
   final habits = overview.habits;
-  if (habits.currentStreak >= 7) {
-    add(ProfileTrait.onAStreak, count: habits.currentStreak);
-  }
-  final sound = overview.sound;
-  final hiRes = sound.share(ProfileQuality.hiRes);
-  if (sound.qualityMilliseconds >= const Duration(hours: 1).inMilliseconds &&
-      hiRes >= 0.5) {
-    add(ProfileTrait.audiophile, share: hiRes);
-  }
-  if (rhythm != null && !rhythm.isEmpty) {
-    final parts = rhythm.dayparts;
-    double share(ProfileDaypart part) => parts[part]! / rhythm.playedThrough;
-    if (share(ProfileDaypart.night) >= 0.35) {
-      add(ProfileTrait.nightOwl, share: share(ProfileDaypart.night));
-    } else if (share(ProfileDaypart.morning) >= 0.35) {
-      add(ProfileTrait.earlyBird, share: share(ProfileDaypart.morning));
+  final all = overview.allTime;
+
+  add(
+    ProfileTrait.onAStreak,
+    habits.currentStreak,
+    threshold: 7,
+    full: 30,
+    count: habits.currentStreak,
+  );
+  final since = overview.since;
+  if (since != null) {
+    final today = now ?? DateTime.now();
+    final span =
+        DateTime(
+          today.year,
+          today.month,
+          today.day,
+        ).difference(DateTime(since.year, since.month, since.day)).inDays +
+        1;
+    if (span >= 30) {
+      final daily = math.min(all.activeDays / span, 1.0);
+      add(
+        ProfileTrait.dailyRitual,
+        daily,
+        threshold: 0.8,
+        full: 1,
+        share: daily,
+      );
     }
   }
+  add(
+    ProfileTrait.marathon,
+    all.peakDayMilliseconds,
+    threshold: 5 * hour,
+    full: 12 * hour,
+    count: all.peakDayMilliseconds,
+  );
+  final change = overview.month.changePercent;
+  if (change != null && overview.month.summary.milliseconds >= 2 * hour) {
+    add(
+      ProfileTrait.onTheRise,
+      change,
+      threshold: 50,
+      full: 200,
+      share: change / 100,
+    );
+  }
+
+  final sound = overview.sound;
+  if (sound.qualityMilliseconds >= hour) {
+    final hiRes = sound.share(ProfileQuality.hiRes);
+    final lossless = hiRes + sound.share(ProfileQuality.lossless);
+    if (hiRes >= 0.5) {
+      add(
+        ProfileTrait.audiophile,
+        hiRes,
+        threshold: 0.5,
+        full: 1,
+        share: hiRes,
+      );
+    } else {
+      add(
+        ProfileTrait.losslessPurist,
+        lossless,
+        threshold: 0.95,
+        full: 1,
+        share: lossless,
+      );
+    }
+  }
+
+  if (rhythm != null && !rhythm.isEmpty) {
+    final busiest = rhythm.daypart!;
+    final share = rhythm.dayparts[busiest]! / rhythm.playedThrough;
+    // Afternoon and evening are long or common, so they need more.
+    final (trait, threshold) = switch (busiest) {
+      ProfileDaypart.night => (ProfileTrait.nightOwl, 0.35),
+      ProfileDaypart.morning => (ProfileTrait.earlyBird, 0.35),
+      ProfileDaypart.afternoon => (ProfileTrait.daytime, 0.45),
+      ProfileDaypart.evening => (ProfileTrait.sunset, 0.45),
+    };
+    add(trait, share, threshold: threshold, full: 0.8, share: share);
+    final through = rhythm.throughShare;
+    add(ProfileTrait.patient, through, threshold: 0.9, full: 1, share: through);
+    add(
+      ProfileTrait.quickSkipper,
+      1 - through,
+      threshold: 0.4,
+      full: 0.8,
+      share: 1 - through,
+    );
+  }
+
   final week = habits.weekdays.fold(0, (sum, time) => sum + time);
-  final weekend = week == 0
-      ? 0.0
-      : (habits.weekdays[5] + habits.weekdays[6]) / week;
-  // Two days of seven are 29% of an even week.
-  if (weekend >= 0.45) add(ProfileTrait.weekender, share: weekend);
-  final artists = overview.allTime.topArtists;
+  if (week >= 2 * hour) {
+    final weekend = (habits.weekdays[5] + habits.weekdays[6]) / week;
+    // Two days of seven are 29% of an even week.
+    add(
+      ProfileTrait.weekender,
+      weekend,
+      threshold: 0.45,
+      full: 0.8,
+      share: weekend,
+    );
+    add(
+      ProfileTrait.workday,
+      1 - weekend,
+      threshold: 0.88,
+      full: 1,
+      share: 1 - weekend,
+    );
+  }
+
+  final artists = all.topArtists;
   final artistTime = artists.fold(0, (sum, artist) => sum + artist.value);
   if (artists.length >= 3 && artistTime > 0) {
     final share = artists.first.value / artistTime;
-    if (share >= 0.25) {
-      add(ProfileTrait.loyal, share: share, subject: artists.first.key);
-    }
+    add(
+      ProfileTrait.loyal,
+      share,
+      threshold: 0.25,
+      full: 0.7,
+      share: share,
+      subject: artists.first.key,
+    );
   }
-  final found = overview.month.newArtists.length;
-  if (found >= 10) add(ProfileTrait.explorer, count: found);
   final genres = overview.genres;
-  if (genres.length >= 8 && overview.genreMilliseconds > 0) {
+  if (genres.isNotEmpty && overview.genreMilliseconds > 0) {
     final top = genres.first.milliseconds / overview.genreMilliseconds;
+    add(
+      ProfileTrait.devotee,
+      top,
+      threshold: 0.6,
+      full: 1,
+      share: top,
+      subject: genres.first.name,
+    );
     if (top < 0.3) {
-      add(ProfileTrait.eclectic, share: top, count: genres.length);
+      add(
+        ProfileTrait.eclectic,
+        genres.length,
+        threshold: 8,
+        full: 24,
+        share: top,
+        count: genres.length,
+      );
     }
   }
-  final replay = overview.allTime.replay;
-  if (replay != null && replay.plays >= 8) {
+  final newArtists = overview.month.newArtists.length;
+  add(
+    ProfileTrait.explorer,
+    newArtists,
+    threshold: 10,
+    full: 50,
+    count: newArtists,
+  );
+  final monthSongs = overview.month.summary.tracks.length;
+  add(
+    ProfileTrait.songHunter,
+    monthSongs,
+    threshold: 200,
+    full: 800,
+    count: monthSongs,
+  );
+
+  if (sound.decadeMilliseconds >= hour) {
+    final old = sound.before(2000);
+    final fresh = sound.recentMilliseconds / sound.decadeMilliseconds;
+    add(ProfileTrait.throwback, old, threshold: 0.4, full: 0.9, share: old);
+    add(ProfileTrait.freshEars, fresh, threshold: 0.4, full: 0.9, share: fresh);
+  }
+
+  final replay = all.replay;
+  if (replay != null) {
     add(
       ProfileTrait.onRepeat,
+      replay.plays,
+      threshold: 8,
+      full: 40,
       count: replay.plays,
       subject: replay.track.title,
     );
   }
-  return traits.take(limit).toList(growable: false);
+
+  // Equals keep [ProfileTrait] order.
+  found.sort((a, b) {
+    final rank = b.$2.compareTo(a.$2);
+    return rank != 0 ? rank : a.$1.trait.index.compareTo(b.$1.trait.index);
+  });
+  return [for (final (fact, _) in found.take(limit)) fact];
 }
+
+/// What the record says about the listener, for the Settings profile row
+/// and the share card. Empty while it is off or says nothing yet.
+final profileTraitsProvider =
+    FutureProvider.autoDispose<List<ProfileTraitFact>>((ref) async {
+      final player = ref.watch(playerUiEnabledProvider);
+      final recording = ref.watch(
+        settingsProvider.select((s) => s.listeningStatisticsEnabled),
+      );
+      if (!player || !recording) return const [];
+      final overview = await ref.watch(profileOverviewProvider.future);
+      if (overview.allTime.isEmpty) return const [];
+      final rhythm = await ref.watch(profileRhythmProvider.future);
+      return profileTraits(overview, rhythm: rhythm);
+    });
 
 /// The days a listener plays music on, read from the daily totals.
 class ProfileHabits {

@@ -310,6 +310,51 @@ void main() {
     },
   );
 
+  testWidgets('the Settings profile row names the listener type', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(393, 852);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await store.save(name: 'Listener');
+    final container = ProviderContainer(
+      overrides: [
+        userProfileStoreProvider.overrideWithValue(store),
+        ..._emptyRecord,
+        profileTraitsProvider.overrideWith(
+          (ref) async => const [
+            (trait: ProfileTrait.nightOwl, share: 0.6, count: 0, subject: ''),
+            (
+              trait: ProfileTrait.devotee,
+              share: 0.7,
+              count: 0,
+              subject: 'Jazz',
+            ),
+            (trait: ProfileTrait.onRepeat, share: 0, count: 9, subject: 'Song'),
+          ],
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(userProfileProvider.future);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: MornyeTheme.build(Brightness.dark),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: SettingsTab()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // The two leading types, under the name.
+    expect(find.text('Listener'), findsOneWidget);
+    expect(find.text('Night owl · Jazz at heart'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('desktop Settings keeps the profile page open after Save', (
     tester,
   ) async {
