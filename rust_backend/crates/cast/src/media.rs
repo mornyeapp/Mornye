@@ -9,7 +9,7 @@ use futures_util::TryStreamExt;
 use http::header::{
     ACCEPT_ENCODING, ACCEPT_RANGES, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS,
     ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_EXPOSE_HEADERS, CACHE_CONTROL, CONTENT_LENGTH,
-    CONTENT_RANGE, CONTENT_TYPE, HeaderValue, RANGE,
+    CONTENT_RANGE, CONTENT_TYPE, HeaderMap, HeaderValue, RANGE,
 };
 use http::{Method, Request, Response, StatusCode, Uri};
 use http_body_util::combinators::BoxBody;
@@ -25,6 +25,7 @@ use std::convert::Infallible;
 use std::io::{self, SeekFrom};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeekExt};
@@ -55,6 +56,27 @@ struct Source {
 struct Shared {
     sources: Mutex<HashMap<String, Source>>,
     client: RelayClient,
+    /// Answer every request as DLNA renderers expect, not only those asking.
+    dlna: AtomicBool,
+}
+
+/// DLNA content features of every answer: byte ranges but no time seeking,
+/// not transcoded, streaming and background transfer, DLNA 1.5.
+pub(crate) const DLNA_FEATURES: &str =
+    "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000";
+/// The same for pictures, which are fetched interactively.
+const DLNA_IMAGE_FEATURES: &str =
+    "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=00F00000000000000000000000000000";
+const CONTENT_FEATURES: &str = "contentfeatures.dlna.org";
+const TRANSFER_MODE: &str = "transfermode.dlna.org";
+const TIME_SEEK: &str = "timeseekrange.dlna.org";
+
+pub(crate) fn dlna_features(mime: &str) -> &'static str {
+    if mime.starts_with("image/") {
+        DLNA_IMAGE_FEATURES
+    } else {
+        DLNA_FEATURES
+    }
 }
 
 /// A running media server; dropping it stops listening and ends every
@@ -75,6 +97,7 @@ impl MediaServer {
         let shared = Arc::new(Shared {
             sources: Mutex::default(),
             client: relay_client()?,
+            dlna: AtomicBool::new(false),
         });
         let shutdown = CancellationToken::new();
         tokio::spawn(accept(listener, Arc::clone(&shared), shutdown.clone()));
@@ -117,6 +140,12 @@ impl MediaServer {
 
     pub fn address(&self) -> SocketAddr {
         self.local
+    }
+
+    /// Adds the DLNA headers to every answer while a DLNA renderer is the
+    /// receiver; requests carrying DLNA headers get them regardless.
+    pub fn set_dlna(&self, on: bool) {
+        self.shared.dlna.store(on, Ordering::Relaxed);
     }
 }
 
@@ -260,6 +289,13 @@ async fn handle(shared: &Shared, request: Request<Incoming>) -> Response<Body> {
     let mut response = respond(shared, &request)
         .await
         .unwrap_or_else(|_| status(StatusCode::BAD_GATEWAY));
+    let asked = request
+        .headers()
+        .keys()
+        .any(|name| name.as_str().ends_with(".dlna.org"));
+    if response.status().is_success() && (asked || shared.dlna.load(Ordering::Relaxed)) {
+        add_dlna_headers(response.headers_mut(), request.headers());
+    }
     let headers = response.headers_mut();
     headers.insert(ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
     headers.insert(
@@ -290,6 +326,10 @@ async fn respond(shared: &Shared, request: &Request<Incoming>) -> io::Result<Res
     let Some(source) = source else {
         return Ok(status(StatusCode::NOT_FOUND));
     };
+    // Only byte ranges are offered; DLNA has a time range refused this way.
+    if request.headers().contains_key(TIME_SEEK) {
+        return Ok(status(StatusCode::NOT_ACCEPTABLE));
+    }
     let head = match *request.method() {
         Method::GET => false,
         Method::HEAD => true,
@@ -361,17 +401,33 @@ async fn relay(
     range: Option<&HeaderValue>,
     head: bool,
 ) -> io::Result<Response<Body>> {
-    let mut upstream = Request::builder()
-        .method(if head { Method::HEAD } else { Method::GET })
-        .uri(uri)
-        .header(ACCEPT_ENCODING, "identity");
-    if let Some(range) = range {
-        upstream = upstream.header(RANGE, range);
-    }
-    let reply = client
-        .request(upstream.body(Empty::new()).map_err(io::Error::other)?)
+    let ask = |method: Method| {
+        let mut upstream = Request::builder()
+            .method(method)
+            .uri(uri.clone())
+            .header(ACCEPT_ENCODING, "identity");
+        if let Some(range) = range {
+            upstream = upstream.header(RANGE, range);
+        }
+        upstream.body(Empty::new()).map_err(io::Error::other)
+    };
+    let method = if head { Method::HEAD } else { Method::GET };
+    let mut reply = client
+        .request(ask(method)?)
         .await
         .map_err(io::Error::other)?;
+    // Renderers probe with HEAD; a source without it answers its GET headers.
+    if head
+        && matches!(
+            reply.status(),
+            StatusCode::METHOD_NOT_ALLOWED | StatusCode::NOT_IMPLEMENTED
+        )
+    {
+        reply = client
+            .request(ask(Method::GET)?)
+            .await
+            .map_err(io::Error::other)?;
+    }
     let mut builder = Response::builder()
         .status(reply.status())
         .header(CONTENT_TYPE, mime);
@@ -386,6 +442,32 @@ async fn relay(
         reply.into_body().map_err(io::Error::other).boxed()
     };
     builder.body(body).map_err(io::Error::other)
+}
+
+/// What DLNA renderers look for: the transfer mode they asked for (or the
+/// one fitting the media) and the content features.
+fn add_dlna_headers(headers: &mut HeaderMap, request: &HeaderMap) {
+    let mime = headers
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    let features = dlna_features(mime);
+    let fitting = if mime.starts_with("image/") {
+        "Interactive"
+    } else {
+        "Streaming"
+    };
+    let mode = request
+        .get(TRANSFER_MODE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|asked| {
+            ["Streaming", "Interactive", "Background"]
+                .into_iter()
+                .find(|mode| mode.eq_ignore_ascii_case(asked.trim()))
+        })
+        .unwrap_or(fitting);
+    headers.insert(TRANSFER_MODE, HeaderValue::from_static(mode));
+    headers.insert(CONTENT_FEATURES, HeaderValue::from_static(features));
 }
 
 fn reader_body(reader: impl AsyncRead + Send + Sync + 'static) -> Body {
