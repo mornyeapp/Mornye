@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,10 +29,17 @@ class PreferenceBlobStore {
   final String name;
   final Map<String, Type> keys;
   final Future<Directory> Function() directory;
-  final Future<void> Function(File, String) persist;
+  final Future<void> Function(File, List<int>) persist;
   static final _pending = <String, Future<void>>{};
   static final _failedRemovals = <String, Set<String>>{};
   static int _sequence = 0;
+
+  /// Blobs this large are encoded and decoded off the calling isolate.
+  static const workerThresholdBytes = 64 * 1024;
+
+  /// The exact file bytes [write] stores for [values].
+  static Uint8List encode(Map<String, Object?> values) =>
+      utf8.encode(jsonEncode(values));
 
   Future<T> _run<T>(Future<T> Function() operation) {
     final result = (_pending[name] ?? Future<void>.value()).then(
@@ -48,11 +58,60 @@ class PreferenceBlobStore {
   Future<File> _file() async =>
       File('${(await directory()).path}/preference_blobs/$name.json');
 
-  bool _valid(Map<String, Object?> values) => values.entries.every((entry) {
-    final type = keys[entry.key];
-    return (type == String && entry.value is String) ||
-        (type == int && entry.value is int);
-  });
+  bool _valid(Map<String, Object?> values) => _validFor(keys, values);
+
+  static bool _validFor(Map<String, Type> keys, Map<String, Object?> values) =>
+      values.entries.every((entry) {
+        final type = keys[entry.key];
+        return (type == String && entry.value is String) ||
+            (type == int && entry.value is int);
+      });
+
+  static Map<String, Object?>? _decode(String text, Map<String, Type> keys) {
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is Map<String, dynamic>) {
+        final candidate = Map<String, Object?>.from(decoded);
+        if (_validFor(keys, candidate)) return candidate;
+      }
+    } on FormatException {
+      // An interrupted or malformed file may still have a legacy value.
+    }
+    return null;
+  }
+
+  static (Map<String, Object?>?, R?) _decodeText<R>(
+    String text,
+    Map<String, Type> keys,
+    R Function(Map<String, Object?>)? convert,
+  ) {
+    final values = _decode(text, keys);
+    return (values, values == null ? null : convert?.call(values));
+  }
+
+  static Future<(Map<String, Object?>?, R?)> _decodeFile<R>(
+    File file,
+    Map<String, Type> keys,
+    R Function(Map<String, Object?>)? convert,
+  ) async {
+    if (await file.length() < workerThresholdBytes) {
+      return _decodeText(await file.readAsString(), keys, convert);
+    }
+    final path = file.path;
+    return Isolate.run(
+      () => _decodeText(File(path).readAsStringSync(), keys, convert),
+    );
+  }
+
+  static Future<Uint8List> _encode(Map<String, Object?> values) {
+    var size = 0;
+    for (final value in values.values) {
+      if (value is String) size += value.length;
+    }
+    if (size < workerThresholdBytes) return Future.value(encode(values));
+    final copy = Map<String, Object?>.of(values);
+    return Isolate.run(() => encode(copy));
+  }
 
   Map<String, Object?> _legacy(SharedPreferences prefs) => {
     for (final entry in keys.entries)
@@ -76,29 +135,35 @@ class PreferenceBlobStore {
     if (retry.isEmpty) _failedRemovals.remove(name);
   }
 
-  Future<PreferenceBlobSnapshot> read(SharedPreferences prefs) =>
-      _run(() => _read(prefs));
+  Future<PreferenceBlobSnapshot> read(SharedPreferences prefs) async =>
+      (await _run(() => _read<Object?>(prefs))).$1;
 
-  Future<PreferenceBlobSnapshot> _read(SharedPreferences prefs) async {
+  /// Reads like [read], then applies [convert] in the same worker as the
+  /// decode. [convert] must be a static or top-level function.
+  Future<R?> readAs<R>(
+    SharedPreferences prefs,
+    R Function(Map<String, Object?>) convert,
+  ) async => (await _run(() => _read(prefs, convert))).$2;
+
+  Future<(PreferenceBlobSnapshot, R?)> _read<R>(
+    SharedPreferences prefs, [
+    R Function(Map<String, Object?>)? convert,
+  ]) async {
     final legacy = _legacy(prefs);
     try {
       final file = await _file();
       Map<String, Object?>? values;
+      R? converted;
       if (await file.exists()) {
-        try {
-          final decoded = jsonDecode(await file.readAsString());
-          if (decoded is Map<String, dynamic>) {
-            final candidate = Map<String, Object?>.from(decoded);
-            if (_valid(candidate)) values = candidate;
-          }
-        } on FormatException {
-          // An interrupted or malformed file may still have a legacy value.
-        }
+        (values, converted) = await _decodeFile(file, keys, convert);
       }
       if (values == null) {
-        if (legacy.isEmpty) return const PreferenceBlobSnapshot({}, 0);
-        await persist(file, jsonEncode(legacy));
+        if (legacy.isEmpty) {
+          return (const PreferenceBlobSnapshot({}, 0), convert?.call(const {}));
+        }
+        await persist(file, await _encode(legacy));
         values = legacy;
+        converted = convert?.call(legacy);
       }
       final size = values.isEmpty ? 0 : await file.length();
       try {
@@ -107,32 +172,45 @@ class PreferenceBlobStore {
       } catch (error) {
         _log.w('Could not finish blob migration for $name: $error');
       }
-      return PreferenceBlobSnapshot(values, size);
+      return (PreferenceBlobSnapshot(values, size), converted);
     } catch (error) {
       _log.w('Could not read or migrate blob $name: $error');
-      return PreferenceBlobSnapshot(
-        legacy,
-        legacy.isEmpty ? 0 : utf8.encode(jsonEncode(legacy)).length,
+      return (
+        PreferenceBlobSnapshot(
+          legacy,
+          legacy.isEmpty ? 0 : utf8.encode(jsonEncode(legacy)).length,
+        ),
+        convert?.call(legacy),
       );
     }
   }
 
   Future<void> write(SharedPreferences prefs, Map<String, Object?> values) {
     if (!_valid(values)) throw ArgumentError.value(values, 'values');
-    final encoded = jsonEncode(values);
-    return _run(() => _write(prefs, encoded));
+    return writeEncoded(prefs, _encode(values));
+  }
+
+  /// Stores [payload], bytes from [encode], in call order with other saves.
+  Future<void> writeEncoded(
+    SharedPreferences prefs,
+    Future<Uint8List> payload,
+  ) {
+    // The queued save reports a failure; this only keeps it from going
+    // unhandled while earlier operations run.
+    unawaited(payload.then<void>((_) {}, onError: (Object _, StackTrace _) {}));
+    return _run(() async => _write(prefs, await payload));
   }
 
   Future<void> update(
     SharedPreferences prefs,
     Map<String, Object?> Function(Map<String, Object?>) change,
   ) => _run(() async {
-    final values = change((await _read(prefs)).values);
+    final values = change((await _read<Object?>(prefs)).$1.values);
     if (!_valid(values)) throw ArgumentError.value(values, 'values');
-    await _write(prefs, jsonEncode(values));
+    await _write(prefs, await _encode(values));
   });
 
-  Future<void> _write(SharedPreferences prefs, String encoded) async {
+  Future<void> _write(SharedPreferences prefs, List<int> encoded) async {
     await persist(await _file(), encoded);
     await _removeLegacy(prefs);
   }
@@ -141,16 +219,16 @@ class PreferenceBlobStore {
     final file = await _file();
     if (!await file.exists() && !keys.keys.any(prefs.containsKey)) return;
     // A committed tombstone prevents an old preference from reviving on retry.
-    await persist(file, '{}');
+    await persist(file, utf8.encode('{}'));
     await _removeLegacy(prefs);
     await file.delete();
   });
 
-  static Future<void> _atomicWrite(File file, String contents) async {
+  static Future<void> _atomicWrite(File file, List<int> contents) async {
     await file.parent.create(recursive: true);
     final temporary = File('${file.path}.tmp-$pid-${_sequence++}');
     try {
-      await temporary.writeAsString(contents, flush: true);
+      await temporary.writeAsBytes(contents, flush: true);
       await temporary.rename(file.path);
     } finally {
       if (await temporary.exists()) await temporary.delete();

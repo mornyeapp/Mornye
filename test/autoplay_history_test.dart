@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/autoplay_history.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 PlayableMedia _song(int id, {String? source}) => PlayableMedia(
   id: '$id',
@@ -13,6 +17,7 @@ PlayableMedia _song(int id, {String? source}) => PlayableMedia(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   test(
     'rotation survives restart independently of preference learning',
     () async {
@@ -107,6 +112,58 @@ void main() {
       expect(stored, isNotNull);
     },
   );
+
+  group('stored rotation', () {
+    late Directory root;
+    const paths = MethodChannel('plugins.flutter.io/path_provider');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    File file() =>
+        File('${root.path}/preference_blobs/autoplay_rotation_v1.json');
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('rotation-blob-');
+      messenger.setMockMethodCallHandler(paths, (_) async => root.path);
+      SharedPreferences.setMockInitialValues({});
+    });
+    tearDown(() async {
+      messenger.setMockMethodCallHandler(paths, null);
+      await root.delete(recursive: true);
+    });
+
+    for (final count in [3, AutoplayHistory.limit + 5]) {
+      test('$count plays save the same bytes and restore in order', () async {
+        final history = AutoplayHistory();
+        for (var i = 0; i < count; i++) {
+          history.remember(_song(i));
+        }
+        await history.flush();
+        final kept = [
+          for (var i = max(0, count - AutoplayHistory.limit); i < count; i++)
+            _song(i),
+        ];
+        final expected = jsonEncode({
+          'autoplay_rotation_v1': jsonEncode({
+            for (final song in kept)
+              AutoplayHistory.sourceKey(song): AutoplayHistory.songKey(song),
+          }),
+        });
+        expect(await file().readAsBytes(), utf8.encode(expected));
+        final restored = AutoplayHistory();
+        await restored.load();
+        expect(restored.snapshot(), history.snapshot());
+      });
+    }
+
+    test('a corrupt file keeps plays made before the restore', () async {
+      await file().parent.create(recursive: true);
+      await file().writeAsString(
+        jsonEncode({'autoplay_rotation_v1': '{broken${' ' * 70000}'}),
+      );
+      final history = AutoplayHistory()..remember(_song(1));
+      await history.load();
+      expect(history.snapshot()[AutoplayHistory.sourceKey(_song(1))], 0);
+    });
+  });
 
   test('rotation is bounded and evicts only the oldest sources', () async {
     final history = AutoplayHistory(

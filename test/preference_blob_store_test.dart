@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -34,6 +35,9 @@ class _CountingPreferences extends InMemorySharedPreferencesStore {
     return super.remove(key);
   }
 }
+
+int? _blobLength(Map<String, Object?> values) =>
+    (values['blob'] as String?)?.length;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -266,6 +270,43 @@ void main() {
       );
     },
   );
+
+  group('large blobs encoded in a worker', () {
+    final large = {
+      'blob': List.generate(9000, (i) => 'Musik 🎵 日本語 "$i"\n').join(),
+      'timestamp': 42,
+    };
+
+    test('write stores the same bytes as a direct string write', () async {
+      await store.write(prefs, large);
+      final expected = File('${root.path}/expected.json');
+      await expected.writeAsString(jsonEncode(large), flush: true);
+      expect(await file().readAsBytes(), await expected.readAsBytes());
+      expect(prefs.containsKey('blob'), isFalse);
+      final snapshot = await store.read(prefs);
+      expect(snapshot.values, large);
+      expect(snapshot.sizeBytes, await file().length());
+    });
+
+    test('writeEncoded keeps call order with plain writes', () async {
+      final slow = Completer<Uint8List>();
+      final first = store.writeEncoded(prefs, slow.future);
+      final second = store.write(prefs, {'blob': 'last'});
+      slow.complete(PreferenceBlobStore.encode(large));
+      await first;
+      await second;
+      expect((await store.read(prefs)).values, {'blob': 'last'});
+    });
+
+    test('readAs converts file and legacy values', () async {
+      expect(await store.readAs(prefs, _blobLength), 'Musik 🎵 日本語'.length);
+      await store.write(prefs, large);
+      expect(
+        await store.readAs(prefs, _blobLength),
+        (large['blob']! as String).length,
+      );
+    });
+  });
 
   test(
     'metadata updates do not replace a newer body with an old snapshot',
