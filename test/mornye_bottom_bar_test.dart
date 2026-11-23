@@ -687,6 +687,35 @@ void main() {
     }
   }
 
+  testWidgets('a fold moves the compact buttons without making them again', (
+    tester,
+  ) async {
+    await pumpShell(tester);
+    await tester.drag(find.byType(ListView), const Offset(0, -240));
+    await tester.pump();
+    expect(chrome.value, isTrue);
+    await tester.pump(const Duration(milliseconds: 16));
+    final buttons = [
+      find.byKey(const ValueKey('mornye-compact-leading')),
+      find.byKey(const ValueKey('mornye-compact-search')),
+    ];
+    final made = <Widget>{};
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      for (final button in buttons) {
+        made.add(tester.widget(button));
+      }
+    }
+    expect(made, hasLength(2));
+    await tester.pumpAndSettle();
+
+    // The kept buttons still act.
+    await tester.tap(buttons.last);
+    await tester.pumpAndSettle();
+    expect(searches, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('downward scroll folds the tabs without replacing the player', (
     tester,
   ) async {

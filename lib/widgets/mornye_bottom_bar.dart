@@ -112,6 +112,7 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
   );
   late double _target = widget.collapsed ? 1 : 0;
   late final _tabOpacity = _controller.drive(const _TabOpacity());
+  static const double _compactSize = 52;
   // Side capsules move between backdrop batches; keep their lenses mounted.
   final _leadingSurfaceKey = GlobalKey();
   final _searchSurfaceKey = GlobalKey();
@@ -256,6 +257,39 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
     // to the moving overlays only while folding, at the same coordinates.
     final fullTabs = tabs(hideMovingIcons: false);
     final foldingTabs = tabs(hideMovingIcons: true);
+    // The compact buttons stay the same through a fold; only their place,
+    // size and glass follow it, so each frame keeps the made button.
+    final compactButtons = <(bool, bool), Widget>{};
+    Widget compactButton({required bool leading, required bool shown}) {
+      final index = leading ? leadingIndex : destinations.length - 1;
+      return Material(
+        color: Colors.transparent,
+        child: IconButton(
+          key: ValueKey(
+            leading ? 'mornye-compact-leading' : 'mornye-compact-search',
+          ),
+          tooltip: leading
+              ? destinations[leadingIndex].label
+              : context.l10n.mornyeSearch,
+          iconSize: 25,
+          constraints: const BoxConstraints.tightFor(
+            width: _compactSize,
+            height: _compactSize,
+          ),
+          color: index == selectedIndex ? scheme.primary : inactiveIconColor,
+          icon: Opacity(
+            opacity: shown ? 1 : 0,
+            child: destinations[index].icon,
+          ),
+          onPressed: leading
+              ? leadingIndex == 0
+                    ? onHome
+                    : () => onSelected(leadingIndex)
+              : onSearch,
+        ),
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         // Match the tab's actual label height, including accessibility scaling.
@@ -313,7 +347,8 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
               final offset =
                   ((leading ? origin : constraints.maxWidth - origin) - 26) *
                   (1 - amount);
-              const size = 52.0;
+              const size = _compactSize;
+              final shown = amount != 0;
               return PositionedDirectional(
                 start: leading ? offset : null,
                 end: leading ? null : offset,
@@ -346,35 +381,9 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
                               ),
                             ),
                           ),
-                          Material(
-                            color: Colors.transparent,
-                            child: IconButton(
-                              key: ValueKey(
-                                leading
-                                    ? 'mornye-compact-leading'
-                                    : 'mornye-compact-search',
-                              ),
-                              tooltip: leading
-                                  ? destinations[leadingIndex].label
-                                  : context.l10n.mornyeSearch,
-                              iconSize: 25,
-                              constraints: BoxConstraints.tightFor(
-                                width: size,
-                                height: size,
-                              ),
-                              color: index == selectedIndex
-                                  ? scheme.primary
-                                  : inactiveIconColor,
-                              icon: Opacity(
-                                opacity: amount == 0 ? 0 : 1,
-                                child: destinations[index].icon,
-                              ),
-                              onPressed: leading
-                                  ? leadingIndex == 0
-                                        ? onHome
-                                        : () => onSelected(leadingIndex)
-                                  : onSearch,
-                            ),
+                          compactButtons[(leading, shown)] ??= compactButton(
+                            leading: leading,
+                            shown: shown,
                           ),
                         ],
                       ),
