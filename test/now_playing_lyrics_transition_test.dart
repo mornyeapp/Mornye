@@ -765,6 +765,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a motion cover lookup in Material rebuilds only the backdrop', (
+    tester,
+  ) async {
+    var video = 'file:///one.mp4';
+    await pumpNowPlaying(
+      tester,
+      theme: AppTheme.light(),
+      size: const Size(390, 844),
+      motionArtworkOf: (_) => MotionArtwork(video),
+    );
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+    Scaffold player() => tester.widget<Scaffold>(
+      find
+          .descendant(
+            of: find.byType(NowPlayingScreen),
+            matching: find.byType(Scaffold),
+          )
+          .first,
+    );
+    String? backdropVideo() => tester
+        .widget<MaterialPlayerBackdrop>(find.byType(MaterialPlayerBackdrop))
+        .videoUrl;
+    expect(backdropVideo(), 'file:///one.mp4');
+    final before = player();
+
+    // A new answer, as when a song changes or the player opens again.
+    video = 'file:///two.mp4';
+    ProviderScope.containerOf(
+      tester.element(find.byType(NowPlayingScreen)),
+    ).invalidate(playerMotionArtworkProvider);
+    await settlePlayer(tester);
+    expect(backdropVideo(), 'file:///two.mp4');
+    expect(player(), same(before));
+    expect(tester.takeException(), isNull);
+  });
+
   for (final mornye in [false, true]) {
     testWidgets('the whole cover setting keeps a full screen cover square '
         '($mornye)', (tester) async {

@@ -433,30 +433,17 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final materialFullScreen =
         materialBackdrop &&
         MediaQuery.orientationOf(context) == Orientation.portrait;
-    // Material plays motion artwork only as the full-screen cover; the card
-    // cover stays still.
-    final motionState =
-        (mornye || materialFullScreen) &&
-            ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) &&
-            !MediaQuery.disableAnimationsOf(context)
-        ? ref.watch(
-            songMotionArtworkProvider((
-              album: mediaItem.album ?? '',
-              artist: mediaItem.artist ?? '',
-              source: source,
-            )),
-          )
+    final motionSong = (
+      album: mediaItem.album ?? '',
+      artist: mediaItem.artist ?? '',
+      source: source,
+    );
+    // Material plays motion artwork only as the full-screen cover, which its
+    // backdrop looks up itself; the card cover stays still.
+    final motionState = mornye
+        ? _watchMotionArtwork(context, ref, motionSong)
         : null;
-    // A new song looks up its artwork for a few frames. The outgoing motion
-    // cover keeps its layout meanwhile, so the gradient and its fade do not
-    // drop to the still cover's layout and come back.
-    final lookingUp =
-        motionState != null && motionState.isLoading && !motionState.hasValue;
-    final resolvedMotion = lookingUp ? _shownMotionArtwork : motionState?.value;
-    _shownMotionArtwork = resolvedMotion;
-    final motionArtwork = resolvedMotion?.source == _failedMotionSource
-        ? null
-        : resolvedMotion;
+    final motionArtwork = _shownMotion(motionState);
     final motionRatio = motionArtwork == null
         ? null
         : motionArtwork.aspectRatio ??
@@ -920,22 +907,34 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         fit: StackFit.expand,
         children: [
           RepaintBoundary(
-            child: MaterialPlayerBackdrop(
-              mediaItem: mediaItem,
-              colorScheme: colorScheme,
-              showArtwork: materialFullScreen && _currentPage != 1,
-              fadeStart: playerCoverFadeStart(
-                MaterialPlayerBackdrop.mediumFadeStart,
-                coverFade,
-              ),
-              wholeCover: wholeCover,
-              playsMotionArtwork: true,
-              videoUrl: motionArtwork?.source,
-              resolvingVideo: motionState?.isLoading == true,
-              onVideoError: () {
-                if (mounted) {
-                  setState(() => _failedMotionSource = motionArtwork?.source);
-                }
+            // Its answer, a few frames into the open or a song, rebuilds
+            // only the backdrop.
+            child: Consumer(
+              builder: (context, ref, _) {
+                final state = materialFullScreen
+                    ? _watchMotionArtwork(context, ref, motionSong)
+                    : null;
+                final motionArtwork = _shownMotion(state);
+                return MaterialPlayerBackdrop(
+                  mediaItem: mediaItem,
+                  colorScheme: colorScheme,
+                  showArtwork: materialFullScreen && _currentPage != 1,
+                  fadeStart: playerCoverFadeStart(
+                    MaterialPlayerBackdrop.mediumFadeStart,
+                    coverFade,
+                  ),
+                  wholeCover: wholeCover,
+                  playsMotionArtwork: true,
+                  videoUrl: motionArtwork?.source,
+                  resolvingVideo: state?.isLoading == true,
+                  onVideoError: () {
+                    if (mounted) {
+                      setState(
+                        () => _failedMotionSource = motionArtwork?.source,
+                      );
+                    }
+                  },
+                );
               },
             ),
           ),
@@ -1029,6 +1028,26 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         ),
       ),
     );
+  }
+
+  static AsyncValue<MotionArtwork?>? _watchMotionArtwork(
+    BuildContext context,
+    WidgetRef ref,
+    PlayerArtworkSong song,
+  ) =>
+      ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) &&
+          !MediaQuery.disableAnimationsOf(context)
+      ? ref.watch(songMotionArtworkProvider(song))
+      : null;
+
+  /// A new song looks up its artwork for a few frames. The outgoing motion
+  /// cover keeps its layout meanwhile, so the gradient and its fade do not
+  /// drop to the still cover's layout and come back.
+  MotionArtwork? _shownMotion(AsyncValue<MotionArtwork?>? state) {
+    final lookingUp = state != null && state.isLoading && !state.hasValue;
+    final resolved = lookingUp ? _shownMotionArtwork : state?.value;
+    _shownMotionArtwork = resolved;
+    return resolved?.source == _failedMotionSource ? null : resolved;
   }
 
   /// A touch on the lyrics page holds the controls; a tap brings hidden
