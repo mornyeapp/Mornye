@@ -507,6 +507,46 @@ void main() {
       expect(find.byKey(const ValueKey('desktop-now-playing')), findsNothing);
       expect(find.text('content'), findsOneWidget);
     });
+
+    testWidgets('a resize keeps the sidebar, inspector and player controls '
+        '($mornye)', (tester) async {
+      addTearDown(() => desktopInspectorPanel.value = null);
+      await pumpShell(tester, mornye: mornye, width: 1500);
+      desktopInspectorPanel.value = DesktopInspectorPanel.upNext;
+      await tester.pumpAndSettle();
+      final kept = [
+        find.byType(mornye ? DesktopSidebar : DesktopNavigationRail),
+        find.byType(DesktopInspector),
+        find.byType(DesktopDownloadsButton),
+        if (!mornye) find.byKey(const ValueKey('desktop-player-shuffle')),
+      ];
+      final before = [for (final finder in kept) tester.widget(finder)];
+      for (var step = 1; step <= 5; step++) {
+        tester.view.physicalSize = Size(1500 - step * 40.0, 800);
+        await tester.pump();
+      }
+      expect([for (final finder in kept) tester.widget(finder)], before);
+      expect(tester.takeException(), isNull);
+      if (mornye) return;
+
+      // Below the breakpoints the inspector floats and the rail collapses.
+      tester.view.physicalSize = const Size(1000, 800);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('desktop-inspector-overlay')),
+          matching: find.byType(DesktopInspector),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<DesktopNavigationRail>(find.byType(DesktopNavigationRail))
+            .extended,
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
 
   group('Material shell', () {

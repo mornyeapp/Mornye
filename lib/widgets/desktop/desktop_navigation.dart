@@ -251,11 +251,17 @@ class DesktopShellLayout extends ConsumerWidget {
           shell: shell!,
           nowPlaying: nowPlaying,
         ),
-        child: Builder(builder: (context) => _shell(context, showPlayer)),
+        child: _WindowBreakpoints(
+          builder: (context, breakpoints) =>
+              _shell(context, showPlayer, breakpoints),
+        ),
       );
 
-  Widget _shell(BuildContext context, bool showPlayer) {
-    final width = MediaQuery.sizeOf(context).width;
+  Widget _shell(
+    BuildContext context,
+    bool showPlayer,
+    _ShellBreakpoints breakpoints,
+  ) {
     if (context.isMornye) {
       // The sidebar always shows, full height against the window's edges.
       return ColoredBox(
@@ -274,7 +280,7 @@ class DesktopShellLayout extends ConsumerWidget {
             Expanded(
               key: const ValueKey('desktop-content'),
               child: _DesktopContentArea(
-                windowWidth: width,
+                inspectorFitsBeside: breakpoints.besideFits,
                 body: body,
                 floatingPlayer: showPlayer ? playerBar : null,
                 showPlayer: showPlayer,
@@ -313,7 +319,7 @@ class DesktopShellLayout extends ConsumerWidget {
                       child: ValueListenableBuilder<bool>(
                         valueListenable: desktopSidebarCollapsed,
                         builder: (context, collapsed, _) {
-                          final wide = width >= desktopExpandedRailBreakpoint;
+                          final wide = breakpoints.wide;
                           return DesktopNavigationRail(
                             destinations: destinations,
                             selected: selected,
@@ -332,7 +338,7 @@ class DesktopShellLayout extends ConsumerWidget {
               ),
               Expanded(
                 child: _DesktopContentArea(
-                  windowWidth: width,
+                  inspectorFitsBeside: breakpoints.besideFits,
                   body: body,
                   showPlayer: showPlayer,
                   titleBarDrag: true,
@@ -496,6 +502,48 @@ class _NowPlayingTransitionState extends State<_NowPlayingTransition>
   );
 }
 
+typedef _ShellBreakpoints = ({bool wide, bool besideFits});
+
+/// Builds the shell again only when the window crosses a breakpoint, so a
+/// resize frame does not build the sidebar, rail and inspectors again.
+class _WindowBreakpoints extends StatefulWidget {
+  const _WindowBreakpoints({required this.builder});
+
+  final Widget Function(BuildContext context, _ShellBreakpoints breakpoints)
+  builder;
+
+  @override
+  State<_WindowBreakpoints> createState() => _WindowBreakpointsState();
+}
+
+class _WindowBreakpointsState extends State<_WindowBreakpoints> {
+  _ShellBreakpoints? _breakpoints;
+  Widget? _shell;
+
+  @override
+  void didUpdateWidget(_WindowBreakpoints oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _shell = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final breakpoints = (
+      wide: width >= desktopExpandedRailBreakpoint,
+      besideFits: width >= desktopInspectorBesideBreakpoint,
+    );
+    if (breakpoints != _breakpoints) {
+      _breakpoints = breakpoints;
+      _shell = null;
+    }
+    // A Builder of its own, so the shell's other dependencies rebuild it.
+    return _shell ??= Builder(
+      builder: (context) => widget.builder(context, breakpoints),
+    );
+  }
+}
+
 /// Gives [child] the size of the space it lays out in, so width-based layout
 /// (centered columns, grids) measures the pane rather than the whole window.
 /// [bottomInset] becomes the bottom padding, which pages add after their
@@ -537,14 +585,15 @@ const double _capsuleBesideInspectorWidth = mornyeGlassInspectorWidth + 520;
 /// no shell search bar above them.
 class _DesktopContentArea extends StatelessWidget {
   const _DesktopContentArea({
-    required this.windowWidth,
+    required this.inspectorFitsBeside,
     required this.body,
     this.floatingPlayer,
     this.showPlayer = true,
     this.titleBarDrag = false,
   });
 
-  final double windowWidth;
+  /// Whether the window is wide enough for the inspector beside the pane.
+  final bool inspectorFitsBeside;
   final Widget body;
 
   /// The Mornye player capsule, floating over the bottom of the pane.
@@ -569,8 +618,8 @@ class _DesktopContentArea extends StatelessWidget {
       listenable: _chromeListenable,
       builder: (context, _) {
         final panel = showPlayer ? desktopInspectorPanel.value : null;
-        final overlayInspector = desktopInspectorOverlays(
-          windowWidth,
+        final overlayInspector = desktopInspectorOverlaysWhen(
+          besideFits: inspectorFitsBeside,
           mornye: mornye,
         );
         final content = LayoutBuilder(

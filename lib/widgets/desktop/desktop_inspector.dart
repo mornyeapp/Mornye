@@ -89,8 +89,17 @@ void closeDesktopNowPlaying() {
 /// Whether the inspector floats over the content in a window [windowWidth]
 /// wide. Mornye's floats at any width until the window goes full screen.
 bool desktopInspectorOverlays(double windowWidth, {required bool mornye}) =>
-    windowWidth < desktopInspectorBesideBreakpoint ||
-    (mornye && !desktopWindowFullScreen.value);
+    desktopInspectorOverlaysWhen(
+      besideFits: windowWidth >= desktopInspectorBesideBreakpoint,
+      mornye: mornye,
+    );
+
+/// [desktopInspectorOverlays] for a window known only by whether it is at
+/// least [desktopInspectorBesideBreakpoint] wide ([besideFits]).
+bool desktopInspectorOverlaysWhen({
+  required bool besideFits,
+  required bool mornye,
+}) => !besideFits || (mornye && !desktopWindowFullScreen.value);
 
 /// Whether Escape or Back has a player layer to close in a window
 /// [windowWidth] wide.
@@ -336,6 +345,8 @@ class DesktopInspectorTransition extends StatefulWidget {
   });
 
   final DesktopInspectorPanel? panel;
+
+  /// Called once per panel shown; it must depend on nothing but the panel.
   final Widget Function(BuildContext context, DesktopInspectorPanel panel)
   builder;
   final bool overlay;
@@ -353,6 +364,10 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
   // so a reversal always goes on from where the pane is.
   late final AnimationController _controller;
   late DesktopInspectorPanel? _shown = widget.panel;
+
+  /// The shown panel as last built, kept through the parent's rebuilds (a
+  /// resize frame) so the lyrics or queue are not built again for each.
+  Widget? _panelView;
 
   @override
   void initState() {
@@ -426,6 +441,12 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
   }
 
   @override
+  void reassemble() {
+    super.reassemble();
+    _panelView = null;
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -450,10 +471,12 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
         alignment: AlignmentDirectional.topStart,
         children: [...previous, ?current],
       ),
-      child: KeyedSubtree(
-        key: ValueKey(shown),
-        child: widget.builder(context, shown),
-      ),
+      child: _panelView?.key == ValueKey(shown)
+          ? _panelView
+          : _panelView = KeyedSubtree(
+              key: ValueKey(shown),
+              child: widget.builder(context, shown),
+            ),
     );
     final rtl = Directionality.of(context) == TextDirection.rtl;
     return AnimatedBuilder(

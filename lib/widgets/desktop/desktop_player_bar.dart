@@ -127,6 +127,16 @@ class _MaterialPlayerBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final loaded = mediaItem != null;
+    // Made outside the LayoutBuilder, so a resize frame only lays them out.
+    final summary = _TrackSummary(mediaItem: mediaItem);
+    final center = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _MaterialTransportRow(enabled: loaded),
+        SizedBox(height: 24, child: _SeekRow(mediaItem: mediaItem)),
+      ],
+    );
+    final trailing = _TrailingControls(enabled: loaded, appTheme: appTheme);
     return Material(
       color: colorScheme.surfaceContainer,
       child: SafeArea(
@@ -147,30 +157,13 @@ class _MaterialPlayerBar extends StatelessWidget {
                       width: sideWidth,
                       child: Align(
                         alignment: AlignmentDirectional.centerStart,
-                        child: _TrackSummary(mediaItem: mediaItem),
+                        child: summary,
                       ),
                     ),
                     const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _MaterialTransportRow(enabled: loaded),
-                          SizedBox(
-                            height: 24,
-                            child: _SeekRow(mediaItem: mediaItem),
-                          ),
-                        ],
-                      ),
-                    ),
+                    Expanded(child: center),
                     const SizedBox(width: 16),
-                    SizedBox(
-                      width: sideWidth,
-                      child: _TrailingControls(
-                        enabled: loaded,
-                        appTheme: appTheme,
-                      ),
-                    ),
+                    SizedBox(width: sideWidth, child: trailing),
                   ],
                 );
               },
@@ -194,36 +187,42 @@ class _MaterialTransportRow extends StatelessWidget {
   final bool enabled;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      if (constraints.maxWidth < _transportWidth + 2 * (_modeSize + _gap)) {
-        return _Transport(enabled: enabled);
-      }
-      final colorScheme = Theme.of(context).colorScheme;
-      Widget mode(PlayerPlaybackMode mode) => PlayerPlaybackModeButton(
-        key: ValueKey('desktop-player-${mode.name}'),
-        mode: mode,
-        colorScheme: colorScheme,
-        secondary: true,
-        size: _modeSize,
-        iconSize: 20,
-        enabled: enabled,
-      );
-      return Directionality(
-        textDirection: TextDirection.ltr,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            mode(PlayerPlaybackMode.shuffle),
-            const SizedBox(width: _gap),
-            _Transport(enabled: enabled),
-            const SizedBox(width: _gap),
-            mode(PlayerPlaybackMode.repeat),
-          ],
-        ),
-      );
-    },
-  );
+  Widget build(BuildContext context) {
+    // Made outside the LayoutBuilder, so a resize frame only lays them out.
+    final transport = _Transport(enabled: enabled);
+    final colorScheme = Theme.of(context).colorScheme;
+    Widget mode(PlayerPlaybackMode mode) => PlayerPlaybackModeButton(
+      key: ValueKey('desktop-player-${mode.name}'),
+      mode: mode,
+      colorScheme: colorScheme,
+      secondary: true,
+      size: _modeSize,
+      iconSize: 20,
+      enabled: enabled,
+    );
+    final shuffle = mode(PlayerPlaybackMode.shuffle);
+    final repeat = mode(PlayerPlaybackMode.repeat);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < _transportWidth + 2 * (_modeSize + _gap)) {
+          return transport;
+        }
+        return Directionality(
+          textDirection: TextDirection.ltr,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              shuffle,
+              const SizedBox(width: _gap),
+              transport,
+              const SizedBox(width: _gap),
+              repeat,
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// The Mornye capsule: shuffle, transport and repeat, the center display,
@@ -702,6 +701,8 @@ class _MornyeLcd extends StatelessWidget {
         ),
       );
     }
+    // Made outside the LayoutBuilder, so a resize frame only lays them out.
+    final lines = _MornyeLcdLines(mediaItem: item);
     // Artwork and left-aligned lines, with a hairline progress
     // track along the bottom from the artwork's edge.
     return Column(
@@ -731,7 +732,7 @@ class _MornyeLcd extends StatelessWidget {
                         alignment: AlignmentDirectional.centerStart,
                         child: SizedBox(
                           width: constraints.maxWidth,
-                          child: _MornyeLcdLines(mediaItem: item),
+                          child: lines,
                         ),
                       ),
                     ),
@@ -942,11 +943,36 @@ class _TrailingControls extends ConsumerWidget {
     final appTheme = this.appTheme ?? Theme.of(context);
     final link = ref.watch(linkDevicesAvailableProvider);
     final buttons = 3 + (desktopMiniPlayerSupported ? 1 : 0) + (link ? 1 : 0);
+    Widget group(bool cast) => ValueListenableBuilder<DesktopInspectorPanel?>(
+      valueListenable: desktopInspectorPanel,
+      builder: (context, panel, _) => ConnectedIconButtons(
+        colorScheme: colorScheme,
+        children: [
+          ..._inspectorToggles(context, panel),
+          if (desktopMiniPlayerSupported) _miniPlayerButton(context),
+          // The menus and sheets these open keep the app scheme.
+          if (link)
+            Theme(data: appTheme, child: const DesktopLinkDevicesButton()),
+          Theme(data: appTheme, child: const DesktopDownloadsButton()),
+          if (cast) Theme(data: appTheme, child: const DesktopCastButton()),
+        ],
+      ),
+    );
+    // Kept across resize frames, which only build the row around them again.
+    Widget? withCast;
+    Widget? withoutCast;
+    Widget? volume;
+    final dismiss = canDismiss
+        ? ConnectedIconButtons(
+            colorScheme: colorScheme,
+            children: [_dismissButton(context, ref)],
+          )
+        : null;
     return LayoutBuilder(
       builder: (context, constraints) {
-        double group(int count) => ConnectedIconButtons.widthOf(context, count);
-        final fixed = group(buttons) + (canDismiss ? _groupGap + group(1) : 0);
-        final castCost = group(buttons + 1) - group(buttons);
+        double width(int count) => ConnectedIconButtons.widthOf(context, count);
+        final fixed = width(buttons) + (canDismiss ? _groupGap + width(1) : 0);
+        final castCost = width(buttons + 1) - width(buttons);
         final cast = constraints.maxWidth - fixed >= castCost;
         final slider =
             constraints.maxWidth - fixed - (cast ? castCost : 0) >=
@@ -954,41 +980,19 @@ class _TrailingControls extends ConsumerWidget {
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            ValueListenableBuilder<DesktopInspectorPanel?>(
-              valueListenable: desktopInspectorPanel,
-              builder: (context, panel, _) => ConnectedIconButtons(
-                colorScheme: colorScheme,
-                children: [
-                  ..._inspectorToggles(context, panel),
-                  if (desktopMiniPlayerSupported) _miniPlayerButton(context),
-                  // The menus and sheets these open keep the app scheme.
-                  if (link)
-                    Theme(
-                      data: appTheme,
-                      child: const DesktopLinkDevicesButton(),
-                    ),
-                  Theme(data: appTheme, child: const DesktopDownloadsButton()),
-                  if (cast)
-                    Theme(data: appTheme, child: const DesktopCastButton()),
-                ],
-              ),
-            ),
+            cast ? withCast ??= group(true) : withoutCast ??= group(false),
             if (slider) ...[
               const SizedBox(width: _groupGap),
               Flexible(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 220),
-                  child: PlayerVolumeControl(foreground: colorScheme.onSurface),
+                  child: volume ??= PlayerVolumeControl(
+                    foreground: colorScheme.onSurface,
+                  ),
                 ),
               ),
             ],
-            if (canDismiss) ...[
-              const SizedBox(width: _groupGap),
-              ConnectedIconButtons(
-                colorScheme: colorScheme,
-                children: [_dismissButton(context, ref)],
-              ),
-            ],
+            if (dismiss != null) ...[const SizedBox(width: _groupGap), dismiss],
           ],
         );
       },
