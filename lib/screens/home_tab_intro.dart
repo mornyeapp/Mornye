@@ -2081,6 +2081,11 @@ class _HomeTopPicksShelfState extends State<_HomeTopPicksShelf> {
   bool _motion = false;
   bool _onScreen = true;
 
+  // A tab switch or a motion setting only starts or stops the drift; the
+  // shelf is made from the widget alone and keeps its cards.
+  Widget? _built;
+  _HomeTopPicksShelf? _builtFor;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -2104,6 +2109,12 @@ class _HomeTopPicksShelfState extends State<_HomeTopPicksShelf> {
     } else {
       _drift.stop();
     }
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _builtFor = null;
   }
 
   @override
@@ -2282,6 +2293,13 @@ class _HomeTopPicksShelfState extends State<_HomeTopPicksShelf> {
 
   @override
   Widget build(BuildContext context) {
+    final built = _built;
+    if (built != null && identical(_builtFor, widget)) return built;
+    _builtFor = widget;
+    return _built = _build();
+  }
+
+  Widget _build() {
     final order = _order;
     // Banners beside each other never share a palette, with or without an
     // album between them.

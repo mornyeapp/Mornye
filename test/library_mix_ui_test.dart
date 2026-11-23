@@ -17,6 +17,7 @@ import 'package:mornye/services/library_mixes.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/library_mix_cover.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
@@ -105,6 +106,33 @@ void main() {
       });
     }
   }
+
+  testWidgets('the Mornye Top Picks keep their banners when Home hides and '
+      'shows again', (tester) async {
+    debugDesktopPlatformOverride = false;
+    addTearDown(() => debugDesktopPlatformOverride = null);
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final tickers = ValueNotifier(true);
+    addTearDown(tickers.dispose);
+    await _pumpHome(tester, mornye: true, mixes: [_mix], tickers: tickers);
+    final banner = find.byType(MornyeMixBanner);
+    expect(banner, findsOneWidget);
+    final made = tester.widget<MornyeMixBanner>(banner);
+    expect(DecorativePhase.debugClockRunning, isTrue);
+
+    // Another tab only stops the drift.
+    tickers.value = false;
+    await tester.pump();
+    expect(tester.widget<MornyeMixBanner>(banner), same(made));
+    expect(DecorativePhase.debugClockRunning, isFalse);
+    tickers.value = true;
+    await tester.pump();
+    expect(tester.widget<MornyeMixBanner>(banner), same(made));
+    expect(DecorativePhase.debugClockRunning, isTrue);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final mornye in [false, true]) {
     testWidgets('a long press on a phone row selects songs for the Library '
@@ -355,6 +383,7 @@ Future<void> _pumpHome(
   List<LibraryMixView> mixes = const [],
   Future<List<LibraryMixView>> Function(Ref ref)? mixesProvider,
   void Function(ProviderContainer container)? onContainer,
+  ValueNotifier<bool>? tickers,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -385,7 +414,14 @@ Future<void> _pumpHome(
           theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.dark(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: const HomeTab(),
+          home: tickers == null
+              ? const HomeTab()
+              : ValueListenableBuilder<bool>(
+                  valueListenable: tickers,
+                  builder: (context, enabled, child) =>
+                      TickerMode(enabled: enabled, child: child!),
+                  child: const HomeTab(),
+                ),
         ),
       ),
     ),
