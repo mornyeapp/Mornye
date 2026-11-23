@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 /// Tells whether [child] is on the screen as the page around it scrolls, for
@@ -25,6 +26,7 @@ class _OnScreenListenerState extends State<OnScreenListener> {
   ScrollPosition? _page;
   Size _view = Size.zero;
   bool _onScreen = true;
+  bool _checkScheduled = false;
 
   @override
   void didChangeDependencies() {
@@ -50,6 +52,17 @@ class _OnScreenListenerState extends State<OnScreenListener> {
     widget.onChanged(onScreen);
   }
 
+  /// A section above can move the child without a scroll; its next paint
+  /// at a new place asks for a check.
+  void _moved() {
+    if (_checkScheduled) return;
+    _checkScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkScheduled = false;
+      _check();
+    });
+  }
+
   @override
   void dispose() {
     _page?.removeListener(_check);
@@ -57,5 +70,39 @@ class _OnScreenListenerState extends State<OnScreenListener> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  Widget build(BuildContext context) =>
+      _MoveReporter(onMoved: _moved, child: widget.child);
+}
+
+class _MoveReporter extends SingleChildRenderObjectWidget {
+  const _MoveReporter({required this.onMoved, super.child});
+
+  final VoidCallback onMoved;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderMoveReporter(onMoved);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderMoveReporter renderObject,
+  ) => renderObject.onMoved = onMoved;
+}
+
+class _RenderMoveReporter extends RenderProxyBox {
+  _RenderMoveReporter(this.onMoved);
+
+  VoidCallback onMoved;
+  Offset? _paintedAt;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    super.paint(context, offset);
+    final at = localToGlobal(Offset.zero);
+    if (at == _paintedAt) return;
+    final first = _paintedAt == null;
+    _paintedAt = at;
+    if (!first) onMoved();
+  }
 }

@@ -54,6 +54,47 @@ void main() {
     expect(calls, [false, true]);
   });
 
+  testWidgets('a section above that grows or shrinks without a scroll '
+      'moves the child off and back on', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final above = ValueNotifier<double>(100);
+    addTearDown(above.dispose);
+    final calls = <bool>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SingleChildScrollView(
+          child: Column(
+            children: [
+              ValueListenableBuilder<double>(
+                valueListenable: above,
+                builder: (context, height, _) => SizedBox(height: height),
+              ),
+              OnScreenListener(
+                onChanged: calls.add,
+                child: const SizedBox(height: 300, width: 400),
+              ),
+              const SizedBox(height: 2000),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(calls, isEmpty);
+
+    above.value = 1000;
+    await tester.pump();
+    await tester.pump();
+    expect(calls, [false]);
+
+    above.value = 100;
+    await tester.pump();
+    await tester.pump();
+    expect(calls, [false, true]);
+  });
+
   testWidgets('a page that opens scrolled past the child says so', (
     tester,
   ) async {
