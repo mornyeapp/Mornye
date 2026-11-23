@@ -280,7 +280,7 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
           colorScheme,
           // The cover decodes once at its largest size rather than on every
           // frame of the resize.
-          _columnWidthFor(constraints, 520),
+          _largestColumnWidth,
         );
         return TweenAnimationBuilder<double>(
           tween: Tween(end: panel != null ? 1 : 0),
@@ -298,6 +298,9 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
       },
     );
   }
+
+  /// The widest the cover column gets, in any window.
+  static const _largestColumnWidth = 520.0;
 
   /// The cover column's width under [limit], leaving room for the title and
   /// transport below.
@@ -340,7 +343,7 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
     final width = constraints.maxWidth;
     final size = progress.clamp(0.0, 1.0);
     final columnWidth = lerpDouble(
-      _columnWidthFor(constraints, 520),
+      _columnWidthFor(constraints, _largestColumnWidth),
       _columnWidthFor(constraints, math.min(440.0, width * 0.34)),
       size,
     )!;

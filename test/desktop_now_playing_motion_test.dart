@@ -229,9 +229,9 @@ void main() {
       expect(opacities.where((value) => value > 0 && value < 1), isNotEmpty);
       expect(panelOpacity(), 1);
 
-      // A live window resize.
+      // A live window resize, down to heights where the cover shrinks.
       for (var frame = 1; frame <= 10; frame++) {
-        tester.view.physicalSize = Size(1520 - frame * 12, 1000 - frame * 8);
+        tester.view.physicalSize = Size(1520 - frame * 12, 1000 - frame * 30);
         await tester.pump();
         expect(controls(tester), same(column), reason: 'resize frame $frame');
         expect(
