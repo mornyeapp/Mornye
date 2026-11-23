@@ -1071,6 +1071,36 @@ void main() {
       );
     });
 
+    testWidgets('the rail spring keeps the destination icons and menu', (
+      tester,
+    ) async {
+      desktopSidebarCollapsed.value = true;
+      await pumpShell(tester, mornye: false, width: 1400);
+      desktopSidebarCollapsed.value = false;
+      await tester.pump();
+      final icon = find.descendant(
+        of: find.byKey(const ValueKey('desktop-rail:library')),
+        matching: find.byType(AppIcon),
+      );
+      final menu = find.byKey(const ValueKey('desktop-rail-menu'));
+      final icons = <Widget>{};
+      final menus = <Widget>{};
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        icons.add(tester.widget(icon));
+        menus.add(tester.widget(menu));
+      }
+      await tester.pumpAndSettle();
+      expect(icons, hasLength(1));
+      expect(menus, hasLength(1));
+      expect(find.text('library'), findsOneWidget);
+
+      // A new selection still reaches the kept icon.
+      await tester.tap(find.text('library'));
+      await tester.pumpAndSettle();
+      expect(selections, [ShellTab.library]);
+    });
+
     testWidgets('Library leaves an open playlist for the Library root', (
       tester,
     ) async {

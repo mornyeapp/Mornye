@@ -843,6 +843,15 @@ class DesktopNavigationRail extends StatelessWidget {
       const AppMotionSpec(Duration.zero, Curves.linear),
     );
     final openLink = onOpenLibraryLink;
+    // Centered over the collapsed rail, where it stays, in line with the
+    // destination icons. Made once, outside the expansion spring.
+    final menu = onToggleExtended == null
+        ? null
+        : SizedBox(
+            width: desktopCollapsedRailWidth,
+            height: 56,
+            child: Center(child: _menuButton(context)),
+          );
     return ValueListenableBuilder<String?>(
       valueListenable: desktopSidebarLink,
       builder: (context, openId, _) {
@@ -886,14 +895,7 @@ class DesktopNavigationRail extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (onToggleExtended != null)
-                        // Centered over the collapsed rail, where it stays,
-                        // in line with the destination icons.
-                        SizedBox(
-                          width: desktopCollapsedRailWidth,
-                          height: 56,
-                          child: Center(child: _menuButton(context)),
-                        ),
+                      ?menu,
                       Expanded(
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.only(top: 8, bottom: 8),
@@ -1189,7 +1191,7 @@ class _RailLinkRow extends StatelessWidget {
 /// around a fixed icon while the row narrows with the rail, as the owner
 /// preferred to a morphing pill. Only the row, or the whole 56dp square
 /// while collapsed, takes clicks and hover.
-class _RailDestination extends StatelessWidget {
+class _RailDestination extends StatefulWidget {
   const _RailDestination({
     super.key,
     required this.destination,
@@ -1208,43 +1210,64 @@ class _RailDestination extends StatelessWidget {
   static const double _inset = (desktopCollapsedRailWidth - 56) / 2;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
-    final t = expansion.clamp(0.0, 1.0);
-    const inset = _RailDestination._inset;
+  State<_RailDestination> createState() => _RailDestinationState();
+}
 
-    final expandedStyle = textTheme.labelLarge!.copyWith(
-      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-    );
-    // The expanded pill spans the rail like the Playlists rows below, so
-    // every fill and hover lines up at both edges.
-    const expandedPillWidth = desktopSidebarWidth - inset * 2;
+class _RailDestinationState extends State<_RailDestination> {
+  static const double _height = 56;
 
-    const height = 56.0;
-    // Like the Playlists rows, the expanded row narrows with the rail and
-    // fades, and the collapsed indicator fades in where it ends. Neither
-    // changes shape, so no long flat pill or edge crosses the label.
-    final expanded = ((t - 0.4) / 0.6).clamp(0.0, 1.0);
-    final collapsed = ((0.6 - t) / 0.6).clamp(0.0, 1.0);
-    final rowWidth = lerpDouble(56, expandedPillWidth, t)!;
+  /// The layers that do not move with the expansion, made once per
+  /// selection and theme instead of on every frame of the rail's spring.
+  Widget? _icon;
+  final _collapsedLayers = <bool, Widget>{};
+  final _expandedLayers = <bool, Widget>{};
 
-    final foreground = selected
-        ? colorScheme.onSecondaryContainer
-        : colorScheme.onSurfaceVariant;
+  void _onTap() => widget.onTap();
+
+  void _forgetLayers() {
+    _icon = null;
+    _collapsedLayers.clear();
+    _expandedLayers.clear();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _forgetLayers();
+  }
+
+  @override
+  void didUpdateWidget(_RailDestination oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected != oldWidget.selected ||
+        widget.destination != oldWidget.destination) {
+      _forgetLayers();
+    }
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _forgetLayers();
+  }
+
+  Color _foreground(ColorScheme colorScheme) => widget.selected
+      ? colorScheme.onSecondaryContainer
+      : colorScheme.onSurfaceVariant;
+
+  // A stadium with the selected fill and the hover and press layers of
+  // the Playlists rows.
+  Widget _surface({required bool active, Widget? child}) {
+    final foreground = _foreground(Theme.of(context).colorScheme);
     final press = desktopRowInk(context, content: foreground);
-
-    // A stadium with the selected fill and the hover and press layers of
-    // the Playlists rows.
-    Widget surface({required bool active, Widget? child}) => _RailIndicator(
-      selected: selected,
+    return _RailIndicator(
+      selected: widget.selected,
       child: Material(
         type: MaterialType.transparency,
         shape: const StadiumBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: active ? onTap : null,
+          onTap: active ? _onTap : null,
           canRequestFocus: active,
           hoverColor: foreground.withValues(alpha: 0.08),
           splashFactory: press.splashFactory,
@@ -1253,15 +1276,97 @@ class _RailDestination extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Names the icon while the label is hidden; the whole square around the
+  // indicator takes the click.
+  Widget _collapsedLayer(bool active) => Tooltip(
+    message: widget.destination.label,
+    excludeFromSemantics: true,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: _surface(active: active),
+      ),
+    ),
+  );
+
+  Widget _expandedLayer(bool active) {
+    final theme = Theme.of(context);
+    final style = theme.textTheme.labelLarge!.copyWith(
+      fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
+      color: _foreground(theme.colorScheme),
+    );
+    return _surface(
+      active: active,
+      child: Row(
+        children: [
+          // The icon is drawn once, above both states.
+          const SizedBox(width: 16 + 24 + 8),
+          Expanded(
+            child: Text(
+              widget.destination.label,
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              softWrap: false,
+              style: style,
+            ),
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _iconLayer() {
+    final destination = widget.destination;
+    return PositionedDirectional(
+      start: _RailDestination._inset + 16,
+      top: (_height - 24) / 2,
+      child: IgnorePointer(
+        child: IconTheme.merge(
+          data: IconThemeData(
+            color: _foreground(Theme.of(context).colorScheme),
+            size: 24,
+          ),
+          child: Badge(
+            isLabelVisible: destination.badgeCount > 0,
+            label: Text('${destination.badgeCount}'),
+            child: AppIcon(
+              widget.selected ? destination.selectedIcon : destination.icon,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.expansion.clamp(0.0, 1.0);
+    const inset = _RailDestination._inset;
+    // The expanded pill spans the rail like the Playlists rows below, so
+    // every fill and hover lines up at both edges.
+    const expandedPillWidth = desktopSidebarWidth - inset * 2;
+
+    // Like the Playlists rows, the expanded row narrows with the rail and
+    // fades, and the collapsed indicator fades in where it ends. Neither
+    // changes shape, so no long flat pill or edge crosses the label.
+    final expanded = ((t - 0.4) / 0.6).clamp(0.0, 1.0);
+    final collapsed = ((0.6 - t) / 0.6).clamp(0.0, 1.0);
+    final rowWidth = lerpDouble(56, expandedPillWidth, t)!;
+    final collapsedActive = t < 0.5;
 
     return Semantics(
       container: true,
       button: true,
-      selected: selected,
-      label: destination.label,
-      onTap: onTap,
+      selected: widget.selected,
+      label: widget.destination.label,
+      onTap: widget.onTap,
       child: SizedBox(
-        height: height,
+        height: _height,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -1270,26 +1375,14 @@ class _RailDestination extends StatelessWidget {
                 start: inset,
                 top: 0,
                 width: 56,
-                height: height,
+                height: _height,
                 child: IgnorePointer(
-                  ignoring: t >= 0.5,
+                  ignoring: !collapsedActive,
                   child: ExcludeSemantics(
-                    // Names the icon while the label is hidden; the whole
-                    // square around the indicator takes the click.
-                    child: Tooltip(
-                      message: destination.label,
-                      excludeFromSemantics: true,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: onTap,
-                        child: Opacity(
-                          opacity: collapsed,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: surface(active: t < 0.5),
-                          ),
-                        ),
-                      ),
+                    child: Opacity(
+                      opacity: collapsed,
+                      child: _collapsedLayers[collapsedActive] ??=
+                          _collapsedLayer(collapsedActive),
                     ),
                   ),
                 ),
@@ -1299,53 +1392,19 @@ class _RailDestination extends StatelessWidget {
                 start: inset,
                 top: 0,
                 width: rowWidth,
-                height: height,
+                height: _height,
                 child: IgnorePointer(
-                  ignoring: t < 0.5,
+                  ignoring: collapsedActive,
                   child: ExcludeSemantics(
                     child: Opacity(
                       opacity: expanded,
-                      child: surface(
-                        active: t >= 0.5,
-                        child: Row(
-                          children: [
-                            // The icon is drawn once, above both states.
-                            const SizedBox(width: 16 + 24 + 8),
-                            Expanded(
-                              child: Text(
-                                destination.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.clip,
-                                softWrap: false,
-                                style: expandedStyle.copyWith(
-                                  color: foreground,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                          ],
-                        ),
-                      ),
+                      child: _expandedLayers[!collapsedActive] ??=
+                          _expandedLayer(!collapsedActive),
                     ),
                   ),
                 ),
               ),
-            PositionedDirectional(
-              start: inset + 16,
-              top: (height - 24) / 2,
-              child: IgnorePointer(
-                child: IconTheme.merge(
-                  data: IconThemeData(color: foreground, size: 24),
-                  child: Badge(
-                    isLabelVisible: destination.badgeCount > 0,
-                    label: Text('${destination.badgeCount}'),
-                    child: AppIcon(
-                      selected ? destination.selectedIcon : destination.icon,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            _icon ??= _iconLayer(),
           ],
         ),
       ),
