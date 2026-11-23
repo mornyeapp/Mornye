@@ -394,18 +394,17 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
     final expandedHeight = calculateExpandedHeight(context);
     final embeddedCoverPath = _resolveAlbumEmbeddedCoverPath(tracks);
     final commonQuality = _getCommonQuality(tracks, qualityLabelMode);
+    // Only a found cover changes the header, not the lookup finishing.
     final motion = context.isMornye && !MediaQuery.disableAnimationsOf(context)
-        ? ref
-              .watch(
-                songMotionArtworkProvider((
-                  album: widget.albumName,
-                  artist: tracks.isEmpty
-                      ? widget.artistName
-                      : tracks.first.artistName,
-                  source: tracks.firstOrNull?.filePath ?? '',
-                )),
-              )
-              .value
+        ? ref.watch(
+            songMotionArtworkProvider((
+              album: widget.albumName,
+              artist: tracks.isEmpty
+                  ? widget.artistName
+                  : tracks.first.artistName,
+              source: tracks.firstOrNull?.filePath ?? '',
+            )).select((lookup) => lookup.value),
+          )
         : null;
 
     final cacheWidth = detailHeaderCoverCacheWidth(context);

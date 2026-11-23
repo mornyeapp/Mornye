@@ -271,7 +271,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
         _sortedTracksCache.firstOrNull;
     // Songs handed to the page keep the covers they had when it opened, so
     // a cover found from here shows from its record.
-    final foundCover = _albumArtwork()?.record?.coverFile;
+    final foundCover = _foundCover();
     return LocalLibraryArtworkBuilder(
       coverPath: albumCover?.isNotEmpty == true
           ? albumCover
@@ -395,18 +395,17 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
     String? coverPath,
   ) {
     final expandedHeight = calculateExpandedHeight(context);
+    // Only a found cover changes the header, not the lookup finishing.
     final motion = context.isMornye && !MediaQuery.disableAnimationsOf(context)
-        ? ref
-              .watch(
-                songMotionArtworkProvider((
-                  album: widget.albumName,
-                  artist:
-                      _sortedTracksCache.firstOrNull?.artistName ??
-                      widget.artistName,
-                  source: _sortedTracksCache.firstOrNull?.filePath ?? '',
-                )),
-              )
-              .value
+        ? ref.watch(
+            songMotionArtworkProvider((
+              album: widget.albumName,
+              artist:
+                  _sortedTracksCache.firstOrNull?.artistName ??
+                  widget.artistName,
+              source: _sortedTracksCache.firstOrNull?.filePath ?? '',
+            )).select((lookup) => lookup.value),
+          )
         : null;
 
     final cacheWidth = detailHeaderCoverCacheWidth(context);
@@ -552,9 +551,26 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
   /// The album's key and what Find Missing Artwork found for it. Null for
   /// songs from a network connection, which keep their server's covers.
   ({String albumKey, AlbumArtworkRecord? record})? _albumArtwork() {
+    final path = _artworkLookupPath;
+    if (path == null) return null;
+    return ref.read(libraryAlbumArtworkForSongProvider(path)).value;
+  }
+
+  String? get _artworkLookupPath {
     final path = _sortedTracksCache.firstOrNull?.filePath;
-    if (path == null || path.startsWith('network://')) return null;
-    return ref.watch(libraryAlbumArtworkForSongProvider(path)).value;
+    return path == null || path.startsWith('network://') ? null : path;
+  }
+
+  /// The cover Find Missing Artwork found. A lookup that finds none does not
+  /// build the page again.
+  String? _foundCover() {
+    final path = _artworkLookupPath;
+    if (path == null) return null;
+    return ref.watch(
+      libraryAlbumArtworkForSongProvider(
+        path,
+      ).select((artwork) => artwork.value?.record?.coverFile),
+    );
   }
 
   /// [groups] with Find Artwork, while the album lacks a cover or an

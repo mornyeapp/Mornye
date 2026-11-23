@@ -7,12 +7,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/download_history_provider.dart';
+import 'package:mornye/providers/library_album_artwork_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
+import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/downloaded_album_screen.dart';
 import 'package:mornye/screens/local_album_screen.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
+import 'package:mornye/services/library_album_artwork.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/motion_artwork_store.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/album_track_tile.dart';
@@ -118,6 +122,62 @@ void main() {
             _albumRowTapTest(tester, mornye: mornye, tapPlays: tapPlays),
       );
     }
+
+    testWidgets('artwork lookups that find nothing keep the album rows '
+        '($mornye)', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(430, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      const path = '/missing/song-1.flac';
+      final found =
+          Completer<({String albumKey, AlbumArtworkRecord? record})?>();
+      final motion = Completer<MotionArtwork?>();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            libraryAlbumArtworkForSongProvider(
+              path,
+            ).overrideWith((ref) => found.future),
+            songMotionArtworkProvider((
+              album: 'Album',
+              artist: 'Artist',
+              source: path,
+            )).overrideWith((ref) => motion.future),
+          ],
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.light)
+                : AppTheme.light(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: LocalAlbumScreen(
+              albumName: 'Album',
+              artistName: 'Artist',
+              tracks: [
+                LocalLibraryItem(
+                  id: '1',
+                  trackName: 'Song 1',
+                  artistName: 'Artist',
+                  albumName: 'Album',
+                  filePath: path,
+                  trackNumber: 1,
+                  scannedAt: DateTime(2026),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final row = tester.widget(find.byType(AlbumTrackTile));
+
+      found.complete((albumKey: 'album', record: null));
+      motion.complete(null);
+      await tester.pumpAndSettle();
+      expect(tester.widget(find.byType(AlbumTrackTile)), same(row));
+      expect(tester.takeException(), isNull);
+    });
   }
 }
 
