@@ -87,6 +87,8 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
   // Hidden while a right-click selection exists only for its open menu.
   bool _menuSelection = false;
   List<LibrarySearchHit> _visibleSongs = const [];
+  Widget? _chips;
+  (LibrarySearchKind?, bool, bool)? _chipsFor;
 
   bool get _selecting => _selected.isNotEmpty;
 
@@ -100,6 +102,12 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
       _suppressSelectionBar = false;
       _selectionOverlay.hide();
     }
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _chips = null;
   }
 
   @override
@@ -321,12 +329,25 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
     if (!chosen) _exitSelection();
   }
 
-  String _label(LibrarySearchKind kind) => switch (kind) {
-    LibrarySearchKind.songs => context.l10n.searchSongs,
-    LibrarySearchKind.albums => context.l10n.searchAlbums,
-    LibrarySearchKind.artists => context.l10n.searchArtists,
-    LibrarySearchKind.playlists => context.l10n.searchPlaylists,
-  };
+  String _label(LibrarySearchKind kind) => _kindLabel(context, kind);
+
+  /// The filter chips, made again only when the chosen filter changes: each
+  /// kind's results arrive on their own and rebuild the slivers around them.
+  Widget _kindChips() {
+    final showKinds = !widget.shelves || _kind != null;
+    final shown = (_kind, _lyricsSearch, showKinds);
+    if (_chips == null || shown != _chipsFor) {
+      _chipsFor = shown;
+      _chips = _LibrarySearchChips(
+        kind: _kind,
+        lyrics: _lyricsSearch,
+        showKinds: showKinds,
+        onSelect: _select,
+        onSelectLyrics: _selectLyrics,
+      );
+    }
+    return _chips!;
+  }
 
   void _select(LibrarySearchKind? kind) => setState(() {
     _lyricsSearch = false;
@@ -831,37 +852,7 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
       return taken;
     }
 
-    final slivers = <Widget>[
-      SliverToBoxAdapter(
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Row(
-            spacing: 8,
-            children: [
-              if (!widget.shelves || _kind != null)
-                for (final kind in [null, ...LibrarySearchKind.values])
-                  AppChoiceChip(
-                    label: Text(
-                      kind == null
-                          ? context.l10n.historyFilterAll
-                          : _label(kind),
-                    ),
-                    selected: !_lyricsSearch && _kind == kind,
-                    singleChoice: true,
-                    onSelected: (_) => _select(kind),
-                  ),
-              AppChoiceChip(
-                label: Text(context.l10n.trackLyrics),
-                selected: _lyricsSearch,
-                singleChoice: true,
-                onSelected: (_) => _selectLyrics(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ];
+    final slivers = <Widget>[SliverToBoxAdapter(child: _kindChips())];
     var hasResults = false;
     var loading = false;
     var failed = false;
@@ -1104,4 +1095,59 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
     }
     return slivers;
   }
+}
+
+String _kindLabel(BuildContext context, LibrarySearchKind kind) =>
+    switch (kind) {
+      LibrarySearchKind.songs => context.l10n.searchSongs,
+      LibrarySearchKind.albums => context.l10n.searchAlbums,
+      LibrarySearchKind.artists => context.l10n.searchArtists,
+      LibrarySearchKind.playlists => context.l10n.searchPlaylists,
+    };
+
+/// The row of search filters: every kind unless [showKinds] is false, then
+/// Lyrics.
+class _LibrarySearchChips extends StatelessWidget {
+  const _LibrarySearchChips({
+    required this.kind,
+    required this.lyrics,
+    required this.showKinds,
+    required this.onSelect,
+    required this.onSelectLyrics,
+  });
+
+  final LibrarySearchKind? kind;
+  final bool lyrics;
+  final bool showKinds;
+  final ValueChanged<LibrarySearchKind?> onSelect;
+  final VoidCallback onSelectLyrics;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+    child: Row(
+      spacing: 8,
+      children: [
+        if (showKinds)
+          for (final kind in [null, ...LibrarySearchKind.values])
+            AppChoiceChip(
+              label: Text(
+                kind == null
+                    ? context.l10n.historyFilterAll
+                    : _kindLabel(context, kind),
+              ),
+              selected: !lyrics && this.kind == kind,
+              singleChoice: true,
+              onSelected: (_) => onSelect(kind),
+            ),
+        AppChoiceChip(
+          label: Text(context.l10n.trackLyrics),
+          selected: lyrics,
+          singleChoice: true,
+          onSelected: (_) => onSelectLyrics(),
+        ),
+      ],
+    ),
+  );
 }

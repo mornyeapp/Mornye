@@ -60,6 +60,62 @@ LibrarySearchHit _hit(
 );
 
 void main() {
+  testWidgets('results arriving kind by kind and a new query keep the filter '
+      'chips', (tester) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final query = ValueNotifier('Fo');
+    addTearDown(query.dispose);
+    final pending = <LibrarySearchKind, Completer<List<LibrarySearchHit>>>{};
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          librarySearchProvider.overrideWith((ref, request) {
+            final results = Completer<List<LibrarySearchHit>>();
+            pending[request.kind] = results;
+            return results.future;
+          }),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ValueListenableBuilder<String>(
+              valueListenable: query,
+              builder: (context, value, _) => CustomScrollView(
+                slivers: [
+                  LibrarySearchResults(query: value, onOpenArtist: (_) {}),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    AppChoiceChip chip(String label) =>
+        tester.widget(find.widgetWithText(AppChoiceChip, label));
+    final all = chip('All');
+    for (final kind in LibrarySearchKind.values) {
+      pending[kind]!.complete([_hit(kind, 0)]);
+      await tester.pump();
+    }
+    expect(find.text('Found songs 0'), findsOneWidget);
+    expect(chip('All'), same(all));
+
+    query.value = 'Found';
+    await tester.pump();
+    expect(chip('All'), same(all));
+
+    // Choosing a filter makes them again.
+    await tester.tap(find.widgetWithText(AppChoiceChip, 'Songs'));
+    await tester.pump();
+    expect(chip('Songs').selected, isTrue);
+    expect(chip('All').selected, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final desktop in [false, true]) {
     for (final mornye in [false, true]) {
       testWidgets(
