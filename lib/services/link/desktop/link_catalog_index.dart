@@ -58,11 +58,15 @@ String linkCleanPath(String path) =>
 class LinkCatalogIndexBuilder {
   final _songs = <LinkCatalogSong>[];
   final _covers = <String, String>{};
+  final _looseKeys = <String?>[];
 
   int get length => _songs.length;
 
-  void add(LinkCatalogSong song, {String? cover}) {
+  /// [looseKey] is the song's [linkLooseKey] when the caller already made
+  /// it; the index makes the missing ones.
+  void add(LinkCatalogSong song, {String? cover, String? looseKey}) {
     _songs.add(song);
+    _looseKeys.add(looseKey);
     if (cover != null) _covers[song.id] = cover;
   }
 
@@ -70,6 +74,7 @@ class LinkCatalogIndexBuilder {
     serverId: serverId,
     songs: _songs,
     covers: _covers,
+    looseKeys: _looseKeys,
   );
 }
 
@@ -80,19 +85,26 @@ class LinkCatalogIndexBuilder {
 /// then the looser title and artist key with the duration within two
 /// seconds. A side without a duration does not block a match.
 class DesktopLinkCatalogIndex implements LinkCatalogIndex {
+  /// [looseKeys], when given, holds each song's [linkLooseKey] or null in
+  /// the order of [songs], so a large catalog does not make them here.
   DesktopLinkCatalogIndex({
     required this.serverId,
     required List<LinkCatalogSong> songs,
     Map<String, String> covers = const {},
+    List<String?> looseKeys = const [],
   }) : _covers = Map.unmodifiable(covers) {
-    for (final song in songs) {
+    final keyed = looseKeys.length == songs.length;
+    for (var i = 0; i < songs.length; i++) {
+      final song = songs[i];
       _byId[song.id] = song;
       _byPath.putIfAbsent(song.path, () => song.id);
       final isrc = normalizeIsrc(song.isrc);
       if (isrc.isNotEmpty) (_byIsrc[isrc] ??= []).add(song);
       final matchKey = song.matchKey ?? linkMatchKey(song.title, song.artist);
       if (matchKey.isNotEmpty) (_byMatchKey[matchKey] ??= []).add(song);
-      final loose = linkLooseKey(song.title, song.artist);
+      final loose =
+          (keyed ? looseKeys[i] : null) ??
+          linkLooseKey(song.title, song.artist);
       if (loose.isNotEmpty) (_byLooseKey[loose] ??= []).add(song);
     }
   }

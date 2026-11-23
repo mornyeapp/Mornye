@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/link/desktop/link_catalog_exporter.dart';
+import 'package:mornye/services/link/desktop/link_catalog_index.dart';
 import 'package:mornye/services/link/desktop/link_web_covers.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 
@@ -169,6 +170,13 @@ void main() {
     expect(document['title'], 'Track content');
     expect(document['size'], isNull, reason: 'the row knows no size');
     expect(document['suffix'], isNull);
+  });
+
+  test('makes each song loose key off the UI isolate', () {
+    final page = mapLinkCatalogRows(rows());
+    expect(page.looseKeys, [
+      for (final song in page.songs) linkLooseKey(song.title, song.artist),
+    ]);
   });
 
   test('shares storage access documents from their rows alone', () {

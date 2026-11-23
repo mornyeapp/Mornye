@@ -45,6 +45,7 @@ class LinkCatalogPage {
     required this.songs,
     required this.covers,
     this.webCoverSongs = const [],
+    this.looseKeys = const [],
   });
 
   /// UTF-8 NDJSON, one line per song.
@@ -62,6 +63,10 @@ class LinkCatalogPage {
 
   /// The songs in [songs] without a local cover file but with a web cover.
   final List<LinkWebCoverSong> webCoverSongs;
+
+  /// [linkLooseKey] of each song in [songs], made off the UI isolate; empty
+  /// when the mapper left them to the index.
+  final List<String> looseKeys;
 }
 
 /// A finished export.
@@ -193,6 +198,7 @@ LinkCatalogPage mapLinkCatalogRows(
   final digests = BytesBuilder(copy: false);
   final songs = <LinkCatalogSong>[];
   final covers = <String?>[];
+  final looseKeys = <String>[];
   final webCoverSongs = <LinkWebCoverSong>[];
   final coverChecks = <String, bool>{};
   final webCoverPaths = <String, String?>{};
@@ -314,6 +320,7 @@ LinkCatalogPage mapLinkCatalogRows(
     songs.add(song);
     // The desktop player shows the web cover itself, not the Link copy.
     covers.add(coverPath ?? _webUrl(item['coverUrl']));
+    looseKeys.add(linkLooseKey(title, artist));
   }
   return LinkCatalogPage(
     bytes: bytes.takeBytes(),
@@ -321,6 +328,7 @@ LinkCatalogPage mapLinkCatalogRows(
     songs: songs,
     covers: covers,
     webCoverSongs: webCoverSongs,
+    looseKeys: looseKeys,
   );
 }
 
@@ -417,8 +425,13 @@ class LinkCatalogExporter {
           final mapped = await _mapPage(page.rows, webCovers, pictures);
           if (mapped.bytes.isNotEmpty) await file.writeFrom(mapped.bytes);
           hash.add(mapped.digests);
+          final keyed = mapped.looseKeys.length == mapped.songs.length;
           for (var i = 0; i < mapped.songs.length; i++) {
-            builder.add(mapped.songs[i], cover: mapped.covers[i]);
+            builder.add(
+              mapped.songs[i],
+              cover: mapped.covers[i],
+              looseKey: keyed ? mapped.looseKeys[i] : null,
+            );
           }
           webCoverSongs.addAll(mapped.webCoverSongs);
         }

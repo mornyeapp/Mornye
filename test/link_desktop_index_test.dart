@@ -166,6 +166,28 @@ void main() {
     expect(linkLooseKey('', 'A'), '');
   });
 
+  test('takes loose keys made ahead and makes only the missing ones', () {
+    final songs = [
+      catalogSong('l:1', title: 'Song', artist: 'Band', durationMs: 200000),
+      catalogSong('l:2', title: 'Tune', artist: 'Group', durationMs: 200000),
+    ];
+    final keyed = DesktopLinkCatalogIndex(
+      serverId: 'srv',
+      songs: songs,
+      // The first key stands for one made off the UI isolate.
+      looseKeys: ['made|ahead', null],
+    );
+    expect(keyed.songIdForRef(ref(title: 'Made', artist: 'Ahead')), 'l:1');
+    expect(keyed.songIdForRef(ref(title: 'tune', artist: 'GROUP')), 'l:2');
+    final builder = LinkCatalogIndexBuilder()
+      ..add(songs.first, looseKey: linkLooseKey('Song', 'Band'))
+      ..add(songs.last);
+    expect(
+      builder.build('srv').songIdForRef(ref(title: 'song!', artist: 'band')),
+      'l:1',
+    );
+  });
+
   test('resolves 50k songs quickly', () {
     final songs = [
       for (var i = 0; i < 50000; i++)
