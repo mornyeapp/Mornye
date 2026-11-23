@@ -200,6 +200,28 @@ DownloadHistoryItem linkMetadataApplied(
   return item;
 }
 
+/// The editor tags that write [changes] into [copy]'s file. A number goes
+/// with the copy's total, which a write of the number alone would drop.
+Map<String, String> linkMetadataTags(
+  DownloadHistoryItem copy,
+  Iterable<LinkMetadataDifference> changes,
+) {
+  final tags = <String, String>{};
+  void total(String key, int? value) {
+    if (value != null && value > 0) tags[key] = '$value';
+  }
+
+  for (final change in changes) {
+    tags[change.field.editorKey] = change.computer;
+    if (change.field == LinkMetadataField.trackNumber) {
+      total('track_total', copy.totalTracks);
+    } else if (change.field == LinkMetadataField.discNumber) {
+      total('disc_total', copy.totalDiscs);
+    }
+  }
+  return tags;
+}
+
 /// A saved copy whose tags differ from its song on the computer.
 class LinkMetadataCandidate {
   const LinkMetadataCandidate({required this.copy, required this.differences});
@@ -395,10 +417,7 @@ class LinkMetadataApplier {
         final saved = await save(
           MetadataSaveRequest(
             filePath: update.copy.filePath,
-            metadata: {
-              for (final change in update.changes)
-                change.field.editorKey: change.computer,
-            },
+            metadata: linkMetadataTags(update.copy, update.changes),
             artistTagMode: mode,
             preserveUnspecifiedTags: true,
           ),

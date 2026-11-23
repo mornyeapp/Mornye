@@ -275,6 +275,41 @@ void main() {
       expect(applied.filePath, copy.filePath);
       expect(applied.id, copy.id);
     });
+
+    test('a number is written with the total the copy has', () {
+      const changes = [
+        LinkMetadataDifference(
+          LinkMetadataField.trackNumber,
+          phone: '3',
+          computer: '5',
+        ),
+        LinkMetadataDifference(
+          LinkMetadataField.discNumber,
+          phone: '',
+          computer: '2',
+        ),
+        LinkMetadataDifference(
+          LinkMetadataField.title,
+          phone: 'Old',
+          computer: 'New',
+        ),
+      ];
+      expect(
+        linkMetadataTags(
+          _copy('a').copyWith(totalTracks: 12, totalDiscs: 0),
+          changes,
+        ),
+        {
+          'track_number': '5',
+          'track_total': '12',
+          'disc_number': '2',
+          'title': 'New',
+        },
+      );
+      expect(linkMetadataTags(_copy('a'), changes.take(1)), {
+        'track_number': '5',
+      });
+    });
   });
 
   group('collector', () {
