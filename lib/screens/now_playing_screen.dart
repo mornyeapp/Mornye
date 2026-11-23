@@ -459,10 +459,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     );
     // Material plays motion artwork only as the full-screen cover, which its
     // backdrop looks up itself; the card cover stays still.
-    final motionState = mornye
-        ? _watchMotionArtwork(context, ref, motionSong)
-        : null;
-    final motionArtwork = _shownMotion(motionState);
+    final motion = mornye
+        ? _watchShownMotion(context, ref, motionSong)
+        : (artwork: _shownMotion(null), resolving: false);
+    final motionArtwork = motion.artwork;
     final motionRatio = motionArtwork == null
         ? null
         : motionArtwork.aspectRatio ??
@@ -515,7 +515,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     Widget artwork() => MornyePlayerArtwork(
       mediaItem: mediaItem,
       videoUrl: motionArtwork?.source,
-      resolvingVideo: motionState?.isLoading == true,
+      resolvingVideo: motion.resolving,
       onAspectRatioChanged: (ratio) {
         if (!mounted ||
             (_measuredMotionSource == motionArtwork?.source &&
@@ -1024,7 +1024,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             MornyeMotionGlow(
               videoUrl: motionArtwork?.source,
               visible: showsFullArtwork,
-              resolvingVideo: motionState?.isLoading == true,
+              resolvingVideo: motion.resolving,
               squareArtwork: squareArtwork,
               artworkAspectRatio: artworkRatio,
               fadeStart: fadeStart,
@@ -1058,6 +1058,36 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
           !MediaQuery.disableAnimationsOf(context)
       ? ref.watch(songMotionArtworkProvider(song))
       : null;
+
+  /// The Mornye player's motion cover, as [_shownMotion] picks it, and
+  /// whether the next one is still looked up. An answer that changes
+  /// neither, as for most songs, does not rebuild the player.
+  ({MotionArtwork? artwork, bool resolving}) _watchShownMotion(
+    BuildContext context,
+    WidgetRef ref,
+    PlayerArtworkSong song,
+  ) {
+    if (!ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) ||
+        MediaQuery.disableAnimationsOf(context)) {
+      return (artwork: _shownMotion(null), resolving: false);
+    }
+    final shown = _shownMotionArtwork;
+    final (:artwork, :resolving) = ref.watch(
+      songMotionArtworkProvider(song).select((state) {
+        final lookingUp = state.isLoading && !state.hasValue;
+        // A lookup only holds a video that is on screen.
+        return (
+          artwork: lookingUp ? shown : state.value,
+          resolving: shown != null && state.isLoading,
+        );
+      }),
+    );
+    _shownMotionArtwork = artwork;
+    return (
+      artwork: artwork?.source == _failedMotionSource ? null : artwork,
+      resolving: resolving,
+    );
+  }
 
   /// A new song looks up its artwork for a few frames. The outgoing motion
   /// cover keeps its layout meanwhile, so the gradient and its fade do not

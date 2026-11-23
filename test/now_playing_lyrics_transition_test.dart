@@ -831,6 +831,50 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a motion cover answer that changes nothing keeps the Mornye '
+      'player', (tester) async {
+    String? video;
+    await pumpNowPlaying(
+      tester,
+      theme: MornyeTheme.build(Brightness.dark),
+      size: const Size(390, 844),
+      motionArtworkOf: (_) => switch (video) {
+        final source? => MotionArtwork(source),
+        null => null,
+      },
+    );
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+    Scaffold player() => tester.widget<Scaffold>(
+      find
+          .descendant(
+            of: find.byType(NowPlayingScreen),
+            matching: find.byType(Scaffold),
+          )
+          .first,
+    );
+    String? artworkVideo() => tester
+        .widget<MornyePlayerArtwork>(find.byType(MornyePlayerArtwork).first)
+        .videoUrl;
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(NowPlayingScreen)),
+    );
+    final before = player();
+
+    // A new lookup that again finds no motion cover, as for most songs.
+    container.invalidate(playerMotionArtworkProvider);
+    await settlePlayer(tester);
+    expect(player(), same(before));
+    expect(artworkVideo(), isNull);
+
+    // An answer with a motion cover still reaches the player.
+    video = 'file:///one.mp4';
+    container.invalidate(playerMotionArtworkProvider);
+    await settlePlayer(tester);
+    expect(artworkVideo(), 'file:///one.mp4');
+    expect(tester.takeException(), isNull);
+  });
+
   for (final mornye in [false, true]) {
     testWidgets('the whole cover setting keeps a full screen cover square '
         '($mornye)', (tester) async {
