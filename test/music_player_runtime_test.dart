@@ -288,6 +288,20 @@ class _TickingDeck extends _Deck {
   }
 }
 
+/// Reports the durations a test sends.
+class _DurationDeck extends _Deck {
+  final durationEvents = StreamController<Duration>.broadcast();
+
+  @override
+  Stream<Duration> get onDurationChanged => durationEvents.stream;
+
+  @override
+  Future<void> dispose() async {
+    await durationEvents.close();
+    await super.dispose();
+  }
+}
+
 class _HandoffDeck extends _TickingDeck {
   final preparing = Completer<void>();
   final prepared = Completer<void>();
@@ -5820,5 +5834,27 @@ void main() {
         expect(preview.media.toMediaItem(covers: covers).artUri, isNull);
       },
     );
+  });
+
+  test('a duration the song already has publishes nothing again', () async {
+    final deck = _DurationDeck();
+    var created = 0;
+    final handler = await _runtime(
+      createDeck: (_) => created++ == 0 ? deck : _Deck(),
+    ).initialize();
+    await handler.setQueueAndPlay([_track]);
+    await _settle();
+    final published = <Duration?>[];
+    final subscription = handler.mediaItem
+        .skip(1)
+        .listen((item) => published.add(item?.duration));
+    addTearDown(subscription.cancel);
+    deck.durationEvents.add(const Duration(seconds: 60));
+    deck.durationEvents.add(const Duration(seconds: 60));
+    await _settle();
+    expect(published, isEmpty);
+    deck.durationEvents.add(const Duration(seconds: 61));
+    await _settle();
+    expect(published, [const Duration(seconds: 61)]);
   });
 }

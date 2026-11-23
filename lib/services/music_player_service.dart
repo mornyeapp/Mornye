@@ -698,7 +698,10 @@ class MusicPlayerHandler extends BaseAudioHandler
       player.onDurationChanged.listen((duration) {
         if (!identical(player, _player) || !_sourceReady) return;
         final current = mediaItem.value;
-        if (current != null && duration > Duration.zero) {
+        // The same duration again would rebuild every player surface.
+        if (current != null &&
+            duration > Duration.zero &&
+            current.duration != duration) {
           mediaItem.add(current.copyWith(duration: duration));
         }
       }),
