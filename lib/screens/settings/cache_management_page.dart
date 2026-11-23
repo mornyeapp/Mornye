@@ -109,7 +109,7 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
     );
 
     final prefs = await prefsFuture;
-    final exploreBytes = (await ExploreCacheStore(prefs).read()).sizeBytes;
+    final exploreBytes = await ExploreCacheStore(prefs).sizeBytes();
     final hasExploreCache = exploreBytes > 0;
 
     final appCacheStats = await appCacheStatsFuture;

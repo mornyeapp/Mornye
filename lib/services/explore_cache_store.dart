@@ -34,6 +34,9 @@ class ExploreCacheStore {
     );
   }
 
+  /// The cache file size, without returning the feed to this isolate.
+  Future<int> sizeBytes() => _blobs.sizeBytes(_prefs);
+
   Future<void> write(String payload) async {
     await _blobs.write(_prefs, {
       _cacheKey: payload,

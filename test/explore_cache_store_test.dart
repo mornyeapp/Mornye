@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -48,6 +49,38 @@ void main() {
     expect(snapshot.sizeBytes, await cacheFile().length());
     expect(prefs.getString('explore_home_feed_cache'), isNull);
     expect(prefs.getInt('explore_home_feed_ts'), isNull);
+  });
+
+  test('a large feed round trips and reports its file size', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = ExploreCacheStore(prefs);
+    final payload = jsonEncode({
+      'sections': [
+        for (var i = 0; i < 4000; i++) {'title': 'Musik 🎵 日本語 $i'},
+      ],
+    });
+
+    await store.write(payload);
+    final snapshot = await store.read();
+
+    expect(snapshot.payload, payload);
+    expect(snapshot.sizeBytes, await cacheFile().length());
+    expect(await store.sizeBytes(), snapshot.sizeBytes);
+    expect(jsonDecode(await cacheFile().readAsString()), {
+      'explore_home_feed_cache': payload,
+      'explore_home_feed_ts': isA<int>(),
+    });
+  });
+
+  test('size of a legacy cache migrates it like a read', () async {
+    SharedPreferences.setMockInitialValues({'explore_home_feed_ts': 123});
+    final prefs = await SharedPreferences.getInstance();
+
+    final size = await ExploreCacheStore(prefs).sizeBytes();
+
+    expect(size, await cacheFile().length());
+    expect(prefs.getKeys(), isEmpty);
   });
 
   test(

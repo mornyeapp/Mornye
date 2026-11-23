@@ -306,6 +306,27 @@ void main() {
         (large['blob']! as String).length,
       );
     });
+
+    test('sizeBytes matches read for every file state', () async {
+      Future<void> same() async {
+        final size = await store.sizeBytes(prefs);
+        expect(size, (await store.read(prefs)).sizeBytes);
+      }
+
+      await same();
+      await store.write(prefs, large);
+      await same();
+      expect(await store.sizeBytes(prefs), await file().length());
+      await file().writeAsString('${jsonEncode(large)}x');
+      expect(await store.sizeBytes(prefs), 0);
+      await same();
+      await store.write(prefs, large);
+      await prefs.setString('blob', 'legacy');
+      await same();
+      expect(prefs.containsKey('blob'), isFalse);
+      await store.clear(prefs);
+      await same();
+    });
   });
 
   test(

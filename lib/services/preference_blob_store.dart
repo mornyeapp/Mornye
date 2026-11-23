@@ -103,6 +103,9 @@ class PreferenceBlobStore {
     );
   }
 
+  static Future<bool> _validFile(String path, Map<String, Type> keys) =>
+      Isolate.run(() => _decode(File(path).readAsStringSync(), keys) != null);
+
   static Future<Uint8List> _encode(Map<String, Object?> values) {
     var size = 0;
     for (final value in values.values) {
@@ -112,6 +115,10 @@ class PreferenceBlobStore {
     final copy = Map<String, Object?>.of(values);
     return Isolate.run(() => encode(copy));
   }
+
+  bool _hasLegacy(SharedPreferences prefs) =>
+      keys.keys.any(prefs.containsKey) ||
+      (_failedRemovals[name]?.isNotEmpty ?? false);
 
   Map<String, Object?> _legacy(SharedPreferences prefs) => {
     for (final entry in keys.entries)
@@ -144,6 +151,24 @@ class PreferenceBlobStore {
     SharedPreferences prefs,
     R Function(Map<String, Object?>) convert,
   ) async => (await _run(() => _read(prefs, convert))).$2;
+
+  /// The [PreferenceBlobSnapshot.sizeBytes] that [read] reports. A large
+  /// file is only validated in a worker; legacy values take the full read.
+  Future<int> sizeBytes(SharedPreferences prefs) => _run(() async {
+    if (!_hasLegacy(prefs)) {
+      try {
+        final file = await _file();
+        if (await file.exists() &&
+            await file.length() >= workerThresholdBytes) {
+          return await _validFile(file.path, keys) ? await file.length() : 0;
+        }
+      } catch (error) {
+        _log.w('Could not read or migrate blob $name: $error');
+        return 0;
+      }
+    }
+    return (await _read<Object?>(prefs)).$1.sizeBytes;
+  });
 
   Future<(PreferenceBlobSnapshot, R?)> _read<R>(
     SharedPreferences prefs, [
