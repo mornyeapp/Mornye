@@ -156,7 +156,13 @@ impl CastService {
                 let failed =
                     |error: std::io::Error| format!("Could not share audio with the TV: {error}");
                 let local = local_address_towards(host).map_err(failed)?;
-                let dlna = self.kind() == Some(Kind::Dlna);
+                // Only a live DLNA session; an ended one says nothing of
+                // the receiver the app serves now.
+                let dlna = {
+                    let status = self.status.lock().expect("cast status");
+                    status.connected
+                        && status.device.as_ref().map(|device| device.kind) == Some(Kind::Dlna)
+                };
                 // This device's address changes with its network; a server
                 // kept on the old one would answer nobody.
                 let bound = self.media.lock().expect("cast media");
