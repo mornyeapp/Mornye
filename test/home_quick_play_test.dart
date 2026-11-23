@@ -162,6 +162,10 @@ Future<void> _open(
 double _top(WidgetTester tester, String text) =>
     tester.getTopLeft(find.text(text)).dy;
 
+/// The box of the grid's song `Quick [index]`.
+Rect _box(WidgetTester tester, int index) =>
+    tester.getRect(find.byKey(ValueKey('home-quick-play-local_Quick $index')));
+
 void main() {
   group('the day\'s stretches', () {
     test('a small Library is read whole', () {
@@ -257,35 +261,43 @@ void main() {
   });
 
   group('Home', () {
-    testWidgets('shows nine covers in three rows between Continue listening '
-        'and Shortcuts', (tester) async {
+    testWidgets('shows nine covers in three rows under Shortcuts', (
+      tester,
+    ) async {
       await _open(tester, _home);
       expect(tester.takeException(), isNull);
       expect(
         _top(tester, 'Continue listening'),
-        lessThan(_top(tester, 'Quick play')),
+        lessThan(_top(tester, 'Shortcuts')),
       );
-      expect(_top(tester, 'Quick play'), lessThan(_top(tester, 'Shortcuts')));
+      expect(_top(tester, 'Shortcuts'), lessThan(_top(tester, 'Quick play')));
       expect(find.byKey(_grid), findsOneWidget);
 
-      Offset at(int index) => tester.getTopLeft(find.text('Quick $index'));
+      Rect box(int index) => _box(tester, index);
       for (final row in [1, 4, 7]) {
-        expect(at(row).dy, at(row + 1).dy);
-        expect(at(row).dy, at(row + 2).dy);
-        expect(at(row).dx, at(1).dx);
-        expect(at(row + 1).dx, at(2).dx);
-        expect(at(row + 2).dx, at(3).dx);
+        expect(box(row).top, box(row + 1).top);
+        expect(box(row).top, box(row + 2).top);
+        expect(box(row).left, box(1).left);
+        expect(box(row + 1).left, box(2).left);
+        expect(box(row + 2).left, box(3).left);
       }
-      expect(at(1).dx, lessThan(at(2).dx));
-      expect(at(2).dx, lessThan(at(3).dx));
-      expect(at(1).dy, lessThan(at(4).dy));
-      expect(at(4).dy, lessThan(at(7).dy));
-      // The third tile ends at the page margin the first starts from.
-      final grid = tester.getRect(find.byKey(_grid));
-      expect(grid.left, 0);
-      expect(grid.right, 400);
-      expect(at(1).dx, 16);
-      // The grid names the songs only.
+      // Square boxes four apart, across and down, from the page margin.
+      expect(box(1).width, box(1).height);
+      expect(box(2).left - box(1).right, 4);
+      expect(box(3).left - box(2).right, 4);
+      expect(box(4).top - box(1).bottom, 4);
+      expect(box(7).top - box(4).bottom, 4);
+      expect(box(1).left, 16);
+      expect(box(3).right, moreOrLessEquals(384, epsilon: 1));
+      // Each title sits inside its box; the grid names the songs only.
+      for (var index = 1; index <= 9; index++) {
+        final title = tester.getRect(find.text('Quick $index'));
+        expect(box(index).contains(title.topLeft), isTrue);
+        expect(
+          box(index).contains(title.bottomRight - const Offset(1, 1)),
+          isTrue,
+        );
+      }
       expect(find.text('Artist of Quick 1'), findsNothing);
     });
 
@@ -298,7 +310,9 @@ void main() {
         _home,
         overrides: [playbackProvider.overrideWith(() => player)],
       );
-      await tester.tap(find.text('Quick 5'));
+      await tester.tap(
+        find.byKey(const ValueKey('home-quick-play-local_Quick 5')),
+      );
       await _settle(tester);
       expect(tester.takeException(), isNull);
       expect(player.starts, [4]);
@@ -358,15 +372,13 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('Quick play'), findsOneWidget);
       expect(find.byKey(_grid), findsOneWidget);
-      // Tiles start under the section title, as Mornye's shelves do.
+      // Boxes start under the section title, as Mornye's shelves do.
       expect(
-        tester.getTopLeft(find.text('Quick 1')).dx,
+        _box(tester, 1).left,
         tester.getTopLeft(find.text('Quick play')).dx,
       );
-      expect(
-        tester.getTopLeft(find.text('Quick 1')).dy,
-        tester.getTopLeft(find.text('Quick 2')).dy,
-      );
+      expect(_box(tester, 1).top, _box(tester, 2).top);
+      expect(_box(tester, 2).left - _box(tester, 1).right, 4);
     });
 
     testWidgets('a wide page lays the songs out as a shelf', (tester) async {
@@ -417,7 +429,7 @@ void main() {
   });
 
   group('Edit Home', () {
-    testWidgets('lists Quick play after Continue listening', (tester) async {
+    testWidgets('lists Quick play after Shortcuts', (tester) async {
       await _open(tester, const HomeLayoutPage());
       expect(tester.takeException(), isNull);
       expect(
@@ -429,9 +441,9 @@ void main() {
       );
       expect(
         _top(tester, 'Continue listening'),
-        lessThan(_top(tester, 'Quick play')),
+        lessThan(_top(tester, 'Shortcuts')),
       );
-      expect(_top(tester, 'Quick play'), lessThan(_top(tester, 'Shortcuts')));
+      expect(_top(tester, 'Shortcuts'), lessThan(_top(tester, 'Quick play')));
     });
 
     testWidgets('leaves it out while another app is the player', (

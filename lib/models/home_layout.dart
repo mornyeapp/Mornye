@@ -12,10 +12,10 @@ enum HomeSection {
   /// Mornye's shelf of albums played lately.
   recentlyPlayed,
   continueListening,
+  shortcuts,
 
   /// Nine Library songs as a grid of covers, each one tap from playing.
   quickPlay,
-  shortcuts,
 
   /// What the person pinned, where it does not sit among [shortcuts].
   pins,

@@ -9,6 +9,9 @@ const _homeQuickSongStretch = 30;
 /// The page width from which Quick play is a shelf rather than a grid.
 const _homeQuickGridMaxWidth = 600.0;
 
+/// Space between Quick play boxes, across and down.
+const _homeQuickGap = 4.0;
+
 /// The stretches of a Library of [trackCount] songs the day's picks are
 /// read from: all of a small one, else three places that move daily.
 @visibleForTesting
@@ -140,8 +143,9 @@ bool _sameLibraryItems(
   return true;
 }
 
-/// Library songs one tap from playing: three across on a phone, a shelf
-/// where the page is wide. A tap plays the song with the others after it.
+/// Library songs one tap from playing: three boxes across on a phone, a
+/// shelf where the page is wide. A tap plays the song with the others after
+/// it.
 class _HomeQuickPlay extends ConsumerWidget {
   const _HomeQuickPlay({required this.songs, required this.inset});
 
@@ -151,27 +155,6 @@ class _HomeQuickPlay extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
-    Widget tile(int index, double size, {required bool artist}) {
-      final song = songs[index];
-      return _HomeShelfTile(
-        size: size,
-        title: song.trackName,
-        subtitle: artist ? song.artistName : null,
-        semanticLabel: context.l10n.a11yOpenTrackByArtist(
-          song.trackName,
-          song.artistName,
-        ),
-        cover: _homeLibraryCover(
-          song,
-          colorScheme,
-          size,
-          (size * pixelRatio).round(),
-        ),
-        onTap: () => _homePlayLibraryItems(context, ref, songs, index),
-      );
-    }
-
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= _homeQuickGridMaxWidth) {
@@ -181,14 +164,33 @@ class _HomeQuickPlay extends ConsumerWidget {
               inset: inset,
               coverSize: coverSize,
               itemCount: songs.length,
-              itemBuilder: (context, index) =>
-                  tile(index, coverSize, artist: true),
+              itemBuilder: (context, index) {
+                final song = songs[index];
+                return _HomeShelfTile(
+                  size: coverSize,
+                  title: song.trackName,
+                  subtitle: song.artistName,
+                  semanticLabel: context.l10n.a11yOpenTrackByArtist(
+                    song.trackName,
+                    song.artistName,
+                  ),
+                  cover: _homeLibraryCover(
+                    song,
+                    colorScheme,
+                    coverSize,
+                    (coverSize * MediaQuery.devicePixelRatioOf(context))
+                        .round(),
+                  ),
+                  onTap: () =>
+                      _homePlayLibraryItems(context, ref, songs, index),
+                );
+              },
             ),
           );
         }
-        final gap = context.isMornye ? _homeMornyeShelfGap : 12.0;
-        final size = ((constraints.maxWidth - 2 * inset - 2 * gap) / 3)
-            .floorToDouble();
+        final size =
+            ((constraints.maxWidth - 2 * inset - 2 * _homeQuickGap) / 3)
+                .floorToDouble();
         return Padding(
           key: const ValueKey('home-quick-play-grid'),
           padding: EdgeInsets.symmetric(horizontal: inset),
@@ -196,17 +198,22 @@ class _HomeQuickPlay extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (var row = 0; row < songs.length; row += 3) ...[
-                if (row > 0) const SizedBox(height: 16),
+                if (row > 0) const SizedBox(height: _homeQuickGap),
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     for (
                       var index = row;
                       index < row + 3 && index < songs.length;
                       index++
                     ) ...[
-                      if (index > row) SizedBox(width: gap),
-                      tile(index, size, artist: false),
+                      if (index > row) const SizedBox(width: _homeQuickGap),
+                      _HomeQuickTile(
+                        key: ValueKey('home-quick-play-${songs[index].id}'),
+                        song: songs[index],
+                        size: size,
+                        onTap: () =>
+                            _homePlayLibraryItems(context, ref, songs, index),
+                      ),
                     ],
                   ],
                 ),
@@ -215,6 +222,84 @@ class _HomeQuickPlay extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// One square of the Quick play grid: the cover with the song's title
+/// inside it, over a darkened lower edge.
+class _HomeQuickTile extends StatelessWidget {
+  const _HomeQuickTile({
+    super.key,
+    required this.song,
+    required this.size,
+    required this.onTap,
+  });
+
+  final UnifiedLibraryItem song;
+  final double size;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final mornye = context.isMornye;
+    final radius = BorderRadius.circular(mornye ? 10 : 12);
+    return Semantics(
+      button: true,
+      label: context.l10n.a11yOpenTrackByArtist(
+        song.trackName,
+        song.artistName,
+      ),
+      excludeSemantics: true,
+      child: ClipRRect(
+        borderRadius: radius,
+        child: SizedBox.square(
+          dimension: size,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _homeLibraryCover(
+                song,
+                colorScheme,
+                size,
+                (size * MediaQuery.devicePixelRatioOf(context)).round(),
+              ),
+              // The title sits on artwork; dim its lower edge.
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x00000000), Color(0x99000000)],
+                    stops: [0.45, 1],
+                  ),
+                ),
+              ),
+              PositionedDirectional(
+                start: 8,
+                end: 8,
+                bottom: 7,
+                child: Text(
+                  song.trackName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Colors.white,
+                    fontSize: 13,
+                    height: 1.2,
+                    fontWeight: mornye ? FontWeight.w600 : null,
+                  ),
+                ),
+              ),
+              Material(
+                type: MaterialType.transparency,
+                child: InkWell(onTap: onTap, borderRadius: radius),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

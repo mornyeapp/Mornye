@@ -1259,9 +1259,7 @@ class _HomeShelfTile extends StatelessWidget {
 
   final Widget cover;
   final String title;
-
-  /// Null for a tile that names only its title.
-  final String? subtitle;
+  final String subtitle;
   final String semanticLabel;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
@@ -1308,16 +1306,15 @@ class _HomeShelfTile extends StatelessWidget {
                   fontWeight: compactText ? FontWeight.w400 : null,
                 ),
               ),
-              if (subtitle case final subtitle?)
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: compactText ? 13 : null,
-                  ),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: compactText ? 13 : null,
                 ),
+              ),
             ],
           ),
         ),
