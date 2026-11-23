@@ -355,9 +355,9 @@ class _TrackItemWithStatus extends ConsumerWidget {
     );
   }
 
-  /// A tap on a search song: skip a queued song, refuse a duplicate unless
-  /// variants are allowed, otherwise download it. The desktop song table
-  /// runs the same on a click, reading the queue and library itself.
+  /// A tap on a search song: skip a queued song, play a copy the person
+  /// already has unless duplicates or variants are allowed, otherwise
+  /// download it. The desktop song table runs the same on a click.
   static Future<void> activate(
     BuildContext context,
     WidgetRef ref,
@@ -372,6 +372,10 @@ class _TrackItemWithStatus extends ConsumerWidget {
     final settings = ref.read(settingsProvider);
     final allowExistingDownload =
         settings.allowQualityVariants || !settings.deduplicateDownloads;
+
+    if (!allowExistingDownload && (isInHistory || isInLocalLibrary)) {
+      if (await playLocalIfAvailable(context, ref, track)) return;
+    }
 
     if (!allowExistingDownload && isInLocalLibrary) {
       if (context.mounted) {

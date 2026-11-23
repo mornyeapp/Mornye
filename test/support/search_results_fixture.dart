@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/settings.dart';
@@ -169,6 +170,9 @@ Future<void> pumpSearchFixture(
     hasSearchedBefore: true,
   ),
   TextDirection textDirection = TextDirection.ltr,
+  DownloadHistoryNotifier Function()? history,
+  Set<String> downloadedIds = const {},
+  List<Override> overrides = const [],
 }) async {
   SharedPreferences.setMockInitialValues({});
   debugDesktopPlatformOverride = desktop;
@@ -184,9 +188,12 @@ Future<void> pumpSearchFixture(
         settingsProvider.overrideWith(() => FixedSettingsNotifier(settings)),
         extensionProvider.overrideWith(() => SearchFixtureExtensions(filters)),
         exploreProvider.overrideWith(_Explore.new),
-        downloadHistoryProvider.overrideWith(_History.new),
+        downloadHistoryProvider.overrideWith(history ?? _History.new),
         downloadHistoryBatchExistsProvider.overrideWith(
-          (ref, request) async => <String>{},
+          (ref, request) async => <String>{
+            for (final track in request.tracks)
+              if (downloadedIds.contains(track.spotifyId)) track.lookupKey,
+          },
         ),
         downloadQueueLookupProvider.overrideWith(
           (ref) => DownloadQueueState().lookup,
@@ -196,6 +203,7 @@ Future<void> pumpSearchFixture(
         ),
         recentAccessProvider.overrideWith(_Recent.new),
         trackProvider.overrideWith(() => results ?? SearchFixtureResults()),
+        ...overrides,
       ],
       child: MaterialApp(
         theme: mornye
