@@ -185,6 +185,7 @@ class CastPlaybackDeck implements PlaybackDeck {
     bool allowFixedVolume = false,
     bool dapExclusive = false,
     int usbMaxSampleRate = 0,
+    bool usbDitherHighPass = false,
   }) => _load(path);
   @override
   Future<void> setNetworkSource(String url, {bool arriving = false}) =>

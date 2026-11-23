@@ -177,9 +177,16 @@ impl UsbResampler {
         channels: u8,
         subslot: u8,
         bits: u8,
+        high_pass_dither: bool,
     ) -> Result<Arc<Self>, UsbAudioError> {
-        let resampler =
-            resample::Resampler::new(source_rate, output_rate, channels, subslot, bits)?;
+        let resampler = resample::Resampler::new(
+            source_rate,
+            output_rate,
+            channels,
+            subslot,
+            bits,
+            high_pass_dither,
+        )?;
         Ok(Arc::new(Self {
             resampler: Mutex::new(resampler),
         }))

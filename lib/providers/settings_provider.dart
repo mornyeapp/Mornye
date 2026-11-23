@@ -791,6 +791,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setUsbMaxSampleRate(int rate) =>
       _commit(state.copyWith(usbMaxSampleRate: rate));
 
+  void setUsbDitherHighPass(bool enabled) =>
+      _commit(state.copyWith(usbDitherHighPass: enabled));
+
   void setDapExclusive(bool enabled) => _commit(
     state.copyWith(dapExclusive: enabled, usbDirect: enabled ? false : null),
   );

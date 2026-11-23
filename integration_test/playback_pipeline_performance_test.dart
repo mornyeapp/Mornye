@@ -192,6 +192,7 @@ class _MeasuredDeck implements PlaybackDeck {
     bool allowFixedVolume = false,
     bool dapExclusive = false,
     int usbMaxSampleRate = 0,
+    bool usbDitherHighPass = false,
   }) {
     source = path;
     return trace.call(

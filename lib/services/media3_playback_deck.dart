@@ -427,6 +427,7 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     bool allowFixedVolume = false,
     bool dapExclusive = false,
     int usbMaxSampleRate = 0,
+    bool usbDitherHighPass = false,
   }) async {
     // ExoPlayer has no DSD decoder; the USB output on audioplayers plays it.
     if (requiresDsd) {

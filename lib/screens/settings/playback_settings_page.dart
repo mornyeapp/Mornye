@@ -40,6 +40,7 @@ import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/discord_presence_settings.dart';
+import 'package:mornye/widgets/dither_type_choice.dart';
 import 'package:mornye/widgets/lastfm_settings.dart';
 import 'package:mornye/widgets/scrobble_settings.dart';
 import 'package:mornye/widgets/automix_settings.dart';
@@ -832,6 +833,18 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                         ].join('\n\n'),
                         onTap: () =>
                             _showUsbMaxSampleRate(settings.usbMaxSampleRate),
+                      ),
+                      DitherTypeChoice(
+                        title: context.l10n.usbDitherType,
+                        plainDescription:
+                            context.l10n.usbDitherPlainDescription,
+                        highPassDescription:
+                            context.l10n.usbDitherHighPassDescription,
+                        highPass: settings.usbDitherHighPass,
+                        showDivider: true,
+                        onChanged: ref
+                            .read(settingsProvider.notifier)
+                            .setUsbDitherHighPass,
                       ),
                       SettingsSwitchItem(
                         icon: Icons.volume_up_outlined,

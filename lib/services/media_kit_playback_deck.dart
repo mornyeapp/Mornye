@@ -845,6 +845,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     bool allowFixedVolume = false,
     bool dapExclusive = false,
     int usbMaxSampleRate = 0,
+    bool usbDitherHighPass = false,
   }) => _load(path, requiresDsd: requiresDsd);
 
   Future<void> _load(String source, {bool requiresDsd = false}) async {

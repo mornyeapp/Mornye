@@ -624,6 +624,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     bool allowFixedVolume = false,
     bool dapExclusive = false,
     int usbMaxSampleRate = 0,
+    bool usbDitherHighPass = false,
   }) async {
     await stop();
     final source = DeviceFileSource(path);
@@ -659,6 +660,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
               'dapExclusive': dapExclusive,
               'requiresDsd': requiresDsd,
               'maxSampleRate': usbMaxSampleRate,
+              'ditherHighPass': usbDitherHighPass,
             });
         if (_disposed || preparingToken != _token) return;
         if (response?['ready'] == true) {

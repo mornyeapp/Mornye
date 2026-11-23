@@ -334,7 +334,8 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 if (!isDsd) playedRates[rate] = outputRate.toInt()
                 if (!isDsd && outputRate.toInt() != rate) {
                     resampler = UsbResampler.create(rate.toUInt(), outputRate, channels.toUByte(),
-                        audio.format().subslot, audio.format().bits)
+                        audio.format().subslot, audio.format().bits,
+                        request.call.argument<Boolean>("ditherHighPass") ?: false)
                     android.util.Log.i("UsbDirect", "Converting $rate Hz to $outputRate Hz for the DAC")
                 }
                 // What the DAC read when it was opened, for the log: a level

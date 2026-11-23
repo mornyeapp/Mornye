@@ -250,6 +250,10 @@ class AppSettings {
   /// The highest sample rate the direct USB driver sets on the DAC, in Hz;
   /// a song above it is converted. 0 leaves the choice to the DAC.
   final int usbMaxSampleRate;
+
+  /// High-pass TPDF instead of plain TPDF when the direct USB driver
+  /// converts a song for a 16-bit output.
+  final bool usbDitherHighPass;
   final bool dapExclusive;
 
   /// Android beta, off by default: play the music player and AutoMix through
@@ -608,6 +612,7 @@ class AppSettings {
     this.usbDsdOverPcm = false,
     this.usbAllowFixedVolume = false,
     this.usbMaxSampleRate = 0,
+    this.usbDitherHighPass = false,
     this.dapExclusive = false,
     this.media3Engine = false,
     this.skipSilence = false,
@@ -819,6 +824,7 @@ class AppSettings {
     bool? usbDsdOverPcm,
     bool? usbAllowFixedVolume,
     int? usbMaxSampleRate,
+    bool? usbDitherHighPass,
     bool? dapExclusive,
     bool? media3Engine,
     bool? skipSilence,
@@ -1001,6 +1007,7 @@ class AppSettings {
       usbDsdOverPcm: usbDsdOverPcm ?? this.usbDsdOverPcm,
       usbAllowFixedVolume: usbAllowFixedVolume ?? this.usbAllowFixedVolume,
       usbMaxSampleRate: usbMaxSampleRate ?? this.usbMaxSampleRate,
+      usbDitherHighPass: usbDitherHighPass ?? this.usbDitherHighPass,
       dapExclusive: dapExclusive ?? this.dapExclusive,
       media3Engine: media3Engine ?? this.media3Engine,
       skipSilence: skipSilence ?? this.skipSilence,

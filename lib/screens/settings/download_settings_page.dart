@@ -9,11 +9,10 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/screens/settings/download_fallback_extensions_page.dart';
 import 'package:mornye/services/local_network_access.dart';
-import 'package:mornye/theme/app_tokens.dart';
-import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/widgets/dither_type_choice.dart';
 import 'package:mornye/widgets/download_service_picker.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -181,7 +180,12 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
                           .read(settingsProvider.notifier)
                           .setAutoConvertSmartDither(value),
                     ),
-                    _SmartDitherTypeChoice(
+                    DitherTypeChoice(
+                      title: context.l10n.trackConvertDitherSmartType,
+                      plainDescription:
+                          context.l10n.trackConvertDitherPlainDescription,
+                      highPassDescription:
+                          context.l10n.trackConvertDitherHighPassDescription,
                       highPass: settings.autoConvertSmartDitherHighPass,
                       enabled: settings.autoConvertSmartDither,
                       onChanged: (value) => ref

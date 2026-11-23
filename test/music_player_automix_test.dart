@@ -39,6 +39,7 @@ void main() {
       expect(defaults.usbDsdOverPcm, isFalse);
       expect(defaults.usbAllowFixedVolume, isFalse);
       expect(defaults.usbMaxSampleRate, 0);
+      expect(defaults.usbDitherHighPass, isFalse);
       expect(defaults.dapExclusive, isFalse);
       final upgraded = AppSettings.fromJson({
         'usbBitPerfect': true,
@@ -51,6 +52,7 @@ void main() {
         usbDsdOverPcm: true,
         usbAllowFixedVolume: true,
         usbMaxSampleRate: 48000,
+        usbDitherHighPass: true,
         autoMix: true,
         playbackNormalization: true,
       );
@@ -60,6 +62,7 @@ void main() {
       expect(restored.usbDsdOverPcm, isTrue);
       expect(restored.usbAllowFixedVolume, isTrue);
       expect(restored.usbMaxSampleRate, 48000);
+      expect(restored.usbDitherHighPass, isTrue);
       expect(
         AppSettings.fromJson(
           defaults.copyWith(dapExclusive: true).toJson(),

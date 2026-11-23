@@ -524,6 +524,12 @@
   "usbMaxSampleRate": "Highest sample rate",
   "usbMaxSampleRateDescription": "Songs above this rate are converted down to it. Set it when a DAC stays silent on high-resolution songs. Applies from the next track.",
   "usbMaxSampleRateAuto": "Automatic",
+  "usbDitherType": "Dither type",
+  "@usbDitherType": {
+    "description": "Label of the choice between plain TPDF and high-pass TPDF for songs the Direct USB driver converts for a 16-bit output"
+  },
+  "usbDitherPlainDescription": "Used when a song's sample rate is converted for a 16-bit output. Plain TPDF spreads the added noise evenly across all frequencies. Applies from the next track.",
+  "usbDitherHighPassDescription": "Used when a song's sample rate is converted for a 16-bit output. High-pass TPDF moves the added noise to high frequencies where it is harder to hear. Applies from the next track.",
   "usbDsdUnsupported":"This DSD format or connected DAC is not supported. Playback stopped.",
   "usbPermissionDenied": "USB permission was not granted. Using normal playback.",
   "usbPermissionDeclined": "USB access was declined. Turn the Direct USB driver off and on, or plug the DAC in again, to be asked again. Using normal playback.",

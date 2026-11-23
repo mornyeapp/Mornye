@@ -2003,6 +2003,7 @@ class MusicPlayerHandler extends BaseAudioHandler
           dapExclusive: _settings.dapExclusive,
           allowDop: _settings.usbDsdOverPcm,
           usbMaxSampleRate: _settings.usbMaxSampleRate,
+          usbDitherHighPass: _settings.usbDitherHighPass,
           requiresDsd: _requiresDsd(media),
         );
       }

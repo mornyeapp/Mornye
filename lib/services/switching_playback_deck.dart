@@ -19,6 +19,7 @@ class DeckSource {
     this.allowFixedVolume = false,
     this.dapExclusive = false,
     this.usbMaxSampleRate = 0,
+    this.usbDitherHighPass = false,
   }) : network = false,
        arriving = false;
 
@@ -30,7 +31,8 @@ class DeckSource {
       requiresDsd = false,
       allowFixedVolume = false,
       dapExclusive = false,
-      usbMaxSampleRate = 0;
+      usbMaxSampleRate = 0,
+      usbDitherHighPass = false;
 
   /// What a [QueuedPlaybackDeck] started: a URL or a path.
   factory DeckSource.queued(String source) =>
@@ -49,6 +51,7 @@ class DeckSource {
   final bool allowFixedVolume;
   final bool dapExclusive;
   final int usbMaxSampleRate;
+  final bool usbDitherHighPass;
 
   /// Whether only Android's native USB and AAudio outputs, which the
   /// audioplayers deck hosts, can play this source the way it was asked
@@ -67,6 +70,7 @@ class DeckSource {
           allowFixedVolume: allowFixedVolume,
           dapExclusive: dapExclusive,
           usbMaxSampleRate: usbMaxSampleRate,
+          usbDitherHighPass: usbDitherHighPass,
         );
 }
 
@@ -392,6 +396,7 @@ abstract class SwitchingPlaybackDeck
     bool allowFixedVolume = false,
     bool dapExclusive = false,
     int usbMaxSampleRate = 0,
+    bool usbDitherHighPass = false,
   }) => _load(
     DeckSource.file(
       path,
@@ -402,6 +407,7 @@ abstract class SwitchingPlaybackDeck
       allowFixedVolume: allowFixedVolume,
       dapExclusive: dapExclusive,
       usbMaxSampleRate: usbMaxSampleRate,
+      usbDitherHighPass: usbDitherHighPass,
     ),
   );
 

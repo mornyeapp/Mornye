@@ -72,6 +72,7 @@ class _Deck implements PlaybackDeck, QueuedPlaybackDeck {
     bool allowFixedVolume = false,
     bool dapExclusive = false,
     int usbMaxSampleRate = 0,
+    bool usbDitherHighPass = false,
   }) async {
     final flags = [
       if (preferBitPerfect) 'bit-perfect',

@@ -166,6 +166,7 @@ void main() {
       expect(prepareArguments['direct'], isTrue);
       expect(prepareArguments['allowDop'], isTrue);
       expect(prepareArguments['maxSampleRate'], 0);
+      expect(prepareArguments['ditherHighPass'], isFalse);
     });
 
     test('the highest sample rate reaches the direct driver', () async {
@@ -176,6 +177,16 @@ void main() {
         usbMaxSampleRate: 48000,
       );
       expect(prepareArguments['maxSampleRate'], 48000);
+    });
+
+    test('the dither type reaches the direct driver', () async {
+      await deck.setFileSource(
+        '/one.flac',
+        preferBitPerfect: true,
+        directUsb: true,
+        usbDitherHighPass: true,
+      );
+      expect(prepareArguments['ditherHighPass'], isTrue);
     });
 
     test('hardware volume changes the DAC, never PCM gain', () async {

@@ -23,6 +23,10 @@ pub struct Resampler {
     step: f64,
     full_scale: f64,
     dither: bool,
+    /// Dither whose noise sits in the high frequencies instead of all of them.
+    high_pass: bool,
+    /// The last uniform value of each channel, for the high-pass dither.
+    previous: [f64; 2],
     random: u32,
     /// Per phase, `taps` coefficients in input order, oldest frame first.
     coefficients: Vec<f64>,
@@ -40,6 +44,7 @@ impl Resampler {
         channels: u8,
         subslot: u8,
         bits: u8,
+        high_pass_dither: bool,
     ) -> Result<Self, String> {
         if source_rate == 0 || output_rate == 0 || source_rate == output_rate {
             return Err("Resampling needs two different sample rates".into());
@@ -63,6 +68,8 @@ impl Resampler {
             step: f64::from(1u32 << (subslot * 8 - bits)),
             full_scale: (1u64 << (subslot * 8 - 1)) as f64,
             dither: bits <= 16,
+            high_pass: high_pass_dither,
+            previous: [0.0; 2],
             random: 0x9e37_79b9,
             coefficients,
             history: vec![Vec::new(); channels as usize],
@@ -117,8 +124,8 @@ impl Resampler {
             for (sum, channel) in sums.iter_mut().zip(&self.history) {
                 *sum = dot(&channel[newest + 1 - self.taps..=newest], coefficients);
             }
-            for sum in sums.into_iter().take(self.channels) {
-                let sample = self.quantize(sum);
+            for (channel, sum) in sums.into_iter().take(self.channels).enumerate() {
+                let sample = self.quantize(sum, channel);
                 output.extend_from_slice(&sample.to_le_bytes()[..self.width]);
             }
             self.position += self.down;
@@ -134,12 +141,19 @@ impl Resampler {
         output
     }
 
-    fn quantize(&mut self, value: f64) -> i64 {
+    fn quantize(&mut self, value: f64, channel: usize) -> i64 {
         let mut steps = value / self.step;
         if self.dither {
             // Triangular dither of one step either way keeps the rounding
-            // error of a 16-bit output free of the signal.
-            steps += self.uniform() + self.uniform();
+            // error of a 16-bit output free of the signal. The high-pass
+            // kind takes the channel's last value from the new one, which
+            // leaves the same noise power but none of it near 0 Hz.
+            let fresh = self.uniform();
+            steps += if self.high_pass {
+                fresh - std::mem::replace(&mut self.previous[channel], fresh)
+            } else {
+                fresh + self.uniform()
+            };
         }
         (steps.round() * self.step).clamp(-self.full_scale, self.full_scale - self.step) as i64
     }
@@ -262,7 +276,7 @@ mod tests {
     }
 
     fn convert(source: u32, output: u32, frequency: f64) -> Vec<f64> {
-        let mut resampler = Resampler::new(source, output, 2, 4, 32).unwrap();
+        let mut resampler = Resampler::new(source, output, 2, 4, 32, false).unwrap();
         let mut bytes = resampler
             .process(&tone(source, frequency, source as usize))
             .unwrap();
@@ -346,10 +360,10 @@ mod tests {
     #[test]
     fn chunked_input_matches_one_call() {
         let input = tone(44_100, 440.0, 20_000);
-        let mut whole = Resampler::new(44_100, 48_000, 2, 4, 24).unwrap();
+        let mut whole = Resampler::new(44_100, 48_000, 2, 4, 24, false).unwrap();
         let mut expected = whole.process(&input).unwrap();
         expected.extend(whole.finish());
-        let mut chunked = Resampler::new(44_100, 48_000, 2, 4, 24).unwrap();
+        let mut chunked = Resampler::new(44_100, 48_000, 2, 4, 24, false).unwrap();
         let mut actual = Vec::new();
         for chunk in input.chunks(8 * 37) {
             actual.extend(chunked.process(chunk).unwrap());
@@ -364,7 +378,7 @@ mod tests {
     #[test]
     fn reset_starts_from_silence_again() {
         let input = tone(96_000, 1000.0, 5000);
-        let mut resampler = Resampler::new(96_000, 48_000, 2, 4, 24).unwrap();
+        let mut resampler = Resampler::new(96_000, 48_000, 2, 4, 24, false).unwrap();
         let first = resampler.process(&input).unwrap();
         resampler.reset();
         assert_eq!(resampler.process(&input).unwrap(), first);
@@ -373,7 +387,7 @@ mod tests {
     #[test]
     fn output_keeps_the_dac_precision_and_never_wraps() {
         // 24 valid bits in a 4-byte subslot: the low byte stays zero.
-        let mut resampler = Resampler::new(96_000, 48_000, 2, 4, 24).unwrap();
+        let mut resampler = Resampler::new(96_000, 48_000, 2, 4, 24, false).unwrap();
         let output = resampler.process(&tone(96_000, 997.0, 9600)).unwrap();
         assert!(
             output
@@ -394,7 +408,7 @@ mod tests {
             };
             square.extend_from_slice(&value.to_le_bytes());
         }
-        let mut mono = Resampler::new(96_000, 48_000, 1, 2, 16).unwrap();
+        let mut mono = Resampler::new(96_000, 48_000, 1, 2, 16, false).unwrap();
         let clipped = mono.process(&square).unwrap();
         let samples: Vec<i16> = clipped
             .as_chunks::<2>()
@@ -403,9 +417,105 @@ mod tests {
             .map(|sample| i16::from_le_bytes(*sample))
             .collect();
         assert!(samples.contains(&i16::MAX) && samples.contains(&i16::MIN));
-        assert_eq!(mono.quantize(1e9), i64::from(i16::MAX));
-        assert_eq!(mono.quantize(-1e9), i64::from(i16::MIN));
-        assert_eq!(resampler.quantize(1e12), i64::from(i32::MAX) - 255);
+        assert_eq!(mono.quantize(1e9, 0), i64::from(i16::MAX));
+        assert_eq!(mono.quantize(-1e9, 0), i64::from(i16::MIN));
+        assert_eq!(resampler.quantize(1e12, 0), i64::from(i32::MAX) - 255);
+    }
+
+    /// One second of 16-bit stereo silence converted, as steps of the
+    /// output: all that is left is the dither.
+    fn dither_of_silence(high_pass: bool) -> (Vec<f64>, Vec<f64>) {
+        let mut resampler = Resampler::new(96_000, 48_000, 2, 2, 16, high_pass).unwrap();
+        let output = resampler.process(&vec![0u8; 96_000 * 4]).unwrap();
+        let samples: Vec<f64> = output
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|sample| f64::from(i16::from_le_bytes(*sample)))
+            .collect();
+        (
+            samples.iter().step_by(2).copied().collect(),
+            samples.iter().skip(1).step_by(2).copied().collect(),
+        )
+    }
+
+    fn power(samples: &[f64]) -> f64 {
+        samples.iter().map(|sample| sample * sample).sum::<f64>() / samples.len() as f64
+    }
+
+    /// The power of the upper half of the band over that of the lower half.
+    fn tilt(samples: &[f64]) -> f64 {
+        let (mut high, mut low) = (0.0, 0.0);
+        for pair in samples.windows(2) {
+            high += (pair[1] - pair[0]).powi(2);
+            low += (pair[1] + pair[0]).powi(2);
+        }
+        high / low
+    }
+
+    #[test]
+    fn high_pass_dither_moves_the_noise_up_without_adding_any() {
+        let (plain, plain_right) = dither_of_silence(false);
+        let (high, high_right) = dither_of_silence(true);
+        for channel in [&plain, &plain_right, &high, &high_right] {
+            // Never more than one step, and no offset.
+            assert!(channel.iter().all(|sample| sample.abs() <= 1.0));
+            let mean = channel.iter().sum::<f64>() / channel.len() as f64;
+            assert!(mean.abs() < 0.01, "mean {mean}");
+            // A quarter of a step squared, whichever kind.
+            let power = power(channel);
+            assert!((power - 0.25).abs() < 0.01, "power {power}");
+        }
+        // Plain dither is level; the high-pass kind has twice the power in
+        // the upper half of the band.
+        assert!((tilt(&plain) - 1.0).abs() < 0.05, "{}", tilt(&plain));
+        assert!((tilt(&plain_right) - 1.0).abs() < 0.05);
+        assert!((tilt(&high) - 2.0).abs() < 0.1, "{}", tilt(&high));
+        assert!((tilt(&high_right) - 2.0).abs() < 0.1);
+        // Each channel has its own noise.
+        assert_ne!(high, high_right);
+    }
+
+    #[test]
+    fn either_dither_keeps_a_quiet_tone_whole() {
+        // A tone of 3 steps peak in 16 bits, which bare rounding would turn
+        // into a staircase.
+        let mut input = Vec::new();
+        for frame in 0..96_000 {
+            let value = 3.0 * 65_536.0 * (TAU * 1000.0 * f64::from(frame) / 96_000.0).sin();
+            input.extend_from_slice(&(value.round() as i32).to_le_bytes());
+        }
+        for high_pass in [false, true] {
+            let mut resampler = Resampler::new(96_000, 48_000, 1, 4, 16, high_pass).unwrap();
+            let output = resampler.process(&input).unwrap();
+            let steps: Vec<f64> = output
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|sample| f64::from(i32::from_le_bytes(*sample)) / 65_536.0)
+                .collect();
+            assert!(steps.iter().all(|step| step.fract() == 0.0));
+            let (amplitude, residual) = fit(steady(&steps), 48_000, 1000.0);
+            assert!(
+                (amplitude - 3.0).abs() < 0.05,
+                "high pass {high_pass}: amplitude {amplitude}"
+            );
+            // Beside the tone there is the dither's quarter of a step
+            // squared and no more: 0.25 over 4.5 is -12.6 dB.
+            assert!(
+                (residual + 12.55).abs() < 0.5,
+                "high pass {high_pass}: residual {residual} dB"
+            );
+        }
+    }
+
+    #[test]
+    fn more_than_16_bits_get_no_dither_of_either_kind() {
+        for high_pass in [false, true] {
+            let mut resampler = Resampler::new(96_000, 48_000, 2, 4, 24, high_pass).unwrap();
+            let output = resampler.process(&vec![0u8; 9600 * 8]).unwrap();
+            assert!(output.iter().all(|byte| *byte == 0));
+        }
     }
 
     #[test]
@@ -414,7 +524,7 @@ mod tests {
         for _ in 0..4000 {
             input.extend_from_slice(&(-4_000_000i32).to_le_bytes()[..3]);
         }
-        let mut resampler = Resampler::new(88_200, 44_100, 1, 3, 24).unwrap();
+        let mut resampler = Resampler::new(88_200, 44_100, 1, 3, 24, false).unwrap();
         let output = resampler.process(&input).unwrap();
         let last = &output[output.len() - 3..];
         let value = i32::from_le_bytes([last[0], last[1], last[2], 0]) << 8 >> 8;
@@ -423,11 +533,11 @@ mod tests {
 
     #[test]
     fn rejects_layouts_and_ratios_it_cannot_serve() {
-        assert!(Resampler::new(48_000, 48_000, 2, 4, 24).is_err());
-        assert!(Resampler::new(96_000, 48_000, 3, 4, 24).is_err());
-        assert!(Resampler::new(96_000, 48_000, 2, 3, 32).is_err());
-        assert!(Resampler::new(96_001, 48_000, 2, 4, 24).is_err());
-        let mut resampler = Resampler::new(96_000, 48_000, 2, 4, 24).unwrap();
+        assert!(Resampler::new(48_000, 48_000, 2, 4, 24, false).is_err());
+        assert!(Resampler::new(96_000, 48_000, 3, 4, 24, false).is_err());
+        assert!(Resampler::new(96_000, 48_000, 2, 3, 32, false).is_err());
+        assert!(Resampler::new(96_001, 48_000, 2, 4, 24, false).is_err());
+        let mut resampler = Resampler::new(96_000, 48_000, 2, 4, 24, false).unwrap();
         assert!(resampler.process(&[0; 7]).is_err());
     }
 }

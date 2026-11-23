@@ -153,6 +153,7 @@ class _Deck implements PlaybackDeck {
     bool allowFixedVolume = false,
     bool dapExclusive = false,
     int usbMaxSampleRate = 0,
+    bool usbDitherHighPass = false,
   }) async {
     sources.add(path);
     outputOptions = {
@@ -302,6 +303,7 @@ class _HandoffDeck extends _TickingDeck {
     bool allowFixedVolume = false,
     bool dapExclusive = false,
     int usbMaxSampleRate = 0,
+    bool usbDitherHighPass = false,
   }) async {
     await super.setFileSource(path);
     preparing.complete();
