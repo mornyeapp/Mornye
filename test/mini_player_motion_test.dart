@@ -35,7 +35,9 @@ Future<int> _framesInOneSecond(WidgetTester tester) async {
 final _wave = find.ancestor(
   of: find.byWidgetPredicate(
     (widget) =>
-        widget is CustomPaint && widget.painter is M3ELinearProgressPainter,
+        widget is CustomPaint &&
+        (widget.painter is M3ELinearProgressPainter ||
+            widget.painter is MiniPlayerPhasePainter),
   ),
   matching: find.byType(RepaintBoundary),
 );

@@ -361,7 +361,14 @@ void main() {
                 matching: find.byType(CustomPaint),
               ),
             )
-            .map((paint) => paint.painter)
+            .map(
+              (paint) => switch (paint.painter) {
+                final MiniPlayerPhasePainter wave => wave.painterAt(
+                  wave.phase.value,
+                ),
+                final painter => painter,
+              },
+            )
             .whereType<M3ELinearProgressPainter>()
             .single
             .value!;

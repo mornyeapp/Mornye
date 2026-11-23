@@ -624,6 +624,22 @@ class _MiniPlayerWave extends StatefulWidget {
   State<_MiniPlayerWave> createState() => _MiniPlayerWaveState();
 }
 
+/// Paints [painterAt] for each value of [phase] as a repaint only, so the
+/// wave's ticks rebuild no widget.
+class MiniPlayerPhasePainter extends CustomPainter {
+  MiniPlayerPhasePainter(this.phase, this.painterAt) : super(repaint: phase);
+
+  final DecorativePhase phase;
+  final CustomPainter Function(double phase) painterAt;
+
+  @override
+  void paint(Canvas canvas, Size size) =>
+      painterAt(phase.value).paint(canvas, size);
+
+  @override
+  bool shouldRepaint(MiniPlayerPhasePainter oldDelegate) => true;
+}
+
 class _MiniPlayerWaveState extends State<_MiniPlayerWave>
     with WidgetsBindingObserver {
   // The package's wave travels one wavelength per second.
@@ -697,10 +713,10 @@ class _MiniPlayerWaveState extends State<_MiniPlayerWave>
             linear.wavyContainerHeight,
           ),
           width: double.infinity,
-          child: ValueListenableBuilder<double>(
-            valueListenable: _phase,
-            builder: (context, phase, _) => CustomPaint(
-              painter: M3ELinearProgressPainter(
+          child: CustomPaint(
+            painter: MiniPlayerPhasePainter(
+              _phase,
+              (phase) => M3ELinearProgressPainter(
                 value: progress,
                 active: linear.activeColor(theme.colorScheme),
                 track: widget.trackColor,
