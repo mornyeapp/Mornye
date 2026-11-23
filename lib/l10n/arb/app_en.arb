@@ -7906,6 +7906,22 @@
   "@openInOtherServices": {
     "description": "Title and tooltip for finding the current collection in other services"
   },
+  "shareSongName": "Share name",
+  "@shareSongName": {
+    "description": "Share sheet option that shares a song's title and artist as text"
+  },
+  "shareSongLink": "Share link",
+  "@shareSongLink": {
+    "description": "Share sheet option, and the title of the list it opens, for sharing a song's link on a music service"
+  },
+  "shareSongLinkSubtitle": "Find this song on your services",
+  "@shareSongLinkSubtitle": {
+    "description": "Subtitle of the Share link option: the song is searched for on the installed services"
+  },
+  "shareSongLinkNoServices": "No installed extension can look up song links",
+  "@shareSongLinkNoServices": {
+    "description": "Empty state of the Share link list when no metadata extension is installed"
+  },
   "shareSheetNoExtensions": "No other compatible services",
   "@shareSheetNoExtensions": {
     "description": "Empty state when no extensions can be searched for cross-service links"

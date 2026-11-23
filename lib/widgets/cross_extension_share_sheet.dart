@@ -11,6 +11,7 @@ import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/services/cross_extension_share_service.dart';
 import 'package:mornye/services/share_intent_service.dart';
 import 'package:mornye/widgets/settings_group.dart';
+import 'package:share_plus/share_plus.dart';
 
 /// [results] with the services that found the item first, each group in
 /// the Metadata Priority order ([priority]), then by name.
@@ -33,11 +34,28 @@ List<CrossExtensionShareResult> sortCrossExtensionResults(
   });
 }
 
+/// Where the system share sheet points on tablets and desktop: [context]'s
+/// box, or the middle of the screen when it has none.
+Rect shareOriginOf(BuildContext context) {
+  final box = context.findRenderObject();
+  if (box is RenderBox && box.attached && box.hasSize) {
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+  return Rect.fromCenter(
+    center: MediaQuery.sizeOf(context).center(Offset.zero),
+    width: 1,
+    height: 1,
+  );
+}
+
 class CrossExtensionShareSheet extends ConsumerStatefulWidget {
   final String name;
   final String artists;
   final String type;
   final String sourceExtensionId;
+
+  /// A tap shares the link through the system instead of opening it here.
+  final bool share;
 
   const CrossExtensionShareSheet({
     super.key,
@@ -45,6 +63,7 @@ class CrossExtensionShareSheet extends ConsumerStatefulWidget {
     required this.artists,
     required this.type,
     required this.sourceExtensionId,
+    this.share = false,
   });
 
   static Future<void> show(
@@ -53,13 +72,16 @@ class CrossExtensionShareSheet extends ConsumerStatefulWidget {
     required String artists,
     required String type,
     required String sourceExtensionId,
+    bool share = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return showAppBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: colorScheme.surfaceContainerHigh,
-      title: context.l10n.openInOtherServices,
+      title: share
+          ? context.l10n.shareSongLink
+          : context.l10n.openInOtherServices,
       subtitle: artists.isNotEmpty ? '$name - $artists' : name,
       maxHeightFactor: 0.82,
       builder: (_) => CrossExtensionShareSheet(
@@ -67,6 +89,7 @@ class CrossExtensionShareSheet extends ConsumerStatefulWidget {
         artists: artists,
         type: type,
         sourceExtensionId: sourceExtensionId,
+        share: share,
       ),
     );
   }
@@ -131,7 +154,10 @@ class _CrossExtensionShareSheetState
             height: 180,
             child: Center(
               child: Text(
-                context.l10n.shareSheetNoExtensions,
+                widget.share
+                    ? context.l10n.shareSongLinkNoServices
+                    : context.l10n.shareSheetNoExtensions,
+                textAlign: TextAlign.center,
                 style: textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -151,6 +177,7 @@ class _CrossExtensionShareSheetState
               child: _CrossExtensionShareTile(
                 result: result,
                 iconPath: _iconPathFor(result.extensionId),
+                share: widget.share,
               ),
             );
           },
@@ -165,7 +192,13 @@ class _CrossExtensionShareTile extends StatelessWidget {
   final CrossExtensionShareResult result;
   final String? iconPath;
 
-  const _CrossExtensionShareTile({required this.result, this.iconPath});
+  final bool share;
+
+  const _CrossExtensionShareTile({
+    required this.result,
+    this.iconPath,
+    this.share = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +254,14 @@ class _CrossExtensionShareTile extends StatelessWidget {
           : null,
       onTap: hasUrl
           ? () {
+              if (share) {
+                final origin = shareOriginOf(context);
+                Navigator.pop(context);
+                SharePlus.instance.share(
+                  ShareParams(text: url, sharePositionOrigin: origin),
+                );
+                return;
+              }
               Navigator.pop(context);
               ShareIntentService().injectUrl(url);
             }

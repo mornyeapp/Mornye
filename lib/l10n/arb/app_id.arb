@@ -7350,6 +7350,22 @@
   "@openInOtherServices": {
     "description": "Title and tooltip for finding the current collection in other services"
   },
+  "shareSongName": "Bagikan nama",
+  "@shareSongName": {
+    "description": "Share sheet option that shares a song's title and artist as text"
+  },
+  "shareSongLink": "Bagikan tautan",
+  "@shareSongLink": {
+    "description": "Share sheet option, and the title of the list it opens, for sharing a song's link on a music service"
+  },
+  "shareSongLinkSubtitle": "Cari lagu ini di layanan kamu",
+  "@shareSongLinkSubtitle": {
+    "description": "Subtitle of the Share link option: the song is searched for on the installed services"
+  },
+  "shareSongLinkNoServices": "Belum ada extension terpasang yang bisa mencari tautan lagu",
+  "@shareSongLinkNoServices": {
+    "description": "Empty state of the Share link list when no metadata extension is installed"
+  },
   "shareSheetNoExtensions": "Tidak ada layanan yang kompatibel",
   "@shareSheetNoExtensions": {
     "description": "Empty state when no extensions can be searched for cross-service links"

@@ -20,7 +20,7 @@ import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:mornye/widgets/song_share_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
@@ -356,23 +356,9 @@ class _TrackOptionsSheet extends ConsumerWidget {
             icon: CupertinoIcons.share_solid,
             label: l10n.trackMetadataShare,
             onPressed: () {
-              final origin =
-                  mornyeMenuAnchor(context) ??
-                  Rect.fromCenter(
-                    center: MediaQuery.sizeOf(context).center(Offset.zero),
-                    width: 1,
-                    height: 1,
-                  );
+              final root = Navigator.of(context, rootNavigator: true).context;
               Navigator.pop(context);
-              SharePlus.instance.share(
-                ShareParams(
-                  text: [
-                    '${track.name} - ${track.artistName}',
-                    ?link?.webUrl,
-                  ].join('\n'),
-                  sharePositionOrigin: origin,
-                ),
-              );
+              showSongShare(root, title: track.name, artist: track.artistName);
             },
           ),
         ],

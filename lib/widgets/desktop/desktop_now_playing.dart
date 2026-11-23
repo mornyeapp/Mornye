@@ -41,7 +41,7 @@ import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_track_crossfade.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:mornye/widgets/song_share_sheet.dart';
 
 /// Now Playing covers the desktop window: cover, title and transport on the
 /// leading side, lyrics or Up Next ([desktopInspectorPanel]) on the trailing
@@ -733,14 +733,10 @@ class _PlayerMoreButton extends ConsumerWidget {
       case 'artist':
         await openPlayingArtist(context, ref, mediaItem);
       case 'share':
-        final artist = mediaItem.artist ?? '';
-        await SharePlus.instance.share(
-          ShareParams(
-            text: artist.isEmpty
-                ? mediaItem.title
-                : '${mediaItem.title}, $artist',
-            sharePositionOrigin: anchor,
-          ),
+        await showSongShare(
+          context,
+          title: mediaItem.title,
+          artist: mediaItem.artist ?? '',
         );
     }
   }

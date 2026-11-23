@@ -5,7 +5,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/player_track_navigation.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
@@ -56,6 +55,7 @@ import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/settings_group.dart';
+import 'package:mornye/widgets/song_share_sheet.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
 import 'package:mornye/widgets/mornye_artwork_contrast.dart';
 import 'package:mornye/widgets/mornye_player_actions_sheet.dart';
@@ -1497,6 +1497,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     onTap: () => Navigator.of(sheetContext).pop('details'),
                   ),
                   SettingsItem(
+                    icon: Icons.share_outlined,
+                    title: sheetContext.l10n.trackMetadataShare,
+                    onTap: () => Navigator.of(sheetContext).pop('share'),
+                  ),
+                  SettingsItem(
                     icon: Icons.format_quote_outlined,
                     title: sheetContext.l10n.lyricsShareTitle,
                     onTap: () => Navigator.of(sheetContext).pop('shareLyrics'),
@@ -1575,17 +1580,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         await _goToCurrentArtist(mediaItem);
         break;
       case 'share':
-        await SharePlus.instance.share(
-          ShareParams(
-            text: '${mediaItem.title} — ${mediaItem.artist ?? ''}',
-            sharePositionOrigin:
-                anchor ??
-                Rect.fromCenter(
-                  center: MediaQuery.sizeOf(context).center(Offset.zero),
-                  width: 1,
-                  height: 1,
-                ),
-          ),
+        await showSongShare(
+          context,
+          title: mediaItem.title,
+          artist: mediaItem.artist ?? '',
         );
         break;
       case 'album':
