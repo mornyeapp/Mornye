@@ -171,6 +171,37 @@ void main() {
     });
   }
 
+  testWidgets('Mornye prepares the full player\'s cover before opening', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(720, 1600);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    final cover = await _writeCover(tester, Colors.teal);
+    final item = MediaItem(
+      id: 'track',
+      title: 'Track',
+      artUri: Uri.file(cover.path),
+    );
+    final key = await coverImageProvider(
+      item.artUri.toString(),
+      cacheWidth: 720,
+    )!.obtainKey(ImageConfiguration.empty);
+    final cache = PaintingBinding.instance.imageCache;
+    await tester.pumpWidget(_player(Stream.value(item)));
+    for (var i = 0; i < 100 && !cache.statusForKey(key).keepAlive; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 5)),
+      );
+      await tester.pump();
+    }
+    expect(cache.statusForKey(key).keepAlive, isTrue);
+    // The cover colour resolves as well; let it finish.
+    expect(await _settledColor(tester, cover), isNotNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('Mornye mini player resolves the cover colour on track change', (
     tester,
   ) async {

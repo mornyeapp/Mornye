@@ -82,11 +82,13 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
   }
 
   void _warmFullScreenArtwork(Uri? artUri) {
-    if (context.isMornye ||
-        isDesktopPlatform ||
+    // Both Mornye cover styles open at this width, Material only its
+    // full-screen one.
+    if (isDesktopPlatform ||
         artUri == null ||
-        ref.read(settingsProvider).playerCoverStyleFor(mornye: false) !=
-            'fullscreen' ||
+        (!context.isMornye &&
+            ref.read(settingsProvider).playerCoverStyleFor(mornye: false) !=
+                'fullscreen') ||
         MediaQuery.orientationOf(context) != Orientation.portrait) {
       _warmedTransition = null;
       return;
