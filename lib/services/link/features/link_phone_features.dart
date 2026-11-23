@@ -18,6 +18,7 @@ import 'package:mornye/services/link/features/link_auto_keep.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_library_lookup.dart';
 import 'package:mornye/services/link/features/link_library_jobs_client.dart';
+import 'package:mornye/services/link/features/link_metadata_update.dart';
 import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/services/link/features/link_phone_files.dart';
 import 'package:mornye/services/link/features/link_phone_library.dart';
@@ -37,6 +38,7 @@ import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/share_intent_service.dart';
 import 'package:mornye/services/system_volume_service.dart';
+import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/file_access.dart';
 
 export 'package:mornye/services/link/features/link_phone_client.dart';
@@ -139,6 +141,43 @@ final linkOfflineSaverProvider = Provider<LinkOfflineSaver?>((ref) {
     },
     temporaryDirectory: getTemporaryDirectory,
     exists: linkHistoryFileExists,
+  );
+});
+
+/// Brings the connected host's tags to the copies saved from it, or null
+/// when no host is connected.
+final linkMetadataUpdaterProvider = Provider<LinkMetadataUpdater?>((ref) {
+  final client = ref.watch(linkPhoneClientProvider);
+  if (client == null) return null;
+  final server = client.server;
+  final history = ref.watch(downloadHistoryProvider.notifier);
+  return LinkMetadataUpdater(
+    name: linkDesktopName(client),
+    collector: LinkMetadataCollector(
+      server: server,
+      copies: () async => [
+        for (final row in await HistoryDatabase.instance.getAll())
+          DownloadHistoryItem.fromJson(row),
+      ],
+      computerSongs: () => linkComputerCatalog(server),
+    ),
+    applier: LinkMetadataApplier(
+      artistTagMode: () => artistTagModeForExistingTags(
+        ref.read(settingsProvider).artistTagMode,
+      ),
+      record: (item) => history.updateMetadataForItem(
+        id: item.id,
+        trackName: item.trackName,
+        artistName: item.artistName,
+        albumName: item.albumName,
+        albumArtist: item.albumArtist,
+        isrc: item.isrc,
+        trackNumber: item.trackNumber,
+        discNumber: item.discNumber,
+        releaseDate: item.releaseDate,
+        genre: item.genre,
+      ),
+    ),
   );
 });
 

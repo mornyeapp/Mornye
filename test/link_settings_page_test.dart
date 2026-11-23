@@ -13,11 +13,14 @@ import 'package:mornye/services/link/client/link_client_controller.dart';
 import 'package:mornye/services/link/client/link_client_pairing.dart';
 import 'package:mornye/services/link/client/link_client_store.dart';
 import 'package:mornye/services/link/desktop/link_desktop_backend.dart';
+import 'package:mornye/services/link/features/link_metadata_update.dart';
+import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_transfers.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
+import 'package:mornye/widgets/link/link_metadata_update_page.dart';
 import 'package:mornye/widgets/link/link_transfer_tile.dart';
 import 'package:mornye/widgets/link/link_transfers_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -670,6 +673,80 @@ void main() {
           expect(find.byType(LinkTransfersPage), findsOneWidget);
           expect(find.text('Song 0 to Studio'), findsNWidgets(2));
 
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump();
+        },
+      );
+
+      testWidgets(
+        '${mornye ? 'Mornye' : 'Material'}: Update metadata shows while the host is connected',
+        (tester) async {
+          const server = LinkServerRecord(
+            serverId: 'a',
+            name: 'Desktop a',
+            connectionId: 'connection-a',
+            address: 'https://10.0.0.2:47710',
+            fingerprint: 'ab',
+          );
+          tester.view.physicalSize = const Size(800, 2400);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final harness = LinkClientHarness();
+          final updater = LinkMetadataUpdater(
+            name: 'Desktop a',
+            collector: LinkMetadataCollector(
+              server: server,
+              copies: () async => const [],
+              computerSongs: () => const Stream.empty(),
+            ),
+            applier: LinkMetadataApplier(
+              artistTagMode: () => 'joined',
+              record: (_) async {},
+            ),
+          );
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                ...harness.overrides,
+                linkMetadataUpdaterProvider.overrideWithValue(updater),
+              ],
+              child: _app(const LinkSettingsPage(), mornye: mornye),
+            ),
+          );
+          await _settle(tester);
+          await ProviderScope.containerOf(
+                tester.element(find.byType(LinkSettingsPage)),
+              )
+              .read(linkClientControllerProvider.notifier)
+              .pair(linkTestTarget('a'), '123456');
+          await _settle(tester);
+          final row = find.byKey(const ValueKey('link-metadata-update-row'));
+          expect(find.text('Desktop a'), findsOneWidget);
+          expect(row, findsNothing);
+
+          harness.sessions.single.emit(LinkConnectionState.connected);
+          await _settle(tester);
+          expect(row, findsOneWidget);
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.text(
+                _l10n.linkMetadataUpdateSubtitle('Desktop a'),
+              ),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(row);
+          await _settle(tester);
+          expect(find.byType(LinkMetadataUpdatePage), findsOneWidget);
+          expect(find.text(_l10n.linkMetadataUpdateNoneTitle), findsOneWidget);
+          // The page under it has a back button too.
+          tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+          await _settle(tester);
+
+          harness.sessions.single.emit(LinkConnectionState.disconnected);
+          await _settle(tester);
+          expect(row, findsNothing);
           await tester.pumpWidget(const SizedBox());
           await tester.pump();
         },

@@ -75,6 +75,13 @@ class LinkOfflineSong {
   final String? fileName;
 }
 
+/// The history id [LinkOfflineSaver] gives the song [songId] of [serverId].
+String linkOfflineHistoryId(
+  String serverId,
+  String songId, {
+  String prefix = 'link',
+}) => '${prefix}_${sha256.convert(utf8.encode('$serverId/$songId'))}';
+
 /// The songs of [items] that stream from [server]'s Subsonic connection.
 List<LinkOfflineSong> linkOfflineSongs(
   Iterable<LocalLibraryItem> items,
@@ -262,7 +269,7 @@ class LinkOfflineSaver {
   /// The history id of [songId] (contract section 13.2): the same song
   /// saved again replaces its record.
   String historyId(String songId) =>
-      '${idPrefix}_${sha256.convert(utf8.encode('$serverId/$songId'))}';
+      linkOfflineHistoryId(serverId, songId, prefix: idPrefix);
 
   /// Whether this device already has [song], the check [save] skips by.
   Future<bool> has(LinkOfflineSong song) => _has(song);

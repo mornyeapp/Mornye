@@ -10,6 +10,7 @@ import 'package:mornye/services/link/client/link_client_discovery.dart';
 import 'package:mornye/services/link/client/link_client_pairing.dart';
 import 'package:mornye/services/link/client/link_client_session.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
+import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/sync/link_sound_sync_runner.dart';
@@ -21,6 +22,7 @@ import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
+import 'package:mornye/widgets/link/link_metadata_update_page.dart';
 import 'package:mornye/widgets/link/link_row_action.dart';
 import 'package:mornye/widgets/link/link_transfers_view.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -325,6 +327,10 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
         if (server.serverId != ownServerId) server,
     ];
     final searching = state.discovery == LinkDiscoveryStatus.searching;
+    // Comparing reads the host's songs, so only while it is connected.
+    final metadataUpdate =
+        state.connection == LinkConnectionState.connected &&
+        ref.watch(linkPhoneClientProvider.select((client) => client != null));
     final theme = Theme.of(context);
     final note = theme.textTheme.bodyMedium?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
@@ -351,6 +357,7 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
                 connected: true,
                 children: [
                   for (final record in state.servers) _pairedRow(state, record),
+                  if (metadataUpdate) const LinkMetadataUpdateSettingsItem(),
                   const LinkTransfersSettingsItem(),
                 ],
               ),
