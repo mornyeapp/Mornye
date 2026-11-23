@@ -1,10 +1,16 @@
+import 'dart:math';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/providers/library_mixes_provider.dart';
+import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/library_mixes.dart';
 import 'package:mornye/services/library_queue_store.dart';
 import 'package:mornye/services/library_schema.dart';
 import 'package:mornye/services/library_shadow_sql.dart';
+import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/services/sqlite_helpers.dart' show normalizeLookupText;
 
 import 'support/sqlite_process_database.dart';
 
@@ -61,6 +67,111 @@ List<PlayableMedia> _wideLibrary() {
 Map<String, Object?> _json(List<LibraryMix> mixes) => {
   for (final mix in mixes) '${mix.kind.name}:${mix.key}': mix.toJson(),
 };
+
+ListeningTotal _heard(String source, String artist, String title, int plays) =>
+    ListeningTotal(
+      ListeningTrack(
+        key: source,
+        title: title,
+        artist: artist,
+        album: '',
+        artwork: 'https://example.com/cover.jpg',
+      ),
+      plays * 180000,
+      plays,
+    );
+
+/// Plays by song id as the provider counted them before the mix worker did.
+Map<String, double> _playsInline(
+  List<PlayableMedia> songs,
+  List<ListeningSummary> summaries,
+) {
+  String songKey(String artist, String title) =>
+      '${normalizeLookupText(artist)}|${normalizeLookupText(title)}';
+  final bySource = <String, double>{}, bySong = <String, double>{};
+  for (final summary in summaries) {
+    for (final total in summary.tracks) {
+      if (total.plays <= 0) continue;
+      final track = total.track;
+      bySource[track.key] = (bySource[track.key] ?? 0) + total.plays;
+      final key = songKey(track.artist, track.title);
+      bySong[key] = (bySong[key] ?? 0) + total.plays;
+    }
+  }
+  return {
+    for (final song in songs)
+      song.id:
+          ?(bySource[song.source] ?? bySong[songKey(song.artist, song.title)]),
+  };
+}
+
+/// The mixes as the provider made them before the mix worker read the
+/// plays and the taste model itself.
+List<LibraryMix> _mixesInline({
+  required List<PlayableMedia> songs,
+  required DateTime at,
+  required List<ListeningSummary> recent,
+  required ListeningSummary past,
+  LibraryMixHints hints = const LibraryMixHints(),
+  AutoplayTasteModel? taste,
+}) {
+  final plays = _playsInline(songs, recent);
+  final pastPlays = _playsInline(songs, [past]);
+  if (plays.length < libraryMixFavoritesMinPlayed) {
+    final hinted = libraryMixHintPlays(songs, hints, at);
+    for (final MapEntry(:key, :value) in hinted.entries) {
+      plays[key] = (plays[key] ?? 0) + value;
+    }
+  }
+  final favorites = songs.where((song) => (plays[song.id] ?? 0) > 0).toList()
+    ..sort((a, b) => plays[b.id]!.compareTo(plays[a.id]!));
+  final session = favorites.take(16).toList();
+  final signal = taste != null && session.isNotEmpty
+      ? autoplayTasteSignal(taste, session, songs)
+      : null;
+  return buildLibraryMixes(
+    LibraryMixRequest(
+      songs: songs,
+      at: at,
+      plays: plays,
+      pastPlays: pastPlays,
+      signals: [?signal],
+      exists: (_) => true,
+    ),
+  );
+}
+
+/// A taste model that knows the first [count] songs, the artists of every
+/// third of them and one artist credited only beside others.
+AutoplayTasteModel _tasteModel(List<PlayableMedia> songs, int count) {
+  String key(String value) => normalizeLookupText(value);
+  final tokens = <String>{
+    for (final song in songs.take(count))
+      'song:${key(song.artist)}|${key(song.title)}',
+    for (final song in songs.take(count).indexed)
+      if (song.$1 % 3 == 0) 'artist:${key(song.$2.artist)}',
+    'artist:guest star',
+  }.toList();
+  final random = Random(11);
+  final vectors = Float32List(tokens.length * AutoplayTasteModel.dimensions);
+  for (var row = 0; row < tokens.length; row++) {
+    var norm = 0.0;
+    for (var k = 0; k < AutoplayTasteModel.dimensions; k++) {
+      final value = random.nextDouble() - 0.5;
+      vectors[row * AutoplayTasteModel.dimensions + k] = value;
+      norm += value * value;
+    }
+    for (var k = 0; k < AutoplayTasteModel.dimensions; k++) {
+      vectors[row * AutoplayTasteModel.dimensions + k] /= sqrt(norm);
+    }
+  }
+  return AutoplayTasteModel(
+    tokens: tokens,
+    vectors: vectors,
+    positives: 500,
+    through: 500,
+  );
+}
 
 void main() {
   group('genre families', () {
@@ -984,6 +1095,149 @@ void main() {
 
     test('are built again when none came out, even at the same total', () {
       expect(stale(cachedEmpty: true), isTrue);
+    });
+  });
+
+  group('mix worker', () {
+    final day = DateTime(2026, 10, 27, 9);
+    final songs = [
+      ..._wideLibrary(),
+      for (var s = 0; s < 4; s++) ...[
+        _song('duet$s', 'Rapper 1 & Guest Star', 'Hip-Hop'),
+        _song('feature$s', 'Newcomer feat. Guest Star', 'Hip-Hop'),
+      ],
+    ];
+    final season = ListeningSummary(
+      tracks: [
+        for (var i = 0; i < 40; i++)
+          _heard(songs[i].source, songs[i].artist, songs[i].title, 1 + i % 4),
+        // Another copy of a Library song, spelled differently.
+        _heard('/phone/copy.flac', ' RAPPER 9 ', 'song HH9-2', 3),
+        _heard(songs[45].source, songs[45].artist, songs[45].title, 0),
+        _heard('/gone/song.flac', 'Nobody', 'Gone', 7),
+      ],
+    );
+    final recent = ListeningSummary(
+      tracks: [
+        for (var i = 0; i < 10; i++)
+          _heard(songs[i].source, songs[i].artist, songs[i].title, 2),
+      ],
+    );
+    final past = ListeningSummary(
+      tracks: [
+        for (var i = 50; i < 80; i++)
+          _heard(songs[i].source, songs[i].artist, songs[i].title, 1),
+        // Matched by its file before its title and artist.
+        _heard(songs[3].source, 'Other', 'Other', 5),
+      ],
+    );
+    final hints = LibraryMixHints(
+      loved: [
+        for (var s = 0; s < 4; s++) (artist: 'band 2', title: 'SONG ROCK2-$s'),
+      ],
+      liked: [(song: 'rapper 4|song hh4-0', reward: 0.8, at: day)],
+      queued: const ['/music/hh3-0.flac', '/music/hh3-1.flac'],
+    );
+
+    LibraryMixInputs inputs({
+      required List<ListeningSummary> recent,
+      required ListeningSummary past,
+      LibraryMixHints? hints,
+      AutoplayTasteModel? taste,
+    }) => LibraryMixInputs(
+      songs: songs,
+      at: day,
+      recent: [for (final summary in recent) summary.tracks],
+      past: past.tracks,
+      hints: hints,
+      taste: taste,
+      exists: (_) => true,
+    );
+
+    test('counts plays as the provider did', () {
+      for (final periods in [
+        [season, recent],
+        [past],
+        [const ListeningSummary()],
+      ]) {
+        expect(
+          libraryMixPlays(songs, [for (final p in periods) p.tracks]),
+          _playsInline(songs, periods),
+        );
+      }
+      final plays = libraryMixPlays(songs, [season.tracks, recent.tracks]);
+      expect(plays[songs[0].id], 3);
+      expect(plays['local_hh9-2'], 3);
+      expect(plays, isNot(contains(songs[45].id)));
+      expect(libraryMixPlays(songs, [past.tracks])[songs[3].id], 5);
+    });
+
+    test('makes the mixes the provider made, with and without taste', () {
+      final model = _tasteModel(songs, 60);
+      // Every song heard lately is known, so the taste signal applies.
+      expect(
+        autoplayTasteSignal(model, songs.take(16).toList(), songs),
+        isNotNull,
+      );
+      final made = <Map<String, Object?>>[];
+      for (final taste in [model, null]) {
+        final mixes = buildLibraryMixesFrom(
+          inputs(recent: [season, recent], past: past, taste: taste),
+        );
+        expect(mixes, isNotNull);
+        expect(mixes, isNotEmpty);
+        made.add(_json(mixes!));
+        expect(
+          made.last,
+          _json(
+            _mixesInline(
+              songs: songs,
+              at: day,
+              recent: [season, recent],
+              past: past,
+              taste: taste,
+            ),
+          ),
+        );
+      }
+      // The taste model reached the ranking.
+      expect(made.first, isNot(made.last));
+    });
+
+    test('asks for the hints only while plays are too few', () {
+      final few = ListeningSummary(
+        tracks: [
+          for (var i = 0; i < 3; i++)
+            _heard(songs[i].source, songs[i].artist, songs[i].title, 2),
+        ],
+      );
+      final model = _tasteModel(songs, 60);
+      expect(
+        buildLibraryMixesFrom(inputs(recent: [few], past: past, taste: model)),
+        isNull,
+      );
+      for (final (summary, hinted) in [
+        (few, hints),
+        (const ListeningSummary(), hints),
+        (const ListeningSummary(), const LibraryMixHints()),
+      ]) {
+        final mixes = buildLibraryMixesFrom(
+          inputs(recent: [summary], past: past, hints: hinted, taste: model),
+        );
+        expect(
+          _json(mixes!),
+          _json(
+            _mixesInline(
+              songs: songs,
+              at: day,
+              recent: [summary],
+              past: past,
+              hints: hinted,
+              taste: model,
+            ),
+          ),
+        );
+      }
     });
   });
 }

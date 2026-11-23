@@ -770,6 +770,50 @@ class AutoplayTasteSignal extends AutoplaySignal {
       _scores[candidate.source] ?? _average;
 }
 
+/// What [model] knows about [session] (in playback order, newest last) and
+/// [candidates], or null when it knows none of the session's songs. Pure, so
+/// it can run on a worker isolate.
+AutoplayTasteSignal? autoplayTasteSignal(
+  AutoplayTasteModel model,
+  List<PlayableMedia> session,
+  List<PlayableMedia> candidates,
+) {
+  final vectors = <String, Float32List>{};
+  final credited = <String>{};
+  void add(PlayableMedia media, {bool credits = false}) {
+    final artist = _key(media.artist);
+    var known = false;
+    for (final token in [
+      _songToken('$artist|${_key(media.title)}'),
+      if (artist.isNotEmpty) _artistToken(artist),
+    ]) {
+      if (model._vector(token) case final vector?) {
+        vectors[token] = vector;
+        known = true;
+      }
+    }
+    // What an unknown candidate may inherit from its credited artists.
+    if (known || !credits || !credited.add(media.artist)) return;
+    for (final credit in _credits(media.artist)) {
+      final token = _artistToken(credit);
+      if (vectors.containsKey(token)) continue;
+      if (model._vector(token) case final vector?) vectors[token] = vector;
+    }
+  }
+
+  // A few more than the window, as ranking merges repeats.
+  for (final media in session.skip(
+    max(0, session.length - _sessionWindow - 4),
+  )) {
+    add(media);
+  }
+  if (vectors.isEmpty) return null;
+  for (final media in candidates) {
+    add(media, credits: true);
+  }
+  return AutoplayTasteSignal(vectors);
+}
+
 /// Days after which a play counts half toward the listener's lasting taste.
 const _profileHalfLife = 30;
 
@@ -1057,50 +1101,38 @@ class AutoplayTaste {
     }
   }
 
+  /// The model when it knows enough to rank, else null.
+  Future<AutoplayTasteModel?> _ready() async {
+    if (_disposed) return null;
+    await _ensureLoaded();
+    final model = _model;
+    if (model == null || model.positives < _coldStart) return null;
+    return model;
+  }
+
   /// What the model knows about [session] (in playback order, newest last)
   /// and [candidates], or null before it knows enough.
   Future<AutoplayTasteSignal?> signal(
     List<PlayableMedia> session,
     List<PlayableMedia> candidates,
   ) async {
-    if (_disposed) return null;
-    await _ensureLoaded();
-    final model = _model;
-    if (model == null || model.positives < _coldStart) return null;
-    final vectors = <String, Float32List>{};
-    final credited = <String>{};
-    void add(PlayableMedia media, {bool credits = false}) {
-      final artist = _key(media.artist);
-      var known = false;
-      for (final token in [
-        _songToken('$artist|${_key(media.title)}'),
-        if (artist.isNotEmpty) _artistToken(artist),
-      ]) {
-        if (model._vector(token) case final vector?) {
-          vectors[token] = vector;
-          known = true;
-        }
-      }
-      // What an unknown candidate may inherit from its credited artists.
-      if (known || !credits || !credited.add(media.artist)) return;
-      for (final credit in _credits(media.artist)) {
-        final token = _artistToken(credit);
-        if (vectors.containsKey(token)) continue;
-        if (model._vector(token) case final vector?) vectors[token] = vector;
-      }
-    }
+    final model = await _ready();
+    return model == null
+        ? null
+        : autoplayTasteSignal(model, session, candidates);
+  }
 
-    // A few more than the window, as ranking merges repeats.
-    for (final media in session.skip(
-      max(0, session.length - _sessionWindow - 4),
-    )) {
-      add(media);
-    }
-    if (vectors.isEmpty) return null;
-    for (final media in candidates) {
-      add(media, credits: true);
-    }
-    return AutoplayTasteSignal(vectors);
+  /// The model [autoplayTasteSignal] reads, for a worker isolate, or null
+  /// before it knows enough. Its token index stays behind, so it copies less.
+  Future<AutoplayTasteModel?> signalModel() async {
+    final model = await _ready();
+    if (model == null) return null;
+    return AutoplayTasteModel(
+      tokens: model.tokens,
+      vectors: model.vectors,
+      positives: model.positives,
+      through: model.through,
+    );
   }
 
   /// The listener's lasting taste, or null before the model knows enough.

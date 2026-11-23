@@ -15,7 +15,10 @@ import 'package:mornye/providers/recent_access_provider.dart'
     show RecentAccessItem, RecentAccessType;
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/app_state_database.dart';
+import 'package:mornye/services/autoplay_personalization.dart'
+    show AutoplayPreferenceModel;
 import 'package:mornye/services/autoplay_signal.dart';
+import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
@@ -330,42 +333,43 @@ class _LibraryMixes {
     MusicPlayerRuntime runtime,
   ) async {
     final (:songs, :years, :added) = await _songs(includeLocal);
-    final (plays, pastPlays) = await _plays(songs, now);
-    if (plays.length < libraryMixFavoritesMinPlayed) {
-      // Statistics are off or new: what else the app keeps of the
-      // listener's taste stands in, so favorites still have a mix.
-      final hinted = libraryMixHintPlays(songs, await _hints(runtime), now);
-      for (final MapEntry(:key, :value) in hinted.entries) {
-        plays[key] = (plays[key] ?? 0) + value;
-      }
-    }
-    // The most played songs stand for the listener's session, as the
-    // songs before a refill do for Autoplay.
-    final favorites = songs.where((song) => (plays[song.id] ?? 0) > 0).toList()
-      ..sort((a, b) => plays[b.id]!.compareTo(plays[a.id]!));
-    final session = favorites.take(16).toList();
+    final (recent, past) = await _listening(now);
     final learning = runtime.personalization.enabled;
+    // The session songs are Library songs too, so the sound signal reads
+    // the same files without them.
     final (sound, taste) = await (
-      runtime.songAnalysis.loadSignal(session: session, candidates: songs),
-      learning && session.isNotEmpty
-          ? runtime.taste.signal(session, songs)
-          : Future<AutoplaySignal?>.value(),
+      runtime.songAnalysis.loadSignal(session: const [], candidates: songs),
+      learning
+          ? runtime.taste.signalModel()
+          : Future<AutoplayTasteModel?>.value(),
     ).wait;
-    return compute(
-      buildLibraryMixes,
-      LibraryMixRequest(
-        songs: songs,
-        at: now,
-        plays: plays,
-        pastPlays: pastPlays,
-        years: years,
-        added: added,
-        signals: [?sound, ?taste],
-        preference: runtime.personalization.rankingSnapshot,
-        weights: learning ? runtime.ranker.weights : const {},
-      ),
+    LibraryMixInputs inputs(LibraryMixHints? hints) => LibraryMixInputs(
+      songs: songs,
+      at: now,
+      years: years,
+      added: added,
+      recent: recent,
+      past: past,
+      hints: hints,
+      sound: sound,
+      taste: taste,
+      preference: runtime.personalization.rankingSnapshot,
+      weights: learning ? runtime.ranker.weights : const {},
+    );
+    final mixes = await compute(
+      buildLibraryMixesFrom,
+      inputs(null),
       debugLabel: 'library-mixes',
     );
+    if (mixes != null) return mixes;
+    // Statistics are off or new: what else the app keeps of the listener's
+    // taste stands in, so favorites still have a mix.
+    final hinted = await compute(
+      buildLibraryMixesFrom,
+      inputs(await _hints(runtime)),
+      debugLabel: 'library-mixes',
+    );
+    return hinted!;
   }
 
   /// Every downloaded and scanned song, by its Library id, with release
@@ -485,12 +489,9 @@ class _LibraryMixes {
     }
   }
 
-  /// Plays of the last 90 days by song id, those of the last 14 counting
-  /// twice, and plays of the year before those 90 days. A song matches its
-  /// played file, or its title and artist when it was played from another
-  /// copy.
-  static Future<(Map<String, double>, Map<String, double>)> _plays(
-    List<PlayableMedia> songs,
+  /// Songs heard in the last 90 days, then again those of the last 14, and
+  /// songs heard in the year before those 90 days.
+  static Future<(List<List<ListeningTotal>>, List<ListeningTotal>)> _listening(
     DateTime now,
   ) async {
     await listeningRecorder.flush();
@@ -502,29 +503,112 @@ class _LibraryMixes {
       store.load(DateTime(now.year, now.month, now.day - 13), end),
       store.load(DateTime(now.year, now.month, now.day - 364), seasonStart),
     ).wait;
-    String songKey(String artist, String title) =>
-        '${normalizeLookupText(artist)}|${normalizeLookupText(title)}';
-    Map<String, double> byId(List<ListeningSummary> summaries) {
-      final bySource = <String, double>{}, bySong = <String, double>{};
-      for (final summary in summaries) {
-        for (final total in summary.tracks) {
-          if (total.plays <= 0) continue;
-          final track = total.track;
-          bySource[track.key] = (bySource[track.key] ?? 0) + total.plays;
-          final key = songKey(track.artist, track.title);
-          bySong[key] = (bySong[key] ?? 0) + total.plays;
-        }
-      }
-      return {
-        for (final song in songs)
-          song.id:
-              ?(bySource[song.source] ??
-              bySong[songKey(song.artist, song.title)]),
-      };
-    }
-
-    return (byId([season, recent]), byId([past]));
+    return ([season.tracks, recent.tracks], past.tracks);
   }
+}
+
+/// What the mix worker makes the day's mixes from.
+@visibleForTesting
+class LibraryMixInputs {
+  const LibraryMixInputs({
+    required this.songs,
+    required this.at,
+    this.years = const {},
+    this.added = const {},
+    this.recent = const [],
+    this.past = const [],
+    this.hints,
+    this.sound,
+    this.taste,
+    this.preference,
+    this.weights = const {},
+    this.exists,
+  });
+
+  final List<PlayableMedia> songs;
+  final DateTime at;
+  final Map<String, int> years;
+  final Map<String, DateTime> added;
+
+  /// Songs heard lately, period by period, and in the year before.
+  final List<List<ListeningTotal>> recent;
+  final List<ListeningTotal> past;
+
+  /// Null until read: with too few plays the worker then returns null.
+  final LibraryMixHints? hints;
+  final AutoplaySignal? sound;
+
+  /// Autoplay's taste model while learning is on and it knows enough.
+  final AutoplayTasteModel? taste;
+  final AutoplayPreferenceModel? preference;
+  final Map<String, double> weights;
+  final bool Function(String source)? exists;
+}
+
+/// The day's mixes from [inputs], on the mix worker; null when the plays
+/// are too few and the hints that would stand in are not read yet.
+@visibleForTesting
+List<LibraryMix>? buildLibraryMixesFrom(LibraryMixInputs inputs) {
+  final songs = inputs.songs;
+  final plays = libraryMixPlays(songs, inputs.recent);
+  final pastPlays = libraryMixPlays(songs, [inputs.past]);
+  if (plays.length < libraryMixFavoritesMinPlayed) {
+    final hints = inputs.hints;
+    if (hints == null) return null;
+    final hinted = libraryMixHintPlays(songs, hints, inputs.at);
+    for (final MapEntry(:key, :value) in hinted.entries) {
+      plays[key] = (plays[key] ?? 0) + value;
+    }
+  }
+  // The most played songs stand for the listener's session, as the songs
+  // before a refill do for Autoplay.
+  final favorites = songs.where((song) => (plays[song.id] ?? 0) > 0).toList()
+    ..sort((a, b) => plays[b.id]!.compareTo(plays[a.id]!));
+  final session = favorites.take(16).toList();
+  final model = inputs.taste;
+  final taste = model != null && session.isNotEmpty
+      ? autoplayTasteSignal(model, session, songs)
+      : null;
+  return buildLibraryMixes(
+    LibraryMixRequest(
+      songs: songs,
+      at: inputs.at,
+      plays: plays,
+      pastPlays: pastPlays,
+      years: inputs.years,
+      added: inputs.added,
+      signals: [?inputs.sound, ?taste],
+      preference: inputs.preference,
+      weights: inputs.weights,
+      exists: inputs.exists,
+    ),
+  );
+}
+
+/// Plays by song id in [periods]. A song matches its played file, or its
+/// title and artist when it was played from another copy.
+@visibleForTesting
+Map<String, double> libraryMixPlays(
+  List<PlayableMedia> songs,
+  List<List<ListeningTotal>> periods,
+) {
+  String songKey(String artist, String title) =>
+      '${normalizeLookupText(artist)}|${normalizeLookupText(title)}';
+  final bySource = <String, double>{}, bySong = <String, double>{};
+  for (final tracks in periods) {
+    for (final total in tracks) {
+      if (total.plays <= 0) continue;
+      final track = total.track;
+      bySource[track.key] = (bySource[track.key] ?? 0) + total.plays;
+      final key = songKey(track.artist, track.title);
+      bySong[key] = (bySong[key] ?? 0) + total.plays;
+    }
+  }
+  return {
+    for (final song in songs)
+      song.id:
+          ?(bySource[song.source] ?? bySong[songKey(song.artist, song.title)]),
+  };
 }
 
 /// The mixes' songs as their current Library entries. Songs deleted since

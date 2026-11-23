@@ -392,6 +392,7 @@ void main() {
     final candidates = [mate, unheardMate, stranger, unknown];
     expect(taste.model?.positives, 40);
     expect(await taste.signal(session, candidates), isNull);
+    expect(await taste.signalModel(), isNull);
 
     for (final feedback in history.skip(40)) {
       taste.record(feedback);
@@ -406,6 +407,16 @@ void main() {
       isNull,
     );
     final signal = (await taste.signal(session, candidates))!;
+    // The model a worker isolate gets reads the same vectors.
+    final sent = (await taste.signalModel())!;
+    expect(sent.tokens, taste.model!.tokens);
+    expect(sent.vectors, taste.model!.vectors);
+    expect(sent.positives, taste.model!.positives);
+    expect(
+      autoplayTasteSignal(sent, session, candidates)!.vectors,
+      signal.vectors,
+    );
+    expect(autoplayTasteSignal(sent, [unknown], candidates), isNull);
     signal.prepare(session, candidates);
     final known = [mate, unheardMate, stranger].map(signal.score).toList();
     debugPrint('Taste scores: mate, unheard mate, stranger $known');
