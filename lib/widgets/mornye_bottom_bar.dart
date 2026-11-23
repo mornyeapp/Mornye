@@ -116,6 +116,8 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
   // Side capsules move between backdrop batches; keep their lenses mounted.
   final _leadingSurfaceKey = GlobalKey();
   final _searchSurfaceKey = GlobalKey();
+  Widget? _player;
+  bool? _playerCompact;
   String? _cachedLabelText;
   TextStyle? _cachedLabelStyle;
   TextDirection? _cachedLabelDirection;
@@ -183,6 +185,12 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
   }
 
   @override
+  void reassemble() {
+    super.reassemble();
+    _player = null;
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -231,9 +239,14 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
     final leadingIndex = searchSelected ? 0 : selectedIndex;
     final scheme = Theme.of(context).colorScheme;
     final inactiveIconColor = scheme.onSurface;
-    final player = RepaintBoundary(
-      child: MiniPlayer(compact: collapsed, bottomPadding: 0),
-    );
+    // Only the fold changes the player; a tab switch keeps it as made.
+    if (_player == null || _playerCompact != collapsed) {
+      _playerCompact = collapsed;
+      _player = RepaintBoundary(
+        child: MiniPlayer(compact: collapsed, bottomPadding: 0),
+      );
+    }
+    final player = _player!;
     Widget tabs({required bool hideMovingIcons}) => TickerMode(
       enabled: !collapsed,
       child: RepaintBoundary(

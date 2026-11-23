@@ -559,6 +559,26 @@ void main() {
     );
   }
 
+  testWidgets('a tab switch keeps the player as made', (tester) async {
+    final activeTab = ValueNotifier(0);
+    addTearDown(activeTab.dispose);
+    await pumpShell(tester, activeTab: activeTab);
+    final player = tester.widget<MiniPlayer>(find.byType(MiniPlayer));
+    activeTab.value = 1;
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<MornyeBottomBar>(find.byType(MornyeBottomBar)),
+      isA<MornyeBottomBar>().having((bar) => bar.selectedIndex, 'tab', 1),
+    );
+    expect(tester.widget(find.byType(MiniPlayer)), same(player));
+
+    // The fold still makes the compact player.
+    chrome.value = true;
+    await tester.pumpAndSettle();
+    expect(tester.widget<MiniPlayer>(find.byType(MiniPlayer)).compact, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final withPlayer in [false, true]) {
     testWidgets('compact transition has no height jump (player: $withPlayer)', (
       tester,
