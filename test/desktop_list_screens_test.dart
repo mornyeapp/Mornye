@@ -123,12 +123,13 @@ void main() {
     );
     int decodeWidth() =>
         (tester.widget<Image>(cover).image as ResizeImage).width!;
-    expect(decodeWidth(), 600);
+    // 300 dp at 2x, wide enough for a 16:9 cover to fill the square.
+    expect(decodeWidth(), 1067);
     // A pane that narrows, as when a panel opens beside it, keeps the decode.
     for (final width in [1180.0, 1060.0, 940.0]) {
       tester.view.physicalSize = Size(width, 900) * 2;
       await tester.pump();
-      expect(decodeWidth(), 600, reason: '$width');
+      expect(decodeWidth(), 1067, reason: '$width');
     }
   });
 

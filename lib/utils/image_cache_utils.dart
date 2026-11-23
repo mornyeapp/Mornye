@@ -15,10 +15,16 @@ int coverCacheWidthForViewport(
 /// The largest side of the artwork in a desktop detail page's header.
 const double desktopDetailArtworkMaxSize = 300;
 
+/// A landscape header cover, such as a 16:9 video thumbnail, decoded this
+/// much wider still fills the square header's height.
+const double _widestHeaderCoverAspect = 16 / 9;
+
 /// The decode width of a detail page's header cover. Phones show it across
 /// the screen; desktop decodes it once at its largest header size instead of
 /// again for every pane width.
 int detailHeaderCoverCacheWidth(BuildContext context) => isDesktopPlatform
-    ? (desktopDetailArtworkMaxSize * MediaQuery.devicePixelRatioOf(context))
+    ? (desktopDetailArtworkMaxSize *
+              _widestHeaderCoverAspect *
+              MediaQuery.devicePixelRatioOf(context))
           .ceil()
     : coverCacheWidthForViewport(context);
