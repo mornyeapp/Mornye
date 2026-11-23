@@ -10,10 +10,12 @@ import 'package:mornye/services/autoplay_taste.dart' show AutoplayTastePlay;
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/listening_rewind.dart';
 import 'package:mornye/services/listening_statistics.dart';
-import 'package:mornye/services/sqlite_helpers.dart' show normalizeLookupText;
+import 'package:mornye/services/sqlite_helpers.dart'
+    show normalizeLookupText, readWriteStamp;
 import 'package:mornye/utils/audio_format_utils.dart'
     show normalizeAudioFormatValue;
 import 'package:mornye/utils/genre_tags.dart';
+import 'package:sqflite/sqflite.dart' show Database, DatabaseExecutor;
 
 /// A genre and the time spent listening to its songs.
 typedef ProfileGenre = ({String name, int milliseconds});
@@ -741,6 +743,98 @@ String profileSongKey(ListeningTrack track) =>
     ? ''
     : LibraryDatabase.matchKeyFor(track.title, track.artist);
 
+/// The parts of [ProfileOverview] the listening record alone gives.
+typedef ProfileListening = ({
+  ListeningRewind allTime,
+  ListeningRewind month,
+  ProfileHabits habits,
+  DateTime? since,
+});
+
+/// Reads the listening parts of the profile from [db] for the day of [now].
+Future<ProfileListening> readProfileListening(
+  DatabaseExecutor db,
+  DateTime now,
+) async {
+  final end = DateTime(now.year, now.month, now.day + 1);
+  final monthStart = DateTime(
+    end.year,
+    end.month,
+    end.day - ProfileHabits.recentDays,
+  );
+  final allTime = await readListeningRewind(
+    db,
+    ListeningRewindRange(
+      start: DateTime(2000),
+      end: end,
+      previousStart: DateTime(1999),
+      previousEnd: DateTime(2000),
+    ),
+  );
+  final month = await readListeningRewind(
+    db,
+    ListeningRewindRange(
+      start: monthStart,
+      end: end,
+      previousStart: DateTime(
+        monthStart.year,
+        monthStart.month,
+        monthStart.day - ProfileHabits.recentDays,
+      ),
+      previousEnd: monthStart,
+    ),
+  );
+  final summary = allTime.summary;
+  final days = [
+    for (final entry in summary.days.entries)
+      if (entry.value > 0) entry.key,
+  ]..sort();
+  return (
+    allTime: allTime,
+    month: month,
+    habits: ProfileHabits.of(summary.days, now),
+    since: days.isEmpty ? null : DateTime.tryParse(days.first),
+  );
+}
+
+/// Gives the listening parts of the profile, read again only after a write
+/// to the record or on a new day, so a Library change reads only the Library.
+class ProfileListeningSource {
+  ProfileListeningSource({
+    Future<Database> Function()? database,
+    this.read = readProfileListening,
+  }) : _database =
+           database ?? (() => ListeningStatisticsStore.instance.database);
+
+  final Future<Database> Function() _database;
+  final Future<ProfileListening> Function(DatabaseExecutor db, DateTime now)
+  read;
+  ({Database db, String stamp, ProfileListening listening})? _last;
+
+  Future<ProfileListening> listeningOn(DateTime now) async {
+    final db = await _database();
+    // Read before the record, so a write in between reads it again next time.
+    final written = await readWriteStamp(db, const ['main']);
+    final stamp = written == null ? null : '${listeningDay(now)}:$written';
+    final last = _last;
+    if (stamp != null &&
+        last != null &&
+        identical(last.db, db) &&
+        last.stamp == stamp) {
+      return last.listening;
+    }
+    final listening = await read(db, now);
+    _last = stamp == null ? null : (db: db, stamp: stamp, listening: listening);
+    return listening;
+  }
+}
+
+/// Lives as long as [profileOverviewProvider] watches it.
+final profileListeningSourceProvider =
+    Provider.autoDispose<ProfileListeningSource>(
+      (ref) => ProfileListeningSource(),
+    );
+
 /// The whole listening record with the genres of the songs in it. Songs are
 /// matched to the Library by title and artist, since a record carried over
 /// from another device knows them by other paths.
@@ -751,42 +845,11 @@ final profileOverviewProvider = FutureProvider.autoDispose<ProfileOverview>((
   final separator = ref.watch(
     settingsProvider.select((s) => s.metadataSeparators.genre),
   );
+  final source = ref.watch(profileListeningSourceProvider);
   await listeningRecorder.flush();
   final now = DateTime.now();
-  final end = DateTime(now.year, now.month, now.day + 1);
-  final monthStart = DateTime(
-    end.year,
-    end.month,
-    end.day - ProfileHabits.recentDays,
-  );
-  final store = ListeningStatisticsStore.instance;
-  final allTime = await store.read(
-    (db) => readListeningRewind(
-      db,
-      ListeningRewindRange(
-        start: DateTime(2000),
-        end: end,
-        previousStart: DateTime(1999),
-        previousEnd: DateTime(2000),
-      ),
-    ),
-  );
-  final month = await store.read(
-    (db) => readListeningRewind(
-      db,
-      ListeningRewindRange(
-        start: monthStart,
-        end: end,
-        previousStart: DateTime(
-          monthStart.year,
-          monthStart.month,
-          monthStart.day - ProfileHabits.recentDays,
-        ),
-        previousEnd: monthStart,
-      ),
-    ),
-  );
-  final summary = allTime.summary;
+  final listening = await source.listeningOn(now);
+  final summary = listening.allTime.summary;
   final heard = summary.tracks.take(profileGenreSongLimit).toList();
   final keys = {for (final total in heard) profileSongKey(total.track)}
     ..remove('');
@@ -803,18 +866,14 @@ final profileOverviewProvider = FutureProvider.autoDispose<ProfileOverview>((
           keys.toList(),
           includeLocal: includeLocal,
         );
-  final days = [
-    for (final entry in summary.days.entries)
-      if (entry.value > 0) entry.key,
-  ]..sort();
   return ProfileOverview(
-    allTime: allTime,
-    month: month,
+    allTime: listening.allTime,
+    month: listening.month,
     genres: genres.genres,
     genreMilliseconds: genres.milliseconds,
-    habits: ProfileHabits.of(summary.days, now),
+    habits: listening.habits,
     sound: listeningSound(heard, details, now: now),
-    since: days.isEmpty ? null : DateTime.tryParse(days.first),
+    since: listening.since,
   );
 });
 
