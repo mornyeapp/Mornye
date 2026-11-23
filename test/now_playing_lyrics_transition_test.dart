@@ -37,6 +37,7 @@ import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/screens/lyrics_share_screen.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/app_theme.dart';
+import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/widgets/audio_output_button.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
@@ -762,6 +763,34 @@ void main() {
     await settlePlayer(tester);
     expect(find.byType(MaterialPlayerBackdrop), findsNothing);
     expect(find.byType(MornyePlayerArtwork), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the open Material player readies the next song\'s colours', (
+    tester,
+  ) async {
+    final palette = _RecordingPalette();
+    PlayerArtworkTheme.debugPalette = palette;
+    addTearDown(() => PlayerArtworkTheme.debugPalette = null);
+    MediaItem covered(String id) =>
+        item(id).copyWith(artUri: Uri.file('/covers/$id.png'));
+    final queue = [covered('first'), covered('second'), covered('third')];
+    await pumpNowPlaying(
+      tester,
+      theme: AppTheme.light(),
+      size: const Size(390, 844),
+      queue: queue,
+    );
+    mediaItems.add(queue[0]);
+    await settlePlayer(tester);
+    bool asked(String name) =>
+        palette.asked.any((source) => source.endsWith(name));
+    expect(asked('second.png'), isTrue);
+    expect(asked('third.png'), isFalse);
+
+    mediaItems.add(queue[1]);
+    await settlePlayer(tester);
+    expect(asked('third.png'), isTrue);
     expect(tester.takeException(), isNull);
   });
 
@@ -6471,6 +6500,20 @@ class _TestRemote implements RemotePlayback {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Notes each cover a scheme is asked for, and knows none ahead.
+class _RecordingPalette extends PlayerArtworkPalette {
+  final asked = <String>[];
+
+  @override
+  ColorScheme? peek(String source, Brightness brightness) => null;
+
+  @override
+  Future<ColorScheme?> resolve(String source, Brightness brightness) async {
+    asked.add(source);
+    return null;
+  }
 }
 
 class _TestCollections extends LibraryCollectionsNotifier {

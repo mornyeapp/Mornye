@@ -61,6 +61,14 @@ class PlayerArtworkTheme extends StatefulWidget {
   static set debugPalette(PlayerArtworkPalette? palette) =>
       _palette = palette ?? const PlayerArtworkPalette();
 
+  /// Resolves [artUri]'s scheme ahead, so a scope that reaches it later
+  /// shows that scheme from its first frame.
+  static void warm(String? artUri, Brightness brightness) {
+    final source = coverImageSource(artUri);
+    if (source == null || _palette.peek(source, brightness) != null) return;
+    _palette.resolve(source, brightness).ignore();
+  }
+
   @override
   State<PlayerArtworkTheme> createState() => _PlayerArtworkThemeState();
 }

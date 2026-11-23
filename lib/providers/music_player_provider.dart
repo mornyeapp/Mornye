@@ -396,6 +396,14 @@ final currentQueueIndexProvider = Provider<int>((ref) {
       : queue.indexWhere((item) => item.id == id);
 });
 
+/// The cover of the song after the current one in the queue.
+final nextQueueArtUriProvider = Provider<String?>((ref) {
+  final queue = ref.watch(playQueueProvider).value ?? const <MediaItem>[];
+  final index = ref.watch(currentQueueIndexProvider);
+  if (index < 0 || index + 1 >= queue.length) return null;
+  return queue[index + 1].artUri?.toString();
+});
+
 /// Drives the player the screens show: the local one, or [remote] while
 /// another device plays in its place.
 class MusicPlayerController {

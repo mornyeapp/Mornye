@@ -18,6 +18,7 @@ import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/screens/lyrics_share_screen.dart';
+import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -150,6 +151,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   ProviderSubscription<bool>? _lyricsPlayingSub;
   ProviderSubscription<(bool, bool)>? _lyricsAutoHideSub;
   ProviderSubscription<bool>? _lyricsLayoutSub;
+  ProviderSubscription<String?>? _nextColoursSub;
   ProviderSubscription<bool>? _lyricLineSub;
 
   /// Whether to read the song file itself, even an SAF document playback
@@ -265,8 +267,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         _scheduleLyricsControlsHide(restart: false);
       },
     );
+    // The next song's colours are ready when it starts, so they move with
+    // its cover instead of rebuilding the player again a moment later.
+    _nextColoursSub = ref.listenManual<String?>(
+      nextQueueArtUriProvider,
+      (_, next) => _warmColours(next),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _warmColours(ref.read(nextQueueArtUriProvider));
       unawaited(
         _trackMetadata.load(
           ref.read(currentMediaItemProvider).value,
@@ -290,6 +299,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
   void _onInspectorChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _warmColours(String? artUri) {
+    if (!mounted || artUri == null) return;
+    if (context.isMornye) {
+      unawaited(CoverPalette.resolveSourceColor(artUri));
+    } else {
+      PlayerArtworkTheme.warm(artUri, Theme.of(context).brightness);
+    }
   }
 
   /// Whether the lyrics (1) or Up Next (2) toggle shows as selected. The
@@ -338,6 +356,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _lyricsPlayingSub?.close();
     _lyricsAutoHideSub?.close();
     _lyricsLayoutSub?.close();
+    _nextColoursSub?.close();
     _lyricLineSub?.close();
     _lyricsTranslation.cancel(owner: this);
     _trackMetadata.dispose();
