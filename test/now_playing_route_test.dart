@@ -13,6 +13,15 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 
 const _sheet = Key('player-sheet');
+const _surface = ValueKey('player-surface');
+
+/// Whether the player is drawn as a surface at its own bounds, growing or
+/// shrinking, rather than as the full page.
+bool _morphing(WidgetTester tester) =>
+    tester
+        .widget<ClipRRect>(find.byKey(_surface, skipOffstage: false))
+        .clipBehavior !=
+    Clip.none;
 
 class _TestPlayerRoute extends NowPlayingRoute {
   _TestPlayerRoute({super.miniPlayerGeometry, super.morph})
@@ -24,6 +33,33 @@ class _TestPlayerRoute extends NowPlayingRoute {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) => const ColoredBox(key: _sheet, color: Colors.black);
+}
+
+/// Counts how often the page's own state is told its dependencies changed,
+/// which a page moved to a new parent is, along with all of its subtree.
+class _DependencyProbe extends StatefulWidget {
+  const _DependencyProbe(this.changes);
+
+  final ValueNotifier<int> changes;
+
+  @override
+  State<_DependencyProbe> createState() => _DependencyProbeState();
+}
+
+class _DependencyProbeState extends State<_DependencyProbe> {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    widget.changes.value++;
+  }
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    key: _sheet,
+    color: Directionality.of(context) == TextDirection.ltr
+        ? Colors.black
+        : Colors.white,
+  );
 }
 
 void main() {
@@ -115,13 +151,10 @@ void main() {
     await tester.pumpAndSettle();
     navigator.currentState!.pop();
     await tester.pump();
-    expect(
-      find.byKey(const ValueKey('player-minimize-surface')),
-      findsOneWidget,
-    );
+    expect(_morphing(tester), isTrue);
     tester.view.physicalSize = const Size(393, 852);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(find.byKey(const ValueKey('player-minimize-surface')), findsNothing);
+    expect(_morphing(tester), isFalse);
     await tester.pumpAndSettle();
     expect(find.byKey(_sheet), findsNothing);
     expect(tester.takeException(), isNull);
@@ -194,7 +227,7 @@ void main() {
     await tester.pump();
     navigator.currentState!.pop();
     await tester.pump();
-    expect(find.byKey(const ValueKey('player-minimize-surface')), findsNothing);
+    expect(_morphing(tester), isFalse);
     await tester.pumpAndSettle();
     expect(find.byKey(_sheet), findsNothing);
     expect(tester.takeException(), isNull);
@@ -348,7 +381,7 @@ void main() {
       ),
     );
     const corners = ValueKey('player-slide-corners');
-    const minimize = ValueKey('player-minimize-surface');
+    const minimize = _surface;
     ClipRRect clip(Key key) => tester.widget<ClipRRect>(find.byKey(key));
     navigator.currentState!.push(
       _TestPlayerRoute(
@@ -397,8 +430,8 @@ void main() {
   group('Material morph', () {
     const mini = Rect.fromLTWH(0, 700, 400, 72);
     const morph = AppMotionSpec(Duration(milliseconds: 500), Curves.linear);
-    const surface = ValueKey('player-expand-surface');
-    const minimize = ValueKey('player-minimize-surface');
+    const surface = _surface;
+    const minimize = _surface;
 
     Future<GlobalKey<NavigatorState>> pumpApp(WidgetTester tester) async {
       tester.view.physicalSize = const Size(400, 800);
@@ -477,7 +510,7 @@ void main() {
       );
       expect(scaled.filterQuality, FilterQuality.low);
       await tester.pumpAndSettle();
-      expect(find.byKey(surface), findsNothing);
+      expect(_morphing(tester), isFalse);
     });
 
     testWidgets('the player grows out of the mini player and shrinks back', (
@@ -504,7 +537,7 @@ void main() {
       expect(content.value, inExclusiveRange(0, 0.2));
       await tester.pumpAndSettle();
       expect(content.value, 1);
-      expect(find.byKey(surface), findsNothing);
+      expect(_morphing(tester), isFalse);
       expect(
         tester.getRect(find.byKey(_sheet)),
         const Rect.fromLTWH(0, 0, 400, 800),
@@ -576,7 +609,7 @@ void main() {
       }
       expect(last, greaterThan(0));
       await frames(tester, 8);
-      expect(find.byKey(surface), findsNothing);
+      expect(_morphing(tester), isFalse);
       expect(
         tester.getRect(find.byKey(_sheet)),
         const Rect.fromLTWH(0, 0, 400, 800),
@@ -646,7 +679,7 @@ void main() {
       );
       await tester.pump();
       await tester.pump();
-      expect(find.byKey(surface), findsNothing);
+      expect(_morphing(tester), isFalse);
       expect(
         tester.getRect(find.byKey(_sheet)),
         const Rect.fromLTWH(0, 0, 400, 800),
@@ -678,7 +711,7 @@ void main() {
 
       await backGesture(tester, 'cancelBackGesture');
       await tester.pumpAndSettle();
-      expect(find.byKey(minimize), findsNothing);
+      expect(_morphing(tester), isFalse);
       expect(
         tester.getRect(find.byKey(_sheet)),
         const Rect.fromLTWH(0, 0, 400, 800),
@@ -717,7 +750,7 @@ void main() {
       await backGesture(tester, 'startBackGesture', 0);
       await backGesture(tester, 'updateBackGestureProgress', 0.5);
       await tester.pump();
-      expect(find.byKey(minimize), findsNothing);
+      expect(_morphing(tester), isFalse);
       await backGesture(tester, 'commitBackGesture');
       await tester.pumpAndSettle();
       // The system back closes the route on top, not the player.
@@ -888,7 +921,7 @@ void main() {
     testWidgets('the Mornye shrink starts from the finger\'s velocity', (
       tester,
     ) async {
-      const minimize = ValueKey('player-minimize-surface');
+      const minimize = _surface;
       final still = await firstFrameTravel(
         tester,
         theme: MornyeTheme.build(Brightness.dark),
@@ -1108,7 +1141,7 @@ void main() {
       fullBleed: false,
     );
     const cover = ValueKey('player-minimize-artwork');
-    const surface = ValueKey('player-minimize-surface');
+    const surface = _surface;
     navigator.currentState!.pop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
@@ -1158,5 +1191,108 @@ void main() {
     expect(NowPlayingRoute.coverLanding.value, isFalse);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+  });
+
+  group('the page keeps its place through every motion', () {
+    const mini = Rect.fromLTWH(16, 700, 368, 64);
+    const morph = AppMotionSpec(Duration(milliseconds: 500), Curves.linear);
+
+    Future<void> backGesture(
+      WidgetTester tester,
+      String method, [
+      double? progress,
+    ]) => tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      'flutter/backgesture',
+      const StandardMethodCodec().encodeMethodCall(
+        MethodCall(
+          method,
+          progress == null
+              ? null
+              : {
+                  'touchOffset': [5.0, 400.0],
+                  'progress': progress,
+                  'swipeEdge': 0,
+                },
+        ),
+      ),
+      (_) {},
+    );
+
+    for (final mornye in [false, true]) {
+      for (final close in ['button', 'drag', if (!mornye) 'back']) {
+        testWidgets('opened and closed by $close (Mornye: $mornye)', (
+          tester,
+        ) async {
+          tester.view.physicalSize = const Size(400, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final changes = ValueNotifier(0);
+          addTearDown(changes.dispose);
+          final navigator = GlobalKey<NavigatorState>();
+          await tester.pumpWidget(
+            MaterialApp(
+              navigatorKey: navigator,
+              theme: mornye
+                  ? MornyeTheme.build(Brightness.dark)
+                  : AppTheme.light(),
+              home: const SizedBox(),
+            ),
+          );
+          final route = NowPlayingRoute(
+            child: _DependencyProbe(changes),
+            miniPlayerGeometry: () =>
+                (surface: mini, artwork: const Rect.fromLTWH(24, 710, 44, 44)),
+            morph: mornye ? null : morph,
+          );
+          navigator.currentState!.push(route);
+          await tester.pump();
+          await tester.pump();
+          for (var i = 0; i < 6; i++) {
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+          if (!mornye) expect(_morphing(tester), isTrue);
+          await tester.pumpAndSettle();
+          expect(_morphing(tester), isFalse);
+          expect(changes.value, 1);
+
+          switch (close) {
+            case 'button':
+              navigator.currentState!.pop();
+            case 'drag':
+              route.startDrag();
+              route.updateDrag(
+                DragUpdateDetails(
+                  globalPosition: const Offset(0, 320),
+                  delta: const Offset(0, 320),
+                  primaryDelta: 320,
+                ),
+                800,
+              );
+              await tester.pump();
+              route.endDrag(DragEndDetails(primaryVelocity: 0), 800);
+            case 'back':
+              // A cancelled preview returns to the page, then one commits.
+              await backGesture(tester, 'startBackGesture', 0);
+              await backGesture(tester, 'updateBackGestureProgress', 0.5);
+              await tester.pump();
+              expect(_morphing(tester), isTrue);
+              await backGesture(tester, 'cancelBackGesture');
+              await tester.pumpAndSettle();
+              expect(_morphing(tester), isFalse);
+              await backGesture(tester, 'startBackGesture', 0);
+              await backGesture(tester, 'updateBackGestureProgress', 0.6);
+              await tester.pump();
+              await backGesture(tester, 'commitBackGesture');
+          }
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(_morphing(tester), isTrue);
+          await tester.pumpAndSettle();
+          expect(find.byKey(_sheet), findsNothing);
+          expect(changes.value, 1);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
   });
 }

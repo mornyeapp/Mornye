@@ -4318,7 +4318,7 @@ void main() {
           final flyingCover = find.byKey(
             const ValueKey('player-minimize-artwork'),
           );
-          final surface = find.byKey(const ValueKey('player-minimize-surface'));
+          final surface = find.byKey(const ValueKey('player-surface'));
           expect(tester.getRect(flyingCover), releasedCover);
           expect(tester.getRect(surface), releasedPanel);
           var previousDistance =

@@ -517,6 +517,16 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
     // The Material mini player is a square bar, which its surface keeps.
     // Material dims the page behind while the player covers it.
     final scrim = context.isMornye ? 0.0 : 0.32;
+    // Every state builds the same layers, idle ones at rest values: a new
+    // parent would move the page by its GlobalKey and rebuild all of it.
+    double? scrimOpacity;
+    Rect? bounds;
+    var radius = 0.0;
+    var surfaceOpacity = 1.0;
+    Animation<Offset> position = const AlwaysStoppedAnimation(Offset.zero);
+    Animation<double> fade = kAlwaysCompleteAnimation;
+    var cornerRadius = 0.0;
+    Widget? cover;
     // Restoring portrait can resize the window during dismissal. Geometry
     // captured in landscape no longer points at the mini player in that case.
     if (target != null && _dismissSize == size) {
@@ -531,115 +541,112 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
         0.0,
         1.0,
       );
-      final cover = _dismissArtwork;
-      final bounds = Rect.lerp(_dismissStart, target.surface, progress)!;
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          if (scrim > 0) _scrim(scrim * (1 - progress)),
-          _surface(
-            key: const ValueKey('player-minimize-surface'),
-            bounds: bounds,
-            size: size,
-            radius: _pageRadius(context, bounds.top),
-            // Solid for most of the way, so the page below is never read
-            // through it; it fades as it closes onto the mini player.
-            opacity: context.isMornye
-                ? 1 - const Interval(0.3, 1).transform(progress)
-                : _solid(_dismissOpen * (1 - progress)),
-            child: child,
-          ),
-          if (cover != null)
-            Positioned.fromRect(
-              rect: Rect.lerp(cover.bounds, target.artwork, progress)!,
-              child: ClipRRect(
-                key: const ValueKey('player-minimize-artwork'),
-                borderRadius: BorderRadius.circular(
-                  cover.fullBleed ? 6 * progress : 12 - 6 * progress,
-                ),
-                child: cover.fullBleed
-                    ? ShaderMask(
-                        blendMode: BlendMode.dstIn,
-                        shaderCallback: (bounds) => LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          stops: const [0, 0.58, 1],
-                          colors: [
-                            Colors.white,
-                            Colors.white,
-                            Colors.white.withValues(alpha: progress),
-                          ],
-                        ).createShader(bounds),
-                        child: cover.child,
-                      )
-                    : cover.child,
-              ),
-            ),
-        ],
-      );
-    }
-    // A rotation while opening leaves the mini player's bounds stale.
-    if (_openFrom != null &&
+      if (scrim > 0) scrimOpacity = scrim * (1 - progress);
+      bounds = Rect.lerp(_dismissStart, target.surface, progress)!;
+      radius = _pageRadius(context, bounds.top);
+      // Solid for most of the way, so the page below is never read through
+      // it; it fades as it closes onto the mini player.
+      surfaceOpacity = context.isMornye
+          ? 1 - const Interval(0.3, 1).transform(progress)
+          : _solid(_dismissOpen * (1 - progress));
+      if (_dismissArtwork case final artwork?) {
+        cover = _dismissCover(artwork, target.artwork, progress);
+      }
+    } else if (_openFrom != null &&
         _openSize == size &&
         animation.status == AnimationStatus.forward) {
+      // A rotation while opening leaves the mini player's bounds stale.
       // The spatial spring may pass its end; only the surface follows it.
       final open = morph!.curve.transform(animation.value).clamp(0.0, 1.0);
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          _scrim(scrim * open),
-          _surface(
-            key: const ValueKey('player-expand-surface'),
-            bounds: _openRect(size, animation.value),
-            size: size,
-            radius: 0,
-            // The mini player hands over in the surface's first frames.
-            opacity: _solid(open),
-            child: child,
-          ),
-        ],
-      );
+      if (scrim > 0) scrimOpacity = scrim * open;
+      bounds = _openRect(size, animation.value);
+      // The mini player hands over in the surface's first frames.
+      surfaceOpacity = _solid(open);
+    } else {
+      final reversing = animation.status == AnimationStatus.reverse;
+      // Mornye's full-bleed artwork travels with its panel. Material keeps
+      // the independent cover flight back to the mini-player on button/back
+      // pop.
+      final inPlacePop =
+          reversing && !_interactiveTransition && !context.isMornye;
+      final slide = _interactiveTransition || _usesSpringSlide
+          ? animation
+          : animation.drive(CurveTween(curve: Easing.emphasizedDecelerate));
+      if (!inPlacePop) {
+        position = slide.drive(
+          Tween(begin: const Offset(0, 1), end: Offset.zero),
+        );
+      }
+      if (inPlacePop) fade = animation;
+      cornerRadius = _pageRadius(context, size.height * (1 - slide.value));
     }
-    final reversing = animation.status == AnimationStatus.reverse;
-    // Mornye's full-bleed artwork travels with its panel. Material keeps the
-    // independent cover flight back to the mini-player on button/back pop.
-    final inPlacePop =
-        reversing && !_interactiveTransition && !context.isMornye;
-    final slide = _interactiveTransition || _usesSpringSlide
-        ? animation
-        : animation.drive(CurveTween(curve: Easing.emphasizedDecelerate));
-    final position = inPlacePop
-        ? const AlwaysStoppedAnimation(Offset.zero)
-        : slide.drive(Tween(begin: const Offset(0, 1), end: Offset.zero));
-    final opacity = inPlacePop ? animation : kAlwaysCompleteAnimation;
-    return SlideTransition(
-      position: position,
-      child: FadeTransition(
-        opacity: opacity,
-        child: context.isMornye
-            ? AnimatedBuilder(
-                animation: slide,
-                builder: (context, page) {
-                  final radius = _pageRadius(
-                    context,
-                    size.height * (1 - slide.value),
-                  );
-                  // Always in the tree, so the page under it never moves.
-                  return ClipRRect(
-                    key: const ValueKey('player-slide-corners'),
-                    clipBehavior: radius > 0 ? Clip.antiAlias : Clip.none,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(radius),
-                    ),
-                    child: page,
-                  );
-                },
-                child: child,
-              )
-            : child,
-      ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        IgnorePointer(
+          child: scrimOpacity == null
+              ? const SizedBox.shrink()
+              : ColoredBox(color: Colors.black.withValues(alpha: scrimOpacity)),
+        ),
+        _surface(
+          bounds: bounds,
+          size: size,
+          radius: radius,
+          opacity: surfaceOpacity,
+          child: SlideTransition(
+            position: position,
+            child: FadeTransition(
+              opacity: fade,
+              child: context.isMornye
+                  ? ClipRRect(
+                      key: const ValueKey('player-slide-corners'),
+                      clipBehavior: cornerRadius > 0
+                          ? Clip.antiAlias
+                          : Clip.none,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(cornerRadius),
+                      ),
+                      child: child,
+                    )
+                  : child,
+            ),
+          ),
+        ),
+        ?cover,
+      ],
     );
   }
+
+  /// The captured cover on its way from [cover]'s bounds onto [artwork].
+  Widget _dismissCover(
+    ({Rect bounds, Widget child, bool fullBleed}) cover,
+    Rect artwork,
+    double progress,
+  ) => Positioned.fromRect(
+    rect: Rect.lerp(cover.bounds, artwork, progress)!,
+    child: ClipRRect(
+      key: const ValueKey('player-minimize-artwork'),
+      borderRadius: BorderRadius.circular(
+        cover.fullBleed ? 6 * progress : 12 - 6 * progress,
+      ),
+      child: cover.fullBleed
+          ? ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (bounds) => LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const [0, 0.58, 1],
+                colors: [
+                  Colors.white,
+                  Colors.white,
+                  Colors.white.withValues(alpha: progress),
+                ],
+              ).createShader(bounds),
+              child: cover.child,
+            )
+          : cover.child,
+    ),
+  );
 
   /// The Mornye mini player's corner, which the page keeps while it moves.
   static const _capsuleRadius = 32.0;
@@ -649,41 +656,42 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
   double _pageRadius(BuildContext context, double top) =>
       context.isMornye ? top.clamp(0.0, _capsuleRadius) : 0;
 
-  Widget _scrim(double opacity) => IgnorePointer(
-    child: ColoredBox(color: Colors.black.withValues(alpha: opacity)),
-  );
-
   /// The full-size page at [bounds], scaled to their width and clipped to
   /// their height, so its layout never changes while the surface moves.
+  /// Without [bounds] it fills the route unclipped and unscaled.
   Widget _surface({
-    required Key key,
-    required Rect bounds,
+    required Rect? bounds,
     required Size size,
     required double radius,
     required double opacity,
     required Widget child,
-  }) => Positioned.fromRect(
-    rect: bounds,
-    child: ClipRRect(
-      key: key,
+  }) {
+    final surface = ClipRRect(
+      key: const ValueKey('player-surface'),
+      clipBehavior: bounds == null ? Clip.none : Clip.antiAlias,
       borderRadius: BorderRadius.circular(radius),
       child: OverflowBox(
         alignment: Alignment.topLeft,
-        minWidth: size.width,
-        maxWidth: size.width,
-        minHeight: size.height,
-        maxHeight: size.height,
+        minWidth: bounds == null ? null : size.width,
+        maxWidth: bounds == null ? null : size.width,
+        minHeight: bounds == null ? null : size.height,
+        maxHeight: bounds == null ? null : size.height,
         child: Transform.scale(
-          scale: bounds.width / size.width,
+          scale: bounds == null ? 1 : bounds.width / size.width,
           alignment: Alignment.topLeft,
           // Scaled as a picture, so its text is not drawn again at a new
           // size on every frame.
-          filterQuality: bounds.width == size.width ? null : FilterQuality.low,
+          filterQuality: bounds == null || bounds.width == size.width
+              ? null
+              : FilterQuality.low,
           child: Opacity(opacity: opacity, child: child),
         ),
       ),
-    ),
-  );
+    );
+    return bounds == null
+        ? Positioned.fill(child: surface)
+        : Positioned.fromRect(rect: bounds, child: surface);
+  }
 }
 
 class _HeldAfterPop extends Animatable<double> {
