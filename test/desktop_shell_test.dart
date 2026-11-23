@@ -997,6 +997,40 @@ void main() {
       expect(find.text('Road trip'), findsNothing);
     });
 
+    testWidgets('the rail spring fades the playlists without building them', (
+      tester,
+    ) async {
+      desktopSidebarCollapsed.value = true;
+      await pumpShell(
+        tester,
+        mornye: false,
+        width: 1400,
+        selected: ShellTab.library,
+        onOpenLibraryLink: (_) {},
+      );
+      final row = find.byKey(const ValueKey('desktop-rail-link:playlist:mix'));
+      expect(row, findsNothing);
+
+      desktopSidebarCollapsed.value = false;
+      await tester.pump();
+      final shown = <Widget>{};
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        if (row.evaluate().isNotEmpty) shown.add(tester.widget(row));
+      }
+      await tester.pumpAndSettle();
+      shown.add(tester.widget(row));
+      expect(shown, hasLength(1));
+
+      // A new open playlist still reaches the rows.
+      desktopSidebarLink.value = 'playlist:mix';
+      await tester.pumpAndSettle();
+      expect(
+        tester.any(find.descendant(of: row, matching: railIndicator)),
+        isTrue,
+      );
+    });
+
     testWidgets('Library leaves an open playlist for the Library root', (
       tester,
     ) async {

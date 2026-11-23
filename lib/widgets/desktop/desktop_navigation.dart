@@ -794,87 +794,90 @@ class DesktopNavigationRail extends StatelessWidget {
       const AppMotionSpec(Duration.zero, Curves.linear),
     );
     final openLink = onOpenLibraryLink;
-    // One expansion value drives the width, every pill and every label, so
-    // the rail morphs continuously instead of swapping layouts at the end.
-    return TweenAnimationBuilder<double>(
-      tween: Tween(end: extended ? 1 : 0),
-      duration: motion.duration,
-      curve: motion.curve,
-      builder: (context, expansion, _) => ValueListenableBuilder<String?>(
-        valueListenable: desktopSidebarLink,
-        builder: (context, openId, _) {
-          // An open playlist takes the selection from Library, as a link
-          // does in the Mornye sidebar.
-          final linkId = openLink != null && selected == ShellTab.library
-              ? openId
-              : null;
-          Widget item(DesktopDestination destination) => _RailDestination(
-            key: ValueKey('desktop-rail:${destination.tab.name}'),
-            destination: destination,
-            selected: destination.tab == selected && linkId == null,
-            expansion: expansion,
-            onTap: () => _select(destination.tab),
-          );
-          final gap = lerpDouble(4, desktopRailItemGap, expansion)!;
-          final playlistsShown = (expansion * 2 - 1).clamp(0.0, 1.0);
-          return ColoredBox(
-            color: background,
-            child: SizedBox(
-              // The width stops at its ends while the pills and labels keep
-              // the spring: a rail growing past its width would narrow the
-              // content below its final size and flip its breakpoints twice.
-              width: lerpDouble(
-                desktopCollapsedRailWidth,
-                desktopSidebarWidth,
-                expansion.clamp(0.0, 1.0),
-              ),
-              child: ClipRect(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (onToggleExtended != null)
-                      // Centered over the collapsed rail, where it stays,
-                      // in line with the destination icons.
-                      SizedBox(
-                        width: desktopCollapsedRailWidth,
-                        height: 56,
-                        child: Center(child: _menuButton(context)),
-                      ),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.only(top: 8, bottom: 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (final (index, destination)
-                                in primary.indexed) ...[
-                              if (index > 0) SizedBox(height: gap),
-                              item(destination),
-                            ],
-                            if (openLink != null && playlistsShown > 0)
-                              Opacity(
-                                opacity: playlistsShown,
-                                child: _RailPlaylists(
-                                  openId: linkId,
-                                  onOpen: openLink,
+    return ValueListenableBuilder<String?>(
+      valueListenable: desktopSidebarLink,
+      builder: (context, openId, _) {
+        // An open playlist takes the selection from Library, as a link
+        // does in the Mornye sidebar.
+        final linkId = openLink != null && selected == ShellTab.library
+            ? openId
+            : null;
+        // One expansion value drives the width, every pill and every label,
+        // so the rail morphs continuously instead of swapping layouts at the
+        // end. The playlist rows are built once here and only fade.
+        return TweenAnimationBuilder<double>(
+          tween: Tween(end: extended ? 1 : 0),
+          duration: motion.duration,
+          curve: motion.curve,
+          child: openLink == null
+              ? null
+              : _RailPlaylists(openId: linkId, onOpen: openLink),
+          builder: (context, expansion, playlists) {
+            Widget item(DesktopDestination destination) => _RailDestination(
+              key: ValueKey('desktop-rail:${destination.tab.name}'),
+              destination: destination,
+              selected: destination.tab == selected && linkId == null,
+              expansion: expansion,
+              onTap: () => _select(destination.tab),
+            );
+            final gap = lerpDouble(4, desktopRailItemGap, expansion)!;
+            final playlistsShown = (expansion * 2 - 1).clamp(0.0, 1.0);
+            return ColoredBox(
+              color: background,
+              child: SizedBox(
+                // The width stops at its ends while the pills and labels keep
+                // the spring: a rail growing past its width would narrow the
+                // content below its final size and flip its breakpoints twice.
+                width: lerpDouble(
+                  desktopCollapsedRailWidth,
+                  desktopSidebarWidth,
+                  expansion.clamp(0.0, 1.0),
+                ),
+                child: ClipRect(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (onToggleExtended != null)
+                        // Centered over the collapsed rail, where it stays,
+                        // in line with the destination icons.
+                        SizedBox(
+                          width: desktopCollapsedRailWidth,
+                          height: 56,
+                          child: Center(child: _menuButton(context)),
+                        ),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.only(top: 8, bottom: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (final (index, destination)
+                                  in primary.indexed) ...[
+                                if (index > 0) SizedBox(height: gap),
+                                item(destination),
+                              ],
+                              if (playlists != null && playlistsShown > 0)
+                                Opacity(
+                                  opacity: playlistsShown,
+                                  child: playlists,
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    if (settings != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: item(settings),
-                      ),
-                  ],
+                      if (settings != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: item(settings),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
-      ),
+            );
+          },
+        );
+      },
     );
   }
 }
