@@ -500,15 +500,23 @@ void main() {
       await frames(tester, 6);
       // The page is scaled to the surface's width: not as text at a new
       // size on every frame.
-      final scaled = tester.widget<Transform>(
-        find
-            .descendant(
-              of: find.byKey(surface),
-              matching: find.byType(Transform),
-            )
-            .first,
-      );
+      final transform = find
+          .descendant(of: find.byKey(surface), matching: find.byType(Transform))
+          .first;
+      final scaled = tester.widget<Transform>(transform);
       expect(scaled.filterQuality, FilterQuality.low);
+      // Its fade is outside the scaled picture, not a second pass inside it.
+      expect(
+        find.descendant(of: transform, matching: find.byType(Opacity)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(surface),
+          matching: find.byType(Opacity),
+        ),
+        findsOneWidget,
+      );
       await tester.pumpAndSettle();
       expect(_morphing(tester), isFalse);
     });

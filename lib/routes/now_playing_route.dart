@@ -676,15 +676,20 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
         maxWidth: bounds == null ? null : size.width,
         minHeight: bounds == null ? null : size.height,
         maxHeight: bounds == null ? null : size.height,
-        child: Transform.scale(
-          scale: bounds == null ? 1 : bounds.width / size.width,
-          alignment: Alignment.topLeft,
-          // Scaled as a picture, so its text is not drawn again at a new
-          // size on every frame.
-          filterQuality: bounds == null || bounds.width == size.width
-              ? null
-              : FilterQuality.low,
-          child: Opacity(opacity: opacity, child: child),
+        // Outside the scale, so the fade joins the picture's own layer
+        // instead of taking a second full-screen pass.
+        child: Opacity(
+          opacity: opacity,
+          child: Transform.scale(
+            scale: bounds == null ? 1 : bounds.width / size.width,
+            alignment: Alignment.topLeft,
+            // Scaled as a picture, so its text is not drawn again at a new
+            // size on every frame.
+            filterQuality: bounds == null || bounds.width == size.width
+                ? null
+                : FilterQuality.low,
+            child: child,
+          ),
         ),
       ),
     );
