@@ -12,6 +12,9 @@ enum HomeSection {
   /// Mornye's shelf of albums played lately.
   recentlyPlayed,
   continueListening,
+
+  /// Nine Library songs as a grid of covers, each one tap from playing.
+  quickPlay,
   shortcuts,
 
   /// What the person pinned, where it does not sit among [shortcuts].
@@ -45,7 +48,7 @@ enum HomeSection {
     downloads => !player,
     topPicks => mornye,
     recentlyPlayed => mornye && player,
-    continueListening => player,
+    continueListening || quickPlay => player,
     shortcuts => !mornye,
     // Material phones and tablets show the pins among the Shortcuts.
     pins => mornye || desktop,

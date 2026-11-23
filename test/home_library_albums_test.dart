@@ -74,6 +74,7 @@ Widget _home({
     ),
     homeRecentlyPlayedProvider.overrideWith((ref) async => const []),
     homeOnRepeatProvider.overrideWith((ref) async => const []),
+    homeQuickSongsProvider.overrideWith((ref) async => const []),
     homeLibraryAlbumsProvider.overrideWith((ref) async => albums),
     playerUiEnabledProvider.overrideWithValue(true),
     currentMediaItemProvider.overrideWithBuild(

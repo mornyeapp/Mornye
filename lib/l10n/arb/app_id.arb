@@ -6436,6 +6436,7 @@
   "homeSectionAboutDownloads": "Yang sedang diunduh, menunggu, dan selesai hari ini",
   "homeSectionAboutTopPicks": "Mix dan playlist hari ini sebagai banner",
   "homeSectionAboutRecentlyPlayed": "Album yang baru kamu putar",
+  "homeSectionAboutQuickPlay": "Lagu yang paling sering kamu putar dan pilihan hari ini dari Koleksimu, sekali ketuk langsung putar",
   "homeSectionAboutShortcuts": "Jalan cepat ke alat dan koleksi, dan yang kamu sematkan",
   "homeSectionAboutPins": "Album, playlist, artis, genre, dan folder yang kamu sematkan",
   "homeSectionLink": "Perangkat terhubung",
@@ -8728,6 +8729,7 @@
   "homeUnfinishedFailed": "{count, plural, other{{count} download gagal}}",
   "homeUnfinishedAlbumProgress": "{present} dari {expected} lagu",
   "homeUnfinishedAlbumSomeMissing": "{count, plural, other{{count} lagu, sebagian belum ada}}",
+  "homeQuickPlay": "Putar cepat",
   "homeShortcuts": "Pintasan",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"

@@ -60,6 +60,7 @@ List<Override> _overrides(AppSettings settings) => [
   ),
   homeRecentlyPlayedProvider.overrideWith((ref) async => const []),
   homeOnRepeatProvider.overrideWith((ref) async => const []),
+  homeQuickSongsProvider.overrideWith((ref) async => const []),
   homeLibraryAlbumsProvider.overrideWith((ref) async => const []),
   playerUiEnabledProvider.overrideWithValue(true),
   currentMediaItemProvider.overrideWithBuild(

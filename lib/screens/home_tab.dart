@@ -151,6 +151,7 @@ part 'home_tab_recent.dart';
 part 'home_tab_import.dart';
 part 'home_tab_intro.dart';
 part 'home_tab_pins.dart';
+part 'home_tab_quick.dart';
 part 'home_tab_search_results.dart';
 part 'home_tab_search_wide.dart';
 part 'home_tab_status.dart';

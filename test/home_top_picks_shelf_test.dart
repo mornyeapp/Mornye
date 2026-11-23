@@ -114,6 +114,7 @@ Widget _home({
     ),
     homeRecentlyPlayedProvider.overrideWith((ref) async => const []),
     homeOnRepeatProvider.overrideWith((ref) async => const []),
+    homeQuickSongsProvider.overrideWith((ref) async => const []),
     homeLibraryAlbumsProvider.overrideWith(
       (ref) async => [for (var index = 0; index < 5; index++) _album(index)],
     ),

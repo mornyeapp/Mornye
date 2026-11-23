@@ -10277,6 +10277,10 @@
       }
     }
   },
+  "homeQuickPlay": "Quick play",
+  "@homeQuickPlay": {
+    "description": "Home section header above a grid of nine Library songs; a tap on one plays it"
+  },
   "homeShortcuts": "Shortcuts",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
@@ -10567,6 +10571,10 @@
   "homeSectionAboutRecentlyPlayed": "Albums you played lately",
   "@homeSectionAboutRecentlyPlayed": {
     "description": "Edit Home: what the Recently Played section shows"
+  },
+  "homeSectionAboutQuickPlay": "Songs you play most and the day's picks from your Library, one tap from playing",
+  "@homeSectionAboutQuickPlay": {
+    "description": "Edit Home: what the Quick play section shows"
   },
   "homeSectionAboutShortcuts": "Quick ways into tools and collections, and what you pinned",
   "@homeSectionAboutShortcuts": {

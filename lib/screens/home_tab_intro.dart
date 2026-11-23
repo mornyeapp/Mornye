@@ -58,28 +58,33 @@ final homeRecentlyAddedProvider = FutureProvider.autoDispose<HomeRecentlyAdded>(
     if (last != null && _sameQueueRows(last.rows, rows)) {
       return (items: last.items, trackCount: counts.allTrackCount);
     }
-    final items = <UnifiedLibraryItem>[];
-    for (final row in rows) {
-      final json = Map<String, dynamic>.from(row['item'] as Map);
-      switch (row['source']) {
-        case 'local':
-          items.add(
-            UnifiedLibraryItem.fromLocalLibrary(
-              LocalLibraryItem.fromJson(json),
-            ),
-          );
-        case 'downloaded':
-          items.add(
-            UnifiedLibraryItem.fromDownloadHistory(
-              DownloadHistoryItem.fromJson(json),
-            ),
-          );
-      }
-    }
+    final items = _homeLibraryItemsOf(rows);
     memo.recentlyAdded = (rows: rows, items: items);
     return (items: items, trackCount: counts.allTrackCount);
   },
 );
+
+/// The Library songs a page of queue rows holds, downloads and scanned
+/// files alike.
+List<UnifiedLibraryItem> _homeLibraryItemsOf(List<Map<String, dynamic>> rows) {
+  final items = <UnifiedLibraryItem>[];
+  for (final row in rows) {
+    final json = Map<String, dynamic>.from(row['item'] as Map);
+    switch (row['source']) {
+      case 'local':
+        items.add(
+          UnifiedLibraryItem.fromLocalLibrary(LocalLibraryItem.fromJson(json)),
+        );
+      case 'downloaded':
+        items.add(
+          UnifiedLibraryItem.fromDownloadHistory(
+            DownloadHistoryItem.fromJson(json),
+          ),
+        );
+    }
+  }
+  return items;
+}
 
 bool _sameQueueRows(
   List<Map<String, dynamic>> first,
@@ -220,11 +225,13 @@ bool _sameAlbums(List<LibraryBrowseEntry> a, List<LibraryBrowseEntry> b) {
 }
 
 /// Up to [limit] played songs of the last four weeks that can be played
-/// again, matched to the Library. Reloads with what changes them.
+/// again, matched to the Library. Reloads with what changes them; without
+/// [followPlays] a song that ends is not one of those.
 Future<List<HomeRepeatTrack>> _homeReplayableTracks(
   Ref ref, {
   required int limit,
   bool latestFirst = false,
+  bool followPlays = true,
 }) async {
   // Turning the record off hides what it already holds, without clearing it.
   if (!ref.watch(
@@ -234,12 +241,14 @@ Future<List<HomeRepeatTrack>> _homeReplayableTracks(
   }
   // A track that ends may have just earned a play. One that starts after
   // none, such as a restored session's, follows no play.
-  ref.listen(currentMediaItemProvider.select((s) => s.value?.id), (
-    previous,
-    _,
-  ) {
-    if (previous != null) ref.invalidateSelf();
-  });
+  if (followPlays) {
+    ref.listen(currentMediaItemProvider.select((s) => s.value?.id), (
+      previous,
+      _,
+    ) {
+      if (previous != null) ref.invalidateSelf();
+    });
+  }
   // A deleted download or a rescan can remove a track from the shelf.
   final historyVersion = ref.watch(
     downloadHistoryProvider.select((s) => s.loadedIndexVersion),
@@ -412,6 +421,7 @@ class _HomeShelfMemo {
   List<HomeRepeatTrack>? onRepeat;
   List<HomeRepeatTrack>? recentlyPlayed;
   List<LibraryBrowseEntry>? libraryAlbums;
+  List<UnifiedLibraryItem>? quickSongs;
 }
 
 final _homeShelfMemoProvider = Provider<_HomeShelfMemo>(
@@ -457,6 +467,11 @@ class _HomeSections extends ConsumerWidget {
               const <LibraryBrowseEntry>[]
         : const <LibraryBrowseEntry>[];
     final layout = ref.watch(settingsProvider.select((s) => s.homeLayout));
+    // Read only while shown: the day's picks are a query of their own.
+    final quickSongs = showPlayer && layout.shows(HomeSection.quickPlay)
+        ? ref.watch(homeQuickSongsProvider.select((s) => s.value)) ??
+              const <UnifiedLibraryItem>[]
+        : const <UnifiedLibraryItem>[];
     // Hidden Top Picks leave their albums to From your Library.
     final pickedAlbums = mornye && layout.shows(HomeSection.topPicks)
         ? dayAlbums.take(_homeTopPickLibraryAlbums).toList()
@@ -505,6 +520,15 @@ class _HomeSections extends ConsumerWidget {
     // the section stays while either is left.
     final hasShortcuts =
         !mornye && _HomeShortcuts.hasContent(ref, pins: !_homeDesktop(context));
+    // The desktop top holds Continue listening and Shortcuts, so it stands
+    // where the person put the first of the two.
+    final order = layout.sections;
+    final desktopTop =
+        showContinue &&
+            order.indexOf(HomeSection.continueListening) <
+                order.indexOf(HomeSection.shortcuts)
+        ? HomeSection.continueListening
+        : HomeSection.shortcuts;
     // What each section has to show now, before the person's order and
     // their hidden sections apply.
     final built = <HomeSection, Widget>{
@@ -521,10 +545,7 @@ class _HomeSections extends ConsumerWidget {
       if (_homeDesktop(context) &&
           hasShortcuts &&
           layout.shows(HomeSection.shortcuts))
-        HomeSection.shortcuts: _HomeDesktopTop(
-          inset: inset,
-          showContinue: showContinue,
-        )
+        desktopTop: _HomeDesktopTop(inset: inset, showContinue: showContinue)
       else ...{
         if (recentlyPlayed.isNotEmpty)
           HomeSection.recentlyPlayed: _HomeSection(
@@ -554,6 +575,16 @@ class _HomeSections extends ConsumerWidget {
             child: const _HomeShortcuts(),
           ),
       },
+      if (quickSongs.isNotEmpty)
+        HomeSection.quickPlay: _HomeSection(
+          title: l10n.homeQuickPlay,
+          inset: inset,
+          shelf: true,
+          child: _HomeQuickPlay(
+            songs: quickSongs,
+            inset: mornye ? inset + 8 : inset,
+          ),
+        ),
       // On Material phones and tablets the pins sit among the Shortcuts.
       if ((mornye || _homeDesktop(context)) && _HomePinsSection.hasContent(ref))
         HomeSection.pins: _HomePinsSection(inset: inset),
@@ -629,7 +660,7 @@ class _HomeSections extends ConsumerWidget {
         ),
     };
     final sections = [
-      for (final section in layout.sections)
+      for (final section in order)
         if (layout.shows(section)) ?built[section],
     ];
 
@@ -1228,7 +1259,9 @@ class _HomeShelfTile extends StatelessWidget {
 
   final Widget cover;
   final String title;
-  final String subtitle;
+
+  /// Null for a tile that names only its title.
+  final String? subtitle;
   final String semanticLabel;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
@@ -1275,15 +1308,16 @@ class _HomeShelfTile extends StatelessWidget {
                   fontWeight: compactText ? FontWeight.w400 : null,
                 ),
               ),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: compactText ? 13 : null,
+              if (subtitle case final subtitle?)
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: compactText ? 13 : null,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -1470,39 +1504,44 @@ class _HomeRecentlyAddedShelf extends ConsumerWidget {
                 coverSize,
                 cacheWidth,
               ),
-              onTap: () => _play(context, ref, index),
+              onTap: () => _homePlayLibraryItems(context, ref, items, index),
             );
           },
         );
       },
     );
   }
+}
 
-  /// Plays the shelf from the tapped song, or with an external player opens
-  /// that song's file in the other app.
-  Future<void> _play(BuildContext context, WidgetRef ref, int index) async {
-    final media = <PlayableMedia>[];
-    final paths = <String>[];
-    var initialIndex = 0;
-    for (final (i, item) in items.indexed) {
-      final playable = _homePlayableFromLibrary(item);
-      if (playable == null || playable.source.trim().isEmpty) continue;
-      if (i == index) initialIndex = media.length;
-      media.add(playable);
-      paths.add(item.filePath);
-    }
-    if (media.isEmpty) return;
-    try {
-      await ref
-          .read(playbackProvider.notifier)
-          .playMediaQueue(
-            media,
-            startIndex: initialIndex,
-            externalPath: paths[initialIndex],
-          );
-    } catch (e) {
-      if (context.mounted) showCannotOpenFileSnackBar(context, e);
-    }
+/// Plays [items] from the one at [index], or with an external player opens
+/// that song's file in the other app.
+Future<void> _homePlayLibraryItems(
+  BuildContext context,
+  WidgetRef ref,
+  List<UnifiedLibraryItem> items,
+  int index,
+) async {
+  final media = <PlayableMedia>[];
+  final paths = <String>[];
+  var initialIndex = 0;
+  for (final (i, item) in items.indexed) {
+    final playable = _homePlayableFromLibrary(item);
+    if (playable == null || playable.source.trim().isEmpty) continue;
+    if (i == index) initialIndex = media.length;
+    media.add(playable);
+    paths.add(item.filePath);
+  }
+  if (media.isEmpty) return;
+  try {
+    await ref
+        .read(playbackProvider.notifier)
+        .playMediaQueue(
+          media,
+          startIndex: initialIndex,
+          externalPath: paths[initialIndex],
+        );
+  } catch (e) {
+    if (context.mounted) showCannotOpenFileSnackBar(context, e);
   }
 }
 

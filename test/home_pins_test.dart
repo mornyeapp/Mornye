@@ -102,6 +102,7 @@ Widget _home({required bool mornye, bool targetsExist = true}) => ProviderScope(
     ),
     homeRecentlyPlayedProvider.overrideWith((ref) async => const []),
     homeOnRepeatProvider.overrideWith((ref) async => const []),
+    homeQuickSongsProvider.overrideWith((ref) async => const []),
     playerUiEnabledProvider.overrideWithValue(true),
     playbackResumeProvider.overrideWith((ref) async => null),
   ],
