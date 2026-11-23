@@ -23,7 +23,8 @@ class PlayerArtworkPalette {
 /// A cover whose scheme is cached shows it from the first frame. While the
 /// next cover's scheme resolves, the previous one stays; then the whole
 /// scheme moves at once on the effects spring, or swaps under reduced
-/// motion. Tracks without readable artwork use the app scheme. With AMOLED
+/// motion and in a hidden scope, such as the shell under the full player.
+/// Tracks without readable artwork use the app scheme. With AMOLED
 /// on, the page background stays pure black.
 ///
 /// A large page sets [fadesSurfaceOnly]: moving the whole scheme rebuilds
@@ -97,6 +98,10 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
   Brightness? _brightness;
   int _generation = 0;
 
+  /// Whether the scope showed when it last checked. A cover that changes
+  /// while it is hidden, or as it shows again, swaps without a transition.
+  bool _onScreen = false;
+
   ThemeData? _base;
   ColorScheme? _scheme;
   ThemeData? _theme;
@@ -105,6 +110,7 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _sync();
+    _onScreen = TickerMode.valuesOf(context).enabled;
   }
 
   @override
@@ -126,17 +132,18 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
     if (source == _source && brightness == _brightness) return;
     // The first frame and a brightness change have no scheme worth keeping.
     final keepPrevious = brightness == _brightness;
+    final animate = keepPrevious && _onScreen;
     _source = source;
     _brightness = brightness;
     final generation = ++_generation;
     if (source == null) {
-      _moveTo(null, animate: keepPrevious);
+      _moveTo(null, animate: animate);
       return;
     }
     final palette = PlayerArtworkTheme._palette;
     final cached = palette.peek(source, brightness);
     if (cached != null || !keepPrevious) {
-      _moveTo(cached, animate: keepPrevious);
+      _moveTo(cached, animate: animate);
     }
     palette
         .resolve(source, brightness)
@@ -150,7 +157,7 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
   /// Null, for unreadable artwork, returns to the app scheme.
   void _resolved(int generation, ColorScheme? scheme) {
     if (!mounted || generation != _generation) return;
-    setState(() => _moveTo(scheme, animate: true));
+    setState(() => _moveTo(scheme, animate: _onScreen));
   }
 
   void _moveTo(ColorScheme? artwork, {required bool animate}) {

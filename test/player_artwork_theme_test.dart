@@ -101,6 +101,7 @@ void main() {
       ThemeData theme, {
       bool reduceMotion = false,
       bool fadesSurfaceOnly = false,
+      bool hidden = false,
       Widget child = const SizedBox(key: probe),
     }) => MaterialApp(
       theme: theme,
@@ -108,10 +109,13 @@ void main() {
         data: MediaQuery.of(context).copyWith(disableAnimations: reduceMotion),
         child: child!,
       ),
-      home: PlayerArtworkTheme(
-        artUri: artUri,
-        fadesSurfaceOnly: fadesSurfaceOnly,
-        child: child,
+      home: TickerMode(
+        enabled: !hidden,
+        child: PlayerArtworkTheme(
+          artUri: artUri,
+          fadesSurfaceOnly: fadesSurfaceOnly,
+          child: child,
+        ),
       ),
     );
 
@@ -205,6 +209,41 @@ void main() {
       palette.complete(_coverB, null);
       await tester.pumpAndSettle();
       expect(shown(tester), theme.colorScheme);
+    });
+
+    testWidgets('a cover that changed while hidden swaps as the scope shows', (
+      tester,
+    ) async {
+      final theme = AppTheme.light();
+      palette.cached[_coverA] = red;
+      palette.cached[_coverB] = green;
+      await tester.pumpWidget(host(_coverA, theme));
+      await tester.pumpWidget(host(_coverA, theme, hidden: true));
+      // A paused consumer hands over the next cover in the frame it shows.
+      await tester.pumpWidget(host(_coverB, theme));
+      expect(shown(tester), green);
+      expect(tester.hasRunningAnimations, isFalse);
+
+      await tester.pumpWidget(host(_coverA, theme));
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(shown(tester).primary, isNot(green.primary));
+      expect(shown(tester).primary, isNot(red.primary));
+      await tester.pumpAndSettle();
+      expect(shown(tester), red);
+    });
+
+    testWidgets('a scheme that resolves while hidden swaps in one step', (
+      tester,
+    ) async {
+      final theme = AppTheme.light();
+      palette.cached[_coverA] = red;
+      await tester.pumpWidget(host(_coverA, theme));
+      await tester.pumpWidget(host(_coverB, theme, hidden: true));
+      palette.complete(_coverB, green);
+      await tester.pump();
+      await tester.pump();
+      expect(shown(tester), green);
+      expect(tester.hasRunningAnimations, isFalse);
     });
 
     testWidgets('reduced motion swaps the scheme in one step', (tester) async {
