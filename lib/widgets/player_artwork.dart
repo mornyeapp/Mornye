@@ -150,10 +150,13 @@ class PlayerArtwork extends StatelessWidget {
 }
 
 class _ArtworkLayer {
-  _ArtworkLayer(this.uri, this.opacity);
+  _ArtworkLayer(this.uri, this.opacity, {this.swaps = false});
 
   final String? uri;
   final AnimationController opacity;
+
+  /// Arrived while the crossfade was hidden: shows at once when it can.
+  final bool swaps;
   final key = UniqueKey();
   bool shown = false;
 }
@@ -206,6 +209,17 @@ class _ArtworkCrossfadeState extends State<_ArtworkCrossfade>
   AnimationController _opacity(double value) =>
       AnimationController(vsync: this, value: value, duration: _total);
 
+  /// Whether the crossfade showed when it last checked. A cover that comes
+  /// while it is hidden, as under the full player, or in the frame it shows
+  /// again, swaps instead of fading in late.
+  bool _onScreen = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _onScreen = TickerMode.valuesOf(context).enabled;
+  }
+
   @override
   void didUpdateWidget(_ArtworkCrossfade oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -226,7 +240,7 @@ class _ArtworkCrossfadeState extends State<_ArtworkCrossfade>
         ..clear()
         ..add(base);
     }
-    _layers.add(_ArtworkLayer(widget.artUri, _opacity(0)));
+    _layers.add(_ArtworkLayer(widget.artUri, _opacity(0), swaps: !_onScreen));
     _showWhenUnavailable(_current);
   }
 
@@ -267,6 +281,11 @@ class _ArtworkCrossfadeState extends State<_ArtworkCrossfade>
     // Runs during build: start the fade once this frame is done.
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_layers.contains(layer)) return;
+      if (layer.swaps) {
+        layer.opacity.value = 1;
+        _dropBelow(layer);
+        return;
+      }
       final fade = layer.opacity.animateTo(1);
       fade.whenCompleteOrCancel(() {
         if (!mounted || !_layers.contains(layer)) return;

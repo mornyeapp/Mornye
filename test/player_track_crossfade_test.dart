@@ -69,4 +69,36 @@ void main() {
       });
     }
   }
+
+  testWidgets('titles that change while hidden swap as they show', (
+    tester,
+  ) async {
+    Widget app(String title, {bool hidden = false}) => MaterialApp(
+      theme: AppTheme.light(),
+      home: TickerMode(
+        enabled: !hidden,
+        child: Center(
+          child: SizedBox(
+            width: 200,
+            child: PlayerTrackCrossfade(trackKey: title, child: Text(title)),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpWidget(app('First'));
+    await tester.pumpWidget(app('First', hidden: true));
+    // Shown again with the next title in the same frame, as a bar under a
+    // closing player is.
+    await tester.pumpWidget(app('Second'));
+    expect(find.text('First'), findsNothing);
+    expect(_opacity(tester, find.text('Second')), 1);
+
+    // A change on screen still fades through.
+    await tester.pumpWidget(app('Third'));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(find.text('Second'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('Second'), findsNothing);
+    expect(_opacity(tester, find.text('Third')), 1);
+  });
 }

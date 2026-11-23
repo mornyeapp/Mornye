@@ -64,6 +64,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
       (_, artUri) {
         _warmCoverColour(artUri);
         _warmFullScreenArtwork(artUri);
+        _warmMiniCover(artUri);
       },
     );
     ref.listenManual(
@@ -79,6 +80,17 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     super.didChangeDependencies();
     _warmCoverColour(ref.read(currentMediaItemProvider).value?.artUri);
     _warmFullScreenArtwork(ref.read(currentMediaItemProvider).value?.artUri);
+  }
+
+  // This listener runs under the full player too, so a song changed there
+  // has its cover ready when the player closes onto this bar.
+  void _warmMiniCover(Uri? artUri) {
+    final provider = coverImageProvider(
+      artUri?.toString(),
+      cacheWidth: PlayerArtwork.miniCacheWidth,
+    );
+    if (provider == null) return;
+    unawaited(precacheImage(provider, context, onError: (_, _) {}));
   }
 
   void _warmFullScreenArtwork(Uri? artUri) {

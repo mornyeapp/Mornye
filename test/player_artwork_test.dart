@@ -178,6 +178,69 @@ void main() {
     });
   }
 
+  testWidgets('a cover that comes while hidden swaps in without a fade', (
+    tester,
+  ) async {
+    final cache = PaintingBinding.instance.imageCache;
+    addTearDown(() {
+      cache.clear();
+      cache.clearLiveImages();
+    });
+    Future<ui.Image> pixel(Color color) async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawColor(color, BlendMode.src);
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(1, 1);
+      picture.dispose();
+      return image;
+    }
+
+    for (final (path, color) in [
+      ('/hidden-first.png', Colors.red),
+      ('/hidden-second.png', Colors.blue),
+    ]) {
+      final image = await tester.runAsync(() => pixel(color));
+      cache.putIfAbsent(
+        FileImage(File(path)),
+        () => OneFrameImageStreamCompleter(
+          Future.value(ImageInfo(image: image!)),
+        ),
+      );
+    }
+    Widget app(String path, {bool hidden = false}) => MaterialApp(
+      home: TickerMode(
+        enabled: !hidden,
+        child: PlayerArtwork(
+          artUri: path,
+          colorScheme: const ColorScheme.dark(),
+          crossfade: const AppMotionSpec(
+            Duration(milliseconds: 200),
+            Curves.linear,
+          ),
+        ),
+      ),
+    );
+    List<ui.Image?> shown() => [
+      for (final image in tester.widgetList<RawImage>(find.byType(RawImage)))
+        image.image,
+    ];
+
+    await tester.pumpWidget(app('/hidden-first.png'));
+    await tester.pump();
+    final displayed = shown().single;
+    await tester.pumpWidget(app('/hidden-first.png', hidden: true));
+    // Shown again with the next cover in the same frame, as a bar under a
+    // closing player is.
+    await tester.pumpWidget(app('/hidden-second.png'));
+    for (var frame = 0; frame < 3; frame++) {
+      await tester.pump();
+    }
+    expect(shown().single, isNot(same(displayed)));
+    expect(tester.hasRunningAnimations, isFalse);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('a growing crossfade waits for the frame, then fades and grows', (
     tester,
   ) async {
