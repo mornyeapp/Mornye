@@ -62,6 +62,7 @@ import 'package:mornye/widgets/material_player_layout.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
 import 'package:mornye/widgets/mornye_player_layout.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
+import 'package:mornye/widgets/player_gesture_regions.dart';
 import 'package:mornye/widgets/player_lyric_preview.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
@@ -4341,6 +4342,62 @@ void main() {
         },
       );
     }
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets('a sheet over the player leaves the player unbuilt '
+        '(Mornye: $mornye)', (tester) async {
+      await pumpNowPlaying(
+        tester,
+        theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+        size: const Size(393, 852),
+        wrapPlayer: (_) => const Scaffold(
+          body: Align(alignment: Alignment.bottomCenter, child: MiniPlayer()),
+        ),
+      );
+      mediaItems.add(item('first'));
+      await settlePlayer(tester);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(MiniPlayer),
+          matching: find.text('First'),
+        ),
+      );
+      await settlePlayer(tester);
+      final player = find.byType(NowPlayingScreen);
+      expect(player, findsOneWidget);
+      final rebuilt = <Type, int>{};
+      debugOnRebuildDirtyWidget = (element, _) => rebuilt.update(
+        element.widget.runtimeType,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+      addTearDown(() => debugOnRebuildDirtyWidget = null);
+      final navigator = Navigator.of(tester.element(player));
+      navigator.push(
+        ModalBottomSheetRoute<void>(
+          builder: (_) => const SizedBox(height: 200),
+          isScrollControlled: false,
+        ),
+      );
+      await settlePlayer(tester);
+      navigator.pop();
+      await settlePlayer(tester);
+      debugOnRebuildDirtyWidget = null;
+      // Only the sheet and the route's own frame build again.
+      for (final type in [
+        NowPlayingScreen,
+        Scaffold,
+        MaterialPlayerLayout,
+        MaterialPlayerBackdrop,
+        MornyePlayerLayout,
+        PlayerArtworkDragRegion,
+        PlayerTransitionArtwork,
+      ]) {
+        expect(rebuilt[type], isNull, reason: '$type');
+      }
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final mornye in [false, true]) {

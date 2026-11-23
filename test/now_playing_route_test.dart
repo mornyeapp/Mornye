@@ -1201,6 +1201,56 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the player page reads its route without rebuilding for a '
+      'sheet', (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(navigatorKey: navigator, home: const SizedBox()),
+    );
+    final builds = <ModalRoute<Object?>?>[];
+    final route = NowPlayingRoute(
+      child: Builder(
+        builder: (context) {
+          builds.add(NowPlayingRoute.routeOf(context));
+          NowPlayingRoute.coverFlightOf(context);
+          return const SizedBox.expand();
+        },
+      ),
+    );
+    navigator.currentState!.push(route);
+    await tester.pumpAndSettle();
+    expect(builds, [route]);
+
+    navigator.currentState!.push(
+      DialogRoute<void>(
+        context: navigator.currentContext!,
+        builder: (_) => const Text('Sheet'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(route.isCurrent, isFalse);
+    navigator.currentState!.pop();
+    await tester.pumpAndSettle();
+    expect(route.isCurrent, isTrue);
+    expect(builds, [route]);
+
+    // Outside a player page it is the page's own route, as before.
+    final other = <(NowPlayingRoute?, ModalRoute<Object?>?)>[];
+    final page = MaterialPageRoute<void>(
+      builder: (context) {
+        other.add((
+          NowPlayingRoute.maybeOf(context),
+          NowPlayingRoute.routeOf(context),
+        ));
+        return const SizedBox();
+      },
+    );
+    navigator.currentState!.push(page);
+    await tester.pumpAndSettle();
+    expect(other.last, (null, page));
+    expect(tester.takeException(), isNull);
+  });
+
   group('the page keeps its place through every motion', () {
     const mini = Rect.fromLTWH(16, 700, 368, 64);
     const morph = AppMotionSpec(Duration(milliseconds: 500), Curves.linear);

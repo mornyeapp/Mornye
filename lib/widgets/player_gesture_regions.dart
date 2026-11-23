@@ -23,7 +23,7 @@ class _PlayerQueueSwipeRegionState extends State<PlayerQueueSwipeRegion> {
 
   @override
   Widget build(BuildContext context) {
-    final route = ModalRoute.of(context);
+    final route = NowPlayingRoute.routeOf(context);
     final playerRoute = route is NowPlayingRoute ? route : null;
     final pageHeight = MediaQuery.sizeOf(context).height;
     return GestureDetector(
@@ -66,7 +66,7 @@ class PlayerArtworkDragRegion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final route = ModalRoute.of(context);
+    final route = NowPlayingRoute.routeOf(context);
     if (route is! NowPlayingRoute) return PlayerTrackSwipeRegion(child: child);
     final pageHeight = MediaQuery.sizeOf(context).height;
     return PlayerTrackSwipeRegion(
@@ -95,7 +95,7 @@ class PlayerTransitionArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final route = ModalRoute.of(context);
+    final route = NowPlayingRoute.routeOf(context);
     return AnimatedBuilder(
       animation: route?.animation ?? kAlwaysCompleteAnimation,
       child: child,

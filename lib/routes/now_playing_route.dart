@@ -64,12 +64,23 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
   /// The cover flight of a player that grows out of the mini player, for
   /// the player's own Hero. Null keeps the default flight.
   static CreateRectTween? coverFlightOf(BuildContext context) {
-    final route = ModalRoute.of(context);
+    final route = routeOf(context);
     final curve = route is NowPlayingRoute ? route.morph?.curve : null;
     if (curve == null) return null;
     return (begin, end) =>
         PlayerCoverRectTween(begin: begin, end: end, curve: curve);
   }
+
+  /// The player route whose page holds [context]. Unlike [ModalRoute.of], it
+  /// does not rebuild [context] when a sheet or menu opens over the player.
+  static NowPlayingRoute? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<_NowPlayingRouteScope>()
+      ?.route;
+
+  /// [maybeOf], or else the [ModalRoute] of [context], such as the embedded
+  /// desktop player's.
+  static ModalRoute<Object?>? routeOf(BuildContext context) =>
+      maybeOf(context) ?? ModalRoute.of(context);
 
   /// True while a player route is on its way open or closed, a held drag
   /// included. The page under it is drawn as one picture meanwhile.
@@ -502,7 +513,10 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) {
-    return _RouteDragRegion(route: this, child: child);
+    return _NowPlayingRouteScope(
+      route: this,
+      child: _RouteDragRegion(route: this, child: child),
+    );
   }
 
   @override
@@ -740,6 +754,17 @@ class _PlayerBackGesture with WidgetsBindingObserver {
 
   @override
   void handleCancelBackGesture() => route._cancelBackGesture();
+}
+
+/// Hands the player's page its route for [NowPlayingRoute.maybeOf].
+class _NowPlayingRouteScope extends InheritedWidget {
+  const _NowPlayingRouteScope({required this.route, required super.child});
+
+  final NowPlayingRoute route;
+
+  @override
+  bool updateShouldNotify(_NowPlayingRouteScope oldWidget) =>
+      route != oldWidget.route;
 }
 
 /// Routes vertical drags to [NowPlayingRoute]. Scrollables inside [child]

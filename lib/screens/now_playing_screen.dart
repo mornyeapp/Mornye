@@ -530,7 +530,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
     // The Mornye route moves the entire player together. A second,
     // delayed content fade would make dismissal appear to pause partway down.
-    final route = ModalRoute.of(context);
+    final route = NowPlayingRoute.routeOf(context);
     final routeAnimation = route?.animation ?? kAlwaysCompleteAnimation;
     if (_artworkRoute != route) {
       _artworkRoute?.readArtwork = null;
@@ -1176,7 +1176,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         _logLyricsAutoHideBlockers();
         return;
       }
-      if (ModalRoute.of(context)?.isCurrent == false) {
+      if (NowPlayingRoute.routeOf(context)?.isCurrent == false) {
         _logLyricsControlsStatus(
           'Lyrics controls stay visible: another route is active',
         );
