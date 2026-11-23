@@ -1,130 +1,235 @@
-//! Finds receivers advertising `_googlecast._tcp.local.` on the local
-//! network. TXT records carry `id` (a stable device id), `fn` (the name the
-//! owner gave it) and `md` (the model).
+//! The receivers on the local network, of every kind the app asked for. Each
+//! kind browses on its own (mDNS for Google Cast and FCast, SSDP for DLNA)
+//! into one shared list, and one kind failing to start leaves the others.
 
-use mdns_sd::{IfKind, ServiceDaemon, ServiceEvent};
+use crate::{dlna, mdns};
 use serde::Serialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use tokio::runtime::Handle;
 
-const SERVICE_TYPE: &str = "_googlecast._tcp.local.";
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Kind {
+    Cast,
+    Dlna,
+    Fcast,
+    Roku,
+}
+
+impl Kind {
+    pub(crate) const ALL: [Self; 4] = [Self::Cast, Self::Dlna, Self::Fcast, Self::Roku];
+
+    pub(crate) fn parse(name: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|kind| kind.name().eq_ignore_ascii_case(name))
+    }
+
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Cast => "cast",
+            Self::Dlna => "dlna",
+            Self::Fcast => "fcast",
+            Self::Roku => "roku",
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Device {
+    /// Google Cast ids as the receiver gives them; other kinds are prefixed
+    /// with their kind (`dlna:<UDN>`, `fcast:<name>`).
     pub id: String,
     pub name: String,
     pub model: String,
     pub host: IpAddr,
     pub port: u16,
+    pub kind: Kind,
+    /// Where a DLNA renderer's description lives.
+    #[serde(skip)]
+    pub(crate) location: Option<String>,
 }
 
-type Devices = Arc<Mutex<BTreeMap<String, Device>>>;
-
-/// A running browse; dropping it stops the mDNS daemon.
-pub(crate) struct Discovery {
-    daemon: ServiceDaemon,
-}
-
-impl Discovery {
-    /// Browses until dropped, calling `changed` with every device list
-    /// change. `devices` keeps the latest list.
-    pub(crate) fn start(
-        devices: Devices,
-        changed: impl Fn(Vec<Device>) + Send + 'static,
-    ) -> Result<Self, String> {
-        let fail = |error: mdns_sd::Error| format!("Cast discovery failed: {error}");
-        let daemon = ServiceDaemon::new().map_err(fail)?;
-        // Receivers answer on IPv4; link-local IPv6 answers only add
-        // addresses a sender cannot always route to.
-        let _ = daemon.disable_interface(vec![IfKind::IPv6, IfKind::LoopbackV4]);
-        let events = match daemon.browse(SERVICE_TYPE) {
-            Ok(events) => events,
-            Err(error) => {
-                let _ = daemon.shutdown();
-                return Err(fail(error));
-            }
-        };
-        std::thread::Builder::new()
-            .name("mornye-cast-discovery".into())
-            .spawn(move || {
-                // Fullname to device id, for removals that carry only the name.
-                let mut names = BTreeMap::<String, String>::new();
-                while let Ok(event) = events.recv() {
-                    let update = match event {
-                        ServiceEvent::ServiceResolved(service) => {
-                            let txt = |key: &str| {
-                                service
-                                    .txt_properties
-                                    .get_property_val_str(key)
-                                    .unwrap_or_default()
-                                    .to_owned()
-                            };
-                            let host = service
-                                .addresses
-                                .iter()
-                                .map(|address| address.to_ip_addr())
-                                .find(IpAddr::is_ipv4);
-                            let id = txt("id");
-                            match host {
-                                Some(host) if !id.is_empty() => {
-                                    let name = Some(txt("fn"))
-                                        .filter(|name| !name.is_empty())
-                                        .unwrap_or_else(|| {
-                                            service
-                                                .fullname
-                                                .split("._googlecast")
-                                                .next()
-                                                .unwrap_or_default()
-                                                .to_owned()
-                                        });
-                                    names.insert(service.fullname.clone(), id.clone());
-                                    let device = Device {
-                                        id: id.clone(),
-                                        name,
-                                        model: txt("md"),
-                                        host,
-                                        port: service.port,
-                                    };
-                                    let mut list = devices.lock().expect("cast devices");
-                                    (list.get(&id) != Some(&device))
-                                        .then(|| list.insert(id, device))
-                                        .is_some()
-                                }
-                                _ => false,
-                            }
-                        }
-                        ServiceEvent::ServiceRemoved(_, fullname) => {
-                            names.remove(&fullname).is_some_and(|id| {
-                                devices.lock().expect("cast devices").remove(&id).is_some()
-                            })
-                        }
-                        ServiceEvent::SearchStopped(_) => break,
-                        _ => false,
-                    };
-                    if update {
-                        changed(
-                            devices
-                                .lock()
-                                .expect("cast devices")
-                                .values()
-                                .cloned()
-                                .collect(),
-                        );
-                    }
-                }
-            })
-            .map_err(|error| format!("Cast discovery failed: {error}"))?;
-        Ok(Self { daemon })
+impl Device {
+    pub(crate) fn new(
+        kind: Kind,
+        id: &str,
+        name: &str,
+        model: &str,
+        host: IpAddr,
+        port: u16,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            model: model.into(),
+            host,
+            port,
+            kind,
+            location: None,
+        }
     }
 }
 
-impl Drop for Discovery {
-    fn drop(&mut self) {
-        let _ = self.daemon.stop_browse(SERVICE_TYPE);
-        if let Ok(done) = self.daemon.shutdown() {
-            let _ = done.recv_timeout(Duration::from_secs(1));
+type Devices = Arc<Mutex<BTreeMap<String, Device>>>;
+type Changed = Arc<dyn Fn(Vec<Device>) + Send + Sync>;
+
+/// The shared device list and the app's change callback.
+#[derive(Clone)]
+pub(crate) struct Registry {
+    devices: Devices,
+    changed: Changed,
+}
+
+impl Registry {
+    pub(crate) fn new(
+        devices: Devices,
+        changed: impl Fn(Vec<Device>) + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            devices,
+            changed: Arc::new(changed),
         }
+    }
+
+    pub(crate) fn upsert(&self, device: Device) {
+        let changed = {
+            let mut list = self.devices.lock().expect("cast devices");
+            (list.get(&device.id) != Some(&device))
+                .then(|| list.insert(device.id.clone(), device))
+                .is_some()
+        };
+        if changed {
+            self.notify();
+        }
+    }
+
+    pub(crate) fn remove(&self, id: &str) {
+        let removed = self
+            .devices
+            .lock()
+            .expect("cast devices")
+            .remove(id)
+            .is_some();
+        if removed {
+            self.notify();
+        }
+    }
+
+    pub(crate) fn retain(&self, keep: impl Fn(&Device) -> bool) {
+        let removed = {
+            let mut list = self.devices.lock().expect("cast devices");
+            let before = list.len();
+            list.retain(|_, device| keep(device));
+            list.len() != before
+        };
+        if removed {
+            self.notify();
+        }
+    }
+
+    fn notify(&self) {
+        let list = self
+            .devices
+            .lock()
+            .expect("cast devices")
+            .values()
+            .cloned()
+            .collect();
+        (self.changed)(list);
+    }
+}
+
+/// The running browses; dropping one stops it.
+pub(crate) struct Discovery {
+    registry: Registry,
+    running: BTreeMap<Kind, Box<dyn Send>>,
+}
+
+impl Discovery {
+    pub(crate) fn new(registry: Registry) -> Self {
+        Self {
+            registry,
+            running: BTreeMap::new(),
+        }
+    }
+
+    /// Browses for exactly `kinds`. Fails only when nothing could start.
+    pub(crate) fn set(&mut self, kinds: &BTreeSet<Kind>, runtime: &Handle) -> Result<(), String> {
+        self.running.retain(|kind, _| kinds.contains(kind));
+        self.registry.retain(|device| kinds.contains(&device.kind));
+        let mut failures = Vec::new();
+        for &kind in kinds {
+            if self.running.contains_key(&kind) {
+                continue;
+            }
+            let registry = self.registry.clone();
+            let started: Result<Box<dyn Send>, String> = match kind {
+                Kind::Cast => mdns::Browse::start(&mdns::GOOGLE_CAST, registry).map(boxed),
+                Kind::Dlna => dlna::Browse::start(runtime, registry).map(boxed),
+                // Roku documents no way for another device to play a URL.
+                Kind::Fcast | Kind::Roku => continue,
+            };
+            match started {
+                Ok(browse) => {
+                    self.running.insert(kind, browse);
+                }
+                Err(error) => failures.push(error),
+            }
+        }
+        match failures.into_iter().next() {
+            Some(error) if self.running.is_empty() => Err(error),
+            _ => Ok(()),
+        }
+    }
+}
+
+fn boxed(browse: impl Send + 'static) -> Box<dyn Send> {
+    Box::new(browse)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kinds_have_the_contract_names() {
+        assert_eq!(Kind::parse("DLNA"), Some(Kind::Dlna));
+        assert_eq!(Kind::parse("airplay"), None);
+        let device = Device::new(
+            Kind::Fcast,
+            "fcast:Den",
+            "Den",
+            "FCast",
+            "192.0.2.4".parse().unwrap(),
+            46899,
+        );
+        assert_eq!(
+            serde_json::to_value(&device).unwrap(),
+            serde_json::json!({"id": "fcast:Den", "name": "Den", "model": "FCast",
+                "host": "192.0.2.4", "port": 46899, "kind": "fcast"})
+        );
+        // Google Cast devices say their kind too.
+        let cast = Device::new(Kind::Cast, "abc", "Hall", "", device.host, 8009);
+        assert_eq!(serde_json::to_value(&cast).unwrap()["kind"], "cast");
+    }
+
+    #[test]
+    fn the_registry_tells_the_app_only_about_changes() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&calls);
+        let registry = Registry::new(Arc::default(), move |list: Vec<Device>| {
+            seen.lock().unwrap().push(list.len());
+        });
+        let host = "192.0.2.4".parse().unwrap();
+        let device = Device::new(Kind::Dlna, "dlna:uuid:1", "Den", "", host, 80);
+        registry.upsert(device.clone());
+        registry.upsert(device);
+        registry.upsert(Device::new(Kind::Cast, "c1", "Hall", "", host, 8009));
+        registry.retain(|device| device.kind == Kind::Cast);
+        registry.remove("missing");
+        assert_eq!(*calls.lock().unwrap(), [1, 2, 1]);
     }
 }

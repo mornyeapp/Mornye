@@ -4,7 +4,7 @@
 //!
 //! | method       | arguments                          | result            |
 //! |--------------|------------------------------------|-------------------|
-//! | `discover`   | `{"on": bool}`                     | null              |
+//! | `discover`   | `{"on": bool, "kinds"?: [kind]}`   | null              |
 //! | `devices`    |                                    | `[device]`        |
 //! | `connect`    | `{"deviceId"}`                     | null              |
 //! | `disconnect` |                                    | null              |
@@ -18,13 +18,17 @@
 //! | `register`   | `{"source","mime"}`                | `{"url"}`         |
 //! | `clearMedia`, `closeMedia` |                      | null              |
 //!
-//! Android keeps Google's sender and uses only the media methods.
+//! Kinds are `cast`, `dlna`, `fcast` and `roku`; without `kinds` all are
+//! browsed. Android keeps Google's sender for Google Cast and uses this one
+//! for the other kinds and the media methods.
 
-use crate::discovery::{Device, Discovery};
+use crate::discovery::{Device, Discovery, Kind, Registry};
 use crate::media::{MediaServer, local_address_towards};
-use crate::sender::{self, Emit, Sender, Status};
+use crate::sender::Emit;
+use crate::session::{self, Control, Item, Session};
+use crate::status::Status;
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
@@ -35,7 +39,7 @@ pub struct CastService {
     emit: Emit,
     devices: Arc<Mutex<BTreeMap<String, Device>>>,
     discovery: Mutex<Option<Discovery>>,
-    sender: Arc<tokio::sync::Mutex<Option<Sender>>>,
+    session: Arc<tokio::sync::Mutex<Option<Session>>>,
     status: Arc<Mutex<Status>>,
     media: Arc<Mutex<Option<MediaServer>>>,
 }
@@ -53,7 +57,7 @@ impl CastService {
             emit: Arc::new(emit),
             devices: Arc::default(),
             discovery: Mutex::default(),
-            sender: Arc::default(),
+            session: Arc::default(),
             status: Arc::default(),
             media: Arc::default(),
         })
@@ -67,13 +71,13 @@ impl CastService {
             "discover" => {
                 let mut discovery = self.discovery.lock().expect("cast discovery");
                 if args["on"].as_bool() == Some(true) {
-                    if discovery.is_none() {
+                    let running = discovery.get_or_insert_with(|| {
                         let emit = Arc::clone(&self.emit);
-                        *discovery =
-                            Some(Discovery::start(Arc::clone(&self.devices), move |list| {
-                                emit("castDevices", json!({"devices": list}));
-                            })?);
-                    }
+                        Discovery::new(Registry::new(Arc::clone(&self.devices), move |list| {
+                            emit("castDevices", json!({"devices": list}));
+                        }))
+                    });
+                    running.set(&kinds(&args["kinds"]), self.runtime.handle())?;
                 } else {
                     *discovery = None;
                     self.devices.lock().expect("cast devices").clear();
@@ -99,51 +103,51 @@ impl CastService {
                     .expect("cast devices")
                     .get(&id)
                     .cloned()
-                    .ok_or("This TV is no longer on the network")?;
+                    .ok_or_else(|| gone(&id))?;
+                let kind = device.kind;
                 let (slot, status, emit) = (
-                    Arc::clone(&self.sender),
+                    Arc::clone(&self.session),
                     Arc::clone(&self.status),
                     Arc::clone(&self.emit),
                 );
-                self.wait(async move {
+                let result = self.wait(async move {
                     let mut slot = slot.lock().await;
                     if let Some(previous) = slot.take() {
-                        let _ = previous.disconnect().await;
+                        let _ = previous.control(Control::Disconnect).await;
                     }
-                    *slot = Some(sender::connect(device, status, emit).await?);
+                    *slot = Some(session::connect(device, status, emit).await?);
                     Ok(Value::Null)
-                })
+                });
+                if result.is_ok()
+                    && let Some(server) = self.media.lock().expect("cast media").as_ref()
+                {
+                    server.set_dlna(kind == Kind::Dlna);
+                }
+                result
             }
             "disconnect" => {
-                let slot = Arc::clone(&self.sender);
+                let slot = Arc::clone(&self.session);
                 self.wait(async move {
-                    if let Some(sender) = slot.lock().await.take() {
-                        let _ = sender.disconnect().await;
+                    if let Some(session) = slot.lock().await.take() {
+                        let _ = session.control(Control::Disconnect).await;
                     }
                     Ok(Value::Null)
                 })
             }
             "load" => {
-                let request = args.clone();
-                self.with_sender(move |sender| async move { sender.load(&request).await })
+                let item = Item::from_request(args)?;
+                self.control(Control::Load(Box::new(item)))
             }
-            "play" | "pause" | "stop" => {
-                let kind = match method {
-                    "play" => "PLAY",
-                    "pause" => "PAUSE",
-                    _ => "STOP",
-                };
-                self.with_sender(move |sender| async move { sender.media(kind, json!({})).await })
-            }
+            "play" => self.control(Control::Play),
+            "pause" => self.control(Control::Pause),
+            "stop" => self.control(Control::Stop),
             "seek" => {
                 let seconds = args["position"].as_f64().unwrap_or_default() / 1000.0;
-                self.with_sender(move |sender| async move {
-                    sender.media("SEEK", json!({"currentTime": seconds})).await
-                })
+                self.control(Control::Seek(seconds))
             }
             "volume" => {
                 let level = args["volume"].as_f64().unwrap_or_default();
-                self.with_sender(move |sender| async move { sender.volume(level).await })
+                self.control(Control::Volume(level.clamp(0.0, 1.0)))
             }
             "serve" => {
                 let host: IpAddr = text("host")
@@ -152,16 +156,22 @@ impl CastService {
                 let failed =
                     |error: std::io::Error| format!("Could not share audio with the TV: {error}");
                 let local = local_address_towards(host).map_err(failed)?;
+                let dlna = self.kind() == Some(Kind::Dlna);
                 // This device's address changes with its network; a server
                 // kept on the old one would answer nobody.
                 let bound = self.media.lock().expect("cast media");
-                if (bound.as_ref()).is_some_and(|server| server.address().ip() == local) {
+                if let Some(server) = bound
+                    .as_ref()
+                    .filter(|server| server.address().ip() == local)
+                {
+                    server.set_dlna(dlna);
                     return Ok(Value::Null);
                 }
                 drop(bound);
                 let media = Arc::clone(&self.media);
                 self.wait(async move {
                     let server = MediaServer::bind(local).await.map_err(failed)?;
+                    server.set_dlna(dlna);
                     *media.lock().expect("cast media") = Some(server);
                     Ok(Value::Null)
                 })
@@ -190,21 +200,27 @@ impl CastService {
         }
     }
 
-    fn with_sender<F, Fut>(&self, run: F) -> Result<Value, String>
-    where
-        F: FnOnce(Sender) -> Fut + Send + 'static,
-        Fut: Future<Output = Result<(), String>> + Send,
-    {
-        let slot = Arc::clone(&self.sender);
+    /// The kind of the session's receiver, also after it disconnected.
+    fn kind(&self) -> Option<Kind> {
+        let status = self.status.lock().expect("cast status");
+        status.device.as_ref().map(|device| device.kind)
+    }
+
+    fn control(&self, control: Control) -> Result<Value, String> {
+        let slot = Arc::clone(&self.session);
+        let disconnected = match self.kind() {
+            None | Some(Kind::Cast) => "TV is disconnected",
+            Some(_) => "Device is disconnected",
+        };
         self.wait(async move {
             let guard = slot.lock().await;
-            let sender = guard
+            let session = guard
                 .as_ref()
-                .filter(|sender| !sender.is_closed())
-                .ok_or("TV is disconnected")?
+                .filter(|session| !session.is_closed())
+                .ok_or(disconnected)?
                 .clone();
             drop(guard);
-            run(sender).await.map(|()| Value::Null)
+            session.control(control).await.map(|()| Value::Null)
         })
     }
 
@@ -222,15 +238,74 @@ impl CastService {
     }
 }
 
+/// The kinds `discover` browses: the listed ones, or all when absent.
+fn kinds(listed: &Value) -> BTreeSet<Kind> {
+    match listed.as_array() {
+        Some(names) => names
+            .iter()
+            .filter_map(Value::as_str)
+            .filter_map(Kind::parse)
+            .collect(),
+        None => Kind::ALL.into_iter().collect(),
+    }
+}
+
+fn gone(id: &str) -> String {
+    let cast = Kind::ALL
+        .into_iter()
+        .filter(|kind| *kind != Kind::Cast)
+        .all(|kind| !id.starts_with(&format!("{}:", kind.name())));
+    if cast {
+        "This TV is no longer on the network".into()
+    } else {
+        "This device is no longer on the network".into()
+    }
+}
+
 impl Drop for CastService {
     fn drop(&mut self) {
         self.discovery.lock().expect("cast discovery").take();
-        let slot = Arc::clone(&self.sender);
+        let slot = Arc::clone(&self.session);
         let _ = self.wait(async move {
-            if let Some(sender) = slot.lock().await.take() {
-                let _ = sender.disconnect().await;
+            if let Some(session) = slot.lock().await.take() {
+                let _ = session.control(Control::Disconnect).await;
             }
             Ok(Value::Null)
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn discovery_kinds_default_to_all() {
+        assert_eq!(kinds(&Value::Null).len(), 4);
+        let listed = kinds(&json!(["dlna", "fcast", "roku", "other"]));
+        assert_eq!(
+            listed.into_iter().collect::<Vec<_>>(),
+            [Kind::Dlna, Kind::Fcast, Kind::Roku]
+        );
+        assert!(kinds(&json!([])).is_empty());
+    }
+
+    #[test]
+    fn kinds_not_built_or_not_known_are_ignored_without_error() {
+        let service = CastService::new(|_, _| {}).unwrap();
+        let only = json!({"on": true, "kinds": ["roku", "airplay"]});
+        assert_eq!(service.call("discover", &only), Ok(Value::Null));
+        assert_eq!(service.call("devices", &Value::Null), Ok(json!([])));
+        let off = json!({"on": false});
+        assert_eq!(service.call("discover", &off), Ok(Value::Null));
+    }
+
+    #[test]
+    fn a_missing_device_is_worded_for_its_kind() {
+        assert_eq!(gone("abc123"), "This TV is no longer on the network");
+        assert_eq!(
+            gone("dlna:uuid:1"),
+            "This device is no longer on the network"
+        );
     }
 }

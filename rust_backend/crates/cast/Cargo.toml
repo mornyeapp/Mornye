@@ -20,6 +20,9 @@ rustls.workspace = true
 tokio-rustls.workspace = true
 mdns-sd.workspace = true
 if-addrs.workspace = true
+# Both already in the app through hyper-util and the network crate.
+socket2 = { workspace = true, features = ["all"] }
+url.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 getrandom.workspace = true

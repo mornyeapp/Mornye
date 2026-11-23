@@ -9,6 +9,8 @@
 
 use crate::discovery::Device;
 use crate::proto::{self, CONNECTION, HEARTBEAT, MEDIA, Message, RECEIVER};
+use crate::session::Item;
+use crate::status::{Status, state};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{CryptoProvider, verify_tls12_signature, verify_tls13_signature};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
@@ -38,67 +40,7 @@ const SILENCE_LIMIT: Duration = Duration::from_secs(16);
 /// How often position updates go out while playing, as on Android.
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(500);
 
-/// Android's `MediaStatus` player states, which the app's player reads.
-mod state {
-    pub(super) const UNKNOWN: i64 = 0;
-    pub(super) const IDLE: i64 = 1;
-    pub(super) const PLAYING: i64 = 2;
-    pub(super) const PAUSED: i64 = 3;
-    pub(super) const BUFFERING: i64 = 4;
-    pub(super) const LOADING: i64 = 5;
-}
-
-/// What the app knows about the session, shared with the service so state
-/// and position answer without waiting on the connection.
-#[derive(Default)]
-pub(crate) struct Status {
-    pub(crate) device: Option<Device>,
-    pub(crate) connected: bool,
-    pub(crate) revision: u64,
-    volume: f64,
-    media_session: Option<i64>,
-    token: Option<i64>,
-    current_time: f64,
-    reported: Option<Instant>,
-    duration: f64,
-    player_state: i64,
-    idle_reason: Option<String>,
-}
-
 impl Status {
-    pub(crate) fn position_ms(&self) -> i64 {
-        let mut seconds = self.current_time;
-        if self.player_state == state::PLAYING
-            && let Some(at) = self.reported
-        {
-            seconds += at.elapsed().as_secs_f64();
-        }
-        if self.duration > 0.0 {
-            seconds = seconds.min(self.duration);
-        }
-        (seconds * 1000.0) as i64
-    }
-
-    pub(crate) fn snapshot(&self) -> Value {
-        let Some(device) = self.device.as_ref().filter(|_| self.connected) else {
-            return json!({"connected": false, "revision": self.revision});
-        };
-        json!({
-            "connected": true,
-            "deviceId": device.id,
-            "revision": self.revision,
-            "deviceName": device.name,
-            "host": device.host.to_string(),
-            "volume": self.volume,
-            "token": self.token,
-            "position": self.position_ms(),
-            "duration": (self.duration * 1000.0) as i64,
-            "state": self.player_state,
-            "finished": self.idle_reason.as_deref() == Some("FINISHED"),
-            "failed": self.idle_reason.as_deref() == Some("ERROR"),
-        })
-    }
-
     fn apply_media(&mut self, entry: &Value, token: Option<i64>) {
         let session = entry["mediaSessionId"].as_i64();
         if session != self.media_session {
@@ -118,8 +60,7 @@ impl Status {
             self.duration = duration;
         }
         if let Some(time) = entry["currentTime"].as_f64() {
-            self.current_time = time;
-            self.reported = Some(Instant::now());
+            self.report(time);
         }
         self.player_state = match entry["playerState"].as_str() {
             Some("IDLE") => state::IDLE,
@@ -152,30 +93,28 @@ impl Sender {
         self.commands.is_closed()
     }
 
-    pub(crate) async fn load(&self, request: &Value) -> Result<(), String> {
-        let text = |key: &str| request[key].as_str().unwrap_or_default();
-        let url = request["url"].as_str().ok_or("load needs a url")?;
-        let token = request["token"].as_i64().ok_or("load needs a token")?;
+    pub(crate) async fn load(&self, item: &Item) -> Result<(), String> {
         let mut metadata = json!({
             "metadataType": 3,
-            "title": text("title"),
-            "artist": text("artist"),
-            "albumName": text("album"),
+            "title": item.title,
+            "artist": item.artist,
+            "albumName": item.album,
         });
-        if let Some(artwork) = request["artwork"].as_str() {
+        if let Some(artwork) = &item.artwork {
             metadata["images"] = json!([{"url": artwork}]);
         }
         let mut media = json!({
-            "contentId": url,
-            "contentUrl": url,
+            "contentId": item.url,
+            "contentUrl": item.url,
             "streamType": "BUFFERED",
-            "contentType": request["mime"].as_str().ok_or("load needs a mime type")?,
+            "contentType": item.mime,
             "metadata": metadata,
-            "customData": {"mornyeToken": token},
+            "customData": {"mornyeToken": item.token},
         });
-        if let Some(duration) = request["duration"].as_i64().filter(|ms| *ms > 0) {
-            media["duration"] = json!(duration as f64 / 1000.0);
+        if item.duration.is_some() {
+            media["duration"] = json!(item.duration_seconds());
         }
+        let token = item.token;
         self.ask(|reply| Command::Load(media, token, reply)).await
     }
 
@@ -235,13 +174,7 @@ pub(crate) async fn connect(
     .map_err(fail)?;
     {
         let mut status = status.lock().expect("cast status");
-        *status = Status {
-            device: Some(device),
-            connected: true,
-            revision: status.revision + 1,
-            volume: link.volume,
-            ..Status::default()
-        };
+        status.start(device, Some(link.volume));
         emit("castStatus", status.snapshot());
     }
     let (commands, receiver) = mpsc::unbounded_channel();
@@ -540,7 +473,7 @@ impl Actor {
                 }
                 let mut status = self.status.lock().expect("cast status");
                 if let Some(level) = payload["status"]["volume"]["level"].as_f64() {
-                    status.volume = level;
+                    status.volume = Some(level);
                 }
                 (self.emit)("castStatus", status.snapshot());
                 drop(status);
@@ -656,15 +589,17 @@ impl ServerCertVerifier for AnyCertificate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::discovery::Kind;
 
     fn device() -> Device {
-        Device {
-            id: "device-1".into(),
-            name: "Living Room".into(),
-            model: "Speaker".into(),
-            host: "192.0.2.10".parse().unwrap(),
-            port: 8009,
-        }
+        Device::new(
+            Kind::Cast,
+            "device-1",
+            "Living Room",
+            "Speaker",
+            "192.0.2.10".parse().unwrap(),
+            8009,
+        )
     }
 
     #[test]
@@ -673,7 +608,7 @@ mod tests {
             device: Some(device()),
             connected: true,
             revision: 2,
-            volume: 0.4,
+            volume: Some(0.4),
             ..Status::default()
         };
         status.apply_media(
@@ -691,6 +626,7 @@ mod tests {
         assert_eq!(snapshot["position"], 12_500);
         assert_eq!(snapshot["duration"], 200_000);
         assert_eq!(snapshot["host"], "192.0.2.10");
+        assert_eq!(snapshot["kind"], "cast");
         assert_eq!(snapshot["finished"], false);
     }
 
@@ -715,7 +651,7 @@ mod tests {
     }
 
     #[test]
-    fn disconnected_snapshots_carry_only_the_revision() {
+    fn disconnected_snapshots_carry_only_the_revision_and_kind() {
         let status = Status {
             device: Some(device()),
             revision: 3,
@@ -723,7 +659,11 @@ mod tests {
         };
         assert_eq!(
             status.snapshot(),
-            json!({"connected": false, "revision": 3})
+            json!({"connected": false, "revision": 3, "kind": "cast"})
+        );
+        assert_eq!(
+            Status::default().snapshot(),
+            json!({"connected": false, "revision": 0})
         );
     }
 }

@@ -1,8 +1,10 @@
 //! The sender against a scripted receiver speaking Cast v2 over TLS.
 
-use crate::discovery::Device;
+use crate::discovery::{Device, Kind};
 use crate::proto::{CONNECTION, HEARTBEAT, MEDIA, Message, RECEIVER};
-use crate::sender::{self, Status};
+use crate::sender;
+use crate::session::Item;
+use crate::status::Status;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
@@ -124,13 +126,12 @@ async fn receiver(listener: TcpListener, seen: mpsc::UnboundedSender<(String, Va
 }
 
 fn device(port: u16) -> Device {
-    Device {
-        id: "device-1".into(),
-        name: "Living Room".into(),
-        model: "Speaker".into(),
-        host: "127.0.0.1".parse().unwrap(),
-        port,
-    }
+    let host = "127.0.0.1".parse().unwrap();
+    Device::new(Kind::Cast, "device-1", "Living Room", "Speaker", host, port)
+}
+
+fn item(request: Value) -> Item {
+    Item::from_request(&request).unwrap()
 }
 
 #[tokio::test]
@@ -158,10 +159,10 @@ async fn a_session_launches_loads_plays_and_stops_the_receiver() {
     assert_eq!(connected["revision"], 1);
 
     session
-        .load(
-            &json!({"url": "http://192.0.2.1/media/x", "mime": "audio/flac",
+        .load(&item(
+            json!({"url": "http://192.0.2.1/media/x", "mime": "audio/flac",
             "token": 42, "title": "Song", "artist": "Artist", "duration": 180_000}),
-        )
+        ))
         .await
         .unwrap();
     assert_eq!(status.lock().unwrap().snapshot()["token"], 42);
@@ -196,7 +197,9 @@ async fn a_session_launches_loads_plays_and_stops_the_receiver() {
     session.volume(0.25).await.unwrap();
     assert_eq!(status.lock().unwrap().snapshot()["volume"], 0.25);
     let rejected = session
-        .load(&json!({"url": "http://192.0.2.1/media/y", "mime": "audio/x-bad", "token": 43}))
+        .load(&item(
+            json!({"url": "http://192.0.2.1/media/y", "mime": "audio/x-bad", "token": 43}),
+        ))
         .await;
     assert!(rejected.is_err());
 
