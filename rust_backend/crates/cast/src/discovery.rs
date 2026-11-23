@@ -168,9 +168,10 @@ impl Discovery {
             let registry = self.registry.clone();
             let started: Result<Box<dyn Send>, String> = match kind {
                 Kind::Cast => mdns::Browse::start(&mdns::GOOGLE_CAST, registry).map(boxed),
+                Kind::Fcast => mdns::Browse::start(&mdns::FCAST, registry).map(boxed),
                 Kind::Dlna => dlna::Browse::start(runtime, registry).map(boxed),
                 // Roku documents no way for another device to play a URL.
-                Kind::Fcast | Kind::Roku => continue,
+                Kind::Roku => continue,
             };
             match started {
                 Ok(browse) => {

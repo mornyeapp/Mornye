@@ -2,9 +2,9 @@
 //! keeps its own sender; the other kinds run an actor fed by [`Remote`].
 
 use crate::discovery::{Device, Kind};
-use crate::dlna;
 use crate::sender::{self, Emit, Sender};
 use crate::status::Status;
+use crate::{dlna, fcast};
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -134,7 +134,10 @@ pub(crate) async fn connect(
         Kind::Dlna => dlna::connect(device, status, emit)
             .await
             .map(Session::Remote),
-        Kind::Fcast | Kind::Roku => Err("This kind of device is not supported".into()),
+        Kind::Fcast => fcast::connect(device, status, emit)
+            .await
+            .map(Session::Remote),
+        Kind::Roku => Err("Roku devices are not supported".into()),
     }
 }
 

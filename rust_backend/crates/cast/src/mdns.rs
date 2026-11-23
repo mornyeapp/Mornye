@@ -19,6 +19,11 @@ pub(crate) const GOOGLE_CAST: Service = Service {
     parse: google_cast,
 };
 
+pub(crate) const FCAST: Service = Service {
+    ty: "_fcast._tcp.local.",
+    parse: crate::fcast::device,
+};
+
 /// A running browse; dropping it stops the mDNS daemon.
 pub(crate) struct Browse {
     daemon: ServiceDaemon,

@@ -1,11 +1,14 @@
 //! Casting for the app: the media server receivers stream from, and senders
-//! for Google Cast (on platforms without Google's Cast SDK) and DLNA
-//! renderers, behind one service.
+//! for Google Cast (on platforms without Google's Cast SDK), DLNA renderers
+//! and FCast receivers, behind one service.
 
 mod discovery;
 mod dlna;
 #[cfg(test)]
 mod dlna_tests;
+mod fcast;
+#[cfg(test)]
+mod fcast_tests;
 mod http;
 mod mdns;
 pub mod media;
