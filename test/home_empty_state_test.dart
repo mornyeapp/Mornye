@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/models/home_layout.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
@@ -12,6 +15,8 @@ import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/home_recommendations_provider.dart';
 import 'package:mornye/providers/home_top_picks_provider.dart';
+import 'package:mornye/providers/home_unfinished_provider.dart';
+import 'package:mornye/providers/library_browse_provider.dart';
 import 'package:mornye/providers/library_mixes_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart';
@@ -30,34 +35,70 @@ import 'support/fixed_settings.dart';
 
 const _title = 'Nothing here yet';
 
+const _album = LibraryBrowseEntry(
+  source: 'downloaded',
+  key: 'album',
+  name: 'Example album',
+  artist: 'Artist',
+  samplePath: '',
+  trackCount: 2,
+);
+
 /// Home without extensions, a feed or a song in the player, with [added] as
-/// its Recently added shelf and [recommended] as its recommendations.
+/// its Recently added shelf and [recommended] as its recommendations. Each
+/// other shelf notes its name in [reads] when it loads.
 Widget _home({
   required bool mornye,
   List<UnifiedLibraryItem> added = const [],
   List<Track> recommended = const [],
+  AppSettings settings = const AppSettings(
+    homeFeedProvider: AppSettings.homeFeedProviderOff,
+  ),
+  List<String>? reads,
+  Future<List<LibraryBrowseEntry>> Function()? libraryAlbums,
 }) => ProviderScope(
   overrides: [
     homeRecommendationsProvider.overrideWith((ref) async => recommended),
-    homeNewReleasesProvider.overrideWith(
-      (ref) => Stream.value(const <WeeklyRelease>[]),
-    ),
-    settingsProvider.overrideWith(
-      () => FixedSettingsNotifier(
-        const AppSettings(homeFeedProvider: AppSettings.homeFeedProviderOff),
-      ),
-    ),
+    homeNewReleasesProvider.overrideWith((ref) {
+      reads?.add('newReleases');
+      return Stream.value(const <WeeklyRelease>[]);
+    }),
+    settingsProvider.overrideWith(() => FixedSettingsNotifier(settings)),
     extensionProvider.overrideWith(_Extensions.new),
     exploreProvider.overrideWith(_Explore.new),
     downloadHistoryProvider.overrideWith(_History.new),
     recentAccessProvider.overrideWith(_Recent.new),
-    libraryMixesProvider.overrideWith((ref) async => const []),
-    homeTopPicksProvider.overrideWith((ref) async => const <ExploreItem>[]),
+    libraryMixesProvider.overrideWith((ref) async {
+      reads?.add('mixes');
+      return const [];
+    }),
+    homeTopPicksProvider.overrideWith((ref) async {
+      reads?.add('topPicks');
+      return const <ExploreItem>[];
+    }),
     homeRecentlyAddedProvider.overrideWith(
       (ref) async => (items: added, trackCount: added.length),
     ),
-    homeRecentlyPlayedProvider.overrideWith((ref) async => const []),
-    homeOnRepeatProvider.overrideWith((ref) async => const []),
+    homeRecentlyPlayedProvider.overrideWith((ref) async {
+      reads?.add('recentlyPlayed');
+      return const [];
+    }),
+    homeOnRepeatProvider.overrideWith((ref) async {
+      reads?.add('onRepeat');
+      return const [];
+    }),
+    homeLibraryAlbumsProvider.overrideWith((ref) {
+      reads?.add('libraryAlbums');
+      return libraryAlbums?.call() ?? Future.value(const []);
+    }),
+    homeIncompleteAlbumCountProvider.overrideWith((ref) async {
+      reads?.add('unfinished');
+      return 0;
+    }),
+    homeRecognizedMissingProvider.overrideWith((ref) async {
+      reads?.add('unfinished');
+      return 0;
+    }),
     homeQuickSongsProvider.overrideWith((ref) async => const []),
     playerUiEnabledProvider.overrideWithValue(true),
     currentMediaItemProvider.overrideWithBuild(
@@ -216,6 +257,136 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+  }
+
+  final added = [
+    UnifiedLibraryItem.fromLocalLibrary(
+      LocalLibraryItem(
+        id: 'song',
+        trackName: 'Example song',
+        artistName: 'Artist',
+        albumName: 'Album',
+        filePath: '/music/example.flac',
+        scannedAt: DateTime.utc(2026, 10, 1),
+      ),
+    ),
+  ];
+  const off = AppSettings.homeFeedProviderOff;
+
+  for (final mornye in [false, true]) {
+    final style = mornye ? 'Mornye' : 'Material';
+
+    testWidgets('sections off by default load nothing ($style)', (
+      tester,
+    ) async {
+      final reads = <String>[];
+      await _open(
+        tester,
+        _home(
+          mornye: mornye,
+          added: added,
+          reads: reads,
+          settings: const AppSettings(
+            homeFeedProvider: off,
+            listeningStatisticsEnabled: false,
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('Recently added'), findsOneWidget);
+      expect(reads, isNot(contains('onRepeat')));
+      expect(reads, isNot(contains('unfinished')));
+      // Mornye's Top Picks still offer the day's albums.
+      expect(reads.contains('libraryAlbums'), mornye);
+    });
+
+    testWidgets('sections the person hid load nothing ($style)', (
+      tester,
+    ) async {
+      final reads = <String>[];
+      var layout = const HomeLayout();
+      for (final section in [
+        HomeSection.newReleases,
+        HomeSection.mixes,
+        HomeSection.topPicks,
+        HomeSection.recentlyPlayed,
+      ]) {
+        layout = layout.withVisible(section, false);
+      }
+      await _open(
+        tester,
+        _home(
+          mornye: mornye,
+          added: added,
+          reads: reads,
+          settings: AppSettings(homeFeedProvider: off, homeLayout: layout),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('Recently added'), findsOneWidget);
+      expect(reads, isEmpty);
+    });
+
+    testWidgets('an empty Library still counts a hidden shelf ($style)', (
+      tester,
+    ) async {
+      final reads = <String>[];
+      await _open(
+        tester,
+        _home(
+          mornye: mornye,
+          reads: reads,
+          libraryAlbums: () async => const [_album],
+          // Without Top Picks every album of the day goes to the hidden
+          // From your Library.
+          settings: AppSettings(
+            homeFeedProvider: off,
+            listeningStatisticsEnabled: false,
+            homeLayout: const HomeLayout().withVisible(
+              HomeSection.topPicks,
+              false,
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(reads, contains('libraryAlbums'));
+      expect(find.text('From your Library'), findsNothing);
+      expect(find.text(_title), findsNothing);
+      expect(find.text('Edit Home'), findsOneWidget);
+    });
+
+    testWidgets('the message waits for a hidden shelf to answer ($style)', (
+      tester,
+    ) async {
+      final albums = Completer<List<LibraryBrowseEntry>>();
+      await _open(
+        tester,
+        _home(
+          mornye: mornye,
+          libraryAlbums: () => albums.future,
+          settings: AppSettings(
+            homeFeedProvider: off,
+            listeningStatisticsEnabled: false,
+            homeLayout: const HomeLayout().withVisible(
+              HomeSection.topPicks,
+              false,
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text(_title), findsNothing);
+      expect(find.text('Edit Home'), findsNothing);
+
+      albums.complete(const []);
+      for (var frame = 0; frame < 3; frame++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(tester.takeException(), isNull);
+      expect(find.text(_title), findsOneWidget);
+      expect(find.text('Edit Home'), findsNothing);
     });
   }
 }

@@ -447,46 +447,18 @@ class _HomeSections extends ConsumerWidget {
     final hasResume =
         showPlayer &&
         ref.watch(playbackResumeProvider.select((s) => s.value != null));
-    final recentlyAdded = ref.watch(
-      homeRecentlyAddedProvider.select((s) => s.value),
-    );
-    // What was heard and the mixes built from it belong to the built-in
-    // player; with another app playing, Home keeps to the Library.
-    final onRepeat = showPlayer
-        ? ref.watch(homeOnRepeatProvider.select((s) => s.value)) ??
-              const <HomeRepeatTrack>[]
-        : const <HomeRepeatTrack>[];
     final mornye = context.isMornye;
     // Without a listening record the day's albums take On repeat's place.
     // Mornye's Top Picks offer the first of them either way.
     final recordsListening =
         showPlayer &&
         ref.watch(settingsProvider.select((s) => s.listeningStatisticsEnabled));
-    final dayAlbums = mornye || !recordsListening
-        ? ref.watch(homeLibraryAlbumsProvider.select((s) => s.value)) ??
-              const <LibraryBrowseEntry>[]
-        : const <LibraryBrowseEntry>[];
     final layout = ref.watch(settingsProvider.select((s) => s.homeLayout));
     // Read only while shown: the day's picks are a query of their own.
     final quickSongs = showPlayer && layout.shows(HomeSection.quickPlay)
         ? ref.watch(homeQuickSongsProvider.select((s) => s.value)) ??
               const <UnifiedLibraryItem>[]
         : const <UnifiedLibraryItem>[];
-    // Hidden Top Picks leave their albums to From your Library.
-    final pickedAlbums = mornye && layout.shows(HomeSection.topPicks)
-        ? dayAlbums.take(_homeTopPickLibraryAlbums).toList()
-        : const <LibraryBrowseEntry>[];
-    final libraryAlbums = recordsListening
-        ? const <LibraryBrowseEntry>[]
-        : dayAlbums.skip(pickedAlbums.length).toList();
-    final mixes = showPlayer
-        ? ref.watch(libraryMixesProvider.select((s) => s.value))
-        : null;
-    final newReleases =
-        ref.watch(homeNewReleasesProvider.select((s) => s.value)) ?? const [];
-    final recommended =
-        ref.watch(homeRecommendationsProvider.select((s) => s.value)) ??
-        const <Track>[];
     // Shelves that need the internet step aside without a network.
     final offline = ref.watch(
       homeOfflineProvider.select((s) => s.value ?? false),
@@ -496,26 +468,6 @@ class _HomeSections extends ConsumerWidget {
         (hasMediaItem || hasResume) &&
         ref.watch(settingsProvider.select((s) => s.homeContinueListening));
 
-    final recentlyPlayed = mornye && showPlayer
-        ? ref.watch(homeRecentlyPlayedProvider.select((s) => s.value)) ??
-              const <HomeRepeatTrack>[]
-        : const <HomeRepeatTrack>[];
-    // The card only stands in once nothing was played: while the shelf
-    // loads, it would show and then give way to Recently Played.
-    final recentlyPlayedLoading =
-        mornye &&
-        showPlayer &&
-        ref.watch(
-          homeRecentlyPlayedProvider.select((s) => !s.hasValue && !s.hasError),
-        );
-    final pickedReleases = mornye && !offline
-        ? newReleases.take(_homeTopPickReleases).toList()
-        : const <WeeklyRelease>[];
-    final hasTopPicks =
-        mornye &&
-        (pickedAlbums.isNotEmpty ||
-            pickedReleases.isNotEmpty ||
-            _HomeTopPicksSection.hasPicks(ref, mixes: showPlayer));
     // On Material phones and tablets the pins sit among the Shortcuts, so
     // the section stays while either is left.
     final hasShortcuts =
@@ -529,171 +481,268 @@ class _HomeSections extends ConsumerWidget {
                 order.indexOf(HomeSection.shortcuts)
         ? HomeSection.continueListening
         : HomeSection.shortcuts;
+
+    // A shelf's value, noted among [loads] as read.
+    T? shelf<T>(
+      Set<ProviderListenable<AsyncValue<Object?>>> loads,
+      ProviderListenable<AsyncValue<T>> provider,
+    ) {
+      loads.add(provider);
+      return ref.watch(provider.select((s) => s.value));
+    }
+
+    bool answered(ProviderListenable<AsyncValue<Object?>> provider) =>
+        ref.watch(provider.select((s) => s.hasValue || s.hasError));
+
     // What each section has to show now, before the person's order and
-    // their hidden sections apply.
-    final built = <HomeSection, Widget>{
-      if (_HomeDownloadsSection.hasContent(ref))
-        HomeSection.downloads: _HomeDownloadsSection(inset: inset),
-      if (hasTopPicks)
-        HomeSection.topPicks: _HomeTopPicksSection(
-          inset: inset,
-          mixes: showPlayer,
-          libraryAlbums: pickedAlbums,
-          releases: pickedReleases,
-        ),
-      // The desktop top holds both; without Shortcuts the card stands alone.
-      if (_homeDesktop(context) &&
-          hasShortcuts &&
-          layout.shows(HomeSection.shortcuts))
-        desktopTop: _HomeDesktopTop(inset: inset, showContinue: showContinue)
-      else ...{
-        if (recentlyPlayed.isNotEmpty)
-          HomeSection.recentlyPlayed: _HomeSection(
-            title: l10n.homeRecentlyPlayed,
+    // their hidden sections apply. Only the sections [reads] names load
+    // their shelves, which go into [loads].
+    Map<HomeSection, Widget> shelves(
+      bool Function(HomeSection section) reads,
+      Set<ProviderListenable<AsyncValue<Object?>>> loads,
+    ) {
+      final recentlyAdded = reads(HomeSection.recentlyAdded)
+          ? shelf(loads, homeRecentlyAddedProvider)
+          : null;
+      // What was heard and the mixes built from it belong to the built-in
+      // player; with another app playing, Home keeps to the Library.
+      final onRepeat = showPlayer && reads(HomeSection.onRepeat)
+          ? shelf(loads, homeOnRepeatProvider) ?? const <HomeRepeatTrack>[]
+          : const <HomeRepeatTrack>[];
+      final dayAlbums =
+          mornye && reads(HomeSection.topPicks) ||
+              !recordsListening && reads(HomeSection.onRepeat)
+          ? shelf(loads, homeLibraryAlbumsProvider) ??
+                const <LibraryBrowseEntry>[]
+          : const <LibraryBrowseEntry>[];
+      // Hidden Top Picks leave their albums to From your Library.
+      final pickedAlbums = mornye && layout.shows(HomeSection.topPicks)
+          ? dayAlbums.take(_homeTopPickLibraryAlbums).toList()
+          : const <LibraryBrowseEntry>[];
+      final libraryAlbums = recordsListening
+          ? const <LibraryBrowseEntry>[]
+          : dayAlbums.skip(pickedAlbums.length).toList();
+      final mixes = showPlayer && !mornye && reads(HomeSection.mixes)
+          ? shelf(loads, libraryMixesProvider)
+          : null;
+      final newReleases =
+          reads(HomeSection.newReleases) ||
+              mornye && reads(HomeSection.topPicks)
+          ? shelf(loads, homeNewReleasesProvider) ?? const <WeeklyRelease>[]
+          : const <WeeklyRelease>[];
+      final recommended = reads(HomeSection.recommended)
+          ? shelf(loads, homeRecommendationsProvider) ?? const <Track>[]
+          : const <Track>[];
+
+      // Shown or not, played albums keep the Continue listening card away.
+      final readsRecentlyPlayed =
+          mornye &&
+          showPlayer &&
+          (reads(HomeSection.recentlyPlayed) || showContinue);
+      final recentlyPlayed = readsRecentlyPlayed
+          ? shelf(loads, homeRecentlyPlayedProvider) ??
+                const <HomeRepeatTrack>[]
+          : const <HomeRepeatTrack>[];
+      // The card only stands in once nothing was played: while the shelf
+      // loads, it would show and then give way to Recently Played.
+      final recentlyPlayedLoading =
+          readsRecentlyPlayed && !answered(homeRecentlyPlayedProvider);
+      final pickedReleases = mornye && !offline
+          ? newReleases.take(_homeTopPickReleases).toList()
+          : const <WeeklyRelease>[];
+      final readsTopPicks = mornye && reads(HomeSection.topPicks);
+      if (readsTopPicks) {
+        loads.addAll([
+          homeTopPicksProvider,
+          if (showPlayer) libraryMixesProvider,
+        ]);
+      }
+      final hasTopPicks =
+          readsTopPicks &&
+          (pickedAlbums.isNotEmpty ||
+              pickedReleases.isNotEmpty ||
+              _HomeTopPicksSection.hasPicks(ref, mixes: showPlayer));
+      final readsUnfinished = reads(HomeSection.unfinished);
+      if (readsUnfinished) {
+        loads.addAll([
+          homeIncompleteAlbumCountProvider,
+          homeRecognizedMissingProvider,
+        ]);
+      }
+      return <HomeSection, Widget>{
+        if (_HomeDownloadsSection.hasContent(ref))
+          HomeSection.downloads: _HomeDownloadsSection(inset: inset),
+        if (hasTopPicks)
+          HomeSection.topPicks: _HomeTopPicksSection(
+            inset: inset,
+            mixes: showPlayer,
+            libraryAlbums: pickedAlbums,
+            releases: pickedReleases,
+          ),
+        // The desktop top holds both; without Shortcuts the card stands alone.
+        if (_homeDesktop(context) &&
+            hasShortcuts &&
+            layout.shows(HomeSection.shortcuts))
+          desktopTop: _HomeDesktopTop(inset: inset, showContinue: showContinue)
+        else ...{
+          if (recentlyPlayed.isNotEmpty)
+            HomeSection.recentlyPlayed: _HomeSection(
+              title: l10n.homeRecentlyPlayed,
+              inset: inset,
+              shelf: true,
+              onShowAll: () => pushPage<void>(
+                context,
+                (_) => const ListeningStatisticsScreen(),
+              ),
+              child: _HomeRecentlyPlayedShelf(
+                tracks: recentlyPlayed,
+                inset: inset + 8,
+              ),
+            )
+          else if (showContinue && !recentlyPlayedLoading)
+            HomeSection.continueListening: _HomeSection(
+              title: l10n.homeContinueListening,
+              inset: inset,
+              child: const _HomeContinueListeningCard(),
+            ),
+          // Mornye exposes these tools in the player and Settings.
+          if (hasShortcuts)
+            HomeSection.shortcuts: _HomeSection(
+              title: l10n.homeShortcuts,
+              inset: inset,
+              child: const _HomeShortcuts(),
+            ),
+        },
+        if (quickSongs.isNotEmpty)
+          HomeSection.quickPlay: _HomeSection(
+            title: l10n.homeQuickPlay,
+            inset: inset,
+            shelf: true,
+            child: _HomeQuickPlay(
+              songs: quickSongs,
+              inset: mornye ? inset + 8 : inset,
+            ),
+          ),
+        // On Material phones and tablets the pins sit among the Shortcuts.
+        if ((mornye || _homeDesktop(context)) &&
+            _HomePinsSection.hasContent(ref))
+          HomeSection.pins: _HomePinsSection(inset: inset),
+        if (_HomeLinkSection.hasContent(ref))
+          HomeSection.link: _HomeLinkSection(inset: inset),
+        if (_HomeHiResSection.hasContent(ref))
+          HomeSection.hiRes: _HomeHiResSection(inset: inset),
+        // Built after startup settles when nothing is cached: the sections'
+        // size animation opens its space rather than letting it jump in.
+        if (!mornye && mixes != null && mixes.isNotEmpty)
+          HomeSection.mixes: _HomeSection(
+            title: l10n.homeMixesForYou,
+            inset: inset,
+            shelf: true,
+            child: _HomeMixesShelf(mixes: mixes, inset: inset),
+          ),
+        if (recentlyAdded != null && recentlyAdded.items.isNotEmpty)
+          HomeSection.recentlyAdded: _HomeSection(
+            title: l10n.homeRecentlyAdded,
+            inset: inset,
+            shelf: true,
+            child: _HomeRecentlyAddedShelf(
+              items: recentlyAdded.items,
+              trackCount: recentlyAdded.trackCount,
+              inset: mornye ? inset + 8 : inset,
+            ),
+          ),
+        if (readsUnfinished && _HomeUnfinishedSection.hasContent(ref))
+          HomeSection.unfinished: _HomeUnfinishedSection(inset: inset),
+        if (recommended.isNotEmpty && !offline)
+          HomeSection.recommended: _HomeSection(
+            title: l10n.homeRecommendedForYou,
+            inset: inset,
+            shelf: true,
+            child: _HomeRecommendationsShelf(
+              tracks: recommended,
+              inset: mornye ? inset + 8 : inset,
+            ),
+          ),
+        if (newReleases.isNotEmpty && !offline)
+          HomeSection.newReleases: _HomeSection(
+            title: l10n.weeklyReleases,
             inset: inset,
             shelf: true,
             onShowAll: () => pushPage<void>(
               context,
-              (_) => const ListeningStatisticsScreen(),
+              (_) => const WeeklyReleasesScreen(days: homeReleaseDays),
             ),
-            child: _HomeRecentlyPlayedShelf(
-              tracks: recentlyPlayed,
-              inset: inset + 8,
+            child: _HomeNewReleasesShelf(
+              releases: newReleases,
+              inset: mornye ? inset + 8 : inset,
+            ),
+          ),
+        if (onRepeat.isNotEmpty)
+          HomeSection.onRepeat: _HomeSection(
+            title: l10n.homeOnRepeat,
+            inset: inset,
+            shelf: true,
+            child: _HomeOnRepeatShelf(
+              tracks: onRepeat,
+              inset: mornye ? inset + 8 : inset,
             ),
           )
-        else if (showContinue && !recentlyPlayedLoading)
-          HomeSection.continueListening: _HomeSection(
-            title: l10n.homeContinueListening,
+        else if (libraryAlbums.isNotEmpty)
+          HomeSection.onRepeat: _HomeSection(
+            title: l10n.homeFromYourLibrary,
             inset: inset,
-            child: const _HomeContinueListeningCard(),
+            shelf: true,
+            child: _HomeLibraryAlbumsShelf(
+              albums: libraryAlbums,
+              inset: mornye ? inset + 8 : inset,
+            ),
           ),
-        // Mornye exposes these tools in the player and Settings.
-        if (hasShortcuts)
-          HomeSection.shortcuts: _HomeSection(
-            title: l10n.homeShortcuts,
-            inset: inset,
-            child: const _HomeShortcuts(),
-          ),
-      },
-      if (quickSongs.isNotEmpty)
-        HomeSection.quickPlay: _HomeSection(
-          title: l10n.homeQuickPlay,
-          inset: inset,
-          shelf: true,
-          child: _HomeQuickPlay(
-            songs: quickSongs,
-            inset: mornye ? inset + 8 : inset,
-          ),
-        ),
-      // On Material phones and tablets the pins sit among the Shortcuts.
-      if ((mornye || _homeDesktop(context)) && _HomePinsSection.hasContent(ref))
-        HomeSection.pins: _HomePinsSection(inset: inset),
-      if (_HomeLinkSection.hasContent(ref))
-        HomeSection.link: _HomeLinkSection(inset: inset),
-      if (_HomeHiResSection.hasContent(ref))
-        HomeSection.hiRes: _HomeHiResSection(inset: inset),
-      // Built after startup settles when nothing is cached: the sections'
-      // size animation opens its space rather than letting it jump in.
-      if (!mornye && mixes != null && mixes.isNotEmpty)
-        HomeSection.mixes: _HomeSection(
-          title: l10n.homeMixesForYou,
-          inset: inset,
-          shelf: true,
-          child: _HomeMixesShelf(mixes: mixes, inset: inset),
-        ),
-      if (recentlyAdded != null && recentlyAdded.items.isNotEmpty)
-        HomeSection.recentlyAdded: _HomeSection(
-          title: l10n.homeRecentlyAdded,
-          inset: inset,
-          shelf: true,
-          child: _HomeRecentlyAddedShelf(
-            items: recentlyAdded.items,
-            trackCount: recentlyAdded.trackCount,
-            inset: mornye ? inset + 8 : inset,
-          ),
-        ),
-      if (_HomeUnfinishedSection.hasContent(ref))
-        HomeSection.unfinished: _HomeUnfinishedSection(inset: inset),
-      if (recommended.isNotEmpty && !offline)
-        HomeSection.recommended: _HomeSection(
-          title: l10n.homeRecommendedForYou,
-          inset: inset,
-          shelf: true,
-          child: _HomeRecommendationsShelf(
-            tracks: recommended,
-            inset: mornye ? inset + 8 : inset,
-          ),
-        ),
-      if (newReleases.isNotEmpty && !offline)
-        HomeSection.newReleases: _HomeSection(
-          title: l10n.weeklyReleases,
-          inset: inset,
-          shelf: true,
-          onShowAll: () => pushPage<void>(
-            context,
-            (_) => const WeeklyReleasesScreen(days: homeReleaseDays),
-          ),
-          child: _HomeNewReleasesShelf(
-            releases: newReleases,
-            inset: mornye ? inset + 8 : inset,
-          ),
-        ),
-      if (onRepeat.isNotEmpty)
-        HomeSection.onRepeat: _HomeSection(
-          title: l10n.homeOnRepeat,
-          inset: inset,
-          shelf: true,
-          child: _HomeOnRepeatShelf(
-            tracks: onRepeat,
-            inset: mornye ? inset + 8 : inset,
-          ),
-        )
-      else if (libraryAlbums.isNotEmpty)
-        HomeSection.onRepeat: _HomeSection(
-          title: l10n.homeFromYourLibrary,
-          inset: inset,
-          shelf: true,
-          child: _HomeLibraryAlbumsShelf(
-            albums: libraryAlbums,
-            inset: mornye ? inset + 8 : inset,
-          ),
-        ),
-    };
+      };
+    }
+
+    final shownLoads = <ProviderListenable<AsyncValue<Object?>>>{};
+    var built = shelves(layout.shows, shownLoads);
+    // An empty Library with nothing played leaves Home without shelves (the
+    // Material Home keeps its Shortcuts): say so, and lead to Search, once
+    // the Library shelves have answered. Hidden sections do not count: a
+    // Home the person emptied is not a Library with nothing in it.
+    var bare =
+        !showContinue && built.keys.every(_homeStandingSections.contains);
+    var settled = false;
+    if (bare && answered(homeRecentlyAddedProvider)) {
+      // Hidden shelves load only now, to tell those two apart.
+      final loads = <ProviderListenable<AsyncValue<Object?>>>{};
+      built = shelves((_) => true, loads);
+      bare = built.keys.every(_homeStandingSections.contains);
+      // A shelf that only now loads answers first, or the message flashes.
+      settled =
+          bare &&
+          loads.difference(shownLoads).every(answered) &&
+          !(mornye && showPlayer && !answered(homeRecentlyPlayedProvider));
+    }
     final sections = [
       for (final section in order)
         if (layout.shows(section)) ?built[section],
     ];
 
-    // An empty Library with nothing played leaves Home without shelves (the
-    // Material Home keeps its Shortcuts): say so, and lead to Search, once
-    // the Library shelves have answered. Hidden sections do not count: a
-    // Home the person emptied is not a Library with nothing in it.
-    final bare =
-        !showContinue && built.keys.every(_homeStandingSections.contains);
     Widget? nothingYet;
-    if (bare) {
-      final librarySettled = ref.watch(
-        homeRecentlyAddedProvider.select((s) => s.hasValue || s.hasError),
+    if (settled) {
+      nothingYet = ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: MediaQuery.sizeOf(context).height * (mornye ? 0.5 : 0.3),
+        ),
+        child: EmptyState(
+          icon: Icons.music_note,
+          title: l10n.homeNothingYetTitle,
+          message: l10n.homeNothingYetMessage,
+          action: ExpressiveButton(
+            onPressed: () => ShellNavigationService.requestTab(ShellTab.search),
+            icon: const Icon(Icons.search),
+            child: Text(l10n.homeFindMusic),
+          ),
+        ),
       );
-      if (librarySettled && !recentlyPlayedLoading) {
-        nothingYet = ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: MediaQuery.sizeOf(context).height * (mornye ? 0.5 : 0.3),
-          ),
-          child: EmptyState(
-            icon: Icons.music_note,
-            title: l10n.homeNothingYetTitle,
-            message: l10n.homeNothingYetMessage,
-            action: ExpressiveButton(
-              onPressed: () =>
-                  ShellNavigationService.requestTab(ShellTab.search),
-              icon: const Icon(Icons.search),
-              child: Text(l10n.homeFindMusic),
-            ),
-          ),
-        );
-        if (mornye && sections.isEmpty) return nothingYet;
-      }
+      if (mornye && sections.isEmpty) return nothingYet;
     }
 
     return Padding(
