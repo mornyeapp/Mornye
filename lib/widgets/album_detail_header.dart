@@ -921,7 +921,13 @@ class AlbumPlayActions extends StatelessWidget {
           onPressed: onPlay,
           icon: AppIcon(isPlaying ? Icons.pause : Icons.play_arrow, size: 20),
           label: Text(playLabel),
-          style: FilledButton.styleFrom(minimumSize: const Size(112, 40)),
+          // As tall as the 40dp icon buttons beside it, whatever the theme's
+          // button height and the desktop's compact density say.
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(112, 40),
+            fixedSize: const Size.fromHeight(40),
+            visualDensity: VisualDensity.standard,
+          ),
         ),
         if (showShuffle)
           IconButton.filledTonal(

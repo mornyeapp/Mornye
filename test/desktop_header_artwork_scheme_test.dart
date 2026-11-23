@@ -197,6 +197,66 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the Material Play button matches its icon buttons at desktop '
+      'density', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentMediaItemProvider.overrideWithBuild(
+            (ref, notifier) => const Stream.empty(),
+          ),
+          playbackPlayingProvider.overrideWith((ref) => false),
+          musicPlayerControllerProvider.overrideWithValue(_Player()),
+        ],
+        child: MaterialApp(
+          // Flutter's default density on macOS, Windows and Linux.
+          theme: AppTheme.light().copyWith(
+            visualDensity: VisualDensity.compact,
+          ),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          navigatorKey: navigator,
+          home: const SizedBox(),
+        ),
+      ),
+    );
+    navigator.currentState!.push(
+      MaterialPageRoute<void>(
+        builder: (_) => LocalAlbumScreen(
+          albumName: 'Album',
+          artistName: 'Artist',
+          coverPath: _cover,
+          tracks: _tracks,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final play = find
+        .ancestor(
+          of: find.text('Play'),
+          matching: find.byWidgetPredicate((w) => w is FilledButton),
+        )
+        .first;
+    // Shuffle, beside Play in the same row.
+    final icon = find
+        .descendant(
+          of: find.ancestor(of: play, matching: find.byType(Row)).first,
+          matching: find.byType(IconButton),
+        )
+        .first;
+    // The painted surfaces, inside their touch targets.
+    Size surface(Finder button) => tester.getSize(
+      find.descendant(of: button, matching: find.byType(Material)).first,
+    );
+    expect(surface(play).height, 40);
+    expect(surface(play).height, surface(icon).height);
+  });
+
   testWidgets('an uncached cover keeps the app scheme, then moves to its own', (
     tester,
   ) async {

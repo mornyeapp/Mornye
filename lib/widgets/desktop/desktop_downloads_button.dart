@@ -9,6 +9,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
+import 'package:mornye/widgets/connected_icon_buttons.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/player_artwork.dart';
@@ -77,7 +78,10 @@ class _DesktopDownloadsButtonState
   final _menu = MenuController();
   // The toolbar ring changes with every progress sample. Keep the open panel
   // mounted with the same widget so those samples do not rebuild its list.
-  late final _popover = DesktopDownloadsPopover(onShowAll: _showAll);
+  // The popover inherits from the button, which may be a group segment.
+  late final _popover = ConnectedIconSegment.exclude(
+    child: DesktopDownloadsPopover(onShowAll: _showAll),
+  );
 
   void _toggle() => _menu.isOpen ? _menu.close() : _menu.open();
 

@@ -15,6 +15,7 @@ import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/services/cast_output.dart';
+import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/string_utils.dart';
@@ -32,7 +33,7 @@ import 'package:mornye/widgets/desktop/desktop_link_devices_button.dart';
 import 'package:mornye/widgets/desktop/desktop_row_ink.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/desktop/desktop_volume_scroll.dart';
-import 'package:mornye/widgets/expressive_icon_button.dart';
+import 'package:mornye/widgets/connected_icon_buttons.dart';
 import 'package:mornye/widgets/expressive_playback_transport.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
@@ -897,8 +898,8 @@ class _TrailingControls extends ConsumerWidget {
   /// Narrowest room in which the Material bar keeps its volume slider.
   static const double _materialVolumeMinWidth = 140;
 
-  /// The Material bar's Cast button, a standard 48 dp icon button.
-  static const double _castWidth = 48;
+  /// Space between the Material bar's button groups.
+  static const double _groupGap = 8;
 
   final bool enabled;
 
@@ -908,129 +909,157 @@ class _TrailingControls extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mornye = context.isMornye;
-    final colorScheme = Theme.of(context).colorScheme;
-    final l10n = context.l10n;
     final canDismiss =
         enabled &&
         !ref.watch(playbackPlayingProvider) &&
         !ref.watch(playbackLoadingProvider) &&
         ref.watch(activeRemotePlaybackProvider) == null;
+    if (!mornye) return _buildMaterial(context, ref, canDismiss);
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      mainAxisSize: mornye ? MainAxisSize.min : MainAxisSize.max,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        if (mornye) ...[
-          const DesktopLinkDevicesButton(),
-          const DesktopDownloadsButton(),
-        ],
+        const DesktopLinkDevicesButton(),
+        const DesktopDownloadsButton(),
         ValueListenableBuilder<DesktopInspectorPanel?>(
           valueListenable: desktopInspectorPanel,
           builder: (context, panel, _) => Row(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              _InspectorToggle(
-                key: const ValueKey('desktop-player-lyrics'),
-                panel: DesktopInspectorPanel.lyrics,
-                selected: panel == DesktopInspectorPanel.lyrics,
-                enabled: enabled,
-                tooltip: desktopTooltip(
-                  context,
-                  l10n.nowPlayingTabLyrics,
-                  DesktopCommand.lyrics,
-                ),
-                icon: mornye
-                    ? CupertinoIcons.quote_bubble
-                    : Icons.lyrics_outlined,
-              ),
-              _InspectorToggle(
-                key: const ValueKey('desktop-player-up-next'),
-                panel: DesktopInspectorPanel.upNext,
-                selected: panel == DesktopInspectorPanel.upNext,
-                enabled: enabled,
-                tooltip: desktopTooltip(
-                  context,
-                  l10n.nowPlayingUpNext,
-                  DesktopCommand.upNext,
-                ),
-                icon: mornye ? CupertinoIcons.list_bullet : Icons.queue_music,
-              ),
-            ],
+            children: _inspectorToggles(context, panel),
           ),
         ),
-        if (desktopMiniPlayerSupported)
-          AppIconButton(
-            key: const ValueKey('desktop-player-mini'),
-            tooltip: desktopTooltip(
-              context,
-              l10n.desktopMenuMiniPlayer,
-              DesktopCommand.miniPlayer,
-            ),
-            color: mornye ? colorScheme.onSurface : null,
-            icon: AppIcon(
-              mornye
-                  ? CupertinoIcons.rectangle_on_rectangle
-                  : Icons.picture_in_picture_alt_outlined,
-            ),
-            onPressed: toggleDesktopMiniPlayer,
-          ),
-        if (mornye)
-          const _MornyeVolumeButton()
-        else ...[
-          Theme(
-            data: appTheme ?? Theme.of(context),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [DesktopLinkDevicesButton(), DesktopDownloadsButton()],
-            ),
-          ),
-          // A narrow window leaves too little room for a usable slider, then
-          // for Cast; the volume shortcuts still work there.
-          Flexible(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final cast = constraints.maxWidth >= _castWidth;
-                final slider =
-                    constraints.maxWidth - (cast ? _castWidth : 0) >=
-                    _materialVolumeMinWidth;
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (cast)
-                      Theme(
-                        data: appTheme ?? Theme.of(context),
-                        child: const DesktopCastButton(),
-                      ),
-                    if (slider)
-                      Flexible(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 220),
-                          child: PlayerVolumeControl(
-                            foreground: colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
-        if (canDismiss)
-          AppIconButton(
-            key: const ValueKey('desktop-player-dismiss'),
-            tooltip: l10n.actionDismiss,
-            color: mornye ? colorScheme.onSurface : null,
-            icon: const AppIcon.adaptive(Icons.close),
-            onPressed: () async {
-              await ref.read(musicPlayerControllerProvider).dismiss();
-              desktopPlayerDismissed.value = true;
-              desktopInspectorPanel.value = null;
-              closeDesktopNowPlaying();
-            },
-          ),
+        if (desktopMiniPlayerSupported) _miniPlayerButton(context),
+        const _MornyeVolumeButton(),
+        if (canDismiss) _dismissButton(context, ref),
       ],
     );
   }
+
+  /// Material joins the controls into one connected M3E button group, then
+  /// the volume slider and dismiss on its own. A narrow window drops the
+  /// slider first, then Cast; the volume shortcuts still work.
+  Widget _buildMaterial(BuildContext context, WidgetRef ref, bool canDismiss) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final appTheme = this.appTheme ?? Theme.of(context);
+    final link = ref.watch(linkDevicesAvailableProvider);
+    final buttons = 3 + (desktopMiniPlayerSupported ? 1 : 0) + (link ? 1 : 0);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        double group(int count) => ConnectedIconButtons.widthOf(context, count);
+        final fixed = group(buttons) + (canDismiss ? _groupGap + group(1) : 0);
+        final castCost = group(buttons + 1) - group(buttons);
+        final cast = constraints.maxWidth - fixed >= castCost;
+        final slider =
+            constraints.maxWidth - fixed - (cast ? castCost : 0) >=
+            _groupGap + _materialVolumeMinWidth;
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            ValueListenableBuilder<DesktopInspectorPanel?>(
+              valueListenable: desktopInspectorPanel,
+              builder: (context, panel, _) => ConnectedIconButtons(
+                colorScheme: colorScheme,
+                children: [
+                  ..._inspectorToggles(context, panel),
+                  if (desktopMiniPlayerSupported) _miniPlayerButton(context),
+                  // The menus and sheets these open keep the app scheme.
+                  if (link)
+                    Theme(
+                      data: appTheme,
+                      child: const DesktopLinkDevicesButton(),
+                    ),
+                  Theme(data: appTheme, child: const DesktopDownloadsButton()),
+                  if (cast)
+                    Theme(data: appTheme, child: const DesktopCastButton()),
+                ],
+              ),
+            ),
+            if (slider) ...[
+              const SizedBox(width: _groupGap),
+              Flexible(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 220),
+                  child: PlayerVolumeControl(foreground: colorScheme.onSurface),
+                ),
+              ),
+            ],
+            if (canDismiss) ...[
+              const SizedBox(width: _groupGap),
+              ConnectedIconButtons(
+                colorScheme: colorScheme,
+                children: [_dismissButton(context, ref)],
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  List<Widget> _inspectorToggles(
+    BuildContext context,
+    DesktopInspectorPanel? panel,
+  ) {
+    final mornye = context.isMornye;
+    final l10n = context.l10n;
+    return [
+      _InspectorToggle(
+        key: const ValueKey('desktop-player-lyrics'),
+        panel: DesktopInspectorPanel.lyrics,
+        selected: panel == DesktopInspectorPanel.lyrics,
+        enabled: enabled,
+        tooltip: desktopTooltip(
+          context,
+          l10n.nowPlayingTabLyrics,
+          DesktopCommand.lyrics,
+        ),
+        icon: mornye ? CupertinoIcons.quote_bubble : Icons.lyrics_outlined,
+      ),
+      _InspectorToggle(
+        key: const ValueKey('desktop-player-up-next'),
+        panel: DesktopInspectorPanel.upNext,
+        selected: panel == DesktopInspectorPanel.upNext,
+        enabled: enabled,
+        tooltip: desktopTooltip(
+          context,
+          l10n.nowPlayingUpNext,
+          DesktopCommand.upNext,
+        ),
+        icon: mornye ? CupertinoIcons.list_bullet : Icons.queue_music,
+      ),
+    ];
+  }
+
+  Widget _miniPlayerButton(BuildContext context) {
+    final mornye = context.isMornye;
+    return AppIconButton(
+      key: const ValueKey('desktop-player-mini'),
+      tooltip: desktopTooltip(
+        context,
+        context.l10n.desktopMenuMiniPlayer,
+        DesktopCommand.miniPlayer,
+      ),
+      color: mornye ? Theme.of(context).colorScheme.onSurface : null,
+      icon: AppIcon(
+        mornye
+            ? CupertinoIcons.rectangle_on_rectangle
+            : Icons.picture_in_picture_alt_outlined,
+      ),
+      onPressed: toggleDesktopMiniPlayer,
+    );
+  }
+
+  Widget _dismissButton(BuildContext context, WidgetRef ref) => AppIconButton(
+    key: const ValueKey('desktop-player-dismiss'),
+    tooltip: context.l10n.actionDismiss,
+    color: context.isMornye ? Theme.of(context).colorScheme.onSurface : null,
+    icon: const AppIcon.adaptive(Icons.close),
+    onPressed: () async {
+      await ref.read(musicPlayerControllerProvider).dismiss();
+      desktopPlayerDismissed.value = true;
+      desktopInspectorPanel.value = null;
+      closeDesktopNowPlaying();
+    },
+  );
 }
 
 /// The Mornye capsule's volume button. Its glyph follows the level, and a
@@ -1195,27 +1224,15 @@ class _InspectorToggle extends StatelessWidget {
     final onPressed = enabled || selected
         ? () => toggleDesktopInspector(panel)
         : null;
-    if (!mornye) {
-      // An M3E tonal toggle: filled and square while its panel is open.
-      return Semantics(
-        toggled: selected,
-        child: ExpressiveIconButton(
-          tooltip: tooltip,
-          selected: selected,
-          foregroundColor: selected
-              ? colorScheme.onSecondaryContainer
-              : colorScheme.onSurfaceVariant,
-          backgroundColor: selected ? colorScheme.secondaryContainer : null,
-          icon: AppIcon(icon),
-          onPressed: onPressed,
-        ),
-      );
-    }
+    // In Material the button is a group segment that fills and rounds
+    // fully while its panel is open.
     return AppIconButton(
       tooltip: tooltip,
       isSelected: selected,
-      color: selected ? colorScheme.primary : colorScheme.onSurface,
-      style: selected
+      color: mornye
+          ? (selected ? colorScheme.primary : colorScheme.onSurface)
+          : null,
+      style: mornye && selected
           ? IconButton.styleFrom(
               backgroundColor: MornyeTheme.controlFill(context),
             )

@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/connected_icon_buttons.dart';
 
 enum _AppIconButtonVariant { standard, filled, tonal }
 
@@ -90,6 +91,19 @@ class AppIconButton extends StatelessWidget {
     final selectedIcon = this.selectedIcon == null
         ? null
         : symbolIconWidget(this.selectedIcon!);
+    final segment = ConnectedIconSegment.maybeOf(context);
+    if (segment != null) {
+      return ConnectedSegmentButton(
+        segment: segment,
+        icon: icon,
+        selectedIcon: selectedIcon,
+        onPressed: onPressed,
+        tooltip: tooltip,
+        color: color,
+        iconSize: iconSize,
+        isSelected: isSelected,
+      );
+    }
     if (!materialExpressiveEnabled(context) || _keepsMaterialLayout) {
       return switch (_variant) {
         _AppIconButtonVariant.standard => IconButton(
