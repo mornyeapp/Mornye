@@ -12750,16 +12750,49 @@
   "listenBrainzReauthenticate": "Your ListenBrainz token no longer works. Connect again with a new token to resume scrobbling.",
   "audioOutputSystem": "This device and Bluetooth",
   "audioOutputCast": "Cast to TV",
-  "audioOutputCastDescription": "Google Cast devices on the same Wi-Fi network",
+  "audioOutputCastDescription": "{kinds} devices on the same Wi-Fi network",
+  "@audioOutputCastDescription": {
+    "description": "Under a Cast row and on the receiver sheet; kinds lists protocol names such as 'Google Cast, DLNA and FCast'",
+    "placeholders": {
+      "kinds": {
+        "type": "String"
+      }
+    }
+  },
+  "audioOutputCastOther": "Other TVs and speakers",
+  "@audioOutputCastOther": {
+    "description": "Android Audio output row, and the title of its sheet, for receivers that are not Google Cast"
+  },
+  "audioOutputCastKindList": "{first} and {last}",
+  "@audioOutputCastKindList": {
+    "description": "Joins the last protocol name to the others in a list such as 'Google Cast, DLNA and FCast'",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      },
+      "last": {
+        "type": "String"
+      }
+    }
+  },
   "audioOutputStopCasting": "Stop casting",
   "audioOutputCastUnavailable": "Unable to open Google Cast. Check Google Play services and local network access.",
+  "audioOutputCastNetworkUnavailable": "Unable to reach cast devices. Check local network access.",
+  "@audioOutputCastNetworkUnavailable": {
+    "description": "Snackbar when the app's own receiver list or Stop casting fails"
+  },
   "audioOutputAirPlay": "AirPlay and Bluetooth",
   "@audioOutputAirPlay": {
     "description": "iOS Audio output sheet row that opens the system picker for AirPlay, Bluetooth and this iPhone"
   },
-  "audioOutputCastSearching": "Looking for Google Cast devices…",
+  "audioOutputCastSearching": "Looking for {kinds} devices…",
   "@audioOutputCastSearching": {
-    "description": "Shown in the Cast device picker on iOS and desktop while no receiver has been found on the network yet"
+    "description": "Shown on the receiver sheet while no receiver has been found on the network yet; kinds lists protocol names",
+    "placeholders": {
+      "kinds": {
+        "type": "String"
+      }
+    }
   },
   "audioOutputCastConnectFailed": "Could not connect to {device}",
   "@audioOutputCastConnectFailed": {

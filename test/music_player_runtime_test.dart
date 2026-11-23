@@ -1255,6 +1255,56 @@ void main() {
     await events.close();
   });
 
+  test('a receiver without a volume level gets no remote volume', () async {
+    const channel = MethodChannel('volume-cast-test');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final calls = <String>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call.method);
+      return call.method == 'state' ? {'connected': false} : null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    final events = StreamController<Object?>.broadcast(sync: true);
+    final output = CastOutput(channel: channel, events: events.stream);
+    final runtime = _runtime(createCastDeck: (_, _) => _Deck());
+    final handler = MusicPlayerHandler(runtime: runtime, castOutput: output);
+    await output.initialize();
+    await handler.setQueueAndPlay([_track]);
+    await handler.pause();
+    events.add({
+      'connected': true,
+      'deviceId': 'dlna:uuid-1',
+      'host': '192.0.2.40',
+      'kind': 'dlna',
+    });
+    for (var i = 0; i < 20; i++) {
+      await _settle();
+    }
+    expect(
+      handler.androidPlaybackInfo.value,
+      isNot(isA<RemoteAndroidPlaybackInfo>()),
+    );
+    await handler.androidAdjustRemoteVolume(AndroidVolumeDirection.raise);
+    expect(calls, isNot(contains('volume')));
+
+    events.add({
+      'connected': true,
+      'deviceId': 'dlna:uuid-1',
+      'host': '192.0.2.40',
+      'kind': 'dlna',
+      'volume': 0.3,
+    });
+    final info = handler.androidPlaybackInfo.value;
+    expect(info, isA<RemoteAndroidPlaybackInfo>());
+    expect((info as RemoteAndroidPlaybackInfo).volume, 30);
+    await handler.androidAdjustRemoteVolume(AndroidVolumeDirection.raise);
+    expect(calls, contains('volume'));
+    await runtime.dispose();
+    output.dispose();
+    await events.close();
+  });
+
   test(
     'playback instances survive pause and seek but change for repeated songs',
     () async {

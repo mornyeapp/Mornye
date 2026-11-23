@@ -67,7 +67,9 @@ class CastPlaybackDeck implements PlaybackDeck {
     if (event['failed'] == true || event['error'] != null) {
       _ready = false;
       _setState(PlaybackDeckState.paused);
-      _states.addError(StateError('TV could not play this audio file'));
+      _states.addError(
+        StateError('The cast device could not play this audio file'),
+      );
       return;
     }
     _position = Duration(
@@ -103,9 +105,7 @@ class CastPlaybackDeck implements PlaybackDeck {
     'ogg' || 'opus' => 'audio/ogg',
     'wav' => 'audio/wav',
     'webm' => 'audio/webm',
-    _ => throw UnsupportedError(
-      'This audio format is not supported by Google Cast',
-    ),
+    _ => throw UnsupportedError('This audio format cannot be cast'),
   };
 
   Future<void> _load(String source) async {
@@ -119,7 +119,9 @@ class CastPlaybackDeck implements PlaybackDeck {
       format == null || format.isEmpty ? path.split('.').last : format,
     );
     final serving = _serving ??= output.command('serve', {
-      'host': output.host ?? (throw StateError('TV has no network address')),
+      'host':
+          output.host ??
+          (throw StateError('The cast device has no network address')),
     });
     try {
       await serving;
@@ -171,7 +173,9 @@ class CastPlaybackDeck implements PlaybackDeck {
       'mime': mime,
     });
     final url = reply?['url'];
-    if (url is! String) throw StateError('TV media server did not answer');
+    if (url is! String) {
+      throw StateError('The cast media server did not answer');
+    }
     return url;
   }
 
@@ -205,7 +209,7 @@ class CastPlaybackDeck implements PlaybackDeck {
 
   @override
   Future<void> resume() async {
-    if (!_ready) throw StateError('TV source is not ready');
+    if (!_ready) throw StateError('The cast source is not ready');
     await output.command('play');
     _setState(PlaybackDeckState.playing);
   }

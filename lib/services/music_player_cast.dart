@@ -105,7 +105,8 @@ class _MusicCast {
   }
 
   void _showVolume() {
-    if (_closed || !active) return;
+    // A receiver that reports no level would show as muted and step from 0.
+    if (_closed || !active || output?.hasVolume != true) return;
     final index = ((output?.volume ?? 0) * 100).round();
     if (index == _volumeIndex) return;
     _volumeIndex = index;
@@ -119,7 +120,7 @@ class _MusicCast {
   }
 
   Future<void> setVolume(int value) async {
-    if (active) {
+    if (active && output?.hasVolume == true) {
       await output?.command('volume', {'volume': value.clamp(0, 100) / 100});
     }
   }

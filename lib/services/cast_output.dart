@@ -5,19 +5,65 @@ import 'package:flutter/services.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
+/// The protocol a receiver speaks, as the platform names it in `kind`.
+enum CastKind {
+  cast('cast', 'Google Cast'),
+  dlna('dlna', 'DLNA'),
+  fcast('fcast', 'FCast'),
+  roku('roku', 'Roku'),
+
+  /// A kind this build does not know; listed without a protocol name.
+  other(null, null);
+
+  const CastKind(this.wireName, this.label);
+
+  final String? wireName;
+
+  /// The protocol's own name, shown to people as it is.
+  final String? label;
+
+  /// The kinds the app's text names, in this order. The only list to edit
+  /// when the sender gains or drops a protocol.
+  static const named = [cast, dlna, fcast];
+
+  /// Every kind but Google Cast, which Android reaches through Google's SDK.
+  static final Set<CastKind> others = Set.unmodifiable(
+    values.where((kind) => kind != cast),
+  );
+
+  /// A missing kind is Google Cast, as older platforms sent no kind.
+  static CastKind parse(Object? value) => value == null
+      ? cast
+      : values.firstWhere(
+          (kind) => kind.wireName == value,
+          orElse: () => other,
+        );
+}
+
 @immutable
 class CastDevice {
-  const CastDevice({required this.id, required this.name, this.model = ''});
+  const CastDevice({
+    required this.id,
+    required this.name,
+    this.model = '',
+    this.kind = CastKind.cast,
+  });
 
   final String id;
   final String name;
   final String model;
+  final CastKind kind;
 
   static CastDevice? fromMap(Object? value) {
     if (value is! Map) return null;
     final id = value['id'], name = value['name'];
     if (id is! String || id.isEmpty || name is! String) return null;
-    return CastDevice(id: id, name: name, model: '${value['model'] ?? ''}');
+    return CastDevice(
+      id: id,
+      name: name,
+      model: '${value['model'] ?? ''}',
+      kind: CastKind.parse(value['kind']),
+    );
   }
 
   @override
@@ -25,10 +71,11 @@ class CastDevice {
       other is CastDevice &&
       other.id == id &&
       other.name == name &&
-      other.model == model;
+      other.model == model &&
+      other.kind == kind;
 
   @override
-  int get hashCode => Object.hash(id, name, model);
+  int get hashCode => Object.hash(id, name, model, kind);
 }
 
 /// How [CastOutput] reaches the platform: Android's Google Cast plugin and
@@ -84,16 +131,18 @@ class CastOutput extends ChangeNotifier {
   }) : _transport =
            transport ??
            MethodChannelCastTransport(channel: channel, eventStream: events),
-       nativePicker =
-           nativePicker ?? defaultTargetPlatform == TargetPlatform.android;
+       _nativePicker = nativePicker;
 
   static final instance = CastOutput(
     transport: isDesktopPlatform ? const DesktopCastTransport() : null,
   );
 
-  /// Android shows Google's own device dialog ([showPicker]); other
-  /// platforms list [devices] after [discover].
-  final bool nativePicker;
+  /// Android shows Google's own device dialog ([showPicker]) for Google
+  /// Cast; every other kind, and every kind elsewhere, is listed in
+  /// [devices] after [discover].
+  bool get nativePicker =>
+      _nativePicker ?? defaultTargetPlatform == TargetPlatform.android;
+  final bool? _nativePicker;
   final CastTransport _transport;
   final _updates = StreamController<Map<Object?, Object?>>.broadcast(
     sync: true,
@@ -110,6 +159,12 @@ class CastOutput extends ChangeNotifier {
   String? get deviceName => _status['deviceName'] as String?;
   String? get host => _status['host'] as String?;
   double get volume => (_status['volume'] as num?)?.toDouble() ?? 0;
+
+  /// Whether the receiver reports its volume; some only step it.
+  bool get hasVolume => _status['volume'] is num;
+
+  /// The protocol of the connected session.
+  CastKind get kind => CastKind.parse(_status['kind']);
   Stream<Map<Object?, Object?>> get updates => _updates.stream;
 
   /// Receivers found since [discover] was turned on.
@@ -147,13 +202,15 @@ class CastOutput extends ChangeNotifier {
     final oldRevision = revision;
     final wasConnected = connected;
     final oldName = deviceName;
+    final oldKind = kind;
     _status = event;
     _updates.add(event);
     if (oldId != deviceId ||
         oldHost != host ||
         oldRevision != revision ||
         wasConnected != connected ||
-        oldName != deviceName) {
+        oldName != deviceName ||
+        oldKind != kind) {
       notifyListeners();
     }
   }
@@ -164,10 +221,18 @@ class CastOutput extends ChangeNotifier {
     return await _transport.invoke('show') as bool? ?? false;
   }
 
-  /// Looks for receivers while [on]; the list arrives in [devices].
-  Future<void> discover(bool on) async {
+  /// Looks for receivers of [kinds] (every kind when null) while [on]; the
+  /// list arrives in [devices].
+  Future<void> discover(bool on, {Set<CastKind>? kinds}) async {
     await initialize();
-    await _transport.invoke('discover', {'on': on});
+    await _transport.invoke('discover', {
+      'on': on,
+      if (on && kinds != null)
+        'kinds': [
+          for (final kind in CastKind.values)
+            if (kinds.contains(kind) && kind.wireName != null) kind.wireName,
+        ],
+    });
     if (!on && _devices.isNotEmpty) {
       _devices = const [];
       notifyListeners();

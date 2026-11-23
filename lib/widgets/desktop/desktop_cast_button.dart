@@ -6,8 +6,8 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/cast_device_picker.dart';
 
-/// Opens the Google Cast receivers on the network. The glyph shows an active
-/// session, whose name the tooltip gives.
+/// Opens the receivers of every kind on the network. The glyph shows an
+/// active session, whose name the tooltip gives.
 class DesktopCastButton extends StatelessWidget {
   const DesktopCastButton({super.key, this.output});
 

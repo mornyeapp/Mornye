@@ -2,7 +2,7 @@ import AVFoundation
 import Flutter
 import MornyeBackend
 
-/// Google Cast on iOS through the Rust sender (`CastBridge`), on the channels
+/// Casting on iOS, every kind, through the Rust sender (`CastBridge`), on the channels
 /// Android's plugin uses, so the Dart player drives both the same way.
 /// Methods run off the main thread; events (session snapshots and the
 /// discovered device list) are pulled from Rust and forwarded as they come.
