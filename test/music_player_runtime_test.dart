@@ -3272,6 +3272,169 @@ void main() {
     });
   });
 
+  group('calls on Android', () {
+    Future<(MusicPlayerHandler, List<_Deck>)> playing(
+      _Session session,
+      Future<bool> Function() callActive,
+    ) async {
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        session: session,
+        decks: decks,
+        isAndroid: true,
+        callActive: callActive,
+      ).initialize();
+      await handler.setQueueAndPlay([_track]);
+      return (handler, decks);
+    }
+
+    test('a call that keeps focus resumes the music once it ends', () async {
+      final time = VirtualTime();
+      await time.run(() async {
+        final session = _Session();
+        var inCall = true;
+        final (handler, decks) = await playing(session, () async => inCall);
+        session.interruptions.add(
+          AudioInterruptionEvent(true, AudioInterruptionType.unknown),
+        );
+        await Future<void>.delayed(const Duration(seconds: 5));
+        expect(decks.single.state, PlaybackDeckState.paused);
+        expect(handler.playbackState.value.playing, isFalse);
+
+        inCall = false;
+        await Future<void>.delayed(const Duration(seconds: 2));
+        expect(decks.single.state, PlaybackDeckState.playing);
+        expect(handler.playbackState.value.playing, isTrue);
+      });
+    });
+
+    test('focus lost for good without a call stays paused', () async {
+      final time = VirtualTime();
+      await time.run(() async {
+        final session = _Session();
+        final (handler, decks) = await playing(session, () async => false);
+        session.interruptions.add(
+          AudioInterruptionEvent(true, AudioInterruptionType.unknown),
+        );
+        await Future<void>.delayed(const Duration(seconds: 5));
+        expect(decks.single.state, PlaybackDeckState.paused);
+        expect(handler.playbackState.value.playing, isFalse);
+      });
+    });
+
+    test('a pause during the call keeps the music paused after it', () async {
+      final time = VirtualTime();
+      await time.run(() async {
+        final session = _Session();
+        var inCall = true;
+        final (handler, decks) = await playing(session, () async => inCall);
+        session.interruptions.add(
+          AudioInterruptionEvent(true, AudioInterruptionType.unknown),
+        );
+        await Future<void>.delayed(const Duration(seconds: 2));
+        await handler.pause();
+        inCall = false;
+        await Future<void>.delayed(const Duration(seconds: 3));
+        expect(decks.single.state, PlaybackDeckState.paused);
+      });
+    });
+
+    test('focus back while still in call mode waits for its end', () async {
+      final time = VirtualTime();
+      await time.run(() async {
+        final session = _Session();
+        var inCall = true;
+        final (handler, decks) = await playing(session, () async => inCall);
+        session.interruptions.add(
+          AudioInterruptionEvent(true, AudioInterruptionType.pause),
+        );
+        await _settle();
+        session.interruptions.add(
+          AudioInterruptionEvent(false, AudioInterruptionType.pause),
+        );
+        await Future<void>.delayed(const Duration(seconds: 3));
+        expect(decks.single.state, PlaybackDeckState.paused);
+
+        inCall = false;
+        await Future<void>.delayed(const Duration(seconds: 2));
+        expect(decks.single.state, PlaybackDeckState.playing);
+        expect(handler.playbackState.value.playing, isTrue);
+      });
+    });
+
+    test('a refused resume drops the request and tries again', () async {
+      final time = VirtualTime();
+      await time.run(() async {
+        final session = _Session();
+        var inCall = true;
+        final (handler, decks) = await playing(session, () async => inCall);
+        session.interruptions.add(
+          AudioInterruptionEvent(true, AudioInterruptionType.unknown),
+        );
+        await Future<void>.delayed(const Duration(seconds: 2));
+        session.activations.clear();
+        session.focusGranted = false;
+        inCall = false;
+        await Future<void>.delayed(const Duration(milliseconds: 1500));
+        // Each refused request is dropped before the next one asks.
+        expect(session.activations.take(2), [true, false]);
+        expect(session.activations.last, isFalse);
+        expect(decks.single.state, PlaybackDeckState.paused);
+
+        session.focusGranted = true;
+        await Future<void>.delayed(const Duration(milliseconds: 1500));
+        expect(session.activations.last, isTrue);
+        expect(decks.single.state, PlaybackDeckState.playing);
+        expect(handler.playbackState.value.playing, isTrue);
+      });
+    });
+
+    test('a resume that does not move reloads the song in place', () async {
+      final time = VirtualTime();
+      await time.run(() async {
+        final session = _Session();
+        final (_, decks) = await playing(session, () async => false);
+        final deck = decks.last;
+        deck.position = const Duration(seconds: 23);
+        final loads = deck.sources.length;
+        session.interruptions.add(
+          AudioInterruptionEvent(true, AudioInterruptionType.pause),
+        );
+        await _settle();
+        session.interruptions.add(
+          AudioInterruptionEvent(false, AudioInterruptionType.pause),
+        );
+        await Future<void>.delayed(const Duration(seconds: 3));
+        expect(decks.expand((deck) => deck.sources), hasLength(loads + 1));
+        expect(decks.last.position, const Duration(seconds: 23));
+        expect(decks.last.state, PlaybackDeckState.playing);
+      });
+    });
+
+    test('a resume that moves is left alone', () async {
+      final time = VirtualTime();
+      await time.run(() async {
+        final session = _Session();
+        final (_, decks) = await playing(session, () async => false);
+        final deck = decks.single;
+        final loads = deck.sources.length;
+        session.interruptions.add(
+          AudioInterruptionEvent(true, AudioInterruptionType.pause),
+        );
+        await _settle();
+        session.interruptions.add(
+          AudioInterruptionEvent(false, AudioInterruptionType.pause),
+        );
+        await _settle();
+        deck.position = const Duration(seconds: 1);
+        await Future<void>.delayed(const Duration(seconds: 3));
+        expect(decks, hasLength(1));
+        expect(deck.sources, hasLength(loads));
+        expect(deck.state, PlaybackDeckState.playing);
+      });
+    });
+  });
+
   test('pause cancels a resume awaiting foreground promotion', () async {
     final session = _Session();
     final decks = <_Deck>[];

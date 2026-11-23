@@ -210,6 +210,8 @@ class MusicPlayerHandler extends BaseAudioHandler
   bool _pausedByInterruption = false;
   bool _interruptionActive = false;
   int _usbFocusCheck = 0;
+  int _callWait = 0;
+  int _deniedFocusRetries = 0;
   bool _userPaused = false;
   // Position saved with the restored session; applied on the first play().
   Duration? _pendingRestorePosition;
@@ -804,8 +806,11 @@ class MusicPlayerHandler extends BaseAudioHandler
             if (event.type == AudioInterruptionType.duck) {
               return;
             }
+            // Some calls in other apps take focus for good and never give it
+            // back, so only their end can resume the music.
+            final permanent = event.type == AudioInterruptionType.unknown;
             if (_holdsUsbDac) {
-              unawaited(_keepPlayingOnUsbDac());
+              unawaited(_keepPlayingOnUsbDac(permanent: permanent));
               return;
             }
 
@@ -813,7 +818,11 @@ class MusicPlayerHandler extends BaseAudioHandler
             _pausedByInterruption =
                 _player.state == PlaybackDeckState.playing ||
                 playbackState.value.playing;
-            unawaited(_pauseForFocusLoss(reason: 'audio interruption'));
+            unawaited(
+              _pauseForFocusLoss(reason: 'audio interruption').then((_) {
+                if (permanent) return _resumeAfterCall();
+              }),
+            );
           } else {
             if (event.type == AudioInterruptionType.duck) {
               return;
@@ -823,8 +832,7 @@ class MusicPlayerHandler extends BaseAudioHandler
             if (_pausedByInterruption &&
                 event.type == AudioInterruptionType.pause &&
                 !_playbackAutomation.blocksPlayback) {
-              _pausedByInterruption = false;
-              unawaited(play());
+              unawaited(_resumeAfterInterruption());
             } else {
               _pausedByInterruption = false;
             }
@@ -944,7 +952,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   /// Keeps playing through a lost focus, unless a call takes it. A call can
   /// set its mode just after taking focus, so it is asked again a second on.
-  Future<void> _keepPlayingOnUsbDac() async {
+  Future<void> _keepPlayingOnUsbDac({required bool permanent}) async {
     final check = ++_usbFocusCheck;
     _log.i('Audio interruption ignored: Direct USB holds the DAC');
     for (final wait in const [Duration.zero, Duration(seconds: 1)]) {
@@ -955,8 +963,63 @@ class MusicPlayerHandler extends BaseAudioHandler
       _interruptionActive = true;
       _pausedByInterruption = true;
       await _pauseForFocusLoss(reason: 'a call');
+      if (permanent) _playWhenCallEnds(_playRequestGeneration);
       return;
     }
+  }
+
+  /// Resumes music a call paused for good once the call ends. A call can
+  /// set its mode just after taking focus, so it is asked again a second on.
+  Future<void> _resumeAfterCall() async {
+    if (!_dependencies.isAndroid || !_pausedByInterruption) return;
+    final generation = _playRequestGeneration;
+    for (final wait in const [Duration.zero, Duration(seconds: 1)]) {
+      if (wait > Duration.zero) await Future<void>.delayed(wait);
+      if (_disposed || generation != _playRequestGeneration) return;
+      if (!await _dependencies.callActive()) continue;
+      if (_disposed || generation != _playRequestGeneration) return;
+      _playWhenCallEnds(generation);
+      return;
+    }
+  }
+
+  /// Focus can come back while the phone is still leaving call mode, and a
+  /// player resumed into that switch can stall, so it waits for the end.
+  Future<void> _resumeAfterInterruption() async {
+    final generation = _playRequestGeneration;
+    if (_dependencies.isAndroid && await _dependencies.callActive()) {
+      if (!_disposed && generation == _playRequestGeneration) {
+        _playWhenCallEnds(generation);
+      }
+      return;
+    }
+    if (_disposed || generation != _playRequestGeneration) return;
+    if (!_pausedByInterruption) return;
+    await play();
+  }
+
+  /// Plays once no call is active, unless anything paused, skipped or
+  /// played meanwhile.
+  void _playWhenCallEnds(int generation) {
+    final wait = ++_callWait;
+    _log.i('Playback waits for the call to end');
+    unawaited(() async {
+      // A call lasting longer than this is left to the listener.
+      for (var second = 0; second < 4 * 3600; second++) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        bool stale() =>
+            _disposed ||
+            wait != _callWait ||
+            generation != _playRequestGeneration ||
+            !_pausedByInterruption;
+        if (stale()) return;
+        if (await _dependencies.callActive()) continue;
+        if (stale()) return;
+        _log.i('Call ended; resuming playback');
+        await play();
+        return;
+      }
+    }());
   }
 
   Future<void> _pauseForFocusLoss({
@@ -1032,6 +1095,9 @@ class MusicPlayerHandler extends BaseAudioHandler
       final granted = await session.setActive(true);
       if (!granted) {
         _log.w('Audio focus request was not granted');
+        // audio_session keeps a refused request and reports every later one
+        // as granted without asking; dropping it makes the next one ask.
+        if (_dependencies.isAndroid) await session.setActive(false);
       }
       return granted;
     } catch (e) {
@@ -2548,6 +2614,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   Future<void> _playInternal() async {
+    final afterInterruption = _pausedByInterruption;
     _pausedByInterruption = false;
     _interruptionActive = false;
     _userPaused = false;
@@ -2594,9 +2661,18 @@ class MusicPlayerHandler extends BaseAudioHandler
         await _player.pause();
         if (generation == _playRequestGeneration && !_disposed) {
           _broadcastState(playerState: PlaybackDeckState.paused);
+          // The phone app can hold focus a moment after the call ends.
+          if (afterInterruption &&
+              _dependencies.isAndroid &&
+              _deniedFocusRetries < 3) {
+            _deniedFocusRetries++;
+            _pausedByInterruption = true;
+            _playWhenCallEnds(generation);
+          }
         }
         return;
       }
+      _deniedFocusRetries = 0;
       await _claimHardwareMediaButtons();
       if (generation != _playRequestGeneration || _disposed) return;
       try {
@@ -2616,7 +2692,28 @@ class MusicPlayerHandler extends BaseAudioHandler
       }
       _heldPaused = false;
       _broadcastState(playerState: PlaybackDeckState.playing);
+      if (afterInterruption && _dependencies.isAndroid) {
+        unawaited(_reloadIfStalled(generation));
+      }
     });
+  }
+
+  /// Some phones resume the player after a call without it moving, while a
+  /// fresh load plays, as a skip does. The song reloads where it stood.
+  Future<void> _reloadIfStalled(int generation) async {
+    final player = _player;
+    final start = await player.getCurrentPosition();
+    await Future<void>.delayed(const Duration(seconds: 2));
+    bool stale() =>
+        _disposed ||
+        generation != _playRequestGeneration ||
+        !identical(player, _player) ||
+        player.state != PlaybackDeckState.playing;
+    if (start == null || stale()) return;
+    final now = await player.getCurrentPosition();
+    if (now == null || now > start || stale()) return;
+    _log.w('Playback did not move after a call; reloading the song');
+    await _playIndex(_index, recordHistory: false, startPosition: now);
   }
 
   @override
