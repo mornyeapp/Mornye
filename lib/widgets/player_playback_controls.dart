@@ -422,19 +422,28 @@ class PlayerPlaybackModeButton extends ConsumerWidget {
     required this.mode,
     required this.colorScheme,
     this.secondary = false,
+    this.size = 48,
+    this.iconSize = 24,
+    this.enabled = true,
   });
 
   final PlayerPlaybackMode mode;
   final ColorScheme colorScheme;
   final bool secondary;
 
+  /// Material only: the button's height and width.
+  final double size;
+  final double iconSize;
+  final bool enabled;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final (:selected, :icon, :tooltip, :onPressed) = _watchPlaybackMode(
+    final (:selected, :icon, :tooltip, onPressed: toggle) = _watchPlaybackMode(
       context,
       ref,
       mode,
     );
+    final onPressed = enabled ? toggle : null;
     if (context.isMornye) {
       // Plain over the player's backdrop; a fill marks the active mode, as
       // on the capsule.
@@ -458,7 +467,8 @@ class PlayerPlaybackModeButton extends ConsumerWidget {
       );
     }
     return ExpressiveIconButton(
-      iconSize: 24,
+      size: size,
+      iconSize: iconSize,
       selected: selected,
       tooltip: tooltip,
       icon: Icon(icon),

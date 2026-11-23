@@ -63,6 +63,13 @@ class _FakeController implements MusicPlayerController {
   Future<void> seek(Duration position) async => calls.add('seek');
 
   @override
+  Future<void> setShuffle(bool enabled) async => calls.add('shuffle $enabled');
+
+  @override
+  Future<void> setRepeatMode(AudioServiceRepeatMode mode) async =>
+      calls.add('repeat ${mode.name}');
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -731,6 +738,30 @@ void main() {
       await tester.tap(findByTooltip('Next track (Ctrl+Right)'));
       await tester.tap(findByTooltip('Play (Space)'));
       expect(controller.calls, ['next', 'play']);
+    });
+
+    testWidgets('player bar puts shuffle and repeat beside the transport', (
+      tester,
+    ) async {
+      await pumpShell(tester, mornye: false, width: 1400);
+
+      final shuffle = tester.getRect(
+        find.byKey(const ValueKey('desktop-player-shuffle')),
+      );
+      final repeat = tester.getRect(
+        find.byKey(const ValueKey('desktop-player-repeat')),
+      );
+      final previous = tester.getRect(
+        findByTooltip('Previous track (Ctrl+Left)'),
+      );
+      final next = tester.getRect(findByTooltip('Next track (Ctrl+Right)'));
+      expect(shuffle.right, lessThanOrEqualTo(previous.left));
+      expect(repeat.left, greaterThanOrEqualTo(next.right));
+      expect(shuffle.center.dy, closeTo(previous.center.dy, 0.5));
+
+      await tester.tap(find.byKey(const ValueKey('desktop-player-shuffle')));
+      await tester.tap(find.byKey(const ValueKey('desktop-player-repeat')));
+      expect(controller.calls, ['shuffle true', 'repeat all']);
     });
 
     testWidgets('idle player bar stays in place with disabled controls', (

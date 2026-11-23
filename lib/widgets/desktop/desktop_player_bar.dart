@@ -32,6 +32,7 @@ import 'package:mornye/widgets/desktop/desktop_link_devices_button.dart';
 import 'package:mornye/widgets/desktop/desktop_row_ink.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/desktop/desktop_volume_scroll.dart';
+import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/expressive_playback_transport.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
@@ -40,6 +41,7 @@ import 'package:mornye/widgets/mornye_player_background.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
+import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_track_crossfade.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
@@ -152,7 +154,7 @@ class _MaterialPlayerBar extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _Transport(enabled: loaded),
+                          _MaterialTransportRow(enabled: loaded),
                           SizedBox(
                             height: 24,
                             child: _SeekRow(mediaItem: mediaItem),
@@ -177,6 +179,50 @@ class _MaterialPlayerBar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Shuffle and repeat as M3E toggle buttons around the transport, which
+/// fill and turn square while on. A narrow center keeps the transport alone.
+class _MaterialTransportRow extends StatelessWidget {
+  const _MaterialTransportRow({required this.enabled});
+
+  static const double _transportWidth = 192;
+  static const double _modeSize = 40;
+  static const double _gap = 8;
+
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (constraints.maxWidth < _transportWidth + 2 * (_modeSize + _gap)) {
+        return _Transport(enabled: enabled);
+      }
+      final colorScheme = Theme.of(context).colorScheme;
+      Widget mode(PlayerPlaybackMode mode) => PlayerPlaybackModeButton(
+        key: ValueKey('desktop-player-${mode.name}'),
+        mode: mode,
+        colorScheme: colorScheme,
+        secondary: true,
+        size: _modeSize,
+        iconSize: 20,
+        enabled: enabled,
+      );
+      return Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            mode(PlayerPlaybackMode.shuffle),
+            const SizedBox(width: _gap),
+            _Transport(enabled: enabled),
+            const SizedBox(width: _gap),
+            mode(PlayerPlaybackMode.repeat),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 /// The Mornye capsule: shuffle, transport and repeat, the center display,
@@ -1145,22 +1191,37 @@ class _InspectorToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final mornye = context.isMornye;
     final colorScheme = Theme.of(context).colorScheme;
+    // An open panel can always close, even after playback stops.
+    final onPressed = enabled || selected
+        ? () => toggleDesktopInspector(panel)
+        : null;
+    if (!mornye) {
+      // An M3E tonal toggle: filled and square while its panel is open.
+      return Semantics(
+        toggled: selected,
+        child: ExpressiveIconButton(
+          tooltip: tooltip,
+          selected: selected,
+          foregroundColor: selected
+              ? colorScheme.onSecondaryContainer
+              : colorScheme.onSurfaceVariant,
+          backgroundColor: selected ? colorScheme.secondaryContainer : null,
+          icon: AppIcon(icon),
+          onPressed: onPressed,
+        ),
+      );
+    }
     return AppIconButton(
       tooltip: tooltip,
       isSelected: selected,
-      color: mornye
-          ? (selected ? colorScheme.primary : colorScheme.onSurface)
-          : null,
-      style: mornye && selected
+      color: selected ? colorScheme.primary : colorScheme.onSurface,
+      style: selected
           ? IconButton.styleFrom(
               backgroundColor: MornyeTheme.controlFill(context),
             )
           : null,
       icon: AppIcon(icon),
-      // An open panel can always close, even after playback stops.
-      onPressed: enabled || selected
-          ? () => toggleDesktopInspector(panel)
-          : null,
+      onPressed: onPressed,
     );
   }
 }
