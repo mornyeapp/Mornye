@@ -570,7 +570,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
     final coverThumbUrl = widget.coverUrl ?? _headerImageUrl;
     final showSquareCover = context.isMornye || !hasMotion;
     final expandedHeight = calculateExpandedHeight(context);
-    final cacheWidth = coverCacheWidthForViewport(context);
+    final cacheWidth = detailHeaderCoverCacheWidth(context);
     final bgCacheWidth = !context.isMornye && showSquareCover
         ? metadataBackdropCacheExtent(context)
         : cacheWidth;

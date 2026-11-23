@@ -312,7 +312,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
 
   Widget _buildAppBar(BuildContext context, ColorScheme colorScheme) {
     final expandedHeight = calculateExpandedHeight(context);
-    final cacheWidth = coverCacheWidthForViewport(context);
+    final cacheWidth = detailHeaderCoverCacheWidth(context);
     final motionUrl = _headerVideoUrl;
     final hasMotion =
         motionUrl != null &&

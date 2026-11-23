@@ -46,6 +46,7 @@ import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/cover_art_utils.dart';
+import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/confirm_and_delete_tracks.dart';
 import 'package:mornye/controllers/library_tracks_folder_data.dart';
@@ -1038,11 +1039,7 @@ class _LibraryTracksFolderScreenState
           )
         : null;
 
-    final dpr = MediaQuery.devicePixelRatioOf(context);
-    final cacheWidth = (MediaQuery.sizeOf(context).width * dpr).round().clamp(
-      320,
-      2048,
-    );
+    final cacheWidth = detailHeaderCoverCacheWidth(context);
     final coverFallback = Container(
       color: colorScheme.surfaceContainerHighest,
       child: Icon(_modeIcon(), size: 80, color: colorScheme.onSurfaceVariant),

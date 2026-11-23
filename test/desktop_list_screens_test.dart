@@ -54,10 +54,15 @@ final _tracks = [
     ),
 ];
 
-Future<_Playback> _pumpAlbum(WidgetTester tester, {bool mornye = false}) async {
+Future<_Playback> _pumpAlbum(
+  WidgetTester tester, {
+  bool mornye = false,
+  String? coverPath,
+  double pixelRatio = 1,
+}) async {
   SharedPreferences.setMockInitialValues({});
-  tester.view.physicalSize = const Size(1280, 900);
-  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = const Size(1280, 900) * pixelRatio;
+  tester.view.devicePixelRatio = pixelRatio;
   addTearDown(tester.view.reset);
   final playback = _Playback();
   final navigator = GlobalKey<NavigatorState>();
@@ -87,6 +92,7 @@ Future<_Playback> _pumpAlbum(WidgetTester tester, {bool mornye = false}) async {
         albumName: 'Album',
         artistName: 'Artist',
         tracks: _tracks,
+        coverPath: coverPath,
       ),
     ),
   );
@@ -106,6 +112,25 @@ Future<void> _click(WidgetTester tester, Finder finder, {int buttons = 1}) =>
 void main() {
   setUp(DesktopDoubleClick.reset);
   tearDown(() => debugDesktopPlatformOverride = null);
+
+  testWidgets('a desktop header cover decodes once at its largest size', (
+    tester,
+  ) async {
+    debugDesktopPlatformOverride = true;
+    await _pumpAlbum(tester, coverPath: '/music/cover.jpg', pixelRatio: 2);
+    final cover = find.byWidgetPredicate(
+      (widget) => widget is Image && widget.image is ResizeImage,
+    );
+    int decodeWidth() =>
+        (tester.widget<Image>(cover).image as ResizeImage).width!;
+    expect(decodeWidth(), 600);
+    // A pane that narrows, as when a panel opens beside it, keeps the decode.
+    for (final width in [1180.0, 1060.0, 940.0]) {
+      tester.view.physicalSize = Size(width, 900) * 2;
+      await tester.pump();
+      expect(decodeWidth(), 600, reason: '$width');
+    }
+  });
 
   testWidgets('phones keep the album track tiles', (tester) async {
     debugDesktopPlatformOverride = false;

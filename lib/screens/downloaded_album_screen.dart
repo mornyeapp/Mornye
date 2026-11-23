@@ -408,7 +408,7 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
               .value
         : null;
 
-    final cacheWidth = coverCacheWidthForViewport(context);
+    final cacheWidth = detailHeaderCoverCacheWidth(context);
     final bgCacheWidth = !context.isMornye
         ? metadataBackdropCacheExtent(context)
         : cacheWidth;

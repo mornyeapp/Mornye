@@ -409,7 +409,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
               .value
         : null;
 
-    final cacheWidth = coverCacheWidthForViewport(context);
+    final cacheWidth = detailHeaderCoverCacheWidth(context);
     final bgCacheWidth = !context.isMornye
         ? metadataBackdropCacheExtent(context)
         : cacheWidth;

@@ -6,6 +6,7 @@ import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
@@ -21,7 +22,7 @@ const double _toolbarHeight = 52;
 /// The header artwork side for a content column: about a third of it, from
 /// 200 to 300.
 double desktopDetailArtworkSize(double contentWidth) =>
-    (contentWidth * 0.32).clamp(200.0, 300.0);
+    (contentWidth * 0.32).clamp(200.0, desktopDetailArtworkMaxSize);
 
 /// The artist line under a desktop detail title, large and in the accent color.
 ///
