@@ -12,6 +12,7 @@ import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 
 class CachedCoverImage extends StatelessWidget {
@@ -88,9 +89,7 @@ class CachedCoverImage extends StatelessWidget {
     }
     // Grid cells size their children through constraints rather than explicit
     // width/height. Use those bounds for decoding as well as explicit sizes.
-    return LayoutBuilder(
-      builder: (context, constraints) => _buildImage(context, constraints),
-    );
+    return _decodeLayout(_buildImage);
   }
 
   Widget _buildImage(BuildContext context, BoxConstraints constraints) {
@@ -253,9 +252,8 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
     if (localCacheWidth != null) {
       return _buildLocalImage(context, file, const BoxConstraints());
     }
-    return LayoutBuilder(
-      builder: (context, constraints) =>
-          _buildLocalImage(context, file, constraints),
+    return _decodeLayout(
+      (context, constraints) => _buildLocalImage(context, file, constraints),
     );
   }
 
@@ -327,6 +325,69 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
     if (size == null || !size.isFinite || size <= 0) return null;
     return (size * MediaQuery.devicePixelRatioOf(context)).ceil();
   }
+}
+
+/// Builds a cover with the constraints it decodes for. On desktop a pane
+/// resizes across many frames, so a cover keeps its decode while its cell
+/// shrinks or grows a little and decodes again once the size settles.
+Widget _decodeLayout(
+  Widget Function(BuildContext context, BoxConstraints constraints) builder,
+) => isDesktopPlatform
+    ? _SettledDecodeLayout(builder: builder)
+    : LayoutBuilder(builder: builder);
+
+class _SettledDecodeLayout extends StatefulWidget {
+  const _SettledDecodeLayout({required this.builder});
+
+  final Widget Function(BuildContext context, BoxConstraints constraints)
+  builder;
+
+  @override
+  State<_SettledDecodeLayout> createState() => _SettledDecodeLayoutState();
+}
+
+class _SettledDecodeLayoutState extends State<_SettledDecodeLayout> {
+  static const _settleAfter = Duration(milliseconds: 150);
+
+  /// Growth past this decodes at once, so a cover is never shown blurred
+  /// by more than a quarter.
+  static const _maxUpscale = 1.25;
+
+  BoxConstraints? _decoded;
+  Timer? _settle;
+
+  static double _growth(double from, double to) {
+    if (from == to) return 1;
+    if (!from.isFinite || !to.isFinite || from <= 0) return double.infinity;
+    return to / from;
+  }
+
+  @override
+  void dispose() {
+    _settle?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final decoded = _decoded;
+      if (decoded == constraints) {
+        _settle?.cancel();
+      } else if (decoded == null ||
+          _growth(decoded.maxWidth, constraints.maxWidth) > _maxUpscale ||
+          _growth(decoded.maxHeight, constraints.maxHeight) > _maxUpscale) {
+        _settle?.cancel();
+        _decoded = constraints;
+      } else {
+        _settle?.cancel();
+        _settle = Timer(_settleAfter, () {
+          if (mounted) setState(() => _decoded = null);
+        });
+      }
+      return widget.builder(context, _decoded!);
+    },
+  );
 }
 
 /// The artwork inside a song file on this device, for a cover whose own
