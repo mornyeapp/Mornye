@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/track.dart';
@@ -146,8 +147,9 @@ final homeRecommendationFilterProvider =
 /// extension's order.
 final homeRecommendationsProvider = FutureProvider<List<Track>>((ref) async {
   final tracks = await ref.watch(homeRecommendationCandidatesProvider.future);
-  List<Track> first(List<Track> songs) =>
-      songs.take(homeRecommendationCount).toList(growable: false);
+  List<Track> first(List<Track> songs) => ref
+      .read(_shownRecommendationsProvider)
+      .keep(songs.take(homeRecommendationCount).toList(growable: false));
   final learning = ref.watch(
     settingsProvider.select(
       (s) => s.autoplayPersonalization && s.usesBuiltInPlayer,
@@ -190,6 +192,30 @@ final homeRecommendationsProvider = FutureProvider<List<Track>>((ref) async {
   }
   return first(order.apply(tracks));
 });
+
+/// The shelf's last list. A reload that finds the same songs returns it, so
+/// Home does not rebuild for every finished download.
+class _ShownRecommendations {
+  List<Track>? _tracks;
+  String? _encoded;
+
+  List<Track> keep(List<Track> tracks) {
+    final String encoded;
+    try {
+      encoded = jsonEncode(tracks);
+    } catch (_) {
+      _encoded = null;
+      return _tracks = tracks;
+    }
+    if (_tracks != null && encoded == _encoded) return _tracks!;
+    _encoded = encoded;
+    return _tracks = tracks;
+  }
+}
+
+final _shownRecommendationsProvider = Provider<_ShownRecommendations>(
+  (ref) => _ShownRecommendations(),
+);
 
 /// Forgets the shelf's stored order, as resetting learning forgets what it
 /// came from.

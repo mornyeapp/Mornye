@@ -207,6 +207,16 @@ void main() {
     expect(requests, hasLength(1));
   });
 
+  test('a reload that finds the same songs keeps the shelf\'s list', () async {
+    final read = container();
+    final first = await read.read(homeRecommendationsProvider.future);
+    expect(first, isNotEmpty);
+    // A finished download reads the candidates again.
+    read.invalidate(homeRecommendationCandidatesProvider);
+    final again = await read.read(homeRecommendationsProvider.future);
+    expect(again, same(first));
+  });
+
   test('another day asks again', () async {
     SharedPreferences.setMockInitialValues({
       _cacheKey: HomeRecommendationCache(
