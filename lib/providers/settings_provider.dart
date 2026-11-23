@@ -25,7 +25,7 @@ import 'package:mornye/utils/logger.dart';
 const _settingsKey = 'app_settings';
 const _settingsCorruptBackupKey = 'app_settings_corrupt_backup';
 const _migrationVersionKey = 'settings_migration_version';
-const _currentMigrationVersion = 16;
+const _currentMigrationVersion = 17;
 
 /// Set while someone who had the search field on Home has not yet seen the
 /// pointer to the Search tab.
@@ -375,6 +375,13 @@ class SettingsNotifier extends Notifier<AppSettings> {
       // an earlier build is owed one pointer to it; a new install is not.
       if (lastMigration > 0 && lastMigration < 16 && !state.isFirstLaunch) {
         await prefs.setBool(searchMovedHintOwedKey, true);
+      }
+      // Migration 17: Off used to mean "show my own Home, not the feed".
+      // Home is always that now, so the old choice no longer empties Search.
+      if (lastMigration > 0 &&
+          lastMigration < 17 &&
+          state.homeFeedProvider == AppSettings.homeFeedProviderOff) {
+        state = state.copyWith(clearHomeFeedProvider: true);
       }
       await prefs.setInt(_migrationVersionKey, _currentMigrationVersion);
       await _saveSettings();

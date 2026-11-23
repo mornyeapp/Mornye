@@ -37,13 +37,13 @@ void main() {
   test('an install that ran an earlier build is owed the hint', () async {
     final preferences = await load(migration: 15, finishedSetup: true);
     expect(preferences.getBool(searchMovedHintOwedKey), isTrue);
-    expect(preferences.getInt('settings_migration_version'), 16);
+    expect(preferences.getInt('settings_migration_version'), 17);
   });
 
   test('a new install on its second launch is not', () async {
     final preferences = await load(migration: null, finishedSetup: true);
     expect(preferences.containsKey(searchMovedHintOwedKey), isFalse);
-    expect(preferences.getInt('settings_migration_version'), 16);
+    expect(preferences.getInt('settings_migration_version'), 17);
   });
 
   test('nor is an earlier build that never finished setup', () async {
