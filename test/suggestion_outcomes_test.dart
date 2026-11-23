@@ -316,6 +316,49 @@ void main() {
     expect(await outcomes.readMixOutcomes(), isEmpty);
   });
 
+  test('a write reads the summary again for a listener, otherwise at the '
+      'next read', () async {
+    final db = await _database();
+    final outcomes = SuggestionOutcomes(open: () async => db)..enabled = true;
+    outcomes.followMix(
+      LibraryMixKind.genre,
+      ['/one', '/two', '/three'],
+      queue: 1,
+      since: _start,
+    );
+    Future<void> settle(int total) async {
+      for (var i = 0; i < 100; i++) {
+        if (outcomes.summary.value?.mixes.total == total) return;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    }
+
+    outcomes.recordPlay(_feedback('/one'), queue: 1);
+    await outcomes.flush();
+    await outcomes.refresh();
+    expect(outcomes.summary.value!.mixes.total, 1);
+
+    // Nothing listens: the write leaves the logs unread until the next read.
+    final summary = outcomes.summary;
+    outcomes.recordPlay(_feedback('/two'), queue: 1);
+    await outcomes.flush();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(summary.value!.mixes.total, 1);
+    await settle(2);
+    expect(summary.value!.mixes.total, 2);
+
+    // A listener sees each write.
+    var heard = 0;
+    void listener() => heard++;
+    summary.addListener(listener);
+    addTearDown(() => summary.removeListener(listener));
+    outcomes.recordPlay(_feedback('/three'), queue: 1);
+    await outcomes.flush();
+    await settle(3);
+    expect(summary.value!.mixes.total, 3);
+    expect(heard, greaterThan(0));
+  });
+
   test('each log keeps its latest rows, and a reset clears both', () async {
     final db = await _database();
     var now = _start;

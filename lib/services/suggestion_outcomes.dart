@@ -269,6 +269,12 @@ class _MixPlay {
   final heard = <String>{};
 }
 
+class _SummaryNotifier extends ValueNotifier<SuggestionOutcomeSummary?> {
+  _SummaryNotifier() : super(null);
+
+  bool get listened => hasListeners;
+}
+
 /// Whether Home's suggestions work for this listener, on this device only:
 /// how the songs of a played mix go, and what the listener does with the
 /// recommended songs shown. No titles, names, paths or ids are stored.
@@ -284,7 +290,7 @@ class SuggestionOutcomes {
   final _pendingMixes = <MixSongOutcome>[];
   final _pendingShown = <RecommendationImpression>[];
   final _pendingActions = <(int, SuggestionAction, DateTime)>[];
-  final _summary = ValueNotifier<SuggestionOutcomeSummary?>(null);
+  final _summary = _SummaryNotifier();
   final _shownToday = <int>{};
   String? _shownDay;
   Map<int, ({int sourceRank, double? fit})> _places = const {};
@@ -517,7 +523,11 @@ class SuggestionOutcomes {
         _log.w('Could not save suggestion outcomes: $error');
         return;
       }
-      if (_summary.value != null) unawaited(refresh());
+      // Read the logs again only for a listener; otherwise the next read of
+      // [summary] does.
+      if (_summary.value != null) {
+        _summary.listened ? unawaited(refresh()) : _loading = null;
+      }
     });
   }
 
