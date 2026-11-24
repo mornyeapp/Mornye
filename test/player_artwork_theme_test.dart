@@ -404,6 +404,23 @@ void main() {
     );
     final cover = _seeded(Colors.teal);
 
+    /// The fill the Material desktop player bar paints behind its controls.
+    Color barFill(WidgetTester tester) => tester
+        .widget<ColoredBox>(
+          find
+              .descendant(
+                of: find
+                    .descendant(
+                      of: find.byType(DesktopPlayerBar),
+                      matching: find.byType(PlayerArtworkSurface),
+                    )
+                    .first,
+                matching: find.byType(ColoredBox),
+              )
+              .first,
+        )
+        .color;
+
     Widget app(
       Widget home, {
       required bool mornye,
@@ -456,10 +473,7 @@ void main() {
 
       final bar = find.byType(DesktopPlayerBar);
       // Resting chrome keeps its container tier, now from the cover.
-      final surface = tester.widget<Material>(
-        find.descendant(of: bar, matching: find.byType(Material)).first,
-      );
-      expect(surface.color, cover.surfaceContainer);
+      expect(barFill(tester), cover.surfaceContainer);
       expect(Theme.of(tester.element(find.text('Song'))).colorScheme, cover);
       final transport = tester.widget<ExpressivePlaybackTransport>(
         find.descendant(
@@ -476,6 +490,42 @@ void main() {
         ).colorScheme,
         AppTheme.light().colorScheme,
       );
+    });
+
+    testWidgets('a song change swaps the Material player bar scheme at once '
+        'and fades only its fill', (tester) async {
+      final items = StreamController<MediaItem?>.broadcast();
+      addTearDown(items.close);
+      final red = _seeded(Colors.red);
+      palette.cached[_coverA] = cover;
+      palette.cached[_coverB] = red;
+      await tester.pumpWidget(
+        app(
+          const Scaffold(bottomNavigationBar: DesktopPlayerBar()),
+          mornye: false,
+          items: items.stream,
+        ),
+      );
+      items.add(track);
+      await tester.pumpAndSettle();
+      // The transport stays put while the title crossfades.
+      ColorScheme scheme() => Theme.of(
+        tester.element(find.byType(ExpressivePlaybackTransport)),
+      ).colorScheme;
+      expect(scheme(), cover);
+      expect(barFill(tester), cover.surfaceContainer);
+
+      items.add(track.copyWith(id: 'b', artUri: Uri.file(_coverB)));
+      await tester.pump();
+      await tester.pump();
+      expect(scheme(), red);
+      await tester.pump(const Duration(milliseconds: 48));
+      expect(scheme(), red);
+      final moving = barFill(tester);
+      expect(moving, isNot(cover.surfaceContainer));
+      expect(moving, isNot(red.surfaceContainer));
+      await tester.pumpAndSettle();
+      expect(barFill(tester), red.surfaceContainer);
     });
 
     testWidgets('the Material mini player takes the cover scheme', (

@@ -116,8 +116,12 @@ class _DesktopMiniPlayerState extends ConsumerState<DesktopMiniPlayer> {
   Widget build(BuildContext context) {
     final mediaItem = ref.watch(currentMediaItemProvider).value;
     if (context.isMornye) return _buildPanel(context, mediaItem);
+    // Only the fill fades; moving the whole scheme rebuilt the panel on
+    // every frame of a song change.
     return PlayerArtworkTheme(
       artUri: mediaItem?.artUri?.toString(),
+      fadesSurfaceOnly: true,
+      background: _barFill,
       child: Builder(builder: (context) => _buildPanel(context, mediaItem)),
     );
   }
@@ -138,7 +142,7 @@ class _DesktopMiniPlayerState extends ConsumerState<DesktopMiniPlayer> {
             if (mornye)
               MornyePlayerBackground(artUri: mediaItem?.artUri)
             else
-              ColoredBox(color: colorScheme.surfaceContainer),
+              PlayerArtworkSurface(surface: colorScheme.surfaceContainer),
             // Behind the content, so empty space and text drag the window
             // while the controls keep their clicks.
             const Positioned.fill(

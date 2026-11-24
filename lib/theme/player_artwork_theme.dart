@@ -27,16 +27,17 @@ class PlayerArtworkPalette {
 /// Tracks without readable artwork use the app scheme. With AMOLED
 /// on, the page background stays pure black.
 ///
-/// A large page or the phone bar sets [fadesSurfaceOnly]: moving the whole
+/// A large page or a player bar sets [fadesSurfaceOnly]: moving the whole
 /// scheme rebuilds everything under it on every frame, so its scheme swaps
 /// in one step and only the background, painted by [PlayerArtworkSurface],
-/// moves.
+/// moves. A song row turns off [animates] and swaps in one step too.
 class PlayerArtworkTheme extends StatefulWidget {
   const PlayerArtworkTheme({
     super.key,
     required this.artUri,
     required this.child,
     this.fadesSurfaceOnly = false,
+    this.background = _surfaceOf,
     this.animates = true,
   });
 
@@ -50,6 +51,12 @@ class PlayerArtworkTheme extends StatefulWidget {
   /// the next track's surface colour. The page paints that background with
   /// [PlayerArtworkSurface] instead of the scheme's surface.
   final bool fadesSurfaceOnly;
+
+  /// The scheme colour the moving background follows with
+  /// [fadesSurfaceOnly]: a page's surface, or a bar's container.
+  final Color Function(ColorScheme scheme) background;
+
+  static Color _surfaceOf(ColorScheme scheme) => scheme.surface;
 
   /// Whether the scheme moves on the effects spring. A song row swaps it in
   /// one step: its card fades its own fill, and a move rebuilt the whole row
@@ -184,7 +191,9 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
       return;
     }
     if (widget.fadesSurfaceOnly) {
-      final nextSurface = _targetFor(Theme.of(context), artwork).surface;
+      final nextSurface = widget.background(
+        _targetFor(Theme.of(context), artwork),
+      );
       final currentSurface = _surface.value;
       if (currentSurface == nextSurface) {
         _from = null;
@@ -227,7 +236,7 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
     final scheme = widget.fadesSurfaceOnly || from == null || progress >= 1
         ? target
         : ColorScheme.lerp(from, target, _curve.transform(progress));
-    if (widget.fadesSurfaceOnly) _surface.to = target.surface;
+    if (widget.fadesSurfaceOnly) _surface.to = widget.background(target);
     _shown = scheme;
     if (!identical(base, _base) || scheme != _scheme) {
       _base = base;
@@ -347,7 +356,7 @@ class _ArtworkSurface extends InheritedWidget {
       target != oldWidget.target || surface != oldWidget.surface;
 }
 
-/// Paints a Material player's page background: [surface], or the moving
+/// Paints a Material player's background: [surface], or the moving
 /// background of a [PlayerArtworkTheme] with
 /// [PlayerArtworkTheme.fadesSurfaceOnly]. Only this box repaints while that
 /// background moves.
@@ -360,7 +369,8 @@ class PlayerArtworkSurface extends StatelessWidget {
     this.child,
   });
 
-  /// The scheme's surface, used outside a surface-moving theme.
+  /// The scheme colour the theme's background follows, used outside a
+  /// surface-moving theme.
   final Color surface;
 
   /// Laid over the background, as the Material group tint is.

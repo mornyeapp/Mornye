@@ -95,9 +95,12 @@ class DesktopPlayerBar extends ConsumerWidget {
     return context.isMornye
         ? _MornyePlayerBar(mediaItem: mediaItem)
         // The bar takes the track's artwork scheme; the downloads popover
-        // it hosts keeps the app scheme.
+        // it hosts keeps the app scheme. Only the fill fades: moving the
+        // whole scheme rebuilt the bar on every frame of a song change.
         : PlayerArtworkTheme(
             artUri: mediaItem?.artUri?.toString(),
+            fadesSurfaceOnly: true,
+            background: _barFill,
             child: _MaterialPlayerBar(
               mediaItem: mediaItem,
               appTheme: Theme.of(context),
@@ -105,6 +108,10 @@ class DesktopPlayerBar extends ConsumerWidget {
           );
   }
 }
+
+/// The fill of the bar and of the mini player, which fades on a song change
+/// while the scheme swaps.
+Color _barFill(ColorScheme scheme) => scheme.surfaceContainer;
 
 /// Shows Now Playing in the content pane, or returns to the content when it
 /// is already showing.
@@ -137,36 +144,39 @@ class _MaterialPlayerBar extends StatelessWidget {
       ],
     );
     final trailing = _TrailingControls(enabled: loaded, appTheme: appTheme);
-    return Material(
-      color: colorScheme.surfaceContainer,
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: DesktopPlayerBar.materialHeight,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final sideWidth = math.max(
-                  _sideControlsMinWidth,
-                  (constraints.maxWidth - 32) * 0.3,
-                );
-                return Row(
-                  children: [
-                    SizedBox(
-                      width: sideWidth,
-                      child: Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: summary,
+    return PlayerArtworkSurface(
+      surface: colorScheme.surfaceContainer,
+      child: Material(
+        type: MaterialType.transparency,
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: DesktopPlayerBar.materialHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final sideWidth = math.max(
+                    _sideControlsMinWidth,
+                    (constraints.maxWidth - 32) * 0.3,
+                  );
+                  return Row(
+                    children: [
+                      SizedBox(
+                        width: sideWidth,
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: summary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(child: center),
-                    const SizedBox(width: 16),
-                    SizedBox(width: sideWidth, child: trailing),
-                  ],
-                );
-              },
+                      const SizedBox(width: 16),
+                      Expanded(child: center),
+                      const SizedBox(width: 16),
+                      SizedBox(width: sideWidth, child: trailing),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ),
