@@ -271,9 +271,9 @@ class LyricsSidecarStore {
     final path = _localPath(source);
     if (path != null) {
       final file = File(sidecarPathFor(path, extension));
-      // Most songs have no sidecar. A synchronous check answers that at
-      // once, so the player's lyrics never wait on file I/O for a miss.
-      if (!file.existsSync() || await file.length() > _maxSidecarBytes) {
+      final stat = await file.stat();
+      if (stat.type != FileSystemEntityType.file ||
+          stat.size > _maxSidecarBytes) {
         return null;
       }
       return utf8.decode(await file.readAsBytes(), allowMalformed: true);
