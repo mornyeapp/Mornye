@@ -51,6 +51,10 @@ class LibraryFileSizes {
       CREATE INDEX IF NOT EXISTS $schema.idx_track_file_sizes_pending
       ON track_file_sizes(item_id, checked_at) WHERE size_bytes IS NULL
     ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS $schema.idx_track_file_sizes_sort
+      ON track_file_sizes(size_bytes, item_id)
+    ''');
     for (final event in ['INSERT', 'UPDATE']) {
       await db.execute('''
         CREATE TRIGGER IF NOT EXISTS $schema.track_file_sizes_${event.toLowerCase()}

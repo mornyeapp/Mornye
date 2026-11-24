@@ -126,6 +126,7 @@ Future<Database> openAppDatabase(
       }
       await db.rawQuery('PRAGMA journal_mode = WAL');
       await db.execute('PRAGMA synchronous = NORMAL');
+      await db.execute('PRAGMA temp_store = MEMORY');
     },
     onCreate: onCreate,
     onUpgrade: onUpgrade,
@@ -453,7 +454,7 @@ Future<void> createPathKeyTable(DatabaseExecutor db, String table) async {
     )
   ''');
   await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_${table}_key ON $table(path_key)',
+    'CREATE INDEX IF NOT EXISTS idx_${table}_key ON $table(path_key, item_id)',
   );
 }
 

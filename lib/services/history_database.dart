@@ -767,12 +767,20 @@ class HistoryDatabase {
           whereArgs: [id, entry['file_path'], ?downloadedAt],
         );
         if (count == 0) continue;
+        deletedIds.add(id);
+      }
+      const chunkSize = 250;
+      for (var start = 0; start < deletedIds.length; start += chunkSize) {
+        final end = start + chunkSize > deletedIds.length
+            ? deletedIds.length
+            : start + chunkSize;
+        final chunk = deletedIds.sublist(start, end);
+        final placeholders = List.filled(chunk.length, '?').join(',');
         await txn.delete(
           'history_path_keys',
-          where: 'item_id = ?',
-          whereArgs: [id],
+          where: 'item_id IN ($placeholders)',
+          whereArgs: chunk,
         );
-        deletedIds.add(id);
       }
       return deletedIds;
     });
