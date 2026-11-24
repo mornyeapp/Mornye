@@ -138,15 +138,11 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     final artUri = ref.watch(
       currentMediaItemProvider.select((item) => item.value?.artUri?.toString()),
     );
-    // The phone shell already moves the whole bar to this cover; a second
-    // scope would only lerp the same scheme again on every frame.
+    // The phone shell already gives the whole bar this cover's scheme; a
+    // second scope would only move the same scheme again.
     final enclosing = context
         .findAncestorWidgetOfExactType<PlayerArtworkTheme>();
-    if (enclosing != null &&
-        !enclosing.fadesSurfaceOnly &&
-        enclosing.artUri == artUri) {
-      return body;
-    }
+    if (enclosing != null && enclosing.artUri == artUri) return body;
     return PlayerArtworkTheme(artUri: artUri, child: body);
   }
 }
@@ -326,9 +322,7 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     final surface = KeyedSubtree(
       key: _surfaceKey,
       child: Material(
-        color: mornye
-            ? Colors.transparent
-            : settingsGroupColor(context).withValues(alpha: 0.72),
+        color: Colors.transparent,
         child: InkWell(
           onTap: _openNowPlaying,
           child: Column(
@@ -514,7 +508,14 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
               ],
             ),
           )
-        : swipeable;
+        // A shell scope that moves only the surface fades this fill while
+        // the rest of the scheme swaps at once.
+        : PlayerArtworkSurface(
+            surface: colorScheme.surface,
+            overlay: settingsGroupOverlay(context),
+            opacity: 0.72,
+            child: swipeable,
+          );
   }
 }
 

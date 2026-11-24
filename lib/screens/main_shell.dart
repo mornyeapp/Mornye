@@ -1543,6 +1543,8 @@ class _MainShellState extends ConsumerState<MainShell>
           // takes the playing track's artwork scheme too; with nothing
           // playing both keep the app scheme. Only this scope listens
           // to the track, so a cover change does not rebuild the shell.
+          // Only the fills fade; a whole-scheme move rebuilt the bar on
+          // every frame of a song change.
           return Consumer(
             builder: (context, ref, child) => PlayerArtworkTheme(
               artUri: ref.watch(
@@ -1550,6 +1552,7 @@ class _MainShellState extends ConsumerState<MainShell>
                   (item) => item.value?.artUri?.toString(),
                 ),
               ),
+              fadesSurfaceOnly: true,
               child: child!,
             ),
             child: Builder(
@@ -1561,14 +1564,17 @@ class _MainShellState extends ConsumerState<MainShell>
                     // The bar's container fill separates it; no divider,
                     // so the mini player and the bar read as one surface.
                     if (!useNavigationRail)
-                      ExpressiveNavigationBar(
-                        selectedIndex: _currentIndex.clamp(0, maxIndex),
-                        onDestinationSelected: _onNavTap,
-                        isTablet: isTablet,
-                        backgroundColor: settingsGroupColor(
-                          context,
-                        ).withValues(alpha: 0.72),
-                        destinations: destinations,
+                      PlayerArtworkSurface(
+                        surface: Theme.of(context).colorScheme.surface,
+                        overlay: settingsGroupOverlay(context),
+                        opacity: 0.72,
+                        child: ExpressiveNavigationBar(
+                          selectedIndex: _currentIndex.clamp(0, maxIndex),
+                          onDestinationSelected: _onNavTap,
+                          isTablet: isTablet,
+                          backgroundColor: Colors.transparent,
+                          destinations: destinations,
+                        ),
                       ),
                   ],
                 );
@@ -1577,8 +1583,9 @@ class _MainShellState extends ConsumerState<MainShell>
                 // opaque base instead unless the user forces blur on in
                 // appearance settings.
                 if (!blurEnabled) {
-                  return ColoredBox(
-                    color: settingsGroupColor(context),
+                  return PlayerArtworkSurface(
+                    surface: Theme.of(context).colorScheme.surface,
+                    overlay: settingsGroupOverlay(context),
                     child: bottomBar,
                   );
                 }

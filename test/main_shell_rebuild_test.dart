@@ -27,11 +27,13 @@ import 'package:mornye/screens/queue_tab.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_navigation.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/expressive_navigation_bar.dart';
+import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/mornye_bottom_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -74,6 +76,7 @@ void main() {
     WidgetTester tester, {
     required bool desktop,
     required bool mornye,
+    Stream<MediaItem?>? items,
   }) async {
     debugDesktopPlatformOverride = desktop;
     debugDesktopTitleBarInContentOverride = false;
@@ -99,11 +102,13 @@ void main() {
           downloadQueueProvider.overrideWith(() => queue = _Queue()),
           repoProvider.overrideWith(() => repo = _Repo()),
           currentMediaItemProvider.overrideWithBuild(
-            (ref, notifier) => Stream.value(null),
+            (ref, notifier) => items ?? Stream.value(null),
           ),
           playbackStateProvider.overrideWith(
             (ref) => Stream.value(PlaybackState()),
           ),
+          if (items != null)
+            musicPlayerControllerProvider.overrideWithValue(_Controller()),
           systemVolumeProvider.overrideWith((ref) => Stream.value(0.5)),
           desktopSidebarPlaylistsProvider.overrideWithValue(const []),
           desktopSidebarProfileProvider.overrideWithValue(null),
@@ -515,6 +520,107 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('a song change swaps the Material bar scheme at once and fades '
+      'only its fills', (tester) async {
+    final a = ColorScheme.fromSeed(
+      seedColor: Colors.teal,
+      brightness: Brightness.dark,
+    );
+    final b = ColorScheme.fromSeed(
+      seedColor: Colors.red,
+      brightness: Brightness.dark,
+    );
+    PlayerArtworkTheme.debugPalette = _Palette({
+      '/covers/a.jpg': a,
+      '/covers/b.jpg': b,
+    });
+    addTearDown(() => PlayerArtworkTheme.debugPalette = null);
+    final items = StreamController<MediaItem?>.broadcast();
+    addTearDown(items.close);
+    await pumpShell(tester, desktop: false, mornye: false, items: items.stream);
+    MediaItem song(String id) => MediaItem(
+      id: id,
+      title: 'Song $id',
+      artist: 'Artist',
+      duration: const Duration(minutes: 3),
+      artUri: Uri.file('/covers/$id.jpg'),
+    );
+    items.add(song('a'));
+    await settle(tester);
+
+    final bar = find.byType(ExpressiveNavigationBar);
+    final mini = find
+        .descendant(of: find.byType(MiniPlayer), matching: find.byType(InkWell))
+        .first;
+    ColorScheme scheme() => Theme.of(tester.element(bar)).colorScheme;
+    // The fills of the navigation bar and of the mini player above it.
+    List<Color> fills() => [
+      for (final part in [bar, mini])
+        tester
+            .widget<ColoredBox>(
+              find
+                  .descendant(
+                    of: find
+                        .ancestor(
+                          of: part,
+                          matching: find.byType(PlayerArtworkSurface),
+                        )
+                        .first,
+                    matching: find.byType(ColoredBox),
+                  )
+                  .first,
+            )
+            .color,
+    ];
+    expect(scheme(), a);
+    final from = fills();
+
+    items.add(song('b'));
+    // The first frame takes the new track, the next one builds with it.
+    await tester.pump();
+    await tester.pump();
+    expect(scheme(), b);
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(scheme(), b);
+    }
+    final moving = fills();
+    await settle(tester);
+    final to = fills();
+    for (var i = 0; i < 2; i++) {
+      expect(to[i], isNot(from[i]));
+      expect(moving[i], isNot(from[i]));
+      expect(moving[i], isNot(to[i]));
+    }
+    // At rest both are the dark group tint over the new cover's surface, at
+    // the bar's opacity.
+    final tinted = Color.alphaBlend(
+      Colors.white.withValues(alpha: 0.08),
+      b.surface,
+    );
+    expect(to, everyElement(tinted.withValues(alpha: tinted.a * 0.72)));
+    expect(tester.takeException(), isNull);
+  });
+}
+
+/// Answers each cover's scheme at once, without decoding an image.
+class _Palette extends PlayerArtworkPalette {
+  const _Palette(this.schemes);
+
+  final Map<String, ColorScheme> schemes;
+
+  @override
+  ColorScheme? peek(String source, Brightness brightness) => schemes[source];
+
+  @override
+  Future<ColorScheme?> resolve(String source, Brightness brightness) =>
+      Future.value(schemes[source]);
+}
+
+class _Controller implements MusicPlayerController {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 /// A page that reads neither the window size nor the download queue, so it

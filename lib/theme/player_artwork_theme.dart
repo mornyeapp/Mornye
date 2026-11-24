@@ -27,9 +27,10 @@ class PlayerArtworkPalette {
 /// Tracks without readable artwork use the app scheme. With AMOLED
 /// on, the page background stays pure black.
 ///
-/// A large page sets [fadesSurfaceOnly]: moving the whole scheme rebuilds
-/// everything under it on every frame, so its scheme swaps in one step and
-/// only the page background, painted by [PlayerArtworkSurface], moves.
+/// A large page or the phone bar sets [fadesSurfaceOnly]: moving the whole
+/// scheme rebuilds everything under it on every frame, so its scheme swaps
+/// in one step and only the background, painted by [PlayerArtworkSurface],
+/// moves.
 class PlayerArtworkTheme extends StatefulWidget {
   const PlayerArtworkTheme({
     super.key,
@@ -345,12 +346,16 @@ class PlayerArtworkSurface extends StatelessWidget {
   const PlayerArtworkSurface({
     super.key,
     required this.surface,
+    this.overlay,
     this.opacity = 1,
     this.child,
   });
 
   /// The scheme's surface, used outside a surface-moving theme.
   final Color surface;
+
+  /// Laid over the background, as the Material group tint is.
+  final Color? overlay;
 
   /// Opacity of the background over what lies below it.
   final double opacity;
@@ -360,8 +365,12 @@ class PlayerArtworkSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final moving = PlayerArtworkTheme.surfaceOf(context);
-    Color tint(Color color) =>
-        opacity == 1 ? color : color.withValues(alpha: color.a * opacity);
+    final overlay = this.overlay;
+    Color tint(Color color) {
+      final fill = overlay == null ? color : Color.alphaBlend(overlay, color);
+      return opacity == 1 ? fill : fill.withValues(alpha: fill.a * opacity);
+    }
+
     if (moving == null) {
       return ColoredBox(color: tint(surface), child: child);
     }

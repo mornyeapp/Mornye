@@ -17,17 +17,14 @@ import 'package:mornye/utils/adaptive_layout.dart';
 Color settingsGroupColor(BuildContext context) {
   final colorScheme = Theme.of(context).colorScheme;
   if (context.isMornye) return colorScheme.surfaceContainer;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return isDark
-      ? Color.alphaBlend(
-          Colors.white.withValues(alpha: 0.08),
-          colorScheme.surface,
-        )
-      : Color.alphaBlend(
-          Colors.black.withValues(alpha: 0.04),
-          colorScheme.surface,
-        );
+  return Color.alphaBlend(settingsGroupOverlay(context), colorScheme.surface);
 }
+
+/// The tint the Material [settingsGroupColor] lays over the page surface.
+Color settingsGroupOverlay(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? Colors.white.withValues(alpha: 0.08)
+    : Colors.black.withValues(alpha: 0.04);
 
 /// Carries a Settings search result into its destination page.
 ///
