@@ -309,9 +309,7 @@ class DownloadQueueState {
       return copyWith(items: items.where((item) => item.id != id).toList());
     }
     if (index == null) return this;
-    final nextItems = ChunkedList<DownloadItem>.from(
-      List<DownloadItem>.of(items)..removeAt(index),
-    );
+    final nextItems = ChunkedList<DownloadItem>.from(items).withoutAt(index);
     return copyWith(
       items: nextItems,
       lookup: lookup.withoutIndex(items, nextItems, index),
@@ -351,11 +349,23 @@ class DownloadQueueLookup {
   final int? _firstFinalizingIndex;
   final _QueuedPositions _queuedPositions;
   final Map<String, List<int>>? _duplicateTrackPositions;
+  final int _lookupId;
+  final int? _sparseParentId;
+  final List<String> _justCompletedItemIds;
+
+  static int _nextLookupId = 1;
 
   DownloadItem? get firstDownloading =>
       _firstDownloadingIndex == null ? null : _items[_firstDownloadingIndex];
   DownloadItem? get firstFinalizing =>
       _firstFinalizingIndex == null ? null : _items[_firstFinalizingIndex];
+
+  /// The items a sparse update of [previous] completed, or null when this
+  /// lookup did not come from one and [previous.notCompletedItemIds] is needed.
+  List<String>? justCompletedFrom(DownloadQueueLookup previous) =>
+      _sparseParentId != null && _sparseParentId == previous._lookupId
+      ? _justCompletedItemIds
+      : null;
 
   const DownloadQueueLookup.empty()
     : byTrackId = const {},
@@ -373,7 +383,10 @@ class DownloadQueueLookup {
       _firstDownloadingIndex = null,
       _firstFinalizingIndex = null,
       _queuedPositions = const _QueuedPositions.empty(),
-      _duplicateTrackPositions = null;
+      _duplicateTrackPositions = null,
+      _lookupId = 0,
+      _sparseParentId = null,
+      _justCompletedItemIds = const [];
 
   DownloadQueueLookup._({
     required this.byTrackId,
@@ -392,11 +405,16 @@ class DownloadQueueLookup {
     required int? firstFinalizingIndex,
     required _QueuedPositions queuedPositions,
     Map<String, List<int>>? duplicateTrackPositions,
+    int? sparseParentId,
+    List<String> justCompletedItemIds = const [],
   }) : _items = items,
        _firstDownloadingIndex = firstDownloadingIndex,
        _firstFinalizingIndex = firstFinalizingIndex,
        _queuedPositions = queuedPositions,
-       _duplicateTrackPositions = duplicateTrackPositions;
+       _duplicateTrackPositions = duplicateTrackPositions,
+       _lookupId = _nextLookupId++,
+       _sparseParentId = sparseParentId,
+       _justCompletedItemIds = justCompletedItemIds;
 
   static int? _firstAfterRemoval(
     int? first,
@@ -645,6 +663,7 @@ class DownloadQueueLookup {
     var nextFinalizingCount = finalizingCount;
     var notCompletedMembershipChanged = false;
     var activeMembershipChanged = false;
+    List<String>? justCompletedItemIds;
 
     for (final index in normalizedChanged) {
       final previous = previousItems[index];
@@ -656,6 +675,10 @@ class DownloadQueueLookup {
       if ((previous.status == DownloadStatus.completed) !=
           (next.status == DownloadStatus.completed)) {
         notCompletedMembershipChanged = true;
+        if (_countsAsQueued(previous.status) &&
+            next.status == DownloadStatus.completed) {
+          (justCompletedItemIds ??= <String>[]).add(next.id);
+        }
       }
       if (_countsAsQueued(previous.status) != _countsAsQueued(next.status)) {
         activeMembershipChanged = true;
@@ -738,6 +761,10 @@ class DownloadQueueLookup {
         normalizedChanged,
       ),
       duplicateTrackPositions: _duplicateTrackPositions,
+      sparseParentId: _lookupId,
+      justCompletedItemIds: justCompletedItemIds == null
+          ? const []
+          : List.unmodifiable(justCompletedItemIds),
     );
   }
 }

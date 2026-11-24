@@ -1350,97 +1350,213 @@ class _QueueTabState extends ConsumerState<QueueTab> {
             reverseDuration: fade.duration,
             // Played backwards, the entrance springs would hold the leaving
             // header open and opaque for most of its exit.
-            transitionBuilder: (child, animation) => SizeTransition(
-              sizeFactor: CurvedAnimation(
-                parent: animation,
-                curve: over(reveal),
-                reverseCurve: fade.leaving,
-              ),
-              alignment: Alignment.topCenter,
-              child: FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: animation,
-                  curve: over(fade),
-                  reverseCurve: fade.leaving,
-                ),
-                child: child,
-              ),
-            ),
-            child: queueCount == 0
-                ? const SizedBox(
-                    width: double.infinity,
-                    key: ValueKey('dl_header_empty'),
-                  )
-                : Padding(
-                    key: const ValueKey('dl_header'),
-                    padding: EdgeInsetsDirectional.fromSTEB(
-                      16 + wideListInset(context),
-                      4,
-                      4 + wideListInset(context),
-                      4,
-                    ),
-                    child: Row(
-                      children: [
-                        AppIcon(
-                          Icons.downloading_rounded,
-                          size: 16,
-                          color: colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            context.l10n.queueDownloadingCount(queueCount),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w600,
-                                ),
+            transitionBuilder: _QueueHeaderTransition.buildTransition,
+            child: _QueueHeaderSlot(
+              key: ValueKey(queueCount == 0 ? 'dl_header_empty' : 'dl_header'),
+              revealCurve: over(reveal),
+              fadeCurve: over(fade),
+              exitCurve: fade.leaving,
+              child: queueCount == 0
+                  ? const SizedBox(width: double.infinity)
+                  : Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(
+                        16 + wideListInset(context),
+                        4,
+                        4 + wideListInset(context),
+                        4,
+                      ),
+                      child: Row(
+                        children: [
+                          AppIcon(
+                            Icons.downloading_rounded,
+                            size: 16,
+                            color: colorScheme.primary,
                           ),
-                        ),
-                        if (failedCount > 0 && !isProcessing)
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              context.l10n.queueDownloadingCount(queueCount),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ),
+                          if (failedCount > 0 && !isProcessing)
+                            AppIconButton(
+                              onPressed: () => ref
+                                  .read(downloadQueueProvider.notifier)
+                                  .retryAllFailed(),
+                              icon: const Icon(Icons.replay_rounded, size: 20),
+                              tooltip: context.l10n.queueRetryAllFailed(
+                                failedCount,
+                              ),
+                              color: colorScheme.primary,
+                              visualDensity: VisualDensity.compact,
+                            ),
                           AppIconButton(
                             onPressed: () => ref
                                 .read(downloadQueueProvider.notifier)
-                                .retryAllFailed(),
-                            icon: const Icon(Icons.replay_rounded, size: 20),
-                            tooltip: context.l10n.queueRetryAllFailed(
-                              failedCount,
+                                .togglePause(),
+                            icon: Icon(
+                              isPaused
+                                  ? Icons.play_arrow_rounded
+                                  : Icons.pause_rounded,
+                              size: 20,
                             ),
-                            color: colorScheme.primary,
+                            tooltip: isPaused
+                                ? context.l10n.actionResume
+                                : context.l10n.actionPause,
+                            color: colorScheme.onSurfaceVariant,
                             visualDensity: VisualDensity.compact,
                           ),
-                        AppIconButton(
-                          onPressed: () => ref
-                              .read(downloadQueueProvider.notifier)
-                              .togglePause(),
-                          icon: Icon(
-                            isPaused
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
-                            size: 20,
+                          AppIconButton(
+                            onPressed: () =>
+                                _showClearAllDialog(context, ref, colorScheme),
+                            icon: const Icon(Icons.clear_all_rounded, size: 20),
+                            tooltip: context.l10n.queueClearAll,
+                            color: colorScheme.error,
+                            visualDensity: VisualDensity.compact,
                           ),
-                          tooltip: isPaused
-                              ? context.l10n.actionResume
-                              : context.l10n.actionPause,
-                          color: colorScheme.onSurfaceVariant,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        AppIconButton(
-                          onPressed: () =>
-                              _showClearAllDialog(context, ref, colorScheme),
-                          icon: const Icon(Icons.clear_all_rounded, size: 20),
-                          tooltip: context.l10n.queueClearAll,
-                          color: colorScheme.error,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+            ),
           ),
         );
       },
     );
   }
+}
+
+class _QueueHeaderSlot extends StatelessWidget {
+  const _QueueHeaderSlot({
+    super.key,
+    required this.revealCurve,
+    required this.fadeCurve,
+    required this.exitCurve,
+    required this.child,
+  });
+
+  final Curve revealCurve;
+  final Curve fadeCurve;
+  final Curve exitCurve;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => child;
+}
+
+class _QueueHeaderTransition extends StatefulWidget {
+  const _QueueHeaderTransition({
+    super.key,
+    required this.animation,
+    required this.revealCurve,
+    required this.fadeCurve,
+    required this.exitCurve,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final Curve revealCurve;
+  final Curve fadeCurve;
+  final Curve exitCurve;
+  final Widget child;
+
+  static Widget buildTransition(Widget child, Animation<double> animation) {
+    final slot = child as _QueueHeaderSlot;
+    return _QueueHeaderTransition(
+      key: ValueKey(slot.key),
+      animation: animation,
+      revealCurve: slot.revealCurve,
+      fadeCurve: slot.fadeCurve,
+      exitCurve: slot.exitCurve,
+      child: slot,
+    );
+  }
+
+  @override
+  State<_QueueHeaderTransition> createState() => _QueueHeaderTransitionState();
+}
+
+class _QueueHeaderTransitionState extends State<_QueueHeaderTransition> {
+  late CurvedAnimation _size;
+  late CurvedAnimation _opacity;
+  late AnimationStatus _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAnimations();
+    _status = widget.animation.status;
+    widget.animation.addStatusListener(_onStatus);
+  }
+
+  // A curve keeps the direction it started in, so an exit that cuts the
+  // entrance short starts new curves to leave on the exit curve.
+  void _onStatus(AnimationStatus status) {
+    final cutShort =
+        _status == AnimationStatus.forward && status == AnimationStatus.reverse;
+    _status = status;
+    if (!cutShort) return;
+    setState(() {
+      _disposeAnimations();
+      _initAnimations();
+    });
+  }
+
+  void _initAnimations() {
+    _size = CurvedAnimation(
+      parent: widget.animation,
+      curve: widget.revealCurve,
+      reverseCurve: widget.exitCurve,
+    );
+    _opacity = CurvedAnimation(
+      parent: widget.animation,
+      curve: widget.fadeCurve,
+      reverseCurve: widget.exitCurve,
+    );
+  }
+
+  void _disposeAnimations() {
+    _size.dispose();
+    _opacity.dispose();
+  }
+
+  @override
+  void didUpdateWidget(_QueueHeaderTransition oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.animation != widget.animation) {
+      oldWidget.animation.removeStatusListener(_onStatus);
+      _disposeAnimations();
+      _initAnimations();
+      _status = widget.animation.status;
+      widget.animation.addStatusListener(_onStatus);
+      return;
+    }
+    // Every build makes new but equal curves; set them in place.
+    _size
+      ..curve = widget.revealCurve
+      ..reverseCurve = widget.exitCurve;
+    _opacity
+      ..curve = widget.fadeCurve
+      ..reverseCurve = widget.exitCurve;
+  }
+
+  @override
+  void dispose() {
+    widget.animation.removeStatusListener(_onStatus);
+    _disposeAnimations();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SizeTransition(
+    sizeFactor: _size,
+    alignment: Alignment.topCenter,
+    child: FadeTransition(opacity: _opacity, child: widget.child),
+  );
 }

@@ -448,4 +448,60 @@ void main() {
     }
     expect(_CountingState.indexReads, 0);
   });
+
+  test('a finished download adds its match without matching again', () async {
+    final request = HistoryBatchLookupRequest.snapshot([
+      for (var i = 0; i < 200; i++)
+        HistoryLookupRequest(
+          spotifyId: 'page-$i',
+          trackName: 'Page song $i',
+          artistName: 'Example artist',
+        ),
+    ]);
+    final first = _item(1, spotifyId: 'page-3');
+    final history = _History();
+    final container = ProviderContainer(
+      overrides: [
+        downloadHistoryProvider.overrideWith(() => history),
+        downloadHistoryBatchExistsProvider(
+          request,
+        ).overrideWith((ref) => const <String>{}),
+      ],
+    );
+    addTearDown(container.dispose);
+    final provider = downloadHistoryVisibleBatchExistsProvider(request);
+    final subscription = container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+
+    history.publish((_) => _CountingState(List.unmodifiable([first])));
+    await container.pump();
+    expect(container.read(provider), {request.lookupKeys[3]});
+
+    _CountingState.indexReads = 0;
+    final bySpotifyId = _item(2, spotifyId: 'page-7');
+    final second = List<DownloadHistoryItem>.unmodifiable([bySpotifyId, first]);
+    history.publish((_) => _CountingState(second));
+    await container.pump();
+    expect(container.read(provider), {
+      request.lookupKeys[3],
+      request.lookupKeys[7],
+    });
+
+    // Names match the way the full matching compares them.
+    final byName = _item(
+      3,
+      trackName: 'PAGE SONG 9',
+      artistName: 'example artist',
+    );
+    history.publish(
+      (_) => _CountingState(List.unmodifiable([byName, ...second])),
+    );
+    await container.pump();
+    expect(container.read(provider), {
+      request.lookupKeys[3],
+      request.lookupKeys[7],
+      request.lookupKeys[9],
+    });
+    expect(_CountingState.indexReads, 0);
+  });
 }

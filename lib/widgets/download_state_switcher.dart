@@ -50,34 +50,168 @@ class DownloadStateSwitcher extends StatelessWidget {
         // Replaying the entrance springs backwards kept it fully opaque on
         // top of the new control for most of the switch.
         reverseDuration: fade.duration,
-        layoutBuilder: (current, previous) => Stack(
-          alignment: AlignmentDirectional.centerEnd,
-          children: [...previous, ?current],
+        layoutBuilder: _layoutBuilder,
+        transitionBuilder: _transitionBuilder,
+        child: _DownloadStateItem(
+          key: ValueKey(state),
+          fadeCurve: over(fade),
+          scaleCurve: over(scale),
+          exitCurve: fade.leaving,
+          expressive: expressive,
+          child: child,
         ),
-        transitionBuilder: (child, animation) {
-          final exit = fade.leaving;
-          final opacity = FadeTransition(
-            opacity: CurvedAnimation(
-              parent: animation,
-              curve: over(fade),
-              reverseCurve: exit,
-            ),
-            child: child,
-          );
-          if (!expressive) return opacity;
-          return ScaleTransition(
-            scale: Tween<double>(begin: 0.8, end: 1).animate(
-              CurvedAnimation(
-                parent: animation,
-                curve: over(scale),
-                reverseCurve: exit,
-              ),
-            ),
-            child: opacity,
-          );
-        },
-        child: KeyedSubtree(key: ValueKey(state), child: child),
       ),
     );
+  }
+
+  static Widget _layoutBuilder(Widget? current, List<Widget> previous) => Stack(
+    alignment: AlignmentDirectional.centerEnd,
+    children: [...previous, ?current],
+  );
+
+  static Widget _transitionBuilder(Widget child, Animation<double> animation) {
+    final item = child as _DownloadStateItem;
+    return _DownloadStateTransition(
+      key: ValueKey(item.key),
+      animation: animation,
+      fadeCurve: item.fadeCurve,
+      scaleCurve: item.scaleCurve,
+      exitCurve: item.exitCurve,
+      expressive: item.expressive,
+      child: item,
+    );
+  }
+}
+
+class _DownloadStateItem extends StatelessWidget {
+  const _DownloadStateItem({
+    super.key,
+    required this.fadeCurve,
+    required this.scaleCurve,
+    required this.exitCurve,
+    required this.expressive,
+    required this.child,
+  });
+
+  final Curve fadeCurve;
+  final Curve scaleCurve;
+  final Curve exitCurve;
+  final bool expressive;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => child;
+}
+
+class _DownloadStateTransition extends StatefulWidget {
+  const _DownloadStateTransition({
+    super.key,
+    required this.animation,
+    required this.fadeCurve,
+    required this.scaleCurve,
+    required this.exitCurve,
+    required this.expressive,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final Curve fadeCurve;
+  final Curve scaleCurve;
+  final Curve exitCurve;
+  final bool expressive;
+  final Widget child;
+
+  @override
+  State<_DownloadStateTransition> createState() =>
+      _DownloadStateTransitionState();
+}
+
+class _DownloadStateTransitionState extends State<_DownloadStateTransition> {
+  static final _scaleTween = Tween<double>(begin: 0.8, end: 1);
+
+  late CurvedAnimation _fade;
+  CurvedAnimation? _scaleCurve;
+  Animation<double>? _scale;
+  late AnimationStatus _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAnimations();
+    _status = widget.animation.status;
+    widget.animation.addStatusListener(_onStatus);
+  }
+
+  // A curve keeps the direction it started in, so an exit that cuts the
+  // entrance short starts new curves to leave on the exit curve.
+  void _onStatus(AnimationStatus status) {
+    final cutShort =
+        _status == AnimationStatus.forward && status == AnimationStatus.reverse;
+    _status = status;
+    if (!cutShort) return;
+    setState(() {
+      _disposeAnimations();
+      _initAnimations();
+    });
+  }
+
+  void _initAnimations() {
+    _fade = CurvedAnimation(
+      parent: widget.animation,
+      curve: widget.fadeCurve,
+      reverseCurve: widget.exitCurve,
+    );
+    if (widget.expressive) {
+      final curve = CurvedAnimation(
+        parent: widget.animation,
+        curve: widget.scaleCurve,
+        reverseCurve: widget.exitCurve,
+      );
+      _scaleCurve = curve;
+      _scale = _scaleTween.animate(curve);
+    }
+  }
+
+  void _disposeAnimations() {
+    _fade.dispose();
+    _scaleCurve?.dispose();
+    _scaleCurve = null;
+    _scale = null;
+  }
+
+  @override
+  void didUpdateWidget(_DownloadStateTransition oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.animation != widget.animation ||
+        oldWidget.expressive != widget.expressive) {
+      oldWidget.animation.removeStatusListener(_onStatus);
+      _disposeAnimations();
+      _initAnimations();
+      _status = widget.animation.status;
+      widget.animation.addStatusListener(_onStatus);
+      return;
+    }
+    // Every build makes new but equal curves; set them in place.
+    _fade
+      ..curve = widget.fadeCurve
+      ..reverseCurve = widget.exitCurve;
+    _scaleCurve
+      ?..curve = widget.scaleCurve
+      ..reverseCurve = widget.exitCurve;
+  }
+
+  @override
+  void dispose() {
+    widget.animation.removeStatusListener(_onStatus);
+    _disposeAnimations();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final opacity = FadeTransition(opacity: _fade, child: widget.child);
+    final scale = _scale;
+    if (scale == null) return opacity;
+    return ScaleTransition(scale: scale, child: opacity);
   }
 }

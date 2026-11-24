@@ -1503,13 +1503,13 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
   }
 
   void removeItem(String id) {
-    final removedItem = state.items.where((item) => item.id == id).firstOrNull;
+    final removedItem = state.lookup.byItemId[id];
     _locallyCancelledItemIds.remove(id);
     state = state.withoutItem(id);
     _saveQueueToStorage();
 
     // Clean stale album RG entries when a track is removed from the queue.
-    // Only purge for items that were NOT completed — completed items' RG data
+    // Only purge for items that were NOT completed: completed items' RG data
     // must survive removal because album gain is computed after the last track
     // finishes, by which time earlier completed tracks have been removed.
     if (removedItem != null && removedItem.status != DownloadStatus.completed) {

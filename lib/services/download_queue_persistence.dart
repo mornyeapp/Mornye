@@ -117,15 +117,21 @@ class DownloadQueuePersistence {
         // Failed songs stay until the user retries or dismisses them.
         if (item.status == DownloadStatus.completed) continue;
         final saved = _saved[item.id];
-        final cached = identical(saved?.item, item) && saved?.payload != null;
+        final savedItem = saved?.item;
+        final cached =
+            savedItem != null &&
+            saved?.payload != null &&
+            samePersistedDownloadItem(savedItem, item);
         seenIds.add(item.id);
         if (!cached) {
           savedUpdates[item.id] = (item: item, payload: null);
           changed.add(item);
-        } else if (savedUpdates.containsKey(item.id)) {
+        } else if (savedUpdates.containsKey(item.id) ||
+            !identical(savedItem, item)) {
           // Preserve the last non-terminal occurrence for malformed input
-          // with repeated request IDs, just as the full snapshot did.
-          savedUpdates[item.id] = saved!;
+          // with repeated request IDs, and cache the latest item reference
+          // when only transient transfer samples changed.
+          savedUpdates[item.id] = (item: item, payload: saved!.payload);
         }
       }
       final encoded = await encodeDownloadQueueItems(changed);

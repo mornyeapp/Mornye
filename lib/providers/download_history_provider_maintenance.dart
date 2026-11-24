@@ -132,10 +132,14 @@ extension _HistoryStartupMaintenance on DownloadHistoryNotifier {
       if (item.downloadTreeUri == null || item.downloadTreeUri!.isEmpty) {
         continue;
       }
-      final hasFilePath = item.filePath.trim().isNotEmpty;
+      final trimmedPath = item.filePath.trim();
+      final hasFilePath = trimmedPath.isNotEmpty;
       final hasSafFileName =
           item.safFileName != null && item.safFileName!.trim().isNotEmpty;
       if (!hasFilePath && !hasSafFileName) {
+        continue;
+      }
+      if (item.safRepaired && isContentUri(trimmedPath) && hasSafFileName) {
         continue;
       }
       candidateIndexes.add(i);
@@ -212,14 +216,22 @@ extension _HistoryStartupMaintenance on DownloadHistoryNotifier {
         final resultFileName = (result['file_name'] as String? ?? '').trim();
         final resultRelativeDir = (result['relative_dir'] as String? ?? '')
             .trim();
+        final nextRelativeDir = resultRelativeDir.isNotEmpty
+            ? resultRelativeDir
+            : item.safRelativeDir;
+        final nextFileName = resultFileName.isNotEmpty
+            ? resultFileName
+            : item.safFileName;
+        if (newUri == item.filePath &&
+            nextRelativeDir == item.safRelativeDir &&
+            nextFileName == item.safFileName &&
+            item.safRepaired) {
+          continue;
+        }
         final updated = item.copyWith(
           filePath: newUri,
-          safRelativeDir: resultRelativeDir.isNotEmpty
-              ? resultRelativeDir
-              : item.safRelativeDir,
-          safFileName: resultFileName.isNotEmpty
-              ? resultFileName
-              : item.safFileName,
+          safRelativeDir: nextRelativeDir,
+          safFileName: nextFileName,
           safRepaired: true,
         );
         changed = true;
@@ -340,7 +352,7 @@ extension _HistoryStartupMaintenance on DownloadHistoryNotifier {
         needsTotalDiscsBackfill;
   }
 
-  /// Errors that indicate the file content itself cannot be parsed — as
+  /// Errors that indicate the file content itself cannot be parsed, as
   /// opposed to transient conditions like a missing file or an unmounted
   /// SAF volume. These never resolve on retry.
   static bool _isPermanentProbeError(String error) {
@@ -349,6 +361,71 @@ extension _HistoryStartupMaintenance on DownloadHistoryNotifier {
         lower.contains('head incorrect') ||
         lower.contains('invalid') ||
         lower.contains('not a ');
+  }
+
+  bool _hasCoreAudioMetadata(DownloadHistoryItem item) {
+    if (item.lyricsMetadataScanVersion < 1 ||
+        item.replayGainMetadataScanVersion < 1 ||
+        _needsAverageBitrateBackfill(item)) {
+      return false;
+    }
+    final hasResolvedSpecs =
+        item.bitDepth != null &&
+        item.bitDepth! > 0 &&
+        item.sampleRate != null &&
+        item.sampleRate! > 0;
+    if (!hasResolvedSpecs) return false;
+    if (normalizeOptionalString(item.format) == null) return false;
+    if (normalizeOptionalString(item.quality) == null ||
+        isPlaceholderQualityLabel(item.quality)) {
+      return false;
+    }
+    return item.duration != null && item.duration! > 0;
+  }
+
+  // A re-download to the same path is a new row version, so it is probed.
+  String _probedOptionalKey(DownloadHistoryItem item) =>
+      '${item.filePath.trim()}|${item.downloadedAt.millisecondsSinceEpoch}';
+
+  Set<String> _readAudioMetadataProbedPaths(SharedPreferences prefs) {
+    final stored = prefs.getStringList(
+      DownloadHistoryNotifier._audioMetadataProbedPathsKey,
+    );
+    if (stored == null || stored.isEmpty) return <String>{};
+    return stored.toSet();
+  }
+
+  Future<void> _rememberAudioMetadataProbedPaths(
+    SharedPreferences prefs,
+    Iterable<String> filePaths,
+  ) async {
+    final normalized = [
+      for (final path in filePaths)
+        if (path.trim().isNotEmpty) path.trim(),
+    ];
+    if (normalized.isEmpty) return;
+    final stored =
+        prefs.getStringList(
+          DownloadHistoryNotifier._audioMetadataProbedPathsKey,
+        ) ??
+        <String>[];
+    final seen = stored.toSet();
+    var added = false;
+    for (final path in normalized) {
+      if (seen.add(path)) {
+        stored.add(path);
+        added = true;
+      }
+    }
+    if (!added) return;
+    while (stored.length >
+        DownloadHistoryNotifier._audioMetadataProbedPathsMax) {
+      stored.removeAt(0);
+    }
+    await prefs.setStringList(
+      DownloadHistoryNotifier._audioMetadataProbedPathsKey,
+      stored,
+    );
   }
 
   Set<String> _readAudioProbeFailedPaths(SharedPreferences prefs) {
@@ -530,10 +607,17 @@ extension _HistoryStartupMaintenance on DownloadHistoryNotifier {
 
     try {
       final probeFailedPaths = _readAudioProbeFailedPaths(prefs);
+      final probedOptionalPaths = _readAudioMetadataProbedPaths(prefs);
       final candidateIndexes = <int>[];
       for (var i = 0; i < items.length; i++) {
-        if (!_shouldBackfillAudioMetadata(items[i])) continue;
-        if (probeFailedPaths.contains(items[i].filePath.trim())) continue;
+        final item = items[i];
+        if (!_shouldBackfillAudioMetadata(item)) continue;
+        final trimmedPath = item.filePath.trim();
+        if (probeFailedPaths.contains(trimmedPath)) continue;
+        if (_hasCoreAudioMetadata(item) &&
+            probedOptionalPaths.contains(_probedOptionalKey(item))) {
+          continue;
+        }
         candidateIndexes.add(i);
       }
 
@@ -559,15 +643,18 @@ extension _HistoryStartupMaintenance on DownloadHistoryNotifier {
       }
 
       final persistedUpdates = <HistoryMaintenanceUpdate>[];
+      final newlyProbedOptionalPaths = <String>[];
       var refreshedCount = 0;
 
       for (final index in selectedIndexes) {
         final item = items[index];
 
         Map<String, dynamic>? probed;
+        var performedFullProbe = false;
         if (item.lyricsMetadataScanVersion < 1 ||
             item.replayGainMetadataScanVersion < 1 ||
             _shouldBackfillAudioMetadataIgnoringBitrate(item)) {
+          performedFullProbe = true;
           probed = await _probeAudioMetadata(
             item,
             fallbackQuality: item.quality,
@@ -669,6 +756,9 @@ extension _HistoryStartupMaintenance on DownloadHistoryNotifier {
             !lyricsScanVersionChanged &&
             !replayGainChanged &&
             !replayGainScanVersionChanged) {
+          if (performedFullProbe && _hasCoreAudioMetadata(item)) {
+            newlyProbedOptionalPaths.add(_probedOptionalKey(item));
+          }
           continue;
         }
 
@@ -689,6 +779,9 @@ extension _HistoryStartupMaintenance on DownloadHistoryNotifier {
           hasReplayGain: resolvedHasReplayGain,
           replayGainMetadataScanVersion: resolvedReplayGainScanVersion,
         );
+        if (performedFullProbe && _hasCoreAudioMetadata(updated)) {
+          newlyProbedOptionalPaths.add(_probedOptionalKey(item));
+        }
         persistedUpdates.add(
           HistoryMaintenanceUpdate(original: item, updated: updated),
         );
@@ -697,6 +790,12 @@ extension _HistoryStartupMaintenance on DownloadHistoryNotifier {
 
       if (persistedUpdates.isNotEmpty) {
         await applyMaintenanceUpdates(persistedUpdates);
+      }
+      if (newlyProbedOptionalPaths.isNotEmpty) {
+        await _rememberAudioMetadataProbedPaths(
+          prefs,
+          newlyProbedOptionalPaths,
+        );
       }
 
       await _writeStartupCursor(

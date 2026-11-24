@@ -89,6 +89,7 @@ class HistoryMaintenanceUpdate {
     final keepReplayGain =
         current.replayGainMetadataScanVersion !=
         original.replayGainMetadataScanVersion;
+    var anyFieldChanged = false;
     for (final field in updated.toJson().entries) {
       if (field.value == before[field.key] ||
           next[field.key] != before[field.key]) {
@@ -105,7 +106,9 @@ class HistoryMaintenanceUpdate {
         continue;
       }
       next[field.key] = field.value;
+      anyFieldChanged = true;
     }
+    if (!anyFieldChanged) return current;
     return DownloadHistoryItem.fromJson(next);
   }
 }

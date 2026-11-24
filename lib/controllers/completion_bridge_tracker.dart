@@ -72,6 +72,17 @@ class CompletionBridgeTracker {
     if (identical(previous.notCompletedItemIds, next.notCompletedItemIds)) {
       return;
     }
+    final fastCompletedIds = next.justCompletedFrom(previous);
+    if (fastCompletedIds != null) {
+      for (final id in fastCompletedIds) {
+        final nextItem = next.byItemId[id];
+        if (nextItem == null) continue;
+        refreshPath(nextItem.filePath);
+        items[id] = nextItem;
+        addedAt[id] = DateTime.now();
+      }
+      return;
+    }
     for (final id in previous.notCompletedItemIds) {
       final prevItem = previous.byItemId[id];
       final nextItem = next.byItemId[id];

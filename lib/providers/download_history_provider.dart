@@ -166,6 +166,8 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
     : _db = database ?? HistoryDatabase.instance;
 
   static const int _initialHistoryLoadLimit = 100;
+  static const int _inMemoryHistoryTrimTrigger = 300;
+  static const int _inMemoryHistoryTrimTarget = 200;
   static const int _safRepairMaxPerLaunch = 60;
   static const int _orphanCleanupMaxPerLaunch = 80;
   static const int _audioMetadataBackfillMaxPerLaunch = 24;
@@ -182,6 +184,9 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
   static const _audioProbeFailedPathsKey =
       'history_audio_probe_failed_paths_v1';
   static const _audioProbeFailedPathsMax = 300;
+  static const _audioMetadataProbedPathsKey =
+      'history_audio_metadata_probed_paths_v1';
+  static const _audioMetadataProbedPathsMax = 500;
   final HistoryDatabase _db;
   bool _isLoaded = false;
   bool _isSafRepairInProgress = false;
@@ -363,23 +368,40 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
     return (item: mergedItem, existingId: existing?.id);
   }
 
+  List<DownloadHistoryItem> _boundedHistoryItems(
+    List<DownloadHistoryItem> items,
+  ) => items.length >= _inMemoryHistoryTrimTrigger
+      ? items.sublist(0, _inMemoryHistoryTrimTarget)
+      : items;
+
   void _putResolvedHistoryInMemory(
     DownloadHistoryItem item,
     String? existingId,
   ) {
     if (existingId != null) {
-      final updatedItems = state.items
-          .where((candidate) => candidate.id != existingId)
-          .toList();
-      updatedItems.insert(0, item);
-      final updatedLookupItems = state.lookupItems
-          .where((candidate) => candidate.id != existingId)
-          .toList(growable: false);
+      final updatedItems = _boundedHistoryItems([
+        item,
+        ...state.items.where((candidate) => candidate.id != existingId),
+      ]);
+      final updatedLookupItems = _boundedHistoryItems([
+        item,
+        ...state.lookupItems.where((candidate) => candidate.id != existingId),
+      ]);
       state = state.copyWith(
         items: updatedItems,
-        lookupItems: [item, ...updatedLookupItems],
+        lookupItems: updatedLookupItems,
       );
       _historyLog.d('Updated existing history entry: ${item.trackName}');
+    } else if (state.items.length + 1 >= _inMemoryHistoryTrimTrigger ||
+        state.lookupItems.length + 1 >= _inMemoryHistoryTrimTrigger) {
+      final boundedItems = _boundedHistoryItems([item, ...state.items]);
+      final boundedLookup = _boundedHistoryItems([item, ...state.lookupItems]);
+      state = state.copyWith(
+        items: boundedItems,
+        lookupItems: boundedLookup,
+        totalCount: state.totalCount + 1,
+      );
+      _historyLog.d('Added new history entry: ${item.trackName}');
     } else {
       state = state.copyWithPrependedLookup(
         item,
@@ -472,9 +494,11 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
     for (final update in updates) {
       final json = await _db.getById(update.original.id);
       if (json == null) continue;
-      final item = update.mergeInto(DownloadHistoryItem.fromJson(json));
-      if (item != null) merged.add(item);
+      final current = DownloadHistoryItem.fromJson(json);
+      final item = update.mergeInto(current);
+      if (item != null && !identical(item, current)) merged.add(item);
     }
+    if (merged.isEmpty) return;
     final persistedIds = await _db.updateExistingBatch(
       merged.map((item) => item.toJson()).toList(growable: false),
     );
@@ -541,19 +565,23 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
 
   DownloadHistoryItem _putInMemoryTrackVariant(DownloadHistoryItem item) {
     final isReplacement = state.items.any((existing) => existing.id == item.id);
-    final items = [
+    final items = _boundedHistoryItems([
       item,
       ...state.items.where((existing) => existing.id != item.id),
-    ];
+    ]);
     final totalCount = isReplacement ? state.totalCount : state.totalCount + 1;
-    state = state.lookupItems.any((existing) => existing.id == item.id)
+    final exceedsLookupCap =
+        state.lookupItems.length + 1 >= _inMemoryHistoryTrimTrigger;
+    state =
+        state.lookupItems.any((existing) => existing.id == item.id) ||
+            exceedsLookupCap
         ? state.copyWith(
             items: items,
             totalCount: totalCount,
-            lookupItems: [
+            lookupItems: _boundedHistoryItems([
               item,
               ...state.lookupItems.where((existing) => existing.id != item.id),
-            ],
+            ]),
           )
         : state.copyWithPrependedLookup(
             item,
@@ -1515,9 +1543,70 @@ class _VisibleHistoryBatchExistsNotifier extends Notifier<Set<String>> {
   late final List<_MemoryLookupKeys> _memoryKeys = request.tracks
       .map(_memoryLookupKeys)
       .toList(growable: false);
+  late final ({
+    Map<String, List<String>> bySpotifyId,
+    Map<String, List<String>> byIsrc,
+    Map<String, List<String>> byTrackArtist,
+  })
+  _reverseIndex = _buildReverseIndex();
   List<DownloadHistoryItem>? _mergedLookupItems;
   Set<String>? _mergedPersistedKeys;
   Set<String> _merged = const <String>{};
+
+  ({
+    Map<String, List<String>> bySpotifyId,
+    Map<String, List<String>> byIsrc,
+    Map<String, List<String>> byTrackArtist,
+  })
+  _buildReverseIndex() {
+    final bySpotifyId = <String, List<String>>{};
+    final byIsrc = <String, List<String>>{};
+    final byTrackArtist = <String, List<String>>{};
+    for (var i = 0; i < _memoryKeys.length; i++) {
+      final memory = _memoryKeys[i];
+      final lookupKey = _lookupKeys[i];
+      for (final candidate in memory.spotifyIds) {
+        (bySpotifyId[candidate] ??= <String>[]).add(lookupKey);
+      }
+      if (memory.isrc.isNotEmpty) {
+        (byIsrc[memory.isrc] ??= <String>[]).add(lookupKey);
+      }
+      if (memory.trackArtist.isNotEmpty) {
+        (byTrackArtist[memory.trackArtist] ??= <String>[]).add(lookupKey);
+      }
+    }
+    return (
+      bySpotifyId: bySpotifyId,
+      byIsrc: byIsrc,
+      byTrackArtist: byTrackArtist,
+    );
+  }
+
+  List<String>? _matchingLookupKeys(DownloadHistoryItem item) {
+    List<String>? matched;
+    void addAll(List<String>? keys) {
+      if (keys == null) return;
+      (matched ??= <String>[]).addAll(keys);
+    }
+
+    // Untrimmed, as the history indexes the full merge reads store them.
+    final spotifyId = item.spotifyId;
+    if (spotifyId != null && spotifyId.isNotEmpty) {
+      addAll(_reverseIndex.bySpotifyId[spotifyId]);
+    }
+    final isrc = item.isrc;
+    if (isrc != null && isrc.isNotEmpty) {
+      addAll(_reverseIndex.byIsrc[isrc]);
+    }
+    final trackArtist = DownloadHistoryState.trackArtistKey(
+      item.trackName,
+      item.artistName,
+    );
+    if (trackArtist.isNotEmpty) {
+      addAll(_reverseIndex.byTrackArtist[trackArtist]);
+    }
+    return matched;
+  }
 
   @override
   Set<String> build() {
@@ -1530,10 +1619,28 @@ class _VisibleHistoryBatchExistsNotifier extends Notifier<Set<String>> {
           data: (keys) => keys,
           orElse: () => const <String>{},
         );
+    final lookupItems = history.lookupItems;
+    final previousLookupItems = _mergedLookupItems;
     // The lookup indexes live and change with lookupItems, so revision bumps
     // and count refreshes cannot change which tracks are held in memory.
-    if (identical(history.lookupItems, _mergedLookupItems) &&
+    if (identical(lookupItems, previousLookupItems) &&
         identical(persistedKeys, _mergedPersistedKeys)) {
+      return _merged;
+    }
+    // One finished download prepends one row: match just that row against the
+    // request's reverse index instead of every requested track.
+    if (previousLookupItems != null &&
+        previousLookupItems.isNotEmpty &&
+        identical(persistedKeys, _mergedPersistedKeys) &&
+        lookupItems.length == previousLookupItems.length + 1 &&
+        identical(lookupItems[1], previousLookupItems.first) &&
+        identical(lookupItems.last, previousLookupItems.last)) {
+      final matched = _matchingLookupKeys(lookupItems.first);
+      _mergedLookupItems = lookupItems;
+      if (matched == null || matched.every(_merged.contains)) {
+        return _merged;
+      }
+      _merged = <String>{..._merged, ...matched};
       return _merged;
     }
     _merged = _mergeVisibleHistoryKeys(
@@ -1542,7 +1649,7 @@ class _VisibleHistoryBatchExistsNotifier extends Notifier<Set<String>> {
       _lookupKeys,
       persistedKeys,
     );
-    _mergedLookupItems = history.lookupItems;
+    _mergedLookupItems = lookupItems;
     _mergedPersistedKeys = persistedKeys;
     return _merged;
   }
