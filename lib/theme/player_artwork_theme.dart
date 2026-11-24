@@ -63,7 +63,7 @@ class PlayerArtworkTheme extends StatefulWidget {
   /// on every frame.
   final bool animates;
 
-  /// The moving page background of the nearest [PlayerArtworkTheme] with
+  /// The moving background of the nearest [PlayerArtworkTheme] when it sets
   /// [fadesSurfaceOnly]. Null elsewhere, where the whole scheme moves.
   static Animation<Color>? surfaceOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<_ArtworkSurface>()?.surface;
@@ -308,11 +308,17 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
         child: Theme(data: theme, child: widget.child),
       );
     }
-    return AnimatedBuilder(
-      // Stands still until a move makes the controller, in the same build.
-      animation: _controller ?? kAlwaysCompleteAnimation,
-      builder: (context, child) => Theme(data: _themeFor(base), child: child!),
-      child: widget.child,
+    // Its own scheme paints the fills below, not an outer moving background.
+    return _ArtworkSurface(
+      surface: null,
+      target: null,
+      child: AnimatedBuilder(
+        // Stands still until a move makes the controller, in the same build.
+        animation: _controller ?? kAlwaysCompleteAnimation,
+        builder: (context, child) =>
+            Theme(data: _themeFor(base), child: child!),
+        child: widget.child,
+      ),
     );
   }
 }
@@ -348,8 +354,9 @@ class _ArtworkSurface extends InheritedWidget {
     required super.child,
   });
 
-  final Animation<Color> surface;
-  final Color target;
+  /// Null under a scope that moves the whole scheme.
+  final Animation<Color>? surface;
+  final Color? target;
 
   @override
   bool updateShouldNotify(_ArtworkSurface oldWidget) =>

@@ -373,6 +373,23 @@ void main() {
         await tester.pumpWidget(host(_coverA, AppTheme.light(), child: page));
         expect(background(tester), Colors.pink);
       });
+
+      testWidgets('a whole-scheme scope inside it paints its own background', (
+        tester,
+      ) async {
+        palette.cached[_coverA] = red;
+        palette.cached[_coverB] = green;
+        await tester.pumpWidget(
+          host(
+            _coverA,
+            AppTheme.light(),
+            fadesSurfaceOnly: true,
+            child: PlayerArtworkTheme(artUri: _coverB, child: page),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(background(tester), Colors.pink);
+      });
     });
 
     testWidgets('AMOLED keeps the page background pure black', (tester) async {
