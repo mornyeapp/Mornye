@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/app_icon.dart';
-import 'package:mornye/widgets/app_loading_indicator.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 /// Square extension icon with a tinted fallback.
@@ -54,21 +54,13 @@ class ExtensionAvatar extends StatelessWidget {
         errorBuilder: (_, _, _) => fallback,
       );
     } else if (imageUrl != null && imageUrl!.isNotEmpty) {
-      image = Image.network(
-        imageUrl!,
+      image = CachedCoverImage(
+        imageUrl: imageUrl!,
         width: size,
         height: size,
         fit: BoxFit.cover,
-        cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-        cacheHeight: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-        filterQuality: FilterQuality.low,
-        errorBuilder: (_, _, _) => fallback,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return const Center(
-            child: AppLoadingIndicator(size: 20, strokeWidth: 2),
-          );
-        },
+        placeholder: (_, _) => fallback,
+        errorWidget: (_, _, _) => fallback,
       );
     }
 
