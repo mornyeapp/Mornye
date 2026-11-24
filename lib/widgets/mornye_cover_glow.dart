@@ -93,6 +93,27 @@ class _MornyeCoverGlowState extends State<MornyeCoverGlow>
 
   /// The glow of [_art], drawn while the glow is visible.
   _Glow? _glow;
+  ui.Image? _glowArt;
+  Size? _glowPage;
+  double? _glowFadeStart;
+  double? _glowDpr;
+  // The artwork's shape inputs; a change redraws even without a resize.
+  (bool, double?)? _glowArtworkShape;
+  Timer? _resizeSettle;
+  static const _resizeSettleDelay = Duration(milliseconds: 150);
+
+  static bool _stretches(Size drawn, Size current) {
+    if (drawn.isEmpty || current.isEmpty) return false;
+    final change = current.aspectRatio / drawn.aspectRatio;
+    return change > 0.8 && change < 1.25;
+  }
+
+  void _settleResize() {
+    if (!mounted) return;
+    setState(() {
+      _glowPage = null;
+    });
+  }
 
   /// The previous cover's glow, kept under the new one while it fades in.
   _Glow? _outgoing;
@@ -122,9 +143,14 @@ class _MornyeCoverGlowState extends State<MornyeCoverGlow>
     // A hidden surface may lose its GPU context. Draw the glow again.
     if (state != AppLifecycleState.resumed || !mounted) return;
     setState(() {
+      _resizeSettle?.cancel();
       _dropOutgoing();
       _glow?.image.dispose();
       _glow = null;
+      _glowArt = null;
+      _glowPage = null;
+      _glowFadeStart = null;
+      _glowDpr = null;
     });
   }
 
@@ -185,8 +211,13 @@ class _MornyeCoverGlowState extends State<MornyeCoverGlow>
 
   /// Moves the shown glow under the next one, which fades in over it.
   void _replaceGlow() {
+    _resizeSettle?.cancel();
     final previous = _glow;
     _glow = null;
+    _glowArt = null;
+    _glowPage = null;
+    _glowFadeStart = null;
+    _glowDpr = null;
     if (previous == null) return;
     _dropOutgoing();
     // Reduced motion swaps at once.
@@ -209,6 +240,7 @@ class _MornyeCoverGlowState extends State<MornyeCoverGlow>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _resizeSettle?.cancel();
     _stream?.removeListener(_listener);
     _fade.dispose();
     _art?.dispose();
@@ -374,7 +406,18 @@ class _MornyeCoverGlowState extends State<MornyeCoverGlow>
         page.height > fadeTop) {
       final dpr = MediaQuery.devicePixelRatioOf(context);
       final inputs = (art, page, artworkHeight, fadeTop, dpr);
-      if (_glow?.inputs != inputs) {
+      final drawnPage = _glowPage;
+      final artworkShape = (widget.squareArtwork, widget.artworkAspectRatio);
+      final needsRender =
+          _glow == null ||
+          _glowArt != art ||
+          _glowFadeStart != widget.fadeStart ||
+          _glowDpr != dpr ||
+          _glowArtworkShape != artworkShape ||
+          drawnPage == null ||
+          !_stretches(drawnPage, page);
+      if (needsRender) {
+        _resizeSettle?.cancel();
         _glow?.image.dispose();
         _glow = (
           image: _render(
@@ -394,6 +437,22 @@ class _MornyeCoverGlowState extends State<MornyeCoverGlow>
           height: page.height - fadeTop,
           inputs: inputs,
         );
+        _glowArt = art;
+        _glowPage = page;
+        _glowFadeStart = widget.fadeStart;
+        _glowDpr = dpr;
+        _glowArtworkShape = artworkShape;
+      } else if (drawnPage != page) {
+        _resizeSettle?.cancel();
+        _resizeSettle = Timer(_resizeSettleDelay, _settleResize);
+        _glow = (
+          image: _glow!.image,
+          top: fadeTop,
+          height: page.height - fadeTop,
+          inputs: _glow!.inputs,
+        );
+      } else {
+        _resizeSettle?.cancel();
       }
     }
     final glow = _glow;

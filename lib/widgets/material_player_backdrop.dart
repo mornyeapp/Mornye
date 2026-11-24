@@ -483,15 +483,21 @@ class _BlurredCoverState extends State<_BlurredCover>
     final art = _art?.image;
     final Widget blurred;
     if (art == null) {
-      // Blur live while the cover decodes and for the placeholder.
-      blurred = ImageFiltered(
-        imageFilter: _liveBlur,
-        child: PlayerArtwork(
-          artUri: widget.artUri,
-          colorScheme: widget.colorScheme,
-          cacheWidth: _artWidth,
-        ),
-      );
+      if (coverImageProvider(widget.artUri, cacheWidth: _artWidth) == null) {
+        // Track has no artwork: skip live full-screen Gaussian blur over a
+        // flat placeholder icon.
+        blurred = PlayerArtworkSurface(surface: surface);
+      } else {
+        // Blur live briefly while the cover decodes.
+        blurred = ImageFiltered(
+          imageFilter: _liveBlur,
+          child: PlayerArtwork(
+            artUri: widget.artUri,
+            colorScheme: widget.colorScheme,
+            cacheWidth: _artWidth,
+          ),
+        );
+      }
     } else {
       final dpr = MediaQuery.devicePixelRatioOf(context);
       blurred = LayoutBuilder(

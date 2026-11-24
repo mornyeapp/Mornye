@@ -77,13 +77,24 @@ class MornyeMotionGlow extends ConsumerStatefulWidget {
 
 class _MornyeMotionGlowState extends ConsumerState<MornyeMotionGlow> {
   final _video = ShownArtworkVideo();
+  bool _keepVideoMounted = true;
+
+  @override
+  void didUpdateWidget(MornyeMotionGlow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.visible && !_keepVideoMounted) {
+      _keepVideoMounted = true;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
-    if (reducedMotion ||
-        !ref.watch(mornyeLiquidGlassProvider) ||
-        !ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled))) {
+    final allowed =
+        !reducedMotion &&
+        ref.watch(mornyeLiquidGlassProvider) &&
+        ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled));
+    if (!allowed || (!widget.visible && !_keepVideoMounted)) {
       _video.clear();
     } else {
       _video.watch(ref, widget.videoUrl, resolving: widget.resolvingVideo);
@@ -105,7 +116,12 @@ class _MornyeMotionGlowState extends ConsumerState<MornyeMotionGlow> {
         opacity: shows && widget.visible ? 1 : 0,
         duration: motion.duration,
         curve: motion.curve,
-        child: !shows
+        onEnd: () {
+          if (mounted && !widget.visible && _keepVideoMounted) {
+            setState(() => _keepVideoMounted = false);
+          }
+        },
+        child: !shows || (!widget.visible && !_keepVideoMounted)
             ? const SizedBox.expand()
             : RepaintBoundary(
                 child: Stack(

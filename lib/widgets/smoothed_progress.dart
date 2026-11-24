@@ -36,25 +36,29 @@ class SmoothedProgressScope extends StatefulWidget {
 
 class _SmoothedProgressScopeState extends State<SmoothedProgressScope>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+  AnimationController? _controller;
   late final ValueNotifier<double> _displayedProgress;
   Animation<double>? _animation;
 
   double _normalized(double value) => value.clamp(0.0, 1.0).toDouble();
+
+  AnimationController _ensureController() =>
+      _controller ??= AnimationController(
+        vsync: this,
+        duration: widget.duration,
+      )..addListener(_updateDisplayedProgress);
 
   @override
   void initState() {
     super.initState();
     final initialValue = _normalized(widget.value);
     _displayedProgress = ValueNotifier<double>(initialValue);
-    _controller = AnimationController(vsync: this, duration: widget.duration)
-      ..addListener(_updateDisplayedProgress);
   }
 
   @override
   void didUpdateWidget(covariant SmoothedProgressScope oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _controller.duration = widget.duration;
+    _controller?.duration = widget.duration;
 
     final target = _normalized(widget.value);
     final current = _displayedProgress.value;
@@ -70,17 +74,18 @@ class _SmoothedProgressScopeState extends State<SmoothedProgressScope>
         target >= 1 ||
         widget.duration == Duration.zero;
     if (shouldSnap) {
-      _controller.stop();
+      _controller?.stop();
       _animation = null;
       _displayedProgress.value = target;
       return;
     }
 
+    final controller = _ensureController();
     _animation = Tween<double>(
       begin: current,
       end: target,
-    ).chain(CurveTween(curve: widget.curve)).animate(_controller);
-    _controller.forward(from: 0);
+    ).chain(CurveTween(curve: widget.curve)).animate(controller);
+    controller.forward(from: 0);
   }
 
   void _updateDisplayedProgress() {
@@ -93,7 +98,7 @@ class _SmoothedProgressScopeState extends State<SmoothedProgressScope>
   @override
   void dispose() {
     _controller
-      ..removeListener(_updateDisplayedProgress)
+      ?..removeListener(_updateDisplayedProgress)
       ..dispose();
     _displayedProgress.dispose();
     super.dispose();
