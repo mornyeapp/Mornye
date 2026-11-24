@@ -400,6 +400,16 @@ class LinkCatalogExporter {
     final generatedMs = _nowMs();
     final webCovers = await _webCovers();
     final pictures = await _pictures();
+    // Pre-index pictures by file path once so each page isolate receives only
+    // its slice instead of re-serializing the entire library map per page.
+    final picturesByPath = <String, List<MapEntry<String, bool>>>{};
+    if (pictures.isNotEmpty) {
+      for (final entry in pictures.entries) {
+        final sep = entry.key.indexOf('\n');
+        final pathKey = sep < 0 ? entry.key : entry.key.substring(0, sep);
+        (picturesByPath[pathKey] ??= []).add(entry);
+      }
+    }
     final webCoverSongs = <LinkWebCoverSong>[];
     late final Digest digest;
     final hash = sha256.startChunkedConversion(
@@ -422,7 +432,34 @@ class LinkCatalogExporter {
           ),
         );
         if (page.rows.isNotEmpty) {
-          final mapped = await _mapPage(page.rows, webCovers, pictures);
+          final pageWebCovers = <String, String>{};
+          final pagePictures = <String, bool>{};
+          if (webCovers.isNotEmpty || picturesByPath.isNotEmpty) {
+            for (final row in page.rows) {
+              final item = row['item'];
+              if (item is! Map) continue;
+              if (webCovers.isNotEmpty) {
+                final url = _webCoverUrl(item['coverUrl']);
+                if (url != null) {
+                  final id = linkCoverUrlId(url);
+                  final held = webCovers[id];
+                  if (held != null) pageWebCovers[id] = held;
+                }
+              }
+              if (picturesByPath.isNotEmpty) {
+                final path = linkLocalFilePath(item['filePath']);
+                if (path != null) {
+                  final entries = picturesByPath[path];
+                  if (entries != null) {
+                    for (final entry in entries) {
+                      pagePictures[entry.key] = entry.value;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          final mapped = await _mapPage(page.rows, pageWebCovers, pagePictures);
           if (mapped.bytes.isNotEmpty) await file.writeFrom(mapped.bytes);
           hash.add(mapped.digests);
           final keyed = mapped.looseKeys.length == mapped.songs.length;
