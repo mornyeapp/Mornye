@@ -86,7 +86,7 @@ MACOS_FFMPEG_OPTIONS=(
   --enable-shared --disable-static --disable-autodetect
   --disable-doc --disable-ffplay --disable-debug
   --disable-avdevice --disable-indevs --disable-outdevs
-  --disable-postproc --disable-hwaccels
+  --disable-hwaccels
   --disable-encoders --enable-encoder="$MACOS_ENCODERS"
   --disable-decoder="$MACOS_DISABLED_VIDEO_DECODERS"
   --enable-zlib --enable-audiotoolbox --enable-securetransport
