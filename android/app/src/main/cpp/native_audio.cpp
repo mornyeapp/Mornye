@@ -246,6 +246,8 @@ public:
     int channels = 0;
     int rate = 0;
     int64_t samples = 0;
+    PcmBuffer<int32_t> unpackScratch;
+    PcmBuffer<jbyte> byteScratch;
     DsdDecoder() = default;
     bool open(const char *path, std::string *errorOut) {
         char error[80]{};
@@ -356,9 +358,11 @@ JNIEXPORT jbyteArray JNICALL JNI_AUDIO(readWavPack)(JNIEnv *env, jobject, jlong 
     std::string error;
     auto d = decoders.get(handle, &error);
     if (!d) { report(env, error); return nullptr; }
-    PcmBuffer<int32_t> data;
-    PcmBuffer<jbyte> bytes;
-    if (!data.resize(static_cast<size_t>(frames) * d->channels) || !bytes.resize(data.size())) {
+    auto &data = d->unpackScratch;
+    auto &bytes = d->byteScratch;
+    const size_t requested = static_cast<size_t>(frames) * d->channels;
+    if ((data.size() < requested && !data.resize(requested)) ||
+        (bytes.size() < requested && !bytes.resize(requested))) {
         report(env, "Cannot allocate DSD buffer");
         return nullptr;
     }
@@ -371,12 +375,12 @@ JNIEXPORT jbyteArray JNICALL JNI_AUDIO(readWavPack)(JNIEnv *env, jobject, jlong 
         report(env, "Truncated WavPack DSD data");
         return nullptr;
     }
-    bytes.resize(static_cast<size_t>(count) * d->channels);
+    const size_t total = static_cast<size_t>(count) * d->channels;
     // OPEN_DSD_NATIVE returns interleaved, MSB-first DSD bytes regardless
     // of the wrapper's original DSF bit-order/blocking flags.
-    for (size_t i = 0; i < bytes.size(); ++i) bytes[i] = static_cast<jbyte>(data[i]);
-    auto result = env->NewByteArray(static_cast<jsize>(bytes.size()));
-    if (result) env->SetByteArrayRegion(result, 0, static_cast<jsize>(bytes.size()), bytes.data());
+    for (size_t i = 0; i < total; ++i) bytes[i] = static_cast<jbyte>(data[i]);
+    auto result = env->NewByteArray(static_cast<jsize>(total));
+    if (result) env->SetByteArrayRegion(result, 0, static_cast<jsize>(total), bytes.data());
     return result;
 }
 JNIEXPORT void JNICALL JNI_AUDIO(seekWavPack)(JNIEnv *env, jobject, jlong handle, jlong sample) {

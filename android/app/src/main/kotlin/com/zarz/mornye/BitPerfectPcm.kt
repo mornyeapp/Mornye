@@ -19,6 +19,11 @@ internal object BitPerfectPcm {
             ?: ByteBuffer.allocateDirect(size)).order(ByteOrder.LITTLE_ENDIAN)
         output.clear()
         output.limit(size)
+        if (!floating && inputBits == sourceBits && outputBits == inputBits) {
+            output.put(input)
+            output.flip()
+            return output
+        }
         while (input.hasRemaining()) {
             val sample = if (floating) {
                 val scaled = input.float.toDouble() * (1L shl (sourceBits - 1))
