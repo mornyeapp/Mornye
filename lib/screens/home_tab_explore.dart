@@ -702,15 +702,16 @@ extension _HomeTabExploreUI on _HomeTabState {
                                 ),
                               ],
                             ),
-                            child: CachedCoverImage(
-                              imageUrl: cover,
-                              width: coverSize,
-                              height: coverSize,
-                              borderRadius: BorderRadius.circular(
-                                tokens.radiusThumb,
+                            child: SizedBox.square(
+                              dimension: coverSize,
+                              child: CachedCoverImage(
+                                imageUrl: cover,
+                                borderRadius: BorderRadius.circular(
+                                  tokens.radiusThumb,
+                                ),
+                                errorWidget: (context, url, error) =>
+                                    const SizedBox.shrink(),
                               ),
-                              errorWidget: (context, url, error) =>
-                                  const SizedBox.shrink(),
                             ),
                           ),
                         ),

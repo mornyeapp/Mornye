@@ -1525,8 +1525,9 @@ class _HomeRecentlyAddedShelf extends ConsumerWidget {
     return _HomeShelfSize(
       inset: inset,
       builder: (context, coverSize) {
-        final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
-            .round();
+        final rawCacheWidth =
+            (coverSize * MediaQuery.devicePixelRatioOf(context)).round();
+        final cacheWidth = ((rawCacheWidth + 63) ~/ 64) * 64;
         return _HomeShelf(
           inset: inset,
           coverSize: coverSize,
@@ -1604,8 +1605,9 @@ class _HomeNewReleasesShelf extends StatelessWidget {
     return _HomeShelfSize(
       inset: inset,
       builder: (context, coverSize) {
-        final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
-            .round();
+        final rawCacheWidth =
+            (coverSize * MediaQuery.devicePixelRatioOf(context)).round();
+        final cacheWidth = ((rawCacheWidth + 63) ~/ 64) * 64;
         return _HomeShelf(
           inset: inset,
           coverSize: coverSize,
@@ -1754,8 +1756,9 @@ class _HomeOnRepeatShelf extends ConsumerWidget {
     return _HomeShelfSize(
       inset: inset,
       builder: (context, coverSize) {
-        final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
-            .round();
+        final rawCacheWidth =
+            (coverSize * MediaQuery.devicePixelRatioOf(context)).round();
+        final cacheWidth = ((rawCacheWidth + 63) ~/ 64) * 64;
         return _HomeShelf(
           inset: inset,
           coverSize: coverSize,
@@ -1801,8 +1804,9 @@ class _HomeRecentlyPlayedShelf extends ConsumerWidget {
     return _HomeShelfSize(
       inset: inset,
       builder: (context, coverSize) {
-        final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
-            .round();
+        final rawCacheWidth =
+            (coverSize * MediaQuery.devicePixelRatioOf(context)).round();
+        final cacheWidth = ((rawCacheWidth + 63) ~/ 64) * 64;
         return _HomeShelf(
           inset: inset,
           coverSize: coverSize,
@@ -1848,8 +1852,9 @@ class _HomeLibraryAlbumsShelf extends StatelessWidget {
     return _HomeShelfSize(
       inset: inset,
       builder: (context, coverSize) {
-        final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
-            .round();
+        final rawCacheWidth =
+            (coverSize * MediaQuery.devicePixelRatioOf(context)).round();
+        final cacheWidth = ((rawCacheWidth + 63) ~/ 64) * 64;
         return _HomeShelf(
           inset: inset,
           coverSize: coverSize,

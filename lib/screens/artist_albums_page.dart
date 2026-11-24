@@ -204,22 +204,23 @@ class _ArtistAlbumCover extends StatelessWidget {
       coverUrl: album.coverUrl,
       baseName: '${album.artists} - ${album.name}',
       enabled: enabled,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: album.coverUrl != null
-            ? CachedCoverImage(
-                imageUrl: album.coverUrl!,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                memCacheWidth: (size * 2).round(),
-                memCacheHeight: (size * 2).round(),
-                placeholder: (context, url) => ShimmerLoading(
-                  child: Container(color: colorScheme.surfaceContainerHighest),
-                ),
-                errorWidget: (context, url, error) => fallback,
-              )
-            : fallback,
+      child: SizedBox.square(
+        dimension: size,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: album.coverUrl != null
+              ? CachedCoverImage(
+                  imageUrl: album.coverUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => ShimmerLoading(
+                    child: Container(
+                      color: colorScheme.surfaceContainerHighest,
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => fallback,
+                )
+              : fallback,
+        ),
       ),
     );
   }

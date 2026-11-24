@@ -852,17 +852,18 @@ class _SearchCoverCell extends StatelessWidget {
         color: colorScheme.onSurfaceVariant,
       ),
     );
-    // CachedCoverImage decodes at this size times the pixel ratio, on one
-    // axis so a cover that is not square keeps its proportions.
-    final image = hasCover
-        ? CachedCoverImage(
-            imageUrl: item.coverUrl!,
-            width: extent,
-            height: extent,
-            fit: BoxFit.cover,
-            errorWidget: (_, _, _) => placeholder,
-          )
-        : placeholder;
+    // No width or height inside SizedBox.square, so the cover decodes once a
+    // desktop resize settles instead of at every size on the way.
+    final image = SizedBox.square(
+      dimension: extent,
+      child: hasCover
+          ? CachedCoverImage(
+              imageUrl: item.coverUrl!,
+              fit: BoxFit.cover,
+              errorWidget: (_, _, _) => placeholder,
+            )
+          : placeholder,
+    );
     final cover = Semantics(
       label:
           '${l10n.dialogDownload} '

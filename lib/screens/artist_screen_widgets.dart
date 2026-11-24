@@ -289,8 +289,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
                 imageUrl: imageUrl,
                 fit: BoxFit.cover,
                 alignment: Alignment.topCenter,
-                memCacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
-                    .round(),
+                memCacheWidth: detailHeaderCoverCacheWidth(context),
                 errorWidget: (_, _, _) => placeholder,
               ),
             ),
