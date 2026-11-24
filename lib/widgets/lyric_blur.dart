@@ -9,7 +9,8 @@ import 'package:flutter/widgets.dart';
 /// While [sigma] is still easing the blur is composited live, as an
 /// [ImageFiltered]. Once it has [settled], the blurred line is rasterized once
 /// and later frames draw that image, so scrolling, fading or scaling the row
-/// does not run the blur again. A new [child] widget, a new sigma or device
+/// does not run the blur again. A new [child] widget (unless an equal
+/// `contentKey` marks it unchanged), a new sigma or device
 /// pixel ratio, a relayout below it, or a repaint below it that is not inside
 /// a nested layer drops the image; the line then blurs live until it is
 /// unchanged for a frame. A paint-only change inside a nested layer (such as
@@ -20,11 +21,16 @@ class LyricBlur extends StatelessWidget {
     super.key,
     required this.sigma,
     required this.settled,
+    this.contentKey,
     required this.child,
   });
 
   final double sigma;
   final bool settled;
+
+  /// When provided, a rebuild whose [contentKey] equals the previous one keeps
+  /// its rasterized blur snapshot instead of invalidating on widget identity.
+  final Object? contentKey;
   final Widget child;
 
   /// The [AnimatedSwitcher] fade for content under a [LyricBlur]. The fade
@@ -51,6 +57,7 @@ class LyricBlur extends StatelessWidget {
         sigma: settled ? sigma : 0,
         devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
         source: child,
+        contentKey: contentKey,
         child: child,
       ),
     );
@@ -62,16 +69,23 @@ class _BlurSnapshot extends SingleChildRenderObjectWidget {
     required this.sigma,
     required this.devicePixelRatio,
     required this.source,
+    required this.contentKey,
     required super.child,
   });
 
   final double sigma;
   final double devicePixelRatio;
   final Widget source;
+  final Object? contentKey;
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      RenderLyricBlurSnapshot(sigma, devicePixelRatio, source);
+      RenderLyricBlurSnapshot(
+        sigma,
+        devicePixelRatio,
+        source,
+        contentKey: contentKey,
+      );
 
   @override
   void updateRenderObject(
@@ -80,7 +94,7 @@ class _BlurSnapshot extends SingleChildRenderObjectWidget {
   ) => renderObject
     ..sigma = sigma
     ..devicePixelRatio = devicePixelRatio
-    ..source = source;
+    ..updateSource(source, contentKey: contentKey);
 }
 
 /// Paints its child blurred by [sigma], from a cached image once the child
@@ -88,7 +102,12 @@ class _BlurSnapshot extends SingleChildRenderObjectWidget {
 /// boundary.
 class RenderLyricBlurSnapshot extends RenderProxyBox
     with WidgetsBindingObserver {
-  RenderLyricBlurSnapshot(this._sigma, this._devicePixelRatio, this._source);
+  RenderLyricBlurSnapshot(
+    this._sigma,
+    this._devicePixelRatio,
+    this._source, {
+    Object? contentKey,
+  }) : _contentKey = contentKey;
 
   double _sigma;
   set sigma(double value) {
@@ -104,13 +123,18 @@ class RenderLyricBlurSnapshot extends RenderProxyBox
     markNeedsPaint();
   }
 
-  // Layers inside the line, such as fades, repaint without reaching this box,
-  // so any rebuild of the line counts as a change.
+  // Fades inside the line repaint without reaching this box, so a rebuild
+  // counts as a change unless an equal contentKey says the content is the same.
   Widget _source;
-  set source(Widget value) {
-    if (identical(value, _source)) return;
+  Object? _contentKey;
+
+  void updateSource(Widget value, {Object? contentKey}) {
+    final unchanged = contentKey != null && _contentKey != null
+        ? contentKey == _contentKey
+        : identical(value, _source) && contentKey == _contentKey;
     _source = value;
-    if (_sigma > 0) markNeedsPaint();
+    _contentKey = contentKey;
+    if (!unchanged && _sigma > 0) markNeedsPaint();
   }
 
   ui.Image? _snapshot;
@@ -122,8 +146,10 @@ class RenderLyricBlurSnapshot extends RenderProxyBox
   @visibleForTesting
   ui.Image? get debugSnapshot => _snapshot;
 
-  bool get _canSnapshot =>
-      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+  bool get _canSnapshot {
+    final state = WidgetsBinding.instance.lifecycleState;
+    return state == null || state == AppLifecycleState.resumed;
+  }
 
   // Keeps the line on its own layer, like the boundary a live blur needs.
   @override

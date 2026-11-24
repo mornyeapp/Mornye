@@ -1421,6 +1421,19 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                               : distance == 2
                               ? 3.6
                               : 4.8);
+                final blurContentKey = (
+                  index,
+                  line.text,
+                  line.romanization,
+                  line.translation,
+                  timed,
+                  visibility,
+                  layoutWidth,
+                  textAlign,
+                  lineDirection,
+                  _pronunciationLayouts[index],
+                  _primaryLyricStyle(context, background: line.isBackground),
+                );
                 content = TweenAnimationBuilder<double>(
                   tween: Tween(end: sigma),
                   duration: motion,
@@ -1429,6 +1442,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                   builder: (context, value, child) => LyricBlur(
                     sigma: value,
                     settled: value == sigma,
+                    contentKey: blurContentKey,
                     child: child!,
                   ),
                 );
@@ -1439,14 +1453,6 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 );
               }
 
-              content = LyricScrollMotion(
-                progress: _scrollMotion,
-                distance: _scrollMotionDistance,
-                rowsAfterFocus: row - _scrollMotionFocus,
-                motionRevision: _scrollMotionRevision,
-                previousProgress: _previousScrollMotionProgress,
-                child: content,
-              );
               return _revealRow(
                 index,
                 textAlign,
@@ -1479,6 +1485,8 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                               .resolve(lineDirection),
                       duration: motion,
                       curve: Curves.easeOutCubic,
+                      // The fade sits above the scroll motion, whose shape
+                      // changes as focus moves, so the fade keeps its state.
                       child: AnimatedOpacity(
                         opacity: mornye
                             ? (isActive || highContrast ? 1 : 0.48)
@@ -1489,7 +1497,14 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                         curve: timed
                             ? Curves.easeOutCubic
                             : Curves.easeInOutCubic,
-                        child: content,
+                        child: LyricScrollMotion(
+                          progress: _scrollMotion,
+                          distance: _scrollMotionDistance,
+                          rowsAfterFocus: row - _scrollMotionFocus,
+                          motionRevision: _scrollMotionRevision,
+                          previousProgress: _previousScrollMotionProgress,
+                          child: RepaintBoundary(child: content),
+                        ),
                       ),
                     ),
                   ),
