@@ -399,6 +399,51 @@ void main() {
       expect(_scheme(tester, find.text('Other')).primary, isNot(cover.primary));
     });
 
+    testWidgets('a row that becomes current or stops being current swaps its '
+        'colours in one step', (tester) async {
+      final cover = ColorScheme.fromSeed(seedColor: Colors.orange);
+      PlayerArtworkTheme.debugPalette = _CachedPalette(cover);
+      addTearDown(() => PlayerArtworkTheme.debugPalette = null);
+      // Built once, so the app theme does not animate between two copies.
+      final current = ValueNotifier(0);
+      addTearDown(current.dispose);
+      await tester.pumpWidget(
+        _app(
+          ValueListenableBuilder<int>(
+            valueListenable: current,
+            builder: (context, playing, _) => Column(
+              children: [
+                for (final index in [0, 1])
+                  TrackCard(
+                    key: ValueKey(index),
+                    leading: const SizedBox.square(dimension: 56),
+                    title: 'Song $index',
+                    isCurrent: index == playing,
+                    isPlaying: true,
+                    leadingArtwork: true,
+                  ),
+              ],
+            ),
+          ),
+          currentId: 'media',
+          artUri: 'https://example.com/cover.jpg',
+        ),
+      );
+      await _pumpFor(tester, _settle);
+      final app = _scheme(tester, find.text('Song 1'));
+      expect(app, isNot(cover));
+      expect(_scheme(tester, find.text('Song 0')), cover);
+
+      current.value = 1;
+      await tester.pump();
+      for (var i = 0; i < 3; i++) {
+        expect(_scheme(tester, find.text('Song 0')), app);
+        expect(_scheme(tester, find.text('Song 1')), cover);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await _pumpFor(tester, _settle);
+    });
+
     testWidgets('text and controls on the fill take its content colour', (
       tester,
     ) async {

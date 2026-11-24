@@ -504,6 +504,7 @@ class _CurrentTrackArtworkThemeState extends State<_CurrentTrackArtworkTheme> {
   @override
   Widget build(BuildContext context) => PlayerArtworkTheme(
     artUri: widget.current ? _artUri : null,
+    animates: false,
     child: widget.child,
   );
 }

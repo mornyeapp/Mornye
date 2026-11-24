@@ -37,6 +37,7 @@ class PlayerArtworkTheme extends StatefulWidget {
     required this.artUri,
     required this.child,
     this.fadesSurfaceOnly = false,
+    this.animates = true,
   });
 
   /// The track's artwork, in any form `PlayerArtwork` shows: an HTTP(S)
@@ -49,6 +50,11 @@ class PlayerArtworkTheme extends StatefulWidget {
   /// the next track's surface colour. The page paints that background with
   /// [PlayerArtworkSurface] instead of the scheme's surface.
   final bool fadesSurfaceOnly;
+
+  /// Whether the scheme moves on the effects spring. A song row swaps it in
+  /// one step: its card fades its own fill, and a move rebuilt the whole row
+  /// on every frame.
+  final bool animates;
 
   /// The moving page background of the nearest [PlayerArtworkTheme] with
   /// [fadesSurfaceOnly]. Null elsewhere, where the whole scheme moves.
@@ -169,7 +175,10 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
       context,
       const AppMotionSpec(Duration.zero, Curves.linear),
     );
-    if (!animate || _from == null || motion.duration == Duration.zero) {
+    if (!animate ||
+        !widget.animates ||
+        _from == null ||
+        motion.duration == Duration.zero) {
       _from = null;
       _controller?.value = 1;
       return;
