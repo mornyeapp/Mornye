@@ -230,6 +230,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   /// No engine position has arrived since a forced broadcast.
   bool _positionCheckDue = false;
   bool _hapticsConfiguredActive = false;
+  PlaybackState? _lastHapticsPlaybackState;
   late final PlaybackSessionWriter _sessionWriter;
   int get _sessionQueueRevision => _sessionWriter.queueRevision;
   static const Duration _positionBroadcastInterval = Duration(
@@ -457,7 +458,25 @@ class MusicPlayerHandler extends BaseAudioHandler
       }),
     );
     _subscriptions.add(mediaItem.listen((_) => _updateHaptics()));
-    _subscriptions.add(playbackState.listen((_) => _updateHaptics()));
+    _subscriptions.add(
+      playbackState.listen((state) {
+        final previous = _lastHapticsPlaybackState;
+        _lastHapticsPlaybackState = state;
+        if (!_settings.musicHaptics && !_hapticsConfiguredActive) return;
+        if (previous != null &&
+            previous.playing == state.playing &&
+            previous.processingState == state.processingState &&
+            previous.speed == state.speed &&
+            previous.queueIndex == state.queueIndex &&
+            (!state.playing
+                ? previous.updatePosition == state.updatePosition
+                : (state.position - previous.position).abs() <=
+                      const Duration(milliseconds: 60))) {
+          return;
+        }
+        _updateHaptics();
+      }),
+    );
     _subscriptions.add(
       _dependencies.coverStore.changes.listen(_covers.changed),
     );

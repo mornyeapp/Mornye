@@ -55,14 +55,70 @@ bool hasPersistedAppSettings(SharedPreferences prefs) {
   return rawSettings != null && rawSettings.isNotEmpty;
 }
 
+String? _lastBootstrapRawSettings;
+AppSettings? _lastBootstrapSettings;
+
+AppSettings _normalizeLoadedSettings(AppSettings loaded) {
+  final sanitizedDownloadFallbackExtensionIds =
+      SettingsNotifier._sanitizeDownloadFallbackExtensionIds(
+        loaded.downloadFallbackExtensionIds,
+      );
+  final sanitizedDefaultSearchTab = SettingsNotifier._normalizeDefaultSearchTab(
+    loaded.defaultSearchTab,
+  );
+  return loaded.copyWith(
+    useExtensionProviders: true,
+    downloadFallbackExtensionIds: sanitizedDownloadFallbackExtensionIds,
+    clearDownloadFallbackExtensionIds:
+        loaded.downloadFallbackExtensionIds != null &&
+        sanitizedDownloadFallbackExtensionIds == null,
+    defaultSearchTab: sanitizedDefaultSearchTab,
+    defaultLibraryView: SettingsNotifier._normalizeDefaultLibraryView(
+      loaded.defaultLibraryView,
+    ),
+    libraryQualityLabelMode: normalizeLibraryQualityLabelMode(
+      loaded.libraryQualityLabelMode,
+    ),
+    autoConvertFormat: normalizeAutoConvertFormat(loaded.autoConvertFormat),
+    autoConvertBitrate: normalizeAutoConvertBitrate(loaded.autoConvertBitrate),
+    autoConvertMaxBitDepth: normalizeAutoConvertBitDepth(
+      loaded.autoConvertMaxBitDepth,
+    ),
+    autoConvertMaxSampleRate: normalizeAutoConvertSampleRate(
+      loaded.autoConvertMaxSampleRate,
+    ),
+    embeddedCoverMaxDimension:
+        SettingsNotifier._normalizeEmbeddedCoverMaxDimension(
+          loaded.embeddedCoverMaxDimension,
+        ),
+    defaultService: loaded.defaultService,
+    searchProvider: loaded.searchProvider,
+    extensionVerificationBrowserMode:
+        SettingsNotifier._normalizeExtensionVerificationBrowserMode(
+          loaded.extensionVerificationBrowserMode,
+        ),
+  );
+}
+
 AppSettings loadBootstrapSettings(SharedPreferences prefs) {
   final rawSettings = prefs.getString(_settingsKey);
-  if (rawSettings == null || rawSettings.isEmpty) return const AppSettings();
+  if (rawSettings == null || rawSettings.isEmpty) {
+    _lastBootstrapRawSettings = null;
+    _lastBootstrapSettings = null;
+    return const AppSettings();
+  }
   try {
     final decoded = jsonDecode(rawSettings);
     if (decoded is! Map) return const AppSettings();
-    return AppSettings.fromJson(Map<String, dynamic>.from(decoded));
+    final normalized = _normalizeLoadedSettings(
+      AppSettings.fromJson(Map<String, dynamic>.from(decoded)),
+    );
+    _lastBootstrapRawSettings = rawSettings;
+    _lastBootstrapSettings = normalized;
+    return normalized;
   } catch (_) {
+    _lastBootstrapRawSettings = null;
+    _lastBootstrapSettings = null;
     return const AppSettings();
   }
 }
@@ -178,7 +234,16 @@ class SettingsNotifier extends Notifier<AppSettings> {
   Future<void> _loadSettings() async {
     final prefs = await _prefs;
     final rawSettings = prefs.getString(_settingsKey);
-    if (rawSettings != null) {
+    final matchesBootstrap =
+        rawSettings != null &&
+        rawSettings == _lastBootstrapRawSettings &&
+        _lastBootstrapSettings != null &&
+        identical(state, _lastBootstrapSettings);
+    if (matchesBootstrap) {
+      await _runMigrations(prefs);
+      await _normalizeIosDownloadDirectoryIfNeeded();
+      await _normalizeSongLinkRegionIfNeeded();
+    } else if (rawSettings != null) {
       AppSettings? loaded;
       try {
         final decoded = jsonDecode(rawSettings);
@@ -197,48 +262,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
       }
 
       if (loaded != null) {
-        final sanitizedDownloadFallbackExtensionIds =
-            _sanitizeDownloadFallbackExtensionIds(
-              loaded.downloadFallbackExtensionIds,
-            );
-        final sanitizedDefaultSearchTab = _normalizeDefaultSearchTab(
-          loaded.defaultSearchTab,
-        );
-        state = loaded.copyWith(
-          useExtensionProviders: true,
-          downloadFallbackExtensionIds: sanitizedDownloadFallbackExtensionIds,
-          clearDownloadFallbackExtensionIds:
-              loaded.downloadFallbackExtensionIds != null &&
-              sanitizedDownloadFallbackExtensionIds == null,
-          defaultSearchTab: sanitizedDefaultSearchTab,
-          defaultLibraryView: _normalizeDefaultLibraryView(
-            loaded.defaultLibraryView,
-          ),
-          libraryQualityLabelMode: normalizeLibraryQualityLabelMode(
-            loaded.libraryQualityLabelMode,
-          ),
-          autoConvertFormat: normalizeAutoConvertFormat(
-            loaded.autoConvertFormat,
-          ),
-          autoConvertBitrate: normalizeAutoConvertBitrate(
-            loaded.autoConvertBitrate,
-          ),
-          autoConvertMaxBitDepth: normalizeAutoConvertBitDepth(
-            loaded.autoConvertMaxBitDepth,
-          ),
-          autoConvertMaxSampleRate: normalizeAutoConvertSampleRate(
-            loaded.autoConvertMaxSampleRate,
-          ),
-          embeddedCoverMaxDimension: _normalizeEmbeddedCoverMaxDimension(
-            loaded.embeddedCoverMaxDimension,
-          ),
-          defaultService: loaded.defaultService,
-          searchProvider: loaded.searchProvider,
-          extensionVerificationBrowserMode:
-              _normalizeExtensionVerificationBrowserMode(
-                loaded.extensionVerificationBrowserMode,
-              ),
-        );
+        state = _normalizeLoadedSettings(loaded);
 
         await _runMigrations(prefs);
         await _normalizeIosDownloadDirectoryIfNeeded();
@@ -509,19 +533,19 @@ class SettingsNotifier extends Notifier<AppSettings> {
     return 'US';
   }
 
-  String _normalizeDefaultSearchTab(String value) {
+  static String _normalizeDefaultSearchTab(String value) {
     final normalized = value.trim().toLowerCase();
     if (_searchTabValues.contains(normalized)) return normalized;
     return 'all';
   }
 
-  String _normalizeDefaultLibraryView(String value) {
+  static String _normalizeDefaultLibraryView(String value) {
     final normalized = value.trim().toLowerCase();
     if (_libraryViewValues.contains(normalized)) return normalized;
     return 'last';
   }
 
-  String _normalizeExtensionVerificationBrowserMode(String value) {
+  static String _normalizeExtensionVerificationBrowserMode(String value) {
     final normalized = value.trim().toLowerCase();
     if (_extensionVerificationBrowserModeValues.contains(normalized)) {
       return normalized;
@@ -529,7 +553,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
     return 'in_app_first';
   }
 
-  int _normalizeEmbeddedCoverMaxDimension(int value) {
+  static int _normalizeEmbeddedCoverMaxDimension(int value) {
     return _embeddedCoverMaxDimensionValues.contains(value) ? value : 0;
   }
 
@@ -545,7 +569,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
     await _commit(state.copyWith(songLinkRegion: normalized));
   }
 
-  List<String>? _sanitizeDownloadFallbackExtensionIds(List<String>? ids) {
+  static List<String>? _sanitizeDownloadFallbackExtensionIds(
+    List<String>? ids,
+  ) {
     if (ids == null) {
       return null;
     }

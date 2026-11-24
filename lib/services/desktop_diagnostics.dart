@@ -41,9 +41,15 @@ class DesktopDiagnostics {
   }
 
   static DesktopDiagnostics? _instance;
+  static Future<DesktopDiagnostics?>? _initializing;
 
   /// The running app's diagnostics; null on mobile and before [initialize].
   static DesktopDiagnostics? get instance => _instance;
+
+  /// Completes when [initialize] has finished: null on mobile or when it
+  /// failed.
+  static Future<DesktopDiagnostics?> get ready =>
+      _initializing ?? Future<DesktopDiagnostics?>.value(_instance);
 
   static const logFileName = 'mornye.log';
   static const panicLogFileName = 'rust-panic.log';
@@ -77,15 +83,22 @@ class DesktopDiagnostics {
   /// Desktop startup: detects an unclean previous exit, starts this
   /// session, mirrors buffered log entries into the log file, and clears the
   /// marker when the app is asked to quit.
-  static Future<DesktopDiagnostics?> initialize() async {
-    if (!isDesktopPlatform) return null;
-    if (_instance != null) return _instance;
+  static Future<DesktopDiagnostics?> initialize() {
+    if (!isDesktopPlatform) return Future<DesktopDiagnostics?>.value(null);
+    if (_instance != null) return Future<DesktopDiagnostics?>.value(_instance);
+    return _initializing ??= _initializeImpl();
+  }
+
+  static Future<DesktopDiagnostics?> _initializeImpl() async {
     try {
       final support = await getApplicationSupportDirectory();
       final diagnostics = DesktopDiagnostics(
         directory: Directory(p.join(support.path, 'logs')),
       );
-      diagnostics.beginSession(device: _deviceDescription());
+      await diagnostics._beginSessionAsync(device: _deviceDescription());
+      for (final early in LogBuffer().entries) {
+        diagnostics.writeEntry(early);
+      }
       LogBuffer.fileSink = diagnostics.writeEntry;
       // `kill`, logout and system shutdown ask the app to quit with SIGTERM;
       // that is a clean quit, not a crash.
@@ -116,18 +129,36 @@ class DesktopDiagnostics {
   static String _deviceDescription() =>
       '${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
 
+  /// [beginSession] for [initialize]: the OS crash report folder, which can
+  /// be large, is read with async I/O instead of blocking the UI isolate.
+  Future<void> _beginSessionAsync({required String device}) async {
+    await directory.create(recursive: true);
+    final previous = _readJson(_marker);
+    final osCrash = previous != null && previous['pid'] != _pid
+        ? await _osCrashReportSinceAsync(_startedAt(previous))
+        : null;
+    _beginSession(device, previous, (_) => osCrash);
+  }
+
   /// Turns a leftover marker from another process into a crash report when
   /// that session left evidence of a crash, then writes this session's
   /// marker. A marker alone means a force quit or power loss, which is only
   /// logged. A marker from this process (a debug hot restart) is not a crash.
   void beginSession({required String device}) {
     directory.createSync(recursive: true);
+    _beginSession(device, _readJson(_marker), _osCrashReportSince);
+  }
+
+  void _beginSession(
+    String device,
+    Map<String, dynamic>? previous,
+    File? Function(int startedAt) osCrashSince,
+  ) {
     final start = _now();
     _sessionStart = start;
-    final previous = _readJson(_marker);
     var endedWithoutCrash = false;
     if (previous != null && previous['pid'] != _pid) {
-      final report = _buildReport(previous, device);
+      final report = _buildReport(previous, device, osCrashSince);
       if (report != null) {
         _writeJson(_report, report);
       } else {
@@ -174,14 +205,18 @@ class DesktopDiagnostics {
     });
   }
 
+  static int _startedAt(Map<String, dynamic> marker) =>
+      (marker['started_at'] as num?)?.toInt() ?? 0;
+
   /// The report for a session that ended without quitting, or null when it
   /// left no evidence of a crash (no Rust panic, no fatal Dart error, no OS
   /// crash report), which means a force quit or power loss.
   Map<String, Object?>? _buildReport(
     Map<String, dynamic> previous,
     String device,
+    File? Function(int startedAt) osCrashSince,
   ) {
-    final startedAt = (previous['started_at'] as num?)?.toInt() ?? 0;
+    final startedAt = _startedAt(previous);
     bool fromSession(DateTime? time) =>
         time != null && time.millisecondsSinceEpoch >= startedAt;
     final panic = fromSession(_modified(_panicLog))
@@ -199,7 +234,7 @@ class DesktopDiagnostics {
             lastLogAt - runtimeAt > runtimeErrorExitWindow.inMilliseconds)) {
       runtime = null;
     }
-    final osCrash = _osCrashReportSince(startedAt);
+    final osCrash = osCrashSince(startedAt);
     if (panic.isEmpty && runtime == null && osCrash == null) return null;
 
     final lastActivity = [
@@ -339,6 +374,39 @@ class DesktopDiagnostics {
     _lifecycle?.dispose();
     await _log?.close();
     _log = null;
+  }
+
+  /// Async variant used during desktop startup so enumerating
+  /// `~/Library/Logs/DiagnosticReports` does not block the UI isolate.
+  Future<File?> _osCrashReportSinceAsync(int startedAt) async {
+    final folder = osCrashReportDirectory;
+    if (folder == null) return null;
+    final executable = p.basenameWithoutExtension(Platform.resolvedExecutable);
+    File? newest;
+    DateTime? newestTime;
+    try {
+      if (!await folder.exists()) return null;
+      await for (final entity in folder.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final name = p.basename(entity.path);
+        final isReport = name.endsWith('.ips') || name.endsWith('.crash');
+        if (!isReport || !name.startsWith('$executable-')) continue;
+        DateTime modified;
+        try {
+          modified = await entity.lastModified();
+        } on FileSystemException {
+          continue;
+        }
+        if (modified.millisecondsSinceEpoch < startedAt) continue;
+        if (newestTime == null || modified.isAfter(newestTime)) {
+          newest = entity;
+          newestTime = modified;
+        }
+      }
+    } on FileSystemException {
+      return null;
+    }
+    return newest;
   }
 
   /// The newest OS crash report for this app written since [startedAt].

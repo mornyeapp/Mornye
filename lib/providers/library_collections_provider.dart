@@ -631,10 +631,13 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
       if (playlist == null || !selected.any(playlist.containsTrackKey)) {
         return 0;
       }
-      await ensurePlaylistLoaded(playlistId);
-      if (!ref.mounted) return 0;
-      playlist = state.playlistById(playlistId);
-      if (playlist == null) return 0;
+      // The remaining songs give the playlist its cover, so load them first.
+      if (!playlist.tracksLoaded) {
+        await ensurePlaylistLoaded(playlistId);
+        if (!ref.mounted) return 0;
+        playlist = state.playlistById(playlistId);
+        if (playlist == null) return 0;
+      }
       final keys = selected.where(playlist.containsTrackKey).toSet();
       if (keys.isEmpty) return 0;
 
@@ -644,15 +647,40 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
         trackKeys: keys.toList(growable: false),
         playlistUpdatedAt: now.toIso8601String(),
       );
-      _replacePlaylistById(
-        playlistId,
-        (current) => current.copyWith(
+      if (!ref.mounted) return 0;
+      final nextAllKeys = Set<String>.of(state.allPlaylistTrackKeysView);
+      for (final key in keys) {
+        final keptElsewhere = state.playlists.any(
+          (other) => other.id != playlistId && other.containsTrackKey(key),
+        );
+        if (!keptElsewhere) nextAllKeys.remove(key);
+      }
+      _replacePlaylistById(playlistId, (current) {
+        final nextKeys = Set<String>.of(current.trackKeys)..removeAll(keys);
+        if (!current.tracksLoaded) {
+          if (nextKeys.isEmpty) {
+            return current.copyWith(
+              tracks: const [],
+              tracksLoaded: true,
+              trackKeys: nextKeys,
+              updatedAt: now,
+            );
+          }
+          return current.copyWith(
+            tracksLoaded: false,
+            trackKeys: nextKeys,
+            updatedAt: now,
+          );
+        }
+        return current.copyWith(
           tracks: current.tracks
               .where((entry) => !keys.contains(entry.key))
               .toList(growable: false),
+          tracksLoaded: true,
+          trackKeys: nextKeys,
           updatedAt: now,
-        ),
-      );
+        );
+      }, allPlaylistTrackKeys: nextAllKeys);
       _invalidatePlaylistPickerSummaries();
       return keys.length;
     });

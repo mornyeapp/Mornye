@@ -2636,25 +2636,33 @@ class PlatformBridge {
   // in DesktopDiagnostics.
 
   static Future<Map<String, dynamic>?> getPendingAppCrash() async {
-    if (isDesktopPlatform) return DesktopDiagnostics.instance?.pendingCrash();
+    if (isDesktopPlatform) {
+      return (await DesktopDiagnostics.ready)?.pendingCrash();
+    }
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
     return _invokeDecoded(_decodeNullableMapResult, 'getPendingAppCrash');
   }
 
   static Future<void> dismissAppCrash(String id) async {
-    if (isDesktopPlatform) return DesktopDiagnostics.instance?.dismiss(id);
+    if (isDesktopPlatform) {
+      return (await DesktopDiagnostics.ready)?.dismiss(id);
+    }
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     await _channel.invokeMethod<void>('dismissAppCrash', {'id': id});
   }
 
   static Future<Map<String, dynamic>?> getLatestAppCrash() async {
-    if (isDesktopPlatform) return DesktopDiagnostics.instance?.latestCrash();
+    if (isDesktopPlatform) {
+      return (await DesktopDiagnostics.ready)?.latestCrash();
+    }
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
     return _invokeDecoded(_decodeNullableMapResult, 'getLatestAppCrash');
   }
 
   static Future<void> markAppCrashShown(String id) async {
-    if (isDesktopPlatform) return DesktopDiagnostics.instance?.markShown(id);
+    if (isDesktopPlatform) {
+      return (await DesktopDiagnostics.ready)?.markShown(id);
+    }
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     await _channel.invokeMethod<void>('markAppCrashShown', {'id': id});
   }
@@ -2665,7 +2673,7 @@ class PlatformBridge {
     required String logs,
   }) async {
     if (isDesktopPlatform) {
-      return DesktopDiagnostics.instance?.recordRuntimeError(
+      return (await DesktopDiagnostics.ready)?.recordRuntimeError(
         error: error,
         stack: stack,
         logs: logs,
