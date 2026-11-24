@@ -101,19 +101,28 @@ internal object NativeHistoryStore {
     fun upsert(context: Context, values: ContentValues, deduplicateTrack: Boolean = true) {
         putNormalizedHistoryColumns(values)
         withHistoryDatabase(context) { db ->
-            val initializeSchema = historyDatabaseSchemaVersion != HISTORY_SCHEMA_VERSION
-            db.beginTransaction()
+            val currentVersion = db.version
+            if (currentVersion > HISTORY_SCHEMA_VERSION) {
+                throw IllegalStateException(
+                    "history schema v$currentVersion is newer than native finalizer contract v$HISTORY_SCHEMA_VERSION"
+                )
+            }
+            val initializeSchema = historyDatabaseSchemaVersion != HISTORY_SCHEMA_VERSION &&
+                currentVersion < HISTORY_SCHEMA_VERSION
+            if (currentVersion == HISTORY_SCHEMA_VERSION &&
+                historyDatabaseSchemaVersion != HISTORY_SCHEMA_VERSION
+            ) {
+                // Read-only check once per process, so a drifted schema still fails clearly.
+                validateHistorySchema(db)
+                historyDatabaseSchemaVersion = HISTORY_SCHEMA_VERSION
+            }
+            db.beginTransactionNonExclusive()
             try {
                 if (initializeSchema) {
-                    if (db.version > HISTORY_SCHEMA_VERSION) {
-                        throw IllegalStateException(
-                            "history schema v${db.version} is newer than native finalizer contract v$HISTORY_SCHEMA_VERSION"
-                        )
-                    }
                     // Only older schemas need metadata backfills. v15 adds
                     // tree-independent document identities to the path index.
-                    val needsBackfill = db.version < 13
-                    val needsPathBackfill = db.version < 15
+                    val needsBackfill = currentVersion < 13
+                    val needsPathBackfill = currentVersion < 15
                     val definitions = historyColumns.entries.joinToString(", ") { (name, type) ->
                         "$name $type"
                     }
