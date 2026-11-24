@@ -275,7 +275,8 @@ fn read_frames(
     if flags & 0x40 != 0 && data.len() >= 4 && matches!(version, 3 | 4) {
         let length = size(&data[..4], version == 4);
         if length > 0 {
-            let skip = if length + 4 <= data.len() {
+            // Only the v2.3 size excludes its own 4 bytes.
+            let skip = if version == 3 && length + 4 <= data.len() {
                 length + 4
             } else if length <= data.len() {
                 length
@@ -483,5 +484,45 @@ mod tests {
         }
         let metadata = crate::tags::id3::read(&mut Cursor::new(&tag)).unwrap();
         assert_eq!(metadata.lyrics, "[00:01.00]new synced");
+    }
+
+    fn extended_header_tag(version: u8) -> Vec<u8> {
+        // The v2.4 extended header size counts its own 4 bytes, the v2.3 one does not.
+        let extended: &[u8] = if version == 4 {
+            &[0, 0, 0, 6, 1, 0]
+        } else {
+            &[0, 0, 0, 6, 0, 0, 0, 0, 0, 0]
+        };
+        let title = b"\0Song";
+        let mut body = extended.to_vec();
+        body.extend(b"TIT2");
+        body.extend(if version == 4 {
+            syncsafe(title.len())
+        } else {
+            (title.len() as u32).to_be_bytes()
+        });
+        body.extend([0, 0]);
+        body.extend(title);
+        let mut tag = [b"ID3".as_slice(), &[version, 0, 0x40]].concat();
+        tag.extend(syncsafe(body.len()));
+        tag.extend(body);
+        tag.extend(b"audio");
+        tag
+    }
+
+    #[test]
+    fn rewriting_tag_with_extended_header_keeps_existing_frames() {
+        let fields: Fields = [("artist".to_owned(), "New artist".to_owned())]
+            .into_iter()
+            .collect();
+        for version in [3, 4] {
+            let source = extended_header_tag(version);
+            let original = crate::tags::id3::read(&mut Cursor::new(&source)).unwrap();
+            assert_eq!(original.title, "Song", "ID3v2.{version} source");
+            let (tag, _) = header(&mut Cursor::new(source), &fields, None, &|| Ok(())).unwrap();
+            let metadata = crate::tags::id3::read(&mut Cursor::new(&tag)).unwrap();
+            assert_eq!(metadata.artist, "New artist", "ID3v2.{version} rewrite");
+            assert_eq!(metadata.title, "Song", "ID3v2.{version} rewrite");
+        }
     }
 }

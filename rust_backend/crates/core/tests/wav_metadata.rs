@@ -283,6 +283,37 @@ fn wav_edit_preserves_private_id3_frames_and_existing_artwork() {
     );
 }
 
+fn id3_with_extended_header(version: u8) -> Vec<u8> {
+    // The v2.4 extended header size counts its own 4 bytes, the v2.3 one does not.
+    let extended: &[u8] = if version == 4 {
+        &[0, 0, 0, 6, 1, 0]
+    } else {
+        &[0, 0, 0, 6, 0, 0, 0, 0, 0, 0]
+    };
+    let title = b"\0Song";
+    let mut tag = [b"ID3".as_slice(), &[version, 0, 0x40]].concat();
+    tag.extend([0, 0, 0, (extended.len() + 10 + title.len()) as u8]);
+    tag.extend(extended);
+    tag.extend(b"TIT2");
+    tag.extend([0, 0, 0, title.len() as u8, 0, 0]);
+    tag.extend(title);
+    tag
+}
+
+#[test]
+fn wav_reads_id3_chunk_with_extended_header() {
+    for version in [3, 4] {
+        let tag = id3_with_extended_header(version);
+        let source = wave(&[chunk(b"data", &[1, 2]), chunk(b"id3 ", &tag)]);
+        let metadata = read_audio_tags(&mut Cursor::new(source), "wav", &|| Ok(()));
+        assert_eq!(
+            metadata.map(|metadata| metadata.title),
+            Ok("Song".into()),
+            "ID3v2.{version}"
+        );
+    }
+}
+
 #[test]
 fn wav_edit_rejects_truncated_info_before_writing_output() {
     for body in [
