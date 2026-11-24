@@ -315,8 +315,6 @@ extension _QueueTabItemWidgets on _QueueTabState {
             width: coverSize,
             height: coverSize,
             borderRadius: radius,
-            fadeInDuration: const Duration(milliseconds: 180),
-            fadeOutDuration: const Duration(milliseconds: 90),
           )
         : Container(
             width: coverSize,
@@ -861,7 +859,16 @@ extension _QueueTabItemWidgets on _QueueTabState {
             gaplessPlayback: true,
             frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
                 fadeInFileImage(child, frame, wasSynchronouslyLoaded),
-            errorBuilder: (context, error, stackTrace) => buildPlaceholder(),
+            errorBuilder: (context, error, stackTrace) => item.coverUrl != null
+                ? CachedCoverImage(
+                    imageUrl: item.coverUrl!,
+                    width: size,
+                    height: size,
+                    memCacheWidth: cacheSize,
+                    placeholder: (context, url) => buildPlaceholder(),
+                    errorWidget: (context, url, error) => buildPlaceholder(),
+                  )
+                : buildPlaceholder(),
           ),
         );
       }
@@ -876,8 +883,6 @@ extension _QueueTabItemWidgets on _QueueTabState {
         borderRadius: BorderRadius.circular(8),
         placeholder: (context, url) => buildPlaceholder(),
         errorWidget: (context, url, error) => buildPlaceholder(),
-        fadeInDuration: const Duration(milliseconds: 180),
-        fadeOutDuration: const Duration(milliseconds: 90),
       );
     }
 
@@ -1682,7 +1687,9 @@ class _LocalCoverFadeState extends State<_LocalCoverFade> {
   Widget build(BuildContext context) {
     final keyedChild = KeyedSubtree(key: _childKey, child: widget.child);
     if (widget.loaded &&
-        (_settled || MediaQuery.disableAnimationsOf(context))) {
+        (_settled ||
+            MediaQuery.disableAnimationsOf(context) ||
+            Scrollable.recommendDeferredLoadingForContext(context))) {
       _settled = true;
       return keyedChild;
     }

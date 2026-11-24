@@ -14,11 +14,7 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     final progress = item.progress.clamp(0.0, 1.0);
 
     final cover = item.track.coverUrl != null
-        ? CachedCoverImage(
-            imageUrl: item.track.coverUrl!,
-            borderRadius: radius,
-            fadeInDuration: const Duration(milliseconds: 180),
-          )
+        ? CachedCoverImage(imageUrl: item.track.coverUrl!, borderRadius: radius)
         : const TrackCoverPlaceholder();
 
     final onTap = isFailed || item.status == DownloadStatus.skipped

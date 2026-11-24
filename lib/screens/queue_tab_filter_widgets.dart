@@ -351,8 +351,11 @@ extension _QueueTabFilterWidgets on _QueueTabState {
     // Songs drag onto playlists; singles do not.
     final playlistDrag = filterMode == 'all';
     // A slide keeps up with songs that load while it scrolls.
-    if (_slideSelect.isActive && _slideSelectFilter == filterMode) {
+    if (_slideSelect.isActive &&
+        _slideSelectFilter == filterMode &&
+        !identical(_slideSelectItems, filteredUnifiedItems)) {
       _slideSelectItems = filteredUnifiedItems;
+      _slideSelectItemIds = [for (final item in filteredUnifiedItems) item.id];
     }
     Widget trackTile(UnifiedLibraryItem item, {required bool grid}) {
       // The first hold, and a hold on a selected song, drags to a playlist;

@@ -34,6 +34,7 @@ extension _QueueTabSelectionActions on _QueueTabState {
     if (!_slideSelect.isActive) return;
     _slideSelectFilter = filterMode;
     _slideSelectItems = visibleItems;
+    _slideSelectItemIds = [for (final entry in visibleItems) entry.id];
     _slideSelectBase = before;
   }
 
@@ -44,7 +45,7 @@ extension _QueueTabSelectionActions on _QueueTabState {
       applySlideSelection(
         selected: _selectedIds,
         base: base,
-        visibleItems: [for (final item in _slideSelectItems) item.id],
+        visibleItems: _slideSelectItemIds,
         anchor: anchor as String,
         target: current as String,
       );

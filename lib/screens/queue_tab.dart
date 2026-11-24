@@ -178,6 +178,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
       _slideSelectBase = null;
       _slideSelectFilter = null;
       _slideSelectItems = const [];
+      _slideSelectItemIds = const [];
     },
   );
 
@@ -185,6 +186,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   /// began with.
   String? _slideSelectFilter;
   List<UnifiedLibraryItem> _slideSelectItems = const [];
+  List<String> _slideSelectItemIds = const [];
   Set<String>? _slideSelectBase;
   final SelectionOverlayController _selectionOverlay =
       SelectionOverlayController();
