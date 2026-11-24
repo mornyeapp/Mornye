@@ -126,10 +126,48 @@ class MornyePlayerLayout extends ConsumerWidget {
           compactCoverSize,
           double.infinity,
         );
-        // Made once per layout, so the panel switch moves the same panels on
-        // every frame instead of rebuilding their rows.
+        // Made once per layout, so the panel switch moves the same panels and
+        // artwork subtrees on every frame instead of rebuilding them.
         late final queuePanel = MornyePlayerQueue(colorScheme: colorScheme);
         late final lyricsPanel = lyricsBuilder(false);
+        late final expandedArtworkChild = DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x40000000),
+                blurRadius: 28,
+                offset: Offset(0, 16),
+              ),
+            ],
+          ),
+          child: PlayerTransitionArtwork(
+            artworkKey: artworkKeys.expanded,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: motionArtwork,
+            ),
+          ),
+        );
+        late final compactArtworkChild = Semantics(
+          button: true,
+          label: context.l10n.nowPlayingTabPlayer,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onPageChanged(0),
+            child: PlayerTransitionArtwork(
+              artworkKey: artworkKeys.compact,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: PlayerArtwork(
+                  artUri: mediaItem.artUri?.toString(),
+                  colorScheme: colorScheme,
+                  cacheWidth: PlayerArtwork.transitionCacheWidth(context),
+                ),
+              ),
+            ),
+          ),
+        );
         Widget stage({
           bool artworkOnly = false,
           double progress = 0,
@@ -296,58 +334,8 @@ class MornyePlayerLayout extends ConsumerWidget {
                                     child: Hero(
                                       tag: kNowPlayingArtworkHeroTag,
                                       child: expanded
-                                          ? DecoratedBox(
-                                              decoration: BoxDecoration(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                boxShadow: const [
-                                                  BoxShadow(
-                                                    color: Color(0x40000000),
-                                                    blurRadius: 28,
-                                                    offset: Offset(0, 16),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: PlayerTransitionArtwork(
-                                                artworkKey:
-                                                    artworkKeys.expanded,
-                                                child: ClipRRect(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  child: motionArtwork,
-                                                ),
-                                              ),
-                                            )
-                                          : Semantics(
-                                              button: true,
-                                              label: context
-                                                  .l10n
-                                                  .nowPlayingTabPlayer,
-                                              child: GestureDetector(
-                                                behavior:
-                                                    HitTestBehavior.opaque,
-                                                onTap: () => onPageChanged(0),
-                                                child: PlayerTransitionArtwork(
-                                                  artworkKey:
-                                                      artworkKeys.compact,
-                                                  child: ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          12,
-                                                        ),
-                                                    child: PlayerArtwork(
-                                                      artUri: mediaItem.artUri
-                                                          ?.toString(),
-                                                      colorScheme: colorScheme,
-                                                      cacheWidth:
-                                                          PlayerArtwork.transitionCacheWidth(
-                                                            context,
-                                                          ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
+                                          ? expandedArtworkChild
+                                          : compactArtworkChild,
                                     ),
                                   ),
                                 ),
@@ -648,6 +636,7 @@ class MornyePlayerLayout extends ConsumerWidget {
     curve: PlayerLyricsControlsVisibility.motion(context).curve,
     builder: (context, reveal, child) => MornyeLyricsFadeMask(
       opaque: reveal == 1,
+      maskKey: (visibleHeight, reveal),
       shaderCallback: (bounds) {
         final height = bounds.height.clamp(1.0, double.infinity);
         final end = visibleHeight.clamp(0.0, height);

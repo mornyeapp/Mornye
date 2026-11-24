@@ -378,6 +378,7 @@ class _LandscapeLyricsViewport extends ConsumerWidget {
           children: [
             MornyeLyricsFadeMask(
               opaque: progress == 0,
+              maskKey: progress,
               shaderCallback: (bounds) => LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -410,34 +411,57 @@ class MornyeLyricsFadeMask extends ShaderMask {
   const MornyeLyricsFadeMask({
     super.key,
     required this.opaque,
+    this.maskKey,
     required super.shaderCallback,
     super.child,
   }) : super(blendMode: BlendMode.dstIn);
 
   final bool opaque;
 
+  /// When provided, unchanged rebuilds with a fresh [shaderCallback] closure
+  /// keep the retained shader layer instead of marking the mask dirty.
+  final Object? maskKey;
+
   @override
   RenderShaderMask createRenderObject(BuildContext context) =>
-      _RenderLyricsFadeMask(opaque: opaque, shaderCallback: shaderCallback);
+      _RenderLyricsFadeMask(
+        opaque: opaque,
+        maskKey: maskKey,
+        shaderCallback: shaderCallback,
+      );
 
   @override
   void updateRenderObject(BuildContext context, RenderShaderMask renderObject) {
-    super.updateRenderObject(context, renderObject);
-    (renderObject as _RenderLyricsFadeMask).opaque = opaque;
+    final mask = renderObject as _RenderLyricsFadeMask;
+    mask
+      ..opaque = opaque
+      ..blendMode = blendMode
+      ..updateShader(shaderCallback, maskKey: maskKey);
   }
 }
 
 class _RenderLyricsFadeMask extends RenderShaderMask {
-  _RenderLyricsFadeMask({required bool opaque, required super.shaderCallback})
-    : _opaque = opaque,
-      super(blendMode: BlendMode.dstIn);
+  _RenderLyricsFadeMask({
+    required bool opaque,
+    required Object? maskKey,
+    required super.shaderCallback,
+  }) : _opaque = opaque,
+       _maskKey = maskKey,
+       super(blendMode: BlendMode.dstIn);
 
   bool _opaque;
+  Object? _maskKey;
 
   set opaque(bool value) {
     if (_opaque == value) return;
     _opaque = value;
     markNeedsPaint();
+  }
+
+  void updateShader(ShaderCallback callback, {Object? maskKey}) {
+    if (maskKey != null && _maskKey == maskKey) return;
+    _maskKey = maskKey;
+    shaderCallback = callback;
   }
 
   @override
