@@ -78,6 +78,9 @@ class MprisPlayerObject extends DBusObject {
   PlaybackStateMessage? _state;
   MediaItemMessage? _item;
   int _track = 0;
+  Timer? _volumeThrottleTimer;
+  bool _volumePending = false;
+  double? _lastEmittedVolume;
 
   static const _noTrack = DBusObjectPath.unchecked(
     '/org/mpris/MediaPlayer2/TrackList/NoTrack',
@@ -196,18 +199,44 @@ class MprisPlayerObject extends DBusObject {
   void updateState(PlaybackStateMessage state) {
     final expected = position;
     final previous = _state;
-    final before = previous == null ? null : _playerProperties;
+    if (previous == null) {
+      _state = state;
+      final after = _playerProperties..remove('Position');
+      if (after.isNotEmpty) unawaited(_emit(after));
+      return;
+    }
+    final prevStatus = _status;
+    final prevRate = previous.speed;
+    final prevMinRate = _minimumRate;
+    final prevMaxRate = _maximumRate;
+    final prevCanNext = _can(MediaActionMessage.skipToNext);
+    final prevCanPrevious = _can(MediaActionMessage.skipToPrevious);
+    final prevCanSeek = _hasItem && _can(MediaActionMessage.seek);
+
     _state = state;
-    final after = _playerProperties..remove('Position');
-    final changed = <String, DBusValue>{
-      for (final entry in after.entries)
-        if (before == null || before[entry.key] != entry.value)
-          entry.key: entry.value,
-    };
-    if (changed.isNotEmpty) unawaited(_emit(changed));
+
+    final status = _status;
+    final rate = state.speed;
+    final minRate = _minimumRate;
+    final maxRate = _maximumRate;
+    final canNext = _can(MediaActionMessage.skipToNext);
+    final canPrevious = _can(MediaActionMessage.skipToPrevious);
+    final canSeek = _hasItem && _can(MediaActionMessage.seek);
+
+    Map<String, DBusValue>? changed;
+    void put(String key, DBusValue value) => (changed ??= {})[key] = value;
+    if (status != prevStatus) put('PlaybackStatus', DBusString(status));
+    if (rate != prevRate) put('Rate', DBusDouble(rate));
+    if (minRate != prevMinRate) put('MinimumRate', DBusDouble(minRate));
+    if (maxRate != prevMaxRate) put('MaximumRate', DBusDouble(maxRate));
+    if (canNext != prevCanNext) put('CanGoNext', DBusBoolean(canNext));
+    if (canPrevious != prevCanPrevious) {
+      put('CanGoPrevious', DBusBoolean(canPrevious));
+    }
+    if (canSeek != prevCanSeek) put('CanSeek', DBusBoolean(canSeek));
+    if (changed != null) unawaited(_emit(changed!));
     // Clients extrapolate Position from the rate; only a jump is signalled.
-    if (previous != null &&
-        (state.updatePosition - expected).abs() > const Duration(seconds: 1)) {
+    if ((state.updatePosition - expected).abs() > const Duration(seconds: 1)) {
       unawaited(
         emitSignal(_playerInterface, 'Seeked', [
           DBusInt64(state.updatePosition.inMicroseconds),
@@ -231,8 +260,27 @@ class MprisPlayerObject extends DBusObject {
     );
   }
 
-  void _volumeChanged() =>
-      unawaited(_emit({'Volume': DBusDouble(playbackOutputVolume.value)}));
+  void _volumeChanged() {
+    if (_volumeThrottleTimer != null) {
+      _volumePending = true;
+      return;
+    }
+    _emitCurrentVolume();
+    _volumeThrottleTimer = Timer(const Duration(milliseconds: 60), () {
+      _volumeThrottleTimer = null;
+      if (_volumePending) {
+        _volumePending = false;
+        _emitCurrentVolume();
+      }
+    });
+  }
+
+  void _emitCurrentVolume() {
+    final value = playbackOutputVolume.value;
+    if (_lastEmittedVolume == value) return;
+    _lastEmittedVolume = value;
+    unawaited(_emit({'Volume': DBusDouble(value)}));
+  }
 
   Future<void> _emit(Map<String, DBusValue> changed) async {
     if (client == null) return;
@@ -443,5 +491,9 @@ class MprisPlayerObject extends DBusObject {
   }
 
   @visibleForTesting
-  void dispose() => playbackOutputVolume.removeListener(_volumeChanged);
+  void dispose() {
+    _volumeThrottleTimer?.cancel();
+    _volumeThrottleTimer = null;
+    playbackOutputVolume.removeListener(_volumeChanged);
+  }
 }
