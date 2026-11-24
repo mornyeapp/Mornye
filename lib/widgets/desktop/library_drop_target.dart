@@ -71,9 +71,20 @@ class _DesktopLibraryDropTargetState
   Future<void> _import(List<String> paths) async {
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.maybeOf(context);
+    final trimmed = [for (final raw in paths) _trimSeparator(raw.trim())];
+    final dirFlags = await Future.wait([
+      for (final path in trimmed)
+        path.isEmpty ? Future.value(false) : FileSystemEntity.isDirectory(path),
+    ]);
+    if (!mounted) return;
+    final dirPaths = <String>{
+      for (var i = 0; i < trimmed.length; i++)
+        if (dirFlags[i]) trimmed[i],
+    };
+    // The helper trims each path once more itself, as the checks above did.
     final folders = libraryFoldersForDrop(
       paths,
-      isDirectory: FileSystemEntity.isDirectorySync,
+      isDirectory: dirPaths.contains,
     );
     if (folders.isEmpty) {
       messenger?.showSnackBar(
