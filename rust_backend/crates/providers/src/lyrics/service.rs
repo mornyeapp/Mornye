@@ -233,7 +233,41 @@ impl LyricsService {
                 return Err(LyricsError::NotFound("lyrics not found (cached)".into()));
             }
             state.negative.remove(&key);
-            let flight_key = (state.generation, key);
+            let generation = state.generation;
+            let cache_key = config::cache_key(
+                "",
+                &request.track,
+                &request.artist,
+                request.duration,
+                &providers,
+                &extensions,
+                &request.options,
+            );
+            // Answer instrumental heuristic and warm cache hits on the calling
+            // thread without spawning a dedicated "lyrics-search" OS thread.
+            if matching::is_likely_instrumental(&request.track) {
+                drop(state);
+                let result = LyricsResponse {
+                    instrumental: true,
+                    source: "Heuristic: Instrumental".into(),
+                    ..LyricsResponse::default()
+                };
+                self.inner.store(generation, cache_key, &result, check)?;
+                return Ok(result);
+            }
+            let resolved = config::resolve_order(&providers, &extensions);
+            if let Some(mut cached) = self.inner.cache.get(&cache_key, SystemTime::now()) {
+                let extension = cached.source.strip_prefix("Extension:");
+                let selected = extension.is_some_and(|id| {
+                    resolved.contains(&format!("extension:{}", lowercase(id.trim())))
+                });
+                let has_extensions = resolved.iter().any(|name| name.starts_with("extension:"));
+                if (extension.is_none() && !has_extensions) || selected {
+                    cached.source.push_str(" (cached)");
+                    return Ok(cached);
+                }
+            }
+            let flight_key = (generation, key);
             let existing = state.flights.try_join(&flight_key);
             let (flight, start) = if let Some(flight) = existing {
                 (flight, false)
