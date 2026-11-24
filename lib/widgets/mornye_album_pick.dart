@@ -133,10 +133,21 @@ class _MornyeAlbumPickState extends State<MornyeAlbumPick>
     setState(_dropSoft);
   }
 
-  /// Asks for the cover again when the card's width in pixels changed.
+  Timer? _resizeSettle;
+  static const _resizeSettleDelay = Duration(milliseconds: 150);
+  String? _dimArtUri;
+  ui.Image? _softArt;
+  double? _softWidth;
+  double? _softDpr;
+
+  /// Asks for the cover again when the card's width in pixels changed; on
+  /// desktop in 64 px steps, so a window drag does not decode every frame.
   void _resolveAtWidth() {
-    final cacheWidth = (widget.width * MediaQuery.devicePixelRatioOf(context))
+    final rawWidth = (widget.width * MediaQuery.devicePixelRatioOf(context))
         .round();
+    final cacheWidth = isDesktopPlatform
+        ? ((rawWidth + 63) ~/ 64) * 64
+        : rawWidth;
     if (cacheWidth == _cacheWidth) return;
     _cacheWidth = cacheWidth;
     _resolve();
@@ -172,22 +183,36 @@ class _MornyeAlbumPickState extends State<MornyeAlbumPick>
       _art?.dispose();
       _art = art;
       _dropSoft();
-      _dim = null;
+      if (art == null || widget.artUri != _dimArtUri) {
+        _dim = null;
+        _dimArtUri = null;
+      }
     });
   }
 
   void _dropSoft() {
     _soft?.image.dispose();
     _soft = null;
+    _softArt = null;
+    _softWidth = null;
+    _softDpr = null;
+  }
+
+  void _settleResize() {
+    if (mounted) setState(_dropSoft);
   }
 
   /// Reads how light the caption's end of [soft] is, drawn from [art]. A
   /// read that fails leaves the labels the dim a white cover needs.
   void _measure(_Soft soft, ImageInfo art) {
     const whole = 0.5;
+    final source = widget.artUri;
     void settle(double dim) {
       if (!mounted || !identical(_art, art)) return;
-      setState(() => _dim = dim);
+      setState(() {
+        _dim = dim;
+        _dimArtUri = source;
+      });
     }
 
     final image = soft.image.clone();
@@ -213,6 +238,7 @@ class _MornyeAlbumPickState extends State<MornyeAlbumPick>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _resizeSettle?.cancel();
     _stream?.removeListener(_listener);
     _art?.dispose();
     _soft?.image.dispose();
@@ -307,8 +333,10 @@ class _MornyeAlbumPickState extends State<MornyeAlbumPick>
     final info = _art;
     final art = info?.image;
     if (info != null && art != null) {
-      final inputs = (art, width, MediaQuery.devicePixelRatioOf(context));
-      if (_soft?.inputs != inputs) {
+      final dpr = MediaQuery.devicePixelRatioOf(context);
+      final inputs = (art, width, dpr);
+      if (_soft == null || _softArt != art || _softDpr != dpr) {
+        _resizeSettle?.cancel();
         _dropSoft();
         final soft = _soft = (
           image: _render(
@@ -316,11 +344,21 @@ class _MornyeAlbumPickState extends State<MornyeAlbumPick>
             width: width,
             height: height,
             softTop: softTop,
-            dpr: inputs.$3,
+            dpr: dpr,
           ),
           inputs: inputs,
         );
+        _softArt = art;
+        _softWidth = width;
+        _softDpr = dpr;
         if (_dim == null) _measure(soft, info);
+      } else if (_softWidth != width) {
+        // Stretch the existing soft blur while desktop window width moves;
+        // re-render at exact width once resize settles.
+        _resizeSettle?.cancel();
+        _resizeSettle = Timer(_resizeSettleDelay, _settleResize);
+      } else {
+        _resizeSettle?.cancel();
       }
     }
     final soft = _soft;
