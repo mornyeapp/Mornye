@@ -36,6 +36,7 @@ class LibrarySearchQuery {
     String? rowId,
     String? ftsTable,
     String? ftsContentTable,
+    bool ftsPreFilterOnly = false,
   }) {
     if (terms.isEmpty) return '0';
     final indexed = ftsTable == null
@@ -51,7 +52,7 @@ class LibrarySearchQuery {
       args.add(indexed.map((term) => '"$term"').join(' AND '));
     }
     for (final term in terms) {
-      if (indexed.contains(term)) continue;
+      if (!ftsPreFilterOnly && indexed.contains(term)) continue;
       predicates.add("$column LIKE ? ESCAPE '\\'");
       args.add('%$term%');
     }
@@ -157,11 +158,12 @@ class LibrarySearchStore {
           // Views do not expose their underlying table's implicit rowid.
           rowId: local ? '$alias.id' : '$alias.rowid',
           ftsContentTable: local ? 'library' : null,
-          ftsTable: kind != LibrarySearchKind.songs
-              ? null
-              : local
+          // search_text includes album and artist tokens, so FTS5 narrows
+          // candidates before verifying the target column on albums/artists.
+          ftsTable: local
               ? (localFts ? 'library_search_fts' : null)
               : (historyFts ? 'history_db.history_search_fts' : null),
+          ftsPreFilterOnly: kind != LibrarySearchKind.songs,
         ),
       );
       parts.add('''
