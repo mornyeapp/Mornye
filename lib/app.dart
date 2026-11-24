@@ -308,6 +308,8 @@ class MornyeApp extends ConsumerWidget {
     return DynamicColorWrapper(
       builder: (lightTheme, darkTheme, themeMode) {
         final isMornye = lightTheme.extension<MornyeTheme>() != null;
+        final reduceMotion =
+            MediaQuery.maybeDisableAnimationsOf(context) ?? false;
         final themeMotion = isMornye
             ? MornyeMotion.effects
             : AppMotionSpec(
@@ -324,7 +326,9 @@ class MornyeApp extends ConsumerWidget {
             disableOverscrollEffects: disableOverscrollEffects,
             materialStyle: !isMornye,
           ),
-          themeAnimationDuration: themeMotion.duration,
+          themeAnimationDuration: reduceMotion
+              ? Duration.zero
+              : themeMotion.duration,
           themeAnimationCurve: themeMotion.curve,
           builder: (context, child) => buildAppContent(
             context,
