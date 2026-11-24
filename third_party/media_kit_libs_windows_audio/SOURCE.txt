@@ -1,10 +1,10 @@
 Plugin: media_kit_libs_windows_audio 1.0.9 (MIT)
 https://github.com/media-kit/media-kit/tree/main/libs/windows/media_kit_libs_windows_audio
 
-x64 and ARM64 libmpv: LGPL bundles, 2026-10-22-488fec0789
-https://github.com/zhongfly/mpv-winbuild/releases/tag/2026-10-22-488fec0789
+x64 and ARM64 libmpv: LGPL bundles, 2026-11-24-35efcf53d5
+https://github.com/zhongfly/mpv-winbuild/releases/tag/2026-11-24-35efcf53d5
 Build recipes: https://github.com/zhongfly/mpv-winbuild
-mpv source: https://github.com/mpv-player/mpv/tree/488fec0789
+mpv source: https://github.com/mpv-player/mpv/tree/35efcf53d5
 The bundles also provide video decoders; Mornye uses their audio API.
 The x64 build targets the baseline architecture, without the x86-64-v3 requirement.
 Both include wasapi-exclusive-buffer. Mornye uses the driver's default period;
