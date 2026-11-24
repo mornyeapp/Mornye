@@ -4240,6 +4240,18 @@
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
   },
+  "playbackNormalizationPreampHintBoost": "Lower values play quieter.",
+  "@playbackNormalizationPreampHintBoost": {
+    "description": "Hint under the normalization pre-amp slider while quiet songs are also turned up"
+  },
+  "playbackNormalizationBoost": "Turn quiet songs up",
+  "@playbackNormalizationBoost": {
+    "description": "Switch title: volume normalization also raises songs that are quieter than the target, instead of only lowering loud ones"
+  },
+  "playbackNormalizationBoostSubtitle": "Songs mastered quieter than the target are raised too. Their loudest moments may sound squeezed or clip.",
+  "@playbackNormalizationBoostSubtitle": {
+    "description": "Subtitle of the switch that lets volume normalization raise quiet songs, warning about clipping"
+  },
   "confirmLoudVolume": "Confirm loud volume",
   "@confirmLoudVolume": {
     "description": "Switch title: the app's volume bar asks before going above a chosen level"

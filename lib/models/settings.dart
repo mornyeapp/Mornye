@@ -193,6 +193,8 @@ class AppSettings {
   final double playbackNormalizationPreamp;
   @JsonKey(fromJson: playbackNormalizationModeFromJson)
   final String playbackNormalizationMode; // 'track' or 'album'
+  // Also turn up songs whose tags ask for more gain, not only turn down.
+  final bool playbackNormalizationBoost;
   // Ask before the app's volume bar goes above [loudVolumeLevel] percent.
   final bool confirmLoudVolume;
   @JsonKey(fromJson: loudVolumeLevelFromJson)
@@ -590,6 +592,7 @@ class AppSettings {
     this.playbackNormalization = false,
     this.playbackNormalizationPreamp = 0,
     this.playbackNormalizationMode = 'track',
+    this.playbackNormalizationBoost = false,
     this.confirmLoudVolume = true,
     this.loudVolumeLevel = 80,
     this.pauseOnMute = true,
@@ -802,6 +805,7 @@ class AppSettings {
     bool? playbackNormalization,
     double? playbackNormalizationPreamp,
     String? playbackNormalizationMode,
+    bool? playbackNormalizationBoost,
     bool? confirmLoudVolume,
     int? loudVolumeLevel,
     bool? pauseOnMute,
@@ -984,6 +988,8 @@ class AppSettings {
           playbackNormalizationPreamp ?? this.playbackNormalizationPreamp,
       playbackNormalizationMode:
           playbackNormalizationMode ?? this.playbackNormalizationMode,
+      playbackNormalizationBoost:
+          playbackNormalizationBoost ?? this.playbackNormalizationBoost,
       confirmLoudVolume: confirmLoudVolume ?? this.confirmLoudVolume,
       loudVolumeLevel: loudVolumeLevel ?? this.loudVolumeLevel,
       pauseOnMute: pauseOnMute ?? this.pauseOnMute,

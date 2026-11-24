@@ -508,6 +508,12 @@ class SettingsSearchCatalog {
              ],
            ),
            SettingsSearchEntry(
+             icon: Icons.trending_up,
+             title: l10n.playbackNormalizationBoost,
+             subtitle: l10n.playbackNormalizationBoostSubtitle,
+             keywords: const ['replaygain', 'boost', 'quiet', 'louder', 'clip'],
+           ),
+           SettingsSearchEntry(
              icon: Icons.volume_up_outlined,
              title: l10n.confirmLoudVolume,
              subtitle: l10n.confirmLoudVolumeDescription,

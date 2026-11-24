@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
@@ -342,35 +343,46 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
       }
       return;
     }
-    if (!settings.enabled && !_equalizerSent) {
+    final own = settings.copyWith(
+      enabled:
+          settings.enabled &&
+          !_direct &&
+          // Android's own equalizer is a bank of fixed bands:
+          // the filters need the media3 deck's DSP.
+          !(settings.parametric &&
+              defaultTargetPlatform == TargetPlatform.android),
+    );
+    final asked = _boostWanted;
+    _boostAsked = asked;
+    final boosted = boostEqualizer(own, asked);
+    if (!boosted.settings.enabled && !_equalizerSent) {
       reportEqualizerError(_ordinary.playerId, null);
+      await _setBoost(0);
       return;
     }
     try {
       // Public API waits for native player creation without changing playback.
       if (!_equalizerSent) await _ordinary.getDuration();
       if (_disposed || _equalizerDisposed) return;
+      // A higher raise lowers the player first and a lower one waits for the
+      // equalizer, so the song never plays louder than asked.
+      if (boosted.boostDb > _boostDb) await _setBoost(boosted.boostDb);
       await _effects
           .invokeMethod<void>('setEqualizer', {
             'playerId': _ordinary.playerId,
-            'configuration': settings
-                .copyWith(
-                  enabled:
-                      settings.enabled &&
-                      !_direct &&
-                      // Android's own equalizer is a bank of fixed bands:
-                      // the filters need the media3 deck's DSP.
-                      !(settings.parametric &&
-                          defaultTargetPlatform == TargetPlatform.android),
-                )
-                .toNative(),
+            'configuration': boosted.settings.toNative(),
           })
           .timeout(const Duration(seconds: 3));
       if (_disposed || _equalizerDisposed) return;
       _equalizerSent = true;
       reportEqualizerError(_ordinary.playerId, null);
+      await _setBoost(boosted.boostDb);
     } catch (error) {
-      if (!_disposed && !_equalizerDisposed && settings.enabled) {
+      if (_disposed || _equalizerDisposed) return;
+      // Without the effect (before Android 9) the song stays at full volume.
+      if (boosted.boostDb > 0 && !own.enabled) _boostRefused = true;
+      await _setBoost(0);
+      if (settings.enabled) {
         reportEqualizerError(
           _ordinary.playerId,
           'Equalizer is unavailable on this output: $error',
@@ -378,6 +390,28 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
       }
     }
   }
+
+  /// The raise above full volume [setVolume] asks for, in dB, that the
+  /// equalizer stage may carry.
+  double get _boostWanted => _equalizerAvailable && !_direct && !_boostRefused
+      ? normalizationBoostDb(_gain)
+      : 0;
+
+  /// The raise last sent, and the one the equalizer stage carries.
+  double _boostAsked = 0;
+  double _boostDb = 0;
+  bool _boostRefused = false;
+
+  Future<void> _setBoost(double db) async {
+    if (db == _boostDb) return;
+    _boostDb = db;
+    if (!_direct && !_disposed) await _ordinary.setVolume(_playerVolume);
+  }
+
+  /// The player's own volume: what [setVolume] asks for below the raise.
+  double get _playerVolume =>
+      (_gain / math.pow(10, _boostDb / 20)).clamp(0.0, 1.0) *
+      playbackOutputVolume.value;
 
   final bool _spatialAudioAvailable;
 
@@ -580,14 +614,17 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   Future<void> setVolume(double volume) async {
     if (_direct) return;
     _gain = volume;
-    await _ordinary.setVolume(volume * playbackOutputVolume.value);
+    // Until the equalizer takes a new raise the song stays at or below what
+    // is asked.
+    if (_boostWanted != _boostAsked) _equalizerChanged();
+    await _ordinary.setVolume(_playerVolume);
   }
 
   void _outputVolumeChanged() {
     if (_direct || _disposed) return;
     unawaited(
       _ordinary
-          .setVolume(_gain * playbackOutputVolume.value)
+          .setVolume(_playerVolume)
           .catchError((Object error) => _log.w('Output volume: $error')),
     );
   }
@@ -768,6 +805,8 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
       }
     }
     if (abandoned.isCompleted) return;
+    // A refused raise is tried again once per song.
+    _boostRefused = false;
     await _syncEqualizer();
     // Sent again for each source with a shift: the fork answers whether
     // this one takes it (Darwin cannot shift protected audio or HLS).

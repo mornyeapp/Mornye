@@ -89,6 +89,7 @@ IconData _cupertinoFor(IconData icon) {
     Icons.repeat_one || Icons.repeat_one_rounded => CupertinoIcons.repeat_1,
     Icons.volume_up || Icons.volume_up_rounded => CupertinoIcons.volume_up,
     Icons.volume_off || Icons.volume_off_rounded => CupertinoIcons.volume_off,
+    Icons.trending_up => CupertinoIcons.arrow_up_right,
     Icons.priority_high_rounded => CupertinoIcons.exclamationmark,
     Icons.campaign_rounded => CupertinoIcons.speaker_2,
     Icons.mic_none || Icons.mic_none_outlined => CupertinoIcons.mic,

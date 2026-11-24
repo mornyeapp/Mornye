@@ -264,7 +264,9 @@ class MusicPlayerHandler extends BaseAudioHandler
         previous.playbackNormalizationPreamp !=
             settings.playbackNormalizationPreamp ||
         previous.playbackNormalizationMode !=
-            settings.playbackNormalizationMode) {
+            settings.playbackNormalizationMode ||
+        previous.playbackNormalizationBoost !=
+            settings.playbackNormalizationBoost) {
       reapplyNormalization();
     }
     // A prepared or queued next song must not keep the engine it was
@@ -1419,6 +1421,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       displayName: displayName,
       preampDb: _settings.playbackNormalizationPreamp,
       preferAlbumGain: _settings.playbackNormalizationMode == 'album',
+      boost: _settings.playbackNormalizationBoost,
     );
   }
 

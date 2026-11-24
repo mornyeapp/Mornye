@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -240,4 +241,139 @@ void main() {
       expect(calls.length, count);
     },
   );
+
+  group('a volume above full', () {
+    List<double> volumes() => [
+      for (final call in calls)
+        if (call.method == 'setVolume')
+          ((call.arguments as Map)['volume'] as num).toDouble(),
+    ];
+    Map<Object?, Object?> lastEffect() =>
+        calls.lastWhere((c) => c.method == 'setEqualizer').arguments
+            as Map<Object?, Object?>;
+    Map<Object?, Object?> configuration(Map<Object?, Object?> call) =>
+        call['configuration']! as Map<Object?, Object?>;
+    final gain = math.pow(10, 4.4 / 20).toDouble();
+    final raise = math.pow(10, 4.5 / 20).toDouble();
+
+    test('rises through a flat equalizer with its limiter', () async {
+      final deck = AudioplayersPlaybackDeck(
+        playerId: 'boost',
+        equalizerAvailable: true,
+      );
+      await deck.setFileSource('/song.flac');
+      await deck.setVolume(gain);
+      // The player waits at full volume until the equalizer takes the raise,
+      // which rounds up to the next half decibel.
+      expect(volumes().last, 1);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      final raised = configuration(lastEffect());
+      expect(raised['enabled'], isTrue);
+      expect(raised['limiter'], isTrue);
+      expect(raised['inputGain'], closeTo(4.5, 1e-9));
+      expect(raised['gains'], everyElement(0.0));
+      expect(volumes().last, closeTo(gain / raise, 1e-9));
+      // The player is lowered before the equalizer raises.
+      final methods = [for (final call in calls) call.method];
+      expect(
+        methods.lastIndexOf('setVolume'),
+        lessThan(methods.lastIndexOf('setEqualizer')),
+      );
+
+      // Back at full volume, the player stays below the raise until the
+      // equalizer lets go of it.
+      await deck.setVolume(0.5);
+      expect(volumes().last, closeTo(0.5 / raise, 1e-9));
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(configuration(lastEffect())['enabled'], isFalse);
+      expect(volumes().last, closeTo(0.5, 1e-9));
+      await deck.dispose();
+    });
+
+    test('a fade within one step leaves the equalizer alone', () async {
+      final deck = AudioplayersPlaybackDeck(
+        playerId: 'boost-fade',
+        equalizerAvailable: true,
+      );
+      await deck.setFileSource('/song.flac');
+      await deck.setVolume(gain);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      final effects = calls.where((c) => c.method == 'setEqualizer').length;
+      // Down to 4.13 dB, still within the 4.5 dB step.
+      for (final level in [0.99, 0.98, 0.97]) {
+        await deck.setVolume(gain * level);
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(
+        calls.where((c) => c.method == 'setEqualizer'),
+        hasLength(effects),
+      );
+      expect(volumes().last, closeTo(gain * 0.97 / raise, 1e-9));
+      await deck.dispose();
+    });
+
+    test(
+      'adds to the listener\'s equalizer as far as its input goes',
+      () async {
+        playbackEqualizer.value = const EqualizerSettings(
+          enabled: true,
+          preamp: 10,
+        );
+        final deck = AudioplayersPlaybackDeck(
+          playerId: 'boost-eq',
+          equalizerAvailable: true,
+        );
+        await deck.setFileSource('/song.flac');
+        await deck.setVolume(gain);
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+        expect(configuration(lastEffect())['inputGain'], closeTo(12, 1e-9));
+        // Two of the 4.5 dB fit; the player stays at full volume for the rest.
+        expect(volumes().last, 1);
+        await deck.dispose();
+      },
+    );
+
+    test('stays at full volume where the effect is refused', () async {
+      final deck = AudioplayersPlaybackDeck(
+        playerId: 'boost-refused',
+        equalizerAvailable: true,
+      );
+      reject = true;
+      await deck.setFileSource('/song.flac');
+      await deck.setVolume(gain);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      // A raise the listener's equalizer never asked for reports nothing.
+      expect(playbackEqualizerError.value, isNull);
+      expect(volumes().last, 1);
+      final effects = calls.where((c) => c.method == 'setEqualizer').length;
+      await deck.setVolume(gain * 1.5);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(
+        calls.where((c) => c.method == 'setEqualizer'),
+        hasLength(effects),
+      );
+      await deck.dispose();
+    });
+
+    test('a deck without the equalizer stage plays at most full', () async {
+      final deck = AudioplayersPlaybackDeck(
+        playerId: 'boost-none',
+        equalizerAvailable: false,
+      );
+      await deck.setFileSource('/song.flac');
+      await deck.setVolume(gain);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(calls.where((c) => c.method == 'setEqualizer'), isEmpty);
+      expect(volumes().last, 1);
+      await deck.dispose();
+    });
+  });
+
+  test('raise steps round up to half a decibel', () {
+    expect(normalizationBoostDb(0.5), 0);
+    expect(normalizationBoostDb(1), 0);
+    expect(normalizationBoostDb(math.pow(10, 0.1 / 20).toDouble()), 0.5);
+    expect(normalizationBoostDb(math.pow(10, 3 / 20).toDouble()), 3);
+    expect(normalizationBoostDb(math.pow(10, 3.01 / 20).toDouble()), 3.5);
+  });
 }

@@ -798,11 +798,11 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     if (playing && _state == PlaybackDeckState.playing) await _engine.play();
   }
 
-  // mpv's volume is cubic: 100 * cbrt(linear gain). The equalizer gain may
-  // add up to +12 dB, within the volume-max the engine sets.
+  // mpv's volume is cubic: 100 * cbrt(linear gain). The equalizer gain and a
+  // normalization raise may add up to +12 dB, within the engine's volume-max.
   double get _mpvVolume {
     final linear =
-        _gain.clamp(0.0, 1.0) *
+        _gain.clamp(0.0, 4.0) *
         playbackOutputVolume.value *
         math.pow(10, _chainGainDb / 20);
     return 100 * math.pow(linear.clamp(0.0, 4.0), 1 / 3).toDouble();

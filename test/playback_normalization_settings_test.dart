@@ -66,4 +66,19 @@ void main() {
     await pump(tester, enabled: false);
     expect(tester.widget<AppSlider>(find.byType(AppSlider)).onChanged, isNull);
   });
+
+  testWidgets('the never clips promise goes once quiet songs rise', (
+    tester,
+  ) async {
+    final container = await pump(tester);
+    expect(find.textContaining('never clips'), findsOneWidget);
+
+    container
+        .read(settingsProvider.notifier)
+        .setPlaybackNormalizationBoost(true);
+    await tester.pump();
+    expect(container.read(settingsProvider).playbackNormalizationBoost, isTrue);
+    expect(find.textContaining('never clips'), findsNothing);
+    expect(find.text('Lower values play quieter.'), findsOneWidget);
+  });
 }

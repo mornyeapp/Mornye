@@ -305,10 +305,21 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                       .read(settingsProvider.notifier)
                       .setPlaybackNormalization(value),
                 ),
-                if (settings.playbackNormalization)
+                if (settings.playbackNormalization) ...[
                   PlaybackNormalizationSettings(
                     enabled: !settings.usbBitPerfect,
                   ),
+                  SettingsSwitchItem(
+                    icon: Icons.trending_up,
+                    title: context.l10n.playbackNormalizationBoost,
+                    subtitle: context.l10n.playbackNormalizationBoostSubtitle,
+                    value: settings.playbackNormalizationBoost,
+                    enabled: !settings.usbBitPerfect,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setPlaybackNormalizationBoost(value),
+                  ),
+                ],
                 SettingsSwitchItem(
                   icon: Icons.volume_up_outlined,
                   title: context.l10n.confirmLoudVolume,

@@ -3734,6 +3734,18 @@
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
   },
+  "playbackNormalizationPreampHintBoost": "Nilai lebih rendah terdengar lebih pelan.",
+  "@playbackNormalizationPreampHintBoost": {
+    "description": "Hint under the normalization pre-amp slider while quiet songs are also turned up"
+  },
+  "playbackNormalizationBoost": "Naikkan lagu yang pelan",
+  "@playbackNormalizationBoost": {
+    "description": "Switch title: volume normalization also raises songs that are quieter than the target, instead of only lowering loud ones"
+  },
+  "playbackNormalizationBoostSubtitle": "Lagu yang di-master lebih pelan dari target ikut dinaikkan. Bagian terkerasnya bisa terdengar tertekan atau clipping.",
+  "@playbackNormalizationBoostSubtitle": {
+    "description": "Subtitle of the switch that lets volume normalization raise quiet songs, warning about clipping"
+  },
   "confirmLoudVolume": "Konfirmasi volume keras",
   "@confirmLoudVolume": {
     "description": "Switch title: the app's volume bar asks before going above a chosen level"

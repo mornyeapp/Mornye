@@ -43,6 +43,7 @@ Versions 4.9.7 to 5.4.0 have their notes on the
 - **CSV Import with Track Links**: Supports `URL`, `Link`, `Track URL`, and `Track Link` columns (including album and playlist links) via matching extensions, with ISRC and stricter title/artist fallbacks.
 - **Library, Queue & Desktop Actions**: Apply one cover image to all selected songs in *Set common values*; added *Re-download* and *Copy title* on track details; added copy/open-album actions for downloads and desktop library items, delete on the desktop album selection bar, desktop scroll arrows for Home shelves and Equalizer band faders, and extension names on verification prompts.
 - **Animation Speed Setting**: Added *Settings > Appearance > Animation speed* (0.5x to 2x) governing page transitions, player motion, sheets, snackbars, banners, and UI animations.
+- **Turn Quiet Songs Up**: *Volume normalization* used to only turn loud songs down, so songs mastered quietly stayed quiet and the app sounded softer than other players. The new *Turn quiet songs up* switch under it raises those songs too, by up to 12 dB. On phones and Macs a limiter holds back their loudest moments; on Windows and Linux they may clip.
 
 ### Improved
 

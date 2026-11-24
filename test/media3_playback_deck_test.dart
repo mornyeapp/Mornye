@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -543,6 +544,68 @@ void main() {
     playbackEqualizer.value = const EqualizerSettings(preamp: 2);
     await Future<void>.delayed(const Duration(milliseconds: 80));
     expect(native.methods, isNot(contains('setEqualizer')));
+  });
+
+  group('a volume above full', () {
+    final gain = math.pow(10, 4.4 / 20).toDouble();
+    final raise = math.pow(10, 4.5 / 20).toDouble();
+    double volume() => (native.last('setVolume')['volume']! as num).toDouble();
+    Map<Object?, Object?> configuration() =>
+        native.last('setEqualizer')['configuration']! as Map<Object?, Object?>;
+
+    test('rises through the platform stage, apart from the filters', () async {
+      await deck.setFileSource('/song.flac');
+      await deck.setVolume(gain);
+      expect(volume(), 1);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(configuration()['enabled'], isTrue);
+      expect(configuration()['limiter'], isTrue);
+      expect(configuration()['inputGain'], closeTo(4.5, 1e-9));
+      expect(configuration()['boostGain'], closeTo(4.5, 1e-9));
+      expect(volume(), closeTo(gain / raise, 1e-9));
+
+      await deck.setVolume(0.5);
+      expect(volume(), closeTo(0.5 / raise, 1e-9));
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(configuration()['enabled'], isFalse);
+      expect(configuration(), isNot(contains('boostGain')));
+      expect(volume(), closeTo(0.5, 1e-9));
+    });
+
+    test('a queued song plays under the raise and takes its own', () async {
+      await deck.setFileSource('/one.flac');
+      await deck.setVolume(gain);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      var started = false;
+      expect(
+        await deck.queueNextSource(
+          '/two.flac',
+          volume: 2,
+          onStarted: () => started = true,
+        ),
+        isTrue,
+      );
+      // Queued at the raise playing now: 2 is 6.02 dB, 4.5 of them raised.
+      expect(
+        (native.last('queueNext')['volume']! as num).toDouble(),
+        closeTo(1, 1e-9),
+      );
+      await native.emit('one', {'event': 'transition'});
+      expect(started, isTrue);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(configuration()['boostGain'], closeTo(6.5, 1e-9));
+      expect(volume(), closeTo(2 / math.pow(10, 6.5 / 20), 1e-9));
+    });
+
+    test('a refused raise leaves the song at full volume', () async {
+      native.replies['setEqualizer'] = (_) async =>
+          throw PlatformException(code: 'equalizer', message: 'Android 9');
+      await deck.setFileSource('/song.flac');
+      await deck.setVolume(gain);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(playbackEqualizerError.value, isNull);
+      expect(volume(), 1);
+    });
   });
 
   test('DSD needs the USB output', () async {

@@ -158,6 +158,33 @@ void main() {
     expect(await albumOnly.volumeFor('song'), closeTo(0.501187, 0.000001));
   });
 
+  test('turning quiet songs up raises them, up to +12 dB', () async {
+    final cache = PlaybackNormalizationCache(
+      readMetadata: (path, {displayName}) async => {
+        'replaygain_track_gain': path == 'quiet' ? '+4.00 dB' : '+9.00 dB',
+      },
+    );
+    expect(await cache.volumeFor('quiet'), 1.0);
+    expect(
+      await cache.volumeFor('quiet', boost: true),
+      closeTo(1.584893, 0.000001),
+    );
+    // The -5 to -4 pre-amp step no longer reaches a wall at 0 dB.
+    expect(
+      await cache.volumeFor('quiet', preampDb: -5, boost: true),
+      closeTo(0.891251, 0.000001),
+    );
+    expect(await cache.volumeFor('quiet', preampDb: -4, boost: true), 1.0);
+    expect(
+      await cache.volumeFor('quiet', preampDb: -3, boost: true),
+      closeTo(1.122018, 0.000001),
+    );
+    expect(
+      await cache.volumeFor('very quiet', preampDb: 6, boost: true),
+      closeTo(PlaybackNormalizationCache.maxBoostVolume, 1e-9),
+    );
+  });
+
   test('untagged files ignore the pre-amp', () async {
     final cache = PlaybackNormalizationCache(
       readMetadata: (_, {displayName}) async => {},

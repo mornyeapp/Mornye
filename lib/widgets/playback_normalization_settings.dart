@@ -35,6 +35,9 @@ class _PlaybackNormalizationSettingsState
     final savedPreamp = ref.watch(
       settingsProvider.select((s) => s.playbackNormalizationPreamp),
     );
+    final boost = ref.watch(
+      settingsProvider.select((s) => s.playbackNormalizationBoost),
+    );
     final notifier = ref.read(settingsProvider.notifier);
     final l10n = context.l10n;
     final preamp = (_preamp ?? savedPreamp).round();
@@ -93,7 +96,9 @@ class _PlaybackNormalizationSettingsState
                 : null,
           ),
           Text(
-            l10n.playbackNormalizationPreampHint,
+            boost
+                ? l10n.playbackNormalizationPreampHintBoost
+                : l10n.playbackNormalizationPreampHint,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),

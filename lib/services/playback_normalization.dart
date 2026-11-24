@@ -18,14 +18,15 @@ class PlaybackNormalizationCache {
   }
 
   /// The player volume for [path]. [preampDb] shifts the -18 LUFS reference
-  /// the tags were written against, so -7 dB targets -25 LUFS. Volume never
-  /// exceeds 1.0: normalization only attenuates and cannot clip.
+  /// the tags were written against, so -7 dB targets -25 LUFS. Volume stays
+  /// at or below 1.0 unless [boost] lets quiet songs rise, up to +12 dB.
   Future<double> volumeFor(
     String path, {
     String? cacheKey,
     String? displayName,
     double preampDb = 0,
     bool preferAlbumGain = false,
+    bool boost = false,
   }) async {
     final gains = await _gainsFor(
       path,
@@ -38,8 +39,14 @@ class PlaybackNormalizationCache {
         ? gains.album ?? gains.track
         : gains.track ?? gains.album;
     if (gain == null) return 1.0;
-    return pow(10.0, (gain + preampDb) / 20.0).toDouble().clamp(0.0, 1.0);
+    return pow(
+      10.0,
+      (gain + preampDb) / 20.0,
+    ).toDouble().clamp(0.0, boost ? maxBoostVolume : 1.0);
   }
+
+  /// The highest volume [boost] allows: +12 dB, the equalizer's input range.
+  static final maxBoostVolume = pow(10.0, 12 / 20.0).toDouble();
 
   Future<({double? track, double? album})?> _gainsFor(
     String path, {

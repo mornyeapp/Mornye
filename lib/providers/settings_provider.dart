@@ -694,6 +694,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
     ),
   );
 
+  void setPlaybackNormalizationBoost(bool enabled) =>
+      _commit(state.copyWith(playbackNormalizationBoost: enabled));
+
   void setConfirmLoudVolume(bool enabled) =>
       _commit(state.copyWith(confirmLoudVolume: enabled));
 

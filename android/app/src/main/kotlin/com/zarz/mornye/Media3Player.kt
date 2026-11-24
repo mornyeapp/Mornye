@@ -514,10 +514,14 @@ internal class Media3Player(
                 parametric.disable()
                 return
             }
-            parametric.configure(configuration)
+            // A normalization raise stays out of the filters, whose integer
+            // PCM would clip it, and goes to the platform's limiter.
+            val boost = (configuration["boostGain"] as? Number)?.toDouble() ?: 0.0
+            val inputGain = (configuration["inputGain"] as? Number)?.toDouble() ?: 0.0
+            parametric.configure(configuration + ("inputGain" to inputGain - boost))
             // Its filters take the input gain with them, ahead of the
             // platform effect: a boost must not clip integer PCM first.
-            val platform = if (parametric.active) configuration + ("inputGain" to 0.0) else configuration
+            val platform = if (parametric.active) configuration + ("inputGain" to boost) else configuration
             if (configuration["enabled"] == true && equalizer == null) {
                 equalizer = PlaybackEqualizer(sessionId)
             }

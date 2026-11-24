@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -168,7 +169,7 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
           _onEvent,
           onError: (Object error) => _log.w('Player events: $error'),
         );
-    if (playbackEqualizer.value.enabled) {
+    if (playbackEqualizer.value.enabled || _boostWanted > 0) {
       _equalizerWrite = _equalizerWrite.then((_) => _syncEqualizer());
     }
     // Before the first source, so its decoder starts in the mode silence
@@ -317,6 +318,7 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
         _gain = next.volume;
         _duration = null;
         if (playbackOutputVolume.value != next.output) _outputVolumeChanged();
+        if (_boostWanted != _boostAsked) _equalizerChanged();
         next.onStarted();
       case 'trace':
         // The decoder and output the phone used; no path or title.
@@ -386,11 +388,37 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   Future<void> configureOutput() =>
       _disposed ? Future.value() : _ensureCreated();
 
-  double get _volume => (_gain * playbackOutputVolume.value).clamp(0.0, 1.0);
+  double get _volume => _playerVolume(_gain);
+
+  /// The player's own volume for [gain]: what is left below the raise the
+  /// equalizer stage carries.
+  double _playerVolume(double gain) =>
+      ((gain / math.pow(10, _boostDb / 20)).clamp(0.0, 1.0) *
+              playbackOutputVolume.value)
+          .clamp(0.0, 1.0);
+
+  /// The raise above full volume [setVolume] asks for, in dB.
+  double get _boostWanted => _boostRefused ? 0 : normalizationBoostDb(_gain);
+
+  /// The raise last sent, and the one the equalizer stage carries.
+  double _boostAsked = 0;
+  double _boostDb = 0;
+  bool _boostRefused = false;
+
+  Future<void> _setBoost(double db) async {
+    if (db == _boostDb) return;
+    _boostDb = db;
+    if (!_disposed && _created != null) {
+      await _invoke<void>('setVolume', {'volume': _volume});
+    }
+  }
 
   @override
   Future<void> setVolume(double volume) async {
     _gain = volume;
+    // Until the equalizer takes a new raise the song stays at or below what
+    // is asked.
+    if (_boostWanted != _boostAsked) _equalizerChanged();
     await _invoke<void>('setVolume', {'volume': _volume});
   }
 
@@ -444,6 +472,9 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     _failure = null;
     _loaded = false;
     _duration = null;
+    // A refused raise is tried again once per song.
+    _boostRefused = false;
+    if (_boostWanted != _boostAsked) _equalizerChanged();
     final abandoned = _preparation = Completer<void>();
     Map<Object?, Object?>? reply;
     try {
@@ -561,7 +592,8 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
               'http',
               'https',
             }.contains(Uri.tryParse(source)?.scheme),
-            'volume': (volume * output).clamp(0.0, 1.0),
+            // At the raise playing now; the next one follows the transition.
+            'volume': _playerVolume(volume),
           }) ??
           false;
     } on PlatformException catch (error) {
@@ -618,21 +650,38 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   Future<void> _syncEqualizer() async {
     if (_disposed) return;
     final settings = playbackEqualizer.value;
-    if (!settings.enabled && !_equalizerSent) {
+    final asked = _boostWanted;
+    final boosted = boostEqualizer(settings, asked);
+    if (!boosted.settings.enabled && !_equalizerSent) {
+      _boostAsked = asked;
       reportEqualizerError(playerId, null);
+      await _setBoost(0);
       return;
     }
     // Creating the player applies the equalizer.
     if (_created == null) return;
+    _boostAsked = asked;
     try {
+      // A higher raise lowers the player first and a lower one waits for the
+      // equalizer, so the song never plays louder than asked.
+      if (boosted.boostDb > _boostDb) await _setBoost(boosted.boostDb);
       await _invoke<void>('setEqualizer', {
-        'configuration': settings.toNative(),
+        'configuration': {
+          ...boosted.settings.toNative(),
+          // Kept out of the filters' integer PCM, ahead of the limiter.
+          if (boosted.boostDb > 0) 'boostGain': boosted.boostDb,
+        },
       }).timeout(const Duration(seconds: 3));
       if (_disposed) return;
       _equalizerSent = true;
       reportEqualizerError(playerId, null);
+      await _setBoost(boosted.boostDb);
     } catch (error) {
-      if (!_disposed && settings.enabled) {
+      if (_disposed) return;
+      // Without the effect (before Android 9) the song stays at full volume.
+      if (boosted.boostDb > 0 && !settings.enabled) _boostRefused = true;
+      await _setBoost(0);
+      if (settings.enabled) {
         reportEqualizerError(
           playerId,
           'Equalizer is unavailable on this output: $error',

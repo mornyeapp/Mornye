@@ -26,7 +26,8 @@ import 'package:mornye/models/theme_settings.dart';
 /// Not synced, on purpose: the curve playing now and the equalizer switch,
 /// the switches that turn normalization, gapless and AutoMix on (a device
 /// can have its own reasons, such as bit-perfect USB, exclusive output or a
-/// slow phone), volume, speed and pitch, the loud volume warning, the
+/// slow phone), the one that lets normalization raise quiet songs (only some
+/// outputs have a limiter), volume, speed and pitch, the loud volume warning, the
 /// app-wide lyric timing offset (it makes up for this device's own output
 /// delay, such as Bluetooth), output devices, direct USB, spatial audio and
 /// skip silence.

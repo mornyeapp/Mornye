@@ -37,6 +37,8 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   playbackNormalizationMode: json['playbackNormalizationMode'] == null
       ? 'track'
       : playbackNormalizationModeFromJson(json['playbackNormalizationMode']),
+  playbackNormalizationBoost:
+      json['playbackNormalizationBoost'] as bool? ?? false,
   confirmLoudVolume: json['confirmLoudVolume'] as bool? ?? true,
   loudVolumeLevel: json['loudVolumeLevel'] == null
       ? 80
@@ -298,6 +300,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'playbackNormalization': instance.playbackNormalization,
   'playbackNormalizationPreamp': instance.playbackNormalizationPreamp,
   'playbackNormalizationMode': instance.playbackNormalizationMode,
+  'playbackNormalizationBoost': instance.playbackNormalizationBoost,
   'confirmLoudVolume': instance.confirmLoudVolume,
   'loudVolumeLevel': instance.loudVolumeLevel,
   'pauseOnMute': instance.pauseOnMute,
