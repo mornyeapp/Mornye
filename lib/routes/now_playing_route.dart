@@ -11,19 +11,29 @@ import 'package:mornye/theme/mornye_theme.dart';
 /// the cover visually expands when the player opens.
 const kNowPlayingArtworkHeroTag = 'now-playing-artwork';
 
-/// A cover flight in step with the player's surface. A Hero flies on its own
-/// ease over the route's time: this undoes that ease and applies [curve],
-/// the surface's own (none on the way back, which a spring drives).
+/// The Material cover flight, in step with the player's surface: its Heroes
+/// fly on the route's own time and the route says how far the surface is.
 class PlayerCoverRectTween extends RectTween {
-  PlayerCoverRectTween({super.begin, super.end, this.curve});
+  PlayerCoverRectTween._(
+    this._route, {
+    required bool landing,
+    super.begin,
+    super.end,
+  }) : _landing = landing;
 
-  final Curve? curve;
+  final NowPlayingRoute _route;
+
+  /// Onto the mini player, rather than out of it.
+  final bool _landing;
+
+  // A Tween skips lerp at either end; the route decides there too.
+  @override
+  Rect? transform(double t) => lerp(t);
 
   @override
-  Rect? lerp(double t) {
-    final time = curveTimeFor(Curves.fastOutSlowIn, t);
-    return Rect.lerp(begin, end, curve?.transform(time) ?? time);
-  }
+  Rect? lerp(double t) => _landing
+      ? _route._landingRect(begin, end, t)
+      : _route._openingRect(begin, end, t);
 }
 
 /// Slide-up route for the full player. Supports live drag-to-dismiss: the
@@ -65,11 +75,37 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
   /// the player's own Hero. Null keeps the default flight.
   static CreateRectTween? coverFlightOf(BuildContext context) {
     final route = routeOf(context);
-    final curve = route is NowPlayingRoute ? route.morph?.curve : null;
-    if (curve == null) return null;
+    if (route is! NowPlayingRoute || route.morph == null) return null;
     return (begin, end) =>
-        PlayerCoverRectTween(begin: begin, end: end, curve: curve);
+        PlayerCoverRectTween._(route, landing: false, begin: begin, end: end);
   }
+
+  /// The mini player's half of the Material cover flight: onto it from the
+  /// player that is shrinking into it, else on the usual Material arc.
+  static Tween<Rect?> landingFlight(Rect? begin, Rect? end) {
+    final route = _shrinking;
+    return route == null
+        ? MaterialRectArcTween(begin: begin, end: end)
+        : PlayerCoverRectTween._(route, landing: true, begin: begin, end: end);
+  }
+
+  /// Both ways the Material cover flight shows the player's own cover, at
+  /// its resolution and crop, never the mini player's small one enlarged.
+  static Widget coverShuttle(
+    BuildContext flightContext,
+    Animation<double> animation,
+    HeroFlightDirection direction,
+    BuildContext fromHeroContext,
+    BuildContext toHeroContext,
+  ) {
+    final player = direction == HeroFlightDirection.push
+        ? toHeroContext
+        : fromHeroContext;
+    return (player.widget as Hero).child;
+  }
+
+  /// The player whose surface is shrinking into the mini player.
+  static NowPlayingRoute? _shrinking;
 
   /// The player route whose page holds [context]. Unlike [ModalRoute.of], it
   /// does not rebuild [context] when a sheet or menu opens over the player.
@@ -177,7 +213,10 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
       if (status.isCompleted) _openFrom = null;
       moving.value = status.isAnimating;
       // The frame that removes the closed player shows the mini player's.
-      if (status.isDismissed) coverLanding.value = false;
+      if (status.isDismissed) {
+        coverLanding.value = false;
+        _endShrink();
+      }
     });
     if (morph != null) {
       WidgetsBinding.instance.addObserver(
@@ -208,7 +247,12 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
     // A route removed while it moves never reports that it stopped.
     moving.value = false;
     coverLanding.value = false;
+    _endShrink();
     super.dispose();
+  }
+
+  void _endShrink() {
+    if (identical(_shrinking, this)) _shrinking = null;
   }
 
   @override
@@ -229,11 +273,19 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
       ? Duration.zero
       : MotionPace.duration(const Duration(milliseconds: 300));
 
-  /// Moves the Material shrink at the stiffness of the entrance, critically
-  /// damped so the surface never passes the mini player: about 430ms.
+  /// Moves Material's full-screen slide at the stiffness of the entrance,
+  /// critically damped: about 430ms.
   static final _exitSpring = SpringDescription.withDampingRatio(
     mass: 1,
     stiffness: M3EMotion.expressiveSpatialDefault.stiffness,
+    ratio: 1,
+  );
+
+  /// Moves the Material shrink at the pace of the entrance, critically damped
+  /// so the surface never passes the mini player: about 330ms.
+  static final _shrinkSpring = SpringDescription.withDampingRatio(
+    mass: 1,
+    stiffness: M3EMotion.expressiveSpatialFast.stiffness,
     ratio: 1,
   );
 
@@ -270,10 +322,10 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
   );
 
   /// Full-screen slides (Mornye, or Material opened without a mini player)
-  /// open and close on the style's critically damped full-screen spring. The
-  /// Material shrink and released drags run on [_exitSpring]. Each starts from
-  /// wherever the page is and from the finger's velocity, so a released drag
-  /// or back gesture carries on without a seam.
+  /// open and close on the style's critically damped full-screen spring, and
+  /// the Material shrink on [_shrinkSpring]. Each starts from wherever the
+  /// page is and from the finger's velocity, so a released drag or back
+  /// gesture carries on without a seam.
   @override
   Simulation? createSimulation({required bool forward}) {
     final velocity = _takeReleaseVelocity();
@@ -290,7 +342,11 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
         _dismissTarget != null &&
         (morph?.duration ?? Duration.zero) > Duration.zero;
     if (!shrinks && !_interactiveTransition && !_usesSpringSlide) return null;
-    return _spring(spring, 0, velocity);
+    return _spring(
+      shrinks ? MotionPace.spring(_shrinkSpring) : spring,
+      0,
+      velocity,
+    );
   }
 
   Rect _openRect(Size size, double value) => Rect.lerp(
@@ -455,7 +511,37 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
     _dismissTarget = target;
     _dismissArtwork = readArtwork?.call();
     coverLanding.value = _dismissArtwork != null;
+    _shrinking = this;
     return true;
+  }
+
+  /// The opening cover flight at [value]: as far as the surface is open, and
+  /// back with it when the player closes before the flight has ended.
+  Rect? _openingRect(Rect? from, Rect? to, double value) => Rect.lerp(
+    from,
+    to,
+    _dismissTarget != null
+        ? _dismissOpen * value / _dismissStartValue
+        : morph!.curve.transform(value),
+  );
+
+  /// The landing cover flight at [time] (0 as closing starts): from where the
+  /// page drew the cover then, a drag included, as far as the surface went.
+  Rect? _landingRect(Rect? from, Rect? to, double time) {
+    final start = _dismissStart;
+    final size = _dismissSize;
+    if (from == null || start == null || size == null) {
+      return Rect.lerp(from, to, time);
+    }
+    final scale = start.width / size.width;
+    final drawn = Rect.fromLTWH(
+      start.left + from.left * scale,
+      start.top + from.top * scale,
+      from.width * scale,
+      from.height * scale,
+    );
+    final progress = (1 - (1 - time) / _dismissStartValue).clamp(0.0, 1.0);
+    return Rect.lerp(drawn, to, progress);
   }
 
   bool _startBackGesture(PredictiveBackEvent event) {
@@ -483,8 +569,8 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
   void _commitBackGesture() {
     if (!_backGestureActive) return;
     _backGestureActive = false;
-    // Popping inside the gesture skips the cover's Hero flight, which would
-    // jump from where the preview left it: the cover shrinks with the page.
+    // The cover's Hero has flown since the gesture began, so popping inside
+    // it carries that flight on to the mini player.
     final navigator = this.navigator;
     if (isCurrent) {
       navigator?.pop();
@@ -503,6 +589,7 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
     _dismissSize = null;
     _dismissArtwork = null;
     coverLanding.value = false;
+    _endShrink();
   }
 
   void _cancelBackGesture() {

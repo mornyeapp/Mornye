@@ -344,11 +344,14 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                     Hero(
                       tag: kNowPlayingArtworkHeroTag,
                       // Back from the Material player the cover keeps step
-                      // with the shrinking surface.
+                      // with the shrinking surface, on a back gesture too.
                       createRectTween: mornye || isDesktopPlatform
                           ? null
-                          : (begin, end) =>
-                                PlayerCoverRectTween(begin: begin, end: end),
+                          : NowPlayingRoute.landingFlight,
+                      flightShuttleBuilder: mornye || isDesktopPlatform
+                          ? null
+                          : NowPlayingRoute.coverShuttle,
+                      transitionOnUserGestures: !mornye && !isDesktopPlatform,
                       child: ClipRRect(
                         key: _artworkKey,
                         borderRadius: BorderRadius.circular(mornye ? 6 : 12),

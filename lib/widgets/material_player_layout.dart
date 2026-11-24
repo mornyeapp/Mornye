@@ -85,6 +85,9 @@ class MaterialPlayerLayout extends StatelessWidget {
                   child: Hero(
                     tag: kNowPlayingArtworkHeroTag,
                     createRectTween: NowPlayingRoute.coverFlightOf(context),
+                    // On the route's own time, as the surface moves.
+                    curve: Curves.linear,
+                    transitionOnUserGestures: true,
                     child: Consumer(
                       builder: (context, ref, artwork) {
                         final resting =

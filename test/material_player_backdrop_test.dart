@@ -96,6 +96,8 @@ class _WholeBoxMask extends StatelessWidget {
             curve: motion.curve,
             child: Hero(
               tag: kNowPlayingArtworkHeroTag,
+              curve: Curves.linear,
+              transitionOnUserGestures: true,
               child: ShaderMask(
                 blendMode: BlendMode.dstIn,
                 shaderCallback: (bounds) => const LinearGradient(
