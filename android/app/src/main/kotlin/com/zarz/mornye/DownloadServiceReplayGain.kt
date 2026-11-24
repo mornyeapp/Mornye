@@ -61,12 +61,12 @@ internal fun DownloadService.writeNativeReplayGainJournal() {
     if (requestKeys.isEmpty()) return
 
     val entries = synchronized(nativeReplayGainEntries) {
-        nativeReplayGainEntries.map { JSONObject(it.toString()) }
+        ArrayList(nativeReplayGainEntries)
     }
     val statuses = nativeWorkerStatusesSnapshot()
     synchronized(DownloadService.NATIVE_REPLAYGAIN_JOURNAL_FILE_LOCK) {
         val file = AtomicFile(File(filesDir, DownloadService.NATIVE_REPLAYGAIN_JOURNAL_FILE))
-        val existing = readNativeReplayGainJournalLocked(file)
+        val existing = cachedReplayGainJournal ?: readNativeReplayGainJournalLocked(file)
         val mergedEntries = mergeNativeReplayGainJournalEntries(
             existing?.optJSONArray("entries"),
             entries,
@@ -85,6 +85,7 @@ internal fun DownloadService.writeNativeReplayGainJournal() {
             .put("entries", mergedEntries)
             .put("request_album_keys", JSONObject(mergedRequestKeys))
             .put("statuses", JSONObject(mergedStatuses))
+        cachedReplayGainJournal = root
 
         var stream: java.io.FileOutputStream? = null
         try {
@@ -140,7 +141,7 @@ internal fun DownloadService.mergeNativeReplayGainJournalEntries(
             "path:$path"
         }
         if (key != "path:") {
-            byKey[key] = JSONObject(entry.toString())
+            byKey[key] = entry
         }
     }
 
@@ -174,6 +175,7 @@ internal fun DownloadService.mergeJsonObjectStringMap(
 
 internal fun DownloadService.clearNativeReplayGainJournal() {
     synchronized(DownloadService.NATIVE_REPLAYGAIN_JOURNAL_FILE_LOCK) {
+        cachedReplayGainJournal = null
         try {
             AtomicFile(File(filesDir, DownloadService.NATIVE_REPLAYGAIN_JOURNAL_FILE)).delete()
         } catch (_: Exception) {
@@ -183,13 +185,13 @@ internal fun DownloadService.clearNativeReplayGainJournal() {
 
 internal fun DownloadService.flushNativeAlbumReplayGainJournalIfComplete() {
     val root = synchronized(DownloadService.NATIVE_REPLAYGAIN_JOURNAL_FILE_LOCK) {
-        try {
+        cachedReplayGainJournal ?: try {
             val file = File(filesDir, DownloadService.NATIVE_REPLAYGAIN_JOURNAL_FILE)
             if (!file.exists()) return
             val text = AtomicFile(file).openRead().bufferedReader(Charsets.UTF_8).use {
                 it.readText()
             }
-            JSONObject(text)
+            JSONObject(text).also { cachedReplayGainJournal = it }
         } catch (e: Exception) {
             android.util.Log.w("DownloadService", "Failed to read native ReplayGain journal: ${e.message}")
             return

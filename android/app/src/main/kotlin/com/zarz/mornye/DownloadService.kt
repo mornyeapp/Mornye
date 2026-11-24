@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -34,6 +35,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -347,9 +349,16 @@ class DownloadService : Service() {
     )
 
     internal val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    internal var nativeWorkerJob: Job? = null
+    // Runs every native queue command in arrival order, off the main thread,
+    // so a pause or cancel never overtakes the start it follows.
+    private val queueCommandExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "DownloadQueueCmd").apply { isDaemon = true }
+    }
+    private val queueCommandDispatcher = queueCommandExecutor.asCoroutineDispatcher()
+    internal var cachedReplayGainJournal: JSONObject? = null
+    @Volatile internal var nativeWorkerJob: Job? = null
     @Volatile internal var pendingNativeItemsSnapshotJob: Job? = null
-    private var nativeWorkerRequestChannel: Channel<NativeDownloadRequest>? = null
+    @Volatile private var nativeWorkerRequestChannel: Channel<NativeDownloadRequest>? = null
     @Volatile private var nativeWorkerPreparationComplete = true
     private val wakeLock = ForegroundWorkLock(this, WAKELOCK_TAG, "DownloadService")
     private var wifiReturnWakeLock: PowerManager.WakeLock? = null
@@ -368,7 +377,7 @@ class DownloadService : Service() {
     private var lastNotificationSignature: String? = null
     internal var lastProgress = 0L
     internal var lastTotal = 0L
-    internal var nativeWorkerRunId = ""
+    @Volatile internal var nativeWorkerRunId = ""
     @Volatile private var nativeWorkerCurrentItemId = ""
     internal val nativeWorkerItems = mutableListOf<NativeWorkerItem>()
     internal val nativeWorkerItemsById = HashMap<String, NativeWorkerItem>()
@@ -418,15 +427,17 @@ class DownloadService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null) {
-            flushNativeAlbumReplayGainJournalIfComplete()
-            writeNativeWorkerSnapshot(
-                isRunning = false,
-                isPaused = false,
-                currentItemId = "",
-                message = "Service restart ignored",
-                includeItems = true
-            )
-            stopForegroundService(cancelNativeWorker = false)
+            serviceScope.launch(queueCommandDispatcher) {
+                flushNativeAlbumReplayGainJournalIfComplete()
+                writeNativeWorkerSnapshot(
+                    isRunning = false,
+                    isPaused = false,
+                    currentItemId = "",
+                    message = "Service restart ignored",
+                    includeItems = true
+                )
+                stopForegroundService(cancelNativeWorker = false)
+            }
             return START_NOT_STICKY
         }
 
@@ -445,47 +456,50 @@ class DownloadService : Service() {
             }
             ACTION_START_NATIVE_QUEUE -> {
                 // Satisfy Android's foreground deadline before file I/O,
-                // queue parsing or ReplayGain recovery can block startup.
-                // Invalid payloads must also enter foreground before stopping.
+                // queue parsing or ReplayGain recovery runs off the main thread.
                 startForegroundService()
-                val requestsJson = readNativeQueuePayload(
-                    intent,
-                    EXTRA_REQUESTS_JSON,
-                    EXTRA_REQUESTS_PATH,
-                    "[]"
-                )
-                val settingsJson = readNativeQueuePayload(
-                    intent,
-                    EXTRA_SETTINGS_JSON,
-                    EXTRA_SETTINGS_PATH,
-                    "{}"
-                )
-                startNativeWorker(requestsJson, settingsJson)
+                serviceScope.launch(queueCommandDispatcher) {
+                    val requestsJson = readNativeQueuePayload(
+                        intent,
+                        EXTRA_REQUESTS_JSON,
+                        EXTRA_REQUESTS_PATH,
+                        "[]"
+                    )
+                    val settingsJson = readNativeQueuePayload(
+                        intent,
+                        EXTRA_SETTINGS_JSON,
+                        EXTRA_SETTINGS_PATH,
+                        "{}"
+                    )
+                    startNativeWorker(requestsJson, settingsJson)
+                }
             }
             ACTION_APPEND_NATIVE_QUEUE -> {
-                val requestsJson = readNativeQueuePayload(
-                    intent,
-                    EXTRA_REQUESTS_JSON,
-                    EXTRA_REQUESTS_PATH,
-                    "[]"
-                )
-                appendNativeWorkerRequests(
-                    requestsJson,
-                    intent.getStringExtra(EXTRA_RUN_ID).orEmpty(),
-                )
+                val runId = intent.getStringExtra(EXTRA_RUN_ID).orEmpty()
+                serviceScope.launch(queueCommandDispatcher) {
+                    val requestsJson = readNativeQueuePayload(
+                        intent,
+                        EXTRA_REQUESTS_JSON,
+                        EXTRA_REQUESTS_PATH,
+                        "[]"
+                    )
+                    appendNativeWorkerRequests(requestsJson, runId)
+                }
             }
             ACTION_FINISH_NATIVE_QUEUE_PREPARATION -> {
-                finishNativeWorkerPreparation(
-                    intent.getStringExtra(EXTRA_RUN_ID).orEmpty(),
-                )
+                val runId = intent.getStringExtra(EXTRA_RUN_ID).orEmpty()
+                serviceScope.launch(queueCommandDispatcher) {
+                    finishNativeWorkerPreparation(runId)
+                }
             }
             ACTION_ACKNOWLEDGE_NATIVE_QUEUE_ITEMS -> {
-                acknowledgeNativeWorkerItems(
-                    intent.getStringExtra(EXTRA_RUN_ID).orEmpty(),
-                    intent.getStringExtra(EXTRA_ITEM_IDS_JSON).orEmpty(),
-                )
+                val runId = intent.getStringExtra(EXTRA_RUN_ID).orEmpty()
+                val itemIdsJson = intent.getStringExtra(EXTRA_ITEM_IDS_JSON).orEmpty()
+                serviceScope.launch(queueCommandDispatcher) {
+                    acknowledgeNativeWorkerItems(runId, itemIdsJson)
+                }
             }
-            ACTION_PAUSE_NATIVE_QUEUE -> {
+            ACTION_PAUSE_NATIVE_QUEUE -> serviceScope.launch(queueCommandDispatcher) {
                 synchronized(nativeWorkerItems) {
                     nativeWorkerResumePending = false
                     nativeWorkerPaused = true
@@ -500,7 +514,7 @@ class DownloadService : Service() {
                     includeItems = true
                 )
             }
-            ACTION_RESUME_NATIVE_QUEUE -> {
+            ACTION_RESUME_NATIVE_QUEUE -> serviceScope.launch(queueCommandDispatcher) {
                 synchronized(nativeWorkerItems) {
                     nativeWorkerResumePending = nativeWorkerPausePendingIds.isNotEmpty()
                     nativeWorkerPaused = nativeWorkerResumePending
@@ -516,7 +530,7 @@ class DownloadService : Service() {
                     includeItems = true
                 )
             }
-            ACTION_CANCEL_NATIVE_QUEUE -> {
+            ACTION_CANCEL_NATIVE_QUEUE -> serviceScope.launch(queueCommandDispatcher) {
                 nativeWorkerCancelRequested = true
                 synchronized(nativeWorkerItems) {
                     nativeWorkerResumePending = false
@@ -1860,6 +1874,8 @@ class DownloadService : Service() {
             )
         }
         serviceScope.cancel()
+        queueCommandDispatcher.close()
+        queueCommandExecutor.shutdownNow()
         isRunning = false
         releaseWakeLock()
         releaseWifiReturnGraceWakeLock()
