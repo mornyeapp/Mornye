@@ -17,6 +17,7 @@ final class CastOutputPlugin: NSObject, FlutterStreamHandler {
     private let lock = NSLock()
     private var bridge: CastBridge?
     private var polling = false
+    private var stopped = false
     private var sink: FlutterEventSink?
     private var keepAlive: AVAudioPlayer?
 
@@ -36,7 +37,7 @@ final class CastOutputPlugin: NSObject, FlutterStreamHandler {
         if let bridge { return bridge }
         let created = try CastBridge()
         bridge = created
-        if !polling {
+        if !polling && !stopped && sink != nil {
             polling = true
             Thread.detachNewThread { [weak self] in self?.poll(created) }
         }
@@ -72,6 +73,11 @@ final class CastOutputPlugin: NSObject, FlutterStreamHandler {
 
     private func poll(_ bridge: CastBridge) {
         while true {
+            lock.lock()
+            let shouldStop = stopped || sink == nil
+            if shouldStop { polling = false }
+            lock.unlock()
+            if shouldStop { return }
             guard let text = bridge.nextEvent(timeoutMs: 1_000) else { continue }
             guard let event = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
                   let payload = event["payload"] as? [String: Any]
@@ -123,18 +129,30 @@ final class CastOutputPlugin: NSObject, FlutterStreamHandler {
     }()
 
     func onListen(withArguments arguments: Any?, eventSink: @escaping FlutterEventSink) -> FlutterError? {
+        lock.lock()
         sink = eventSink
-        // Start the service so its first snapshot reaches the new listener.
-        queue.async { [weak self] in _ = try? self?.service() }
+        let existing = bridge
+        let shouldStart = existing != nil && !polling && !stopped
+        if shouldStart { polling = true }
+        lock.unlock()
+        if shouldStart, let existing {
+            Thread.detachNewThread { [weak self] in self?.poll(existing) }
+        }
         return nil
     }
 
     func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        lock.lock()
         sink = nil
+        lock.unlock()
         return nil
     }
 
     deinit {
+        lock.lock()
+        stopped = true
+        sink = nil
+        lock.unlock()
         methods.setMethodCallHandler(nil)
         events.setStreamHandler(nil)
     }
