@@ -73,6 +73,9 @@ public class AudioService extends MediaBrowserServiceCompat {
     public static final int KEYCODE_BYPASS_PLAY = KeyEvent.KEYCODE_MUTE;
     public static final int KEYCODE_BYPASS_PAUSE = KeyEvent.KEYCODE_MEDIA_RECORD;
     public static final int MAX_COMPACT_ACTIONS = 3;
+    // Matches Android's conventional window for a headset's double/triple
+    // press gesture without making a normal play/pause press feel sluggish.
+    private static final long HEADSET_MULTI_CLICK_TIMEOUT_MS = 300L;
     private static final int ART_CACHE_ENTRIES = 3;
     private static final String NOTIFICATION_ART = "notification";
     private static final long AUTO_ENABLED_ACTIONS = PlaybackStateCompat.ACTION_STOP
@@ -817,6 +820,9 @@ public class AudioService extends MediaBrowserServiceCompat {
 
     private void releaseMediaSession() {
         if (mediaSession == null) return;
+        if (mediaSessionCallback != null) {
+            mediaSessionCallback.cancelPendingHeadsetClick();
+        }
         deactivateMediaSession();
         mediaSession.release();
         mediaSession = null;
@@ -979,6 +985,12 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     public class MediaSessionCallback extends MediaSessionCompat.Callback {
+        private final HeadsetClickTracker headsetClickTracker = new HeadsetClickTracker();
+        private final Runnable dispatchHeadsetClick = () -> {
+            final MediaButton button = headsetClickTracker.consumeButton();
+            if (listener != null) listener.onClick(button);
+        };
+
         @Override
         public void onAddQueueItem(MediaDescriptionCompat description) {
             if (listener == null) return;
@@ -1091,11 +1103,33 @@ public class AudioService extends MediaBrowserServiceCompat {
                     // These are the "genuine" media button click events
                 case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
                 case KeyEvent.KEYCODE_HEADSETHOOK:
-                    listener.onClick(eventToButton(event));
+                    if (isMultiPressHeadsetButton(event)) {
+                        registerHeadsetClick();
+                    } else {
+                        listener.onClick(eventToButton(event));
+                    }
                     break;
                 }
             }
             return true;
+        }
+
+        private boolean isMultiPressHeadsetButton(KeyEvent event) {
+            final int keyCode = event.getKeyCode();
+            return event.getRepeatCount() == 0 &&
+                (keyCode == KeyEvent.KEYCODE_HEADSETHOOK ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
+        }
+
+        private void registerHeadsetClick() {
+            headsetClickTracker.addClick();
+            handler.removeCallbacks(dispatchHeadsetClick);
+            handler.postDelayed(dispatchHeadsetClick, HEADSET_MULTI_CLICK_TIMEOUT_MS);
+        }
+
+        void cancelPendingHeadsetClick() {
+            handler.removeCallbacks(dispatchHeadsetClick);
+            headsetClickTracker.clear();
         }
 
         private MediaButton eventToButton(KeyEvent event) {
