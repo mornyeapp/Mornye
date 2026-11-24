@@ -1583,10 +1583,18 @@ class _MainShellState extends ConsumerState<MainShell>
                   );
                 }
                 return ClipRect(
-                  child: BackdropFilter(
-                    filter: _materialBottomBarBlur,
-                    blendMode: BlendMode.src,
-                    child: bottomBar,
+                  child: Stack(
+                    fit: StackFit.passthrough,
+                    children: [
+                      Positioned.fill(
+                        child: BackdropFilter(
+                          filter: _materialBottomBarBlur,
+                          blendMode: BlendMode.src,
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                      RepaintBoundary(child: bottomBar),
+                    ],
                   ),
                 );
               },
