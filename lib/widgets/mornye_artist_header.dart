@@ -134,7 +134,8 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
         // without Material's pastel accent mapping.
         final logoColor = logo == null
             ? null
-            : CoverPalette.sourceColor(logo, Brightness.dark);
+            : CoverPalette.peekSourceColor(logo) ??
+                  CoverPalette.sourceColor(logo, Brightness.dark);
         // Keep the artwork accent for colorful portraits. A neutral
         // portrait can acquire a blue Material accent; use white there,
         // while allowing an explicit logo color to take precedence.
@@ -191,7 +192,7 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
 
       if (widget.neutralActions) return finish(context);
       // Built before the logo is known, so its arrival keeps the page's state.
-      return CoverPaletteBuilder(
+      return CoverSourceColorBuilder(
         imageSource: widget.logoSource,
         builder: (context, _) => finish(context),
       );
@@ -472,6 +473,26 @@ class _ArtistCollapsingArtwork extends ConsumerWidget {
   final Color surface;
   final Widget child;
 
+  static final _zeroBlur = ImageFilter.blur(
+    sigmaX: 0,
+    sigmaY: 0,
+    tileMode: TileMode.clamp,
+  );
+  static final _blurCache = <int, ImageFilter>{};
+
+  static ImageFilter _blurFor(double sigma) {
+    final step = (sigma * 2).round().clamp(0, 36);
+    if (step == 0) return _zeroBlur;
+    return _blurCache.putIfAbsent(step, () {
+      final value = step * 0.5;
+      return ImageFilter.blur(
+        sigmaX: value,
+        sigmaY: value,
+        tileMode: TileMode.clamp,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = context
@@ -495,6 +516,7 @@ class _ArtistCollapsingArtwork extends ConsumerWidget {
         !MediaQuery.disableAnimationsOf(context) &&
         // The collapse blur and masked backdrop re-filter on every scroll frame.
         ref.watch(mornyeLiquidGlassProvider);
+    final applyBlur = blurEnabled && blur > 0 && fade < 1;
 
     return ClipRect(
       child: Stack(
@@ -503,12 +525,8 @@ class _ArtistCollapsingArtwork extends ConsumerWidget {
           TickerMode(
             enabled: fade < 1,
             child: ImageFiltered(
-              enabled: blurEnabled && blur > 0 && fade < 1,
-              imageFilter: ImageFilter.blur(
-                sigmaX: blur,
-                sigmaY: blur,
-                tileMode: TileMode.clamp,
-              ),
+              enabled: applyBlur,
+              imageFilter: applyBlur ? _blurFor(blur) : _zeroBlur,
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final height = settings?.maxExtent ?? constraints.maxHeight;

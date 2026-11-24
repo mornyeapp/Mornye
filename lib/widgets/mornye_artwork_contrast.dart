@@ -98,6 +98,31 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
   int _readbacks = 0;
   int? _sampledRevision;
   Map<String, Rect> _sampledTargets = {};
+  Animation<double>? _deferredRouteAnimation;
+
+  void _clearRouteAnimationListener() {
+    _deferredRouteAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    _deferredRouteAnimation = null;
+  }
+
+  void _deferUntilRouteSettled(Animation<double>? animation) {
+    if (animation == null || identical(_deferredRouteAnimation, animation)) {
+      return;
+    }
+    _clearRouteAnimationListener();
+    _deferredRouteAnimation = animation;
+    animation.addStatusListener(_onRouteAnimationStatus);
+  }
+
+  void _onRouteAnimationStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed ||
+        status == AnimationStatus.dismissed) {
+      _clearRouteAnimationListener();
+      if (mounted && status == AnimationStatus.completed) {
+        _queueSample();
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -153,8 +178,9 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
     final route = ModalRoute.of(context);
-    if (route != null &&
-        (!route.isCurrent || route.animation?.isAnimating == true)) {
+    if (route != null && !route.isCurrent) return;
+    if (route?.animation?.isAnimating == true) {
+      _deferUntilRouteSettled(route!.animation);
       return;
     }
     if (_sampling) {
@@ -248,6 +274,7 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
 
   @override
   void dispose() {
+    _clearRouteAnimationListener();
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();

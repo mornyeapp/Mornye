@@ -239,6 +239,7 @@ class _MornyeDialogRoute<T> extends RawDialogRoute<T> {
       : MotionPace.duration(const Duration(milliseconds: 160));
 
   CurvedAnimation? _scaleAnimation;
+  Animation<double>? _mornyeScale;
 
   @override
   Widget buildTransitions(
@@ -257,14 +258,15 @@ class _MornyeDialogRoute<T> extends RawDialogRoute<T> {
       curve: MornyeMotion.fast.curve,
       reverseCurve: MornyeMotion.fast.leaving,
     );
-    return ScaleTransition(
-      scale: scaleAnimation.drive(Tween<double>(begin: 0.96, end: 1)),
-      child: child,
+    final scale = _mornyeScale ??= scaleAnimation.drive(
+      Tween<double>(begin: 0.96, end: 1),
     );
+    return ScaleTransition(scale: scale, child: child);
   }
 
   @override
   void dispose() {
+    _mornyeScale = null;
     _scaleAnimation?.dispose();
     super.dispose();
   }

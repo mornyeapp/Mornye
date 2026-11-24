@@ -201,7 +201,7 @@ class _LiquidMenuGlassState extends State<_LiquidMenuGlass> {
     final fadeCurve = MornyeMotion.effectsFast.curve;
     return AnimatedBuilder(
       animation: animation,
-      child: widget.child,
+      child: RepaintBoundary(child: widget.child),
       builder: (context, content) {
         final from = _closingFrom;
         final double width;
@@ -290,6 +290,12 @@ class _MenuFrame extends SingleChildRenderObjectWidget {
 
   @override
   void updateRenderObject(BuildContext context, _RenderMenuFrame renderObject) {
+    if (renderObject.anchor == anchor &&
+        renderObject.widthProgress == width &&
+        renderObject.heightProgress == height &&
+        renderObject.dropSize == dropSize) {
+      return;
+    }
     renderObject
       ..anchor = anchor
       ..widthProgress = width
@@ -385,6 +391,11 @@ class _MenuContent extends SingleChildRenderObjectWidget {
     BuildContext context,
     _RenderMenuContent renderObject,
   ) {
+    if (renderObject.widthProgress == width &&
+        renderObject.heightProgress == height &&
+        renderObject.dropSize == dropSize) {
+      return;
+    }
     renderObject
       ..widthProgress = width
       ..heightProgress = height

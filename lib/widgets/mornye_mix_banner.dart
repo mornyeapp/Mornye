@@ -237,6 +237,16 @@ class _BannerPainter extends CustomPainter {
     return middle + reach * math.sin(start + 2 * math.pi * turns);
   }
 
+  static final _paint = Paint();
+  static final _captionGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Colors.black.withValues(alpha: 0),
+      Colors.black.withValues(alpha: 0.26),
+    ],
+  );
+
   @override
   void paint(Canvas canvas, Size size) {
     final palette = _palettes[seed % _palettes.length];
@@ -246,33 +256,27 @@ class _BannerPainter extends CustomPainter {
     final loop = phase?.value ?? 0;
     final way = (seed >> 3).isEven ? 1.0 : -1.0;
     final breath = math.sin(2 * math.pi * loop);
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [palette.start, palette.end],
-          transform: GradientRotation(way * 0.5 * breath),
-        ).createShader(rect),
-    );
+    _paint.shader = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [palette.start, palette.end],
+      transform: GradientRotation(way * 0.5 * breath),
+    ).createShader(rect);
+    canvas.drawRect(rect, _paint);
     // The seed's upper bits place the blooms, apart from the palette's choice.
     final drift = ((seed >> 8) & 0xff) / 255;
     final lean = ((seed >> 16) & 0xff) / 255;
     void bloom(Offset center, double radius, Color color, double strength) {
       final circle = Rect.fromCircle(center: center, radius: radius);
-      canvas.drawRect(
-        rect,
-        Paint()
-          ..shader = RadialGradient(
-            colors: [
-              color.withValues(alpha: strength),
-              color.withValues(alpha: strength * 0.62),
-              color.withValues(alpha: 0),
-            ],
-            stops: const [0, 0.52, 1],
-          ).createShader(circle),
-      );
+      _paint.shader = RadialGradient(
+        colors: [
+          color.withValues(alpha: strength),
+          color.withValues(alpha: strength * 0.62),
+          color.withValues(alpha: 0),
+        ],
+        stops: const [0, 0.52, 1],
+      ).createShader(circle);
+      canvas.drawRect(rect, _paint);
     }
 
     // The light bloom keeps to the top, clear of the white title.
@@ -301,18 +305,8 @@ class _BannerPainter extends CustomPainter {
       size.width,
       size.height,
     );
-    canvas.drawRect(
-      caption,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withValues(alpha: 0),
-            Colors.black.withValues(alpha: 0.26),
-          ],
-        ).createShader(caption),
-    );
+    _paint.shader = _captionGradient.createShader(caption);
+    canvas.drawRect(caption, _paint);
   }
 
   @override

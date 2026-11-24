@@ -211,15 +211,14 @@ class _MornyeSwitchState extends State<_MornyeSwitch>
             refractiveIndex: 1 + (_heldRefractiveIndex - 1) * held,
             pinch: 1 - (1 - held) * (1 - held),
             // The white thumb fills the growing lens and fades as it lifts.
-            child: Opacity(
-              opacity: (1 - held * 1.4).clamp(0.0, 1.0),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: radius,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(
+                  alpha: (1 - held * 1.4).clamp(0.0, 1.0),
                 ),
-                child: const SizedBox.expand(),
+                borderRadius: radius,
               ),
+              child: const SizedBox.expand(),
             ),
           ),
         ),

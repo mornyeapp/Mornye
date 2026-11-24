@@ -356,13 +356,10 @@ class _MornyeSliderState extends ConsumerState<MornyeSlider>
                 interaction: true,
                 progress: lift,
                 refractiveIndex: MornyeSlider.lensRefractiveIndex,
-                child: Opacity(
-                  opacity: fill,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: radius,
-                    ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: fill),
+                    borderRadius: radius,
                   ),
                 ),
               ),
@@ -558,11 +555,10 @@ class _LiftShadowPainter extends CustomPainter {
     );
     canvas.save();
     canvas.clipPath(
-      Path.combine(
-        PathOperation.difference,
-        Path()..addRect(shape.outerRect.inflate(24)),
-        Path()..addRRect(shape),
-      ),
+      Path()
+        ..fillType = PathFillType.evenOdd
+        ..addRect(shape.outerRect.inflate(24))
+        ..addRRect(shape),
     );
     canvas.drawRRect(
       shape.shift(const Offset(0, 7)),
