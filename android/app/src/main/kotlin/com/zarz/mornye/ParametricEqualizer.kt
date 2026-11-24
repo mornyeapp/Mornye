@@ -30,44 +30,56 @@ internal data class ParametricFilter(
      * (https://www.w3.org/TR/audio-eq-cookbook/), the same on every platform.
      */
     fun coefficients(rate: Double): DoubleArray {
+        val out = DoubleArray(5)
+        writeCoefficients(rate, out, 0)
+        return out
+    }
+
+    /** Writes `b0, b1, b2, a1, a2` into [out] starting at [offset] with zero allocations. */
+    fun writeCoefficients(rate: Double, out: DoubleArray, offset: Int) {
         val w = 2 * PI * min(frequency, rate * 0.45) / rate
         val a = 10.0.pow(gain / 40)
         val cosine = cos(w)
         val alpha = sin(w) / (2 * q)
         val slope = 2 * sqrt(a) * alpha
-        val b: DoubleArray
+        val b0: Double
+        val b1: Double
+        val b2: Double
         val a0: Double
         val a1: Double
         val a2: Double
         when (type) {
             LOW_SHELF -> {
-                b = doubleArrayOf(
-                    a * ((a + 1) - (a - 1) * cosine + slope),
-                    2 * a * ((a - 1) - (a + 1) * cosine),
-                    a * ((a + 1) - (a - 1) * cosine - slope),
-                )
+                b0 = a * ((a + 1) - (a - 1) * cosine + slope)
+                b1 = 2 * a * ((a - 1) - (a + 1) * cosine)
+                b2 = a * ((a + 1) - (a - 1) * cosine - slope)
                 a0 = (a + 1) + (a - 1) * cosine + slope
                 a1 = -2 * ((a - 1) + (a + 1) * cosine)
                 a2 = (a + 1) + (a - 1) * cosine - slope
             }
             HIGH_SHELF -> {
-                b = doubleArrayOf(
-                    a * ((a + 1) + (a - 1) * cosine + slope),
-                    -2 * a * ((a - 1) + (a + 1) * cosine),
-                    a * ((a + 1) + (a - 1) * cosine - slope),
-                )
+                b0 = a * ((a + 1) + (a - 1) * cosine + slope)
+                b1 = -2 * a * ((a - 1) + (a + 1) * cosine)
+                b2 = a * ((a + 1) + (a - 1) * cosine - slope)
                 a0 = (a + 1) - (a - 1) * cosine + slope
                 a1 = 2 * ((a - 1) - (a + 1) * cosine)
                 a2 = (a + 1) - (a - 1) * cosine - slope
             }
             else -> {
-                b = doubleArrayOf(1 + alpha * a, -2 * cosine, 1 - alpha * a)
+                b0 = 1 + alpha * a
+                b1 = -2 * cosine
+                b2 = 1 - alpha * a
                 a0 = 1 + alpha / a
                 a1 = -2 * cosine
                 a2 = 1 - alpha / a
             }
         }
-        return doubleArrayOf(b[0] / a0, b[1] / a0, b[2] / a0, a1 / a0, a2 / a0)
+        val invA0 = 1.0 / a0
+        out[offset] = b0 * invA0
+        out[offset + 1] = b1 * invA0
+        out[offset + 2] = b2 * invA0
+        out[offset + 3] = a1 * invA0
+        out[offset + 4] = a2 * invA0
     }
 
     companion object {
@@ -163,11 +175,13 @@ internal class ParametricEqualizerDsp {
         if (!smooth) {
             sections = next.filters.size
             coefficients = DoubleArray(sections * 5)
+            targets = DoubleArray(sections * 5)
             state = DoubleArray(sections * channels * 2)
+        } else if (targets.size != sections * 5) {
+            targets = DoubleArray(sections * 5)
         }
-        targets = DoubleArray(sections * 5)
-        next.filters.forEachIndexed { index, filter ->
-            filter.coefficients(rate).copyInto(targets, index * 5)
+        for (index in next.filters.indices) {
+            next.filters[index].writeCoefficients(rate, targets, index * 5)
         }
         targetGain = next.inputGain
         if (smooth) {
@@ -179,6 +193,39 @@ internal class ParametricEqualizerDsp {
             ramp = 0
         }
         built = next
+    }
+
+    private fun advanceRamp() {
+        val step = 1.0 / ramp
+        val coeffs = coefficients
+        val dest = targets
+        for (index in coeffs.indices) {
+            coeffs[index] += (dest[index] - coeffs[index]) * step
+        }
+        gain += (targetGain - gain) * step
+        ramp--
+    }
+
+    private fun filterSample(raw: Double, channel: Int): Double {
+        var value = if (raw.isFinite()) raw * gain else 0.0
+        val coeffs = coefficients
+        val zState = state
+        val channelCount = channels
+        val sectionCount = sections
+        for (section in 0 until sectionCount) {
+            val c = section * 5
+            val z = (section * channelCount + channel) * 2
+            val out = coeffs[c] * value + zState[z]
+            zState[z] = coeffs[c + 1] * value - coeffs[c + 3] * out + zState[z + 1]
+            zState[z + 1] = coeffs[c + 2] * value - coeffs[c + 4] * out
+            value = out
+        }
+        if (!value.isFinite()) {
+            // A filter that ran away starts over in silence.
+            zState.fill(0.0)
+            return 0.0
+        }
+        return value
     }
 
     /**
@@ -196,61 +243,61 @@ internal class ParametricEqualizerDsp {
         }
         if (channels <= 0 || rate <= 0) return false
         if (current !== built) build(current)
-        val frames = input.remaining() / (width * channels)
+        val channelCount = channels
+        val frames = input.remaining() / (width * channelCount)
         var position = input.position()
-        for (frame in 0 until frames) {
-            if (ramp > 0) {
-                val step = 1.0 / ramp
-                for (index in coefficients.indices) {
-                    coefficients[index] += (targets[index] - coefficients[index]) * step
-                }
-                gain += (targetGain - gain) * step
-                ramp--
-            }
-            for (channel in 0 until channels) {
-                var value = when (encoding) {
-                    C.ENCODING_PCM_16BIT -> input.getShort(position) / 32768.0
-                    C.ENCODING_PCM_24BIT -> (
-                        (input.get(position).toInt() and 0xFF) or
-                            ((input.get(position + 1).toInt() and 0xFF) shl 8) or
-                            (input.get(position + 2).toInt() shl 16)
-                        ) / 8388608.0
-                    C.ENCODING_PCM_32BIT -> input.getInt(position) / 2147483648.0
-                    else -> input.getFloat(position).toDouble()
-                }
-                if (!value.isFinite()) value = 0.0
-                value *= gain
-                for (section in 0 until sections) {
-                    val c = section * 5
-                    val z = (section * channels + channel) * 2
-                    val out = coefficients[c] * value + state[z]
-                    state[z] = coefficients[c + 1] * value - coefficients[c + 3] * out + state[z + 1]
-                    state[z + 1] = coefficients[c + 2] * value - coefficients[c + 4] * out
-                    value = out
-                }
-                if (!value.isFinite()) {
-                    // A filter that ran away starts over in silence.
-                    state.fill(0.0)
-                    value = 0.0
-                }
-                when (encoding) {
-                    C.ENCODING_PCM_16BIT -> {
+        when (encoding) {
+            C.ENCODING_PCM_16BIT -> {
+                for (frame in 0 until frames) {
+                    if (ramp > 0) advanceRamp()
+                    for (channel in 0 until channelCount) {
+                        val value = filterSample(input.getShort(position) / 32768.0, channel)
                         // Triangular dither of one step hides the rounding.
                         val dithered = value * 32768.0 + random() - random()
                         output.putShort(dithered.roundToLong().coerceIn(-32768, 32767).toShort())
+                        position += 2
                     }
-                    C.ENCODING_PCM_24BIT -> {
+                }
+            }
+            C.ENCODING_PCM_FLOAT -> {
+                for (frame in 0 until frames) {
+                    if (ramp > 0) advanceRamp()
+                    for (channel in 0 until channelCount) {
+                        val value = filterSample(input.getFloat(position).toDouble(), channel)
+                        output.putFloat(value.toFloat())
+                        position += 4
+                    }
+                }
+            }
+            C.ENCODING_PCM_24BIT -> {
+                for (frame in 0 until frames) {
+                    if (ramp > 0) advanceRamp()
+                    for (channel in 0 until channelCount) {
+                        val raw = (
+                            (input.get(position).toInt() and 0xFF) or
+                                ((input.get(position + 1).toInt() and 0xFF) shl 8) or
+                                (input.get(position + 2).toInt() shl 16)
+                            ) / 8388608.0
+                        val value = filterSample(raw, channel)
                         val sample = (value * 8388608.0).roundToLong().coerceIn(-8388608, 8388607).toInt()
                         output.put(sample.toByte())
                         output.put((sample shr 8).toByte())
                         output.put((sample shr 16).toByte())
+                        position += 3
                     }
-                    C.ENCODING_PCM_32BIT -> output.putInt(
-                        (value * 2147483648.0).roundToLong().coerceIn(-2147483648L, 2147483647L).toInt(),
-                    )
-                    else -> output.putFloat(value.toFloat())
                 }
-                position += width
+            }
+            else -> {
+                for (frame in 0 until frames) {
+                    if (ramp > 0) advanceRamp()
+                    for (channel in 0 until channelCount) {
+                        val value = filterSample(input.getInt(position) / 2147483648.0, channel)
+                        output.putInt(
+                            (value * 2147483648.0).roundToLong().coerceIn(-2147483648L, 2147483647L).toInt(),
+                        )
+                        position += 4
+                    }
+                }
             }
         }
         input.position(position)
