@@ -39,6 +39,9 @@ internal class LinkHostPlugin : FlutterPlugin, EventChannel.StreamHandler {
         workers.execute {
             val reply = runCatching { bridge.value.call(call.method, arguments) }
             mainThread.post {
+                if (sink != null && pump == null && bridge.isInitialized()) {
+                    startPump()
+                }
                 reply.fold(
                     { result.success(it) },
                     { result.error("LINK_HOST", it.message, null) },
@@ -47,10 +50,8 @@ internal class LinkHostPlugin : FlutterPlugin, EventChannel.StreamHandler {
         }
     }
 
-    /** Each event is the JSON text `{"method","arguments"}`. */
-    override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
-        this.sink = sink
-        if (pump != null) return
+    private fun startPump() {
+        if (pump != null || !bridge.isInitialized()) return
         pump = Thread({
             val current = Thread.currentThread()
             while (pump === current) {
@@ -65,6 +66,14 @@ internal class LinkHostPlugin : FlutterPlugin, EventChannel.StreamHandler {
         }, "MornyeLinkEvents").apply {
             isDaemon = true
             start()
+        }
+    }
+
+    /** Each event is the JSON text `{"method","arguments"}`. */
+    override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
+        this.sink = sink
+        if (bridge.isInitialized()) {
+            startPump()
         }
     }
 

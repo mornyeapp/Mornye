@@ -15,9 +15,10 @@ final class LinkHostPlugin: NSObject, FlutterStreamHandler {
         qos: .userInitiated,
         attributes: .concurrent
     )
-    private let bridge = LinkBridge()
+    private var bridge: LinkBridge?
     private let lock = NSLock()
     private var polling = false
+    private var stopped = false
     private var sink: FlutterEventSink?
 
     init(messenger: FlutterBinaryMessenger) {
@@ -30,12 +31,26 @@ final class LinkHostPlugin: NSObject, FlutterStreamHandler {
         events.setStreamHandler(self)
     }
 
+    private func ensureBridge() -> LinkBridge {
+        lock.lock()
+        defer { lock.unlock() }
+        if let existing = bridge { return existing }
+        let created = LinkBridge()
+        bridge = created
+        if !polling && !stopped && sink != nil {
+            polling = true
+            Thread.detachNewThread { [weak self] in self?.poll(created) }
+        }
+        return created
+    }
+
     /// The method is the `link*` name; the arguments are its JSON text.
     private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         let arguments = call.arguments as? String ?? "{}"
-        queue.async { [bridge] in
+        queue.async { [weak self] in
+            guard let self else { return }
             do {
-                let reply = try bridge.call(method: call.method, argsJson: arguments)
+                let reply = try self.ensureBridge().call(method: call.method, argsJson: arguments)
                 DispatchQueue.main.async { result(reply) }
             } catch {
                 DispatchQueue.main.async {
@@ -51,8 +66,13 @@ final class LinkHostPlugin: NSObject, FlutterStreamHandler {
     }
 
     /// Each event is the JSON text `{"method","arguments"}`.
-    private func poll() {
+    private func poll(_ bridge: LinkBridge) {
         while true {
+            lock.lock()
+            let shouldStop = stopped || sink == nil
+            if shouldStop { polling = false }
+            lock.unlock()
+            if shouldStop { return }
             guard let text = bridge.nextEvent(timeoutMs: 1_000) else { continue }
             DispatchQueue.main.async { [weak self] in
                 self?.sink?(text)
@@ -61,22 +81,30 @@ final class LinkHostPlugin: NSObject, FlutterStreamHandler {
     }
 
     func onListen(withArguments arguments: Any?, eventSink: @escaping FlutterEventSink) -> FlutterError? {
-        sink = eventSink
         lock.lock()
-        defer { lock.unlock() }
-        if !polling {
-            polling = true
-            Thread.detachNewThread { [weak self] in self?.poll() }
+        sink = eventSink
+        let existing = bridge
+        let shouldStart = existing != nil && !polling && !stopped
+        if shouldStart { polling = true }
+        lock.unlock()
+        if shouldStart, let existing {
+            Thread.detachNewThread { [weak self] in self?.poll(existing) }
         }
         return nil
     }
 
     func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        lock.lock()
         sink = nil
+        lock.unlock()
         return nil
     }
 
     deinit {
+        lock.lock()
+        stopped = true
+        sink = nil
+        lock.unlock()
         methods.setMethodCallHandler(nil)
         events.setStreamHandler(nil)
     }
