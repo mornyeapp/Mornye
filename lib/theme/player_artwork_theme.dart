@@ -156,7 +156,7 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
   /// Moves to a resolved scheme unless a newer cover replaced its request.
   /// Null, for unreadable artwork, returns to the app scheme.
   void _resolved(int generation, ColorScheme? scheme) {
-    if (!mounted || generation != _generation) return;
+    if (!mounted || generation != _generation || scheme == _artwork) return;
     setState(() => _moveTo(scheme, animate: _onScreen));
   }
 
@@ -174,9 +174,18 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
       return;
     }
     if (widget.fadesSurfaceOnly) {
+      final nextSurface = _targetFor(Theme.of(context), artwork).surface;
+      final currentSurface = _surface.value;
+      if (currentSurface == nextSurface) {
+        _from = null;
+        _surface.to = nextSurface;
+        _controller?.value = 1;
+        return;
+      }
       // From the colour on screen, which may be partway through a move.
       _surface
-        ..from = _surface.value
+        ..from = currentSurface
+        ..to = nextSurface
         ..curve = motion.curve;
     }
     _curve = motion.curve;
@@ -190,16 +199,19 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
       base.brightness == Brightness.dark &&
       base.colorScheme.surface == Colors.black;
 
+  /// The scheme a move goes to, shared by [_moveTo] and [_themeFor].
+  static ColorScheme _targetFor(ThemeData base, ColorScheme? artwork) =>
+      artwork == null
+      ? base.colorScheme
+      : _isAmoled(base)
+      ? artwork.copyWith(
+          surface: Colors.black,
+          surfaceContainerLowest: Colors.black,
+        )
+      : artwork;
+
   ThemeData _themeFor(ThemeData base) {
-    final artwork = _artwork;
-    final target = artwork == null
-        ? base.colorScheme
-        : _isAmoled(base)
-        ? artwork.copyWith(
-            surface: Colors.black,
-            surfaceContainerLowest: Colors.black,
-          )
-        : artwork;
+    final target = _targetFor(base, _artwork);
     final from = _from;
     final progress = _controller?.value ?? 1;
     final scheme = widget.fadesSurfaceOnly || from == null || progress >= 1
