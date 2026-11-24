@@ -309,7 +309,10 @@ extension ExtensionNotifierProviderPriority on ExtensionNotifier {
       priority = sanitizeBackend(await fetchBackend());
       _log.d('Using default $label: $priority');
     }
-    await prefs.setString(prefsKey, jsonEncode(priority));
+    final encoded = jsonEncode(priority);
+    if (encoded != savedJson) {
+      await prefs.setString(prefsKey, encoded);
+    }
     await pushBackend(priority);
     return priority;
   }
