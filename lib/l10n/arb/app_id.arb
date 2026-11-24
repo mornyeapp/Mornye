@@ -282,6 +282,7 @@
   "queueNoDuplicates": "Tanpa duplikat di antrean",
   "queueNoDuplicatesDescription": "Menambahkan lagu yang sudah ada di antrean berikutnya akan memindahkannya, bukan menambah salinan kedua. Lagu yang sedang diputar dan yang sudah diputar tetap di tempatnya.",
   "queueLock": "Kunci antrean",
+  "queueSaveAsPlaylist": "Simpan antrean sebagai playlist",
   "queueUnlock": "Buka kunci antrean",
   "queueLockDescription": "Mencegah lagu di antrean digeser urutannya atau diusap untuk dihapus. Menambah lagu tetap bisa. Tombol yang sama ada di antrean.",
   "usbBitPerfect": "Audio Hi-Res dan Bit-Perfect",

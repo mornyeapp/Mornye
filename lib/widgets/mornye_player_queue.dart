@@ -10,6 +10,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/mornye_squircle_border.dart';
 import 'package:mornye/widgets/player_queue_artwork.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
+import 'package:mornye/widgets/queue_save_playlist.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/scaled_drag_proxy.dart';
 
@@ -279,6 +280,21 @@ class _MornyePlayerQueueState extends ConsumerState<MornyePlayerQueue> {
                               ),
                           ],
                         ),
+                      ),
+                      IconButton(
+                        tooltip: context.l10n.queueSaveAsPlaylist,
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size.square(44),
+                          foregroundColor: Colors.white,
+                          disabledForegroundColor: Colors.white38,
+                        ),
+                        icon: const Icon(
+                          CupertinoIcons.text_badge_plus,
+                          size: 20,
+                        ),
+                        onPressed: queue.isEmpty
+                            ? null
+                            : () => saveQueueAsPlaylist(context, ref),
                       ),
                       // A toggle: a fill marks it on, as on the mode buttons.
                       Semantics(

@@ -16,6 +16,7 @@ import 'package:mornye/widgets/now_playing_indicator.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_queue_artwork.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
+import 'package:mornye/widgets/queue_save_playlist.dart';
 import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/scaled_drag_proxy.dart';
 
@@ -161,6 +162,15 @@ class _PlayerQueueSheetState extends ConsumerState<PlayerQueueSheet> {
                         ),
                       ),
               ),
+              ExpressiveIconButton(
+                tooltip: context.l10n.queueSaveAsPlaylist,
+                icon: const Icon(Icons.playlist_add),
+                foregroundColor: colorScheme.onSurfaceVariant,
+                onPressed: queue.isEmpty
+                    ? null
+                    : () => saveQueueAsPlaylist(context, ref),
+              ),
+              const SizedBox(width: 4),
               ExpressiveIconButton(
                 selected: locked,
                 tooltip: locked

@@ -485,6 +485,10 @@
   "@queueLock": {
     "description": "Playback setting and queue header toggle tooltip that stops reordering and swiping songs out of the play queue"
   },
+  "queueSaveAsPlaylist": "Save queue as playlist",
+  "@queueSaveAsPlaylist": {
+    "description": "Tooltip of the queue header button that adds every song in the play queue, in order, to a new or existing playlist"
+  },
   "queueUnlock": "Unlock queue",
   "@queueUnlock": {
     "description": "Tooltip of the queue header toggle while the queue is locked"
