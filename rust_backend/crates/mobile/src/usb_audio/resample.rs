@@ -3,7 +3,9 @@
 //! are little-endian integers left-justified in their subslot, as on the
 //! wire. The transport itself never changes a sample.
 
+use std::collections::HashMap;
 use std::f64::consts::{PI, TAU};
+use std::sync::{Arc, Mutex, OnceLock};
 
 /// Stopband attenuation of the filter, in dB.
 const ATTENUATION_DB: f64 = 130.0;
@@ -29,7 +31,7 @@ pub struct Resampler {
     previous: [f64; 2],
     random: u32,
     /// Per phase, `taps` coefficients in input order, oldest frame first.
-    coefficients: Vec<f64>,
+    coefficients: Arc<Vec<f64>>,
     /// The input frames the filter still needs, one buffer per channel.
     history: Vec<Vec<f64>>,
     /// The next output frame, in `1 / up` input frames from the oldest one
@@ -191,10 +193,19 @@ fn gcd(a: u32, b: u32) -> u32 {
     if b == 0 { a } else { gcd(b, a % b) }
 }
 
+/// Taps per phase and the coefficient table, shared by every resampler of
+/// one rate pair.
+type Design = (usize, Arc<Vec<f64>>);
+
 /// The taps per phase and the coefficient table of the low-pass filter that
 /// both removes the images of raising the rate by `up` and guards against
 /// the aliases of lowering it by `down`.
-fn design(up: usize, down: usize) -> Result<(usize, Vec<f64>), String> {
+fn design(up: usize, down: usize) -> Result<Design, String> {
+    static CACHE: OnceLock<Mutex<HashMap<(usize, usize), Design>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(hit) = cache.lock().unwrap().get(&(up, down)) {
+        return Ok((hit.0, Arc::clone(&hit.1)));
+    }
     // Frequencies in cycles per sample of the common rate `source * up`.
     let nyquist = 0.5 / up.max(down) as f64;
     let transition = nyquist * (1.0 - PASSBAND);
@@ -206,15 +217,18 @@ fn design(up: usize, down: usize) -> Result<(usize, Vec<f64>), String> {
         return Err("Sample rates have no practical conversion ratio".into());
     }
     let beta = 0.1102 * (ATTENUATION_DB - 8.7);
+    let inv_i0_beta = 1.0 / bessel_i0(beta);
     let centre = (length - 1) as f64 / 2.0;
-    let prototype: Vec<f64> = (0..length)
-        .map(|index| {
-            let offset = index as f64 - centre;
-            let edge = offset / centre;
-            let window = bessel_i0(beta * (1.0 - edge * edge).max(0.0).sqrt()) / bessel_i0(beta);
-            sinc(2.0 * cutoff * offset) * window
-        })
-        .collect();
+    let mut prototype = vec![0.0; length];
+    let half = length.div_ceil(2);
+    for index in 0..half {
+        let offset = index as f64 - centre;
+        let edge = offset / centre;
+        let window = bessel_i0(beta * (1.0 - edge * edge).max(0.0).sqrt()) * inv_i0_beta;
+        let value = sinc(2.0 * cutoff * offset) * window;
+        prototype[index] = value;
+        prototype[length - 1 - index] = value;
+    }
     let gain = up as f64 / prototype.iter().sum::<f64>();
     let mut coefficients = vec![0.0; length];
     for phase in 0..up {
@@ -222,6 +236,12 @@ fn design(up: usize, down: usize) -> Result<(usize, Vec<f64>), String> {
             coefficients[phase * taps + taps - 1 - tap] = prototype[phase + tap * up] * gain;
         }
     }
+    let coefficients = Arc::new(coefficients);
+    let mut guard = cache.lock().unwrap();
+    if guard.len() >= 16 {
+        guard.clear();
+    }
+    guard.insert((up, down), (taps, Arc::clone(&coefficients)));
     Ok((taps, coefficients))
 }
 
