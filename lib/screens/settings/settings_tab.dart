@@ -651,12 +651,22 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
     if (!builtInPlayer) ref.watch(settingsLinkInUseProvider);
     // Settings reads as chrome; its pages scroll without a bar.
     if (!_supportsListDetail) return NoScrollbars(child: _buildList(context));
+    Widget? wide;
+    bool? wideMornye;
     return NoScrollbars(
       child: LayoutBuilder(
-        builder: (context, constraints) =>
-            constraints.maxWidth >= listDetailMinWidth
-            ? _buildListDetail(context)
-            : _buildList(context),
+        builder: (context, constraints) {
+          if (constraints.maxWidth >= listDetailMinWidth) {
+            final mornye = context.isMornye;
+            if (wide == null || wideMornye != mornye) {
+              wideMornye = mornye;
+              wide = _buildListDetail(context);
+            }
+            return wide!;
+          }
+          // Not cached: the list reads strings and insets from this context.
+          return _buildList(context);
+        },
       ),
     );
   }
@@ -757,37 +767,42 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                 ),
               Expanded(
                 child: ClipRect(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final mediaQuery = MediaQuery.of(context);
-                      // Pages measure the detail pane, not the window.
-                      return MediaQuery(
-                        data: mediaQuery.copyWith(
-                          size: Size(
-                            constraints.maxWidth,
-                            constraints.maxHeight,
-                          ),
-                        ),
-                        // A semantics container keeps the detail routes'
-                        // modal barriers from hiding the category list.
-                        child: Semantics(
-                          container: true,
-                          child: _detailFade(
-                            context,
-                            HeroControllerScope.none(
-                              child: Navigator(
-                                key: _detailNavigatorKey,
-                                onGenerateInitialRoutes: (_, _) => [
-                                  PageRouteBuilder<void>(
-                                    transitionDuration: Duration.zero,
-                                    reverseTransitionDuration: Duration.zero,
-                                    pageBuilder: (_, _, _) => _detailPage(),
-                                  ),
-                                ],
-                              ),
+                  child: Builder(
+                    builder: (context) {
+                      final detailChild = Semantics(
+                        container: true,
+                        child: _detailFade(
+                          context,
+                          HeroControllerScope.none(
+                            child: Navigator(
+                              key: _detailNavigatorKey,
+                              onGenerateInitialRoutes: (_, _) => [
+                                PageRouteBuilder<void>(
+                                  transitionDuration: Duration.zero,
+                                  reverseTransitionDuration: Duration.zero,
+                                  pageBuilder: (_, _, _) => _detailPage(),
+                                ),
+                              ],
                             ),
                           ),
                         ),
+                      );
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final mediaQuery = MediaQuery.of(context);
+                          // Pages measure the detail pane, not the window.
+                          return MediaQuery(
+                            data: mediaQuery.copyWith(
+                              size: Size(
+                                constraints.maxWidth,
+                                constraints.maxHeight,
+                              ),
+                            ),
+                            // A semantics container keeps the detail routes'
+                            // modal barriers from hiding the category list.
+                            child: detailChild,
+                          );
+                        },
                       );
                     },
                   ),
