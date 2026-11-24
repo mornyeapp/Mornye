@@ -15,6 +15,20 @@ struct Reader<'a, R> {
 }
 
 pub(super) fn read(file: &mut (impl Read + Seek)) -> Result<AudioMetadata, String> {
+    read_inner(file, None)
+}
+
+pub(super) fn read_with_cover(
+    file: &mut (impl Read + Seek),
+    cover: &mut Option<CoverArt>,
+) -> Result<AudioMetadata, String> {
+    read_inner(file, Some(cover))
+}
+
+fn read_inner(
+    file: &mut (impl Read + Seek),
+    mut cover: Option<&mut Option<CoverArt>>,
+) -> Result<AudioMetadata, String> {
     let size = seek(file, SeekFrom::End(0))?;
     let mut reader = Reader { file, size };
     let ilst = reader.ilst()?;
@@ -58,6 +72,14 @@ pub(super) fn read(file: &mut (impl Read + Seek)) -> Result<AudioMetadata, Strin
                     apply(&mut metadata, &name, value);
                 }
             }
+            b"covr" => {
+                if let Some(slot) = cover.as_deref_mut()
+                    && slot.is_none()
+                    && let Ok(art) = reader.cover_from_atom(atom)
+                {
+                    *slot = Some(art);
+                }
+            }
             _ => {}
         }
         position = atom.end;
@@ -78,27 +100,31 @@ pub(super) fn cover(file: &mut (impl Read + Seek)) -> Result<CoverArt, String> {
         .ok()
         .flatten()
         .ok_or("cover atom not found")?;
-    let data = reader
-        .find(cover.payload, cover.end, b"data")
-        .ok()
-        .flatten()
-        .ok_or("data atom not found in cover")?;
-    if data.end <= data.payload + 8 {
-        return Err("empty cover data".into());
-    }
-    let data = reader.payload(data, 8)?;
-    let mime = if data.len() >= 8 && data.starts_with(b"\x89PNG") {
-        "image/png"
-    } else {
-        "image/jpeg"
-    };
-    Ok(CoverArt {
-        data,
-        mime: mime.into(),
-    })
+    reader.cover_from_atom(cover)
 }
 
 impl<R: Read + Seek> Reader<'_, R> {
+    fn cover_from_atom(&mut self, cover: Atom) -> Result<CoverArt, String> {
+        let data = self
+            .find(cover.payload, cover.end, b"data")
+            .ok()
+            .flatten()
+            .ok_or("data atom not found in cover")?;
+        if data.end <= data.payload + 8 {
+            return Err("empty cover data".into());
+        }
+        let data = self.payload(data, 8)?;
+        let mime = if data.len() >= 8 && data.starts_with(b"\x89PNG") {
+            "image/png"
+        } else {
+            "image/jpeg"
+        };
+        Ok(CoverArt {
+            data,
+            mime: mime.into(),
+        })
+    }
+
     fn ilst(&mut self) -> Result<Atom, String> {
         let moov = self
             .find(0, self.size, b"moov")

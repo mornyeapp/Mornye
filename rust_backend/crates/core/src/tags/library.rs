@@ -87,8 +87,8 @@ pub fn read_library_metadata(
     read_observed(file, path, hint, scan_time, mod_time, check, None)
 }
 
-/// FLAC scans collect artwork during the existing tag pass. Other formats keep
-/// their existing readers; callers request this only on a FLAC cover-cache miss.
+/// On a cover-cache miss, scans collect embedded artwork during the tag pass
+/// (FLAC, MP3, MP4/M4A, AAC, Ogg and Opus) instead of reading the file again.
 pub fn read_library_metadata_with_cover(
     file: &mut (impl Read + Seek),
     path: &str,
@@ -146,7 +146,10 @@ fn read(
     let format = read_container_format(file, &extension)?;
     let metadata = read_tags(file, format, &|| Ok(()), cover.as_deref_mut());
     let tagged = metadata.is_ok();
-    if !tagged && let Some(cover) = cover {
+    if !tagged
+        && !matches!(format, "m4a" | "mp4" | "aac" | "adts" | "mp3")
+        && let Some(cover) = cover
+    {
         *cover = None;
     }
     if let Ok(metadata) = metadata {

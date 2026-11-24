@@ -7,7 +7,7 @@ pub(crate) mod path_keys;
 use crate::manager::ExtensionManager;
 use chrono::Utc;
 use rusqlite::{Connection, OpenFlags, TransactionBehavior, params, params_from_iter};
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 use std::{
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Read, Write},
@@ -216,28 +216,25 @@ fn scan_timestamp(value: &str) -> i64 {
 /// Rows built outside the Rust readers, such as the Android DSD/WavPack row,
 /// carry no scan time. Stamp them with the import time instead of rejecting
 /// the whole scan.
-fn stamped(row: &Value) -> Option<Value> {
-    if !row.is_object() || !row["scannedAt"].is_null() {
-        return None;
+fn stamp_if_missing(row: &mut Value) {
+    if let Some(object) = row.as_object_mut()
+        && object.get("scannedAt").is_none_or(Value::is_null)
+    {
+        object.insert("scannedAt".into(), dart_date::iso_utc(&Utc::now()).into());
     }
-    let mut copy = row.clone();
-    copy["scannedAt"] = dart_date::iso_utc(&Utc::now()).into();
-    Some(copy)
 }
 
-fn incremental_row(row: &Value) -> Result<Value, String> {
-    let mut canonical = stamped(row).unwrap_or_else(|| row.clone());
-    let timestamp = text(&canonical, "scannedAt")?;
+fn canonicalize_incremental_row(row: &mut Value) -> Result<(), String> {
+    stamp_if_missing(row);
+    let timestamp = text(row, "scannedAt")?;
     let parsed =
         dart_date::parse(timestamp).ok_or("Invalid incremental Library scannedAt timestamp")?;
     let formatted = dart_date::iso(&parsed);
-    canonical["scannedAt"] = formatted.into();
     // Preserve the existing LocalLibraryItem.fromJson(...).toJson() contract,
     // including its numeric truncation and scan-version defaults. Full-scan
     // imports retain the raw scan flags through LibraryRowMapper instead.
-    let object = canonical
-        .as_object_mut()
-        .ok_or("Library row must be an object")?;
+    let object = row.as_object_mut().ok_or("Library row must be an object")?;
+    object.insert("scannedAt".into(), formatted.into());
     object.remove("audioMetadataScanVersion");
     object.remove("metadataFromFilename");
     for key in [
@@ -259,23 +256,24 @@ fn incremental_row(row: &Value) -> Result<Value, String> {
             object.insert(key.into(), value.into());
         }
     }
-    Ok(canonical)
+    Ok(())
 }
 
-fn encode(row: &Value, source: &str) -> Result<Map<String, Value>, String> {
-    let stamped = stamped(row);
-    let row = stamped.as_ref().unwrap_or(row);
+fn encode_sql_row(
+    row: &mut Value,
+    source: &str,
+    columns: &[String],
+    out: &mut Vec<rusqlite::types::Value>,
+) -> Result<(), String> {
+    use rusqlite::types::Value as SqlValue;
+    stamp_if_missing(row);
     if !row.is_object() || path_keys::dart_trim(text(row, "id")?).is_empty() {
         return Err("Library scan row has no valid id".into());
     }
-    let mut values = Map::new();
     for key in ["audioMetadataScanVersion", "fileModTime"] {
         if !row[key].is_null() && !row[key].is_number() {
             return Err(format!("Library {key} must be numeric"));
         }
-    }
-    for (json_key, column) in COLUMNS {
-        values.insert((*column).into(), row[*json_key].clone());
     }
     // Staging CTAS does not retain NOT NULL constraints. Validate required
     // storage fields before staging so corrupt input cannot survive to swap.
@@ -290,23 +288,6 @@ fn encode(row: &Value, source: &str) -> Result<Map<String, Value>, String> {
             return Err(format!("Library scan row requires string {key}"));
         }
     }
-    values.insert("source_id".into(), source.into());
-    values.insert("explicit".into(), flag(&row["explicit"]).into());
-    values.insert("has_lyrics".into(), flag(&row["hasLyrics"]).into());
-    values.insert(
-        "has_replaygain".into(),
-        i64::from(has_replaygain(row)).into(),
-    );
-    values.insert(
-        "audio_metadata_scan_version".into(),
-        numeric(&row["audioMetadataScanVersion"])
-            .unwrap_or(if row["metadataFromFilename"] == true {
-                0
-            } else {
-                SCAN_VERSION
-            })
-            .into(),
-    );
     let track = normalized(text(row, "trackName")?);
     let artist = normalized(text(row, "artistName")?);
     let album = normalized(text(row, "albumName")?);
@@ -315,42 +296,108 @@ fn encode(row: &Value, source: &str) -> Result<Map<String, Value>, String> {
     } else {
         normalized(text(row, "albumArtist")?)
     };
-    for (key, value) in [
-        ("track_name_norm", track.clone()),
-        ("artist_name_norm", artist.clone()),
-        ("album_name_norm", album.clone()),
-        ("album_artist_norm", album_artist.clone()),
-        ("match_key", format!("{track}|{artist}")),
-        ("album_key", format!("{album}|{album_artist}")),
-    ] {
-        values.insert(key.into(), value.into());
-    }
     let search_album_artist = if path_keys::dart_trim(text(row, "albumArtist")?).is_empty() {
-        artist.clone()
+        artist.as_str()
     } else {
-        album_artist
+        album_artist.as_str()
     };
-    values.insert(
-        "search_text".into(),
-        [track, artist, album, search_album_artist]
-            .into_iter()
-            .filter(|value| !value.is_empty())
-            .collect::<Vec<_>>()
-            .join(" ")
-            .into(),
+    let search_text = [
+        track.as_str(),
+        artist.as_str(),
+        album.as_str(),
+        search_album_artist,
+    ]
+    .into_iter()
+    .filter(|value| !value.is_empty())
+    .collect::<Vec<_>>()
+    .join(" ");
+    let match_key = format!("{track}|{artist}");
+    let album_key = format!("{album}|{album_artist}");
+    let sort_genre = normalized(text(row, "genre")?);
+    let sort_release = path_keys::dart_trim(text(row, "releaseDate")?).to_owned();
+    let sort_added = numeric(&row["fileModTime"])
+        .unwrap_or_else(|| scan_timestamp(text(row, "scannedAt").unwrap_or("")));
+    let explicit = flag(&row["explicit"]);
+    let has_lyrics = flag(&row["hasLyrics"]);
+    let has_replaygain_val = i64::from(has_replaygain(row));
+    let scan_version = numeric(&row["audioMetadataScanVersion"]).unwrap_or(
+        if row["metadataFromFilename"] == true {
+            0
+        } else {
+            SCAN_VERSION
+        },
     );
-    values.insert("sort_genre".into(), normalized(text(row, "genre")?).into());
-    values.insert(
-        "sort_release".into(),
-        path_keys::dart_trim(text(row, "releaseDate")?).into(),
+
+    out.clear();
+    for column in columns {
+        let sql = match column.as_str() {
+            "source_id" => SqlValue::Text(source.to_owned()),
+            "explicit" => SqlValue::Integer(explicit),
+            "has_lyrics" => SqlValue::Integer(has_lyrics),
+            "has_replaygain" => SqlValue::Integer(has_replaygain_val),
+            "audio_metadata_scan_version" => SqlValue::Integer(scan_version),
+            "track_name_norm" => SqlValue::Text(track.clone()),
+            "artist_name_norm" => SqlValue::Text(artist.clone()),
+            "album_name_norm" => SqlValue::Text(album.clone()),
+            "album_artist_norm" => SqlValue::Text(album_artist.clone()),
+            "match_key" => SqlValue::Text(match_key.clone()),
+            "album_key" => SqlValue::Text(album_key.clone()),
+            "search_text" => SqlValue::Text(search_text.clone()),
+            "sort_genre" => SqlValue::Text(sort_genre.clone()),
+            "sort_release" => SqlValue::Text(sort_release.clone()),
+            "sort_added" => SqlValue::Integer(sort_added),
+            other => match COLUMNS.iter().find(|(_, col)| *col == other) {
+                Some((json_key, _)) => sql_value(&row[*json_key])?,
+                None => SqlValue::Null,
+            },
+        };
+        out.push(sql);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+fn encode(row: &Value, source: &str) -> Result<serde_json::Map<String, Value>, String> {
+    use rusqlite::types::Value as SqlValue;
+    let mut columns: Vec<String> = COLUMNS.iter().map(|(_, col)| (*col).to_owned()).collect();
+    columns.extend(
+        [
+            "source_id",
+            "explicit",
+            "has_lyrics",
+            "has_replaygain",
+            "audio_metadata_scan_version",
+            "track_name_norm",
+            "artist_name_norm",
+            "album_name_norm",
+            "album_artist_norm",
+            "match_key",
+            "album_key",
+            "search_text",
+            "sort_genre",
+            "sort_release",
+            "sort_added",
+        ]
+        .into_iter()
+        .map(str::to_owned),
     );
-    values.insert(
-        "sort_added".into(),
-        numeric(&row["fileModTime"])
-            .unwrap_or_else(|| scan_timestamp(text(row, "scannedAt").unwrap_or("")))
-            .into(),
-    );
-    Ok(values)
+    let mut owned = row.clone();
+    let mut values = Vec::with_capacity(columns.len());
+    encode_sql_row(&mut owned, source, &columns, &mut values)?;
+    let mut map = serde_json::Map::with_capacity(columns.len());
+    for (column, value) in columns.into_iter().zip(values) {
+        let json = match value {
+            SqlValue::Null => Value::Null,
+            SqlValue::Integer(v) => v.into(),
+            SqlValue::Real(v) => serde_json::Number::from_f64(v)
+                .map(Value::Number)
+                .unwrap_or(Value::Null),
+            SqlValue::Text(s) => Value::String(s),
+            SqlValue::Blob(_) => Value::Null,
+        };
+        map.insert(column, json);
+    }
+    Ok(map)
 }
 
 fn sql_value(value: &Value) -> Result<rusqlite::types::Value, String> {
@@ -402,6 +449,7 @@ fn import(request: &Value, delta: Option<&Value>, check: Check<'_>) -> Result<Va
     // platform read errors. Past 256 entries it preserves every missing row.
     let mut invalid_paths = Vec::<String>::new();
     let mut pending = Vec::with_capacity(BATCH_SIZE);
+    let mut fields = Vec::with_capacity(columns.len());
     let mut flush = |rows: &mut Vec<Value>| -> Result<(), String> {
         if rows.is_empty() {
             return Ok(());
@@ -410,19 +458,28 @@ fn import(request: &Value, delta: Option<&Value>, check: Check<'_>) -> Result<Va
         let transaction = db
             .transaction()
             .map_err(|e| error("stage transaction", e))?;
-        for row in rows.drain(..) {
-            check()?;
-            // One corrupt row is reported and skipped. It must not discard the
-            // rest of an otherwise valid scan; the swap below keeps the file's
-            // previous entry, as it does for a platform read error.
-            let encoded = if delta.is_some() {
-                incremental_row(&row).and_then(|canonical| encode(&canonical, source))
-            } else {
-                encode(&row, source)
-            };
-            let mapped = match encoded {
-                Ok(mapped) => mapped,
-                Err(message) => {
+        {
+            let mut insert_stmt = transaction
+                .prepare_cached(&insert)
+                .map_err(|e| error("prepare staged row", e))?;
+            let mut delete_keys_stmt = transaction
+                .prepare_cached("DELETE FROM native_library_keys WHERE item_id = ?")
+                .map_err(|e| error("prepare replace staged keys", e))?;
+            let mut insert_key_stmt = transaction
+                .prepare_cached("INSERT OR IGNORE INTO native_library_keys VALUES (?, ?)")
+                .map_err(|e| error("prepare staged keys", e))?;
+            for mut row in rows.drain(..) {
+                check()?;
+                // One corrupt row is reported and skipped. It must not discard the
+                // rest of an otherwise valid scan; the swap below keeps the file's
+                // previous entry, as it does for a platform read error.
+                let encoded = if delta.is_some() {
+                    canonicalize_incremental_row(&mut row)
+                        .and_then(|()| encode_sql_row(&mut row, source, &columns, &mut fields))
+                } else {
+                    encode_sql_row(&mut row, source, &columns, &mut fields)
+                };
+                if let Err(message) = encoded {
                     invalid += 1;
                     let path = row["filePath"].as_str().unwrap_or("<no path>");
                     if first_invalid.is_none() {
@@ -433,28 +490,18 @@ fn import(request: &Value, delta: Option<&Value>, check: Check<'_>) -> Result<Va
                     }
                     continue;
                 }
-            };
-            let fields = columns
-                .iter()
-                .map(|column| sql_value(mapped.get(column).unwrap_or(&Value::Null)))
-                .collect::<Result<Vec<_>, _>>()?;
-            transaction
-                .prepare_cached(&insert)
-                .map_err(|e| error("prepare staged row", e))?
-                .execute(params_from_iter(fields))
-                .map_err(|e| error("stage Library row", e))?;
-            let id = text(&row, "id")?;
-            transaction
-                .prepare_cached("DELETE FROM native_library_keys WHERE item_id = ?")
-                .map_err(|e| error("prepare replace staged keys", e))?
-                .execute([id])
-                .map_err(|e| error("replace staged keys", e))?;
-            for key in path_keys::build(text(&row, "filePath")?, android)? {
-                transaction
-                    .prepare_cached("INSERT OR IGNORE INTO native_library_keys VALUES (?, ?)")
-                    .map_err(|e| error("prepare staged keys", e))?
-                    .execute(params![id, key])
-                    .map_err(|e| error("stage path key", e))?;
+                insert_stmt
+                    .execute(params_from_iter(fields.iter()))
+                    .map_err(|e| error("stage Library row", e))?;
+                let id = text(&row, "id")?;
+                delete_keys_stmt
+                    .execute([id])
+                    .map_err(|e| error("replace staged keys", e))?;
+                for key in path_keys::build(text(&row, "filePath")?, android)? {
+                    insert_key_stmt
+                        .execute(params![id, key])
+                        .map_err(|e| error("stage path key", e))?;
+                }
             }
         }
         transaction

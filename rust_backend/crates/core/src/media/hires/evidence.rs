@@ -464,17 +464,23 @@ fn pearson(a: &[f64], b: &[f64]) -> f64 {
     cov / (var_a * var_b).sqrt()
 }
 
-/// Sorts `values` and returns their median.
+/// Partitions `values` in linear time and returns their median.
 pub(super) fn median_in_place(values: &mut [f64]) -> f64 {
-    if values.is_empty() {
+    let len = values.len();
+    if len == 0 {
         return f64::NAN;
     }
-    values.sort_by(f64::total_cmp);
-    let mid = values.len() / 2;
-    if values.len() % 2 == 1 {
-        values[mid]
+    let mid = len / 2;
+    let (lower, upper_mid, _) = values.select_nth_unstable_by(mid, f64::total_cmp);
+    if len % 2 == 1 {
+        *upper_mid
     } else {
-        (values[mid - 1] + values[mid]) / 2.0
+        let lower_max = lower
+            .iter()
+            .copied()
+            .max_by(f64::total_cmp)
+            .expect("non-empty lower half");
+        (lower_max + *upper_mid) / 2.0
     }
 }
 

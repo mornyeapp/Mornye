@@ -282,14 +282,25 @@ fn read_tags(
             Some(cover) => containers::flac_with_cover(&mut reader, cover),
             None => containers::flac(&mut reader),
         },
-        "m4a" | "mp4" | "aac" => mp4::read(&mut reader),
+        "m4a" | "mp4" | "aac" => match cover {
+            Some(cover) => mp4::read_with_cover(&mut reader, cover),
+            None => mp4::read(&mut reader),
+        },
         "mp3" => match cover {
             Some(cover) => id3::read_with_cover(&mut reader, cover),
             None => id3::read(&mut reader),
         },
         // ADTS has no tag format of its own; taggers use ID3 or APEv2.
-        "adts" => id3::read(&mut reader).or_else(|_| containers::ape(&mut reader)),
-        "ogg" | "opus" => containers::ogg(&mut reader),
+        "adts" => match cover {
+            Some(cover) => {
+                id3::read_with_cover(&mut reader, cover).or_else(|_| containers::ape(&mut reader))
+            }
+            None => id3::read(&mut reader).or_else(|_| containers::ape(&mut reader)),
+        },
+        "ogg" | "opus" => match cover {
+            Some(cover) => containers::ogg_with_cover(&mut reader, cover),
+            None => containers::ogg(&mut reader),
+        },
         "ape" | "wv" | "mpc" => containers::ape(&mut reader),
         "wav" => containers::riff(&mut reader, false),
         "aiff" | "aif" | "aifc" => containers::riff(&mut reader, true),

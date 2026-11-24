@@ -319,6 +319,44 @@ pub(crate) fn ogg_stream_is_opus(packets: &[Vec<u8>]) -> Option<bool> {
 }
 
 pub(super) fn ogg(reader: &mut impl Read) -> Result<AudioMetadata, String> {
+    ogg_inner(reader, None)
+}
+
+pub(super) fn ogg_with_cover(
+    reader: &mut impl Read,
+    cover: &mut Option<CoverArt>,
+) -> Result<AudioMetadata, String> {
+    ogg_inner(reader, Some(cover))
+}
+
+fn decode_ogg_picture_base64(value: &[u8]) -> Option<CoverArt> {
+    let has_whitespace = value
+        .iter()
+        .any(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'));
+    let decoded = if has_whitespace {
+        let stripped: Vec<u8> = value
+            .iter()
+            .copied()
+            .filter(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+            .collect();
+        base64::engine::general_purpose::STANDARD
+            .decode(&stripped)
+            .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(&stripped))
+    } else {
+        base64::engine::general_purpose::STANDARD
+            .decode(value)
+            .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(value))
+    };
+    decoded
+        .ok()
+        .and_then(|bytes| picture_block(&bytes, true))
+        .map(|(_, art)| art)
+}
+
+fn ogg_inner(
+    reader: &mut impl Read,
+    mut cover: Option<&mut Option<CoverArt>>,
+) -> Result<AudioMetadata, String> {
     let packets = ogg_comment_packets(reader)?;
     let stream = ogg_stream_is_opus(&packets);
     let packet = packets.iter().find_map(|packet| {
@@ -332,9 +370,23 @@ pub(super) fn ogg(reader: &mut impl Read) -> Result<AudioMetadata, String> {
     });
     // Every Opus and Vorbis stream has this header, so a complete one without
     // a title or artist is an untagged or partly tagged song, not a failed read.
-    packet
-        .map(|data| comments::ogg(comments::parse(data, 512 * 1024), stream == Some(true)))
-        .ok_or_else(|| "no Vorbis comments found".into())
+    let Some(data) = packet else {
+        return Err("no Vorbis comments found".into());
+    };
+    // One streaming pass: a large tag of many fields is never held at once.
+    // Only the picture may exceed the 512 KiB limit for other fields.
+    let items = comments::parse_raw(data, MAX_TAG_BYTES).filter_map(move |(key, value)| {
+        if let Some(slot) = cover.as_deref_mut()
+            && slot.is_none()
+            && key.eq_ignore_ascii_case(b"METADATA_BLOCK_PICTURE")
+        {
+            *slot = decode_ogg_picture_base64(value);
+            return None;
+        }
+        (key.len() + 1 + value.len() <= 512 * 1024).then(|| (utf8(key), utf8(value)))
+    });
+    let metadata = comments::ogg(items, stream == Some(true));
+    Ok(metadata)
 }
 
 pub(super) fn ogg_cover(reader: &mut impl Read) -> Result<CoverArt, String> {
@@ -348,20 +400,11 @@ pub(super) fn ogg_cover(reader: &mut impl Read) -> Result<CoverArt, String> {
         } else {
             continue;
         };
-        for (key, value) in comments::parse(comments, MAX_TAG_BYTES) {
-            if !key.eq_ignore_ascii_case("METADATA_BLOCK_PICTURE") {
+        for (key, value) in comments::parse_raw(comments, MAX_TAG_BYTES) {
+            if !key.eq_ignore_ascii_case(b"METADATA_BLOCK_PICTURE") {
                 continue;
             }
-            let value: Vec<_> = value
-                .bytes()
-                .filter(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
-                .collect();
-            let decoded = base64::engine::general_purpose::STANDARD
-                .decode(&value)
-                .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(&value));
-            if let Ok(decoded) = decoded
-                && let Some((_, cover)) = picture_block(&decoded, true)
-            {
+            if let Some(cover) = decode_ogg_picture_base64(value) {
                 return Ok(cover);
             }
         }

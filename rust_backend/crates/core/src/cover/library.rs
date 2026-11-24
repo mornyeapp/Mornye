@@ -1,14 +1,14 @@
 //! Bounded thumbnail reuse for tracks that embed the same album artwork.
 
 use sha2::{Digest, Sha256};
-use std::collections::{VecDeque, hash_map::DefaultHasher};
-use std::hash::{Hash, Hasher};
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, OnceLock, TryLockError};
 use std::time::Duration;
 
 const MAX_BYTES: usize = 8 << 20;
 const MAX_ENTRIES: usize = 32;
 static CACHE: OnceLock<Mutex<Cache>> = OnceLock::new();
+static DECODE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 /// Android Library names identify the final thumbnail bytes, independently
 /// of the song, source, and original image encoding.
@@ -25,8 +25,8 @@ pub fn library_content_stem(data: &[u8]) -> String {
 }
 
 struct Entry {
-    hash: u64,
-    original: Arc<[u8]>,
+    digest: [u8; 32],
+    original_len: usize,
     thumbnail: Arc<[u8]>,
     stored: Arc<Mutex<Option<String>>>,
     bytes: usize,
@@ -47,6 +47,20 @@ struct Cache {
 }
 
 impl Cache {
+    fn get(&mut self, digest: &[u8; 32], original_len: usize) -> Option<LibraryThumbnail> {
+        let index = self
+            .entries
+            .iter()
+            .position(|entry| entry.original_len == original_len && entry.digest == *digest)?;
+        let entry = self.entries.remove(index).expect("cached thumbnail");
+        let thumbnail = LibraryThumbnail {
+            data: entry.thumbnail.clone(),
+            stored: entry.stored.clone(),
+        };
+        self.entries.push_back(entry);
+        Some(thumbnail)
+    }
+
     fn insert(&mut self, entry: Entry) {
         if entry.bytes > MAX_BYTES {
             return;
@@ -63,8 +77,22 @@ impl Cache {
     }
 }
 
-/// Serialize large image decodes while keeping tag reads parallel. Reuse resized
-/// artwork by content, not filename or album name; never confuse alternate covers.
+fn lock_checked<'a, T>(
+    mutex: &'a Mutex<T>,
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<std::sync::MutexGuard<'a, T>, String> {
+    loop {
+        check()?;
+        match mutex.try_lock() {
+            Ok(guard) => return Ok(guard),
+            Err(TryLockError::WouldBlock) => std::thread::sleep(Duration::from_millis(10)),
+            Err(TryLockError::Poisoned(_)) => return Err("thumbnail cache unavailable".into()),
+        }
+    }
+}
+
+/// Large decodes run one at a time; tag reads and cache hits stay parallel.
+/// Artwork is reused by content, so alternate covers are never confused.
 pub fn library_thumbnail(
     data: &[u8],
     check: &dyn Fn() -> Result<(), String>,
@@ -78,64 +106,44 @@ pub fn library_thumbnail_entry(
     check: &dyn Fn() -> Result<(), String>,
 ) -> Result<LibraryThumbnail, String> {
     check()?;
-    let mut hasher = DefaultHasher::new();
-    data.hash(&mut hasher);
-    let hash = hasher.finish();
-    let mutex = CACHE.get_or_init(Mutex::default);
-    let mut cache = loop {
-        check()?;
-        match mutex.try_lock() {
-            Ok(cache) => break cache,
-            Err(TryLockError::WouldBlock) => std::thread::sleep(Duration::from_millis(10)),
-            Err(TryLockError::Poisoned(_)) => return Err("thumbnail cache unavailable".into()),
-        }
-    };
-    if let Some(index) = cache
-        .entries
-        .iter()
-        .position(|entry| entry.hash == hash && &*entry.original == data)
+    let digest: [u8; 32] = Sha256::digest(data).into();
+    let original_len = data.len();
+    let cache_mutex = CACHE.get_or_init(Mutex::default);
     {
-        let entry = cache.entries.remove(index).expect("cached thumbnail");
-        let thumbnail = LibraryThumbnail {
-            data: entry.thumbnail.clone(),
-            stored: entry.stored.clone(),
-        };
-        cache.entries.push_back(entry);
-        return Ok(thumbnail);
+        let mut cache = lock_checked(cache_mutex, check)?;
+        if let Some(hit) = cache.get(&digest, original_len) {
+            return Ok(hit);
+        }
+    }
+    let decode_mutex = DECODE_LOCK.get_or_init(|| Mutex::new(()));
+    let _decode_guard = lock_checked(decode_mutex, check)?;
+    {
+        let mut cache = lock_checked(cache_mutex, check)?;
+        if let Some(hit) = cache.get(&digest, original_len) {
+            return Ok(hit);
+        }
     }
     let resized = super::resize(data, super::LIBRARY_MAX_DIMENSION, check)?;
-    if let std::borrow::Cow::Owned(thumbnail) = &resized
-        && data.len().saturating_add(thumbnail.len()) > MAX_BYTES
-    {
-        check()?;
-        let std::borrow::Cow::Owned(thumbnail) = resized else {
-            unreachable!("owned resized thumbnail");
-        };
-        return Ok(LibraryThumbnail {
-            data: thumbnail.into(),
-            stored: Arc::default(),
+    check()?;
+    let thumbnail: Arc<[u8]> = match resized {
+        std::borrow::Cow::Borrowed(bytes) => bytes.into(),
+        std::borrow::Cow::Owned(bytes) => bytes.into(),
+    };
+    let bytes = thumbnail.len();
+    let stored = Arc::<Mutex<_>>::default();
+    if bytes <= MAX_BYTES {
+        let mut cache = lock_checked(cache_mutex, check)?;
+        if let Some(hit) = cache.get(&digest, original_len) {
+            return Ok(hit);
+        }
+        cache.insert(Entry {
+            digest,
+            original_len,
+            thumbnail: thumbnail.clone(),
+            stored: stored.clone(),
+            bytes,
         });
     }
-    let original: Arc<[u8]> = data.into();
-    let thumbnail = match resized {
-        std::borrow::Cow::Borrowed(_) => original.clone(),
-        std::borrow::Cow::Owned(data) => data.into(),
-    };
-    check()?;
-    let bytes = original.len()
-        + if Arc::ptr_eq(&original, &thumbnail) {
-            0
-        } else {
-            thumbnail.len()
-        };
-    let stored = Arc::<Mutex<_>>::default();
-    cache.insert(Entry {
-        hash,
-        original,
-        thumbnail: thumbnail.clone(),
-        stored: stored.clone(),
-        bytes,
-    });
     Ok(LibraryThumbnail {
         data: thumbnail,
         stored,
@@ -201,22 +209,19 @@ mod tests {
         assert_eq!(super::super::dimensions(&thumbnail), (800, 800));
         assert!(thumbnail.len() < MAX_BYTES);
         let cache = CACHE.get().unwrap().lock().unwrap();
-        assert!(
-            cache
-                .entries
-                .iter()
-                .all(|entry| entry.original.len() <= MAX_BYTES)
-        );
+        assert!(cache.entries.iter().all(|entry| entry.bytes <= MAX_BYTES));
     }
 
     #[test]
     fn cache_has_fixed_byte_and_entry_bounds() {
         let mut cache = Cache::default();
-        for hash in 0..100 {
+        for hash in 0_u64..100 {
+            let mut digest = [0_u8; 32];
+            digest[..8].copy_from_slice(&hash.to_le_bytes());
             let data: Arc<[u8]> = vec![0; 1 << 20].into();
             cache.insert(Entry {
-                hash,
-                original: data.clone(),
+                digest,
+                original_len: 1 << 20,
                 thumbnail: data,
                 stored: Arc::default(),
                 bytes: 1 << 20,
@@ -225,6 +230,13 @@ mod tests {
             assert!(cache.entries.len() <= MAX_ENTRIES);
         }
         assert_eq!(cache.bytes, MAX_BYTES);
-        assert_eq!(cache.entries.front().unwrap().hash, 92);
+        assert_eq!(
+            u64::from_le_bytes(
+                cache.entries.front().unwrap().digest[..8]
+                    .try_into()
+                    .unwrap()
+            ),
+            92
+        );
     }
 }

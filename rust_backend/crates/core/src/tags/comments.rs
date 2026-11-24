@@ -1,10 +1,10 @@
 use super::{AudioMetadata, pair, truthy, utf8};
 use crate::matching::{lowercase, uppercase};
 
-pub(super) fn parse(
+pub(super) fn parse_raw(
     data: &[u8],
     max_comment: usize,
-) -> impl Iterator<Item = (String, String)> + '_ {
+) -> impl Iterator<Item = (&[u8], &[u8])> + '_ {
     let header = data.get(..4).and_then(|length| {
         let vendor = u32::from_le_bytes(length.try_into().unwrap()) as usize;
         let end = vendor.checked_add(8)?;
@@ -26,11 +26,18 @@ pub(super) fn parse(
             if length <= max_comment
                 && let Some(index) = value.iter().position(|value| *value == b'=')
             {
-                return Some((utf8(&value[..index]), utf8(&value[index + 1..])));
+                return Some((&value[..index], &value[index + 1..]));
             }
         }
         None
     })
+}
+
+pub(super) fn parse(
+    data: &[u8],
+    max_comment: usize,
+) -> impl Iterator<Item = (String, String)> + '_ {
+    parse_raw(data, max_comment).map(|(key, value)| (utf8(key), utf8(value)))
 }
 
 fn joined<'a>(items: impl Iterator<Item = &'a str>) -> String {

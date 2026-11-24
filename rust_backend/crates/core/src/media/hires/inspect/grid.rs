@@ -11,6 +11,7 @@
 //! plain DFT bins of the frame, and the DFT of a frame moved by one sample
 //! costs one multiplication per bin.
 
+use super::super::fft::Radix2Fft;
 use std::f64::consts::PI;
 
 /// The window shapes lapped-transform codecs use.
@@ -117,13 +118,14 @@ pub(super) struct GridPeak {
     pub offset: usize,
 }
 
-/// What mixes the DFT bins around a coefficient into that coefficient, for
-/// one window. Per sine term and coefficient: the factor of the bin above
-/// (`up`) and of the bin below (`down`).
+/// What mixes the DFT bins around a coefficient into it, for one window; one
+/// array per sine term, so the loop over coefficients vectorizes.
 struct Mixer {
     window: Window,
-    up: Vec<Vec<(f64, f64)>>,
-    down: Vec<Vec<(f64, f64)>>,
+    up_re: Vec<Vec<f64>>,
+    up_im: Vec<Vec<f64>>,
+    down_re: Vec<Vec<f64>>,
+    down_im: Vec<Vec<f64>>,
 }
 
 /// Scans `excerpts` of one signal, each at least `transform.size * 3 / 2`
@@ -163,36 +165,64 @@ pub(super) fn scan(
         .map(|&window| {
             let series = window.series(size);
             let shift = 0.5 + size as f64 / 4.0;
-            let factors = |sign: f64| -> Vec<Vec<(f64, f64)>> {
-                series
-                    .iter()
-                    .enumerate()
-                    .map(|(m, c)| {
-                        let phi = PI * (2 * m + 1) as f64 / size as f64;
-                        (0..count)
-                            .map(|i| {
-                                let theta = 2.0 * PI * ((first + i) as f64 + 0.5) / size as f64;
-                                let angle = theta * shift + sign * phi / 2.0;
-                                (0.5 * c * angle.cos(), 0.5 * c * angle.sin())
-                            })
-                            .collect()
-                    })
-                    .collect()
+            let factors = |sign: f64| -> (Vec<Vec<f64>>, Vec<Vec<f64>>) {
+                let mut re_terms = Vec::with_capacity(series.len());
+                let mut im_terms = Vec::with_capacity(series.len());
+                for (m, c) in series.iter().enumerate() {
+                    let phi = PI * (2 * m + 1) as f64 / size as f64;
+                    let mut term_re = Vec::with_capacity(count);
+                    let mut term_im = Vec::with_capacity(count);
+                    for i in 0..count {
+                        let theta = 2.0 * PI * ((first + i) as f64 + 0.5) / size as f64;
+                        let angle = theta * shift + sign * phi / 2.0;
+                        let (sin, cos) = angle.sin_cos();
+                        term_re.push(0.5 * c * cos);
+                        term_im.push(0.5 * c * sin);
+                    }
+                    re_terms.push(term_re);
+                    im_terms.push(term_im);
+                }
+                (re_terms, im_terms)
             };
+            let (up_re, up_im) = factors(1.0);
+            let (down_re, down_im) = factors(-1.0);
             Mixer {
                 window,
-                up: factors(1.0),
-                down: factors(-1.0),
+                up_re,
+                up_im,
+                down_re,
+                down_im,
             }
         })
         .collect();
 
-    let turn: Vec<(f64, f64)> = (0..size)
-        .map(|t| {
-            let angle = 2.0 * PI * t as f64 / size as f64;
-            (angle.cos(), angle.sin())
+    let fft = size.is_power_of_two().then(|| Radix2Fft::new(size));
+    let mut fft_re = if fft.is_some() {
+        vec![0.0f64; size]
+    } else {
+        Vec::new()
+    };
+    let mut fft_im = if fft.is_some() {
+        vec![0.0f64; size]
+    } else {
+        Vec::new()
+    };
+    let turn: Vec<(f64, f64)> = if fft.is_some() {
+        Vec::new()
+    } else {
+        (0..size)
+            .map(|t| {
+                let (sin, cos) = (2.0 * PI * t as f64 / size as f64).sin_cos();
+                (cos, sin)
+            })
+            .collect()
+    };
+    let (bin_turn_re, bin_turn_im): (Vec<f64>, Vec<f64>) = (0..bins)
+        .map(|index| {
+            let (sin, cos) = (2.0 * PI * ((bin0 + index) % size) as f64 / size as f64).sin_cos();
+            (cos, sin)
         })
-        .collect();
+        .unzip();
     let relative = 10f64.powf(transform.zero_db / 20.0);
     let mut share = vec![vec![0.0f64; hop]; mixers.len()];
     let mut frames = vec![vec![0u32; hop]; mixers.len()];
@@ -205,29 +235,45 @@ pub(super) fn scan(
             continue;
         }
         // The plain DFT of the first frame, over the bins the band needs.
-        for (index, (r, i)) in re.iter_mut().zip(im.iter_mut()).enumerate() {
-            let bin = bin0 + index;
-            let (mut sum_re, mut sum_im) = (0.0, 0.0);
-            for (t, sample) in excerpt[..size].iter().enumerate() {
-                let (cos, sin) = turn[bin * t % size];
-                sum_re += sample * cos;
-                sum_im -= sample * sin;
+        if let Some(fft) = &fft {
+            fft_re.copy_from_slice(&excerpt[..size]);
+            fft_im.fill(0.0);
+            fft.transform(&mut fft_re, &mut fft_im);
+            re.copy_from_slice(&fft_re[bin0..bin0 + bins]);
+            im.copy_from_slice(&fft_im[bin0..bin0 + bins]);
+        } else {
+            for (index, (r, i)) in re.iter_mut().zip(im.iter_mut()).enumerate() {
+                let bin = bin0 + index;
+                let (mut sum_re, mut sum_im) = (0.0, 0.0);
+                for (t, sample) in excerpt[..size].iter().enumerate() {
+                    let (cos, sin) = turn[bin * t % size];
+                    sum_re += sample * cos;
+                    sum_im -= sample * sin;
+                }
+                (*r, *i) = (sum_re, sum_im);
             }
-            (*r, *i) = (sum_re, sum_im);
         }
         for offset in 0..hop {
+            if offset % 64 == 0 {
+                check()?;
+            }
             for (which, mixer) in mixers.iter().enumerate() {
                 coefficients.fill(0.0);
-                for (m, (up, down)) in mixer.up.iter().zip(&mixer.down).enumerate() {
+                for m in 0..mixer.up_re.len() {
                     // Coefficient k mixes bins k + m + 1 and k - m.
+                    let up_re = &mixer.up_re[m][..count];
+                    let up_im = &mixer.up_im[m][..count];
+                    let down_re = &mixer.down_re[m][..count];
+                    let down_im = &mixer.down_im[m][..count];
                     let above = &re[terms + m + 1..terms + m + 1 + count];
                     let above_im = &im[terms + m + 1..terms + m + 1 + count];
                     let below = &re[terms - m..terms - m + count];
                     let below_im = &im[terms - m..terms - m + count];
+                    let coeff = &mut coefficients[..count];
                     for i in 0..count {
-                        coefficients[i] += up[i].1 * above[i]
-                            - up[i].0 * above_im[i]
-                            - (down[i].1 * below[i] - down[i].0 * below_im[i]);
+                        coeff[i] += up_im[i] * above[i]
+                            - up_re[i] * above_im[i]
+                            - (down_im[i] * below[i] - down_re[i] * below_im[i]);
                     }
                 }
                 let rms = (coefficients.iter().map(|c| c * c).sum::<f64>() / count as f64).sqrt();
@@ -241,10 +287,13 @@ pub(super) fn scan(
             }
             // Move the frame one sample on.
             let change = excerpt[offset + size] - excerpt[offset];
-            for (index, (r, i)) in re.iter_mut().zip(im.iter_mut()).enumerate() {
-                let (cos, sin) = turn[(bin0 + index) % size];
-                let moved = *r + change;
-                (*r, *i) = (moved * cos - *i * sin, moved * sin + *i * cos);
+            for index in 0..bins {
+                let cos = bin_turn_re[index];
+                let sin = bin_turn_im[index];
+                let moved = re[index] + change;
+                let cur_im = im[index];
+                re[index] = moved * cos - cur_im * sin;
+                im[index] = moved * sin + cur_im * cos;
             }
         }
     }

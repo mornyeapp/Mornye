@@ -204,32 +204,45 @@ impl Filterbank {
     }
 
     /// The subbands from `first_band` up at every position of an excerpt:
-    /// `out[b][p]` is the output of subband `first_band + b` when sample
-    /// `TAPS - 1 + p` is the newest one in.
-    fn subbands(&self, excerpt: &[f32], first_band: usize) -> Vec<Vec<f64>> {
-        let mut out = vec![vec![0.0; POSITIONS]; BANDS - first_band];
+    /// `out[b * POSITIONS + p]` is the output of subband `first_band + b` when
+    /// sample `TAPS - 1 + p` is the newest one in.
+    fn subbands(
+        &self,
+        excerpt: &[f32],
+        first_band: usize,
+        out: &mut [f64],
+        check: &dyn Fn() -> Result<(), String>,
+    ) -> Result<(), String> {
+        let band_count = BANDS - first_band;
+        debug_assert_eq!(out.len(), band_count * POSITIONS);
         let mut folded = [0.0f64; 64];
+        let (taps, _) = self.window.as_chunks::<64>();
+        let matrix = &self.matrix[first_band..];
         for p in 0..POSITIONS {
+            if p % 256 == 0 {
+                check()?;
+            }
             folded.fill(0.0);
-            let (taps, _) = self.window.as_chunks::<64>();
             let (samples, _) = excerpt[p..p + TAPS].as_chunks::<64>();
             for (taps, samples) in taps.iter().zip(samples) {
                 for ((sum, tap), sample) in folded.iter_mut().zip(taps).zip(samples) {
                     *sum += tap * f64::from(*sample);
                 }
             }
-            for (band, row) in out.iter_mut().zip(&self.matrix[first_band..]) {
-                band[p] = row.iter().zip(&folded).map(|(m, y)| m * y).sum();
+            for (b, row) in matrix.iter().enumerate() {
+                out[b * POSITIONS + p] = row.iter().zip(&folded).map(|(m, y)| m * y).sum();
             }
         }
-        out
+        Ok(())
     }
 
     /// The coefficients of the block that starts at position `q`, into
     /// `lines`: 18 per subband. The lowest subband given lacks the
     /// butterfly with the one below it.
-    fn block(&self, subbands: &[Vec<f64>], first_band: usize, q: usize, lines: &mut [f64]) {
-        for (b, band) in subbands.iter().enumerate() {
+    fn block(&self, subbands: &[f64], first_band: usize, q: usize, lines: &mut [f64]) {
+        let band_count = BANDS - first_band;
+        for b in 0..band_count {
+            let band = &subbands[b * POSITIONS..(b + 1) * POSITIONS];
             let out = &mut lines[b * BAND_LINES..(b + 1) * BAND_LINES];
             out.fill(0.0);
             for (m, weights) in self.transform[(first_band + b) % 2].iter().enumerate() {
@@ -239,7 +252,7 @@ impl Filterbank {
                 }
             }
         }
-        for b in 1..subbands.len() {
+        for b in 1..band_count {
             for (i, (cs, ca)) in self.butterflies.iter().enumerate() {
                 let (below, above) = (b * BAND_LINES - 1 - i, b * BAND_LINES + i);
                 let (low, high) = (lines[below], lines[above]);
@@ -267,6 +280,7 @@ struct Tally {
     /// Loud lines the zeros were counted in.
     gated: f64,
     power: Vec<f64>,
+    loud: Vec<usize>,
 }
 
 impl Tally {
@@ -293,6 +307,7 @@ impl Tally {
             zeros: vec![0.0; GRANULE],
             gated: 0.0,
             power: Vec::new(),
+            loud: Vec::new(),
         }
     }
 
@@ -320,12 +335,16 @@ impl Tally {
             self.cos[alignment] += cos;
             self.sin[alignment] += sin;
         }
-        let loud: Vec<usize> = (zeros_from.max(lattice_from)..width)
-            .filter(|&line| self.power[line] >= self.gate)
-            .collect();
-        self.gated += loud.len() as f64;
+        self.loud.clear();
+        for line in zeros_from.max(lattice_from)..width {
+            if self.power[line] >= self.gate {
+                self.loud.push(line);
+            }
+        }
+        self.gated += self.loud.len() as f64;
         for (alignment, row) in rows.chunks_exact(width).enumerate() {
-            let zeros = loud
+            let zeros = self
+                .loud
                 .iter()
                 .filter(|&&line| row[line].abs() < self.zero_level)
                 .count();
@@ -496,13 +515,15 @@ pub(super) fn scan(
     }
     let bank = Filterbank::new();
     let mut tally = Tally::new();
-    let mut rows = vec![vec![0.0f64; GRANULE * width]; if right.is_some() { 2 } else { 1 }];
+    let channels = if right.is_some() { 2 } else { 1 };
+    let mut subbands = vec![vec![0.0f64; (BANDS - first_band) * POSITIONS]; channels];
+    let mut rows = vec![vec![0.0f64; GRANULE * width]; channels];
     let mut mixed = vec![0.0f64; if right.is_some() { GRANULE * width } else { 0 }];
     for &index in &chosen {
         check()?;
-        let mut subbands = vec![bank.subbands(left[index], first_band)];
+        bank.subbands(left[index], first_band, &mut subbands[0], check)?;
         if let Some(right) = right {
-            subbands.push(bank.subbands(right[index], first_band));
+            bank.subbands(right[index], first_band, &mut subbands[1], check)?;
         }
         for granule in 0..GRANULES {
             check()?;
@@ -718,7 +739,9 @@ mod tests {
         // for 4096 samples of the generator with seed 1.
         let audio = as_audio(&lcg(4_096, 1));
         let bank = Filterbank::new();
-        let subbands = bank.subbands(&audio[..EXCERPT], 0);
+        let mut subbands = vec![0.0; BANDS * POSITIONS];
+        bank.subbands(&audio[..EXCERPT], 0, &mut subbands, &|| Ok(()))
+            .unwrap();
         let first = [
             4.841525678929e-02,
             1.117178065265e-01,
@@ -753,8 +776,9 @@ mod tests {
             7.635066870005e-02,
             6.623927084890e-02,
         ];
-        for (band, expected) in subbands.iter().zip(first) {
-            assert!((band[0] - expected).abs() < 1e-11, "{} {expected}", band[0]);
+        for (k, expected) in first.into_iter().enumerate() {
+            let value = subbands[k * POSITIONS];
+            assert!((value - expected).abs() < 1e-11, "{value} {expected}");
         }
         for (k, expected) in [
             7.882292299976e-03,
@@ -765,7 +789,7 @@ mod tests {
         .into_iter()
         .enumerate()
         {
-            let value = subbands[k][1_000 - (TAPS - 1)];
+            let value = subbands[k * POSITIONS + (1_000 - (TAPS - 1))];
             assert!((value - expected).abs() < 1e-11, "{value} {expected}");
         }
 

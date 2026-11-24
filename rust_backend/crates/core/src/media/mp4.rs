@@ -169,9 +169,63 @@ impl<R: Read + Seek> Reader<'_, R> {
         Ok(())
     }
 
+    // Walks the box tree so large udta/covr/stsz boxes are skipped by seeking;
+    // the byte scan remains for files that nest entries unexpectedly.
+    fn sample_entry(&mut self, atom: Atom) -> Result<(u64, [u8; 4]), String> {
+        if let Ok(Some(found)) = self.find_sample_entry(atom.payload, atom.end, 0) {
+            return Ok(found);
+        }
+        self.sample_entry_scan(atom)
+    }
+
+    fn find_sample_entry(
+        &mut self,
+        mut start: u64,
+        end: u64,
+        depth: usize,
+    ) -> Result<Option<(u64, [u8; 4])>, String> {
+        if depth >= 32 {
+            return Ok(None);
+        }
+        while start.checked_add(8).is_some_and(|value| value <= end) {
+            let atom = self.atom(start, end)?;
+            match &atom.kind {
+                b"mp4a" | b"alac" | b"fLaC" | b"ec-3" | b"ac-3" | b"ac-4" | b"Opus" => {
+                    let absolute = atom.start + 4;
+                    if absolute
+                        .checked_add(32)
+                        .is_none_or(|value| value > self.size)
+                    {
+                        return Err("audio info not found in M4A file".into());
+                    }
+                    return Ok(Some((absolute, atom.kind)));
+                }
+                b"trak" | b"mdia" | b"minf" | b"stbl" | b"dinf" => {
+                    if let Some(found) =
+                        self.find_sample_entry(atom.payload, atom.end, depth + 1)?
+                    {
+                        return Ok(Some(found));
+                    }
+                }
+                b"stsd" => {
+                    if let Some(children) = atom.payload.checked_add(8)
+                        && children < atom.end
+                        && let Some(found) =
+                            self.find_sample_entry(children, atom.end, depth + 1)?
+                    {
+                        return Ok(Some(found));
+                    }
+                }
+                _ => {}
+            }
+            start = atom.end;
+        }
+        Ok(None)
+    }
+
     // Match Go's earliest recognized byte pattern, including chunk boundaries.
     // Do not load moov/mdat in full: some files put large covers in moov.
-    fn sample_entry(&mut self, atom: Atom) -> Result<(u64, [u8; 4]), String> {
+    fn sample_entry_scan(&mut self, atom: Atom) -> Result<(u64, [u8; 4]), String> {
         let mut offset = atom.start;
         let mut data = vec![0; 65536 + 3];
         let mut tail = 0;

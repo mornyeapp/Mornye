@@ -5,9 +5,16 @@ import java.security.MessageDigest
 
 internal object AndroidLibraryCovers {
     private val HEX_CHARS = "0123456789abcdef".toCharArray()
+    // ThreadLocal.withInitial needs API 26; subclasses work on every version.
+    private val COMPARE_BUFFER = object : ThreadLocal<ByteArray>() {
+        override fun initialValue() = ByteArray(8192)
+    }
+    private val SHA256_DIGEST = object : ThreadLocal<MessageDigest>() {
+        override fun initialValue(): MessageDigest = MessageDigest.getInstance("SHA-256")
+    }
 
     private fun sha256Hex(data: ByteArray): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(data)
+        val digest = SHA256_DIGEST.get()!!.apply { reset() }.digest(data)
         val out = CharArray(digest.size * 2)
         for (i in digest.indices) {
             val v = digest[i].toInt() and 0xff
@@ -19,7 +26,7 @@ internal object AndroidLibraryCovers {
 
     private fun fileEqualsBytes(file: File, expected: ByteArray): Boolean {
         if (file.length() != expected.size.toLong()) return false
-        val buffer = ByteArray(minOf(expected.size, 8192).coerceAtLeast(1))
+        val buffer = COMPARE_BUFFER.get()!!
         var offset = 0
         file.inputStream().use { input ->
             while (offset < expected.size) {
