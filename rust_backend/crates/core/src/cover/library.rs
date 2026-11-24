@@ -13,11 +13,15 @@ static CACHE: OnceLock<Mutex<Cache>> = OnceLock::new();
 /// Android Library names identify the final thumbnail bytes, independently
 /// of the song, source, and original image encoding.
 pub fn library_content_stem(data: &[u8]) -> String {
-    let hex: String = Sha256::digest(data)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
-    format!("cover_content_{hex}")
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let digest = Sha256::digest(data);
+    let mut out = String::with_capacity("cover_content_".len() + digest.len() * 2);
+    out.push_str("cover_content_");
+    for &byte in &digest {
+        out.push(HEX[(byte >> 4) as usize] as char);
+        out.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    out
 }
 
 struct Entry {

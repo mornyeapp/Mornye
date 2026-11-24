@@ -187,7 +187,10 @@ pub(crate) fn ogg_quality(
     size: i64,
     path: &str,
 ) -> Result<AudioQuality, String> {
-    let packets = ogg_packets(file, 5, 10)?;
+    let packets = {
+        let mut buffered = std::io::BufReader::new(&mut *file);
+        ogg_packets(&mut buffered, 5, 10)?
+    };
     let opus =
         ogg_stream_is_opus(&packets).unwrap_or_else(|| path.to_lowercase().ends_with(".opus"));
     let mut quality = AudioQuality::default();
