@@ -131,20 +131,20 @@ class _FilterList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final filters = ref.watch(
-      equalizerProvider.select((state) => state.settings.filters),
+    final filterCount = ref.watch(
+      equalizerProvider.select((state) => state.settings.filters.length),
     );
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final tokens = context.tokens;
     final mornye = context.isMornye;
-    final full = filters.length >= EqualizerSettings.maxFilters;
+    final full = filterCount >= EqualizerSettings.maxFilters;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(height: tokens.gapSm),
-        if (filters.isEmpty)
+        if (filterCount == 0)
           Padding(
             padding: EdgeInsets.symmetric(
               horizontal: tokens.rowPaddingH,
@@ -157,36 +157,8 @@ class _FilterList extends ConsumerWidget {
               ),
             ),
           ),
-        for (final (index, filter) in filters.indexed)
-          SettingsItem(
-            title: _filterHz(filter.frequency),
-            subtitle:
-                '${_filterTypeLabel(l10n, filter.type)} · '
-                '${_signed(filter.gain)} dB · '
-                '${l10n.equalizerFilterQ} ${filter.q.toStringAsFixed(2)}',
-            trailing: AppSwitch(
-              value: filter.enabled,
-              semanticLabel:
-                  '${l10n.equalizerFilterNumber(index + 1)}, '
-                  '${_filterHz(filter.frequency)}',
-              onChanged: (enabled) => ref
-                  .read(equalizerProvider.notifier)
-                  .update(
-                    ref
-                        .read(equalizerProvider)
-                        .settings
-                        .copyWith(
-                          filters: [
-                            for (final (i, other) in filters.indexed)
-                              i == index
-                                  ? other.copyWith(enabled: enabled)
-                                  : other,
-                          ],
-                        ),
-                  ),
-            ),
-            onTap: () => _edit(context, index),
-          ),
+        for (var index = 0; index < filterCount; index++)
+          _FilterRow(index: index, onEdit: () => _edit(context, index)),
         if (mornye)
           _ActionRow(
             label: l10n.equalizerAddFilter,
@@ -212,6 +184,54 @@ class _FilterList extends ConsumerWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _FilterRow extends ConsumerWidget {
+  const _FilterRow({required this.index, required this.onEdit});
+
+  final int index;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final filter = ref.watch(
+      equalizerProvider.select(
+        (state) => index < state.settings.filters.length
+            ? state.settings.filters[index]
+            : null,
+      ),
+    );
+    if (filter == null) return const SizedBox.shrink();
+    final l10n = context.l10n;
+    return SettingsItem(
+      title: _filterHz(filter.frequency),
+      subtitle:
+          '${_filterTypeLabel(l10n, filter.type)} · '
+          '${_signed(filter.gain)} dB · '
+          '${l10n.equalizerFilterQ} ${filter.q.toStringAsFixed(2)}',
+      trailing: AppSwitch(
+        value: filter.enabled,
+        semanticLabel:
+            '${l10n.equalizerFilterNumber(index + 1)}, '
+            '${_filterHz(filter.frequency)}',
+        onChanged: (enabled) {
+          final settings = ref.read(equalizerProvider).settings;
+          if (index >= settings.filters.length) return;
+          ref
+              .read(equalizerProvider.notifier)
+              .update(
+                settings.copyWith(
+                  filters: [
+                    for (final (i, other) in settings.filters.indexed)
+                      i == index ? other.copyWith(enabled: enabled) : other,
+                  ],
+                ),
+              );
+        },
+      ),
+      onTap: onEdit,
     );
   }
 }
