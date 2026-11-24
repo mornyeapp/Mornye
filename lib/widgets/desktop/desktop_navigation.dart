@@ -614,6 +614,20 @@ class _DesktopContentArea extends StatelessWidget {
     final player = floatingPlayer;
     final playerInset = player == null ? 0.0 : DesktopPlayerBar.floatingInset;
     final mornye = context.isMornye;
+    final pages = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // A semantics container keeps the tab navigators'
+        // modal barriers from hiding the sidebar.
+        Expanded(
+          key: const ValueKey('desktop-pages'),
+          child: Semantics(
+            container: true,
+            child: _PaneMediaQuery(bottomInset: playerInset, child: body),
+          ),
+        ),
+      ],
+    );
     return ListenableBuilder(
       listenable: _chromeListenable,
       builder: (context, _) {
@@ -622,81 +636,71 @@ class _DesktopContentArea extends StatelessWidget {
           besideFits: inspectorFitsBeside,
           mornye: mornye,
         );
-        final content = LayoutBuilder(
-          builder: (context, pane) {
-            // Mornye's glass runs the window's height and the capsule moves
-            // beside it, while the pane has room for the two.
-            final beside =
-                mornye &&
-                overlayInspector &&
-                pane.maxWidth >= _capsuleBesideInspectorWidth;
-            final motion = desktopInspectorMotion(context);
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // A semantics container keeps the tab navigators'
-                    // modal barriers from hiding the sidebar.
-                    Expanded(
-                      key: const ValueKey('desktop-pages'),
-                      child: Semantics(
-                        container: true,
-                        child: _PaneMediaQuery(
-                          bottomInset: playerInset,
-                          child: body,
-                        ),
-                      ),
+        Widget buildContent(bool beside) {
+          final motion = desktopInspectorMotion(context);
+          final stack = Stack(
+            fit: StackFit.expand,
+            children: [
+              pages,
+              if (player != null)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: DesktopPlayerBar.floatingMargin,
+                  child: AnimatedPadding(
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : motion.duration,
+                    curve: motion.curve,
+                    padding: EdgeInsetsDirectional.only(
+                      end: beside && panel != null
+                          ? mornyeGlassInspectorWidth
+                          : 0,
                     ),
-                  ],
-                ),
-                if (player != null)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: DesktopPlayerBar.floatingMargin,
-                    child: AnimatedPadding(
-                      duration: MediaQuery.disableAnimationsOf(context)
-                          ? Duration.zero
-                          : motion.duration,
-                      curve: motion.curve,
-                      padding: EdgeInsetsDirectional.only(
-                        end: beside && panel != null
-                            ? mornyeGlassInspectorWidth
-                            : 0,
-                      ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) => Center(
-                          child: SizedBox(
-                            width: DesktopPlayerBar.floatingWidth(
-                              constraints.maxWidth,
-                            ),
-                            child: player,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => Center(
+                        child: SizedBox(
+                          width: DesktopPlayerBar.floatingWidth(
+                            constraints.maxWidth,
                           ),
+                          child: player,
                         ),
                       ),
                     ),
                   ),
-                // A narrow window's inspector floats above the player.
-                PositionedDirectional(
-                  top: 0,
-                  bottom: beside ? 0 : playerInset,
-                  end: 0,
-                  width: mornye
-                      ? mornyeGlassInspectorWidth
-                      : desktopInspectorWidth,
-                  child: DesktopInspectorTransition(
-                    key: const ValueKey('desktop-inspector-overlay'),
-                    panel: overlayInspector ? panel : null,
-                    overlay: true,
-                    builder: (context, panel) =>
-                        DesktopInspector(panel: panel, overlay: true),
-                  ),
                 ),
-              ],
-            );
-          },
+              // A narrow window's inspector floats above the player.
+              PositionedDirectional(
+                top: 0,
+                bottom: beside ? 0 : playerInset,
+                end: 0,
+                width: mornye
+                    ? mornyeGlassInspectorWidth
+                    : desktopInspectorWidth,
+                child: DesktopInspectorTransition(
+                  key: const ValueKey('desktop-inspector-overlay'),
+                  panel: overlayInspector ? panel : null,
+                  overlay: true,
+                  builder: (context, panel) =>
+                      DesktopInspector(panel: panel, overlay: true),
+                ),
+              ),
+            ],
+          );
+          return stack;
+        }
+
+        // Mornye's glass runs the window's height and the capsule moves
+        // beside it, while the pane has room for the two.
+        Widget? besideContent;
+        Widget? stackedContent;
+        final content = LayoutBuilder(
+          builder: (context, pane) =>
+              mornye &&
+                  overlayInspector &&
+                  pane.maxWidth >= _capsuleBesideInspectorWidth
+              ? (besideContent ??= buildContent(true))
+              : (stackedContent ??= buildContent(false)),
         );
         // One structure for every state, so opening the inspector never
         // remounts the destinations.
@@ -1016,15 +1020,27 @@ class _RailIndicatorState extends State<_RailIndicator>
     with TickerProviderStateMixin {
   // Linear progress; [_growSpec] and [_fadeSpec] shape it when read, so a
   // stopped grow keeps the width it reached.
-  late final _grow = AnimationController(
-    vsync: this,
-    value: widget.selected ? 1 : 0,
-  );
-  late final _fade = AnimationController(
-    vsync: this,
-    value: widget.selected ? 1 : 0,
-  );
-  late final _listenable = Listenable.merge([_grow, _fade]);
+  AnimationController? _grow;
+  AnimationController? _fade;
+  Listenable? _listenable;
+
+  // Made on first use, so rows never selected hold no controllers or tickers.
+  void _ensureControllers({required double initialValue}) {
+    if (_grow != null) return;
+    final grow = AnimationController(vsync: this, value: initialValue);
+    final fade = AnimationController(vsync: this, value: initialValue);
+    _grow = grow;
+    _fade = fade;
+    _listenable = Listenable.merge([grow, fade]);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.selected) {
+      _ensureControllers(initialValue: 1);
+    }
+  }
 
   AppMotionSpec get _growSpec => AppMotion.spatialFast(
     context,
@@ -1040,47 +1056,56 @@ class _RailIndicatorState extends State<_RailIndicator>
   void didUpdateWidget(_RailIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.selected == oldWidget.selected) return;
+    _ensureControllers(initialValue: oldWidget.selected ? 1 : 0);
+    final grow = _grow!;
+    final fadeController = _fade!;
     final fade = _fadeSpec;
-    _fade.duration = fade.duration;
+    fadeController.duration = fade.duration;
     if (widget.selected) {
       // A pill that had faded out grows again from half width; one still
       // fading out grows on from where it is.
-      if (_fade.value == 0) _grow.value = 0;
-      _grow.duration = _growSpec.duration;
-      _grow.forward();
-      _fade.forward();
+      if (fadeController.value == 0) grow.value = 0;
+      grow.duration = _growSpec.duration;
+      grow.forward();
+      fadeController.forward();
     } else {
       // The outgoing pill keeps its width and only fades.
-      _grow.stop();
-      _fade.reverse();
+      grow.stop();
+      fadeController.reverse();
     }
   }
 
   @override
   void dispose() {
-    _grow.dispose();
-    _fade.dispose();
+    _grow?.dispose();
+    _fade?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // The same structure before the controllers exist, so a first selection
+    // never remounts the row and its focus.
+    final growController = _grow;
+    final fadeController = _fade;
     final color = Theme.of(context).colorScheme.secondaryContainer;
     final grow = _growSpec.curve;
     final fade = _fadeSpec.curve;
     return AnimatedBuilder(
-      animation: _listenable,
+      animation: _listenable ?? kAlwaysDismissedAnimation,
       child: widget.child,
       builder: (context, child) {
-        final fill = fade.transform(_fade.value).clamp(0.0, 1.0);
+        final fill = fadeController == null
+            ? 0.0
+            : fade.transform(fadeController.value).clamp(0.0, 1.0);
         return Stack(
           fit: StackFit.passthrough,
           children: [
-            if (fill > 0)
+            if (fill > 0 && growController != null)
               Positioned.fill(
                 child: Center(
                   child: FractionallySizedBox(
-                    widthFactor: 0.5 + grow.transform(_grow.value) / 2,
+                    widthFactor: 0.5 + grow.transform(growController.value) / 2,
                     child: DecoratedBox(
                       key: const ValueKey('desktop-rail-indicator'),
                       decoration: ShapeDecoration(
@@ -1695,44 +1720,50 @@ class _SidebarArtwork extends StatelessWidget {
             child: child,
           ),
           child: RepaintBoundary(
-            child: OverflowBox(
-              alignment: AlignmentDirectional.topEnd,
-              minWidth: hero.width,
-              maxWidth: hero.width,
-              minHeight: hero.height,
-              maxHeight: hero.height,
-              child: Stack(
-                key: const ValueKey('desktop-sidebar-backdrop'),
-                fit: StackFit.expand,
-                children: [
-                  Transform.flip(
-                    flipX: true,
-                    child: Image(
-                      image: image,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                      filterQuality: FilterQuality.high,
-                      gaplessPlayback: true,
-                      excludeFromSemantics: true,
-                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                    ),
-                  ),
-                  // The sidebar glass fades out where the hero ends.
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        stops: const [0, 0.6, 1],
-                        colors: [
-                          fill.withValues(alpha: 0.42),
-                          fill.withValues(alpha: 0.62),
-                          fill,
-                        ],
+            child: SizedBox(
+              width: DesktopSidebar.width,
+              height: hero.height,
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: AlignmentDirectional.topEnd,
+                  minWidth: hero.width,
+                  maxWidth: hero.width,
+                  minHeight: hero.height,
+                  maxHeight: hero.height,
+                  child: Stack(
+                    key: const ValueKey('desktop-sidebar-backdrop'),
+                    fit: StackFit.expand,
+                    children: [
+                      Transform.flip(
+                        flipX: true,
+                        child: Image(
+                          image: image,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.topCenter,
+                          filterQuality: FilterQuality.high,
+                          gaplessPlayback: true,
+                          excludeFromSemantics: true,
+                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                        ),
                       ),
-                    ),
+                      // The sidebar glass fades out where the hero ends.
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: const [0, 0.6, 1],
+                            colors: [
+                              fill.withValues(alpha: 0.42),
+                              fill.withValues(alpha: 0.62),
+                              fill,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
