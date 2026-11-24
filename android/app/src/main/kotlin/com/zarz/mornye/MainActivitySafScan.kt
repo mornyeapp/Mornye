@@ -9,6 +9,14 @@ import java.io.IOException
 import java.security.MessageDigest
 import java.util.Locale
 
+// A scan outlives the Activity that started it, so its state is kept for the
+// process: the next Activity reads the same progress and can pause or cancel.
+internal val safScanLock = Any()
+internal var safScanProgress = MainActivity.SafScanProgress()
+@Volatile internal var safScanCancel = false
+@Volatile internal var safScanPaused = false
+@Volatile internal var safScanActive = false
+
 internal fun MainActivity.buildStableLibraryId(filePath: String): String {
         val digest = MessageDigest.getInstance("SHA-1")
         val bytes = digest.digest(filePath.toByteArray(Charsets.UTF_8))

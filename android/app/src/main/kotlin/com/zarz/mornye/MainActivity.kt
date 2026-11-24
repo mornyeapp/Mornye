@@ -162,8 +162,6 @@ class MainActivity: FlutterFragmentActivity() {
     internal val setupFolderPickerStore by lazy {
         SetupFolderPickerStore(getSharedPreferences("setup_folder_picker", Context.MODE_PRIVATE))
     }
-    internal val safScanLock = Any()
-    internal var safScanProgress = SafScanProgress()
     internal var downloadProgressStreamJob: Job? = null
     internal var downloadProgressConnection: AtomicReference<CoreDownloadProgress?>? = null
     internal var downloadProgressEventSink: EventChannel.EventSink? = null
@@ -173,9 +171,6 @@ class MainActivity: FlutterFragmentActivity() {
     internal var libraryScanProgressEventSink: EventChannel.EventSink? = null
     internal var lastLibraryScanProgressPayload: String? = null
     internal var flutterBackCallback: OnBackPressedCallback? = null
-    @Volatile internal var safScanCancel = false
-    @Volatile internal var safScanPaused = false
-    @Volatile internal var safScanActive = false
     internal val safTreeLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
@@ -503,8 +498,7 @@ class MainActivity: FlutterFragmentActivity() {
         // The backend belongs to the process/shared Flutter engine and download
         // service. Activity recreation must not shut it down (or wait for its
         // active scans/downloads on the UI thread).
-        stopDownloadProgressStream()
-        stopLibraryScanProgressStream()
+        detachProgressStreams()
         super.onDestroy()
     }
 
@@ -531,7 +525,7 @@ class MainActivity: FlutterFragmentActivity() {
         registerConcertCalendarChannel(messenger)
         registerAudioOutputChannel(messenger)
 
-        registerProgressStreams(messenger)
+        attachProgressStreams(messenger)
 
         // Replaces the playback subset the engine registered without an
         // Activity (see SharedEngineChannels) with every backend method.

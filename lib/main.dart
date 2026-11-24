@@ -193,8 +193,11 @@ void main() {
       final previousOnError = FlutterError.onError;
       FlutterError.onError = (details) {
         previousOnError?.call(details);
+        // The context names what was being done, such as the channel.
+        final context = details.context?.toDescription();
         _log.e(
           'Uncaught Flutter error: ${details.exceptionAsString()}'
+          '${context == null ? '' : ' ($context)'}'
           '${firstStackFrames(details.stack)}',
         );
         unawaited(

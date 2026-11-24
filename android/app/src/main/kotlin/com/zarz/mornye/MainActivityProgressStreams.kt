@@ -8,6 +8,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicReference
 import org.json.JSONObject
 import org.json.JSONTokener
@@ -20,40 +21,45 @@ private val LIBRARY_SCAN_PROGRESS_STREAM_CHANNEL =
 // disk-read wakeups during a scan vs the previous 200ms.
 private val LIBRARY_SCAN_PROGRESS_STREAM_POLLING_INTERVAL_MS = 400L
 
-internal fun MainActivity.registerProgressStreams(messenger: BinaryMessenger) {
-    EventChannel(
-        messenger,
-        DOWNLOAD_PROGRESS_STREAM_CHANNEL,
-    ).setStreamHandler(
-        object : EventChannel.StreamHandler {
-            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                if (events != null) {
-                    startDownloadProgressStream(events)
-                }
-            }
-
-            override fun onCancel(arguments: Any?) {
-                stopDownloadProgressStream()
-            }
-        },
+private class ProgressStreams(messenger: BinaryMessenger) {
+    val messenger = WeakReference(messenger)
+    val downloads = ProgressStreamRelay(
+        MainActivity::startDownloadProgressStream,
+        MainActivity::stopDownloadProgressStream,
+    )
+    val libraryScans = ProgressStreamRelay(
+        MainActivity::startLibraryScanProgressStream,
+        MainActivity::stopLibraryScanProgressStream,
     )
 
-    EventChannel(
-        messenger,
-        LIBRARY_SCAN_PROGRESS_STREAM_CHANNEL,
-    ).setStreamHandler(
-        object : EventChannel.StreamHandler {
-            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                if (events != null) {
-                    startLibraryScanProgressStream(events)
-                }
-            }
+    init {
+        EventChannel(messenger, DOWNLOAD_PROGRESS_STREAM_CHANNEL)
+            .setStreamHandler(downloads)
+        EventChannel(messenger, LIBRARY_SCAN_PROGRESS_STREAM_CHANNEL)
+            .setStreamHandler(libraryScans)
+    }
+}
 
-            override fun onCancel(arguments: Any?) {
-                stopLibraryScanProgressStream()
-            }
-        },
-    )
+// Registered once per engine. A handler registered again for each Activity
+// has no sink for the stream Dart still listens to, so its cancel fails.
+private var progressStreams: ProgressStreams? = null
+
+internal fun MainActivity.attachProgressStreams(messenger: BinaryMessenger) {
+    val streams = progressStreams?.takeIf { it.messenger.get() === messenger }
+        ?: ProgressStreams(messenger).also { progressStreams = it }
+    streams.downloads.attach(this)
+    streams.libraryScans.attach(this)
+}
+
+internal fun MainActivity.detachProgressStreams() {
+    val streams = progressStreams
+    if (streams == null) {
+        stopDownloadProgressStream()
+        stopLibraryScanProgressStream()
+        return
+    }
+    streams.downloads.detach(this)
+    streams.libraryScans.detach(this)
 }
 
 internal fun downloadProgressSequence(payload: String, previous: Long): Long {
