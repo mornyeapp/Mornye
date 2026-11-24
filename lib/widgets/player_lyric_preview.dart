@@ -201,6 +201,26 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
     );
   }
 
+  /// Steady position reports are already followed by [_nextLine]; only
+  /// transport changes, seeks and clock jumps rebuild the line.
+  static bool _shouldRebuildForPlayback(
+    PlaybackState? previous,
+    PlaybackState? next,
+  ) {
+    if (previous == null || next == null) return previous != next;
+    if (previous.playing != next.playing ||
+        previous.processingState != next.processingState ||
+        previous.speed != next.speed ||
+        previous.queueIndex != next.queueIndex) {
+      return true;
+    }
+    if (!next.playing) {
+      return previous.updatePosition != next.updatePosition;
+    }
+    return (next.position - previous.position).abs() >
+        const Duration(milliseconds: 350);
+  }
+
   @override
   Widget build(BuildContext context) {
     // The line reads as sung unless its own setting asks for the
@@ -228,11 +248,20 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
       ),
     );
     // An offstage or covered player keeps no line timer running and avoids
-    // 2 Hz position-tick rebuilds while hidden.
+    // 2 Hz position-tick rebuilds while hidden. Even while visible, listen
+    // selectively so steady 2 Hz position reports do not rebuild the row.
     final visible = TickerMode.valuesOf(context).enabled;
-    final state = visible
-        ? ref.watch(playbackStateProvider).value
-        : ref.read(playbackStateProvider).value;
+    if (visible) {
+      ref.listen<AsyncValue<PlaybackState>>(playbackStateProvider, (
+        previous,
+        next,
+      ) {
+        if (_shouldRebuildForPlayback(previous?.value, next.value)) {
+          _refresh();
+        }
+      });
+    }
+    final state = ref.read(playbackStateProvider).value;
     final translation = ref.read(lyricsTranslationProvider.notifier);
     return ListenableBuilder(
       listenable: widget.metadata,

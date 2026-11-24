@@ -412,6 +412,7 @@ class MornyeLyricsFadeMask extends ShaderMask {
     super.key,
     required this.opaque,
     this.maskKey,
+    this.clipBottom,
     required super.shaderCallback,
     super.child,
   }) : super(blendMode: BlendMode.dstIn);
@@ -422,11 +423,16 @@ class MornyeLyricsFadeMask extends ShaderMask {
   /// keep the retained shader layer instead of marking the mask dirty.
   final Object? maskKey;
 
+  /// Caps the offscreen mask height when everything below [clipBottom] is
+  /// fully transparent, shrinking the [ShaderMaskLayer] render target.
+  final double? clipBottom;
+
   @override
   RenderShaderMask createRenderObject(BuildContext context) =>
       _RenderLyricsFadeMask(
         opaque: opaque,
         maskKey: maskKey,
+        clipBottom: clipBottom,
         shaderCallback: shaderCallback,
       );
 
@@ -435,6 +441,7 @@ class MornyeLyricsFadeMask extends ShaderMask {
     final mask = renderObject as _RenderLyricsFadeMask;
     mask
       ..opaque = opaque
+      ..clipBottom = clipBottom
       ..blendMode = blendMode
       ..updateShader(shaderCallback, maskKey: maskKey);
   }
@@ -444,17 +451,27 @@ class _RenderLyricsFadeMask extends RenderShaderMask {
   _RenderLyricsFadeMask({
     required bool opaque,
     required Object? maskKey,
+    required double? clipBottom,
     required super.shaderCallback,
   }) : _opaque = opaque,
        _maskKey = maskKey,
+       _clipBottom = clipBottom,
        super(blendMode: BlendMode.dstIn);
 
   bool _opaque;
   Object? _maskKey;
+  double? _clipBottom;
+  final _clip = LayerHandle<ClipRectLayer>();
 
   set opaque(bool value) {
     if (_opaque == value) return;
     _opaque = value;
+    markNeedsPaint();
+  }
+
+  set clipBottom(double? value) {
+    if (_clipBottom == value) return;
+    _clipBottom = value;
     markNeedsPaint();
   }
 
@@ -470,9 +487,40 @@ class _RenderLyricsFadeMask extends RenderShaderMask {
     if (_opaque && lyrics != null) {
       // Drop the layer retained from a frame that faded the lyrics.
       layer = null;
+      _clip.layer = null;
       context.paintChild(lyrics, offset);
-    } else {
-      super.paint(context, offset);
+      return;
     }
+    final clipBottom = _clipBottom;
+    if (lyrics == null || clipBottom == null || clipBottom >= size.height) {
+      _clip.layer = null;
+      super.paint(context, offset);
+      return;
+    }
+    final visible = Rect.fromLTWH(
+      0,
+      0,
+      size.width,
+      clipBottom.clamp(0.0, size.height),
+    );
+    layer = (layer ?? ShaderMaskLayer())
+      ..shader = shaderCallback(Offset.zero & size)
+      ..maskRect = visible.shift(offset)
+      ..blendMode = blendMode;
+    context.pushLayer(layer!, (context, offset) {
+      _clip.layer = context.pushClipRect(
+        lyrics.needsCompositing,
+        offset,
+        visible,
+        (context, offset) => context.paintChild(lyrics, offset),
+        oldLayer: _clip.layer,
+      );
+    }, offset);
+  }
+
+  @override
+  void dispose() {
+    _clip.layer = null;
+    super.dispose();
   }
 }

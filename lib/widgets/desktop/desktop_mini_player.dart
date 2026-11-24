@@ -339,15 +339,39 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
     super.dispose();
   }
 
+  static bool _shouldRebuildForPlayback(
+    PlaybackState? previous,
+    PlaybackState? next,
+  ) {
+    if (previous == null || next == null) return previous != next;
+    if (previous.playing != next.playing ||
+        previous.processingState != next.processingState ||
+        previous.speed != next.speed ||
+        previous.queueIndex != next.queueIndex) {
+      return true;
+    }
+    if (!next.playing) {
+      return previous.updatePosition != next.updatePosition;
+    }
+    return (next.position - previous.position).abs() >
+        const Duration(milliseconds: 350);
+  }
+
   /// The lead line playing now. Playback reports its position only when its
   /// state changes, so a timer rebuilds the view when the next line starts.
   int _followPlayback(WidgetRef ref, List<LyricLine> lines) {
     _nextLine?.cancel();
-    final state =
-        (_visible
-                ? ref.watch(playbackStateProvider)
-                : ref.read(playbackStateProvider))
-            .value;
+    if (_visible) {
+      ref.listen<AsyncValue<PlaybackState>>(playbackStateProvider, (
+        previous,
+        next,
+      ) {
+        if (_shouldRebuildForPlayback(previous?.value, next.value) && mounted) {
+          setState(() {});
+        }
+      });
+    }
+    final state = ref.read(playbackStateProvider).value;
     final position = state?.position ?? Duration.zero;
     final current = _sungLineAt(lines, position);
     final next = _leadLineAfter(lines, current);

@@ -315,6 +315,7 @@ class TrackCard extends StatelessWidget {
     final card = AppContentCard(
       elevation: 0,
       mornyeSurface: false,
+      expressiveSurface: false,
       margin: cardMargin,
       color: cardColor,
       clipBehavior: Clip.antiAlias,

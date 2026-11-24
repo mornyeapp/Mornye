@@ -67,7 +67,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
   bool _dragCancelled = false;
   bool _pressed = false;
   int? _pressedIndex;
-  double? _dragAlignment;
+  bool _dragging = false;
   int? _activePointer;
   final _foregroundKey = GlobalKey();
 
@@ -127,7 +127,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
   /// build, after the parent has applied a new selection, so a released pill
   /// never heads for the old slot first.
   void _followSelection(int selected, int count) {
-    if (_dragAlignment != null) return;
+    if (_dragging) return;
     final shown = selected >= 0 && selected < count;
     final target = _slotAlignment(selected);
     final velocity = _releaseVelocity;
@@ -192,7 +192,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
     if (oldWidget.labels.length != widget.labels.length ||
         oldWidget.selectedIndex != widget.selectedIndex) {
       _dragIndex = null;
-      _dragAlignment = null;
+      _dragging = false;
       _pressedIndex = null;
     }
   }
@@ -216,12 +216,12 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
     final alignment = Directionality.of(context) == TextDirection.rtl
         ? -position
         : position;
-    setState(() {
-      _dragIndex = logical;
-      _dragAlignment = alignment;
-    });
+    final needsRebuild = _dragIndex != logical || !_dragging;
+    _dragIndex = logical;
+    _dragging = true;
     _slideTarget = null;
     _slide.value = alignment;
+    if (needsRebuild) setState(() {});
   }
 
   /// The pill's velocity for a horizontal finger [velocity] in pixels a
@@ -278,7 +278,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
         setState(() {
           _pressed = false;
           _pressedIndex = null;
-          _dragAlignment = null;
+          _dragging = false;
         });
       },
       onPointerCancel: (event) {
@@ -289,7 +289,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
           _dragCancelled = true;
           _pressed = false;
           _pressedIndex = null;
-          _dragAlignment = null;
+          _dragging = false;
         });
       },
       child: Padding(
@@ -305,7 +305,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
               final index = _dragIndex;
               setState(() {
                 _dragIndex = null;
-                _dragAlignment = null;
+                _dragging = false;
                 // The pill leaves the finger at the finger's speed.
                 _releaseVelocity = _alignmentVelocity(
                   details.velocity.pixelsPerSecond.dx,
@@ -316,7 +316,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
             },
             onHorizontalDragCancel: () => setState(() {
               _dragIndex = null;
-              _dragAlignment = null;
+              _dragging = false;
             }),
             child: Stack(
               fit: StackFit.passthrough,

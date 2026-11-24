@@ -1,4 +1,7 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show GlassBackdropGroup;
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/desktop/detail_header.dart';
@@ -102,28 +105,34 @@ class _CollectionScaffoldState extends State<CollectionScaffold> {
       },
       child: Scaffold(
         backgroundColor: widget.backgroundColor,
-        body: CustomScrollView(
-          controller: widget.scrollController,
-          slivers: [
-            if (widget.appBar case final AlbumDetailHeader header)
-              ...header.buildSlivers(context)
-            else
-              widget.appBar,
-            ...widget.slivers,
-            SliverToBoxAdapter(
-              child: SizedBox(
-                key: const ValueKey('collection-selection-spacer'),
-                height: widget.isSelectionMode
-                    ? _selectionBarHeight
-                    // Desktop pages scroll under the floating player.
-                    : isDesktopPlatform
-                    ? desktopDetailBottomInset
-                    : 32,
+        body: () {
+          final scrollView = CustomScrollView(
+            controller: widget.scrollController,
+            slivers: [
+              if (widget.appBar case final AlbumDetailHeader header)
+                ...header.buildSlivers(context)
+              else
+                widget.appBar,
+              ...widget.slivers,
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  key: const ValueKey('collection-selection-spacer'),
+                  height: widget.isSelectionMode
+                      ? _selectionBarHeight
+                      // Desktop pages scroll under the floating player.
+                      : isDesktopPlatform
+                      ? desktopDetailBottomInset
+                      : 32,
+                ),
               ),
-            ),
-            NavBarSliverSpacer(bottomInset: widget.bottomInset),
-          ],
-        ),
+              NavBarSliverSpacer(bottomInset: widget.bottomInset),
+            ],
+          );
+          // Share one backdrop capture across the pinned leading back circle
+          // and trailing MornyeActionCapsule in collection detail headers.
+          if (!context.isMornye) return scrollView;
+          return GlassBackdropGroup(child: BackdropGroup(child: scrollView));
+        }(),
       ),
     );
   }

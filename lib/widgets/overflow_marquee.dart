@@ -37,6 +37,7 @@ class _OverflowMarqueeState extends State<OverflowMarquee>
   int _generation = 0;
   int _cycles = 0;
   bool _restartQueued = false;
+  bool _animationsDisabled = false;
   bool _motionEnabled = false;
   bool _appActive = true;
   bool _looping = false;
@@ -56,10 +57,15 @@ class _OverflowMarqueeState extends State<OverflowMarquee>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _motionEnabled =
-        !MediaQuery.disableAnimationsOf(context) &&
-        TickerMode.valuesOf(context).enabled;
-    _queueRestart();
+    final disabled = MediaQuery.disableAnimationsOf(context);
+    final enabled = !disabled && TickerMode.valuesOf(context).enabled;
+    final changed =
+        disabled != _animationsDisabled || enabled != _motionEnabled;
+    _animationsDisabled = disabled;
+    _motionEnabled = enabled;
+    if (changed || _viewport == null) {
+      _queueRestart(resetCycles: !enabled);
+    }
   }
 
   @override
@@ -85,10 +91,10 @@ class _OverflowMarqueeState extends State<OverflowMarquee>
     _queueRestart();
   }
 
-  void _queueRestart() {
+  void _queueRestart({bool resetCycles = true}) {
     _pause?.cancel();
     _generation++;
-    _cycles = 0;
+    if (resetCycles) _cycles = 0;
     _passInFlight = false;
     if (_restartQueued) return;
     _restartQueued = true;
@@ -104,7 +110,7 @@ class _OverflowMarqueeState extends State<OverflowMarquee>
       _loopDistance = content.size.width + _gap;
       if (_looping != overflowing) {
         setState(() => _looping = overflowing);
-        _queueRestart();
+        _queueRestart(resetCycles: false);
         return;
       }
       if (_motionEnabled && _appActive && _looping) {
@@ -155,7 +161,7 @@ class _OverflowMarqueeState extends State<OverflowMarquee>
 
   @override
   Widget build(BuildContext context) {
-    if (!_motionEnabled) return widget.child;
+    if (_animationsDisabled) return widget.child;
 
     return NotificationListener<ScrollMetricsNotification>(
       onNotification: (notification) {
@@ -164,25 +170,29 @@ class _OverflowMarqueeState extends State<OverflowMarquee>
             _extent != metrics.maxScrollExtent) {
           _viewport = metrics.viewportDimension;
           _extent = metrics.maxScrollExtent;
+          // A new width starts a fresh count, as [maxCycles] says.
           _queueRestart();
         }
-        return false;
+        return true;
       },
-      child: SingleChildScrollView(
-        controller: _scroll,
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
-        // The viewport repaints as it scrolls; retain the unchanged content.
-        child: RepaintBoundary(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              KeyedSubtree(key: _contentKey, child: widget.child),
-              if (_looping) ...[
-                const SizedBox(width: _gap),
-                ExcludeSemantics(child: IgnorePointer(child: widget.child)),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (_) => true,
+        child: SingleChildScrollView(
+          controller: _scroll,
+          scrollDirection: Axis.horizontal,
+          physics: const NeverScrollableScrollPhysics(),
+          // The viewport repaints as it scrolls; retain the unchanged content.
+          child: RepaintBoundary(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                KeyedSubtree(key: _contentKey, child: widget.child),
+                if (_looping) ...[
+                  const SizedBox(width: _gap),
+                  ExcludeSemantics(child: IgnorePointer(child: widget.child)),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

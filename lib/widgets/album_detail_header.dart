@@ -419,80 +419,31 @@ class AlbumDetailHeader extends StatelessWidget {
           final contentProgress = Curves.easeOut.transform(
             ((collapseRatio - 0.3) / 0.5).clamp(0.0, 1.0),
           );
-          final content = Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (coverBuilder != null) ...[
-                Builder(
-                  builder: (context) {
-                    // Landscape headers are short: the cover also yields to
-                    // the height left below the toolbar once the title,
-                    // details and actions are placed, so it never rises
-                    // into the status bar or toolbar buttons.
-                    final toolbarBottom =
-                        MediaQuery.paddingOf(context).top + kToolbarHeight;
-                    final detailsHeight =
-                        contentBottom +
-                        20 +
-                        58 +
-                        (subtitle == null ? 0 : 28) +
-                        (meta == null ? 0 : 34) +
-                        (actions == null ? 0 : 64);
-                    final coverSize = math.min(
-                      (constraints.maxWidth * 0.5).clamp(150.0, 210.0),
-                      math.max(
-                        96.0,
-                        expandedHeight - toolbarBottom - detailsHeight,
-                      ),
-                    );
-                    // Material uses the expressive extra-large corner.
-                    final coverRadius = context.isMornye
-                        ? tokens.radiusControl
-                        : 28.0;
-                    return Container(
-                      width: coverSize,
-                      height: coverSize,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(
-                          plainArtworkHeader ? tokens.radiusCover : coverRadius,
-                        ),
-                        boxShadow: [
-                          if (coverShadow)
-                            BoxShadow(
-                              color: headerScheme.shadow.withValues(
-                                alpha: 0.45,
-                              ),
-                              blurRadius: 24,
-                              offset: const Offset(0, 8),
-                            ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(coverRadius),
-                        child: coverBuilder!(context, coverSize),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 20),
-              ],
-              Text(
-                title,
-                style: TextStyle(
-                  color: onHeader,
-                  fontSize: _titleFontSize(),
-                  fontWeight: FontWeight.bold,
-                  height: 1.2,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (subtitle != null) ...[const SizedBox(height: 6), subtitle!],
-              if (meta != null) ...[const SizedBox(height: 12), meta!],
-              if (actions != null) ...[const SizedBox(height: 16), actions!],
-            ],
+          final toolbarBottom =
+              MediaQuery.paddingOf(context).top + kToolbarHeight;
+          final detailsHeight =
+              contentBottom +
+              20 +
+              58 +
+              (subtitle == null ? 0 : 28) +
+              (meta == null ? 0 : 34) +
+              (actions == null ? 0 : 64);
+          final coverSize = math.min(
+            (constraints.maxWidth * 0.5).clamp(150.0, 210.0),
+            math.max(96.0, expandedHeight - toolbarBottom - detailsHeight),
+          );
+          final content = _AlbumHeaderBody(
+            coverBuilder: coverBuilder,
+            coverSize: coverSize,
+            coverShadow: coverShadow,
+            plainArtworkHeader: plainArtworkHeader,
+            shadowColor: headerScheme.shadow,
+            title: title,
+            titleColor: onHeader,
+            titleFontSize: _titleFontSize(),
+            subtitle: subtitle,
+            meta: meta,
+            actions: actions,
           );
 
           // The sheet's rounded top edge covers the backdrop's end and
@@ -611,6 +562,129 @@ class AlbumDetailHeader extends StatelessWidget {
       actionsPadding: EdgeInsetsDirectional.only(end: iosEdgeInset),
       actions: appBarActions,
     );
+  }
+}
+
+/// Caches the header body widget across vertical scroll ticks so collapsing
+/// [LayoutBuilder] rebuilds do not reconstruct cover artwork and metadata.
+class _AlbumHeaderBody extends StatefulWidget {
+  const _AlbumHeaderBody({
+    required this.coverBuilder,
+    required this.coverSize,
+    required this.coverShadow,
+    required this.plainArtworkHeader,
+    required this.shadowColor,
+    required this.title,
+    required this.titleColor,
+    required this.titleFontSize,
+    required this.subtitle,
+    required this.meta,
+    required this.actions,
+  });
+
+  final Widget Function(BuildContext context, double coverSize)? coverBuilder;
+  final double coverSize;
+  final bool coverShadow;
+  final bool plainArtworkHeader;
+  final Color shadowColor;
+  final String title;
+  final Color titleColor;
+  final double titleFontSize;
+  final Widget? subtitle;
+  final Widget? meta;
+  final Widget? actions;
+
+  @override
+  State<_AlbumHeaderBody> createState() => _AlbumHeaderBodyState();
+}
+
+class _AlbumHeaderBodyState extends State<_AlbumHeaderBody> {
+  Widget? _cached;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _cached = null;
+  }
+
+  @override
+  void didUpdateWidget(_AlbumHeaderBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.coverBuilder != widget.coverBuilder ||
+        oldWidget.coverSize != widget.coverSize ||
+        oldWidget.coverShadow != widget.coverShadow ||
+        oldWidget.plainArtworkHeader != widget.plainArtworkHeader ||
+        oldWidget.shadowColor != widget.shadowColor ||
+        oldWidget.title != widget.title ||
+        oldWidget.titleColor != widget.titleColor ||
+        oldWidget.titleFontSize != widget.titleFontSize ||
+        oldWidget.subtitle != widget.subtitle ||
+        oldWidget.meta != widget.meta ||
+        oldWidget.actions != widget.actions) {
+      _cached = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cached = _cached;
+    if (cached != null) return cached;
+    final tokens = context.tokens;
+    // Material uses the expressive extra-large corner.
+    final coverRadius = context.isMornye ? tokens.radiusControl : 28.0;
+    final built = Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.coverBuilder != null) ...[
+          Container(
+            width: widget.coverSize,
+            height: widget.coverSize,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(
+                widget.plainArtworkHeader ? tokens.radiusCover : coverRadius,
+              ),
+              boxShadow: [
+                if (widget.coverShadow)
+                  BoxShadow(
+                    color: widget.shadowColor.withValues(alpha: 0.45),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(coverRadius),
+              child: widget.coverBuilder!(context, widget.coverSize),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+        Text(
+          widget.title,
+          style: TextStyle(
+            color: widget.titleColor,
+            fontSize: widget.titleFontSize,
+            fontWeight: FontWeight.bold,
+            height: 1.2,
+          ),
+          textAlign: TextAlign.center,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (widget.subtitle != null) ...[
+          const SizedBox(height: 6),
+          widget.subtitle!,
+        ],
+        if (widget.meta != null) ...[const SizedBox(height: 12), widget.meta!],
+        if (widget.actions != null) ...[
+          const SizedBox(height: 16),
+          widget.actions!,
+        ],
+      ],
+    );
+    _cached = built;
+    return built;
   }
 }
 

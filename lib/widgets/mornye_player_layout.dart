@@ -637,6 +637,7 @@ class MornyePlayerLayout extends ConsumerWidget {
     builder: (context, reveal, child) => MornyeLyricsFadeMask(
       opaque: reveal == 1,
       maskKey: (visibleHeight, reveal),
+      clipBottom: reveal == 0 ? visibleHeight : null,
       shaderCallback: (bounds) {
         final height = bounds.height.clamp(1.0, double.infinity);
         final end = visibleHeight.clamp(0.0, height);
