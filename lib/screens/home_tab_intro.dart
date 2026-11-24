@@ -658,6 +658,8 @@ class _HomeSections extends ConsumerWidget {
             title: l10n.homeRecommendedForYou,
             inset: inset,
             shelf: true,
+            onShowAll: () =>
+                pushPage<void>(context, (_) => const _HomeRecommendedPage()),
             child: _HomeRecommendationsShelf(
               tracks: recommended,
               inset: mornye ? inset + 8 : inset,
@@ -1394,10 +1396,17 @@ class _HomeShelfTile extends StatelessWidget {
 
 /// Songs outside the Library like the person's own.
 class _HomeRecommendationsShelf extends StatelessWidget {
-  const _HomeRecommendationsShelf({required this.tracks, required this.inset});
+  const _HomeRecommendationsShelf({
+    required this.tracks,
+    required this.inset,
+    this.learns = true,
+  });
 
   final List<Track> tracks;
   final double inset;
+
+  /// Whether learning logs the songs: only the day's shelf, in Home's order.
+  final bool learns;
 
   @override
   Widget build(BuildContext context) => _HomeShelfSize(
@@ -1408,7 +1417,7 @@ class _HomeRecommendationsShelf extends StatelessWidget {
       itemCount: tracks.length,
       itemBuilder: (context, index) => _HomeRecommendationTile(
         track: tracks[index],
-        rank: index,
+        rank: learns ? index : null,
         size: coverSize,
       ),
     ),
@@ -1417,7 +1426,8 @@ class _HomeRecommendationsShelf extends StatelessWidget {
 
 /// A recommended song. A tap downloads it and a long press opens its
 /// actions, as on search results; the button on the cover plays its preview.
-/// Learning logs that it showed at [rank] and what the listener did with it.
+/// Learning logs that it showed at [rank] and what the listener did with it;
+/// without a rank, nothing.
 class _HomeRecommendationTile extends ConsumerStatefulWidget {
   const _HomeRecommendationTile({
     required this.track,
@@ -1426,7 +1436,7 @@ class _HomeRecommendationTile extends ConsumerStatefulWidget {
   });
 
   final Track track;
-  final int rank;
+  final int? rank;
   final double size;
 
   @override
@@ -1453,17 +1463,24 @@ class _HomeRecommendationTileState
     }
   }
 
-  void _shown() => _outcomes.recommendationShown(
-    artist: widget.track.artistName,
-    title: widget.track.name,
-    rank: widget.rank,
-  );
+  void _shown() {
+    final rank = widget.rank;
+    if (rank == null) return;
+    _outcomes.recommendationShown(
+      artist: widget.track.artistName,
+      title: widget.track.name,
+      rank: rank,
+    );
+  }
 
-  void _acted(SuggestionAction action) => _outcomes.recommendationActed(
-    artist: widget.track.artistName,
-    title: widget.track.name,
-    action: action,
-  );
+  void _acted(SuggestionAction action) {
+    if (widget.rank == null) return;
+    _outcomes.recommendationActed(
+      artist: widget.track.artistName,
+      title: widget.track.name,
+      action: action,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2050,25 +2067,56 @@ final class _FeedAlbumPick extends _TopPick {
   final ExploreItem item;
 }
 
+/// The feed's albums and playlists in its order. A new album of [releases]
+/// the feed has too is offered once, as a release.
+List<_TopPick> _homeFeedPicks(
+  List<ExploreItem> feed,
+  List<WeeklyRelease> releases, {
+  bool albums = true,
+  bool playlists = true,
+}) => [
+  for (final item in feed)
+    if (item.type != 'album') ...[
+      if (playlists) _PlaylistPick(item),
+    ] else if (albums &&
+        !releases.any(
+          (release) =>
+              release.id == item.id && release.providerId == item.providerId,
+        ))
+      _FeedAlbumPick(item),
+];
+
+/// Home's Top Picks: a mix, then another pick, by turns, the other picks an
+/// album and a playlist by turns.
+List<_TopPick> _homeTopPicksOrder({
+  required List<LibraryMixView> mixes,
+  required List<ExploreItem> feed,
+  required List<LibraryBrowseEntry> libraryAlbums,
+  required List<WeeklyRelease> releases,
+}) => homeTakeByTurns<_TopPick>([
+  [for (final view in mixes) _MixPick(view)],
+  homeTakeByTurns<_TopPick>([
+    homeTakeByTurns<_TopPick>([
+      [for (final release in releases) _ReleasePick(release)],
+      [for (final album in libraryAlbums) _LibraryAlbumPick(album)],
+      _homeFeedPicks(feed, releases, playlists: false),
+    ]),
+    _homeFeedPicks(feed, releases, albums: false),
+  ]),
+]);
+
 /// Mornye's first shelf: tall cards, a little over three to the pane on
 /// desktop and one with its neighbor peeking on phones. Mixes and playlists
 /// are banners drawn here, whose color fields move; albums show their cover.
 class _HomeTopPicksShelf extends StatefulWidget {
   const _HomeTopPicksShelf({
-    required this.mixes,
     required this.picks,
-    required this.libraryAlbums,
-    required this.releases,
     required this.inset,
     required this.drift,
   });
 
-  final List<LibraryMixView> mixes;
-
-  /// The day's playlists and albums of the extension's feed.
-  final List<ExploreItem> picks;
-  final List<LibraryBrowseEntry> libraryAlbums;
-  final List<WeeklyRelease> releases;
+  /// The cards in their order.
+  final List<_TopPick> picks;
   final double inset;
 
   /// Whether the banners' color fields move.
@@ -2103,13 +2151,18 @@ class _HomeTopPicksShelfState extends State<_HomeTopPicksShelf> {
   @override
   void didUpdateWidget(_HomeTopPicksShelf oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.drift != widget.drift) _syncDrift();
+    if (oldWidget.drift != widget.drift || oldWidget.picks != widget.picks) {
+      _syncDrift();
+    }
   }
 
-  /// The fields stand still on another tab, under reduced motion, and while
-  /// the page has scrolled the shelf away.
+  /// The fields stand still on another tab, under reduced motion, while the
+  /// page has scrolled the shelf away and on a shelf of albums only.
   void _syncDrift() {
-    if (widget.drift && _motion && _onScreen) {
+    final banners = widget.picks.any(
+      (pick) => pick is _MixPick || pick is _PlaylistPick,
+    );
+    if (widget.drift && _motion && _onScreen && banners) {
       _drift.start();
     } else {
       _drift.stop();
@@ -2126,36 +2179,6 @@ class _HomeTopPicksShelfState extends State<_HomeTopPicksShelf> {
   void dispose() {
     _drift.dispose();
     super.dispose();
-  }
-
-  /// A mix, then another pick, by turns, the other picks an album and a
-  /// playlist by turns.
-  List<_TopPick> get _order {
-    final releases = widget.releases;
-    return homeTakeByTurns<_TopPick>([
-      [for (final view in widget.mixes) _MixPick(view)],
-      homeTakeByTurns<_TopPick>([
-        homeTakeByTurns<_TopPick>([
-          [for (final release in releases) _ReleasePick(release)],
-          [for (final album in widget.libraryAlbums) _LibraryAlbumPick(album)],
-          [
-            for (final item in widget.picks)
-              // A new release the feed has too is offered once.
-              if (item.type == 'album' &&
-                  !releases.any(
-                    (release) =>
-                        release.id == item.id &&
-                        release.providerId == item.providerId,
-                  ))
-                _FeedAlbumPick(item),
-          ],
-        ]),
-        [
-          for (final item in widget.picks)
-            if (item.type != 'album') _PlaylistPick(item),
-        ],
-      ]),
-    ]);
   }
 
   /// One card: its art under a round clip, pressed as a whole.
@@ -2305,7 +2328,7 @@ class _HomeTopPicksShelfState extends State<_HomeTopPicksShelf> {
   }
 
   Widget _build() {
-    final order = _order;
+    final order = widget.picks;
     // Banners beside each other never share a palette, with or without an
     // album between them.
     final seeds = mornyeBannerSeeds([
@@ -2389,13 +2412,17 @@ class _HomeTopPicksSection extends ConsumerWidget {
     title: context.l10n.homeTopPicks,
     inset: inset,
     shelf: true,
+    onShowAll: () => pushPage<void>(context, (_) => const _HomeTopPicksPage()),
     child: _HomeTopPicksShelf(
-      mixes: mixes
-          ? ref.watch(libraryMixesProvider.select((s) => s.value)) ?? const []
-          : const [],
-      picks: ref.watch(homeTopPicksProvider.select((s) => s.value)) ?? const [],
-      libraryAlbums: libraryAlbums,
-      releases: releases,
+      picks: _homeTopPicksOrder(
+        mixes: mixes
+            ? ref.watch(libraryMixesProvider.select((s) => s.value)) ?? const []
+            : const [],
+        feed:
+            ref.watch(homeTopPicksProvider.select((s) => s.value)) ?? const [],
+        libraryAlbums: libraryAlbums,
+        releases: releases,
+      ),
       inset: inset + 8,
       // A slow device keeps its frames for scrolling.
       drift: !ref.watch(lowEndDeviceProvider),

@@ -8738,6 +8738,15 @@
   "@homeFromYourLibrary": {
     "description": "Home section header for the day's albums from the Library, shown in On repeat's place while listening is not recorded"
   },
+  "homeFromSource": "Dari {source}",
+  "@homeFromSource": {
+    "description": "Top Picks page: header of the shelf of playlists and albums from the Home feed extension, named by its display name",
+    "placeholders": {"source": {"type": "String"}}
+  },
+  "homeRecommendedFromLibrary": "Berdasarkan Koleksimu",
+  "@homeRecommendedFromLibrary": {
+    "description": "Recommended page: header of the day's recommended songs, which start from songs the user plays, adds and loves; genre shelves follow"
+  },
   "homeUnfinishedTitle": "Lengkapi koleksimu",
   "homeUnfinishedWishlist": "{count, plural, other{{count} lagu di wishlist}}",
   "homeUnfinishedAlbums": "{count, plural, other{{count} album belum lengkap}}",

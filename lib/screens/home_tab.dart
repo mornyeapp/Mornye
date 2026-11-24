@@ -87,8 +87,11 @@ import 'package:mornye/screens/network_storage_screen.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/screens/queue_tab.dart';
 import 'package:mornye/services/album_completeness.dart';
+import 'package:mornye/services/home_recommendations.dart'
+    show homeRecommendationShelvesApart;
 import 'package:mornye/services/library_database.dart';
-import 'package:mornye/services/library_mixes.dart' show stableTextHash;
+import 'package:mornye/services/library_mixes.dart'
+    show LibraryMixKind, stableTextHash;
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/music_player_service.dart' show PlayableMedia;
 import 'package:mornye/services/suggestion_outcomes.dart';
@@ -156,6 +159,7 @@ part 'home_tab_pins.dart';
 part 'home_tab_quick.dart';
 part 'home_tab_search_results.dart';
 part 'home_tab_search_wide.dart';
+part 'home_tab_shelf_pages.dart';
 part 'home_tab_status.dart';
 part 'home_tab_unfinished.dart';
 part 'home_tab_widgets.dart';

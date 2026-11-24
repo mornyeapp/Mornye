@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/home_recommendations_provider.dart';
@@ -18,6 +19,7 @@ import 'package:mornye/services/autoplay_personalization.dart';
 import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/collection_suggestions.dart';
 import 'package:mornye/services/home_recommendations.dart';
+import 'package:mornye/services/library_mixes.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/suggestion_outcomes.dart';
@@ -497,5 +499,167 @@ void main() {
     expect(fit(_track('New', 'Someone')), isNotNull);
     expect(fit(_track('New', 'Guest feat. Another')), isNotNull);
     expect(fit(_track('New', 'Nobody')), isNull);
+  });
+
+  group('genre recommendations', () {
+    const genreCacheKey = 'home_genre_recommendations_v1';
+
+    LibraryMixView mix(String genre, List<String> songs) => LibraryMixView(
+      mix: LibraryMix(
+        kind: LibraryMixKind.genre,
+        key: genre,
+        label: genre,
+        artists: const ['Artist'],
+        songIds: songs,
+      ),
+      items: [
+        for (final song in songs)
+          UnifiedLibraryItem(
+            id: song,
+            trackName: song,
+            artistName: 'Artist',
+            albumName: 'Album',
+            filePath: '/music/$song.flac',
+            addedAt: DateTime(2026),
+            source: LibraryItemSource.local,
+          ),
+      ],
+    );
+
+    ProviderContainer genres() => container(
+      overrides: [
+        libraryMixesProvider.overrideWith(
+          (ref) async => [
+            mix('rock', ['Rock one', 'Rock two']),
+            mix('jazz', ['Jazz one']),
+          ],
+        ),
+      ],
+    );
+
+    Future<List<String>> read(ProviderContainer from, String genre) async {
+      final provider = homeGenreRecommendationsProvider(genre);
+      from.listen(provider, (_, _) {});
+      return [for (final track in await from.read(provider.future)) track.name];
+    }
+
+    test('start from the genre\'s songs and are asked once a day', () async {
+      expect(await read(genres(), 'rock'), ['New one', 'New two']);
+      expect(requests, hasLength(1));
+      expect([
+        for (final seed in requests.single) (seed as Map)['name'],
+      ], containsAll(['Rock one', 'Rock two']));
+
+      answer = [_result('Another')];
+      expect(await read(genres(), 'rock'), ['New one', 'New two']);
+      expect(requests, hasLength(1));
+    });
+
+    test('genres asked together are all kept', () async {
+      final from = genres();
+      await Future.wait([read(from, 'rock'), read(from, 'jazz')]);
+      expect(requests, hasLength(2));
+      final prefs = await SharedPreferences.getInstance();
+      final stored = HomeGenreRecommendationCache.decode(
+        prefs.getString(genreCacheKey),
+      )!;
+      expect(stored.genres.keys, unorderedEquals(['rock', 'jazz']));
+      expect(stored.day, listeningDay(DateTime.now()));
+    });
+
+    test('a failed request falls back on the last day of that genre', () async {
+      SharedPreferences.setMockInitialValues({
+        genreCacheKey: HomeGenreRecommendationCache(
+          day: '2020-01-01',
+          extensionId: _extension.id,
+          genres: {
+            'rock': [_track('Old'), _track('Owned')],
+          },
+        ).encode(),
+      });
+      fail = true;
+      expect(await read(genres(), 'rock'), ['Old']);
+      expect(await read(genres(), 'jazz'), isEmpty);
+    });
+
+    test(
+      'a genre without a mix, or with the switch off, asks nothing',
+      () async {
+        expect(await read(genres(), 'pop'), isEmpty);
+        final off = container(
+          settings: const AppSettings(homeRecommendations: false),
+          overrides: [
+            libraryMixesProvider.overrideWith(
+              (ref) async => [
+                mix('rock', ['Rock one']),
+              ],
+            ),
+          ],
+        );
+        expect(await read(off, 'rock'), isEmpty);
+        expect(requests, isEmpty);
+      },
+    );
+
+    test('a genre\'s pool keeps each song once, with an artist', () {
+      final pool = homeGenreRecommendationPool([
+        _track('One'),
+        _track('One'),
+        _track('No artist', ' '),
+        for (var i = 0; i < 40; i++) _track('Song $i'),
+      ]);
+      expect(pool, hasLength(homeGenreRecommendationPoolSize));
+      expect([for (final track in pool.take(2)) track.name], ['One', 'Song 0']);
+    });
+
+    test('a song shows on its first shelf only, and empty shelves go', () {
+      final apart = homeRecommendationShelvesApart(
+        [
+          ('rock', [_track('Daily'), _track('Rock'), _track('Both')]),
+          ('jazz', [_track('Both')]),
+          ('pop', [_track('Pop'), _track('Rock')]),
+        ],
+        shown: [_track('Daily')],
+      );
+      expect(
+        {
+          for (final (genre, tracks) in apart)
+            genre: [for (final track in tracks) track.name],
+        },
+        {
+          'rock': ['Rock', 'Both'],
+          'pop': ['Pop'],
+        },
+      );
+      expect([for (final (genre, _) in apart) genre], ['rock', 'pop']);
+    });
+
+    test('a stored day reads back and another day starts over', () {
+      final stored = HomeGenreRecommendationCache(
+        day: '2026-11-23',
+        extensionId: _extension.id,
+        genres: {
+          'rock': [_track('Rock')],
+        },
+      );
+      final read = HomeGenreRecommendationCache.decode(stored.encode())!;
+      expect(read.genres['rock']!.single.name, 'Rock');
+      final sameDay = read.put(
+        day: '2026-11-23',
+        extensionId: _extension.id,
+        genre: 'jazz',
+        tracks: [_track('Jazz')],
+      );
+      expect(sameDay.genres.keys, unorderedEquals(['rock', 'jazz']));
+      final nextDay = sameDay.put(
+        day: '2026-11-24',
+        extensionId: _extension.id,
+        genre: 'pop',
+        tracks: [_track('Pop')],
+      );
+      expect(nextDay.genres.keys, ['pop']);
+      expect(HomeGenreRecommendationCache.decode('{"day": 1}'), isNull);
+      expect(HomeGenreRecommendationCache.decode('nonsense'), isNull);
+    });
   });
 }

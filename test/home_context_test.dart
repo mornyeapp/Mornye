@@ -27,6 +27,7 @@ import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_row_mapper.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/library_mixes.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/music_player_runtime.dart';
@@ -94,9 +95,14 @@ Widget _home({
   List<Track> recommended = const [],
   List<WeeklyRelease> releases = const [],
   MusicPlayerRuntime? runtime,
+  List<String> genres = const [],
+  Map<String, List<Track>> genreSongs = const {},
 }) => ProviderScope(
   overrides: [
     if (runtime != null) musicPlayerRuntimeProvider.overrideWithValue(runtime),
+    homeGenreRecommendationsProvider.overrideWith(
+      (ref, genre) async => genreSongs[genre] ?? const [],
+    ),
     homeHiResOutputProvider.overrideWith(() => _Output(hiResOutput)),
     homeHiResAlbumsProvider.overrideWith((ref) async {
       onHiResRead?.call();
@@ -115,7 +121,21 @@ Widget _home({
     exploreProvider.overrideWith(_Explore.new),
     downloadHistoryProvider.overrideWith(_History.new),
     recentAccessProvider.overrideWith(_Recent.new),
-    libraryMixesProvider.overrideWith((ref) async => const []),
+    libraryMixesProvider.overrideWith(
+      (ref) async => [
+        for (final genre in genres)
+          LibraryMixView(
+            mix: LibraryMix(
+              kind: LibraryMixKind.genre,
+              key: genre.toLowerCase(),
+              label: genre,
+              artists: const ['Someone'],
+              songIds: const [],
+            ),
+            items: const [],
+          ),
+      ],
+    ),
     homeTopPicksProvider.overrideWith((ref) async => const <ExploreItem>[]),
     homeRecentlyAddedProvider.overrideWith(
       (ref) async => (items: const <UnifiedLibraryItem>[], trackCount: 0),
@@ -519,6 +539,57 @@ void main() {
         ('Someone', 'First song', 0),
         ('Someone else', 'Second song', 1),
       ]);
+    });
+
+    testWidgets('the $style Recommended page adds a shelf for each Library '
+        'genre, each song once', (tester) async {
+      Track song(String name) => Track(
+        id: name,
+        name: name,
+        artistName: 'Someone',
+        albumName: 'Album',
+        duration: 200,
+      );
+      final outcomes = _Outcomes();
+      await _open(
+        tester,
+        _home(
+          mornye: mornye,
+          recommended: [song('Daily song')],
+          genres: const ['Rock', 'Jazz', 'Folk'],
+          genreSongs: {
+            'rock': [song('Daily song'), song('Rock song')],
+            // Only songs another shelf has: no shelf of its own.
+            'jazz': [song('Rock song')],
+            'folk': [song('Folk song')],
+          },
+          runtime: MusicPlayerRuntime(
+            dependencies: PlaybackDependencies(
+              createSuggestionOutcomes: () => outcomes,
+            ),
+          ),
+        ),
+      );
+      final title = find.text('Recommended for you');
+      await tester.ensureVisible(title);
+      await tester.tap(title);
+      for (var frame = 0; frame < 10; frame++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(tester.takeException(), isNull);
+
+      expect(find.text('Based on your Library'), findsOneWidget);
+      expect(find.text('Rock'), findsOneWidget);
+      expect(find.text('Jazz'), findsNothing);
+      expect(find.text('Folk'), findsOneWidget);
+      expect(find.text('Daily song'), findsOneWidget);
+      expect(find.text('Rock song'), findsOneWidget);
+      expect(find.text('Folk song'), findsOneWidget);
+      // Learning hears of the day's songs only.
+      expect(
+        {for (final (_, title, _) in outcomes.shown) title},
+        {'Daily song'},
+      );
     });
   }
 }

@@ -8,7 +8,7 @@ import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/library_mixes_provider.dart'
-    show libraryMixesStartupProvider;
+    show libraryMixesProvider, libraryMixesStartupProvider;
 import 'package:mornye/providers/library_song_reads.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -17,6 +17,7 @@ import 'package:mornye/services/collection_suggestions.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/home_recommendations.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/library_mixes.dart' show LibraryMixKind;
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/logger.dart';
@@ -311,15 +312,44 @@ final homeRecommendationCandidatesProvider = FutureProvider<List<Track>>((
   );
   if (pool.isEmpty || source == null) return const [];
 
+  final tracks = await _askRecommendations(
+    pool,
+    source,
+    round: round,
+    limit: homeRecommendationKept,
+  );
+  if (tracks == null) {
+    if (usable) return shown(cached.tracks);
+    // Startup cancels extension reads under way: failing with an Exception,
+    // not an Error, has Riverpod try again in a moment.
+    throw Exception('Home has no recommendations yet');
+  }
+  await prefs.setString(
+    _cacheKey,
+    HomeRecommendationCache(
+      day: day,
+      extensionId: source.extensionId,
+      tracks: tracks,
+    ).encode(),
+  );
+  return shown(tracks);
+});
+
+/// Songs like [pool] from [source], or null when no request answered.
+Future<List<Track>?> _askRecommendations(
+  List<Track> pool,
+  CollectionSuggestionSource source, {
+  required int round,
+  required int limit,
+}) async {
   // Searches by artist swallow their failures: none answered is a failure.
   var answered = false;
-  List<Track>? tracks;
   try {
     final suggestions = await loadCollectionSuggestions(
       tracks: pool,
       source: source,
       round: round,
-      limit: homeRecommendationKept,
+      limit: limit,
       related: (extensionId, seeds, limit) async {
         final results = await PlatformBridge.getExtensionRelatedTracks(
           extensionId,
@@ -339,23 +369,102 @@ final homeRecommendationCandidatesProvider = FutureProvider<List<Track>>((
         return results;
       },
     );
-    if (answered) tracks = suggestions.tracks;
+    return answered ? suggestions.tracks : null;
   } on Object catch (error, stack) {
     _log.w('Could not read Home recommendations: $error\n$stack');
+    return null;
   }
-  if (tracks == null) {
-    if (usable) return shown(cached.tracks);
-    // Startup cancels extension reads under way: failing with an Exception,
-    // not an Error, has Riverpod try again in a moment.
-    throw Exception('Home has no recommendations yet');
-  }
-  await prefs.setString(
-    _cacheKey,
-    HomeRecommendationCache(
-      day: day,
-      extensionId: source.extensionId,
-      tracks: tracks,
-    ).encode(),
-  );
-  return shown(tracks);
-});
+}
+
+const _genreCacheKey = 'home_genre_recommendations_v1';
+
+/// Genre shelves load together; their cache writes go one after another.
+Future<void> _genreCacheWrites = Future.value();
+
+/// Songs outside the Library like the Library's songs of the genre family
+/// [genre] (a genre mix's key), for the Recommended page. Asked once a day
+/// per genre and kept for that day; a failed request falls back on the last
+/// day's songs of that genre, else none.
+final homeGenreRecommendationsProvider = FutureProvider.autoDispose
+    .family<List<Track>, String>((ref, genre) async {
+      if (!ref.watch(settingsProvider.select((s) => s.homeRecommendations)) ||
+          !ref.watch(extensionProvider.select((s) => s.isInitialized))) {
+        return const [];
+      }
+      watchLibrarySongs(ref);
+      ref.watch(extensionProvider.select(collectionSuggestionSourceKey));
+      final outsideLibrary = ref.watch(homeRecommendationFilterProvider);
+      final mixes = await ref.watch(libraryMixesProvider.future);
+      final mix = mixes
+          .where(
+            (view) =>
+                view.mix.kind == LibraryMixKind.genre && view.mix.key == genre,
+          )
+          .firstOrNull;
+      if (mix == null) return const [];
+
+      final extensions = ref.read(extensionProvider);
+      final prefs = await SharedPreferences.getInstance();
+      final cached = HomeGenreRecommendationCache.decode(
+        prefs.getString(_genreCacheKey),
+      );
+      final last =
+          cached != null &&
+              extensions.extensions.any(
+                (extension) =>
+                    extension.id == cached.extensionId &&
+                    extension.enabled &&
+                    (extension.hasRelatedTracks ||
+                        extension.hasMetadataProvider),
+              )
+          ? cached.genres[genre]
+          : null;
+      final day = listeningDay(DateTime.now());
+      if (last != null && cached!.day == day) return outsideLibrary(last);
+
+      final pool = homeGenreRecommendationPool([
+        for (final item in mix.items) _seed(item.toTrack()),
+      ]);
+      final round = homeRecommendationRound(day);
+      final source = collectionSuggestionSource(
+        extensions,
+        collectionSuggestionSeeds(pool, round: round),
+      );
+      if (pool.isEmpty || source == null) return const [];
+      final tracks = await _askRecommendations(
+        pool,
+        source,
+        round: round,
+        limit: homeRecommendationCount,
+      );
+      if (tracks == null) {
+        return last == null ? const [] : outsideLibrary(last);
+      }
+      await (_genreCacheWrites = _genreCacheWrites
+          .then((_) async {
+            final stored =
+                HomeGenreRecommendationCache.decode(
+                  prefs.getString(_genreCacheKey),
+                ) ??
+                HomeGenreRecommendationCache(
+                  day: day,
+                  extensionId: source.extensionId,
+                  genres: const {},
+                );
+            await prefs.setString(
+              _genreCacheKey,
+              stored
+                  .put(
+                    day: day,
+                    extensionId: source.extensionId,
+                    genre: genre,
+                    tracks: tracks,
+                  )
+                  .encode(),
+            );
+          })
+          .catchError((Object error) {
+            _log.w('Could not store genre recommendations: $error');
+          }));
+      return outsideLibrary(tracks);
+    });

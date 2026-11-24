@@ -285,10 +285,109 @@ class HomeRecommendationCache {
       return HomeRecommendationCache(
         day: day,
         extensionId: extensionId,
-        tracks: [
-          for (final track in tracks)
-            if (track is Map<String, dynamic>) Track.fromJson(track),
-        ],
+        tracks: _tracksOf(tracks),
+      );
+    } on Object {
+      return null;
+    }
+  }
+}
+
+List<Track> _tracksOf(List<dynamic> json) => [
+  for (final track in json)
+    if (track is Map<String, dynamic>) Track.fromJson(track),
+];
+
+/// The most songs of one genre its recommendations start from.
+const homeGenreRecommendationPoolSize = 30;
+
+/// The songs a genre's recommendations start from: the genre mix's songs in
+/// its order, each once. Songs without a title or an artist cannot be looked
+/// up and are left out.
+List<Track> homeGenreRecommendationPool(List<Track> songs) =>
+    filterCollectionSuggestions(
+      songs.where((track) => track.artistName.trim().isNotEmpty),
+      const [],
+      limit: homeGenreRecommendationPoolSize,
+    );
+
+/// [shelves] with each song only on the first shelf that has it and on none
+/// when [shown] has it. Shelves left without songs go.
+List<(K, List<Track>)> homeRecommendationShelvesApart<K>(
+  List<(K, List<Track>)> shelves, {
+  Iterable<Track> shown = const [],
+}) {
+  final seen = {for (final track in shown) homeRecommendationKey(track)};
+  final apart = <(K, List<Track>)>[];
+  for (final (key, tracks) in shelves) {
+    final kept = [
+      for (final track in tracks)
+        if (seen.add(homeRecommendationKey(track))) track,
+    ];
+    if (kept.isNotEmpty) apart.add((key, kept));
+  }
+  return apart;
+}
+
+/// A day's recommendations of each genre as stored, by genre family, with
+/// the extension they came from.
+class HomeGenreRecommendationCache {
+  const HomeGenreRecommendationCache({
+    required this.day,
+    required this.extensionId,
+    required this.genres,
+  });
+
+  final String day;
+  final String extensionId;
+  final Map<String, List<Track>> genres;
+
+  /// This cache with [tracks] for [genre]. Another day or extension starts
+  /// the cache over.
+  HomeGenreRecommendationCache put({
+    required String day,
+    required String extensionId,
+    required String genre,
+    required List<Track> tracks,
+  }) => HomeGenreRecommendationCache(
+    day: day,
+    extensionId: extensionId,
+    genres: {
+      if (this.day == day && this.extensionId == extensionId) ...genres,
+      genre: tracks,
+    },
+  );
+
+  String encode() => jsonEncode({
+    'day': day,
+    'extensionId': extensionId,
+    'genres': {
+      for (final MapEntry(:key, :value) in genres.entries)
+        key: [for (final track in value) track.toJson()],
+    },
+  });
+
+  static HomeGenreRecommendationCache? decode(String? value) {
+    if (value == null) return null;
+    try {
+      final json = jsonDecode(value);
+      if (json is! Map) return null;
+      final day = json['day'], extensionId = json['extensionId'];
+      final genres = json['genres'];
+      if (day is! String || extensionId is! String || genres is! Map) {
+        return null;
+      }
+      return HomeGenreRecommendationCache(
+        day: day,
+        extensionId: extensionId,
+        genres: {
+          for (final MapEntry(:key, :value) in genres.entries)
+            if ((key, value) case (
+              final String genre,
+              final List<dynamic> tracks,
+            ))
+              genre: _tracksOf(tracks),
+        },
       );
     } on Object {
       return null;

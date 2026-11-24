@@ -75,6 +75,7 @@ LibraryBrowseEntry _album(int index) => LibraryBrowseEntry(
 Widget _home({
   bool lowEnd = false,
   bool reducedMotion = false,
+  bool banners = true,
 }) => ProviderScope(
   overrides: [
     homeNewReleasesProvider.overrideWith(
@@ -98,15 +99,15 @@ Widget _home({
     downloadHistoryProvider.overrideWith(_History.new),
     recentAccessProvider.overrideWith(_Recent.new),
     libraryMixesProvider.overrideWith(
-      (ref) async => [_mix('Rock'), _mix('Jazz')],
+      (ref) async => banners ? [_mix('Rock'), _mix('Jazz')] : const [],
     ),
     homeTopPicksProvider.overrideWith(
       (ref) async => [
         _feed('a', 'album'),
-        _feed('p', 'playlist'),
+        if (banners) _feed('p', 'playlist'),
         // The feed's copy of the new release.
         _feed('new', 'album'),
-        _feed('q', 'playlist'),
+        if (banners) _feed('q', 'playlist'),
       ],
     ),
     homeRecentlyAddedProvider.overrideWith(
@@ -124,6 +125,7 @@ Widget _home({
     ),
     playbackResumeProvider.overrideWith((ref) async => null),
     lowEndDeviceProvider.overrideWithValue(lowEnd),
+    homeTopPicksExtensionProvider.overrideWithValue('example'),
   ],
   child: MaterialApp(
     theme: MornyeTheme.build(Brightness.dark),
@@ -137,8 +139,12 @@ Widget _home({
   ),
 );
 
-Future<void> _open(WidgetTester tester, Widget home) async {
-  tester.view.physicalSize = const Size(400, 900);
+Future<void> _open(
+  WidgetTester tester,
+  Widget home, {
+  Size size = const Size(400, 900),
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(home);
@@ -265,6 +271,68 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the title opens Top Picks kind by kind, a shelf each', (
+    tester,
+  ) async {
+    await _open(tester, _home(), size: const Size(400, 2400));
+    await tester.tap(find.text('Top Picks for You'));
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(tester.takeException(), isNull);
+
+    Finder headed(String title) => find
+        .ancestor(
+          of: find
+              .ancestor(
+                of: find.text(title),
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Semantics &&
+                      (widget.properties.header ?? false),
+                ),
+              )
+              .first,
+          matching: find.byType(Column),
+        )
+        .first;
+
+    final shelves = {
+      'Made for You': ['Rock Mix', 'Jazz Mix'],
+      // Every album of the day, not only the three Home offers.
+      'From your Library': [
+        for (var index = 0; index < 5; index++) 'Owned $index',
+      ],
+      'New releases': ['Fresh'],
+      'From Example Feed': ['Feed a', 'Feed p', 'Feed q'],
+    };
+    for (final MapEntry(key: title, value: cards) in shelves.entries) {
+      final section = headed(title);
+      final shelf = find
+          .descendant(of: section, matching: find.byType(Scrollable))
+          .first;
+      for (final card in cards) {
+        await tester.scrollUntilVisible(
+          find.descendant(of: section, matching: find.text(card)),
+          120,
+          scrollable: shelf,
+        );
+      }
+      // No card of another kind joins the shelf.
+      for (final other in shelves.entries) {
+        if (other.key == title) continue;
+        for (final card in other.value) {
+          expect(
+            find.descendant(of: section, matching: find.text(card)),
+            findsNothing,
+          );
+        }
+      }
+    }
+    expect(find.text('Feed new'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   group('the banners\' color fields', () {
     testWidgets('move while Home shows them', (tester) async {
       await _open(tester, _home());
@@ -305,12 +373,34 @@ void main() {
       await tester.pump();
       expect(DecorativePhase.debugClockRunning, isTrue);
     });
+
+    testWidgets('leave the clock alone on a shelf of albums only', (
+      tester,
+    ) async {
+      await _open(tester, _home(banners: false));
+
+      expect(find.byType(MornyeAlbumPick), findsWidgets);
+      expect(find.byType(MornyeMixBanner), findsNothing);
+      expect(DecorativePhase.debugClockRunning, isFalse);
+    });
   });
 }
 
 class _Extensions extends ExtensionNotifier {
   @override
-  ExtensionState build() => const ExtensionState();
+  ExtensionState build() => const ExtensionState(
+    extensions: [
+      Extension(
+        id: 'example',
+        name: 'example',
+        displayName: 'Example Feed',
+        version: '1.0.0',
+        description: 'Home feed',
+        enabled: true,
+        status: 'loaded',
+      ),
+    ],
+  );
 }
 
 class _Explore extends ExploreNotifier {

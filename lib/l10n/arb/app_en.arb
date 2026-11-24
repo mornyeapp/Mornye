@@ -10232,6 +10232,15 @@
   "@homeFromYourLibrary": {
     "description": "Home section header for the day's albums from the Library, shown in On repeat's place while listening is not recorded"
   },
+  "homeFromSource": "From {source}",
+  "@homeFromSource": {
+    "description": "Top Picks page: header of the shelf of playlists and albums from the Home feed extension, named by its display name",
+    "placeholders": {"source": {"type": "String"}}
+  },
+  "homeRecommendedFromLibrary": "Based on your Library",
+  "@homeRecommendedFromLibrary": {
+    "description": "Recommended page: header of the day's recommended songs, which start from songs the user plays, adds and loves; genre shelves follow"
+  },
   "homeUnfinishedTitle": "Finish your collection",
   "@homeUnfinishedTitle": {
     "description": "Home section header for loose ends of the collection: Wishlist, incomplete albums, recognized songs and failed downloads"
