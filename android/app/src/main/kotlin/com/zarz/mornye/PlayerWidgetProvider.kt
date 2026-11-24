@@ -40,12 +40,29 @@ class PlayerWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        update(context, ids)
+        val pending = goAsync()
+        val appContext = context.applicationContext
+        val copy = ids.copyOf()
+        widgetExecutor.execute {
+            try {
+                update(appContext, copy)
+            } finally {
+                pending.finish()
+            }
+        }
         PlayerWidgetBridge.installedWidgetsChanged(context)
     }
 
     override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) {
-        update(context, intArrayOf(id))
+        val pending = goAsync()
+        val appContext = context.applicationContext
+        widgetExecutor.execute {
+            try {
+                update(appContext, intArrayOf(id))
+            } finally {
+                pending.finish()
+            }
+        }
     }
 
     override fun onDeleted(context: Context, ids: IntArray) {
@@ -90,6 +107,10 @@ class PlayerWidgetProvider : AppWidgetProvider() {
         const val ACTION = "com.zarz.mornye.PLAYER_WIDGET_ACTION"
         const val COMMAND = "player_widget_command"
         private const val DISABLED_ALPHA = 0.38f
+        // One thread renders every widget update, so an older frame never lands last.
+        internal val widgetExecutor = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "MornyePlayerWidget").apply { isDaemon = true }
+        }
         fun preferences(context: Context) = context.getSharedPreferences("player_widget", Context.MODE_PRIVATE)
 
         fun installedCount(context: Context): Int = AppWidgetManager.getInstance(context)
@@ -336,7 +357,7 @@ object PlayerWidgetBridge : FlutterEngine.EngineLifecycleListener {
     private var channel: MethodChannel? = null
     private var ready = false
     private var pendingCommand: String? = null
-    private val worker = Executors.newSingleThreadExecutor()
+    private val worker = PlayerWidgetProvider.widgetExecutor
     private val main = Handler(Looper.getMainLooper())
 
     fun attach(context: Context, flutterEngine: FlutterEngine) {
