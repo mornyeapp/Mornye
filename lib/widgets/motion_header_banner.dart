@@ -50,6 +50,8 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
   bool _ready = false;
   bool _failed = false;
   bool _headerVisible = true;
+  bool _reduceMotion = false;
+  bool _initializedOnce = false;
   ValueListenable<TickerModeData>? _tickerMode;
 
   @override
@@ -63,9 +65,8 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
       _disposeController();
       _ready = false;
       _failed = false;
-      if (enabled) _initialize();
+      if (enabled && !_reduceMotion) _initialize();
     });
-    _initialize();
   }
 
   @override
@@ -76,6 +77,9 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
     // A collapsed FlexibleSpaceBar hides its background with opacity only;
     // its TickerMode remains enabled while the pinned toolbar is visible.
     _headerVisible = header == null || header.currentExtent > header.minExtent;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final reduceChanged = reduceMotion != _reduceMotion;
+    _reduceMotion = reduceMotion;
     // TickerMode is off while this subtree is hidden: covered by an opaque
     // route (Navigator offstages it) or on an inactive shell tab. Follow it
     // so the decoder doesn't keep running behind other screens.
@@ -85,14 +89,31 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
       _tickerMode = notifier;
       notifier.addListener(_syncPlayback);
     }
-    _syncPlayback();
+    if (reduceMotion) {
+      if (_controller != null) {
+        _disposeController();
+        _ready = false;
+        _failed = false;
+      }
+      _initializedOnce = true;
+      return;
+    }
+    if (!_initializedOnce || reduceChanged) {
+      _initializedOnce = true;
+      _initialize();
+    } else {
+      _syncPlayback();
+    }
   }
 
   bool get _visible {
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     final appVisible =
         lifecycle == null || lifecycle == AppLifecycleState.resumed;
-    return appVisible && _headerVisible && (_tickerMode?.value.enabled ?? true);
+    return !_reduceMotion &&
+        appVisible &&
+        _headerVisible &&
+        (_tickerMode?.value.enabled ?? true);
   }
 
   void _syncPlayback() {
@@ -122,7 +143,9 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
   }
 
   Future<void> _initialize() async {
-    if (!ref.read(settingsProvider).motionArtworkEnabled) return;
+    if (_reduceMotion || !ref.read(settingsProvider).motionArtworkEnabled) {
+      return;
+    }
     final prepared = widget.controller;
     if (prepared != null && prepared.value.isInitialized) {
       _ownsController = false;
