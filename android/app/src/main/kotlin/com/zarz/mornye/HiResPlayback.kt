@@ -174,10 +174,20 @@ internal class HiResPlayback(context: Context, private val emit: (Map<String, An
             try {
                 fill()
                 val pcm = requireNotNull(source)
-                if (pcm.ended && pending == null && NativeAudio.framesOboe(output) >= writtenFrames) {
+                val playedFrames = NativeAudio.framesOboe(output)
+                if (pcm.ended && pending == null && playedFrames >= writtenFrames) {
                     pause()
                     emit(mapOf("token" to token, "event" to "complete"))
-                } else worker.postDelayed(this, 5)
+                } else {
+                    val bufferedMs = ((writtenFrames - playedFrames).coerceAtLeast(0L) * 1000L) /
+                        pcm.rate.toLong().coerceAtLeast(1L)
+                    val delayMs = if (!pcm.ended && pending == null && bufferedMs > 80L) {
+                        (bufferedMs / 4L).coerceIn(15L, 40L)
+                    } else {
+                        5L
+                    }
+                    worker.postDelayed(this, delayMs)
+                }
             } catch (error: Exception) { fail(error.message ?: "AAudio error") }
         }
     }

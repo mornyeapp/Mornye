@@ -478,7 +478,16 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                 if (ended && pending == null && frames >= writtenFrames) {
                     pause()
                     emit(mapOf("token" to token, "event" to "complete"))
-                } else worker.postDelayed(this, 5)
+                } else {
+                    val sampleRate = format?.sampleRate?.toLong()?.coerceAtLeast(1L) ?: 48000L
+                    val bufferedMs = ((writtenFrames - frames).coerceAtLeast(0L) * 1000L) / sampleRate
+                    val delayMs = if (!ended && pending == null && bufferedMs > 80L) {
+                        (bufferedMs / 4L).coerceIn(15L, 40L)
+                    } else {
+                        5L
+                    }
+                    worker.postDelayed(this, delayMs)
+                }
             } catch (error: Exception) {
                 val reason = if (error is UsbDirectException) UsbDirectFormats.DECODE_FAILED else "route_changed"
                 fail(listOfNotNull((error as? UsbDirectException)?.info?.describe(), error.message ?: "USB transfer failed")
