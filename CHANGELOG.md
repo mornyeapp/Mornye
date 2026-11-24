@@ -11,7 +11,7 @@ first: the dialog stops at 2000 characters in versions before 5.4.5 and at
 Versions 4.9.7 to 5.4.0 have their notes on the
 [releases page](https://github.com/mornyeapp/Mornye/releases).
 
-## [5.4.5] - Unreleased
+## [5.4.5] - 2026-11-24
 
 ### Added
 
