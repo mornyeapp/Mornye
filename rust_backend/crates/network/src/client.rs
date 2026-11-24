@@ -108,9 +108,9 @@ impl NetworkService {
                 tokio::pin!(operation);
                 let timeout = tokio::time::sleep(timeout);
                 tokio::pin!(timeout);
-                // The first check runs below; an immediate first tick would
-                // only repeat it before the operation is polled.
-                let period = Duration::from_millis(10);
+                // The first check runs below. Some cancellations wake the
+                // request at once; the rest are seen at the next tick.
+                let period = Duration::from_millis(50);
                 let mut heartbeat =
                     tokio::time::interval_at(tokio::time::Instant::now() + period, period);
                 loop {
