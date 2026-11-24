@@ -81,6 +81,8 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
     required bool forceFullScan,
   }) async {
     if (_scanCancelRequested) return null;
+    final progressClock = Stopwatch()..start();
+    var lastProgressMs = -250;
     final scanFile = folderPath.startsWith('network://')
         ? await _scanNetworkFolder(
             folderPath,
@@ -98,6 +100,9 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
             },
             onProgress: (processed, errors, name) {
               if (!ref.mounted) return;
+              final elapsedMs = progressClock.elapsedMilliseconds;
+              if (elapsedMs - lastProgressMs < 250) return;
+              lastProgressMs = elapsedMs;
               state = state.copyWith(
                 scannedFiles: processed,
                 scanErrorCount: errors,
