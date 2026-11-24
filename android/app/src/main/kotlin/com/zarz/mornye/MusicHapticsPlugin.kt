@@ -14,14 +14,50 @@ import io.flutter.plugin.common.MethodChannel
 class MusicHapticsPlugin : FlutterPlugin {
     private lateinit var channel: MethodChannel
     private var vibrator: Vibrator? = null
+    private var hasVibrator = false
+    private var hasAmplitudeControl = false
+    private var supportsThud = false
+    private var supportsClick = false
+    private var mediaVibrationAttrs: VibrationAttributes? = null
+    private var touchVibrationAttrs: VibrationAttributes? = null
+    private var mediaAudioAttrs: AudioAttributes? = null
+    private var touchAudioAttrs: AudioAttributes? = null
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         val context = binding.applicationContext
-        vibrator = if (Build.VERSION.SDK_INT >= 31) {
+        val deviceVibrator = if (Build.VERSION.SDK_INT >= 31) {
             context.getSystemService(VibratorManager::class.java)?.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
             context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+        vibrator = deviceVibrator
+        if (deviceVibrator != null && Build.VERSION.SDK_INT >= 26) {
+            hasVibrator = deviceVibrator.hasVibrator()
+            hasAmplitudeControl = deviceVibrator.hasAmplitudeControl()
+            if (Build.VERSION.SDK_INT >= 31) {
+                supportsThud = deviceVibrator.areAllPrimitivesSupported(
+                    VibrationEffect.Composition.PRIMITIVE_THUD,
+                )
+                supportsClick = deviceVibrator.areAllPrimitivesSupported(
+                    VibrationEffect.Composition.PRIMITIVE_CLICK,
+                )
+            }
+            if (Build.VERSION.SDK_INT >= 33) {
+                mediaVibrationAttrs =
+                    VibrationAttributes.createForUsage(VibrationAttributes.USAGE_MEDIA)
+                touchVibrationAttrs =
+                    VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH)
+            } else {
+                mediaAudioAttrs = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+                touchAudioAttrs = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            }
         }
         channel = MethodChannel(binding.binaryMessenger, "com.zarz.mornye/haptics")
         channel.setMethodCallHandler { call, result ->
@@ -49,12 +85,12 @@ class MusicHapticsPlugin : FlutterPlugin {
      */
     private fun pulse(intensity: Double, sharpness: Double, touch: Boolean) {
         val vibrator = vibrator ?: return
-        if (Build.VERSION.SDK_INT < 26 || !vibrator.hasVibrator() || intensity <= 0) return
+        if (Build.VERSION.SDK_INT < 26 || !hasVibrator || intensity <= 0) return
         // Without tuned primitives the motor is often an eccentric mass that
         // needs tens of milliseconds to spin up, and stays still at low
         // amplitudes. Shorter or weaker one-shots are not felt at all.
-        val effect = composed(vibrator, intensity, sharpness)
-            ?: if (vibrator.hasAmplitudeControl()) {
+        val effect = composed(intensity, sharpness)
+            ?: if (hasAmplitudeControl) {
                 // Bass hits are longer and softer; bright hits short and crisp.
                 VibrationEffect.createOneShot(
                     (20 + 20 * (1 - sharpness)).toLong(),
@@ -73,45 +109,29 @@ class MusicHapticsPlugin : FlutterPlugin {
         // Media usage honours the system's separate media vibration switch;
         // touch usage honours the touch feedback switch.
         if (Build.VERSION.SDK_INT >= 33) {
-            vibrator.vibrate(
-                effect,
-                VibrationAttributes.createForUsage(
-                    if (touch) VibrationAttributes.USAGE_TOUCH else VibrationAttributes.USAGE_MEDIA,
-                ),
-            )
+            val attrs = if (touch) touchVibrationAttrs else mediaVibrationAttrs
+            if (attrs != null) {
+                vibrator.vibrate(effect, attrs)
+            }
         } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(
-                effect,
-                AudioAttributes.Builder()
-                    .setUsage(
-                        if (touch) {
-                            AudioAttributes.USAGE_ASSISTANCE_SONIFICATION
-                        } else {
-                            AudioAttributes.USAGE_MEDIA
-                        },
-                    )
-                    .setContentType(
-                        if (touch) {
-                            AudioAttributes.CONTENT_TYPE_SONIFICATION
-                        } else {
-                            AudioAttributes.CONTENT_TYPE_MUSIC
-                        },
-                    )
-                    .build(),
-            )
+            val attrs = if (touch) touchAudioAttrs else mediaAudioAttrs
+            if (attrs != null) {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(effect, attrs)
+            }
         }
     }
 
     /** Device-tuned primitives feel cleaner than raw motor amplitudes. */
-    private fun composed(vibrator: Vibrator, intensity: Double, sharpness: Double): VibrationEffect? {
+    private fun composed(intensity: Double, sharpness: Double): VibrationEffect? {
         if (Build.VERSION.SDK_INT < 31) return null
         val primitive = if (sharpness < 0.5) {
+            if (!supportsThud) return null
             VibrationEffect.Composition.PRIMITIVE_THUD
         } else {
+            if (!supportsClick) return null
             VibrationEffect.Composition.PRIMITIVE_CLICK
         }
-        if (!vibrator.areAllPrimitivesSupported(primitive)) return null
         return VibrationEffect.startComposition()
             .addPrimitive(primitive, intensity.toFloat())
             .compose()
