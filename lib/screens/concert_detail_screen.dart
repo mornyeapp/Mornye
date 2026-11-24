@@ -97,15 +97,10 @@ class _ConcertDetailScreenState extends State<ConcertDetailScreen> {
     final base = MornyeTheme.fromContext(context, brightness: Brightness.dark);
     return Theme(
       data: base,
-      child: CoverPaletteBuilder(
+      child: CoverSourceColorBuilder(
         imageSource: source,
-        builder: (context, palette) {
-          final color = HSLColor.fromColor(
-            source == null
-                ? Colors.grey
-                : CoverPalette.sourceColor(source, Brightness.dark) ??
-                      Colors.grey,
-          );
+        builder: (context, sourceColor) {
+          final color = HSLColor.fromColor(sourceColor ?? Colors.grey);
           final top = color
               .withSaturation((color.saturation * 1.2).clamp(0, 0.65))
               .withLightness(0.27)

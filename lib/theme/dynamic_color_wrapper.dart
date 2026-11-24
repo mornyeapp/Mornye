@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/theme_provider.dart';
@@ -5,12 +6,83 @@ import 'package:mornye/providers/custom_font_provider.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 
 class DynamicColorWrapper extends ConsumerWidget {
   final Widget Function(ThemeData light, ThemeData dark, ThemeMode mode)
   builder;
 
   const DynamicColorWrapper({super.key, required this.builder});
+
+  static final _materialThemeCache = <Object, (ThemeData, ThemeData)>{};
+  static const int _maxMaterialThemeCache = 12;
+
+  static (ThemeData, ThemeData) _buildMaterialThemes({
+    required bool useDynamicColor,
+    required ColorScheme? lightDynamic,
+    required ColorScheme? darkDynamic,
+    required Color seedColor,
+    required bool useAmoled,
+    required bool useSystemFont,
+    required String? fontFamily,
+  }) {
+    // Themes bake in the platform, which tests switch within one run.
+    final key = (
+      isDesktopPlatform,
+      defaultTargetPlatform,
+      useDynamicColor,
+      useDynamicColor ? lightDynamic : null,
+      useDynamicColor ? darkDynamic : null,
+      useDynamicColor && lightDynamic != null && darkDynamic != null
+          ? null
+          : seedColor,
+      useAmoled,
+      useSystemFont,
+      fontFamily,
+    );
+    final cached = _materialThemeCache[key];
+    if (cached != null) return cached;
+
+    ColorScheme lightScheme;
+    ColorScheme darkScheme;
+
+    if (useDynamicColor && lightDynamic != null && darkDynamic != null) {
+      lightScheme = lightDynamic;
+      darkScheme = darkDynamic;
+    } else {
+      lightScheme = ColorScheme.fromSeed(
+        seedColor: seedColor,
+        brightness: Brightness.light,
+      );
+      darkScheme = ColorScheme.fromSeed(
+        seedColor: seedColor,
+        brightness: Brightness.dark,
+      );
+    }
+
+    if (useAmoled) {
+      darkScheme = _applyAmoledColors(darkScheme);
+    }
+
+    final built = (
+      AppTheme.light(
+        dynamicScheme: lightScheme,
+        useSystemFont: useSystemFont,
+        fontFamily: fontFamily,
+      ),
+      AppTheme.dark(
+        dynamicScheme: darkScheme,
+        isAmoled: useAmoled,
+        useSystemFont: useSystemFont,
+        fontFamily: fontFamily,
+      ),
+    );
+    if (_materialThemeCache.length >= _maxMaterialThemeCache) {
+      _materialThemeCache.remove(_materialThemeCache.keys.first);
+    }
+    _materialThemeCache[key] = built;
+    return built;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -63,38 +135,12 @@ class DynamicColorWrapper extends ConsumerWidget {
           );
         }
 
-        ColorScheme lightScheme;
-        ColorScheme darkScheme;
-
-        if (themeSettings.useDynamicColor &&
-            lightDynamic != null &&
-            darkDynamic != null) {
-          lightScheme = _toFlutterColorScheme(lightDynamic);
-          darkScheme = _toFlutterColorScheme(darkDynamic);
-        } else {
-          final seedColor = themeSettings.seedColor;
-          lightScheme = ColorScheme.fromSeed(
-            seedColor: seedColor,
-            brightness: Brightness.light,
-          );
-          darkScheme = ColorScheme.fromSeed(
-            seedColor: seedColor,
-            brightness: Brightness.dark,
-          );
-        }
-
-        if (themeSettings.useAmoled) {
-          darkScheme = _applyAmoledColors(darkScheme);
-        }
-
-        final lightTheme = AppTheme.light(
-          dynamicScheme: lightScheme,
-          useSystemFont: themeSettings.useSystemFont,
-          fontFamily: fontFamily,
-        );
-        final darkTheme = AppTheme.dark(
-          dynamicScheme: darkScheme,
-          isAmoled: themeSettings.useAmoled,
+        final (lightTheme, darkTheme) = _buildMaterialThemes(
+          useDynamicColor: themeSettings.useDynamicColor,
+          lightDynamic: lightDynamic,
+          darkDynamic: darkDynamic,
+          seedColor: themeSettings.seedColor,
+          useAmoled: themeSettings.useAmoled,
           useSystemFont: themeSettings.useSystemFont,
           fontFamily: fontFamily,
         );
@@ -104,52 +150,12 @@ class DynamicColorWrapper extends ConsumerWidget {
     );
   }
 
-  ColorScheme _toFlutterColorScheme(ColorScheme scheme) {
-    return ColorScheme.fromSeed(
-      seedColor: scheme.primary,
-      brightness: scheme.brightness,
-    ).copyWith(
-      primary: scheme.primary,
-      onPrimary: scheme.onPrimary,
-      primaryContainer: scheme.primaryContainer,
-      onPrimaryContainer: scheme.onPrimaryContainer,
-      secondary: scheme.secondary,
-      onSecondary: scheme.onSecondary,
-      secondaryContainer: scheme.secondaryContainer,
-      onSecondaryContainer: scheme.onSecondaryContainer,
-      tertiary: scheme.tertiary,
-      onTertiary: scheme.onTertiary,
-      tertiaryContainer: scheme.tertiaryContainer,
-      onTertiaryContainer: scheme.onTertiaryContainer,
-      error: scheme.error,
-      onError: scheme.onError,
-      errorContainer: scheme.errorContainer,
-      onErrorContainer: scheme.onErrorContainer,
-      outline: scheme.outline,
-      outlineVariant: scheme.outlineVariant,
-      surface: scheme.surface,
-      onSurface: scheme.onSurface,
-      surfaceContainerLowest: scheme.surfaceContainerLowest,
-      surfaceContainerLow: scheme.surfaceContainerLow,
-      surfaceContainer: scheme.surfaceContainer,
-      surfaceContainerHigh: scheme.surfaceContainerHigh,
-      surfaceContainerHighest: scheme.surfaceContainerHighest,
-      onSurfaceVariant: scheme.onSurfaceVariant,
-      inverseSurface: scheme.inverseSurface,
-      onInverseSurface: scheme.onInverseSurface,
-      inversePrimary: scheme.inversePrimary,
-      shadow: scheme.shadow,
-      surfaceTint: scheme.surfaceTint,
-      scrim: scheme.scrim,
-    );
-  }
-
   /// Apply AMOLED colors: a pure black page with a neutral container ladder.
   ///
   /// The tiers keep the M3 dark tone steps around the container (low -2,
   /// high +5, highest +10), anchored near tone 7 so the lowest raised tier,
   /// used by menus, still reads against black where shadows do not show.
-  ColorScheme _applyAmoledColors(ColorScheme scheme) {
+  static ColorScheme _applyAmoledColors(ColorScheme scheme) {
     return scheme.copyWith(
       surface: Colors.black,
       onSurface: Colors.white,

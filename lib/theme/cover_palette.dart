@@ -353,8 +353,6 @@ class CoverPalette {
       (info, _) async {
         loadFailureTimeout.cancel();
         stream.removeListener(listener);
-        ui.Picture? picture;
-        ui.Image? image;
         try {
           final source = info.image;
           Uint8List? straight;
@@ -373,23 +371,40 @@ class CoverPalette {
             result.complete((null, straight));
             return;
           }
-          // Mirror Flutter's image-to-palette canvas/readback. Decoding,
-          // filtering and premultiplied alpha remain with Flutter's renderer.
-          final recorder = ui.PictureRecorder();
-          paintImage(
-            canvas: Canvas(recorder),
-            rect: Rect.fromLTWH(
-              0,
-              0,
-              source.width.toDouble(),
-              source.height.toDouble(),
-            ),
-            image: source,
-            filterQuality: FilterQuality.none,
-          );
-          picture = recorder.endRecording();
-          image = await picture.toImage(source.width, source.height);
-          final data = await image.toByteData();
+          if (straight != null) {
+            // Premultiplied from the one straight readback, avoiding a second
+            // GPU sync; an opaque cover's buffer is the same either way.
+            var hasTransparency = false;
+            for (var i = 3; i < straight.length; i += 4) {
+              if (straight[i] != 255) {
+                hasTransparency = true;
+                break;
+              }
+            }
+            if (!hasTransparency) {
+              result.complete((straight, straight));
+              return;
+            }
+            final premul = Uint8List(straight.length);
+            for (var i = 0; i + 3 < straight.length; i += 4) {
+              final a = straight[i + 3];
+              if (a == 255) {
+                premul[i] = straight[i];
+                premul[i + 1] = straight[i + 1];
+                premul[i + 2] = straight[i + 2];
+                premul[i + 3] = 255;
+              } else if (a > 0) {
+                premul[i] = (straight[i] * a + 127) ~/ 255;
+                premul[i + 1] = (straight[i + 1] * a + 127) ~/ 255;
+                premul[i + 2] = (straight[i + 2] * a + 127) ~/ 255;
+                premul[i + 3] = a;
+              }
+            }
+            result.complete((premul, straight));
+            return;
+          }
+          // Fallback only if straight readback failed on the host renderer.
+          final data = await source.toByteData();
           if (data == null) throw StateError('Palette readback failed');
           result.complete((
             data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
@@ -398,8 +413,6 @@ class CoverPalette {
         } catch (error, stack) {
           result.completeError(error, stack);
         } finally {
-          image?.dispose();
-          picture?.dispose();
           info.dispose();
         }
       },
@@ -448,12 +461,21 @@ Color? coverSourceColor(ByteData data, {double minimumCoverage = 0.12}) {
     blue += b * alpha;
     weight += alpha;
     final high = math.max(r, math.max(g, b));
-    final chroma = high - math.min(r, math.min(g, b));
+    final low = math.min(r, math.min(g, b));
+    final chroma = high - low;
     // Dark pixels have unstable hues, as in the navy-black case below.
     if (chroma < 20 || high < 48) continue;
     chromatic += alpha;
-    final hue = HSVColor.fromColor(Color.fromARGB(255, r, g, b)).hue;
-    final bin = (hue / (360 / bins)).floor() % bins;
+    final double hue;
+    if (high == r) {
+      hue = 60.0 * (((g - b) / chroma) % 6);
+    } else if (high == g) {
+      hue = 60.0 * ((b - r) / chroma + 2);
+    } else {
+      hue = 60.0 * ((r - g) / chroma + 4);
+    }
+    final normalizedHue = hue < 0 ? hue + 360.0 : hue;
+    final bin = (normalizedHue / (360 / bins)).floor() % bins;
     final w = alpha * chroma;
     binWeight[bin] += w;
     binRed[bin] += r * w;
@@ -556,8 +578,14 @@ class _CoverPaletteBuilderState extends State<CoverPaletteBuilder> {
   @override
   void didUpdateWidget(CoverPaletteBuilder oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Re-check local file identity even when its path did not change. Metadata
-    // editing can replace cover bytes in place.
+    final source = widget.imageSource;
+    // An unchanged remote URL keeps its palette (a failed one retries on the
+    // next remount); local files re-check, since edits replace cover bytes.
+    if (oldWidget.imageSource == source &&
+        source != null &&
+        isHttpCoverUrl(source)) {
+      return;
+    }
     _maybeResolve();
   }
 
@@ -651,7 +679,12 @@ class _CoverSourceColorBuilderState extends State<CoverSourceColorBuilder> {
   @override
   void didUpdateWidget(CoverSourceColorBuilder oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Re-check local file identity, as CoverPaletteBuilder does.
+    final source = widget.imageSource;
+    if (oldWidget.imageSource == source &&
+        source != null &&
+        isHttpCoverUrl(source)) {
+      return;
+    }
     _resolve();
   }
 
