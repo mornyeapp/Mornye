@@ -295,12 +295,13 @@ final class RustCoreBackend: CoreBackend {
             throw failure("Missing native data job lease")
         }
         defer { finishDataJob(id, lease) }
-        guard let raw = args["request_json"] as? String,
-              var request = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any] else {
+        guard let raw = args["request_json"] as? String else {
             throw failure("Missing native data job request")
         }
         let bytes = (args["bytes"] as? FlutterStandardTypedData)?.data ?? Data()
-        if request["operation"] as? String == "library_scan_incremental" {
+        if raw.contains("\"library_scan_incremental\""),
+           var request = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any],
+           request["operation"] as? String == "library_scan_incremental" {
             guard let folder = request["folder_path"] as? String else { throw failure("Missing library folder") }
             return try withLibraryDirectories([folder]) { current in
                 let staged = root.appendingPathComponent("files", isDirectory: true)

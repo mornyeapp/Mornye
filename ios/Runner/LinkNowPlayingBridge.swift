@@ -84,7 +84,7 @@ private final class LinkNowPlayingController {
                         LinkNowPlayingState.self, from: JSONSerialization.data(withJSONObject: snapshot)
                     )
                     guard state.id == connection.id else { throw LinkNowPlayingError.invalidConnection }
-                    state.artwork = try? self.sharedArtwork(state.artwork)
+                    state.artwork = try? await self.sharedArtwork(state.artwork)
                     state.connection = self.inlineConnection ? connection : nil
                     if state.trackId.isEmpty {
                         try await self.session?.end()
@@ -130,7 +130,7 @@ private final class LinkNowPlayingController {
         try await session?.end()
     }
 
-    private func sharedArtwork(_ source: String?) throws -> String? {
+    private func sharedArtwork(_ source: String?) async throws -> String? {
         guard let source, let url = URL(string: source) else { return nil }
         if !url.isFileURL {
             guard url.scheme == "https", var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
@@ -146,15 +146,20 @@ private final class LinkNowPlayingController {
         if source == artworkSource { return artworkFile?.absoluteString }
         guard let group = LinkNowPlayingConnection.group,
               let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) else { return nil }
-        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-        guard size > 0, size <= 16 * 1024 * 1024 else { return nil }
-        let directory = container.appendingPathComponent("LinkNowPlayingArtwork", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let name = SHA256.hash(data: Data(source.utf8)).map { String(format: "%02x", $0) }.joined()
-        let file = directory.appendingPathComponent(name)
-        try Data(contentsOf: url).write(to: file, options: .atomic)
-        try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: file.path)
-        if let old = artworkFile, old != file { try? FileManager.default.removeItem(at: old) }
+        let oldFile = artworkFile
+        let copied = try await Task.detached(priority: .utility) { () throws -> URL? in
+            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            guard size > 0, size <= 16 * 1024 * 1024 else { return nil }
+            let directory = container.appendingPathComponent("LinkNowPlayingArtwork", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let name = SHA256.hash(data: Data(source.utf8)).map { String(format: "%02x", $0) }.joined()
+            let file = directory.appendingPathComponent(name)
+            try Data(contentsOf: url).write(to: file, options: .atomic)
+            try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: file.path)
+            if let old = oldFile, old != file { try? FileManager.default.removeItem(at: old) }
+            return file
+        }.value
+        guard let file = copied else { return nil }
         artworkSource = source
         artworkFile = file
         return file.absoluteString
