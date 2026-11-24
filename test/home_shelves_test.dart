@@ -70,7 +70,12 @@ Map<String, dynamic> _download(String id, String path, {int number = 1}) => {
   'isrc': 'ISRC-$id',
 };
 
-Future<void> _addScanned(String id, String path, {String? source}) async {
+Future<void> _addScanned(
+  String id,
+  String path, {
+  String? source,
+  String? album,
+}) async {
   final db = await LibraryDatabase.instance.database;
   await db.insert(
     'library',
@@ -80,7 +85,7 @@ Future<void> _addScanned(String id, String path, {String? source}) async {
         sourceId: source ?? LibraryDatabase.legacySourceId,
         trackName: 'Scanned $id',
         artistName: 'Artist',
-        albumName: 'Album $id',
+        albumName: album ?? 'Album $id',
         filePath: path,
         scannedAt: DateTime.utc(2026, 10, 1),
       ).toJson(),
@@ -138,6 +143,7 @@ final _media = StreamController<MediaItem?>.broadcast();
 
 ProviderContainer _container({
   required bool includeLocal,
+  bool recordListening = true,
   List<DownloadHistoryItem> inMemory = const [],
   List<Override> overrides = const [],
 }) {
@@ -145,7 +151,10 @@ ProviderContainer _container({
     overrides: [
       settingsProvider.overrideWith(
         () => FixedSettingsNotifier(
-          AppSettings(localLibraryEnabled: includeLocal),
+          AppSettings(
+            localLibraryEnabled: includeLocal,
+            listeningStatisticsEnabled: recordListening,
+          ),
         ),
       ),
       downloadHistoryProvider.overrideWith(
@@ -330,7 +339,7 @@ void main() {
         expect(added.items.first.historyItem?.id, 'd9');
         expect(added.trackCount, includeLocal ? 6 : 5);
         // The Library index loads with its own startup warmup.
-        expect(container.exists(localLibraryProvider), isFalse);
+        expect(container.read(localLibraryProvider.exists), isFalse);
       });
     }
 
@@ -360,6 +369,55 @@ void main() {
       await container.read(badges.future);
       expect(_ran(_countRead), 2);
     });
+  });
+
+  group('Without a listening record', () {
+    test('the played shelves stay empty and read no statistics', () async {
+      await HistoryDatabase.instance.upsertBatch([
+        _download('d0', _path('d0.flac')),
+      ]);
+      await _played(_path('d0.flac'), 600000);
+
+      final recording = _container(includeLocal: true);
+      expect(await recording.read(homeOnRepeatProvider.future), hasLength(1));
+      expect(
+        await recording.read(homeRecentlyPlayedProvider.future),
+        hasLength(1),
+      );
+
+      _statements.clear();
+      final off = _container(includeLocal: true, recordListening: false);
+      expect(await off.read(homeOnRepeatProvider.future), isEmpty);
+      expect(await off.read(homeRecentlyPlayedProvider.future), isEmpty);
+      expect(_ran(_statisticsRead), 0);
+    });
+
+    for (final includeLocal in [true, false]) {
+      test('the day\'s albums are the Library\'s albums '
+          '(Local Library ${includeLocal ? 'on' : 'off'})', () async {
+        await HistoryDatabase.instance.upsertBatch([
+          for (final (index, album) in ['First', 'First', 'Second'].indexed)
+            {
+              ..._download('d$index', _path('d$index.flac'), number: index),
+              'albumName': album,
+            },
+        ]);
+        for (var index = 0; index < 2; index++) {
+          await _addScanned('s$index', _path('s$index.flac'), album: 'Scanned');
+        }
+
+        final container = _container(
+          includeLocal: includeLocal,
+          recordListening: false,
+        );
+        final albums = await container.read(homeLibraryAlbumsProvider.future);
+        // An album of one song is a single, not an album.
+        expect(
+          {for (final album in albums) '${album.source}:${album.name}'},
+          {'downloaded:First', if (includeLocal) 'local:Scanned'},
+        );
+      });
+    }
   });
 
   group('On Repeat', () {

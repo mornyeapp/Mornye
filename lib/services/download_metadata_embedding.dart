@@ -65,7 +65,7 @@ class DownloadMetadataEmbedding {
       String,
     )?
     writeWithFFmpeg,
-  }) : _loadCover = loadCover ?? _downloadCover,
+  }) : _loadCover = loadCover ?? downloadCoverFile,
        _loadLyrics = loadLyrics ?? _fetchLyrics,
        _editMetadata = editMetadata ?? PlatformBridge.editFileMetadata,
        _scanReplayGain = scanReplayGain ?? FFmpegReplayGain.scan,
@@ -482,7 +482,9 @@ class DownloadMetadataEmbedding {
     return cover;
   }
 
-  static Future<String?> _downloadCover(String url, int maxDimension) async {
+  /// Downloads the cover at [url], no larger than [maxDimension] when that
+  /// is positive, to a temporary file the caller deletes. Null on failure.
+  static Future<String?> downloadCoverFile(String url, int maxDimension) async {
     try {
       final tempDir = await getTemporaryDirectory();
       final uniqueId =
@@ -501,7 +503,7 @@ class DownloadMetadataEmbedding {
       }
       return result['file_path'] as String? ?? path;
     } catch (error) {
-      _log.e('Failed to download cover for embedding: $error');
+      _log.e('Failed to download cover: $error');
       return null;
     }
   }

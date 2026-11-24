@@ -12,6 +12,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 [dependencies]
 mornye-cast.workspace = true
 mornye-core.workspace = true
+mornye-link.workspace = true
 mornye-network.workspace = true
 mornye-providers.workspace = true
 base64.workspace = true

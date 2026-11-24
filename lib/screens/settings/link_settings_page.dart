@@ -1,14 +1,18 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/settings/link_pairing_dialogs.dart';
+import 'package:mornye/screens/settings/link_phone_host_section.dart';
 import 'package:mornye/services/link/client/link_client_controller.dart';
 import 'package:mornye/services/link/client/link_client_discovery.dart';
 import 'package:mornye/services/link/client/link_client_pairing.dart';
 import 'package:mornye/services/link/client/link_client_session.dart';
+import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/sync/link_sound_sync_runner.dart';
 import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
@@ -16,13 +20,14 @@ import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
-import 'package:mornye/widgets/expressive_icon_button.dart';
+import 'package:mornye/widgets/link/link_row_action.dart';
 import 'package:mornye/widgets/link/link_transfers_view.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
-/// Mornye on your computer: paired computers with their connection and the
-/// songs copied with them, what this phone shares with them, the computers
-/// found on the network, and pairing.
+/// Mornye on your computer: paired computers (or shared phones) with their
+/// connection and the songs copied with them, what this phone shares with
+/// them, the hosts found on the network, pairing, and sharing this phone
+/// with other phones.
 class LinkSettingsPage extends ConsumerStatefulWidget {
   const LinkSettingsPage({super.key});
 
@@ -127,7 +132,11 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
       ),
     );
     if (paired == true && mounted) {
-      _showMessage(context.l10n.linkPaired(serverName));
+      _showMessage(
+        ref.read(linkPhoneOptionsProvider).showComputerSongs
+            ? context.l10n.linkPaired(serverName)
+            : context.l10n.linkPairedWithoutLibrary(serverName),
+      );
     }
   }
 
@@ -258,7 +267,7 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
     final active = record.serverId == state.activeServerId;
     final scheme = Theme.of(context).colorScheme;
     return SettingsItem(
-      icon: Icons.computer,
+      icon: record.isPhone ? Icons.phone_android : Icons.computer,
       showIconInMornye: true,
       iconColor: active && state.connection == LinkConnectionState.connected
           ? scheme.primary
@@ -280,7 +289,7 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
                 ? _controller.retry
                 : null)
           : () => _controller.setActive(record.serverId),
-      trailing: _LinkIconAction(
+      trailing: LinkRowAction(
         tooltip: l10n.linkForget,
         icon: Icons.link_off,
         cupertinoIcon: CupertinoIcons.minus_circle,
@@ -295,7 +304,18 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
     final state = ref.watch(linkClientControllerProvider);
     final options = ref.watch(linkPhoneOptionsProvider);
     final optionsNotifier = ref.read(linkPhoneOptionsProvider.notifier);
-    final unpaired = state.unpaired;
+    final hideDisconnected = ref.watch(
+      settingsProvider.select((s) => s.linkHideDisconnectedSongs),
+    );
+    final soundSync = ref.watch(linkSoundSyncOptionProvider);
+    // A shared phone finds itself on the network; leave it out.
+    final ownServerId = ref.watch(
+      linkDesktopHostProvider.select((host) => host.server?.serverId),
+    );
+    final unpaired = [
+      for (final server in state.unpaired)
+        if (server.serverId != ownServerId) server,
+    ];
     final searching = state.discovery == LinkDiscoveryStatus.searching;
     final theme = Theme.of(context);
     final note = theme.textTheme.bodyMedium?.copyWith(
@@ -330,12 +350,43 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
               title: l10n.linkPhoneSection,
               children: [
                 SettingsSwitchItem(
+                  icon: Icons.devices_other_outlined,
+                  title: l10n.linkShowComputerSongsTitle,
+                  subtitle: l10n.linkShowComputerSongsSubtitle,
+                  value: options.showComputerSongs,
+                  onChanged: options.loaded
+                      ? optionsNotifier.setShowComputerSongs
+                      : null,
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.visibility_off,
+                  title: l10n.linkHideDisconnectedTitle,
+                  subtitle: l10n.linkHideDisconnectedSubtitle,
+                  value: hideDisconnected,
+                  onChanged: options.showComputerSongs
+                      ? ref
+                            .read(settingsProvider.notifier)
+                            .setLinkHideDisconnectedSongs
+                      : null,
+                ),
+                SettingsSwitchItem(
                   icon: Icons.library_music_outlined,
                   title: l10n.linkShareSongsTitle,
                   subtitle: l10n.linkShareSongsSubtitle,
                   value: options.shareSongs,
                   onChanged: options.loaded
                       ? optionsNotifier.setShareSongs
+                      : null,
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.equalizer,
+                  title: l10n.linkSyncSoundTitle,
+                  subtitle: l10n.linkSyncSoundSubtitle,
+                  value: soundSync.enabled,
+                  onChanged: soundSync.loaded
+                      ? ref
+                            .read(linkSoundSyncOptionProvider.notifier)
+                            .setEnabled
                       : null,
                 ),
                 SettingsSwitchItem(
@@ -355,7 +406,7 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
             children: [
               for (final server in unpaired)
                 SettingsItem(
-                  icon: Icons.computer,
+                  icon: server.isPhone ? Icons.phone_android : Icons.computer,
                   showIconInMornye: true,
                   title: server.name,
                   subtitle: server.host,
@@ -393,6 +444,7 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
               ),
             ),
           ),
+          const SliverToBoxAdapter(child: LinkPhoneHostSection()),
           const NavBarSliverSpacer(),
         ],
       ),
@@ -416,41 +468,4 @@ class _LinkInset extends StatelessWidget {
       );
     },
   );
-}
-
-class _LinkIconAction extends StatelessWidget {
-  const _LinkIconAction({
-    required this.tooltip,
-    required this.icon,
-    required this.cupertinoIcon,
-    required this.onPressed,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final IconData cupertinoIcon;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) => context.isMornye
-      ? Tooltip(
-          message: tooltip,
-          child: CupertinoButton(
-            onPressed: onPressed,
-            padding: const EdgeInsets.all(12),
-            child: Icon(
-              cupertinoIcon,
-              size: 24,
-              semanticLabel: tooltip,
-              color: onPressed == null
-                  ? Theme.of(context).disabledColor
-                  : Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        )
-      : ExpressiveIconButton(
-          icon: Icon(icon),
-          tooltip: tooltip,
-          onPressed: onPressed,
-        );
 }

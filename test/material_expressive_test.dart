@@ -1,13 +1,12 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
-import 'package:material_ui/material_ui.dart' as material_ui;
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/material_expressive.dart';
@@ -21,10 +20,12 @@ import 'package:mornye/widgets/expressive_button_group.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/expressive_navigation_bar.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
+import 'package:mornye/widgets/reorderable_priority_item.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/tooltip_finder.dart';
 
 Widget _host(
   Widget child, {
@@ -36,7 +37,7 @@ Widget _host(
   child: MaterialApp(
     theme: theme ?? AppTheme.light(),
     locale: locale,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(context).copyWith(
@@ -63,7 +64,7 @@ void main() {
         isAmoled: true,
         useSystemFont: systemFont,
       );
-      late material_ui.ThemeData adapted;
+      late ThemeData adapted;
       late M3EThemeData expressive;
       late ThemeData host;
       late String adaptedCancel;
@@ -73,10 +74,10 @@ void main() {
           MaterialExpressiveScope(
             child: Builder(
               builder: (context) {
-                adapted = material_ui.Theme.of(context);
+                adapted = Theme.of(context);
                 expressive = M3ETheme.of(context);
                 host = Theme.of(context);
-                adaptedCancel = material_ui.MaterialLocalizations.of(
+                adaptedCancel = MaterialLocalizations.of(
                   context,
                 ).cancelButtonLabel;
                 hostCancel = MaterialLocalizations.of(
@@ -420,7 +421,7 @@ void main() {
     expect(find.byType(M3EIconButton), findsNothing);
     expect(find.byType(M3ESwitch), findsNothing);
     await tester.tap(find.text('Play'));
-    await tester.tap(find.byTooltip('Next'));
+    await tester.tap(findByTooltip('Next'));
     await tester.tap(find.byType(Switch));
     expect(calls, 3);
   });
@@ -499,6 +500,49 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('custom rows among standard ones keep the group connected', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        SettingsGroup(
+          children: [
+            SettingsSwitchItem(title: 'Switch', value: true, onChanged: (_) {}),
+            const Padding(padding: EdgeInsets.all(16), child: Text('Slider')),
+            SettingsItem(title: 'Last', onTap: () {}),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final group = find.byType(SettingsGroup);
+    expect(
+      find.descendant(of: group, matching: find.byType(M3ECard)),
+      findsNothing,
+    );
+    // Each row has its own surface, 2dp from the next.
+    Rect surface(String text) => tester.getRect(
+      find.ancestor(of: find.text(text), matching: find.byType(Material)).first,
+    );
+    expect(surface('Slider').top, surface('Switch').bottom + 2);
+    expect(surface('Last').top, surface('Slider').bottom + 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('a group decides from its children whether they are rows', () {
+    const row = SettingsItem(title: 'Row');
+    const custom = Padding(padding: EdgeInsets.zero);
+    expect(settingsGroupHasRows(const []), isFalse);
+    expect(settingsGroupHasRows(const [row]), isTrue);
+    // Single content, such as a chart, keeps its card.
+    expect(settingsGroupHasRows(const [custom]), isFalse);
+    expect(settingsGroupHasRows(const [row, custom]), isTrue);
+    expect(settingsGroupHasRows(const [custom, custom]), isTrue);
+    // A hand-built form.
+    expect(settingsGroupHasRows(const [custom, SizedBox(), custom]), isFalse);
+    expect(settingsGroupHasRows(const [row, Divider(), row]), isFalse);
+  });
+
   testWidgets('button group squishes neighbours and keeps a plain fallback', (
     tester,
   ) async {
@@ -537,7 +581,7 @@ void main() {
     expect(restingDownload, closeTo(360 - 2 * 48 - 2 * 12, 1));
 
     final gesture = await tester.startGesture(
-      tester.getCenter(find.byTooltip('Love')),
+      tester.getCenter(findByTooltip('Love')),
     );
     // Stay under the long-press delay so the release still taps.
     await tester.pump();
@@ -588,5 +632,36 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(radius, isNull);
+  });
+
+  testWidgets('priority rows connect only on the Material theme', (
+    tester,
+  ) async {
+    late BorderRadius radius;
+    late double gap;
+    Widget row({required bool first, required bool last}) => Builder(
+      builder: (context) {
+        radius = priorityRowRadius(context, first: first, last: last);
+        gap = priorityRowGap(context, last: last);
+        return const SizedBox();
+      },
+    );
+    await tester.pumpWidget(_host(row(first: true, last: false)));
+    expect(radius.topLeft, const Radius.circular(20));
+    expect(radius.bottomLeft, const Radius.circular(4));
+    expect(gap, 2);
+    await tester.pumpWidget(_host(row(first: false, last: true)));
+    expect(radius.topLeft, const Radius.circular(4));
+    expect(radius.bottomLeft, const Radius.circular(20));
+    expect(gap, 8);
+    await tester.pumpWidget(
+      _host(
+        row(first: true, last: false),
+        theme: MornyeTheme.build(Brightness.dark),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(radius, BorderRadius.circular(16));
+    expect(gap, 8);
   });
 }

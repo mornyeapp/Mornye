@@ -27,6 +27,9 @@ Map<String, dynamic> _dto(ParsedLyrics value) => {
         'romanization': line.romanization,
         'romanizationWords': line.romanizationWords.map(_word).toList(),
         'translation': line.translation,
+        // The native parser sends it only for lines that have it.
+        if (line.translationWords.isNotEmpty)
+          'translationWords': line.translationWords.map(_word).toList(),
         'voice': line.voice == null
             ? null
             : {
@@ -39,6 +42,26 @@ Map<String, dynamic> _dto(ParsedLyrics value) => {
       },
   ],
 };
+
+/// Word-synced TTML of at least [chars] characters.
+String _ttml(int chars) {
+  String clock(int ms) => '${(ms / 1000).toStringAsFixed(3)}s';
+  final out = StringBuffer('<tt xmlns="http://www.w3.org/ns/ttml"><body>');
+  for (var line = 0; out.length < chars; line++) {
+    final start = line * 4000;
+    out.write('<p begin="${clock(start)}" end="${clock(start + 4000)}">');
+    for (var word = 0; word < 7; word++) {
+      final at = start + word * 500;
+      out.write(
+        '<span begin="${clock(at)}" end="${clock(at + 500)}">'
+        'word$line-$word </span>',
+      );
+    }
+    out.write('</p>');
+  }
+  out.write('</body></tt>');
+  return out.toString();
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -122,5 +145,55 @@ void main() {
     } finally {
       messenger.setMockMethodCallHandler(channel, null);
     }
+  });
+
+  void answerWith(ParsedLyrics expected) {
+    final json = jsonEncode(_dto(expected));
+    messenger.setMockMethodCallHandler(channel, (_) async => json);
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  }
+
+  // Widget tests run on fake time, where isolate work cannot finish until
+  // runAsync: what finishes on a pump stayed on the calling isolate.
+  testWidgets('small lyrics parse without an isolate hop', (tester) async {
+    final raw = _ttml(LyricsParser.inlineNativeParseChars - 1024);
+    final expected = LyricsParser.parse(raw);
+    answerWith(expected);
+    ParsedLyrics? parsed;
+    LyricsParser.parseAsyncNative(raw).then((value) => parsed = value);
+    await tester.pump();
+    expect(parsed, isNotNull);
+    expect(_dto(parsed!), _dto(expected));
+  });
+
+  testWidgets('large lyrics parse off the calling isolate', (tester) async {
+    final raw = _ttml(LyricsParser.inlineNativeParseChars + 1024);
+    answerWith(LyricsParser.parse(raw));
+    ParsedLyrics? parsed;
+    LyricsParser.parseAsyncNative(raw).then((value) => parsed = value);
+    await tester.pump();
+    expect(parsed, isNull);
+  });
+
+  test('large lyrics parse to the same result', () async {
+    final raw = _ttml(LyricsParser.inlineNativeParseChars + 1024);
+    final expected = LyricsParser.parse(raw);
+    answerWith(expected);
+    expect(_dto(await LyricsParser.parseAsyncNative(raw)), _dto(expected));
+  });
+
+  test('lyrics at the inline limit parse well within a frame', () async {
+    final raw = _ttml(LyricsParser.inlineNativeParseChars);
+    answerWith(LyricsParser.parse(raw));
+    final times = <int>[];
+    for (var i = 0; i < 9; i++) {
+      final watch = Stopwatch()..start();
+      await LyricsParser.parseAsyncNative(raw);
+      times.add(watch.elapsedMicroseconds);
+    }
+    times.sort();
+    // About 2 ms here, most of it the JSON decode the bridge always does
+    // inline at this size; encoding and rebuilding take about 0.4 ms.
+    expect(times[times.length ~/ 2], lessThan(16000));
   });
 }

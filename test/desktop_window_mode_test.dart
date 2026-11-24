@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +17,8 @@ import 'package:mornye/widgets/desktop/desktop_player_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_shortcuts.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/desktop/desktop_window_controls.dart';
+
+import 'support/tooltip_finder.dart';
 
 const _channel = MethodChannel('com.zarz.mornye/window');
 
@@ -293,7 +295,7 @@ void main() {
           'Maximize or restore window',
           'Close',
         ]) {
-          await tester.tap(find.byTooltip(tooltip));
+          await tester.tap(findByTooltip(tooltip));
           await tester.pump();
         }
         expect(
@@ -305,7 +307,7 @@ void main() {
           const Offset(-20, -20),
         );
         expect(calls.last.method, 'startResize');
-        await tester.tap(find.byTooltip('Window mode'));
+        await tester.tap(findByTooltip('Window mode'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Full screen'));
         await tester.pumpAndSettle();
@@ -328,8 +330,8 @@ void main() {
         await tester.tap(find.text('Full screen'));
         await tester.pumpAndSettle();
         expect(desktopWindowFullScreen.value, isTrue);
-        expect(find.byTooltip(RegExp(r'^Exit full screen')), findsNothing);
-        expect(find.byTooltip('Window mode'), findsNothing);
+        expect(findByTooltip(RegExp(r'^Exit full screen')), findsNothing);
+        expect(findByTooltip('Window mode'), findsNothing);
         expect(tester.getTopLeft(find.byType(Scaffold)), Offset.zero);
         expect(tester.getSize(find.byType(Scaffold)), const Size(1000, 800));
         await tester.sendKeyEvent(LogicalKeyboardKey.f11);

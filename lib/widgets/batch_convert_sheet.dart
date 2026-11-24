@@ -1,8 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
+import 'package:mornye/widgets/app_slider.dart';
+import 'package:mornye/widgets/slider_value_header.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/app_switch.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -60,8 +63,12 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
   late String _selectedBitrate;
   int? _selectedMaxBitDepth;
   int? _selectedMaxSampleRate;
-  String _selectedDither = 'none';
+  String _selectedDither = 'auto';
+  bool _smartDitherHighPass = false;
   String _selectedResampler = 'swr';
+
+  /// Null while the resampler's default level stands.
+  String? _selectedResamplerQuality;
   bool _keepOriginal = false;
 
   String _defaultBitrateForFormat(String format) {
@@ -139,8 +146,10 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                     } else {
                       _selectedMaxBitDepth = null;
                       _selectedMaxSampleRate = null;
-                      _selectedDither = 'none';
+                      _selectedDither = 'auto';
+                      _smartDitherHighPass = false;
                       _selectedResampler = 'swr';
+                      _selectedResamplerQuality = null;
                     }
                   },
                 ),
@@ -167,7 +176,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                     selected: _selectedMaxBitDepth,
                     onSelect: (depth) {
                       _selectedMaxBitDepth = depth;
-                      if (depth == null) _selectedDither = 'none';
+                      if (depth == null) _selectedDither = 'auto';
                     },
                   ),
 
@@ -183,7 +192,10 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                     selected: _selectedMaxSampleRate,
                     onSelect: (rate) {
                       _selectedMaxSampleRate = rate;
-                      if (rate == null) _selectedResampler = 'swr';
+                      if (rate == null) {
+                        _selectedResampler = 'swr';
+                        _selectedResamplerQuality = null;
+                      }
                     },
                   ),
 
@@ -195,6 +207,12 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                     labelOf: context.l10n.losslessDitherOptionLabel,
                     selected: _selectedDither,
                     onSelect: (mode) => _selectedDither = mode,
+                    description: _selectedDither == 'auto'
+                        ? context.l10n.trackConvertDitherSmartDescription
+                        : null,
+                    footer: _selectedDither == 'auto'
+                        ? _smartDitherType(cs)
+                        : null,
                   ),
 
                 if (_isLosslessTarget && _selectedMaxSampleRate != null)
@@ -204,7 +222,13 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                     values: losslessResamplerOptions,
                     labelOf: context.l10n.losslessResamplerOptionLabel,
                     selected: _selectedResampler,
-                    onSelect: (mode) => _selectedResampler = mode,
+                    onSelect: (mode) {
+                      if (mode == _selectedResampler) return;
+                      _selectedResampler = mode;
+                      // Each resampler has its own levels and default.
+                      _selectedResamplerQuality = null;
+                    },
+                    footer: _resamplerQuality(cs),
                   ),
 
                 if (_isLosslessTarget && widget.sourceIsLossless)
@@ -285,6 +309,8 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                       LosslessConversionProcessing(
                         dither: _selectedDither,
                         resampler: _selectedResampler,
+                        resamplerQuality: _selectedResamplerQuality,
+                        highPass: _smartDitherHighPass,
                       ),
                       _keepOriginal,
                     ),
@@ -324,6 +350,94 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
         : content;
   }
 
+  /// Which TPDF Smart dither adds: plain or high-pass.
+  Widget _smartDitherType(ColorScheme cs) {
+    final l10n = context.l10n;
+    final textTheme = Theme.of(context).textTheme;
+    final title = l10n.trackConvertDitherSmartType;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 2, bottom: 8),
+          child: Text(
+            title,
+            style: textTheme.labelMedium?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.1,
+            ),
+          ),
+        ),
+        SettingsSegmentedChoice<bool>(
+          key: const ValueKey('smart-dither-type'),
+          selected: _smartDitherHighPass,
+          onChanged: (value) => setState(() => _smartDitherHighPass = value),
+          semanticLabel: title,
+          options: [
+            SettingsSegmentOption(
+              value: false,
+              label: l10n.trackConvertDitherTriangular,
+            ),
+            SettingsSegmentOption(
+              value: true,
+              label: l10n.trackConvertDitherTriangularHp,
+            ),
+          ],
+        ),
+        Padding(
+          padding: EdgeInsets.only(top: context.tokens.gapMd),
+          child: Text(
+            _smartDitherHighPass
+                ? l10n.trackConvertDitherHighPassDescription
+                : l10n.trackConvertDitherPlainDescription,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// How carefully the chosen resampler works: a slider with one stop per
+  /// level, moved by dragging or by a tap anywhere on its track.
+  Widget _resamplerQuality(ColorScheme cs) {
+    final l10n = context.l10n;
+    final textTheme = Theme.of(context).textTheme;
+    final levels = losslessResamplerQualityOptionsFor(_selectedResampler);
+    final quality =
+        _selectedResamplerQuality ??
+        defaultLosslessResamplerQuality(_selectedResampler);
+    final label = l10n.losslessResamplerQualityLabel(quality);
+    final note = textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SliderValueHeader(
+          title: l10n.trackConvertResamplerQuality,
+          value: label,
+        ),
+        AppSlider(
+          key: const ValueKey('resampler-quality'),
+          value: levels.indexOf(quality).toDouble(),
+          max: (levels.length - 1).toDouble(),
+          divisions: levels.length - 1,
+          label: label,
+          semanticLabel: l10n.trackConvertResamplerQuality,
+          semanticFormatterCallback: (value) =>
+              l10n.losslessResamplerQualityLabel(levels[value.round()]),
+          onChanged: (value) =>
+              setState(() => _selectedResamplerQuality = levels[value.round()]),
+        ),
+        Text(
+          l10n.losslessResamplerQualityDetail(_selectedResampler, quality),
+          style: note,
+        ),
+        SizedBox(height: context.tokens.gapSm),
+        Text(l10n.trackConvertResamplerQualityDescription, style: note),
+      ],
+    );
+  }
+
   Widget _card(ColorScheme cs, {required Widget child}) {
     if (context.isMornye) {
       return Padding(
@@ -360,6 +474,8 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
     required String Function(T value) labelOf,
     required T selected,
     required void Function(T value) onSelect,
+    String? description,
+    Widget? footer,
   }) {
     return _card(
       cs,
@@ -390,6 +506,21 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                 ),
             ],
           ),
+          if (description != null)
+            Padding(
+              padding: EdgeInsets.only(top: context.tokens.gapMd),
+              child: Text(
+                description,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+          if (footer != null)
+            Padding(
+              padding: EdgeInsets.only(top: context.tokens.gapMd),
+              child: footer,
+            ),
         ],
       ),
     );

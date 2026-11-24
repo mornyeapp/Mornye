@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A continuous player track with no thumb in either gesture state.
 class MornyePlayerSlider extends StatelessWidget {

@@ -1,7 +1,48 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/cover_palette.dart';
+
+/// The player's background for a cover whose average is [sourceColor]: the
+/// same two muted tones on every page, so the controls keep their surface
+/// when lyrics or the queue open. With [fullBleed] they run straight down,
+/// behind the artwork and the controls; otherwise across the page.
+LinearGradient mornyePlayerGradient(
+  Color? sourceColor, {
+  required bool fullBleed,
+}) {
+  final dominant = HSLColor.fromColor(sourceColor ?? const Color(0xff808080));
+  // Bright and mid covers keep their tones. Darker ones go darker with the
+  // cover, so a black cover ends near black rather than on a gray surface.
+  final depth = ui.lerpDouble(
+    0.1,
+    1,
+    (dominant.lightness / 0.35).clamp(0.0, 1.0),
+  )!;
+  final muted = dominant.withSaturation(dominant.saturation.clamp(0.0, 0.34));
+  return LinearGradient(
+    // Straight down under the artwork, whose fade into it is then a single
+    // vertical overlay (see [_ArtworkFade]).
+    begin: fullBleed ? Alignment.topCenter : Alignment.topLeft,
+    end: fullBleed ? Alignment.bottomCenter : Alignment.bottomRight,
+    colors: [
+      muted.withLightness((0.28 + dominant.lightness * 0.24) * depth).toColor(),
+      muted.withLightness((0.14 + dominant.lightness * 0.20) * depth).toColor(),
+    ],
+  );
+}
+
+/// Height of the full-bleed artwork on a screen of [size].
+double mornyeArtworkHeight(
+  Size size, {
+  required bool squareArtwork,
+  required double? aspectRatio,
+}) => aspectRatio != null && aspectRatio > 0
+    ? (size.width / aspectRatio).clamp(0.0, size.height * 0.75)
+    : squareArtwork
+    ? size.width
+    : size.height * 0.66;
 
 /// Opaque cover-derived surface, with full-bleed artwork on the player page
 /// and a muted two-tone gradient behind lyrics and the queue.
@@ -38,55 +79,20 @@ class MornyePlayerBackground extends StatelessWidget {
       child: CoverSourceColorBuilder(
         imageSource: artUri?.toString(),
         builder: (context, sourceColor) {
-          final dominant = HSLColor.fromColor(
-            sourceColor ?? const Color(0xff808080),
+          final motion = mornyePlayerPanelMotion(context);
+          final background = mornyePlayerGradient(
+            sourceColor,
+            fullBleed: artwork != null,
           );
-          final muted = dominant.withSaturation(
-            dominant.saturation.clamp(0.0, 0.34),
+          final artworkHeight = mornyeArtworkHeight(
+            MediaQuery.sizeOf(context),
+            squareArtwork: squareArtwork,
+            aspectRatio: artworkAspectRatio,
           );
-          // Carry the cover's muted colour through the controls instead of
-          // fading bright artwork into a nearly black, flat surface.
-          final backdrop = dominant.withSaturation(
-            dominant.saturation.clamp(0.0, 0.2),
-          );
-          final motion = MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 380);
-          final background = LinearGradient(
-            begin: artwork == null ? Alignment.topLeft : Alignment.topCenter,
-            end: artwork == null
-                ? Alignment.bottomRight
-                : Alignment.bottomCenter,
-            stops: artwork == null ? null : const [0, 0.5, 1],
-            colors: artwork == null
-                ? [
-                    muted
-                        .withLightness(0.28 + dominant.lightness * 0.24)
-                        .toColor(),
-                    muted
-                        .withLightness(0.14 + dominant.lightness * 0.20)
-                        .toColor(),
-                  ]
-                : [
-                    backdrop.withLightness(0.62).toColor(),
-                    backdrop.withLightness(0.54).toColor(),
-                    backdrop.withLightness(0.34).toColor(),
-                  ],
-          );
-          final size = MediaQuery.sizeOf(context);
-          final artworkHeight =
-              artworkAspectRatio != null && artworkAspectRatio! > 0
-              ? (size.width / artworkAspectRatio!).clamp(
-                  0.0,
-                  size.height * 0.75,
-                )
-              : squareArtwork
-              ? size.width
-              : size.height * 0.66;
           return TweenAnimationBuilder<LinearGradient>(
             tween: _GradientTween(end: background),
-            duration: motion,
-            curve: Curves.easeInOutCubic,
+            duration: motion.duration,
+            curve: motion.curve,
             builder: (context, gradient, artworkLayer) => DecoratedBox(
               decoration: BoxDecoration(gradient: gradient),
               child: Stack(
@@ -116,9 +122,9 @@ class MornyePlayerBackground extends StatelessWidget {
                 // full cover is fading out behind the lyrics.
                 enabled: artwork != null,
                 child: AnimatedSwitcher(
-                  duration: motion,
-                  switchInCurve: Curves.easeInOutCubic,
-                  switchOutCurve: Curves.easeInOutCubic,
+                  duration: motion.duration,
+                  switchInCurve: motion.curve,
+                  switchOutCurve: motion.leaving,
                   layoutBuilder: (current, previous) => Stack(
                     fit: StackFit.expand,
                     children: [
@@ -138,6 +144,73 @@ class MornyePlayerBackground extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// The Mornye player's change between the full cover and a panel (lyrics or
+/// the queue), and between two covers: the cover, the gradient, the shade
+/// and the moving artwork's glow all change together, as content, on the
+/// standard spring without bounce. Reduced motion changes them at once.
+AppMotionSpec mornyePlayerPanelMotion(BuildContext context) =>
+    MediaQuery.disableAnimationsOf(context)
+    ? const AppMotionSpec(Duration.zero, Curves.linear)
+    : MornyeMotion.standard;
+
+/// How dark [MornyeControlsDim] is at full strength.
+const mornyeControlsDimAlpha = 0.4;
+
+/// Keeps the player's white labels readable from the artwork's fade down: a
+/// soft dark layer over [MornyePlayerBackground] with the same artwork
+/// geometry. Moving artwork has all of it; a still cover has as much as the
+/// contrast sample asks for, none while white already reads on it. It stays
+/// outside that sample, so it does not change what is read.
+class MornyeControlsDim extends StatelessWidget {
+  const MornyeControlsDim({
+    super.key,
+    required this.strength,
+    this.squareArtwork = true,
+    this.artworkAspectRatio,
+    this.fadeStart = 0.58,
+  });
+
+  /// From 0 (no layer) to 1 (all of it).
+  final double strength;
+  final bool squareArtwork;
+  final double? artworkAspectRatio;
+  final double fadeStart;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final artworkHeight = mornyeArtworkHeight(
+      size,
+      squareArtwork: squareArtwork,
+      aspectRatio: artworkAspectRatio,
+    );
+    final start = (artworkHeight * fadeStart / size.height).clamp(0.0, 1.0);
+    final end = ((start + artworkHeight / size.height) / 2).clamp(start, 1.0);
+    final motion = mornyePlayerPanelMotion(context);
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: strength.clamp(0.0, 1.0),
+        duration: motion.duration,
+        curve: motion.curve,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [start, end],
+              colors: [
+                Colors.black.withValues(alpha: 0),
+                // 4.5:1 for white over a white frame mid-fade.
+                Colors.black.withValues(alpha: mornyeControlsDimAlpha),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

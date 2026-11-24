@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:audio_service_platform_interface/audio_service_platform_interface.dart';
 import 'package:dbus/dbus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/media_session_desktop.dart';
 import 'package:mornye/services/media_session_mpris.dart';
 import 'package:mornye/services/media_session_smtc.dart';
 import 'package:mornye/services/playback_deck.dart';
+import 'package:mornye/services/windows_taskbar_controls.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:smtc_windows/smtc_windows.dart' as smtc;
 
@@ -93,6 +95,7 @@ PlaybackStateMessage _state({
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   tearDown(() {
     debugDefaultTargetPlatformOverride = null;
     debugDesktopPlatformOverride = null;
@@ -103,7 +106,8 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     expect(desktopMediaSession(), isA<MprisAudioService>());
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-    expect(desktopMediaSession(), isA<SmtcAudioService>());
+    final windows = desktopMediaSession() as SmtcAudioService;
+    expect(windows.taskbar, isNotNull);
     // macOS keeps the audio_service plugin; mobile is unchanged.
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     expect(desktopMediaSession(), isNull);
@@ -449,6 +453,58 @@ void main() {
         ),
         isNull,
       );
+    });
+
+    test(
+      'the taskbar still controls playback when SMTC is unavailable',
+      () async {
+        const channel = MethodChannel('test/smtc-taskbar');
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        final updates = <Map<Object?, Object?>>[];
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          updates.add(call.arguments as Map<Object?, Object?>);
+          return null;
+        });
+        final failing = SmtcAudioService(
+          create: () async => throw StateError('no SMTC'),
+          taskbar: WindowsTaskbarControls(channel: channel),
+        )..setHandlerCallbacks(callbacks);
+        addTearDown(() async {
+          await failing.close();
+          messenger.setMockMethodCallHandler(channel, null);
+        });
+        await failing.configure(
+          ConfigureRequest(config: AudioServiceConfigMessage()),
+        );
+        await failing.setState(SetStateRequest(state: _state()));
+        expect(updates.last['visible'], isTrue);
+        expect(updates.last['next'], isTrue);
+        await messenger.handlePlatformMessage(
+          channel.name,
+          const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('button', 'next'),
+          ),
+          (_) {},
+        );
+        expect(callbacks.requests.single, isA<SkipToNextRequest>());
+        await failing.stopService(const StopServiceRequest());
+        expect(updates.last['visible'], isFalse);
+      },
+    );
+
+    test('a missing taskbar channel does not prevent SMTC updates', () async {
+      const channel = MethodChannel('test/missing-taskbar');
+      final fallback = SmtcAudioService(
+        create: () async => controls,
+        taskbar: WindowsTaskbarControls(channel: channel),
+      );
+      addTearDown(fallback.close);
+      await fallback.configure(
+        ConfigureRequest(config: AudioServiceConfigMessage()),
+      );
+      await fallback.setState(SetStateRequest(state: _state()));
+      expect(controls.statuses.last, smtc.PlaybackStatus.playing);
     });
 
     test('unavailable controls are skipped', () async {

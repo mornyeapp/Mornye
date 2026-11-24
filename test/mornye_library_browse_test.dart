@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -12,11 +12,20 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/mornye_library_screen.dart';
 import 'package:mornye/services/album_completeness.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_search_field.dart';
+import 'package:mornye/widgets/library_search_results.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Settings extends SettingsNotifier {
+  _Settings([this.initial = const AppSettings(localLibraryEnabled: false)]);
+
+  final AppSettings initial;
+
   @override
-  AppSettings build() => const AppSettings(localLibraryEnabled: false);
+  AppSettings build() => initial;
 }
 
 class _History extends DownloadHistoryNotifier {
@@ -34,6 +43,75 @@ LibraryBrowseEntry _album(int index) => LibraryBrowseEntry(
 );
 
 void main() {
+  for (final desktop in [false, true]) {
+    for (final newest in [false, true]) {
+      testWidgets('album year sort applies and survives reopening '
+          '(desktop: $desktop, newest: $newest)', (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final preferences = await SharedPreferences.getInstance();
+        debugDesktopPlatformOverride = desktop;
+        addTearDown(() => debugDesktopPlatformOverride = null);
+        tester.view.physicalSize = desktop
+            ? const Size(1200, 900)
+            : const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final requests = <LibraryBrowseRequest>[];
+        Future<void> pumpAlbums() async {
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                settingsProvider.overrideWith(
+                  () => _Settings(loadBootstrapSettings(preferences)),
+                ),
+                downloadHistoryProvider.overrideWith(_History.new),
+                libraryBrowsePageLoaderProvider.overrideWithValue((page) async {
+                  requests.add(page.browse);
+                  return LibraryBrowsePage([_album(0)]);
+                }),
+              ],
+              child: MaterialApp(
+                theme: MornyeTheme.build(Brightness.light),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: Scaffold(
+                  body: MornyeLibraryScreen(
+                    page: MornyeLibraryPage.albums,
+                    onOpenSection: (_) {},
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+
+        await pumpAlbums();
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(MornyeLibraryScreen)),
+        );
+        await tester.tap(findByTooltip(l10n.searchSortTitle));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.text(
+            newest
+                ? l10n.libraryFilterSortYearDesc
+                : l10n.libraryFilterSortYearAsc,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final mode = newest ? 'year-desc' : 'year-asc';
+        expect(requests.last.sort, mode);
+        expect(loadBootstrapSettings(preferences).libraryAlbumSortMode, mode);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await pumpAlbums();
+        expect(requests.last.sort, mode);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets(
     'Mornye albums filter incomplete and unknown tags without losing search',
     (tester) async {
@@ -86,27 +164,27 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Filters'));
+      await tester.tap(findByTooltip('Filters'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Incomplete albums'));
       await tester.pumpAndSettle();
       expect(requests.last.completeness, incompleteAlbumFilter);
       expect(find.text('8/12'), findsOneWidget);
-      expect(find.byTooltip('8/12 tracks · 4 missing'), findsOneWidget);
-      await tester.tap(find.byTooltip('Search your library'));
+      expect(findByTooltip('8/12 tracks · 4 missing'), findsOneWidget);
+      await tester.tap(findByTooltip('Search your library'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'My album');
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
       expect(requests.last.search, 'My album');
       expect(requests.last.completeness, incompleteAlbumFilter);
-      await tester.tap(find.byTooltip('Filters'));
+      await tester.tap(findByTooltip('Filters'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Album completeness unknown'));
       await tester.pumpAndSettle();
       expect(requests.last.completeness, unknownAlbumCompletenessFilter);
       expect(find.text('?'), findsOneWidget);
-      await tester.tap(find.byTooltip('Filters'));
+      await tester.tap(findByTooltip('Filters'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('All'));
       await tester.pumpAndSettle();
@@ -185,14 +263,14 @@ void main() {
       await tester.tap(find.text('Playlists'));
       expect(opened, ['downloads', 'all', 'playlists']);
 
-      await tester.tap(find.byTooltip('Search your library'));
+      await tester.tap(findByTooltip('Search your library'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'green lilac');
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
       expect(searches, hasLength(4));
       expect(find.byType(TextField), findsOneWidget);
-      await tester.tap(find.byTooltip('Clear'));
+      await tester.tap(findByTooltip('Clear'));
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
 
@@ -259,7 +337,7 @@ void main() {
     );
     scroll.controller!.jumpTo(0);
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Search your library'));
+    await tester.tap(findByTooltip('Search your library'));
     await tester.pumpAndSettle();
     expect(tester.testTextInput.isVisible, isTrue);
     // The field scrolls with the page over its plain background.
@@ -276,6 +354,62 @@ void main() {
     expect(requests.last.search, 'My album');
     expect(requests.last.limit, 40);
     expect(offsets.last, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a song from the Library search plays on in the Songs sort', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(
+            () => _Settings(
+              const AppSettings(
+                localLibraryEnabled: true,
+                historySortMode: 'oldest',
+              ),
+            ),
+          ),
+          downloadHistoryProvider.overrideWith(_History.new),
+          libraryBrowsePageLoaderProvider.overrideWithValue(
+            (page) async => const LibraryBrowsePage([]),
+          ),
+          librarySearchProvider.overrideWith((ref, request) async => []),
+        ],
+        child: MaterialApp(
+          theme: MornyeTheme.build(Brightness.light),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: MornyeLibraryScreen(onOpenSection: (_) {})),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(findByTooltip('Search your library'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'green lilac');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    // The overview has no filters of its own; the Songs page's last only
+    // while that page is open.
+    expect(
+      tester
+          .widget<LibrarySearchResults>(find.byType(LibrarySearchResults))
+          .songList,
+      (
+        filterMode: 'all',
+        sortMode: 'oldest',
+        source: null,
+        quality: null,
+        format: null,
+        metadata: null,
+        includeLocal: true,
+      ),
+    );
     expect(tester.takeException(), isNull);
   });
 }

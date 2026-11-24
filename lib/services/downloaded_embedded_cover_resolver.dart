@@ -21,6 +21,10 @@ class _EmbeddedCoverCacheEntry {
   });
 }
 
+class _PreviewsCleared extends ChangeNotifier {
+  void fire() => notifyListeners();
+}
+
 class _PendingPreviewValidation {
   final _EmbeddedCoverCacheEntry entry;
   final Set<VoidCallback> callbacks = {};
@@ -96,7 +100,7 @@ class DownloadedEmbeddedCoverResolver {
   static const _maxPendingPreviewValidations = 64;
   static DateTime Function() _validationClock = DateTime.now;
   static final _failedExtract = <String, DateTime>{};
-  static const _documentFailureRetryDelay = Duration(seconds: 30);
+  static const _failureRetryDelay = Duration(seconds: 30);
 
   static Directory? _persistentCacheDirectoryOverride;
   static Future<String>? _persistentCacheRootFuture;
@@ -245,9 +249,22 @@ class DownloadedEmbeddedCoverResolver {
     await _deletePersistentVariantsForSource(cleanPath);
   }
 
+  /// Fires once previews were deleted from outside a song's own refresh, as
+  /// when the user clears the app cache. A widget that keeps a resolved path
+  /// listens and resolves again: its file is gone and nothing else says so,
+  /// so it would show an empty cover until the app restarts.
+  static Listenable get previewsCleared => _previewsCleared;
+  static final _previewsCleared = _PreviewsCleared();
+
+  /// Tells [previewsCleared] listeners to resolve again. Call it after the
+  /// last delete of a clear: a preview extracted any earlier could be wiped
+  /// with the directory it was written to.
+  static void announcePreviewsCleared() => _previewsCleared.fire();
+
   /// Clears resolver state together with its App Cache-backed disk entries.
   /// Running native work is generation-cancelled and awaited before the disk
   /// directory is wiped, so a completed clear leaves no late staging output.
+  /// Follow it with [announcePreviewsCleared].
   static Future<void> clearPersistentCache() async {
     final keys = <String>{..._cache.keys, ..._pendingExtract.keys};
     for (final key in keys) {
@@ -505,10 +522,12 @@ class DownloadedEmbeddedCoverResolver {
       // A SAF provider may temporarily be offline or still opening its remote
       // file. Do not turn that failure into "no artwork" for the whole session.
       // Retry on demand, with a cooldown so scrolling cannot flood the NAS.
+      // A plain file can fail as well, such as a read before the desktop
+      // backend has started: playing or opening the song asks again, a list
+      // does not, so files without a cover are not read at every scroll.
       final failedAt = _failedExtract[cleanPath]!;
-      if (!isContentUri(cleanPath) ||
-          _validationClock().difference(failedAt) <
-              _documentFailureRetryDelay) {
+      if ((!isContentUri(cleanPath) && !isForeground) ||
+          _validationClock().difference(failedAt) < _failureRetryDelay) {
         return Future<String?>.value();
       }
       _failedExtract.remove(cleanPath);

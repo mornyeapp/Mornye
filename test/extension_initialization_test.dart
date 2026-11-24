@@ -357,39 +357,46 @@ void main() {
           case 'initExtensionRepo':
             expect(container.read(extensionProvider).isInitialized, isTrue);
             return null;
-          case 'setRepoRegistryUrl':
+          case 'resolveRepoRegistryUrl':
             expect(container.read(repoProvider).isInitialized, isTrue);
-            return null;
-          case 'getRepoRegistryUrl':
             return url;
-          case 'getRepoExtensions':
-            return <Map<String, dynamic>>[];
+          case 'setRepoRegistryUrls':
+            return null;
+          case 'getRepoCatalog':
+            return {
+              'sources': [
+                {'registry_url': url, 'name': 'example', 'error': ''},
+              ],
+              'extensions': <Map<String, dynamic>>[],
+            };
           default:
             throw StateError('Unexpected backend call: ${call.method}');
         }
       });
       final repository = container.read(repoProvider.notifier);
       await repository.initialize('/cache/store');
-      await repository.setRegistryUrl(url);
+      final failed = await repository.addRegistryUrl(url);
+      expect(failed.status, RepoAddStatus.failed);
+      expect(failed.error, contains('Native initialization failed'));
       expect(
         container.read(repoProvider).error,
         contains('Native initialization failed'),
       );
       expect(calls, isEmpty);
       notifier._failInitialization = false;
-      await repository.setRegistryUrl(url);
+      final added = await repository.addRegistryUrl(url);
+      expect(added.status, RepoAddStatus.added);
       expect(calls, [
         'initExtensionRepo',
-        'setRepoRegistryUrl',
-        'getRepoRegistryUrl',
-        'getRepoExtensions',
+        'resolveRepoRegistryUrl',
+        'setRepoRegistryUrls',
+        'getRepoCatalog',
       ]);
-      expect(container.read(repoProvider).registryUrl, url);
+      expect(container.read(repoProvider).registryUrls, [url]);
       expect(container.read(repoProvider).error, isNull);
-      expect(
-        (await SharedPreferences.getInstance()).getString('store_registry_url'),
-        url,
-      );
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('store_registry_urls'), jsonEncode([url]));
+      expect(prefs.getString('store_registry_url'), url);
     },
   );
 
@@ -584,6 +591,7 @@ void main() {
       ];
       const persisted = AppSettings(
         lyricsProviders: providers,
+        lyricsPreferBestTiming: false,
         lyricsIncludeTranslationNetease: true,
         lyricsIncludeRomanizationNetease: true,
         lyricsMultiPersonWordByWord: true,
@@ -604,6 +612,7 @@ void main() {
       await first;
       final loaded = container.read(settingsProvider);
       expect(loaded.lyricsProviders, providers);
+      expect(loaded.lyricsPreferBestTiming, isFalse);
       expect(loaded.lyricsIncludeTranslationNetease, isTrue);
       expect(loaded.lyricsIncludeRomanizationNetease, isTrue);
       expect(loaded.lyricsMultiPersonWordByWord, isTrue);
@@ -615,6 +624,7 @@ void main() {
         'multi_person_word_by_word': true,
         'apple_elrc_word_sync': true,
         'musixmatch_language': 'id',
+        'prefer_best_timing': false,
       });
     },
   );

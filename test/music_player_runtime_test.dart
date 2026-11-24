@@ -8,12 +8,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/autoplay_history.dart';
 import 'package:mornye/services/autoplay_ranker.dart';
 import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/background_favorites.dart';
@@ -38,12 +40,15 @@ import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/network_metadata_service.dart';
 import 'package:mornye/services/network_playback_cache.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/source_metadata_events.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'
     show databaseFactoryFfi, sqfliteFfiInit;
@@ -89,6 +94,8 @@ class _Deck implements PlaybackDeck {
 
   @override
   bool get isDirect => false;
+  @override
+  PlaybackTempoSupport get tempoSupport => PlaybackTempoSupport.full;
   @override
   bool get needsSourceReload => false;
   @override
@@ -138,6 +145,7 @@ class _Deck implements PlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    int usbMaxSampleRate = 0,
   }) async {
     sources.add(path);
     outputOptions = {
@@ -158,6 +166,9 @@ class _Deck implements PlaybackDeck {
 }
 
 class _CastDeck extends _Deck {
+  @override
+  PlaybackTempoSupport get tempoSupport => PlaybackTempoSupport.none;
+
   final states = StreamController<PlaybackDeckState>.broadcast(sync: true);
   final completions = StreamController<void>.broadcast(sync: true);
 
@@ -283,6 +294,7 @@ class _HandoffDeck extends _TickingDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    int usbMaxSampleRate = 0,
   }) async {
     await super.setFileSource(path);
     preparing.complete();
@@ -303,8 +315,31 @@ class _Session implements AudioSession {
   Object? activationError;
   Completer<void>? configureBarrier;
   final interruptions = StreamController<AudioInterruptionEvent>.broadcast();
+  final noisy = StreamController<void>.broadcast();
+  final devicesChanged = StreamController<AudioDevicesChangedEvent>.broadcast();
+  Set<AudioDevice> devices = {};
 
-  Future<void> dispose() => interruptions.close();
+  Future<void> dispose() async {
+    await interruptions.close();
+    await noisy.close();
+    await devicesChanged.close();
+  }
+
+  /// Changes the outputs and notifies, as a plug or a Bluetooth link does.
+  void route(Set<AudioDevice> next) {
+    devices = next;
+    devicesChanged.add(AudioDevicesChangedEvent());
+  }
+
+  @override
+  Future<Set<AudioDevice>> getDevices({
+    bool includeInputs = true,
+    bool includeOutputs = true,
+  }) async => devices;
+
+  @override
+  Stream<AudioDevicesChangedEvent> get devicesChangedEventStream =>
+      devicesChanged.stream;
 
   @override
   Future<void> configure(AudioSessionConfiguration configuration) async {
@@ -331,7 +366,7 @@ class _Session implements AudioSession {
   Stream<AudioInterruptionEvent> get interruptionEventStream =>
       interruptions.stream;
   @override
-  Stream<void> get becomingNoisyEventStream => const Stream.empty();
+  Stream<void> get becomingNoisyEventStream => noisy.stream;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -570,6 +605,17 @@ class _BrowsedLibrary implements LibraryDatabase {
   final album = [song('c', 3), song('a', 1), song('b', 2)];
 
   @override
+  Future<QueueLibraryDbPage> getQueueTrackPageResult(
+    QueueLibraryDbQuery request,
+  ) async => QueueLibraryDbPage(
+    rows: [
+      if (request.offset == 0)
+        for (final row in album) {'source': 'local', 'item': row},
+    ],
+    nextCursor: null,
+  );
+
+  @override
   Future<QueueLibraryDbPage> getQueueAlbumPageResult(
     QueueLibraryDbQuery request,
   ) async => const QueueLibraryDbPage(
@@ -681,6 +727,7 @@ MusicPlayerRuntime _runtime({
   LibraryCollectionsDatabase? collectionsDatabase,
   Future<String?> Function(String)? recoverMissingFile,
   Future<String?> Function(String, String, AppSettings)? recoverMovedDownload,
+  Future<ContentUriPlaybackLease?> Function(String)? openPlaybackLease,
   Future<String> Function(String)? resolveNetworkSource,
   Future<String?> Function(String)? offlineCopy,
   NetworkPlaybackCache? networkCache,
@@ -721,6 +768,7 @@ MusicPlayerRuntime _runtime({
           (_, {displayName}) async => {'replaygain_track_gain': '-6 dB'},
       recoverMissingFile: recoverMissingFile ?? (_) async => null,
       recoverMovedDownload: recoverMovedDownload ?? (_, _, _) async => null,
+      openPlaybackLease: openPlaybackLease ?? (_) async => null,
       resolveNetworkSource:
           resolveNetworkSource ?? NetworkStorageService.instance.resolve,
       offlineCopy: offlineCopy ?? (_) async => null,
@@ -827,6 +875,203 @@ void main() {
     expect(created, 1);
   });
 
+  test('the media3 engine setting reaches the decks on Android only', () {
+    addTearDown(() => playbackMedia3Engine.value = false);
+    final android = _runtime(isAndroid: true);
+    android.configure(android.settings.copyWith(media3Engine: true));
+    expect(playbackMedia3Engine.value, isTrue);
+    android.configure(android.settings.copyWith(media3Engine: false));
+    expect(playbackMedia3Engine.value, isFalse);
+
+    final other = _runtime();
+    other.configure(other.settings.copyWith(media3Engine: true));
+    expect(playbackMedia3Engine.value, isFalse);
+  });
+
+  test('skip silence needs Android, the media3 engine and no AutoMix', () {
+    addTearDown(() {
+      playbackMedia3Engine.value = false;
+      playbackSkipSilence.value = false;
+    });
+    final android = _runtime(isAndroid: true);
+    final on = android.settings.copyWith(
+      media3Engine: true,
+      skipSilence: true,
+      autoMix: false,
+    );
+    android.configure(on);
+    expect(playbackSkipSilence.value, isTrue);
+    android.configure(on.copyWith(autoMix: true));
+    expect(playbackSkipSilence.value, isFalse);
+    android.configure(on.copyWith(media3Engine: false));
+    expect(playbackSkipSilence.value, isFalse);
+    android.configure(on.copyWith(skipSilence: false));
+    expect(playbackSkipSilence.value, isFalse);
+
+    final other = _runtime();
+    other.configure(on);
+    expect(playbackSkipSilence.value, isFalse);
+  });
+
+  test('spatial audio follows the setting for the decks', () {
+    addTearDown(() => playbackSpatialAudio.value = true);
+    final runtime = _runtime(isAndroid: true);
+    runtime.configure(runtime.settings.copyWith(spatialAudio: false));
+    expect(playbackSpatialAudio.value, isFalse);
+    runtime.configure(runtime.settings.copyWith(spatialAudio: true));
+    expect(playbackSpatialAudio.value, isTrue);
+  });
+
+  test('changing the engine drops a song queued on the old one', () async {
+    final deck = _QueuedDeck();
+    final runtime = _runtime(
+      settings: const AppSettings(
+        pauseOnMute: false,
+        gaplessPlayback: true,
+        autoMix: false,
+        media3Engine: true,
+      ),
+      createDeck: (_) => deck,
+    );
+    final player = await runtime.initialize();
+    await player.setQueueAndPlay([
+      _track,
+      const PlayableMedia(
+        id: 'two',
+        source: '/two.flac',
+        title: 'Two',
+        artist: 'Artist',
+        duration: Duration(seconds: 60),
+      ),
+    ]);
+    deck.positionEvents.add(const Duration(seconds: 45));
+    for (var i = 0; i < 30 && deck.nextSource == null; i++) {
+      await _settle();
+    }
+    expect(deck.nextSource, '/two.flac');
+
+    runtime.configure(runtime.settings.copyWith(media3Engine: false));
+    await _settle();
+    expect(deck.nextSource, isNull);
+    // The next position prepares it again, on the engine now chosen.
+    deck.positionEvents.add(const Duration(seconds: 46));
+    for (var i = 0; i < 30 && deck.nextSource == null; i++) {
+      await _settle();
+    }
+    expect(deck.nextSource, '/two.flac');
+    expect(deck.queued, 2);
+  });
+
+  group('end-of-song sleep timer', () {
+    const two = PlayableMedia(
+      id: 'two',
+      source: '/two.flac',
+      title: 'Two',
+      artist: 'Artist',
+      duration: Duration(seconds: 60),
+    );
+    const three = PlayableMedia(
+      id: 'three',
+      source: '/three.flac',
+      title: 'Three',
+      artist: 'Artist',
+      duration: Duration(seconds: 60),
+    );
+
+    Future<(MusicPlayerHandler, _QueuedDeck)> start() async {
+      final deck = _QueuedDeck();
+      final runtime = _runtime(
+        settings: const AppSettings(
+          pauseOnMute: false,
+          gaplessPlayback: true,
+          autoMix: false,
+        ),
+        createDeck: (_) => deck,
+      );
+      final player = await runtime.initialize();
+      await player.setQueueAndPlay([_track, two, three]);
+      return (player, deck);
+    }
+
+    Future<void> finish(MusicPlayerHandler player, _QueuedDeck deck) async {
+      final index = player.playbackState.value.queueIndex;
+      deck.state = PlaybackDeckState.completed;
+      deck.completions.add(null);
+      for (
+        var i = 0;
+        i < 30 && player.playbackState.value.queueIndex == index;
+        i++
+      ) {
+        await _settle();
+      }
+      await _settle();
+    }
+
+    test('drops a queued next song and loads the next one paused', () async {
+      final (player, deck) = await start();
+      deck.positionEvents.add(const Duration(seconds: 45));
+      for (var i = 0; i < 30 && deck.nextSource == null; i++) {
+        await _settle();
+      }
+      expect(deck.nextSource, '/two.flac');
+
+      player.setSleepTimerEndOfSong();
+      await _settle();
+      expect(player.sleepAtEndOfSong, isTrue);
+      expect(player.sleepTimerEndsAt, isNull);
+      expect(deck.nextSource, isNull);
+      // Gapless stays off for the rest of the song.
+      deck.positionEvents.add(const Duration(seconds: 50));
+      for (var i = 0; i < 5; i++) {
+        await _settle();
+      }
+      expect(deck.nextSource, isNull);
+
+      await finish(player, deck);
+      expect(player.playbackState.value.queueIndex, 1);
+      expect(player.mediaItem.value!.id, 'two');
+      expect(player.playbackState.value.playing, isFalse);
+      expect(deck.state, isNot(PlaybackDeckState.playing));
+      expect(deck.sources.last, '/two.flac');
+      expect(player.sleepAtEndOfSong, isFalse);
+    });
+
+    test('a skip moves the stop to the end of the new song', () async {
+      final (player, deck) = await start();
+      player.setSleepTimerEndOfSong();
+      await player.skipToNext();
+      await _settle();
+      expect(player.mediaItem.value!.id, 'two');
+      expect(player.playbackState.value.playing, isTrue);
+      expect(player.sleepAtEndOfSong, isTrue);
+
+      await finish(player, deck);
+      expect(player.mediaItem.value!.id, 'three');
+      expect(player.playbackState.value.playing, isFalse);
+      expect(player.sleepAtEndOfSong, isFalse);
+    });
+
+    test('replaces the minute timer and is cancelled like it', () async {
+      final (player, deck) = await start();
+      player.setSleepTimer(const Duration(minutes: 15));
+      player.setSleepTimerEndOfSong();
+      expect(player.sleepTimerEndsAt, isNull);
+      expect(player.sleepAtEndOfSong, isTrue);
+      player.setSleepTimer(const Duration(minutes: 15));
+      expect(player.sleepAtEndOfSong, isFalse);
+      expect(player.sleepTimerEndsAt, isNotNull);
+
+      player.setSleepTimerEndOfSong();
+      player.cancelSleepTimer();
+      expect(player.sleepAtEndOfSong, isFalse);
+      expect(player.sleepTimerEndsAt, isNull);
+      // Cancelled: the queue plays on.
+      await finish(player, deck);
+      expect(player.mediaItem.value!.id, 'two');
+      expect(player.playbackState.value.playing, isTrue);
+    });
+  });
+
   for (final failure in [false, true]) {
     test(
       'exclusive gapless handles cancellation and queue failure ($failure)',
@@ -914,6 +1159,12 @@ void main() {
         ),
       ]);
       await handler.seek(const Duration(seconds: 12));
+      addTearDown(() {
+        playbackSpeed.value = 1;
+        playbackTempoSupport.value = PlaybackTempoSupport.full;
+      });
+      playbackSpeed.value = 1.5;
+      expect(handler.playbackState.value.speed, 1.5);
       events.add({
         'connected': true,
         'deviceId': 'tv',
@@ -921,6 +1172,9 @@ void main() {
         'volume': 0.4,
       });
       await handler.play();
+      // The receiver plays at normal speed, whatever the setting.
+      expect(handler.playbackState.value.speed, 1);
+      expect(playbackTempoSupport.value, PlaybackTempoSupport.none);
       expect(local.single.disposals, 1);
       expect(tv.single.sources, [_track.source]);
       expect(tv.single.position.inSeconds, 12);
@@ -943,6 +1197,8 @@ void main() {
       expect(local.last.sources.last, '/two.flac');
       expect(local.last.state, isNot(PlaybackDeckState.playing));
       expect(handler.playbackState.value.playing, isFalse);
+      expect(handler.playbackState.value.speed, 1.5);
+      expect(playbackTempoSupport.value, PlaybackTempoSupport.full);
       await runtime.dispose();
       output.dispose();
       await events.close();
@@ -1029,6 +1285,73 @@ void main() {
         (store.active!['media'] as List).map((item) => (item as Map)['source']),
         ['/new-folder/song.flac', '/new-folder/song.flac'],
       );
+    },
+  );
+
+  test(
+    'an Android document that opens is not looked for as a moved download',
+    () async {
+      final decks = <_Deck>[];
+      final recoveries = <String>[];
+      final opened = <String>[];
+      const song = 'content://tree/a/document/song';
+      final handler = await _runtime(
+        isAndroid: true,
+        decks: decks,
+        recoverMovedDownload: (source, id, settings) async {
+          recoveries.add(source);
+          return null;
+        },
+        openPlaybackLease: (uri) async {
+          opened.add(uri);
+          return const ContentUriPlaybackLease(
+            path: '/proc/self/fd/7',
+            token: 'lease',
+          );
+        },
+      ).initialize();
+      await handler.setQueueAndPlay([
+        PlayableMedia.fromJson({..._track.toJson(), 'source': song})!,
+      ]);
+      expect(opened, [song]);
+      expect(recoveries, isEmpty);
+      expect(decks.single.sources, ['/proc/self/fd/7']);
+      expect(handler.playbackState.value.errorMessage, isNull);
+    },
+  );
+
+  test(
+    'an Android document that cannot be opened plays from where it moved',
+    () async {
+      final decks = <_Deck>[];
+      final recoveries = <String>[];
+      final opened = <String>[];
+      const song = 'content://tree/a/document/old';
+      const moved = 'content://tree/a/document/new';
+      final handler = await _runtime(
+        isAndroid: true,
+        decks: decks,
+        recoverMovedDownload: (source, id, settings) async {
+          recoveries.add(source);
+          return source == song ? moved : null;
+        },
+        openPlaybackLease: (uri) async {
+          opened.add(uri);
+          if (uri != moved) throw StateError('missing');
+          return const ContentUriPlaybackLease(
+            path: '/proc/self/fd/8',
+            token: 'lease',
+          );
+        },
+      ).initialize();
+      await handler.setQueueAndPlay([
+        PlayableMedia.fromJson({..._track.toJson(), 'source': song})!,
+      ]);
+      expect(recoveries, [song]);
+      expect(opened, [song, moved]);
+      expect(decks.single.sources, ['/proc/self/fd/8']);
+      expect(handler.mediaItem.value?.extras?['source'], moved);
+      expect(handler.playbackState.value.errorMessage, isNull);
     },
   );
 
@@ -1178,6 +1501,15 @@ void main() {
       );
     },
   );
+
+  test('Shuffle turns on before the player has been initialized', () async {
+    final runtime = _runtime();
+    await MusicPlayerController(runtime: runtime).setShuffle(true);
+    expect(
+      runtime.handler!.playbackState.value.shuffleMode,
+      AudioServiceShuffleMode.all,
+    );
+  });
 
   for (final desktop in [false, true]) {
     test('Link handoff starts at its position on desktop=$desktop', () async {
@@ -1523,6 +1855,81 @@ void main() {
     expect(handler.playbackState.value.updatePosition, Duration.zero);
   });
 
+  for (final personalized in [false, true]) {
+    test(
+      'Autoplay rotates suggestions across restart (personalized: $personalized)',
+      () async {
+        String? stored;
+        final candidates = [
+          for (var i = 0; i < 12; i++)
+            PlayableMedia(
+              id: 'candidate-$i',
+              source: '/candidate-$i.flac',
+              title: 'Candidate $i',
+              artist: 'Artist $i',
+              genre: i < 6 ? 'Pop' : 'Rock',
+            ),
+        ];
+        final model = AutoplayPreferenceModel();
+        for (var i = 0; i < 40; i++) {
+          model.learn(
+            const AutoplayLearningTrack(
+              source: '/candidate-0.flac',
+              title: 'Candidate 0',
+              artist: 'Artist 0',
+              genre: 'Pop',
+            ),
+            at: DateTime(2026),
+            reward: 1,
+          );
+        }
+        Future<(MusicPlayerRuntime, MusicPlayerHandler)> open() async {
+          final learning = AutoplayPersonalization(
+            load: () async => model.encode(),
+            save: (_) async {},
+          );
+          final runtime = _runtime(
+            settings: AppSettings(
+              pauseOnMute: false,
+              autoplay: true,
+              autoplayPersonalization: personalized,
+            ),
+            createPersonalization: () => learning,
+          );
+          final handler = MusicPlayerHandler(
+            runtime: runtime,
+            autoplayLibraryLoader: (_) async => candidates,
+            autoplayHistory: AutoplayHistory(
+              read: () async => stored,
+              write: (value) async => stored = value,
+            ),
+          );
+          await learning.ensureLoaded();
+          await handler.setQueueAndPlay([_track]);
+          await handler.queue
+              .firstWhere((queue) => queue.length == 7)
+              .timeout(const Duration(seconds: 5));
+          return (runtime, handler);
+        }
+
+        final (firstRuntime, firstHandler) = await open();
+        final first = firstHandler.queue.value
+            .skip(1)
+            .map((item) => item.id)
+            .toSet();
+        await firstRuntime.dispose();
+        expect(stored, isNotNull);
+        final (_, secondHandler) = await open();
+        final second = secondHandler.queue.value
+            .skip(1)
+            .map((item) => item.id)
+            .toSet();
+        expect(second, hasLength(6));
+        expect(second.intersection(first), isEmpty);
+      },
+    );
+  }
+
   test(
     'trained personalized ranking runs through the real autoplay worker',
     () async {
@@ -1562,6 +1969,7 @@ void main() {
         ),
         createPersonalization: () => learning,
       );
+      var includeFresh = false;
       final handler = MusicPlayerHandler(
         runtime: runtime,
         autoplayLibraryLoader: (_) async => [
@@ -1581,6 +1989,15 @@ void main() {
             genre: 'Jazz',
             duration: Duration(seconds: 60),
           ),
+          if (includeFresh)
+            for (var i = 0; i < 6; i++)
+              PlayableMedia(
+                id: 'fresh-$i',
+                source: '/fresh-$i.flac',
+                title: 'Fresh $i',
+                artist: 'Fresh artist $i',
+                genre: 'Rock',
+              ),
         ],
       );
       await learning.ensureLoaded();
@@ -1594,6 +2011,15 @@ void main() {
         'rock',
       ]);
       expect(handler.playbackState.value.playing, isTrue);
+      includeFresh = true;
+      await handler.setQueueAndPlay([_track]);
+      await handler.queue
+          .firstWhere((queue) => queue.length == 7)
+          .timeout(const Duration(seconds: 5));
+      expect(handler.queue.value.skip(1).map((item) => item.id).toSet(), {
+        for (var i = 0; i < 6; i++) 'fresh-$i',
+      });
+      includeFresh = false;
       await resetAutoplayLearning(runtime: runtime);
       expect(learning.observations, 0);
       await handler.queue
@@ -2162,6 +2588,150 @@ void main() {
       handler.playbackState.value.errorMessage,
       contains('Audio file is unavailable'),
     );
+  });
+
+  group('resume when headphones reconnect', () {
+    // ignore: experimental_member_use
+    final car = AudioDevice(
+      id: 'car',
+      name: 'Car',
+      isInput: false,
+      isOutput: true,
+      // ignore: experimental_member_use
+      type: AudioDeviceType.bluetoothA2dp,
+    );
+
+    Future<(MusicPlayerHandler, _Session, List<_Deck>)> start({
+      String mode = 'after_disconnect',
+    }) async {
+      final session = _Session()..devices = {car};
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        settings: AppSettings(pauseOnMute: false, headphoneResume: mode),
+        session: session,
+        decks: decks,
+      ).initialize();
+      await handler.setQueueAndPlay([_track]);
+      await _settle();
+      return (handler, session, decks);
+    }
+
+    Future<void> unplug(_Session session) async {
+      session.noisy.add(null);
+      session.route({});
+      await _settle();
+      await _settle();
+    }
+
+    test('a route-loss pause resumes when the output returns', () async {
+      final (handler, session, decks) = await start();
+      await unplug(session);
+      expect(decks.single.state, PlaybackDeckState.paused);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.playing);
+      expect(handler.playbackState.value.playing, isTrue);
+    });
+
+    test('a pause after the unplug keeps it paused', () async {
+      final (handler, session, decks) = await start();
+      await unplug(session);
+      await handler.pause();
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+    });
+
+    test('a song paused before the unplug stays paused', () async {
+      final (handler, session, decks) = await start();
+      await handler.pause();
+      await unplug(session);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+    });
+
+    test('off: the output returning leaves it paused', () async {
+      final (_, session, decks) = await start(mode: 'off');
+      await unplug(session);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+    });
+
+    test('Always still resumes a song the user paused', () async {
+      final (handler, session, decks) = await start(mode: 'always');
+      await handler.pause();
+      session.route({});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.playing);
+    });
+
+    test('Always pauses on disconnect and resumes on connect', () async {
+      final (_, session, decks) = await start(mode: 'always');
+      session.route({});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+      session.route({car});
+      await _settle();
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.playing);
+    });
+
+    group('Android TV behaves like a phone', () {
+      setUp(() => debugAndroidTvOverride = true);
+      tearDown(() => debugAndroidTvOverride = null);
+
+      test('Reconnect resumes a route-loss pause', () async {
+        final (_, session, decks) = await start();
+        await unplug(session);
+        expect(decks.single.state, PlaybackDeckState.paused);
+        session.route({car});
+        await _settle();
+        await _settle();
+        expect(decks.single.state, PlaybackDeckState.playing);
+      });
+
+      test('Reconnect leaves a user pause paused', () async {
+        final (handler, session, decks) = await start();
+        await handler.pause();
+        await unplug(session);
+        session.route({car});
+        await _settle();
+        await _settle();
+        expect(decks.single.state, PlaybackDeckState.paused);
+      });
+
+      test('Always resumes a song the user paused', () async {
+        final (handler, session, decks) = await start(mode: 'always');
+        await handler.pause();
+        session.route({});
+        await _settle();
+        session.route({car});
+        await _settle();
+        await _settle();
+        expect(decks.single.state, PlaybackDeckState.playing);
+      });
+
+      test('Off leaves it paused', () async {
+        final (_, session, decks) = await start(mode: 'off');
+        await unplug(session);
+        session.route({car});
+        await _settle();
+        await _settle();
+        expect(decks.single.state, PlaybackDeckState.paused);
+      });
+    });
   });
 
   test('denied or failed audio focus cannot resume a paused source', () async {
@@ -3049,6 +3619,106 @@ void main() {
     },
   );
 
+  test(
+    'lyrics synced for a SAF song stay synced after leaving the song',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('saf-lyrics-');
+      addTearDown(() => directory.delete(recursive: true));
+      const source = 'content://test.provider/document/song.mp3';
+      const plain = 'First line\nSecond line';
+      const synced = '[00:01.00]First line\n[00:04.00]Second line';
+      // The document's lyrics tag. A playback copy keeps the tag the
+      // document had when it was copied, as a real copy keeps its tags.
+      var document = plain;
+      final copyTags = <String, String>{};
+      final copies = <File>[];
+      const channel = MethodChannel('com.zarz.mornye/backend');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method != 'safCopyToTemp') return null;
+        final copy = File('${directory.path}/copy-${copies.length}.mp3');
+        await copy.writeAsString('audio');
+        copies.add(copy);
+        copyTags[copy.path] = document;
+        return copy.path;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      Future<Map<String, dynamic>> tags(String path) async => {
+        'title': 'Song',
+        'lyrics': path == source ? document : copyTags[path] ?? '',
+      };
+      final events = SourceMetadataEvents();
+      final handler = await _runtime(
+        sourceMetadataEvents: events,
+        readMetadata: (path, {displayName}) => tags(path),
+      ).initialize();
+      final metadata = PlayerMetadataController(
+        readMetadata: tags,
+        parseLyrics: (raw) async => LyricsParser.parse(raw),
+        metadataEvents: events,
+        saveOnlineLyrics: (target, raw) async {
+          document = raw;
+          // The tag writer announces every lyrics change it makes.
+          await events.publish(target);
+        },
+      );
+      addTearDown(metadata.dispose);
+      final shown = handler.mediaItem.listen(
+        (item) =>
+            unawaited(metadata.load(item, inspectUnresolvedContentUri: true)),
+      );
+      addTearDown(shown.cancel);
+      Future<void> idle() async {
+        for (var i = 0; i < 100 && (i < 3 || metadata.loading); i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+        }
+        expect(metadata.loading, isFalse);
+      }
+
+      const song = PlayableMedia(
+        id: 'song',
+        source: source,
+        title: 'Song',
+        artist: 'Artist',
+      );
+      await handler.setQueueAndPlay([song, _track]);
+      await idle();
+      expect(
+        handler.mediaItem.value?.extras?['resolvedSource'],
+        copies[0].path,
+      );
+      expect(metadata.rawLyrics, plain);
+
+      final edit = metadata.beginLyricsEdit()!;
+      await metadata.saveEditedLyrics(synced, edit: edit);
+      await idle();
+      expect(document, synced);
+      expect(metadata.lyrics.synced, isTrue);
+      // The song keeps playing from its copy, which stays on disk, while
+      // probes read the edited document instead of that copy.
+      expect(await copies[0].exists(), isTrue);
+      expect(handler.mediaItem.value?.extras?['resolvedSource'], isNull);
+
+      await handler.skipToNext();
+      await idle();
+      expect(handler.mediaItem.value?.id, _track.id);
+      // No deck holds the retired copy any longer.
+      expect(await copies[0].exists(), isFalse);
+
+      await handler.skipToQueueItem(0);
+      await idle();
+      expect(handler.mediaItem.value?.id, 'song');
+      expect(copies, hasLength(2));
+      expect(
+        handler.mediaItem.value?.extras?['resolvedSource'],
+        copies[1].path,
+      );
+      expect(metadata.rawLyrics, synced);
+      expect(metadata.lyrics.synced, isTrue);
+    },
+  );
+
   test('failed player stop cannot undo a confirmed storage deletion', () async {
     final directory = await Directory.systemTemp.createTemp('failed-reaction-');
     addTearDown(() => directory.delete(recursive: true));
@@ -3330,6 +4000,38 @@ void main() {
       expect(handler.queue.value.map((item) => item.id), ['b']);
     },
   );
+
+  test('play with nothing queued shuffles the Library', () async {
+    final runtime = _runtime(
+      libraryDatabase: _BrowsedLibrary(),
+      historyDatabase: _NoHistory(),
+    );
+    final handler = await runtime.initialize();
+    expect(handler.queue.value, isEmpty);
+
+    // What a car or a headset button sends.
+    await handler.play();
+
+    expect(handler.queue.value.map((item) => item.id).toSet(), {'a', 'b', 'c'});
+    expect(handler.playbackState.value.playing, isTrue);
+    expect(
+      handler.playbackState.value.shuffleMode,
+      AudioServiceShuffleMode.all,
+    );
+  });
+
+  test('play with nothing queued and an empty Library stays silent', () async {
+    final runtime = _runtime(
+      libraryDatabase: _BrowsedLibrary()..album.clear(),
+      historyDatabase: _NoHistory(),
+    );
+    final handler = await runtime.initialize();
+
+    await handler.play();
+
+    expect(handler.queue.value, isEmpty);
+    expect(handler.playbackState.value.playing, isFalse);
+  });
 
   test('the star loves songs until the app shell takes it over', () async {
     final loved = _Loved();

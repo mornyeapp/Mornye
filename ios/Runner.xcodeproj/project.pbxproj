@@ -15,6 +15,7 @@
 		A02700000000000000000016 /* LinkNowPlaying.appex in Embed Now Playing Extension */ = {isa = PBXBuildFile; fileRef = A02700000000000000000007 /* LinkNowPlaying.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C0CE00000000000000000001 /* ConcertCalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0CE00000000000000000002 /* ConcertCalendarBridge.swift */; };
 		C0CA57000000000000000001 /* CastOutputPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0CA57000000000000000002 /* CastOutputPlugin.swift */; };
+		D11A4E000000000000000001 /* LinkHostPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = D11A4E000000000000000002 /* LinkHostPlugin.swift */; };
 		A0D100000000000000000001 /* AudioOutputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D100000000000000000002 /* AudioOutputView.swift */; };
 		A0D100000000000000000003 /* MusicHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D100000000000000000004 /* MusicHaptics.swift */; };
 		F59500000000000000000011 /* PlayerWidgetState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59500000000000000000001 /* PlayerWidgetState.swift */; };
@@ -98,6 +99,7 @@
 		A02700000000000000000007 /* LinkNowPlaying.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; path = LinkNowPlaying.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0CE00000000000000000002 /* ConcertCalendarBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcertCalendarBridge.swift; sourceTree = "<group>"; };
 		C0CA57000000000000000002 /* CastOutputPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastOutputPlugin.swift; sourceTree = "<group>"; };
+		D11A4E000000000000000002 /* LinkHostPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkHostPlugin.swift; sourceTree = "<group>"; };
 		A0D100000000000000000002 /* AudioOutputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioOutputView.swift; sourceTree = "<group>"; };
 		A0D100000000000000000004 /* MusicHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicHaptics.swift; sourceTree = "<group>"; };
 		F59500000000000000000009 /* PlayerWidget.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = PlayerWidget.xcconfig; sourceTree = "<group>"; };
@@ -255,6 +257,7 @@
 				A0D100000000000000000004 /* MusicHaptics.swift */,
 				C0CE00000000000000000002 /* ConcertCalendarBridge.swift */,
 				C0CA57000000000000000002 /* CastOutputPlugin.swift */,
+				D11A4E000000000000000002 /* LinkHostPlugin.swift */,
 				F59500000000000000000007 /* Runner.entitlements */,
 				C03400000000000000000002 /* CoreBackend.swift */,
 				D08A594730CF000100000002 /* DownloadProgressSubscription.swift */,
@@ -538,6 +541,7 @@
 				A0D100000000000000000003 /* MusicHaptics.swift in Sources */,
 				C0CE00000000000000000001 /* ConcertCalendarBridge.swift in Sources */,
 				C0CA57000000000000000001 /* CastOutputPlugin.swift in Sources */,
+				D11A4E000000000000000001 /* LinkHostPlugin.swift in Sources */,
 				C03400000000000000000001 /* CoreBackend.swift in Sources */,
 				D08A594730CF000100000001 /* DownloadProgressSubscription.swift in Sources */,
 				A11CE0012F00000000000001 /* ExtensionCallbackParser.swift in Sources */,

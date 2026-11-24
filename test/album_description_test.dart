@@ -1,10 +1,12 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/editorial_notes.dart';
 import 'package:mornye/widgets/album_description.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   test(
@@ -204,7 +206,7 @@ void main() {
         ModalRoute.of(tester.element(find.byType(SelectionArea)))!.navigator,
         tester.state<NavigatorState>(find.byType(Navigator).first),
       );
-      expect(find.byTooltip('Close').hitTestable(), findsOneWidget);
+      expect(findByTooltip('Close').hitTestable(), findsOneWidget);
       await tester.drag(
         find.byType(SingleChildScrollView),
         const Offset(0, -600),
@@ -217,8 +219,8 @@ void main() {
         ),
       );
       expect(scroll.position.pixels, greaterThan(0));
-      expect(find.byTooltip('Close').hitTestable(), findsOneWidget);
-      await tester.tap(find.byTooltip('Close'));
+      expect(findByTooltip('Close').hitTestable(), findsOneWidget);
+      await tester.tap(findByTooltip('Close'));
       await tester.pumpAndSettle();
       expect(find.byType(SelectionArea), findsNothing);
       expect(tester.takeException(), isNull);

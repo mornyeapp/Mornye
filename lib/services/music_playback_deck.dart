@@ -68,14 +68,46 @@ class UsbAudioStatus {
     this.bitDepth,
     this.transport = 'pcm',
     this.driver = 'android',
+    this.codec,
+    this.lossy = false,
+    this.sourceBitDepth,
+    this.channels,
+    this.outputSampleRate,
   });
+
+  /// A native reply that did not start the output. Keeps the specific
+  /// reason and the source or DAC format the label names.
+  factory UsbAudioStatus.failure(Map<String, dynamic>? reply) => UsbAudioStatus(
+    reason: reply?['reason'] as String? ?? 'unsupported',
+    sampleRate: (reply?['sampleRate'] as num?)?.toInt(),
+    bitDepth: (reply?['bitDepth'] as num?)?.toInt(),
+    codec: reply?['codec'] as String?,
+    lossy: reply?['lossy'] == true,
+    sourceBitDepth: (reply?['sourceBitDepth'] as num?)?.toInt(),
+    channels: (reply?['channels'] as num?)?.toInt(),
+  );
 
   final String reason;
   final String? device;
   final int? sampleRate;
+
+  /// The depth sent to the DAC; for a refused format, the depth asked for.
   final int? bitDepth;
   final String transport;
   final String driver;
+
+  /// The source codec, such as FLAC, ALAC or AAC, when native reports it.
+  final String? codec;
+
+  /// A lossy source decoded by the phone: the transport may be direct, but
+  /// the chain is not bit-perfect to a lossless original.
+  final bool lossy;
+  final int? sourceBitDepth;
+  final int? channels;
+
+  /// The rate sent to the DAC when it refused the song's own [sampleRate]
+  /// and the song is converted: the chain is not bit-perfect. Null otherwise.
+  final int? outputSampleRate;
 }
 
 final AudioContext _musicAudioContext = AudioContext(
@@ -159,6 +191,8 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     required String playerId,
     bool? nativeAvailable,
     bool? equalizerAvailable,
+    bool? spatialAudioAvailable,
+    bool? pitchAvailable,
   }) : _ordinary = AudioPlayer(playerId: playerId),
        // The Darwin fork's tap is shared source, so macOS has it as well.
        // isDesktopPlatform keeps host-run tests on the mobile default.
@@ -171,9 +205,25 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
            Platform.isAndroid ||
            Platform.isIOS ||
            (isDesktopPlatform && Platform.isMacOS),
+       // Both forks carry `setSpatialAudio`.
+       _spatialAudioAvailable =
+           spatialAudioAvailable ??
+           (Platform.isAndroid ||
+               Platform.isIOS ||
+               (isDesktopPlatform && Platform.isMacOS)),
+       // Both forks carry `setPitch`; the Windows and Linux plugins (the
+       // fallback without libmpv) change only the speed.
+       _pitchAvailable =
+           pitchAvailable ??
+           (Platform.isAndroid ||
+               Platform.isIOS ||
+               (isDesktopPlatform && Platform.isMacOS)),
        _nativeAvailable = nativeAvailable ?? Platform.isAndroid {
     playbackEqualizer.addListener(_equalizerChanged);
     playbackOutputVolume.addListener(_outputVolumeChanged);
+    playbackSpatialAudio.addListener(_spatialAudioChanged);
+    playbackSpeed.addListener(_speedChanged);
+    playbackPitch.addListener(_pitchChanged);
     _subscriptions.addAll([
       _ordinary.onPlayerStateChanged.listen((value) {
         if (!_direct) _states.add(_deckState(value));
@@ -205,6 +255,18 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
 
   static const _channel = MethodChannel('com.zarz.mornye/usb_pcm');
   static const _events = EventChannel('com.zarz.mornye/usb_pcm/events');
+
+  /// Lets the next Direct USB song ask for USB access again after the user
+  /// declined it this session.
+  static Future<void> forgetUsbPermissionDenial() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod<void>('forgetPermissionDenial');
+    } on PlatformException catch (_) {
+      // No USB plugin; nothing was remembered.
+    } on MissingPluginException catch (_) {}
+  }
+
   static Stream<dynamic>? _nativeEvents;
   static int _nextToken = 0;
   final AudioPlayer _ordinary;
@@ -267,6 +329,110 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     }
   }
 
+  final bool _spatialAudioAvailable;
+
+  /// Both forks start a player with spatialization allowed; only a change
+  /// from that is sent.
+  bool _spatialAudioSent = true;
+  Future<void> _spatialAudioWrite = Future.value();
+
+  void _spatialAudioChanged() {
+    _spatialAudioWrite = _spatialAudioWrite.then((_) => _syncSpatialAudio());
+  }
+
+  /// Android's MediaPlayer takes it from the next source; the Darwin fork
+  /// also sets it on the current item.
+  Future<void> _syncSpatialAudio() async {
+    if (!_spatialAudioAvailable || _disposed) return;
+    final enabled = playbackSpatialAudio.value;
+    if (enabled == _spatialAudioSent) return;
+    _spatialAudioSent = enabled;
+    try {
+      // Public API waits for native player creation without changing playback.
+      await _ordinary.getDuration();
+      if (_disposed) return;
+      await _effects
+          .invokeMethod<void>('setSpatialAudio', {
+            'playerId': _ordinary.playerId,
+            'enabled': enabled,
+          })
+          .timeout(const Duration(seconds: 3));
+    } catch (error) {
+      _log.w('Spatial audio setting unavailable: $error');
+    }
+  }
+
+  final bool _pitchAvailable;
+
+  /// Both forks start a player without a shift, its pitch kept while the
+  /// speed changes; only a change from that is sent. Null when unknown
+  /// after a failed send.
+  PlaybackPitch? _pitchSent = PlaybackPitch.none;
+  Future<void> _pitchWrite = Future.value();
+
+  /// True while the fork refused [playbackPitch] for the current source.
+  bool _pitchFailed = false;
+
+  void _pitchChanged() {
+    _pitchWrite = _pitchWrite.then((_) => _syncPitch());
+  }
+
+  /// The fork keeps the values for this player and applies them to the
+  /// current source and every later one, also when the rate changes.
+  Future<void> _syncPitch() async {
+    if (!_pitchAvailable || _disposed) return;
+    final pitch = playbackPitch.value;
+    if (pitch == _pitchSent) return;
+    _pitchSent = pitch;
+    try {
+      // Public API waits for native player creation without changing playback.
+      await _ordinary.getDuration();
+      if (_disposed) return;
+      await _effects
+          .invokeMethod<void>('setPitch', {
+            'playerId': _ordinary.playerId,
+            'semitones': pitch.semitones,
+            'followsRate': pitch.followsRate,
+          })
+          .timeout(const Duration(seconds: 3));
+      _setPitchFailed(false);
+    } catch (error) {
+      _log.w('Pitch unavailable for this source: $error');
+      // Sent again with the next change or source.
+      _pitchSent = null;
+      if (!_disposed) _setPitchFailed(true);
+    }
+  }
+
+  void _setPitchFailed(bool failed) {
+    if (failed == _pitchFailed) return;
+    _pitchFailed = failed;
+    if (!_direct) notifyPlaybackTempoSupportChanged();
+  }
+
+  /// The rate [setPlaybackRate] gave, before [playbackSpeed].
+  double _rate = 1;
+
+  /// The rate the ordinary player was given last.
+  double _rateSent = 1;
+
+  double get _effectiveRate => _rate * playbackSpeed.value;
+
+  Future<void> _syncRate() async {
+    if (_direct || _disposed) return;
+    final rate = _effectiveRate;
+    _rateSent = rate;
+    // The forks apply it once playing; a paused player stays paused.
+    await _ordinary.setPlaybackRate(rate);
+  }
+
+  void _speedChanged() {
+    if (_direct || _disposed) return;
+    unawaited(
+      _syncRate().catchError((Object error) => _log.w('Speed: $error')),
+    );
+  }
+
   final bool _nativeAvailable;
   final _states = StreamController<PlaybackDeckState>.broadcast();
   final _durations = StreamController<Duration>.broadcast();
@@ -296,6 +462,12 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
 
   @override
   bool get isDirect => _direct;
+  @override
+  PlaybackTempoSupport get tempoSupport => _direct
+      ? PlaybackTempoSupport.none
+      : !_pitchAvailable || _pitchFailed
+      ? PlaybackTempoSupport.speedOnly
+      : PlaybackTempoSupport.full;
   @override
   bool get needsSourceReload => _direct && _routeLost;
   @override
@@ -360,9 +532,11 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     );
   }
 
+  /// Direct (USB) output plays at the source's own rate.
   @override
   Future<void> setPlaybackRate(double rate) async {
-    if (!_direct) await _ordinary.setPlaybackRate(rate);
+    _rate = rate;
+    await _syncRate();
   }
 
   @override
@@ -389,6 +563,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    int usbMaxSampleRate = 0,
   }) async {
     await stop();
     final source = DeviceFileSource(path);
@@ -423,6 +598,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
               'allowFixedVolume': allowFixedVolume,
               'dapExclusive': dapExclusive,
               'requiresDsd': requiresDsd,
+              'maxSampleRate': usbMaxSampleRate,
             });
         if (_disposed || preparingToken != _token) return;
         if (response?['ready'] == true) {
@@ -443,29 +619,54 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
             bitDepth: (response?['bitDepth'] as num?)?.toInt(),
             transport: response?['transport'] as String? ?? 'pcm',
             driver: response?['driver'] as String? ?? 'android',
+            codec: response?['codec'] as String?,
+            lossy: response?['lossy'] == true,
+            sourceBitDepth: (response?['sourceBitDepth'] as num?)?.toInt(),
+            outputSampleRate: response?['resampled'] == true
+                ? (response?['carrierRate'] as num?)?.toInt()
+                : null,
           );
+          final codec = _preparedStatus.codec;
+          final outputRate = _preparedStatus.outputSampleRate;
           _log.i(
             'Native output prepared: ${_preparedStatus.driver}, '
-            '${_preparedStatus.sampleRate} Hz, ${_preparedStatus.bitDepth}-bit',
+            '${_preparedStatus.sampleRate} Hz, ${_preparedStatus.bitDepth}-bit'
+            '${codec == null ? '' : ', $codec'}'
+            '${_preparedStatus.lossy ? ' (lossy source)' : ''}'
+            '${outputRate == null ? '' : ', resampled to $outputRate Hz'}',
           );
+          // A DAC level that falls from one song to the next shows here:
+          // what the DAC read when opened against what the app set last.
+          if (response?['volumeTrace'] case final Map<Object?, Object?> trace
+              when volume is Map) {
+            _log.i(
+              'DAC volume: connected at ${trace['connectedDb']} dB, '
+              'remembered ${trace['rememberedDb']} dB, '
+              'released ${trace['sinceReleaseMs']} ms ago, '
+              'playing at ${volume['currentDb']} dB '
+              '(${volume['minDb']} to ${volume['maxDb']} dB)',
+            );
+          }
           usbAudioStatus.value = _volumeBlocked
               ? const UsbAudioStatus(reason: 'volume_unavailable')
               : const UsbAudioStatus(reason: 'ready');
           _durations.add(_duration!);
           return;
         }
-        usbAudioStatus.value = UsbAudioStatus(
-          reason: response?['reason'] as String? ?? 'unsupported',
-        );
+        usbAudioStatus.value = UsbAudioStatus.failure(response);
+        // Every refusal is logged, also the ones without a detail (no DAC,
+        // permission declined): the song then plays through Android's mixer.
         final detail = response?['detail'] as String?;
-        if (detail != null && detail.isNotEmpty) {
-          _log.w('Native output ${usbAudioStatus.value.reason}: $detail');
-        }
+        _log.w(
+          'Native output ${usbAudioStatus.value.reason}'
+          '${detail == null || detail.isEmpty ? '' : ': $detail'}',
+        );
         if (response?['fatal'] == true) {
           throw UsbDsdUnavailable();
         }
-      } on PlatformException {
+      } on PlatformException catch (error) {
         if (_disposed || preparingToken != _token) return;
+        _log.w('Native output unsupported: ${error.message ?? error.code}');
         usbAudioStatus.value = const UsbAudioStatus(reason: 'unsupported');
       } on MissingPluginException {
         if (_disposed || preparingToken != _token) return;
@@ -486,6 +687,11 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     // /proc/self/fd number for a different SAF file, so URL equality must not
     // reuse the previous MediaPlayer or its pending preparation callbacks.
     await _ordinary.release();
+    // Android's MediaPlayer reads its audio attributes as the source loads.
+    _spatialAudioChanged();
+    await _spatialAudioWrite;
+    // A speed change while the direct output played did not reach it.
+    if (_rateSent != _effectiveRate) await _syncRate();
     _ordinaryError = null;
     final abandoned = _ordinaryPreparation = Completer<void>();
     try {
@@ -499,6 +705,13 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     }
     if (abandoned.isCompleted) return;
     await _syncEqualizer();
+    // Sent again for each source with a shift: the fork answers whether
+    // this one takes it (Darwin cannot shift protected audio or HLS).
+    if (_pitchFailed || playbackPitch.value != PlaybackPitch.none) {
+      _pitchSent = null;
+    }
+    _pitchChanged();
+    await _pitchWrite;
   }
 
   /// Reconcile the display with the current native session without reopening it.
@@ -548,7 +761,11 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
         _routeLost = true;
         _timer?.cancel();
         _setState(PlaybackDeckState.paused);
-        usbAudioStatus.value = const UsbAudioStatus(reason: 'route_changed');
+        // A source that stopped decoding is not a lost USB route. Constant
+        // values keep a repeated report from notifying listeners again.
+        usbAudioStatus.value = event['reason'] == 'decode_failed'
+            ? const UsbAudioStatus(reason: 'decode_failed')
+            : const UsbAudioStatus(reason: 'route_changed');
       case 'complete':
         _timer?.cancel();
         _setState(PlaybackDeckState.completed);
@@ -720,6 +937,9 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     _equalizerDisposed = true;
     playbackEqualizer.removeListener(_equalizerChanged);
     playbackOutputVolume.removeListener(_outputVolumeChanged);
+    playbackSpatialAudio.removeListener(_spatialAudioChanged);
+    playbackSpeed.removeListener(_speedChanged);
+    playbackPitch.removeListener(_pitchChanged);
     _equalizerTimer?.cancel();
     reportEqualizerError(_ordinary.playerId, null);
     await stop();

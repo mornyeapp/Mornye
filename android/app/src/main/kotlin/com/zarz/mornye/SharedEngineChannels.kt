@@ -20,8 +20,11 @@ internal object SharedEngineChannels {
     fun configure(context: Context, engine: FlutterEngine) {
         engine.plugins.add(LocalNetworkPlugin())
         engine.plugins.add(CastOutputPlugin())
+        engine.plugins.add(LinkHostPlugin())
         engine.plugins.add(UsbBitPerfectPlugin())
+        engine.plugins.add(Media3PlayerPlugin())
         engine.plugins.add(MusicHapticsPlugin())
+        engine.plugins.add(LockScreenStatePlugin())
         PlayerWidgetBridge.attach(context, engine)
         registerPlaybackBackend(context, MethodChannel(engine.dartExecutor.binaryMessenger, BACKEND_CHANNEL))
         MethodChannel(engine.dartExecutor.binaryMessenger, COVERS_CHANNEL).setMethodCallHandler { call, result ->

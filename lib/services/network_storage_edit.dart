@@ -48,6 +48,37 @@ extension NetworkStorageEdit on NetworkStorageService {
     }
   }
 
+  /// Runs [action], again after each recovery delay while it fails and
+  /// [done] cannot confirm the result, as when the server cannot be reached.
+  /// Never throws: the edit's own result or error matters more than its
+  /// cleanup.
+  Future<void> _recoverEdit(
+    String what, {
+    required Future<void> Function() action,
+    required Future<bool> Function() done,
+  }) async {
+    Object? last;
+    for (final delay in [
+      Duration.zero,
+      ...NetworkStorageService.debugEditRecoveryDelaysOverride ??
+          NetworkStorageService.editRecoveryDelays,
+    ]) {
+      if (delay > Duration.zero) await Future<void>.delayed(delay);
+      try {
+        await action();
+        return;
+      } catch (error) {
+        last = error;
+        try {
+          if (await done()) return;
+        } catch (_) {
+          // Still unreachable.
+        }
+      }
+    }
+    NetworkStorageService._log.w('Could not $what: $last');
+  }
+
   /// Uploads completely before moving the original aside. A failed replacement
   /// restores the original; an uncertain rollback keeps its recovery copy.
   /// The original must still match the file downloaded before editing.
@@ -68,8 +99,10 @@ extension NetworkStorageEdit on NetworkStorageService {
     )).where((entry) => entry.path == path && !entry.directory).firstOrNull;
     if (entry == null) throw const FileSystemException('File is unavailable');
     final token = NetworkStorageService.newId();
-    final staging = '$parent.mornye-edit-$token.part';
-    final backup = '$parent.mornye-original-$token.part';
+    // No leading dot, which Samba would keep as a hidden attribute on the
+    // song (see publishUpload).
+    final staging = '${parent}mornye-edit-$token.part';
+    final backup = '${parent}mornye-original-$token.part';
     final stagingSource = NetworkStorageService.source(connection.id, staging);
     final backupSource = NetworkStorageService.source(connection.id, backup);
     final editedLength = await edited.length();
@@ -128,25 +161,25 @@ extension NetworkStorageEdit on NetworkStorageService {
         if (!committed) rethrow;
       }
     } finally {
+      // A phone that slept mid-save has no connection for a moment. Retry, so
+      // the song is put back and no `.part` file is left behind.
       if (movedOriginal && !committed) {
-        try {
-          if (!await exists(path)) {
-            await _moveEditedFile(connection, backup, path);
-          }
-        } catch (error) {
-          NetworkStorageService._log.w(
-            'Could not restore network file; recovery copy: $backup: $error',
-          );
-        }
+        await _recoverEdit(
+          'restore network file; recovery copy: $backup',
+          action: () async {
+            if (!await exists(path)) {
+              await _moveEditedFile(connection, backup, path);
+            }
+          },
+          done: () => exists(path),
+        );
       }
       for (final name in [staging, if (committed) backup]) {
-        try {
-          await discard(name);
-        } catch (error) {
-          NetworkStorageService._log.w(
-            'Could not clean up a network edit temporary file: $error',
-          );
-        }
+        await _recoverEdit(
+          'clean up a network edit temporary file',
+          action: () => discard(name),
+          done: () async => !await exists(name),
+        );
       }
     }
   }

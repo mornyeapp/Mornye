@@ -12,7 +12,7 @@ use crate::files::{self, ReceiveError};
 use crate::pairing::{PAIRED, PairError};
 use crate::server::{MAX_BODY, State};
 use crate::types::{Device, HttpResponse, SubsonicRequest, json};
-use crate::{auth, subsonic, ws};
+use crate::{auth, source, subsonic, ws};
 use bytes::Bytes;
 use http::{HeaderMap, Method, header};
 use http_body_util::{BodyExt, LengthLimitError, Limited};
@@ -112,17 +112,16 @@ async fn rest(state: &Arc<State>, method: &str, request: http::Request<Incoming>
 
 /// `GET /mornye/v1/info`: what a phone checks before pairing.
 fn info(state: &State) -> HttpResponse {
-    json(
-        200,
-        &object!({
-            "serverId": state.shared.server_id,
-            "name": state.name(),
-            "protocol": 1,
-            "appVersion": state.shared.config.app_version,
-            "fingerprint": state.fingerprint,
-            "pairing": state.pairing.is_open(),
-        }),
-    )
+    let mut info = object!({
+        "serverId": state.shared.server_id,
+        "name": state.name(),
+        "protocol": 1,
+        "appVersion": state.shared.config.app_version,
+        "fingerprint": state.fingerprint,
+        "pairing": state.pairing.is_open(),
+    });
+    state.shared.config.announce(&mut info);
+    json(200, &info)
 }
 
 /// `POST /mornye/v1/pair` `{"deviceId","name","platform","proof"}`.
@@ -187,9 +186,11 @@ async fn forward(state: &Arc<State>, op: &str, request: http::Request<Incoming>)
     let Some(record) = auth::bearer(&state.store, request.headers()) else {
         return unauthorized();
     };
-    if op
-        .split('/')
-        .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+    // Only the server itself asks the app to lend it files.
+    if source::is_server_op(op)
+        || op
+            .split('/')
+            .any(|segment| segment.is_empty() || segment == "." || segment == "..")
     {
         return not_found();
     }

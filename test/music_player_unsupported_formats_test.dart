@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/file_access_check.dart';
+import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -48,6 +49,23 @@ class _SessionStore implements AppStateDatabase {
     index = null;
     clears++;
   }
+
+  // Play with nothing queued reads the saved session back: there is none
+  // before a test starts, and none after a queue was cleared.
+  @override
+  Future<Map<String, dynamic>?> getPlaybackSession() async => null;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// A Library without songs, so play with nothing queued has nothing to
+/// shuffle.
+class _EmptyLibrary implements LibraryDatabase {
+  @override
+  Future<QueueLibraryDbPage> getQueueTrackPageResult(
+    QueueLibraryDbQuery request,
+  ) async => const QueueLibraryDbPage(rows: [], nextCursor: null);
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -100,6 +118,7 @@ class _Player {
           recoverMissingFile: recoverMissingFile ?? (_) async => null,
           fileAccess: fileAccess,
           sessionDatabase: session,
+          libraryDatabase: _EmptyLibrary(),
           recoverMovedDownload: (_, _, _) async => null,
           convertAudio: (arguments) {
             conversions.add(arguments);

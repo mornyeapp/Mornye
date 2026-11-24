@@ -301,6 +301,16 @@ internal object RustCoreBackend : CoreBackend {
         return JSONObject(readAudioMetadata(path, hint, cacheKey))
     }
 
+    override fun cacheLibraryFolderCover(path: String): String? {
+        val directory = libraryCoverDirectory ?: return null
+        val descriptor = path.removePrefix("/proc/self/fd/").toIntOrNull()
+        require(path.startsWith("/proc/self/fd/") && descriptor != null) {
+            "Folder images are read from an open descriptor"
+        }
+        val thumbnail = com.mornye.backend.libraryThumbnailFromDescriptor(descriptor, null)
+        return AndroidLibraryCovers.cache(directory, null, thumbnail, "")?.path
+    }
+
     // Native callers have already selected/resolved these files through app or
     // SAF access. Retain only their parent directories for this operation.
     internal fun <T> withMediaFiles(paths: List<String>, block: (ExtensionManager) -> T): T =

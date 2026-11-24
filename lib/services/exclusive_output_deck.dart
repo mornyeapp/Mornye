@@ -1,9 +1,5 @@
-import 'dart:async';
-
 import 'package:mornye/services/playback_deck.dart';
-import 'package:mornye/utils/logger.dart';
-
-final _log = AppLogger('ExclusiveOutputDeck');
+import 'package:mornye/services/switching_playback_deck.dart';
 
 /// macOS: AVPlayer cannot play while the app holds the output in hog mode,
 /// so exclusive output plays through a libmpv deck (`audio-exclusive`)
@@ -11,320 +7,34 @@ final _log = AppLogger('ExclusiveOutputDeck');
 /// deck while [playbackExclusiveOutput] is on; a change mid-track reopens the
 /// source on the other deck where it was. Leaving exclusive output disposes
 /// the libmpv deck, which gives the device back.
-class ExclusiveOutputDeck implements PlaybackDeck, QueuedPlaybackDeck {
+class ExclusiveOutputDeck extends SwitchingPlaybackDeck {
   ExclusiveOutputDeck({
     required PlaybackDeck shared,
     required PlaybackDeck Function() createExclusive,
     required bool Function() exclusiveAvailable,
-  }) : _shared = shared,
-       _active = shared,
-       _createExclusive = createExclusive,
-       _exclusiveAvailable = exclusiveAvailable {
-    _attach(shared);
-    playbackExclusiveOutput.addListener(_exclusiveChanged);
-  }
+  }) : _exclusiveAvailable = exclusiveAvailable,
+       super(
+         primary: shared,
+         createAlternate: createExclusive,
+         trigger: playbackExclusiveOutput,
+       );
 
-  final PlaybackDeck _shared;
-  final PlaybackDeck Function() _createExclusive;
   final bool Function() _exclusiveAvailable;
-  PlaybackDeck? _exclusive;
-  PlaybackDeck _active;
-  final _subscriptions = <PlaybackDeck, List<StreamSubscription<dynamic>>>{};
-  final _states = StreamController<PlaybackDeckState>.broadcast();
-  final _durations = StreamController<Duration>.broadcast();
-  final _positions = StreamController<Duration>.broadcast();
-  final _completions = StreamController<void>.broadcast();
-  int _queueRevision = 0;
 
-  /// Settings a deck taking over must apply as well.
-  double _volume = 1, _rate = 1;
-  Duration? _positionInterval;
-  bool Function()? _positionWanted;
+  @override
+  String get switchName => 'Exclusive output';
 
-  /// Loads the current source on a deck; null before the first.
-  Future<void> Function(PlaybackDeck deck)? _source;
+  @override
+  bool get reloadsOnChange => true;
 
-  /// Switches run one at a time, in order.
-  Future<void> _switching = Future.value();
-  int _transportRevision = 0;
-  int _stopRevision = 0;
-  PlaybackDeckState? _requestedState;
-  bool _disposed = false;
+  @override
+  bool get routesEachSource => false;
 
-  void _attach(PlaybackDeck deck) {
-    void Function(T) forward<T>(StreamController<T> to) => (value) {
-      if (identical(deck, _active)) to.add(value);
-    };
-    _subscriptions[deck] = [
-      deck.onPlayerStateChanged.listen(
-        forward(_states),
-        onError: (Object error, StackTrace stack) {
-          if (identical(deck, _active)) _states.addError(error, stack);
-        },
-      ),
-      deck.onDurationChanged.listen(forward(_durations)),
-      deck.onPositionChanged.listen(forward(_positions)),
-      deck.onPlayerComplete.listen(forward(_completions)),
-    ];
-  }
-
-  bool get _wantsExclusive {
+  @override
+  bool wantsAlternate(DeckSource? source) {
     if (!playbackExclusiveOutput.value) return false;
     if (_exclusiveAvailable()) return true;
     playbackExclusiveStatus.value = ExclusiveOutputStatus.unavailable;
     return false;
-  }
-
-  void _exclusiveChanged() {
-    if (_disposed) return;
-    unawaited(
-      _queueSwitch(
-        reload: true,
-      ).catchError((Object error) => _log.w('Exclusive output: $error')),
-    );
-  }
-
-  Future<void> _queueSwitch({bool reload = false}) {
-    final operation = _switching.then((_) => _switchTo(reload: reload));
-    // Keep later output changes available after a failed switch.
-    _switching = operation.catchError((Object _) {});
-    return operation;
-  }
-
-  Future<void> _switchTo({required bool reload}) async {
-    if (_disposed) return;
-    final exclusive = _wantsExclusive;
-    final previous = _active;
-    if (exclusive == !identical(previous, _shared)) return;
-    _queueRevision++;
-    final PlaybackDeck target;
-    if (exclusive) {
-      target = _exclusive = _createExclusive();
-      _attach(target);
-    } else {
-      target = _shared;
-    }
-    final state = previous.state;
-    final transportRevision = _transportRevision;
-    final stopRevision = _stopRevision;
-    final position = await previous.getCurrentPosition();
-    if (_disposed) return;
-    _active = target;
-    await target.setVolume(_volume);
-    await target.setPlaybackRate(_rate);
-    if (_positionInterval case final interval?) {
-      target.startPositionUpdates(interval, wanted: _positionWanted);
-    }
-    await previous.stop();
-    if (!exclusive) {
-      _exclusive = null;
-      for (final subscription
-          in _subscriptions.remove(previous) ??
-              const <StreamSubscription<dynamic>>[]) {
-        await subscription.cancel();
-      }
-      await previous.dispose();
-    }
-    final source = _source;
-    if (_disposed ||
-        stopRevision != _stopRevision ||
-        !reload ||
-        source == null ||
-        (state != PlaybackDeckState.playing &&
-            state != PlaybackDeckState.paused)) {
-      return;
-    }
-    await target.configureOutput();
-    if (_disposed || stopRevision != _stopRevision) return;
-    await source(target);
-    if (_disposed) return;
-    if (stopRevision != _stopRevision) {
-      await target.stop();
-      return;
-    }
-    if (position != null && position > Duration.zero) {
-      await target.seek(position);
-    }
-    if (_disposed || stopRevision != _stopRevision) return;
-    if (transportRevision == _transportRevision) {
-      if (state == PlaybackDeckState.playing) await target.resume();
-    } else if (_requestedState == PlaybackDeckState.paused) {
-      await target.pause();
-    }
-  }
-
-  @override
-  PlaybackDeckState get state => _active.state;
-  @override
-  bool get isDirect => _active.isDirect;
-  @override
-  bool get needsSourceReload => _active.needsSourceReload;
-  @override
-  Stream<PlaybackDeckState> get onPlayerStateChanged => _states.stream;
-  @override
-  Stream<Duration> get onDurationChanged => _durations.stream;
-  @override
-  Stream<Duration> get onPositionChanged => _positions.stream;
-  @override
-  Stream<void> get onPlayerComplete => _completions.stream;
-
-  @override
-  bool get canQueueNextSource =>
-      _active is QueuedPlaybackDeck &&
-      (_active as QueuedPlaybackDeck).canQueueNextSource;
-
-  @override
-  Future<bool> queueNextSource(
-    String source, {
-    required double volume,
-    required void Function() onStarted,
-  }) async {
-    final active = _active;
-    if (active is! QueuedPlaybackDeck || !active.canQueueNextSource) {
-      return false;
-    }
-    final revision = ++_queueRevision;
-    return active.queueNextSource(
-      source,
-      volume: volume,
-      onStarted: () {
-        if (_disposed ||
-            revision != _queueRevision ||
-            !identical(active, _active)) {
-          return;
-        }
-        _volume = volume;
-        _source = const {'http', 'https'}.contains(Uri.tryParse(source)?.scheme)
-            ? (deck) => deck.setNetworkSource(source)
-            : (deck) => deck.setFileSource(source);
-        onStarted();
-      },
-    );
-  }
-
-  @override
-  Future<void> clearNextSource() async {
-    _queueRevision++;
-    if (_disposed) return;
-    if (_active case final QueuedPlaybackDeck deck) {
-      await deck.clearNextSource();
-    }
-  }
-
-  @override
-  void startPositionUpdates(Duration interval, {bool Function()? wanted}) {
-    _positionInterval = interval;
-    _positionWanted = wanted;
-    _active.startPositionUpdates(interval, wanted: wanted);
-  }
-
-  @override
-  Future<void> configureOutput() async {
-    await _queueSwitch();
-    await _active.configureOutput();
-  }
-
-  @override
-  Future<void> setVolume(double volume) {
-    _volume = volume;
-    return _active.setVolume(volume);
-  }
-
-  @override
-  Future<void> setPlaybackRate(double rate) {
-    _rate = rate;
-    return _active.setPlaybackRate(rate);
-  }
-
-  @override
-  Future<void> setNetworkSource(String url, {bool arriving = false}) {
-    _queueRevision++;
-    _source = (deck) => deck.setNetworkSource(url, arriving: arriving);
-    return _active.setNetworkSource(url, arriving: arriving);
-  }
-
-  @override
-  Future<void> setFileSource(
-    String path, {
-    bool preferBitPerfect = false,
-    bool directUsb = false,
-    bool allowDop = false,
-    bool requiresDsd = false,
-    bool allowFixedVolume = false,
-    bool dapExclusive = false,
-  }) {
-    _queueRevision++;
-    _source = (deck) => deck.setFileSource(
-      path,
-      preferBitPerfect: preferBitPerfect,
-      directUsb: directUsb,
-      allowDop: allowDop,
-      requiresDsd: requiresDsd,
-      allowFixedVolume: allowFixedVolume,
-      dapExclusive: dapExclusive,
-    );
-    return _source!(_active);
-  }
-
-  @override
-  Future<void> cancelPreparation() {
-    _transportRevision++;
-    _stopRevision++;
-    return _active.cancelPreparation();
-  }
-
-  @override
-  Future<void> resume() async {
-    final revision = ++_transportRevision;
-    _requestedState = PlaybackDeckState.playing;
-    await _switching;
-    if (_disposed || revision != _transportRevision) return;
-    await _active.resume();
-  }
-
-  @override
-  Future<void> pause() {
-    _transportRevision++;
-    _requestedState = PlaybackDeckState.paused;
-    return _active.pause();
-  }
-
-  @override
-  Future<void> seek(Duration position) => _active.seek(position);
-  @override
-  Future<void> stop() {
-    _queueRevision++;
-    _transportRevision++;
-    _stopRevision++;
-    _requestedState = PlaybackDeckState.stopped;
-    return _active.stop();
-  }
-
-  @override
-  Future<bool> setNextDeck(PlaybackDeck? next) =>
-      _active.setNextDeck(next is ExclusiveOutputDeck ? next._active : next);
-  @override
-  Future<Duration?> getCurrentPosition() => _active.getCurrentPosition();
-  @override
-  Future<Duration?> getDuration() => _active.getDuration();
-
-  @override
-  Future<void> dispose() async {
-    if (_disposed) return;
-    _disposed = true;
-    playbackExclusiveOutput.removeListener(_exclusiveChanged);
-    await _switching;
-    for (final subscriptions in _subscriptions.values) {
-      for (final subscription in subscriptions) {
-        await subscription.cancel();
-      }
-    }
-    _subscriptions.clear();
-    await _shared.dispose();
-    await _exclusive?.dispose();
-    await _states.close();
-    await _durations.close();
-    await _positions.close();
-    await _completions.close();
   }
 }

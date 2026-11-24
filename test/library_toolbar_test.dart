@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:material_3_expressive/material_3_expressive.dart'
@@ -10,20 +11,32 @@ import 'package:mornye/models/download_item.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
+import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/providers/library_browse_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/providers/library_genres_provider.dart';
+import 'package:mornye/providers/library_search_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/screens/library_mix_screen.dart';
 import 'package:mornye/screens/library_tracks_folder_screen.dart';
 import 'package:mornye/screens/queue_tab.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/library_search.dart';
+import 'package:mornye/services/playable_media.dart' show PlayableMedia;
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_search_field.dart';
+import 'package:mornye/widgets/animated_library_sliver_grid.dart';
 import 'package:mornye/widgets/library_directory_view.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
+
+import 'support/page_back.dart';
 
 class _Settings extends SettingsNotifier {
   _Settings(this.initial);
@@ -87,12 +100,29 @@ class _Queue extends DownloadQueueNotifier {
   DownloadQueueState build() => DownloadQueueState();
 }
 
+class _Playback extends PlaybackController {
+  final queues = <List<String>>[];
+  final starts = <int>[];
+
+  @override
+  Future<void> playMediaQueue(
+    Iterable<PlayableMedia> queue, {
+    required int startIndex,
+    required String externalPath,
+  }) async {
+    queues.add([for (final media in queue) media.source]);
+    starts.add(startIndex);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final queries = <String>[];
+  final albumRows = <List<Object?>>[];
 
   setUp(() {
     queries.clear();
+    albumRows.clear();
     SharedPreferences.setMockInitialValues({});
     final previousFactory = databaseFactoryOrNull;
     databaseFactory = databaseFactorySqflitePlugin;
@@ -102,7 +132,7 @@ void main() {
     const paths = MethodChannel('plugins.flutter.io/path_provider');
     messenger.setMockMethodCallHandler(paths, (_) async => '/test/documents');
     addTearDown(() => messenger.setMockMethodCallHandler(paths, null));
-    // An empty database: every page query returns no rows.
+    // Most tests use an empty database; album order tests supply page rows.
     const sqlite = MethodChannel('com.tekartik.sqflite');
     final versions = <int, int>{};
     messenger.setMockMethodCallHandler(sqlite, (call) async {
@@ -128,6 +158,23 @@ void main() {
           ],
         };
       }
+      if (sql.trimLeft().startsWith('SELECT *') &&
+          sql.contains('sample_file_path') &&
+          sql.contains('AS queue_source')) {
+        return {
+          'columns': [
+            'queue_source',
+            'album_key',
+            'album_name',
+            'artist_name',
+            'track_count',
+            'sort_added',
+            'sample_file_path',
+            'sort_release',
+          ],
+          'rows': albumRows,
+        };
+      }
       return {'columns': <String>[], 'rows': <List<Object?>>[]};
     });
     addTearDown(() => messenger.setMockMethodCallHandler(sqlite, null));
@@ -142,10 +189,13 @@ void main() {
     List<DateTime>? dates,
     List<UserPlaylistCollection> playlists = const [],
     bool withQueueItem = true,
+    String? librarySection,
+    List<Override> overrides = const [],
+    Size size = const Size(1280, 900),
   }) async {
     final preferences = await SharedPreferences.getInstance();
     debugDesktopPlatformOverride = desktop;
-    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final queue = DownloadQueueLookup.fromItems([
@@ -167,6 +217,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // These tests play songs with a tap on the row.
+          librarySongTapPlaysProvider.overrideWithValue(true),
           settingsProvider.overrideWith(
             () => _Settings(
               hasPersistedAppSettings(preferences)
@@ -183,6 +235,7 @@ void main() {
           ),
           downloadQueueProvider.overrideWith(_Queue.new),
           downloadQueueLookupProvider.overrideWithValue(queue),
+          ...overrides,
         ],
         child: MaterialApp(
           theme: mornye
@@ -197,7 +250,11 @@ void main() {
             child: child!,
           ),
           // Mornye opens Songs as a section page from its Library root.
-          home: Scaffold(body: QueueTab(librarySection: mornye ? 'all' : null)),
+          home: Scaffold(
+            body: QueueTab(
+              librarySection: librarySection ?? (mornye ? 'all' : null),
+            ),
+          ),
         ),
       ),
     );
@@ -308,15 +365,18 @@ void main() {
       expect(groups, findsOneWidget);
       final group = tester.widget<M3EButtonGroup>(groups);
       expect(group.type, M3EButtonGroupType.connected);
-      expect(group.actions, hasLength(3));
+      expect(group.actions, hasLength(4));
+      // Shuffle leads the Songs page's tools as one of them.
+      expect(group.actions[0].tooltip, l10n.actionShuffle);
+      expect(group.actions[0].label, isNull);
       // Sort keeps its label so the current order stays visible.
       expect(
-        (group.actions[0].label! as Text).data,
+        (group.actions[1].label! as Text).data,
         l10n.libraryFilterSortLatest,
       );
-      expect((group.actions[1].label! as Text).data, l10n.libraryFilterTitle);
-      expect(group.actions[2].tooltip, l10n.appearanceHistoryViewGrid);
-      expect(group.actions[2].label, isNull);
+      expect((group.actions[2].label! as Text).data, l10n.libraryFilterTitle);
+      expect(group.actions[3].tooltip, l10n.appearanceHistoryViewGrid);
+      expect(group.actions[3].label, isNull);
       expect(group.selectedIndex, isNull);
 
       // A compact visual that keeps the 48dp touch target.
@@ -331,10 +391,14 @@ void main() {
     });
   }
 
-  testWidgets('the desktop sort menu opens below the sort button', (
+  testWidgets('the desktop sort menu opens below its button when it fits', (
     tester,
   ) async {
     await pumpLibrary(tester, desktop: true);
+    tester.view.physicalSize = const Size(1280, 1200);
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
     final l10n = l10nOf(tester);
     final sort = toolButton(null, label: l10n.libraryFilterSortLatest);
     final sortRect = tester.getRect(sort);
@@ -471,6 +535,120 @@ void main() {
         }
         expect(tester.takeException(), isNull);
       });
+
+      testWidgets('album grid preserves year order across local and downloads '
+          '(desktop: $desktop, Mornye: $mornye)', (tester) async {
+        albumRows.addAll([
+          ['local', 'new|artist', 'New', 'Artist', 2, 1, '/new.flac', 2026],
+          [
+            'downloaded',
+            'old|artist',
+            'Old',
+            'Artist',
+            2,
+            1,
+            '/old.flac',
+            2001,
+          ],
+          [
+            'local',
+            'unknown|artist',
+            'Unknown',
+            'Artist',
+            2,
+            1,
+            '/unknown.flac',
+            0,
+          ],
+        ]);
+        await pumpLibrary(
+          tester,
+          desktop: desktop,
+          mornye: mornye,
+          librarySection: 'albums',
+        );
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(QueueTab)),
+        );
+        container
+            .read(settingsProvider.notifier)
+            .setHistorySortMode('year-desc');
+        for (var i = 0; i < 20; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        final grid = find.byType(AnimatedLibrarySliverGrid);
+        final delegate =
+            tester.widget<AnimatedLibrarySliverGrid>(grid).delegate
+                as SliverChildBuilderDelegate;
+        expect(delegate.childCount, 3);
+        expect(
+          [
+            for (var i = 0; i < delegate.childCount!; i++)
+              delegate.builder(tester.element(grid), i)!.key,
+          ],
+          [
+            const ValueKey('local_new|artist'),
+            const ValueKey('Old|Artist'),
+            const ValueKey('local_unknown|artist'),
+          ],
+        );
+        expect(tester.takeException(), isNull);
+      });
+
+      for (final newest in [false, true]) {
+        testWidgets('year sort applies and restores from the Library menu '
+            '(desktop: $desktop, Mornye: $mornye, newest: $newest)', (
+          tester,
+        ) async {
+          await pumpLibrary(tester, desktop: desktop, mornye: mornye);
+          final l10n = l10nOf(tester);
+          final label = newest
+              ? l10n.libraryFilterSortYearDesc
+              : l10n.libraryFilterSortYearAsc;
+          final mode = newest ? 'year-desc' : 'year-asc';
+          await tester.tap(
+            find
+                .text(
+                  mornye
+                      ? l10n.libraryFilterTitle
+                      : l10n.libraryFilterSortLatest,
+                )
+                .hitTestable(),
+          );
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+          final choice = find.text(label);
+          await tester.ensureVisible(choice);
+          await tester.pump(const Duration(milliseconds: 300));
+          await tester.tap(choice);
+          if (mornye) {
+            await tester.ensureVisible(find.text(l10n.libraryFilterApply));
+            await tester.pump(const Duration(milliseconds: 300));
+            await tester.tap(find.text(l10n.libraryFilterApply));
+          }
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+          final preferences = await SharedPreferences.getInstance();
+          expect(loadBootstrapSettings(preferences).historySortMode, mode);
+          expect(
+            queries.any(
+              (sql) =>
+                  sql.contains('THEN CAST(') &&
+                  sql.contains('sort_release ${newest ? 'DESC' : 'ASC'}'),
+            ),
+            isTrue,
+          );
+          await tester.pumpWidget(const SizedBox.shrink());
+          await pumpLibrary(tester, desktop: desktop, mornye: mornye);
+          final container = ProviderScope.containerOf(
+            tester.element(find.byType(QueueTab)),
+          );
+          expect(container.read(settingsProvider).historySortMode, mode);
+          expect(tester.takeException(), isNull);
+        });
+      }
     }
   }
 
@@ -520,6 +698,271 @@ void main() {
     );
     expect(container.read(settingsProvider).historyFilterMode, 'folders');
   });
+
+  testWidgets('the Genres tab lists genres and opens one; six tabs scroll at '
+      'phone width', (tester) async {
+    const genre = LibraryBrowseEntry(
+      source: '',
+      key: 'rock',
+      name: 'Rock',
+      artist: '',
+      samplePath: '',
+      trackCount: 2,
+    );
+    await pumpLibrary(
+      tester,
+      size: const Size(390, 844),
+      overrides: [
+        libraryGenresProvider.overrideWith((ref) async => const [genre]),
+        libraryGenreSongsProvider.overrideWith(
+          (ref, key) async => [
+            for (final id in ['a', 'b'])
+              UnifiedLibraryItem.fromLocalLibrary(
+                LocalLibraryItem(
+                  id: id,
+                  trackName: 'Rock song $id',
+                  artistName: 'Artist',
+                  albumName: 'Album',
+                  filePath: '/music/$id.flac',
+                  scannedAt: DateTime(2026, 11, 16),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+    final l10n = l10nOf(tester);
+    final tabs = find.byType(TabBar);
+    expect(tester.widget<TabBar>(tabs).isScrollable, isTrue);
+    expect(
+      find.descendant(of: tabs, matching: find.byType(Tab)),
+      findsNWidgets(6),
+    );
+    final genresTab = find.descendant(
+      of: tabs,
+      matching: find.text(l10n.libraryGenres),
+    );
+    await tester.ensureVisible(genresTab);
+    await tester.pump();
+    await tester.tap(genresTab);
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(QueueTab)),
+    );
+    expect(container.read(settingsProvider).historyFilterMode, 'genres');
+    expect(find.text('Rock'), findsOneWidget);
+    expect(find.text(l10n.tracksCount(2)), findsOneWidget);
+
+    await tester.tap(find.text('Rock'));
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.byType(LibraryMixScreen), findsOneWidget);
+    expect(find.text('Rock song a'), findsOneWidget);
+    expect(find.text('Rock song b'), findsOneWidget);
+    await pageBack(tester);
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    // The last tab is still reachable at phone width.
+    final foldersTab = find.descendant(
+      of: tabs,
+      matching: find.text(l10n.libraryFolders),
+    );
+    await tester.ensureVisible(foldersTab);
+    await tester.pump();
+    await tester.tap(foldersTab);
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.byType(LibraryDirectoryView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the Genres tab explains an empty Library', (tester) async {
+    await pumpLibrary(tester);
+    final l10n = l10nOf(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text(l10n.libraryGenres),
+      ),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    // The mocked database has no songs.
+    expect(find.text(l10n.libraryGenresEmpty), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the pager leaves sideways swipes to song rows while they '
+      'swipe to queue', (tester) async {
+    await pumpLibrary(tester);
+    final l10n = l10nOf(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(QueueTab)),
+    );
+    ScrollPhysics? pagerPhysics() => tester
+        .widget<PageView>(
+          find.descendant(
+            of: find.byType(QueueTab),
+            matching: find.byType(PageView),
+          ),
+        )
+        .physics;
+    expect(container.read(settingsProvider).swipeToQueue, isTrue);
+    expect(pagerPhysics(), isA<NeverScrollableScrollPhysics>());
+
+    // The tabs still change pages.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text(l10n.libraryFolders),
+      ),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.byType(LibraryDirectoryView), findsOneWidget);
+
+    // With the setting off the pager swipes as before.
+    container.read(settingsProvider.notifier).setSwipeToQueue(false);
+    await tester.pump();
+    expect(pagerPhysics(), isA<ClampingScrollPhysics>());
+  });
+
+  for (final mornye in [false, true]) {
+    testWidgets('a searched song plays on into the Songs list in its sort '
+        'and filters (Mornye: $mornye)', (tester) async {
+      UnifiedLibraryItem song(String id) => UnifiedLibraryItem.fromLocalLibrary(
+        LocalLibraryItem(
+          id: id,
+          trackName: 'Track $id',
+          artistName: 'Artist',
+          albumName: 'Album',
+          filePath: '/music/$id.flac',
+          scannedAt: DateTime(2026),
+        ),
+      );
+      final lists = <LibrarySongListRequest>[];
+      final player = _Playback();
+      await pumpLibrary(
+        tester,
+        mornye: mornye,
+        overrides: [
+          playbackProvider.overrideWith(() => player),
+          librarySearchProvider.overrideWith(
+            (ref, request) async => request.kind == LibrarySearchKind.songs
+                ? [
+                    const LibrarySearchHit(
+                      kind: LibrarySearchKind.songs,
+                      id: 'b',
+                      title: 'Track b',
+                      source: 'local',
+                    ),
+                  ]
+                : [],
+          ),
+          librarySearchTrackProvider.overrideWith(
+            (ref, key) async => song(key.id),
+          ),
+          librarySongListProvider.overrideWith((ref, request) async {
+            lists.add(request);
+            return [
+              for (final id in ['a', 'b', 'c']) song(id),
+            ];
+          }),
+        ],
+      );
+      final l10n = l10nOf(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(QueueTab)),
+      );
+      container.read(settingsProvider.notifier).setHistorySortMode('oldest');
+      await tester.tap(find.text(l10n.libraryFilterTitle).hitTestable());
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.tap(find.text(l10n.libraryFilterQualityHiRes));
+      await tester.ensureVisible(find.text(l10n.libraryFilterApply));
+      await tester.tap(find.text(l10n.libraryFilterApply));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(AppSearchField),
+          matching: find.byType(EditableText),
+        ),
+        'Track',
+      );
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(find.text('Track b'), findsOneWidget);
+      expect(lists, isEmpty);
+      // A tap on the song plays it, as its Play button did.
+      await tester.tap(find.text('Track b').hitTestable());
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      expect(lists, [
+        (
+          filterMode: 'all',
+          sortMode: 'oldest',
+          source: null,
+          quality: 'hires',
+          format: null,
+          metadata: null,
+          includeLocal: container.read(settingsProvider).localLibraryEnabled,
+        ),
+      ]);
+      expect(player.queues, [
+        ['/music/a.flac', '/music/b.flac', '/music/c.flac'],
+      ]);
+      expect(player.starts, [1]);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets('an unsearched song plays on into the loaded Songs list '
+        '(Mornye: $mornye)', (tester) async {
+      final lists = <LibrarySongListRequest>[];
+      final player = _Playback();
+      await pumpLibrary(
+        tester,
+        mornye: mornye,
+        dates: [DateTime(2026, 1, 12), DateTime(2026, 1, 11), DateTime(2026)],
+        overrides: [
+          playbackProvider.overrideWith(() => player),
+          librarySongListProvider.overrideWith((ref, request) async {
+            lists.add(request);
+            return const [];
+          }),
+        ],
+      );
+      // A tap on the song plays it, as its Play button did.
+      await tester.tap(find.text('Song 1').hitTestable());
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      expect(lists, isEmpty);
+      expect(player.queues, [
+        ['/music/song-0.flac', '/music/song-1.flac', '/music/song-2.flac'],
+      ]);
+      expect(player.starts, [1]);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('Mornye keeps its filter button', (tester) async {
     await pumpLibrary(tester, mornye: true);

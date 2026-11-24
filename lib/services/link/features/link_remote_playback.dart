@@ -17,6 +17,7 @@ import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_mirrored_playback.dart';
 import 'package:mornye/services/link/link_playback_details.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/link/together/link_together_controller.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/logger.dart';
@@ -44,8 +45,10 @@ class LinkPlaysOnDesktop extends Notifier<bool> {
       final now = desktopPlaying =
           desktop != null && desktop.playing && desktop.track != null;
       // The desktop starting to play takes over the player screens, as
-      // choosing it in Devices does, unless this phone plays meanwhile.
+      // choosing it in Devices does, unless this phone plays meanwhile or
+      // the two play together.
       if (was == true || !now || playing == true || state) return;
+      if (ref.read(linkPlayTogetherProvider).active) return;
       final options = ref.read(linkPhoneOptionsProvider);
       if (options.loaded && options.followDesktop) state = true;
     }
@@ -112,6 +115,8 @@ class LinkPlaysOnDesktop extends Notifier<bool> {
         .listen((playback) {
           final was = playing;
           playing = playback.playing;
+          // Playing together, both players run and Play together decides.
+          if (ref.read(linkPlayTogetherProvider).active) return;
           if (was == false && playback.playing) {
             if (state) state = false;
             // One player at a time: this phone starting pauses the desktop.
@@ -189,6 +194,7 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
     remote: remote,
     handoff: handoff,
     covers: runtime.dependencies.coverStore,
+    arriving: handoff.takeArriving(),
     initialItem: ref.read(localMediaItemProvider).value,
     initialState: runtime.handler?.playbackState.value,
     details: (track, local) => readLinkPlaybackDetails(
@@ -243,6 +249,8 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
     required LinkHandoff handoff,
     required super.covers,
     Future<PlayableMedia?> Function(TrackRef, PlayableMedia?)? details,
+    TrackRef? arriving,
+    Duration arrivalWait = linkHandoffArrivalWait,
     super.extractArtwork,
     super.initialItem,
     super.initialState,
@@ -251,12 +259,30 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
     super.nowMs,
   }) : _remote = remote,
        _handoff = handoff,
-       _details = details;
+       _details = details,
+       _arriving = arriving {
+    if (arriving != null) _arrivalTimer = Timer(arrivalWait, _stopWaiting);
+  }
 
   final LinkDesktopRemote _remote;
   final LinkHandoff _handoff;
   final Future<PlayableMedia?> Function(TrackRef, PlayableMedia?)? _details;
   LinkConnectionState? _connection;
+
+  /// The song just moved to the desktop. The state the desktop reports until
+  /// it names this song is older, so it waits in [_held] and the player keeps
+  /// showing the song that was playing.
+  TrackRef? _arriving;
+  LinkRemoteState? _held;
+  Timer? _arrivalTimer;
+
+  void _stopWaiting() {
+    _arrivalTimer?.cancel();
+    _arriving = null;
+    final held = _held;
+    _held = null;
+    if (held != null) update(held);
+  }
 
   /// Shows the desktop's [state].
   void update(LinkRemoteState state) {
@@ -266,7 +292,23 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
       retryFailed();
     }
     _connection = state.connection;
+    final arriving = _arriving;
+    if (arriving != null) {
+      final track = state.player?.track;
+      if (track == null || !linkSameTrack(arriving, track)) {
+        _held = state;
+        return;
+      }
+      _arrivalTimer?.cancel();
+      _arriving = _held = null;
+    }
     show(state.player);
+  }
+
+  @override
+  void dispose() {
+    _arrivalTimer?.cancel();
+    super.dispose();
   }
 
   @override

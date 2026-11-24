@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
@@ -11,10 +11,10 @@ import 'package:path/path.dart' as p;
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/song_leftovers_provider.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/utils/duplicate_cleanup_policy.dart';
-import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -142,7 +142,7 @@ class _DuplicateReviewSheetState extends ConsumerState<DuplicateReviewSheet> {
     final deleted = await deleteReviewedDuplicateCopies(
       entries: entries,
       retainedEntries: retainedEntries,
-      deleteFile: deleteFile,
+      deleteFile: ref.read(songLeftoversProvider).delete,
       removePhysicalFile: (path) async {
         // A download may also be indexed by a scan. Clear both references so
         // playlist resolution by ISRC finds the surviving file, not a ghost.

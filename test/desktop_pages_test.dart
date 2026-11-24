@@ -1,5 +1,5 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -32,6 +32,8 @@ import 'package:mornye/widgets/desktop/desktop_shortcuts.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart'
     show desktopWindowFullScreen;
 
+import 'support/tooltip_finder.dart';
+
 class _Queue extends DownloadQueueNotifier {
   _Queue(this._items);
 
@@ -39,13 +41,17 @@ class _Queue extends DownloadQueueNotifier {
   final cancelled = <String>[];
 
   @override
-  DownloadQueueState build() => DownloadQueueState(items: _items);
+  DownloadQueueState build() =>
+      const DownloadQueueState().copyWith(items: _items);
 
   @override
   void cancelItem(String id) => cancelled.add(id);
 
   void replace(List<DownloadItem> items) =>
-      state = DownloadQueueState(items: items);
+      state = state.copyWith(items: items);
+
+  void update(int index, DownloadItem item) =>
+      state = state.withItemReplacements({index: item});
 }
 
 DownloadItem _download(
@@ -129,7 +135,11 @@ void main() {
         ),
     ];
     for (var length = 0; length <= items.length; length++) {
-      final active = activeDesktopDownloads(items.sublist(0, length));
+      // The ring must count exactly the rows the popover lists.
+      final lookup = DownloadQueueLookup.fromItems(items.sublist(0, length));
+      final active = [
+        for (final id in lookup.activeItemIds) lookup.byItemId[id]!,
+      ];
       var total = 0.0;
       for (final item in active) {
         total += item.status == DownloadStatus.finalizing
@@ -191,6 +201,51 @@ void main() {
         );
         semantics.dispose();
         expect(list, findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('a new category ${mornye ? 'cuts in' : 'fades in'}', (
+        tester,
+      ) async {
+        await setWindow(tester, 1400);
+        await tester.pumpWidget(
+          app(
+            mornye: mornye,
+            home: Scaffold(
+              body: SettingsTab(
+                remoteConfigService: AppRemoteConfigService(
+                  client: MockClient((_) async => http.Response('{}', 200)),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        final fade = find.byKey(const ValueKey('settings-detail-fade'));
+        // Opening Settings shows the first page without a fade.
+        expect(tester.widget<Opacity>(fade).opacity, 1);
+        await tester.pumpAndSettle();
+
+        final other = find.byWidgetPredicate((widget) {
+          final key = widget.key;
+          return key is ValueKey<String> &&
+              key.value.startsWith('settings-category:') &&
+              key.value != 'settings-category:Appearance';
+        }).first;
+        await tester.tap(other);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 40));
+        final opacity = tester.widget<Opacity>(fade).opacity;
+        if (mornye) {
+          expect(opacity, 1);
+        } else {
+          expect(opacity, greaterThan(0));
+          expect(opacity, lessThan(1));
+        }
+        // The previous category's navigator is gone at once.
+        expect(find.byType(Navigator), findsNWidgets(2));
+        await tester.pumpAndSettle();
+        expect(tester.widget<Opacity>(fade).opacity, 1);
         expect(tester.takeException(), isNull);
       });
 
@@ -513,7 +568,7 @@ void main() {
       expect(find.text('Done song'), findsNothing);
       expect(find.textContaining('40%'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Cancel download').first);
+      await tester.tap(findByTooltip('Cancel download').first);
       expect(queue.cancelled, ['a']);
 
       await tester.tap(
@@ -525,6 +580,94 @@ void main() {
       expect(requested, mornye ? isEmpty : [ShellTab.library]);
       expect(links, mornye ? ['downloads'] : isEmpty);
       expect(popover, findsNothing);
+    });
+
+    testWidgets('$style downloads popover builds only visible rows', (
+      tester,
+    ) async {
+      await setWindow(tester, 1200);
+      final queue = _Queue([
+        for (var i = 0; i < 200; i++)
+          _download('$i', 'Waiting song $i', DownloadStatus.queued),
+      ]);
+      await tester.pumpWidget(
+        app(
+          mornye: mornye,
+          overrides: [downloadQueueProvider.overrideWith(() => queue)],
+          home: const Scaffold(body: Center(child: DesktopDownloadsButton())),
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('desktop-downloads-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Waiting song 0'), findsOneWidget);
+      expect(find.byType(PlayerArtwork).evaluate().length, lessThan(20));
+      expect(find.text('Waiting song 49'), findsNothing);
+      final list = find.byKey(const ValueKey('desktop-downloads-list'));
+      await tester.drag(list, const Offset(0, -4000));
+      await tester.pumpAndSettle();
+      expect(find.text('Waiting song 49'), findsOneWidget);
+      expect(find.text('Waiting song 50'), findsNothing);
+      expect(find.byType(PlayerArtwork).evaluate().length, lessThan(20));
+      expect(
+        find.byKey(const ValueKey('desktop-downloads-show-all')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('$style progress updates keep unrelated download rows', (
+      tester,
+    ) async {
+      await setWindow(tester, 1200);
+      final running = _download(
+        'a',
+        'Running song',
+        DownloadStatus.downloading,
+        progress: 0.4,
+      );
+      final queue = _Queue([
+        running,
+        _download('b', 'Waiting song', DownloadStatus.queued),
+      ]);
+      await tester.pumpWidget(
+        app(
+          mornye: mornye,
+          overrides: [downloadQueueProvider.overrideWith(() => queue)],
+          home: const Scaffold(body: Center(child: DesktopDownloadsButton())),
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('desktop-downloads-button')));
+      await tester.pumpAndSettle();
+      final waitingTitle = tester.widget<Text>(find.text('Waiting song'));
+      final list = tester.widget<ListView>(
+        find.byKey(const ValueKey('desktop-downloads-list')),
+      );
+
+      queue.update(0, running.copyWith(progress: 0.7));
+      await tester.pump();
+      expect(find.textContaining('70%'), findsOneWidget);
+      expect(tester.widget(find.text('Waiting song')), same(waitingTitle));
+      expect(
+        tester.widget(find.byKey(const ValueKey('desktop-downloads-list'))),
+        same(list),
+      );
+
+      queue.update(0, running.copyWith(status: DownloadStatus.completed));
+      await tester.pumpAndSettle();
+      expect(find.text('Running song'), findsNothing);
+      expect(find.text('Waiting song'), findsOneWidget);
+      queue.replace([]);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('desktop-downloads-list')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('desktop-downloads-show-all')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('$style downloads button rebuilds only for its ring', (

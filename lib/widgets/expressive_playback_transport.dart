@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -12,6 +12,7 @@ import 'package:mornye/widgets/expressive_icon_button.dart';
 ///
 /// Play-pause rests round while paused and square while playing. Pressing a
 /// button widens it and squishes its neighbours, keeping the row width fixed.
+/// The mini player shows only play-pause and next ([mini]).
 /// Callers use the standard transport row when expressive motion is off.
 class ExpressivePlaybackTransport extends StatefulWidget {
   const ExpressivePlaybackTransport({
@@ -30,6 +31,7 @@ class ExpressivePlaybackTransport extends StatefulWidget {
     this.compact = false,
     this.dense = false,
     this.fill = false,
+    this.mini = false,
   });
 
   final ColorScheme colorScheme;
@@ -57,6 +59,10 @@ class ExpressivePlaybackTransport extends StatefulWidget {
   /// full width and [leading] and [trailing] line up with its ends.
   final bool fill;
 
+  /// The mini player's pair: play-pause and next at its cover's 44dp height,
+  /// without previous, at a fixed size.
+  final bool mini;
+
   @override
   State<ExpressivePlaybackTransport> createState() =>
       _ExpressivePlaybackTransportState();
@@ -73,11 +79,14 @@ class _ExpressivePlaybackTransportState
   Widget build(BuildContext context) {
     final compact = widget.compact;
     final dense = widget.dense;
-    final height = dense ? 40.0 : (compact ? 56.0 : 72.0);
-    final restingWidths = dense
+    final mini = widget.mini;
+    final height = mini ? 44.0 : (dense ? 40.0 : (compact ? 56.0 : 72.0));
+    final restingWidths = mini
+        ? [0.0, 60.0, 44.0]
+        : dense
         ? [48.0, 64.0, 48.0]
         : (compact ? [56.0, 80.0, 56.0] : [68.0, 104.0, 68.0]);
-    final sideIconSize = dense ? 20.0 : (compact ? 28.0 : 32.0);
+    final sideIconSize = mini ? 24.0 : (dense ? 20.0 : (compact ? 28.0 : 32.0));
     return LayoutBuilder(
       builder: (context, constraints) {
         final sideActions =
@@ -89,7 +98,9 @@ class _ExpressivePlaybackTransportState
             sideActions * (_sideActionWidth + _gap) -
             2 * _gap;
         var widths = [...restingWidths];
-        if (constraints.hasBoundedWidth && available < groupWidth) {
+        // The mini pair keeps its size: it has no previous slot to trade.
+        final adapts = !mini && constraints.hasBoundedWidth;
+        if (adapts && available < groupWidth) {
           // Narrow phones: previous/next keep a 48dp target and play-pause
           // absorbs the remaining shortfall.
           final side = math.max(
@@ -97,7 +108,7 @@ class _ExpressivePlaybackTransportState
             restingWidths.first * available / groupWidth,
           );
           widths = [side, math.max(_minTarget, available - 2 * side), side];
-        } else if (constraints.hasBoundedWidth && widget.fill) {
+        } else if (adapts && widget.fill) {
           final scale = available / groupWidth;
           widths = [for (final width in restingWidths) width * scale];
         }
@@ -106,10 +117,12 @@ class _ExpressivePlaybackTransportState
         if (pressed != null) {
           // Neighbours give up exactly what the pressed button gains.
           final growth = restingWidths[pressed] * squishRatio;
+          // The mini pair's empty previous slot has no width to give.
+          final first = mini ? 1 : 0;
           final neighbours = [
             pressed - 1,
             pressed + 1,
-          ].where((index) => index >= 0 && index < widths.length).toList();
+          ].where((index) => index >= first && index < widths.length).toList();
           factors[pressed] += squishRatio;
           for (final index in neighbours) {
             factors[index] -= growth / neighbours.length / restingWidths[index];
@@ -137,7 +150,7 @@ class _ExpressivePlaybackTransportState
             icon: playIcon ?? const AppIcon(Icons.play_arrow),
             selectedIcon: playIcon ?? const AppIcon(Icons.pause),
             selected: widget.playing,
-            iconSize: dense ? 24 : (compact ? 32 : 40),
+            iconSize: mini || dense ? 24 : (compact ? 32 : 40),
             round: true,
             background: scheme.primary,
             foreground: scheme.onPrimary,
@@ -178,8 +191,10 @@ class _ExpressivePlaybackTransportState
                   leading,
                   const SizedBox(width: _gap),
                 ],
-                _slot(0, previous, height, buttons[0]),
-                const SizedBox(width: _gap),
+                if (!mini) ...[
+                  _slot(0, previous, height, buttons[0]),
+                  const SizedBox(width: _gap),
+                ],
                 _slot(1, play, height, buttons[1]),
                 const SizedBox(width: _gap),
                 _slot(2, next, height, buttons[2]),
@@ -229,7 +244,7 @@ class _ExpressivePlaybackTransportState
             isSelected: selected,
             semanticLabel: tooltip,
             onPressed: onPressed,
-            size: widget.dense
+            size: widget.dense || widget.mini
                 ? M3EIconButtonSize.sm
                 : (widget.compact
                       ? M3EIconButtonSize.md

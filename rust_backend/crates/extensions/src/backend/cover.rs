@@ -15,7 +15,8 @@ use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 type Check<'a> = dyn Fn() -> Result<(), String> + 'a;
@@ -49,6 +50,100 @@ const LINK_THUMBNAILS: bool = cfg!(any(target_vendor = "apple", target_os = "lin
 /// directory's regenerate marker was touched at `regenerate`.
 pub fn library_cover_is_current(modified: SystemTime, regenerate: Option<SystemTime>) -> bool {
     regenerate.is_none_or(|marker| modified >= marker)
+}
+
+/// Library artwork ready to store: the thumbnail when one could be made, and
+/// the record of where its bytes are stored.
+#[derive(Clone)]
+pub(super) struct LibraryArtwork {
+    data: Arc<[u8]>,
+    mime: String,
+    stored: Option<Arc<Mutex<Option<String>>>>,
+}
+
+impl LibraryArtwork {
+    /// Library caching may retain unsupported image bytes when the resize
+    /// fails.
+    pub(super) fn new(cover: CoverArt, check: &Check<'_>) -> Self {
+        let Ok(thumbnail) = mornye_core::cover::library_thumbnail_entry(&cover.data, check) else {
+            return Self {
+                data: cover.data.into(),
+                mime: cover.mime,
+                stored: None,
+            };
+        };
+        let mime = if thumbnail.data.starts_with(b"\x89PNG") {
+            "image/png".into()
+        } else if thumbnail.data.starts_with(b"\xff\xd8") {
+            "image/jpeg".into()
+        } else {
+            cover.mime
+        };
+        Self {
+            data: thumbnail.data,
+            mime,
+            stored: Some(thumbnail.stored),
+        }
+    }
+}
+
+/// Folder artwork above this size is read again per song, as the thumbnail
+/// cache does not keep it either.
+const FOLDER_ARTWORK_MAX_BYTES: usize = 8 << 20;
+
+/// The artwork of one folder image for one scan, read and resized once for
+/// the songs that use it. It is kept only while songs announced with
+/// [`Self::expect_song`] are unfinished, and a later scan starts again, so it
+/// sees a changed image.
+#[derive(Default)]
+pub(super) struct FolderArtwork {
+    artwork: Mutex<Option<LibraryArtwork>>,
+    remaining: AtomicUsize,
+}
+
+impl FolderArtwork {
+    pub(super) fn expect_song(&self) {
+        self.remaining.fetch_add(1, Ordering::AcqRel);
+    }
+
+    /// Releases the artwork after the last announced song.
+    pub(super) fn song_done(&self) {
+        if self.remaining.fetch_sub(1, Ordering::AcqRel) == 1 {
+            *self.artwork.lock().unwrap_or_else(PoisonError::into_inner) = None;
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn is_held(&self) -> bool {
+        self.artwork
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .is_some()
+    }
+
+    /// Other songs of the folder wait for a read in progress; the reader
+    /// checks cancellation, so the wait ends with it.
+    pub(super) fn get_or_read(
+        &self,
+        check: &Check<'_>,
+        read: impl FnOnce() -> Result<LibraryArtwork, String>,
+    ) -> Result<LibraryArtwork, String> {
+        let mut artwork = self.artwork.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(artwork) = artwork.as_ref() {
+            return Ok(artwork.clone());
+        }
+        let result = read();
+        // A failed read, maybe a passing I/O error, is tried again by the next
+        // song; a cancelled read says nothing about the image.
+        if let Ok(read) = &result
+            && read.data.len() <= FOLDER_ARTWORK_MAX_BYTES
+            && self.remaining.load(Ordering::Acquire) > 0
+            && check().is_ok()
+        {
+            *artwork = Some(read.clone());
+        }
+        result
+    }
 }
 
 struct Entry {
@@ -284,14 +379,37 @@ impl Backend {
         explicit_key: &str,
         check: &Check<'_>,
     ) -> Result<String, String> {
+        self.save_cover_to_cache_batched(
+            audio_path,
+            hint,
+            cache_directory,
+            explicit_key,
+            None,
+            check,
+        )
+    }
+
+    /// [`Self::save_cover_to_cache_with_hint_and_key`]; with `batch`, the scan
+    /// flushes the thumbnail folder once at its end instead of per file.
+    pub(super) fn save_cover_to_cache_batched(
+        &self,
+        audio_path: &str,
+        hint: &str,
+        cache_directory: &str,
+        explicit_key: &str,
+        batch: Option<&SyncBatch>,
+        check: &Check<'_>,
+    ) -> Result<String, String> {
         self.cache_cover(
             audio_path,
             hint,
             cache_directory,
             explicit_key,
             None,
-            read_cover,
-            None,
+            |input, format, check| {
+                read_cover(input, format, check).map(|cover| LibraryArtwork::new(cover, check))
+            },
+            batch,
             cfg!(target_os = "android"),
             check,
         )
@@ -320,7 +438,54 @@ impl Backend {
             cache_directory,
             explicit_key,
             format,
-            read,
+            |input, format, check| {
+                read(input, format, check).map(|cover| LibraryArtwork::new(cover, check))
+            },
+            batch,
+            cfg!(target_os = "android"),
+            check,
+        )
+    }
+
+    /// Caches the folder image at `image_path` (cover.jpg and the like) as
+    /// the Library thumbnail of a song without embedded artwork. `key` must
+    /// name this version of the image, so a replaced image gets a new
+    /// thumbnail. Songs that share `artwork` read and resize the image once.
+    pub(super) fn save_folder_cover_to_cache_for_scan(
+        &self,
+        image_path: &str,
+        cache_directory: &str,
+        key: &str,
+        artwork: &FolderArtwork,
+        batch: Option<&SyncBatch>,
+        check: &Check<'_>,
+    ) -> Result<String, String> {
+        self.cache_cover(
+            image_path,
+            "",
+            cache_directory,
+            key,
+            Some("image"),
+            |input, _, check| {
+                artwork.get_or_read(check, || {
+                    let mut file = input
+                        .open_native_read()
+                        .map_err(|error| error.to_string())?;
+                    let data = mornye_core::cover::read_folder_image(&mut file, check)?;
+                    let mime = if data.starts_with(b"\x89PNG") {
+                        "image/png"
+                    } else {
+                        "image/jpeg"
+                    };
+                    Ok(LibraryArtwork::new(
+                        CoverArt {
+                            data,
+                            mime: mime.into(),
+                        },
+                        check,
+                    ))
+                })
+            },
             batch,
             cfg!(target_os = "android"),
             check,
@@ -335,7 +500,7 @@ impl Backend {
         cache_directory: &str,
         explicit_key: &str,
         format_override: Option<&str>,
-        read: impl FnOnce(&crate::files::FilePath, &str, &Check<'_>) -> Result<CoverArt, String>,
+        read: impl FnOnce(&crate::files::FilePath, &str, &Check<'_>) -> Result<LibraryArtwork, String>,
         batch: Option<&SyncBatch>,
         content_addressed: bool,
         check: &Check<'_>,
@@ -398,7 +563,9 @@ impl Backend {
         if let Some(value) = format_override {
             format = value.into();
         }
+        // An override names a format its reader already handles.
         if cached.is_none()
+            && format_override.is_none()
             && !matches!(
                 format.as_str(),
                 "flac" | "m4a" | "mp3" | "ogg" | "opus" | "wav" | "aiff" | "aif" | "aifc"
@@ -413,7 +580,7 @@ impl Backend {
                 }
             ));
         }
-        let mut cover = if let Some((_, cached)) = cached {
+        let cover = if let Some((_, cached)) = cached {
             let mut data = Vec::new();
             cached
                 .open(OpenOptions::new().read(true))
@@ -425,32 +592,24 @@ impl Backend {
                 check()?;
                 return Ok(cached.display());
             }
-            CoverArt {
-                data,
-                mime: if cached.display().ends_with(".png") {
-                    "image/png"
-                } else {
-                    "image/jpeg"
-                }
-                .into(),
-            }
+            let mime = if cached.display().ends_with(".png") {
+                "image/png"
+            } else {
+                "image/jpeg"
+            };
+            LibraryArtwork::new(
+                CoverArt {
+                    data,
+                    mime: mime.into(),
+                },
+                &check,
+            )
         } else {
             read(&input, &format, &check)?
         };
-        let mut stored = None;
-        if let Ok(thumbnail) = mornye_core::cover::library_thumbnail_entry(&cover.data, &check) {
-            let resized = thumbnail.data;
-            cover.mime = if resized.starts_with(b"\x89PNG") {
-                "image/png"
-            } else if resized.starts_with(b"\xff\xd8") {
-                "image/jpeg"
-            } else {
-                &cover.mime
-            }
-            .into();
-            cover.data = resized.to_vec();
-            stored = (LINK_THUMBNAILS && !content_addressed).then_some(thumbnail.stored);
-        }
+        let stored = cover
+            .stored
+            .filter(|_| LINK_THUMBNAILS && !content_addressed);
         // Library caching may retain unsupported image bytes, but must never
         // swallow cancellation while attempting the optional resize.
         check()?;
@@ -484,7 +643,7 @@ impl Backend {
                 .read_to_end(&mut existing)
                 .map_err(|error| error.to_string())?;
             check()?;
-            if existing != cover.data {
+            if *existing != *cover.data {
                 return Err("content-addressed library artwork differs from its name".into());
             }
             return Ok(output.display());
@@ -786,6 +945,14 @@ pub(super) mod tests {
         .unwrap()
     }
 
+    fn read_artwork(
+        input: &crate::files::FilePath,
+        format: &str,
+        check: &Check<'_>,
+    ) -> Result<LibraryArtwork, String> {
+        read_cover(input, format, check).map(|cover| LibraryArtwork::new(cover, check))
+    }
+
     fn id3_audio(jpeg: &[u8]) -> Vec<u8> {
         let mut picture = b"\0image/jpeg\0\x03\0\0".to_vec();
         picture.extend(jpeg);
@@ -817,7 +984,7 @@ pub(super) mod tests {
                     cache.to_str().unwrap(),
                     &format!("song-{index}"),
                     None,
-                    read_cover,
+                    read_artwork,
                     None,
                     true,
                     &|| Ok(()),
@@ -870,11 +1037,14 @@ pub(super) mod tests {
                 cache.to_str().unwrap(),
                 "legacy",
                 None,
-                |_, _, _| {
-                    Ok(CoverArt {
-                        data: pictures[1].clone(),
-                        mime: "image/jpeg".into(),
-                    })
+                |_, _, check| {
+                    Ok(LibraryArtwork::new(
+                        CoverArt {
+                            data: pictures[1].clone(),
+                            mime: "image/jpeg".into(),
+                        },
+                        check,
+                    ))
                 },
                 None,
                 true,
@@ -894,7 +1064,7 @@ pub(super) mod tests {
                     cache.to_str().unwrap(),
                     "fresh",
                     None,
-                    read_cover,
+                    read_artwork,
                     None,
                     true,
                     &|| Ok(()),
@@ -1228,6 +1398,63 @@ pub(super) mod tests {
                 );
             });
         }
+    }
+
+    #[test]
+    fn folder_artwork_keeps_only_reads_that_succeeded_while_songs_wait() {
+        let reads = Cell::new(0);
+        let artwork = |size: usize| {
+            LibraryArtwork::new(
+                CoverArt {
+                    data: vec![1; size],
+                    mime: "image/jpeg".into(),
+                },
+                &|| Ok(()),
+            )
+        };
+        let read = |result: Result<LibraryArtwork, String>| {
+            reads.set(reads.get() + 1);
+            result
+        };
+        let folder = FolderArtwork::default();
+        // Nothing is kept before any song is announced.
+        folder
+            .get_or_read(&|| Ok(()), || read(Ok(artwork(4))))
+            .unwrap();
+        assert!(!folder.is_held());
+        folder.expect_song();
+        folder.expect_song();
+
+        // A passing I/O error costs one song, not the folder.
+        let error = folder.get_or_read(&|| Ok(()), || read(Err("I/O error".into())));
+        assert_eq!(error.err().as_deref(), Some("I/O error"));
+        assert!(!folder.is_held());
+        // Artwork over the budget is read again per song.
+        folder
+            .get_or_read(&|| Ok(()), || {
+                read(Ok(artwork(FOLDER_ARTWORK_MAX_BYTES + 1)))
+            })
+            .unwrap();
+        assert!(!folder.is_held());
+        // A cancelled read is not kept either.
+        folder
+            .get_or_read(&|| Err("cancelled".into()), || read(Ok(artwork(4))))
+            .unwrap();
+        assert!(!folder.is_held());
+        folder
+            .get_or_read(&|| Ok(()), || read(Ok(artwork(4))))
+            .unwrap();
+        assert!(folder.is_held());
+        let kept = folder
+            .get_or_read(&|| Ok(()), || panic!("kept artwork is read again"))
+            .unwrap();
+        assert_eq!(*kept.data, [1; 4]);
+        assert_eq!(reads.get(), 5);
+
+        folder.song_done();
+        assert!(folder.is_held());
+        folder.song_done();
+        assert!(!folder.is_held());
     }
 
     #[test]

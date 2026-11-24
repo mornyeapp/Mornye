@@ -167,10 +167,16 @@ pub fn artists_match(expected: &str, found: &str) -> bool {
 
 /// Album/title matching used by Go's metadata enrichment policy.
 pub fn titles_match(expected: &str, found: &str) -> bool {
+    edition_titles_match(expected, found, true)
+}
+
+/// Without containment, one title only matches another that names the same
+/// work once edition words, brackets and a " - " suffix are set aside.
+fn edition_titles_match(expected: &str, found: &str, containment: bool) -> bool {
     use crate::lyrics::matching::normalize_title;
     use crate::matching::lowercase;
     let (expected, found) = (lowercase(expected.trim()), lowercase(found.trim()));
-    let contains = |a: &str, b: &str| a.contains(b) || b.contains(a);
+    let contains = |a: &str, b: &str| a == b || (containment && (a.contains(b) || b.contains(a)));
     if contains(&expected, &found) {
         return true;
     }
@@ -299,6 +305,17 @@ fn track_title_without_annotations(value: &str) -> std::borrow::Cow<'_, str> {
 }
 
 pub fn track_titles_match(expected: &str, found: &str) -> bool {
+    track_titles_match_with(expected, found, true)
+}
+
+/// Like `track_titles_match`, but a title that merely contains the other is
+/// another song: "Name" is not "Name Forever". Credits, a From "Film" note and
+/// edition suffixes such as " - Remastered 2011" still name the same song.
+pub fn same_track_title(expected: &str, found: &str) -> bool {
+    track_titles_match_with(expected, found, false)
+}
+
+fn track_titles_match_with(expected: &str, found: &str, containment: bool) -> bool {
     let (expected, found) = (
         track_title_without_annotations(expected),
         track_title_without_annotations(found),
@@ -331,7 +348,7 @@ pub fn track_titles_match(expected: &str, found: &str) -> bool {
     {
         return false;
     }
-    titles_match(&expected, &found)
+    edition_titles_match(&expected, &found, containment)
 }
 
 #[cfg(test)]
@@ -352,6 +369,25 @@ mod tests {
             ));
         }
         assert!(!track_titles_match("Signal (with Live Band)", "Signal"));
+    }
+
+    #[test]
+    fn same_track_title_rejects_a_longer_title_that_contains_the_song() {
+        assert!(track_titles_match("Signal", "Signal Night Dance"));
+        assert!(!same_track_title("Signal", "Signal Night Dance"));
+        assert!(!same_track_title("Signal Night Dance", "Signal"));
+        for found in [
+            "Signal",
+            "signal",
+            "Signal (feat. Guest Artist)",
+            "Signal (From \"Example Film\")",
+            "Signal - Remastered 2011",
+            "Signal (2011 Remaster)",
+        ] {
+            assert!(same_track_title("Signal", found), "{found}");
+        }
+        assert!(!same_track_title("Signal", "Signal (Live)"));
+        assert!(!same_track_title("Signal", ""));
     }
 
     #[test]

@@ -41,6 +41,43 @@ DownloadItem _item(int index) => DownloadItem(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
+    'active panel membership survives progress and follows status changes',
+    () {
+      var state = const DownloadQueueState().copyWith(
+        items: [
+          _item(0),
+          _item(1).copyWith(status: DownloadStatus.queued),
+          _item(2).copyWith(status: DownloadStatus.finalizing),
+          _item(3).copyWith(status: DownloadStatus.failed),
+          _item(4).copyWith(status: DownloadStatus.skipped),
+          _item(5).copyWith(status: DownloadStatus.completed),
+        ],
+      );
+      final initialIds = state.lookup.activeItemIds;
+      expect(initialIds, ['item-0', 'item-1', 'item-2']);
+      state = state.withItemReplacements({
+        0: state.items[0].copyWith(progress: 0.6),
+        1: state.items[1].copyWith(status: DownloadStatus.downloading),
+        2: state.items[2].copyWith(status: DownloadStatus.downloading),
+      });
+      expect(state.lookup.activeItemIds, same(initialIds));
+      // Keep the active count unchanged while exchanging two members.
+      state = state.withItemReplacements({
+        0: state.items[0].copyWith(status: DownloadStatus.failed),
+        3: state.items[3].copyWith(status: DownloadStatus.queued),
+      });
+      expect(state.lookup.activeItemIds, ['item-1', 'item-2', 'item-3']);
+      expect(initialIds, ['item-0', 'item-1', 'item-2']);
+      final beforeRemoval = state.lookup.activeItemIds;
+      state = state.withoutItem('item-4');
+      expect(state.lookup.activeItemIds, same(beforeRemoval));
+      state = state.withoutItem('item-1');
+      expect(state.lookup.activeItemIds, ['item-2', 'item-3']);
+      expect(() => state.lookup.activeItemIds.clear(), throwsUnsupportedError);
+    },
+  );
+
+  test(
     'queued positions span word/chunk boundaries and preserve iterables',
     () {
       final queued = {
@@ -239,6 +276,7 @@ void main() {
           state.items.where((item) => item.status == DownloadStatus.queued),
         );
         expect(state.lookup.notCompletedItemIds, rebuilt.notCompletedItemIds);
+        expect(state.lookup.activeItemIds, rebuilt.activeItemIds);
         expect(
           old.lookup.byItemId[old.items[index].id],
           same(old.items[index]),

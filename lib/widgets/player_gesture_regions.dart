@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/widgets/player_track_swipe.dart';
 

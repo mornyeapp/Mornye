@@ -13,10 +13,15 @@ import 'package:mornye/utils/logger.dart';
 final _log = AppLogger('FFmpeg');
 
 class _ResolvedLosslessQuality {
+  final int? sourceBitDepth;
   final int? targetBitDepth;
   final int? targetSampleRate;
 
-  const _ResolvedLosslessQuality({this.targetBitDepth, this.targetSampleRate});
+  const _ResolvedLosslessQuality({
+    this.sourceBitDepth,
+    this.targetBitDepth,
+    this.targetSampleRate,
+  });
 }
 
 /// Encoding and track splitting depend on inspection, tagging and output
@@ -30,14 +35,19 @@ abstract final class FFmpegConversion {
     required LosslessConversionQuality quality,
     int? sourceBitDepth,
   }) async {
+    if (sourceBitDepth != null && sourceBitDepth <= 0) sourceBitDepth = null;
     final needsDepth = sourceBitDepth == null && quality.maxBitDepth != null;
     final needsRate = quality.maxSampleRate != null;
     final probe = needsDepth || needsRate
         ? await FFmpegProbe.audioProperties(inputPath)
         : const PrimaryAudioProperties();
-    final depth = sourceBitDepth ?? probe.bitDepth;
+    final probedDepth = probe.bitDepth;
+    final depth =
+        sourceBitDepth ??
+        (probedDepth != null && probedDepth > 0 ? probedDepth : null);
     final rate = needsRate ? probe.sampleRate : null;
     return _ResolvedLosslessQuality(
+      sourceBitDepth: depth,
       targetBitDepth:
           quality.maxBitDepth != null &&
               (depth == null || depth > quality.maxBitDepth!)
@@ -64,6 +74,7 @@ abstract final class FFmpegConversion {
     List<String> arguments, {
     int? targetSampleRate,
     String? outputSampleFormat,
+    int? outputBitDepth,
     required LosslessConversionProcessing processing,
   }) {
     final hasRate = targetSampleRate != null && targetSampleRate > 0;
@@ -75,6 +86,10 @@ abstract final class FFmpegConversion {
       if (hasRate) 'osr=$targetSampleRate',
       if (hasFormat) 'osf=${outputSampleFormat.trim()}',
       if (processing.hasDither) 'dither_method=${processing.normalizedDither}',
+      // 24-bit encoders use s32 buffers. Dither at the encoded precision,
+      // before the encoder discards the unused low bits.
+      if (processing.hasDither && outputBitDepth != null && outputBitDepth > 0)
+        'output_sample_bits=$outputBitDepth',
     ];
     arguments.addAll(['-af', 'aresample=${options.join(':')}']);
   }
@@ -90,6 +105,7 @@ abstract final class FFmpegConversion {
       arguments,
       targetSampleRate: targetSampleRate,
       outputSampleFormat: _sampleFormat(codec, targetBitDepth),
+      outputBitDepth: targetBitDepth,
       processing: processing,
     );
     if (targetBitDepth == null || targetBitDepth <= 0) return;
@@ -259,7 +275,10 @@ abstract final class FFmpegConversion {
         artistTagMode: artistTagMode,
         targetBitDepth: quality.targetBitDepth,
         targetSampleRate: quality.targetSampleRate,
-        processing: losslessProcessing,
+        processing: losslessProcessing.resolveDither(
+          sourceBitDepth: quality.sourceBitDepth,
+          targetBitDepth: quality.targetBitDepth,
+        ),
         deleteOriginal: deleteOriginal,
       );
     }
@@ -269,7 +288,7 @@ abstract final class FFmpegConversion {
         metadata: metadata,
         coverPath: coverPath,
         container: format == 'wav' ? 'wav' : 'aiff',
-        sourceBitDepth: sourceBitDepth,
+        sourceBitDepth: quality.sourceBitDepth,
         targetBitDepth: quality.targetBitDepth,
         targetSampleRate: quality.targetSampleRate,
         processing: losslessProcessing,
@@ -424,7 +443,8 @@ abstract final class FFmpegConversion {
       '${targetBitDepth != null ? ' $targetBitDepth-bit' : ''}'
       '${targetSampleRate != null ? ' @ ${targetSampleRate}Hz' : ''}'
       '${processing.hasDither ? ' dither=${processing.normalizedDither}' : ''}'
-      '${processing.normalizedResampler != 'swr' ? ' resampler=${processing.normalizedResampler}' : ''}',
+      '${processing.normalizedResampler != 'swr' ? ' resampler=${processing.normalizedResampler}' : ''}'
+      '${processing.hasDefaultResamplerQuality ? '' : ' quality=${processing.normalizedResamplerQuality}'}',
     );
     final result = await FFmpegExecution.arguments(arguments);
     if (!result.success) {
@@ -468,11 +488,16 @@ abstract final class FFmpegConversion {
       deleteOriginal: deleteOriginal,
     );
     final outputPath = plan.workingPath;
-    var depth = targetBitDepth ?? sourceBitDepth;
-    if (depth == null || depth <= 0) {
-      depth = (await FFmpegProbe.audioProperties(inputPath)).bitDepth;
+    if (sourceBitDepth == null || sourceBitDepth <= 0) {
+      sourceBitDepth = (await FFmpegProbe.audioProperties(inputPath)).bitDepth;
     }
+    final depth = targetBitDepth ?? sourceBitDepth;
     final use24 = depth != null && depth >= 24;
+    final outputBitDepth = use24 ? 24 : 16;
+    processing = processing.resolveDither(
+      sourceBitDepth: sourceBitDepth,
+      targetBitDepth: outputBitDepth,
+    );
     final codec = isAiff
         ? (use24 ? 'pcm_s24be' : 'pcm_s16be')
         : (use24 ? 'pcm_s24le' : 'pcm_s16le');
@@ -488,7 +513,8 @@ abstract final class FFmpegConversion {
     _appendResampleFilter(
       arguments,
       targetSampleRate: targetSampleRate,
-      outputSampleFormat: _sampleFormat('pcm', targetBitDepth),
+      outputSampleFormat: _sampleFormat('pcm', outputBitDepth),
+      outputBitDepth: outputBitDepth,
       processing: processing,
     );
     arguments.addAll(['-c:a', codec, '-map_metadata', '-1']);
@@ -504,7 +530,8 @@ abstract final class FFmpegConversion {
       '${container.toUpperCase()} (${use24 ? 24 : 16}-bit'
       '${targetSampleRate != null ? ', ${targetSampleRate}Hz' : ''}'
       '${processing.hasDither ? ', dither=${processing.normalizedDither}' : ''}'
-      '${processing.normalizedResampler != 'swr' ? ', resampler=${processing.normalizedResampler}' : ''})',
+      '${processing.normalizedResampler != 'swr' ? ', resampler=${processing.normalizedResampler}' : ''}'
+      '${processing.hasDefaultResamplerQuality ? '' : ', quality=${processing.normalizedResamplerQuality}'})',
     );
     final result = await FFmpegExecution.arguments(arguments);
     if (!result.success) {

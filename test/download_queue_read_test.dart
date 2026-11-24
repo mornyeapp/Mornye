@@ -224,8 +224,8 @@ void main() {
     ''');
       final expected = await database.query(
         'download_queue_items',
-        where: 'status IN (?, ?, ?, ?)',
-        whereArgs: ['queued', 'downloading', 'finalizing', 'skipped'],
+        where: 'status IN (?, ?, ?, ?, ?)',
+        whereArgs: ['queued', 'downloading', 'finalizing', 'skipped', 'failed'],
         orderBy: 'created_at ASC, rowid ASC',
       );
       final reads = _Reads();
@@ -234,7 +234,7 @@ void main() {
             databaseOverride: _RecordingDatabase(database, reads),
           );
       expect(actual, expected);
-      expect(actual, hasLength(1400));
+      expect(actual, hasLength(1750));
       expect(reads.transactions, 1);
       expect(reads.sizes.first, 257);
       expect(reads.sizes.skip(1).every((size) => size <= 256), isTrue);

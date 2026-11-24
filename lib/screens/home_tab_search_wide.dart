@@ -43,20 +43,31 @@ extension _HomeTabSearchWideUI on _HomeTabState {
         ?.id;
 
     final hasActualData = tracks.isNotEmpty;
+    // The results fade in once over the skeleton's place; a new search
+    // shows the skeleton again, while results that refine keep the stage.
+    Widget reveal({required bool loading, required Widget sliver}) =>
+        LoadedSliverFadeIn(
+          key: const ValueKey('wide-search-results'),
+          loading: loading,
+          sliver: sliver,
+        );
     if (!hasActualData && isLoading) {
       return [
-        SliverToBoxAdapter(
-          child: HomeSearchSkeleton(
-            layout: switch (overview
-                ? 'all'
-                : canonicalExtensionSearchFilterId(displayFilter)) {
-              'all' => HomeSearchSkeletonLayout.overview,
-              'artist' => HomeSearchSkeletonLayout.artistGrid,
-              'track' ||
-              'album' ||
-              'playlist' => HomeSearchSkeletonLayout.coverGrid,
-              _ => HomeSearchSkeletonLayout.rows,
-            },
+        reveal(
+          loading: true,
+          sliver: SliverToBoxAdapter(
+            child: HomeSearchSkeleton(
+              layout: switch (overview
+                  ? 'all'
+                  : canonicalExtensionSearchFilterId(displayFilter)) {
+                'all' => HomeSearchSkeletonLayout.overview,
+                'artist' => HomeSearchSkeletonLayout.artistGrid,
+                'track' ||
+                'album' ||
+                'playlist' => HomeSearchSkeletonLayout.coverGrid,
+                _ => HomeSearchSkeletonLayout.rows,
+              },
+            ),
           ),
         ),
       ];
@@ -83,7 +94,6 @@ extension _HomeTabSearchWideUI on _HomeTabState {
     // provider does not supply a relevance ranking across different types.
     final topResults = overview && context.isMornye;
 
-    // Songs are covers too, as the other kinds are.
     void addSongs() {
       final isInHistory = _watchSearchHistory(resultsRef, songs);
       final songFilter = overview ? filterFor('track') : null;
@@ -233,7 +243,9 @@ extension _HomeTabSearchWideUI on _HomeTabState {
     if (!songsAdded && songs.isNotEmpty) addSongs();
 
     slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 16)));
-    return slivers;
+    return [
+      reveal(loading: false, sliver: SliverMainAxisGroup(slivers: slivers)),
+    ];
   }
 
   /// Which results fill the preview cards: a song first, then the first
@@ -632,7 +644,6 @@ class _SearchSongCoverCell extends ConsumerWidget {
 
   final Track track;
 
-  /// The side of the cover.
   final double extent;
   final bool isInHistory;
   final bool showLocalLibraryIndicator;
@@ -744,7 +755,12 @@ class _SearchSongCoverCell extends ConsumerWidget {
                     PositionedDirectional(
                       start: 4,
                       bottom: 4,
-                      child: PreviewButton(track: track, size: 28, dense: true),
+                      child: PreviewButton(
+                        track: track,
+                        size: 28,
+                        dense: true,
+                        overArtwork: true,
+                      ),
                     ),
                     if (isInLocalLibrary)
                       const PositionedDirectional(
@@ -796,7 +812,6 @@ class _SearchCoverCell extends StatelessWidget {
 
   final Track item;
 
-  /// The side of the cover.
   final double extent;
   final VoidCallback onTap;
   final VoidCallback onSaveCover;

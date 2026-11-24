@@ -45,7 +45,9 @@ extension _QueueTabSections on _QueueTabState {
     final mode =
         widget.librarySection ?? ref.read(settingsProvider).historyFilterMode;
     return mode == 'playlists'
-        ? librarySortModes.where((sort) => !sort.startsWith('size-'))
+        ? librarySortModes.where(
+            (sort) => !sort.startsWith('size-') && !sort.startsWith('year-'),
+          )
         : librarySortModes;
   }
 
@@ -61,6 +63,8 @@ extension _QueueTabSections on _QueueTabState {
       'artist-desc' => l10n.searchSortArtistZA,
       'album-asc' => l10n.libraryFilterSortAlbumAsc,
       'album-desc' => l10n.libraryFilterSortAlbumDesc,
+      'year-asc' => l10n.libraryFilterSortYearAsc,
+      'year-desc' => l10n.libraryFilterSortYearDesc,
       'release-newest' => l10n.searchSortDateNewest,
       'release-oldest' => l10n.searchSortDateOldest,
       'genre-asc' => l10n.libraryFilterSortGenreAsc,
@@ -104,7 +108,6 @@ extension _QueueTabSections on _QueueTabState {
     return null;
   }
 
-  /// Splits [items] into runs that share a section label.
   List<_LibrarySection> _trackSections(
     BuildContext context,
     List<UnifiedLibraryItem> items,
@@ -208,7 +211,10 @@ extension _QueueTabSections on _QueueTabState {
                 'a-z' || 'z-a' => Icons.sort_by_alpha,
                 'artist-asc' || 'artist-desc' => Icons.person_outline,
                 'album-asc' || 'album-desc' => Icons.album_outlined,
-                'release-newest' || 'release-oldest' => Icons.event_outlined,
+                'year-asc' ||
+                'year-desc' ||
+                'release-newest' ||
+                'release-oldest' => Icons.event_outlined,
                 'genre-asc' || 'genre-desc' => Icons.category_outlined,
                 'size-desc' || 'size-asc' => Icons.storage_outlined,
                 _ => Icons.schedule,
@@ -224,12 +230,18 @@ extension _QueueTabSections on _QueueTabState {
   }
 
   /// Sort, filter and, given a [viewMode], the list/grid switch of a Library
-  /// page. Material 3 Expressive joins them in one connected button group
-  /// with the labels and tooltips of the separate buttons, which Mornye and
-  /// reduced motion keep.
-  List<Widget> _buildLibraryTools(BuildContext context, {String? viewMode}) {
+  /// page, led by Shuffle where [onShuffle] is given. Material 3 Expressive
+  /// joins them in one connected button group with the labels and tooltips
+  /// of the separate buttons, which Mornye and reduced motion keep.
+  List<Widget> _buildLibraryTools(
+    BuildContext context, {
+    String? viewMode,
+    VoidCallback? onShuffle,
+  }) {
     if (!materialExpressiveEnabled(context)) {
       return [
+        if (onShuffle != null)
+          _buildLibraryShuffleButton(context, onPressed: onShuffle),
         _buildSortButton(context),
         _buildFilterButton(context),
         if (viewMode != null) _buildViewModeButton(context, viewMode),
@@ -241,6 +253,12 @@ extension _QueueTabSections on _QueueTabState {
     return [
       ToolButtonGroup(
         tools: [
+          if (onShuffle != null)
+            ToolButton(
+              icon: const AppIcon(Icons.shuffle),
+              tooltip: l10n.actionShuffle,
+              onPressed: (_) => onShuffle(),
+            ),
           ToolButton(
             icon: const AppIcon(Icons.sort),
             label: _sortLabel(context, _sortMode),
@@ -273,7 +291,38 @@ extension _QueueTabSections on _QueueTabState {
     ];
   }
 
-  /// Switches song pages between the list and the cover grid.
+  /// Shuffle on the Songs page. Material shows it as one of the page's
+  /// tools: the first segment of their group ([_buildLibraryTools]), or
+  /// this plain icon button where the tools are separate buttons. Mornye
+  /// uses the gray Shuffle capsule of its collection headers, across the
+  /// page on phones.
+  Widget _buildLibraryShuffleButton(
+    BuildContext context, {
+    required VoidCallback onPressed,
+  }) {
+    final l10n = context.l10n;
+    if (context.isMornye) {
+      final button = HeaderFilledButton(
+        icon: Icons.shuffle,
+        label: l10n.actionShuffle,
+        tonal: true,
+        onPressed: onPressed,
+      );
+      final edge = 16 + wideListInset(context);
+      return Padding(
+        padding: EdgeInsets.fromLTRB(edge, 8, edge, 0),
+        child: isDesktopPlatform
+            ? Align(alignment: AlignmentDirectional.centerStart, child: button)
+            : SizedBox(width: double.infinity, child: button),
+      );
+    }
+    return AppIconButton(
+      tooltip: l10n.actionShuffle,
+      onPressed: onPressed,
+      icon: const AppIcon(Icons.shuffle),
+    );
+  }
+
   Widget _buildViewModeButton(BuildContext context, String viewMode) {
     final grid = viewMode == 'grid';
     return AppIconButton(
@@ -354,42 +403,16 @@ extension _QueueTabSections on _QueueTabState {
   /// Albums | Singles switch at the top of the Albums page.
   Widget _buildAlbumsModeToggle(BuildContext context) {
     final l10n = context.l10n;
-    final labels = [l10n.historyFilterAlbums, l10n.historyFilterSingles];
-    final selected = _albumsShowSingles ? 1 : 0;
-    final Widget toggle;
-    if (materialExpressiveEnabled(context)) {
-      toggle = MaterialExpressiveScope(
-        skipAutofocus: true,
-        child: M3EButtonGroup(
-          type: M3EButtonGroupType.connected,
-          style: M3EButtonStyle.filled,
-          // Connected segments get no inflated target; keep 48 dp.
-          size: M3EButtonSize.sm.copyWith(height: 48),
-          selectedIndex: selected,
-          selectionRequired: true,
-          onSelectedIndexChanged: (index) {
-            if (index != null) _setAlbumsShowSingles(index == 1);
-          },
-          actions: [
-            for (final label in labels)
-              M3EButtonGroupAction(label: Text(label)),
-          ],
-        ),
-      );
-    } else {
-      toggle = SegmentedButton<int>(
-        showSelectedIcon: false,
-        segments: [
-          for (final (index, label) in labels.indexed)
-            ButtonSegment(value: index, label: Text(label)),
-        ],
-        selected: {selected},
-        onSelectionChanged: (value) => _setAlbumsShowSingles(value.first == 1),
-      );
-    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Align(alignment: AlignmentDirectional.centerStart, child: toggle),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: LibraryViewToggle(
+          labels: [l10n.historyFilterAlbums, l10n.historyFilterSingles],
+          selected: _albumsShowSingles ? 1 : 0,
+          onChanged: (index) => _setAlbumsShowSingles(index == 1),
+        ),
+      ),
     );
   }
 
@@ -408,27 +431,9 @@ extension _QueueTabSections on _QueueTabState {
       builder: (context, ref, _) {
         final state = ref.watch(libraryBrowseProvider(request));
         final entries = state.value?.entries ?? const <LibraryBrowseEntry>[];
-        final sections = <_LibrarySection>[];
-        for (var i = 0; i < entries.length; i++) {
-          final label = _sectionInitial(entries[i].artist);
-          if (sections.isEmpty || sections.last.label != label) {
-            if (sections.isNotEmpty) {
-              final last = sections.removeLast();
-              sections.add(_LibrarySection(last.label, last.start, i));
-            }
-            sections.add(_LibrarySection(label, i, entries.length));
-          }
-        }
-        void openArtist(String artist) => pushPage<void>(
-          context,
-          (_) => Scaffold(
-            body: MornyeLibraryScreen(
-              page: MornyeLibraryPage.albums,
-              artist: artist,
-              onOpenSection: (_) {},
-            ),
-          ),
-        );
+        final sections = _initialSections(entries);
+        void openArtist(String artist) =>
+            pushPage<void>(context, (_) => LibraryArtistScreen(artist: artist));
         final content = CustomScrollView(
           slivers: [
             if (state.isLoading && entries.isEmpty)
@@ -466,7 +471,7 @@ extension _QueueTabSections on _QueueTabState {
                       sections: sections,
                       rowBuilder: (index, section) {
                         final entry = entries[index];
-                        return _ArtistRow(
+                        return _BrowseRow(
                           key: ValueKey('artist_${entry.key}'),
                           entry: entry,
                           first: index == section.start,
@@ -512,6 +517,96 @@ extension _QueueTabSections on _QueueTabState {
       },
     );
   }
+
+  /// Genres across downloaded and scanned music, by name under pinned
+  /// letter headers. Tapping one opens its songs.
+  Widget _buildGenresPage(BuildContext context, ColorScheme colorScheme) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(libraryGenresProvider);
+        final entries = state.value ?? const <LibraryBrowseEntry>[];
+        final sections = _initialSections(entries);
+        final content = CustomScrollView(
+          slivers: [
+            if (state.isLoading && entries.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: AppLoadingIndicator()),
+              )
+            else if (entries.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Text(
+                      context.l10n.libraryGenresEmpty,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  wideListInset(context),
+                  8,
+                  wideListInset(context),
+                  0,
+                ),
+                sliver: _LibrarySectionList(
+                  sections: sections,
+                  rowBuilder: (index, section) {
+                    final entry = entries[index];
+                    return _BrowseRow(
+                      key: ValueKey('genre_${entry.key}'),
+                      entry: entry,
+                      artist: false,
+                      first: index == section.start,
+                      last: index == section.end - 1,
+                      onTap: () => pushPage<void>(
+                        context,
+                        (_) => LibraryMixScreen.genre(genre: entry),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            const NavBarSliverSpacer(),
+          ],
+        );
+        return LibraryFastScroller(
+          topPadding: MediaQuery.paddingOf(context).top + kToolbarHeight,
+          bottomPadding: context.navBarBottomInset,
+          labelAt: (fraction) => entries.isEmpty
+              ? null
+              : _sectionInitial(
+                  entries[(fraction * (entries.length - 1)).round()].name,
+                ),
+          child: content,
+        );
+      },
+    );
+  }
+}
+
+/// Letter sections over [entries], which come sorted by name.
+List<_LibrarySection> _initialSections(List<LibraryBrowseEntry> entries) {
+  final sections = <_LibrarySection>[];
+  for (var i = 0; i < entries.length; i++) {
+    final label = _sectionInitial(entries[i].name);
+    if (sections.isEmpty || sections.last.label != label) {
+      if (sections.isNotEmpty) {
+        final last = sections.removeLast();
+        sections.add(_LibrarySection(last.label, last.start, i));
+      }
+      sections.add(_LibrarySection(label, i, entries.length));
+    }
+  }
+  return sections;
 }
 
 class _LibrarySectionList extends StatelessWidget {
@@ -595,24 +690,45 @@ class _LibrarySectionHeader extends StatelessWidget {
   }
 }
 
-class _ArtistRow extends StatelessWidget {
-  const _ArtistRow({
+/// A row of the Artists or Genres page: the artist's shaped avatar or the
+/// genre's square cover, its name and its song count.
+class _BrowseRow extends StatelessWidget {
+  const _BrowseRow({
     super.key,
     required this.entry,
     required this.first,
     required this.last,
     required this.onTap,
+    this.artist = true,
   });
 
   final LibraryBrowseEntry entry;
   final bool first;
   final bool last;
   final VoidCallback onTap;
+  final bool artist;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final cover = entry.cover;
+    final artwork = SizedBox.square(
+      dimension: 52,
+      child: cover == null || cover.isEmpty
+          ? ColoredBox(
+              color: colors.surfaceContainerHighest,
+              child: AppIcon(
+                artist ? Icons.person : Icons.category_outlined,
+                color: colors.onSurfaceVariant,
+              ),
+            )
+          : PlayerArtwork(
+              artUri: cover,
+              colorScheme: colors,
+              cacheWidth: (52 * MediaQuery.devicePixelRatioOf(context)).ceil(),
+              iconSize: 24,
+            ),
+    );
     return Padding(
       padding: EdgeInsets.fromLTRB(16, first ? 0 : 1, 16, last ? 4 : 1),
       child: Material(
@@ -625,35 +741,22 @@ class _ArtistRow extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                AppShapeClip(
-                  kind: AppShapes.artist,
-                  child: SizedBox.square(
-                    dimension: 52,
-                    child: cover == null || cover.isEmpty
-                        ? ColoredBox(
-                            color: colors.surfaceContainerHighest,
-                            child: AppIcon(
-                              Icons.person,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          )
-                        : PlayerArtwork(
-                            artUri: cover,
-                            colorScheme: colors,
-                            cacheWidth:
-                                (52 * MediaQuery.devicePixelRatioOf(context))
-                                    .ceil(),
-                            iconSize: 24,
-                          ),
+                if (artist)
+                  AppShapeClip(kind: AppShapes.artist, child: artwork)
+                else
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(
+                      context.tokens.radiusThumb,
+                    ),
+                    child: artwork,
                   ),
-                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        entry.artist,
+                        entry.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(

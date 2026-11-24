@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/swipe_commit_haptic.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 /// End-to-start swipe that removes a track row over a delete background.
@@ -30,6 +32,7 @@ class SwipeDeleteDismissible extends StatefulWidget {
 class _SwipeDeleteDismissibleState extends State<SwipeDeleteDismissible> {
   static const _threshold = 0.4;
   final _swipe = ValueNotifier<DismissUpdateDetails?>(null);
+  final _haptic = SwipeCommitHaptic();
 
   @override
   void dispose() {
@@ -46,10 +49,17 @@ class _SwipeDeleteDismissibleState extends State<SwipeDeleteDismissible> {
     final margin =
         TrackCardSegment.marginOf(context) ??
         const EdgeInsets.symmetric(horizontal: 16, vertical: 4);
+    // The fill turns at the threshold on the fast effects spring; reduced
+    // motion keeps the short dissolve.
+    final tint = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 150), Curves.linear),
+    );
     Widget background({required bool reached, required double progress}) {
       final scale = 0.7 + 0.45 * (progress / _threshold).clamp(0.0, 1.0);
       return AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: tint.duration,
+        curve: tint.curve,
         margin: margin,
         decoration: BoxDecoration(
           color: reached ? colorScheme.error : colorScheme.errorContainer,
@@ -74,7 +84,10 @@ class _SwipeDeleteDismissibleState extends State<SwipeDeleteDismissible> {
       dismissThresholds: const {DismissDirection.endToStart: _threshold},
       confirmDismiss: widget.confirmDismiss,
       onDismissed: widget.onDismissed,
-      onUpdate: expressive ? (details) => _swipe.value = details : null,
+      onUpdate: (details) {
+        _haptic.update(details.reached);
+        if (expressive) _swipe.value = details;
+      },
       background: expressive
           ? ValueListenableBuilder(
               valueListenable: _swipe,

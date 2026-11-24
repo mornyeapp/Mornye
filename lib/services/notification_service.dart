@@ -44,6 +44,7 @@ class NotificationService {
   static const String libraryScanWorkKind = 'library_scan';
   static const String updateDownloadWorkKind = 'app_update';
   int _linkTransferSequence = 0;
+  int _networkEditSequence = 0;
 
   // Kinds whose progress the Android foreground-service notification shows,
   // replacing the plugin's progress notification so only one is visible.
@@ -89,6 +90,22 @@ class NotificationService {
       title:
           _l10n?.linkHandoffSending(desktopName) ??
           'Sending this song to $desktopName...',
+    );
+    var released = false;
+    return () async {
+      if (released) return;
+      released = true;
+      await endBackgroundWork(kind);
+    };
+  }
+
+  /// Keeps one save to network storage running with the screen off. Each
+  /// save owns its lease, so finishing one cannot stop another.
+  Future<Future<void> Function()> acquireNetworkEditWork() async {
+    final kind = 'network_edit_${_networkEditSequence++}';
+    await beginBackgroundWork(
+      kind,
+      title: _l10n?.networkEditSaving ?? 'Saving to network storage',
     );
     var released = false;
     return () async {

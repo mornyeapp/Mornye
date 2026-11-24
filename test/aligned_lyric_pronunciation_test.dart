@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/widgets/aligned_lyric_pronunciation.dart';
@@ -84,6 +84,31 @@ void main() {
           time: Duration.zero,
           text: 'Original',
           romanization: 'Pronunciation',
+        ),
+      ),
+      isNull,
+    );
+  });
+
+  test('does not split right-to-left lyrics into left-to-right word boxes', () {
+    expect(
+      _layout(
+        LyricLine(
+          time: Duration.zero,
+          text: 'قطة صغيرة على الشباك',
+          words: [
+            _word('قطة ', 0, 400),
+            _word('صغيرة ', 400, 800),
+            _word('على ', 800, 1200),
+            _word('الشباك', 1200, 1600),
+          ],
+          romanization: 'qitta saghira ala ashubbak',
+          romanizationWords: [
+            _word('qitta ', 0, 400),
+            _word('saghira ', 400, 800),
+            _word('ala ', 800, 1200),
+            _word('ashubbak', 1200, 1600),
+          ],
         ),
       ),
       isNull,

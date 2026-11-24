@@ -557,8 +557,16 @@ final class RustCoreBackend: CoreBackend {
 
     func editFileMetadata(path: String, metadataJson: String) throws -> String {
         let fields = try JSONSerialization.jsonObject(with: Data(metadataJson.utf8), options: [.fragmentsAllowed]) as? [String: Any]
-        return try withMediaFiles([path, fields?["cover_path"] as? String ?? ""]) {
-            try $0.editFileMetadata(path: mediaPath(path), metadataJson: metadataJson, lease: nil)
+        let cover = fields?["cover_path"] as? String ?? ""
+        var resolved = metadataJson
+        // The cover's folder is granted under its standardized spelling, which
+        // drops /private from a temporary path; the cover must use it too.
+        if var object = fields, cover.hasPrefix("/") {
+            object["cover_path"] = mediaPath(cover)
+            resolved = String(decoding: try JSONSerialization.data(withJSONObject: object), as: UTF8.self)
+        }
+        return try withMediaFiles([path, cover]) {
+            try $0.editFileMetadata(path: mediaPath(path), metadataJson: resolved, lease: nil)
         }
     }
 
@@ -694,11 +702,15 @@ final class RustCoreBackend: CoreBackend {
             scope?.close()
             return nil
         case "initExtensionRepo": try initializeRepository(string("cache_dir")); return nil
-        case "getRepoRegistryUrl": return try repositoryOwner().registryUrl()
-        case "setRepoRegistryUrl": try repositoryOwner().setRegistryUrl(url: string("registry_url")); return nil
-        case "clearRepoRegistryUrl": try repositoryOwner().clearRegistryUrl(); return nil
-        case "getRepoExtensions": return try repositoryOwner().extensions(forceRefresh: args["force_refresh"] as? Bool ?? false)
-        case "downloadRepoExtension": return try repositoryOwner().download(extensionId: string("extension_id"), destinationDirectory: string("dest_dir"))
+        case "setRepoRegistryUrls":
+            guard let urls = args["registry_urls"] as? [String] else {
+                throw failure("Expected registry_urls string list")
+            }
+            try repositoryOwner().setRegistryUrls(registryUrls: urls)
+            return nil
+        case "resolveRepoRegistryUrl": return try repositoryOwner().resolveRegistryUrl(registryUrl: string("registry_url"))
+        case "getRepoCatalog": return try repositoryOwner().catalog(forceRefresh: args["force_refresh"] as? Bool ?? false)
+        case "downloadRepoExtension": return try repositoryOwner().download(extensionId: string("extension_id"), destinationDirectory: string("dest_dir"), registryUrl: string("registry_url"))
         case "cleanupExtensions": shutdownOwner(); return nil
         case "buildFilename": return try buildFilename(template: string("template"), metadataJson: string("metadata", "{}"))
         case "sanitizeFilename": return sanitizeFilename(filename: string("filename"))

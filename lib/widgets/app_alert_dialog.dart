@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
@@ -30,33 +30,14 @@ Future<T?> showAppDialog<T>({
     );
   }
   if (materialExpressiveEnabled(context)) {
-    // Expressive: the dialog scales in on a spatial spring while an effects
-    // spring fades it, keeping opacity within range.
-    const fallback = AppMotionSpec(Duration.zero, Curves.linear);
-    final scale = AppMotion.spatial(context, fallback);
-    final fade = AppMotion.effectsFast(context, fallback);
     final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
     final themes = InheritedTheme.capture(from: context, to: navigator.context);
-    return showGeneralDialog<T>(
-      context: context,
-      barrierDismissible: barrierDismissible,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: DialogTheme.of(context).barrierColor ?? Colors.black54,
-      useRootNavigator: useRootNavigator,
-      transitionDuration: scale.duration,
-      pageBuilder: (dialogContext, _, _) =>
-          themes.wrap(SafeArea(child: Builder(builder: builder))),
-      transitionBuilder: (context, animation, _, child) => FadeTransition(
-        opacity: animation.drive(CurveTween(curve: fade.curve)),
-        child: ScaleTransition(
-          scale: animation.drive(
-            Tween<double>(
-              begin: 0.85,
-              end: 1,
-            ).chain(CurveTween(curve: scale.curve)),
-          ),
-          child: child,
-        ),
+    return navigator.push<T>(
+      _MaterialDialogRoute<T>(
+        context: context,
+        builder: (context) =>
+            themes.wrap(SafeArea(child: Builder(builder: builder))),
+        barrierDismissible: barrierDismissible,
       ),
     );
   }
@@ -163,6 +144,67 @@ class AppDialogSurface extends StatelessWidget {
   }
 }
 
+/// The expressive Material dialog: it scales in on a spatial spring while an
+/// effects spring fades it, keeping opacity within range. The exit is a
+/// short accelerating fade with no scale, rather than the spring played
+/// backwards at entrance length. A dismissal during the entrance plays the
+/// entrance back instead of jumping to the exit's start.
+class _MaterialDialogRoute<T> extends RawDialogRoute<T> {
+  _MaterialDialogRoute({
+    required BuildContext context,
+    required WidgetBuilder builder,
+    required super.barrierDismissible,
+  }) : _scale = AppMotion.spatial(context, _fallback),
+       _fade = AppMotion.effectsFast(context, _fallback),
+       super(
+         pageBuilder: (context, animation, secondaryAnimation) =>
+             builder(context),
+         barrierColor: DialogTheme.of(context).barrierColor ?? Colors.black54,
+         barrierLabel: MaterialLocalizations.of(
+           context,
+         ).modalBarrierDismissLabel,
+         transitionDuration: AppMotion.spatial(context, _fallback).duration,
+       );
+
+  static const _fallback = AppMotionSpec(Duration.zero, Curves.linear);
+
+  final AppMotionSpec _scale;
+  final AppMotionSpec _fade;
+
+  static final Animatable<double> _exitFade = Tween<double>(
+    begin: 1,
+    end: 0,
+  ).chain(CurveTween(curve: Curves.easeIn));
+
+  @override
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 150);
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => DualTransitionBuilder(
+    animation: animation,
+    forwardBuilder: (context, animation, child) => FadeTransition(
+      opacity: animation.drive(CurveTween(curve: _fade.curve)),
+      child: ScaleTransition(
+        scale: animation.drive(
+          Tween<double>(
+            begin: 0.85,
+            end: 1,
+          ).chain(CurveTween(curve: _scale.curve)),
+        ),
+        child: child,
+      ),
+    ),
+    reverseBuilder: (context, animation, child) =>
+        FadeTransition(opacity: _exitFade.animate(animation), child: child),
+    child: child,
+  );
+}
+
 class _MornyeDialogRoute<T> extends RawDialogRoute<T> {
   _MornyeDialogRoute({
     required BuildContext context,
@@ -180,10 +222,10 @@ class _MornyeDialogRoute<T> extends RawDialogRoute<T> {
          ).modalBarrierDismissLabel,
          transitionDuration: MediaQuery.disableAnimationsOf(context)
              ? Duration.zero
-             : const Duration(milliseconds: 220),
+             : MornyeMotion.fast.duration,
        );
 
-  // Use a timed exit instead of CupertinoDialogRoute's settling spring.
+  // Use a short timed exit instead of the entrance's settling spring.
   @override
   Duration get reverseTransitionDuration => transitionDuration == Duration.zero
       ? Duration.zero
@@ -201,9 +243,11 @@ class _MornyeDialogRoute<T> extends RawDialogRoute<T> {
     if (MediaQuery.disableAnimationsOf(context)) return child;
     // Keep the backdrop in the page's compositing context. A fading dialog
     // creates an opacity layer that hides the page from its BackdropFilter.
+    // It grows on the fast spring. A dismissal during the entrance keeps
+    // that curve and plays it back from where the dialog is.
     final scaleAnimation = _scaleAnimation ??= CurvedAnimation(
       parent: animation,
-      curve: Curves.easeOutCubic,
+      curve: MornyeMotion.fast.curve,
       reverseCurve: Curves.easeInCubic,
     );
     return ScaleTransition(

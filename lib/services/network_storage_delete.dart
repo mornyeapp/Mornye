@@ -33,6 +33,30 @@ extension NetworkStorageDelete on NetworkStorageService {
     return (connection: c, path: path);
   }
 
+  /// Whether [source] is a `network://` song of a host the app no longer
+  /// has: a removed connection that no virtual source owns. Adding the
+  /// server again creates another connection, so the app can never reach
+  /// that song again, and callers may drop it from their index.
+  Future<bool> isOrphanedSource(String source) async {
+    final uri = Uri.tryParse(source);
+    if (uri == null || uri.scheme != 'network' || uri.host.isEmpty) {
+      return false;
+    }
+    // A paired phone's songs have no saved connection either, and with Link
+    // off no virtual source: they come back when the phone does.
+    if (virtualFor(uri.host) != null || isLinkPhoneSourceId(uri.host)) {
+      return false;
+    }
+    try {
+      return !(await connections()).any((c) => c.id == uri.host);
+    } catch (error) {
+      NetworkStorageService._log.w(
+        'Could not read network connections: $error',
+      );
+      return false;
+    }
+  }
+
   /// Protocol capability only; the server still decides write permission.
   Future<bool> canDeleteFile(String source) async {
     try {

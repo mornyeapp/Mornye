@@ -26,6 +26,9 @@ import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/lastfm/lastfm_service.dart';
+import 'package:mornye/services/listenbrainz/listenbrainz_service.dart';
+import 'package:mornye/services/lock_screen_lyrics.dart';
+import 'package:mornye/services/media3_playback_deck.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/media_session_art_cache.dart';
@@ -43,6 +46,7 @@ import 'package:mornye/services/playback_output_volume.dart';
 import 'package:mornye/services/player_widget_service.dart';
 import 'package:mornye/services/remote_media_session.dart';
 import 'package:mornye/services/remote_playback.dart';
+import 'package:mornye/services/scrobbling/scrobbler.dart';
 import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/source_metadata_events.dart';
@@ -78,6 +82,7 @@ class PlaybackDependencies {
     this.recoverMissingFile = _recoverMissingFile,
     this.fileAccess = checkFileAccess,
     this.recoverMovedDownload = _recoverMovedDownload,
+    this.openPlaybackLease = PlatformBridge.openContentUriPlaybackLease,
     this.initializeHandler = _initializeAudioHandler,
     this.synchronizePlaybackState = _synchronizePlaybackState,
     this.createPersonalization = AutoplayPersonalization.new,
@@ -147,6 +152,9 @@ class PlaybackDependencies {
     AppSettings settings,
   )
   recoverMovedDownload;
+
+  /// Opens an Android document for the song starting to play.
+  final Future<ContentUriPlaybackLease?> Function(String uri) openPlaybackLease;
   final Future<MusicPlayerHandler> Function(MusicPlayerHandler Function())
   initializeHandler;
   final Future<void> Function() synchronizePlaybackState;
@@ -198,15 +206,27 @@ class PlaybackDependencies {
   /// The macOS app, which plays through AVPlayer like iOS.
   bool get isMacOS => _isMacOS ?? (isDesktopPlatform && Platform.isMacOS);
 
+  static int _media3Decks = 0;
+
   // Windows and Linux play through libmpv. Without the library they fall
   // back to audioplayers, which has no equalizer there. macOS plays through
-  // AVPlayer and moves to libmpv for exclusive output (hog mode).
+  // AVPlayer and moves to libmpv for exclusive output (hog mode). Android
+  // moves ordinary sources to media3 while its beta engine is on.
   static PlaybackDeck _createDeck(String playerId) {
     if (playbackEngine == PlaybackEngine.mediaKit &&
         MediaKitPlaybackDeck.isAvailable) {
       return MediaKitPlaybackDeck(playerId: playerId);
     }
     final shared = AudioplayersPlaybackDeck(playerId: playerId);
+    if (!isDesktopPlatform && defaultTargetPlatform == TargetPlatform.android) {
+      return Media3EngineDeck(
+        audioplayers: shared,
+        // A fresh native id each time, so a player still being released
+        // never shares one with its successor.
+        createMedia3: () =>
+            Media3PlaybackDeck(playerId: '$playerId-media3-${_media3Decks++}'),
+      );
+    }
     if (!isDesktopPlatform || defaultTargetPlatform != TargetPlatform.macOS) {
       return shared;
     }
@@ -223,7 +243,9 @@ class PlaybackDependencies {
   ) => CastPlaybackDeck(output: output, metadata: metadata);
 
   // Previews follow the in-app volume on desktop. Mobile previews keep
-  // playing without the equalizer.
+  // playing without the equalizer, and on Android through audioplayers
+  // whichever engine the music player uses: they are short streamed clips,
+  // and a second media3 player would only add one more output to manage.
   static PlaybackDeck _createPreviewDeck(String playerId) => isDesktopPlatform
       ? _createDeck(playerId)
       : AudioplayersPlaybackDeck(playerId: playerId, equalizerAvailable: false);
@@ -274,6 +296,8 @@ class PlaybackDependencies {
     // MPRIS on Linux and SMTC on Windows; other OSes keep the plugin and
     // send it only the states their sessions cannot advance themselves.
     installDesktopMediaSession();
+    // Under the filter, so lyrics replace the title for the system alone.
+    installLockScreenLyrics();
     installMediaSessionFilter();
     late final MusicPlayerHandler handler;
     final session = await AudioService.init(
@@ -307,8 +331,13 @@ class MusicPlayerRuntime {
   }) : _settings = settings;
 
   final PlaybackDependencies dependencies;
-  LastfmService? _lastfm;
+  LastfmService? _lastfm, _librefm;
+  ListenBrainzService? _listenBrainz;
   LastfmService get lastfm => _lastfm ??= LastfmService();
+  LastfmService get librefm => _librefm ??= LastfmService.librefm();
+  ListenBrainzService get listenBrainz =>
+      _listenBrainz ??= ListenBrainzService();
+  List<Scrobbler?> get _createdScrobblers => [_lastfm, _librefm, _listenBrainz];
   AutoplayPersonalization? _personalization;
   // What learning observes also teaches [taste] what plays together and
   // [ranker] how much each part of a score counts.
@@ -346,6 +375,7 @@ class MusicPlayerRuntime {
   Future<void> Function()? exclusiveAudioHook;
   RemotePlayback? _remote;
   RemoteMediaSession? _remoteSession;
+  bool _soundsBesideRemote = false;
   final _arriving = <String, ({String url, Future<void> done})>{};
   bool _coversPrepared = false;
   static const _coverTrimDelay = Duration(minutes: 2);
@@ -407,10 +437,41 @@ class MusicPlayerRuntime {
     playbackExclusiveOutput.value = exclusive;
   }
 
-  void configure(AppSettings settings) {
+  /// The settings [configure] was given last, before [_override].
+  AppSettings? _requested;
+  AppSettings Function(AppSettings settings)? _override;
+
+  /// Plays with [override] applied to every settings snapshot until it is
+  /// cleared with null, without saving anything: a crash or restart forgets
+  /// it. Mornye Link Play together switches off what cannot stay in step.
+  void overrideSettings(AppSettings Function(AppSettings settings)? override) {
+    _override = override;
+    configure(_requested ?? _settings);
+  }
+
+  void configure(AppSettings requested) {
+    _requested = requested;
+    final settings = _override?.call(requested) ?? requested;
     final previous = _settings;
     _settings = settings;
     _configureExclusiveOutput(settings);
+    // The decks read it as each song loads.
+    playbackMedia3Engine.value =
+        settings.media3Engine && dependencies.isAndroid;
+    // AutoMix times its fades and beat matching on the clock, which silence
+    // skipping would outrun.
+    playbackSkipSilence.value =
+        settings.skipSilence &&
+        settings.media3Engine &&
+        !settings.autoMix &&
+        dependencies.isAndroid;
+    playbackSpatialAudio.value = settings.spatialAudio;
+    playbackSpeed.value = settings.playbackSpeed;
+    playbackPitch.value = PlaybackPitch(
+      semitones: settings.playbackPitch,
+      followsRate: !settings.playbackKeepPitch,
+    );
+    configureLockScreenLyrics(enabled: settings.lockScreenLyrics);
     _songAnalysis?.configure(settings);
     _handler?.applySettings(previous);
     if (previous.playerMode == 'internal' &&
@@ -553,7 +614,9 @@ class MusicPlayerRuntime {
 
   void detach(MusicPlayerHandler handler) {
     if (!identical(_handler, handler)) return;
-    _lastfm?.bind(null);
+    for (final scrobbler in _createdScrobblers) {
+      scrobbler?.bind(null);
+    }
     _unsubscribeSourceDeletion?.call();
     _unsubscribeSourceDeletion = null;
     _unsubscribeSourceMetadata?.call();
@@ -600,8 +663,9 @@ class MusicPlayerRuntime {
       if (dependencies.isAndroid || dependencies.isIOS || isDesktopPlatform) {
         DiscordPresenceService.instance.bind(handler);
       }
-      if (isDesktopPlatform) {
-        lastfm.bind(
+      // Every service counts the same listen and keeps its own queue.
+      for (final scrobbler in <Scrobbler>[lastfm, librefm, listenBrainz]) {
+        scrobbler.bind(
           handler,
           unknownTitle: () => unknownTitle,
           unknownArtist: () => unknownArtist,
@@ -682,7 +746,15 @@ class MusicPlayerRuntime {
             remote,
             local: system.local,
             onLocal: () => _showSession(null),
+            ownVolume: _soundsBesideRemote,
           );
+  }
+
+  /// Whether this device sounds too while a remote one is shown, as when
+  /// the two play together: the system volume keys then stay on this device.
+  set soundsBesideRemote(bool value) {
+    _soundsBesideRemote = value;
+    _remoteSession?.ownVolume = value;
   }
 
   /// The default runtime lives for the app lifetime. Scoped runtimes close
@@ -698,7 +770,10 @@ class MusicPlayerRuntime {
     _remoteSession?.dispose();
     _remoteSession = null;
     await _handler?.dispose();
-    await _lastfm?.close();
+    await Future.wait([
+      for (final scrobbler in _createdScrobblers)
+        if (scrobbler != null) scrobbler.close(),
+    ]);
     try {
       await _initFuture;
     } catch (_) {

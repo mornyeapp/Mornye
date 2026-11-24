@@ -13,6 +13,7 @@ mod ffmpeg;
 mod filename;
 mod hires;
 mod library_metadata;
+mod link;
 mod logging;
 mod lyrics;
 mod manager;

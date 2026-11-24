@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
+import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/theme/mornye_icons.dart';
@@ -39,6 +40,12 @@ import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/utils/provider_resource_ids.dart';
 import 'package:mornye/utils/ttl_cache.dart';
 import 'package:mornye/screens/album_screen.dart';
+import 'package:mornye/screens/downloaded_album_screen.dart';
+import 'package:mornye/screens/local_album_screen.dart';
+import 'package:mornye/services/artist_snapshot_store.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/library_database.dart';
+import 'package:mornye/utils/logger.dart';
 import 'package:mornye/screens/extension_collection_screens.dart'
     show ExtensionAlbumScreen;
 import 'package:mornye/controllers/clickable_metadata.dart';
@@ -64,12 +71,16 @@ import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/detail_header.dart';
+import 'package:mornye/widgets/desktop/hover_play_button.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 
+part 'artist_albums_page.dart';
 part 'artist_screen_widgets.dart';
 part 'artist_screen_discography.dart';
+
+final _log = AppLogger('ArtistScreen');
 
 class _ArtistCache {
   static final _cache = TtlCache<_CacheEntry>(
@@ -142,9 +153,13 @@ class ArtistScreen extends ConsumerStatefulWidget {
   final String? albumsNext;
   final int? monthlyListeners;
   final List<ArtistAlbum>? albums;
+  final List<ArtistAlbum>? releases;
   final List<Track>? topTracks;
   final List<ArtistConcert> concerts;
   final String? extensionId;
+
+  /// The data above came from [ArtistSnapshotStore], not from the provider.
+  final bool savedCopy;
 
   const ArtistScreen({
     super.key,
@@ -157,9 +172,11 @@ class ArtistScreen extends ConsumerStatefulWidget {
     this.albumsNext,
     this.monthlyListeners,
     this.albums,
+    this.releases,
     this.topTracks,
     this.concerts = const [],
     this.extensionId,
+    this.savedCopy = false,
   });
 
   @override
@@ -185,6 +202,12 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
   String? _error;
 
   final _showTitleInAppBar = ValueNotifier(false);
+
+  /// The page shows an [ArtistSnapshot] because the provider failed.
+  bool _savedCopy = false;
+
+  /// Bumped for a shelf's grid, which sits on its own route above this page.
+  final _albumsChanged = ValueNotifier(0);
   final ScrollController _scrollController = ScrollController();
   final PageController _popularPageController = PageController();
   final SelectionOverlayController _selectionOverlay =
@@ -262,6 +285,8 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
 
     if (widget.albums != null) {
       _albums = sortArtistAlbumsNewestFirst(widget.albums!);
+      _releases = widget.releases;
+      _savedCopy = widget.savedCopy;
       _topTracks = widget.topTracks;
       _headerImageUrl = widget.headerImageUrl;
       _headerVideoUrl = widget.headerVideoUrl;
@@ -271,6 +296,8 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
 
       if (_topTracks == null || _topTracks!.isEmpty) {
         _fetchDiscography();
+      } else {
+        _saveSnapshot();
       }
     } else if (cached != null) {
       _albums = sortArtistAlbumsNewestFirst(cached.albums);
@@ -297,6 +324,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
 
   @override
   void dispose() {
+    _albumsChanged.dispose();
     _selectionOverlay.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
@@ -441,17 +469,100 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
           _albumsPageError = null;
           _monthlyListeners = finalListeners;
           _error = null;
+          _savedCopy = false;
           _isLoadingDiscography = false;
         });
+        _saveSnapshot();
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
+      final saved = await ArtistSnapshotStore.instance.read(widget.artistName);
+      if (!mounted) return;
+      setState(() {
+        if (saved != null && saved.artistId == widget.artistId) {
+          _showSavedCopy(saved);
+        } else {
           _error = context.friendlyError(e);
-          _isLoadingDiscography = false;
-        });
-      }
+        }
+        _isLoadingDiscography = false;
+      });
     }
+  }
+
+  void _showSavedCopy(ArtistSnapshot saved) {
+    _savedCopy = true;
+    _albums = sortArtistAlbumsNewestFirst(saved.albums);
+    _releases = saved.releases == null
+        ? null
+        : sortArtistAlbumsNewestFirst(saved.releases!);
+    _topTracks = saved.topTracks;
+    _headerImageUrl = saved.headerImageUrl ?? _headerImageUrl;
+    _headerLogoUrl = saved.headerLogoUrl ?? _headerLogoUrl;
+    _monthlyListeners = saved.monthlyListeners ?? _monthlyListeners;
+  }
+
+  void _saveSnapshot() {
+    final albums = _albums;
+    if (_savedCopy || albums == null || albums.isEmpty) return;
+    unawaited(
+      ArtistSnapshotStore.instance.save(
+        ArtistSnapshot(
+          artistId: widget.artistId,
+          artistName: widget.artistName,
+          extensionId: widget.extensionId,
+          coverUrl: widget.coverUrl,
+          albums: albums,
+          releases: _releases,
+          topTracks: _topTracks,
+          headerImageUrl: _headerImageUrl,
+          headerLogoUrl: _headerLogoUrl,
+          monthlyListeners: _monthlyListeners,
+        ),
+      ),
+    );
+  }
+
+  /// Opens a saved page's album from this device when it is there, since
+  /// the provider cannot be reached.
+  Future<bool> _openLibraryAlbum(ArtistAlbum album) async {
+    try {
+      for (final artist in {widget.artistName, album.artists}) {
+        final downloaded = await HistoryDatabase.instance.getAlbumTracks(
+          album.name,
+          artist,
+        );
+        if (!mounted) return true;
+        if (downloaded.isNotEmpty) {
+          await pushPage<void>(
+            context,
+            (_) => DownloadedAlbumScreen(
+              albumName: album.name,
+              artistName: artist,
+              coverUrl: album.coverUrl,
+            ),
+          );
+          return true;
+        }
+        final local = await LibraryDatabase.instance.getQueueLocalAlbumTracks(
+          album.name,
+          artist,
+        );
+        if (!mounted) return true;
+        if (local.isNotEmpty) {
+          await pushPage<void>(
+            context,
+            (_) => LocalAlbumScreen(
+              albumName: album.name,
+              artistName: artist,
+              tracks: local.map(LocalLibraryItem.fromJson).toList(),
+            ),
+          );
+          return true;
+        }
+      }
+    } catch (error) {
+      _log.w('Could not look up a saved album: ${error.runtimeType}');
+    }
+    return false;
   }
 
   bool _onAlbumsScroll(ScrollNotification notification) {
@@ -462,13 +573,17 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
     };
     if (advancing &&
         notification.metrics.extentAfter < 480 &&
-        !_isLoadingDiscography &&
         !isSelectionMode) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _loadMoreAlbums();
-      });
+      _requestMoreAlbums();
     }
     return false;
+  }
+
+  void _requestMoreAlbums() {
+    if (_isLoadingDiscography) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadMoreAlbums();
+    });
   }
 
   Future<void> _loadMoreAlbums() async {
@@ -485,6 +600,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
       _isLoadingMoreAlbums = true;
       _albumsPageError = null;
     });
+    _albumsChanged.value++;
     try {
       final result = await PlatformBridge.getProviderMetadata(
         provider,
@@ -527,7 +643,10 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
         });
       }
     } finally {
-      if (mounted) setState(() => _isLoadingMoreAlbums = false);
+      if (mounted) {
+        setState(() => _isLoadingMoreAlbums = false);
+        _albumsChanged.value++;
+      }
     }
   }
 
@@ -617,6 +736,13 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
         .where((a) => a.albumType == 'compilation')
         .toList(growable: false);
   }
+
+  /// Reads a bucket for a page that outlives this page's next build.
+  List<ArtistAlbum> Function() _bucket(List<ArtistAlbum> Function() read) =>
+      () {
+        _ensureAlbumBuckets(_albums ?? const []);
+        return read();
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -711,6 +837,25 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
                             ),
                           ),
                         if (!_isLoadingDiscography && _error == null) ...[
+                          if (_savedCopy)
+                            SliverToBoxAdapter(
+                              key: const ValueKey('artist-saved-copy'),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  12,
+                                  16,
+                                  0,
+                                ),
+                                child: Text(
+                                  context.l10n.artistSavedCopyNotice,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                ),
+                              ),
+                            ),
                           if (isDesktopPlatform && context.isMornye)
                             if (albums.isNotEmpty ||
                                 (_topTracks?.isNotEmpty ?? false))
@@ -754,6 +899,8 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
                                 context.l10n.artistReleases,
                                 releases,
                                 colorScheme,
+                                listing: () =>
+                                    _releases ?? const <ArtistAlbum>[],
                               ),
                             ),
                           if (albumsOnly.isNotEmpty)
@@ -764,6 +911,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
                                 context.l10n.artistAlbums,
                                 albumsOnly,
                                 colorScheme,
+                                listing: _bucket(() => _albumsOnlyBucket),
                               ),
                             ),
                           if (singles.isNotEmpty)
@@ -774,6 +922,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
                                 context.l10n.artistSingles,
                                 singles,
                                 colorScheme,
+                                listing: _bucket(() => _singlesBucket),
                                 showTypeBadge: true,
                               ),
                             ),
@@ -785,6 +934,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
                                 context.l10n.artistCompilations,
                                 compilations,
                                 colorScheme,
+                                listing: _bucket(() => _compilationsBucket),
                               ),
                             ),
                         ],

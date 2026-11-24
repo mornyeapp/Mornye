@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -49,7 +49,6 @@ class LibraryTrackConversionResult {
 
   const LibraryTrackConversionResult.success() : this._();
 
-  /// Pipeline stage that was running when the conversion failed.
   final String? failureStage;
   final Object? error;
   final StackTrace? stackTrace;

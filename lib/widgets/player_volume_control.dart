@@ -1,17 +1,20 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_slider.dart';
 import 'package:mornye/widgets/desktop/desktop_volume_scroll.dart';
 import 'package:mornye/widgets/mornye_player_slider.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/loud_volume_guard.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 
 export 'package:mornye/providers/system_volume_provider.dart';
@@ -35,6 +38,54 @@ class _PlayerVolumeControlState extends ConsumerState<PlayerVolumeControl> {
   double? _pendingVolume;
   bool _dragging = false;
   bool _writing = false;
+  final _loud = LoudVolumeGuard();
+
+  /// The volume the platform last reported, kept by [build].
+  double? _volume;
+
+  void _startGesture() {
+    _dragging = true;
+    _loud.startGesture();
+  }
+
+  /// A change made on the bar, including one it sends to a paired device.
+  /// With Confirm loud volume on, a move past the level stops there and
+  /// asks. Volume buttons and commands from a paired device never come
+  /// through here.
+  void _request(double value) {
+    final settings = ref.read(settingsProvider);
+    final level = settings.confirmLoudVolume
+        ? settings.loudVolumeLevel / 100
+        : null;
+    final step = _loud.request(
+      from: _preview ?? _volume ?? value,
+      to: value,
+      level: level,
+    );
+    _setVolume(step.value);
+    if (step.ask) unawaited(_confirmLoud(level!));
+  }
+
+  /// The end of a touch repeats a value the bar already had: the last one it
+  /// reported, or on the expressive slider the one it was given, which can
+  /// be a frame old. While asking, the guard already holds the finger's.
+  void _end(double value) {
+    if (!_loud.asking) _request(value);
+  }
+
+  Future<void> _confirmLoud(double level) async {
+    final l10n = context.l10n;
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: l10n.confirmLoudVolumeTitle,
+      message: l10n.confirmLoudVolumeMessage('${(level * 100).round()}%'),
+      confirmLabel: l10n.confirmLoudVolumeContinue,
+      cancelIsDefault: true,
+      filled: false,
+    );
+    final target = _loud.answer(confirmed: confirmed);
+    if (target != null && mounted) _setVolume(target);
+  }
 
   void _setVolume(double value) {
     setState(() => _preview = value);
@@ -44,7 +95,9 @@ class _PlayerVolumeControlState extends ConsumerState<PlayerVolumeControl> {
 
   Future<void> _flushVolume() async {
     _writing = true;
-    final remote = ref.read(activeRemotePlaybackProvider);
+    final remote = ref.read(soundsBesideRemoteProvider)
+        ? null
+        : ref.read(activeRemotePlaybackProvider);
     final write = remote == null
         ? ref.read(systemVolumeWriterProvider)
         : remote.setVolume;
@@ -74,8 +127,10 @@ class _PlayerVolumeControlState extends ConsumerState<PlayerVolumeControl> {
   @override
   Widget build(BuildContext context) {
     // While another device plays in this one's place, the slider sets its
-    // volume.
-    final remote = ref.watch(activeRemotePlaybackProvider) != null;
+    // volume. While this one sounds too, it sets this one's.
+    final remote =
+        ref.watch(activeRemotePlaybackProvider) != null &&
+        !ref.watch(soundsBesideRemoteProvider);
     final usb = remote
         ? null
         : ref.watch(usbVolumeProvider).value ?? usbHardwareVolume.value;
@@ -86,6 +141,7 @@ class _PlayerVolumeControlState extends ConsumerState<PlayerVolumeControl> {
         : usb.available
         ? usb.fraction
         : null;
+    _volume = volume;
     final value = (_preview ?? volume ?? 0).clamp(0.0, 1.0);
     String percentage(double volume) => '${(volume * 100).round()}%';
     final control = Semantics(
@@ -104,10 +160,16 @@ class _PlayerVolumeControlState extends ConsumerState<PlayerVolumeControl> {
           : percentage((value - 0.05).clamp(0, 1)),
       onIncrease: volume == null
           ? null
-          : () => _setVolume((value + 0.05).clamp(0, 1)),
+          : () {
+              _loud.startGesture();
+              _request((value + 0.05).clamp(0, 1));
+            },
       onDecrease: volume == null
           ? null
-          : () => _setVolume((value - 0.05).clamp(0, 1)),
+          : () {
+              _loud.startGesture();
+              _request((value - 0.05).clamp(0, 1));
+            },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 28),
         child: !context.isMornye
@@ -134,11 +196,11 @@ class _PlayerVolumeControlState extends ConsumerState<PlayerVolumeControl> {
                             inactiveColor: widget.foreground.withValues(
                               alpha: 0.12,
                             ),
-                            onChangeStart: (_) => _dragging = true,
-                            onChanged: _setVolume,
+                            onChangeStart: (_) => _startGesture(),
+                            onChanged: _request,
                             onChangeEnd: (value) {
                               _dragging = false;
-                              _setVolume(value);
+                              _end(value);
                             },
                           ),
                         ),
@@ -186,7 +248,7 @@ class _PlayerVolumeControlState extends ConsumerState<PlayerVolumeControl> {
             child: Opacity(
               opacity: enabled ? 1 : 0.4,
               child: Listener(
-                onPointerDown: (_) => _dragging = true,
+                onPointerDown: (_) => _startGesture(),
                 onPointerUp: (_) => release(),
                 onPointerCancel: (_) => release(),
                 child: AppSlider(
@@ -195,8 +257,8 @@ class _PlayerVolumeControlState extends ConsumerState<PlayerVolumeControl> {
                   trackThickness: 4,
                   thumbLength: 20,
                   value: value,
-                  onChanged: enabled ? _setVolume : null,
-                  onChangeEnd: _setVolume,
+                  onChanged: enabled ? _request : null,
+                  onChangeEnd: _end,
                 ),
               ),
             ),

@@ -10,6 +10,7 @@
 //! [`LinkServer`] owns its own Tokio runtime. Start and stop it from a plain
 //! thread (the desktop worker pool), not from inside an async task.
 
+pub mod bridge;
 pub mod catalog;
 pub mod subsonic;
 pub mod types;
@@ -20,6 +21,7 @@ mod files;
 mod mdns;
 mod pairing;
 mod server;
+mod source;
 mod store;
 mod tls;
 mod ws;
@@ -104,6 +106,7 @@ impl LinkServer {
                 timeout: tuning.request_timeout,
             }),
             catalog: RwLock::new(Arc::new(Catalog::empty())),
+            leases: Default::default(),
         });
         let state = Arc::new(State {
             shared,
@@ -124,6 +127,7 @@ impl LinkServer {
                 state.name(),
                 &state.shared.server_id,
                 &state.fingerprint,
+                &state.shared.config.platform,
                 local.port(),
             ) {
                 Ok(advertiser) => (Some(advertiser), None),
@@ -190,16 +194,18 @@ impl LinkServer {
     pub fn set_catalog(&self, path: &Path) -> Result<Value, String> {
         let catalog = Catalog::load(path)?;
         let songs = catalog.song_count();
-        let version = {
+        let (version, previous) = {
             let mut current = self
                 .state
                 .shared
                 .catalog
                 .write()
                 .unwrap_or_else(PoisonError::into_inner);
-            *current = Arc::new(catalog);
-            self.state.catalog_version.fetch_add(1, Ordering::SeqCst) + 1
+            let previous = std::mem::replace(&mut *current, Arc::new(catalog));
+            let version = self.state.catalog_version.fetch_add(1, Ordering::SeqCst) + 1;
+            (version, previous)
         };
+        drop(previous);
         let message = json!({"type": "catalog.changed", "version": version, "songs": songs});
         self.state.clients.send(None, &message.to_string());
         Ok(json!({"songs": songs, "version": version}))

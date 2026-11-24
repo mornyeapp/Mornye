@@ -66,7 +66,8 @@ impl ExtensionManager {
                 enabled,
                 error: String::new(),
             }),
-            engine: Mutex::default(),
+            compiled: Mutex::default(),
+            engine: EngineLock::default(),
             downloads: Mutex::default(),
         })
     }

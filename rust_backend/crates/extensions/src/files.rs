@@ -634,8 +634,11 @@ impl FilePath {
         for _ in 0..8 {
             let mut nonce = [0; 16];
             getrandom::fill(&mut nonce).map_err(|error| io::Error::other(error.to_string()))?;
+            // No leading dot: Samba and NTFS drivers with hide_dot_files mark a
+            // dot name hidden when it is created, and the rename keeps that on
+            // the song. Scanners skip the `.partial` suffix instead.
             let name = format!(
-                ".mornye-{}.partial",
+                "mornye-{}.partial",
                 crate::binary::encode(&nonce, "hex").expect("hex encoding")
             );
             #[cfg(unix)]

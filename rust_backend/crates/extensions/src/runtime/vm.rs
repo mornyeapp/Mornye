@@ -133,6 +133,33 @@ pub(crate) struct CompiledSource {
     pub(super) bytecode: OnceLock<Vec<u8>>,
 }
 
+#[cfg(test)]
+static SOURCE_COMPILES: std::sync::Mutex<Vec<(Arc<str>, usize)>> =
+    std::sync::Mutex::new(Vec::new());
+
+#[cfg(test)]
+fn record_compile(source: &str) {
+    let mut compiles = SOURCE_COMPILES.lock().expect("source compile counter");
+    match compiles
+        .iter_mut()
+        .find(|(known, _)| known.as_ref() == source)
+    {
+        Some((_, count)) => *count += 1,
+        None => compiles.push((source.into(), 1)),
+    }
+}
+
+/// Extension source compilations since the test binary started.
+#[cfg(test)]
+pub(crate) fn source_compiles(source: &str) -> usize {
+    SOURCE_COMPILES
+        .lock()
+        .expect("source compile counter")
+        .iter()
+        .find(|(known, _)| known.as_ref() == source)
+        .map_or(0, |(_, count)| *count)
+}
+
 fn builtin_factory<'js>(
     ctx: &Ctx<'js>,
     source: &'static str,
@@ -166,6 +193,10 @@ fn eval_cached<'js>(
             )
         }
     } else {
+        #[cfg(test)]
+        if !strict {
+            record_compile(source);
+        }
         let mut source = source.as_bytes().to_vec();
         source.push(0);
         let flags = qjs::JS_EVAL_TYPE_GLOBAL

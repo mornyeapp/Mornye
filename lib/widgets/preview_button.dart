@@ -1,11 +1,12 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/preview_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
@@ -17,11 +18,16 @@ class PreviewButton extends ConsumerWidget {
   /// A 32dp pointer target for desktop table rows.
   final bool dense;
 
+  /// On a cover, where a bare outline gets lost in the artwork: Material
+  /// shows its filled icon button, in every state.
+  final bool overArtwork;
+
   const PreviewButton({
     super.key,
     required this.track,
     this.size = 24,
     this.dense = false,
+    this.overArtwork = false,
   });
 
   BoxConstraints get _constraints => dense
@@ -56,6 +62,7 @@ class PreviewButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final filled = overArtwork && !context.isMornye;
 
     // When the built-in player is currently on this track, mirror and control
     // it (consistent with the mini player) rather than the preview snippet.
@@ -66,6 +73,17 @@ class PreviewButton extends ConsumerWidget {
     );
     if (isCurrentMainTrack) {
       final isPlaying = ref.watch(playbackPlayingProvider);
+      if (filled) {
+        return AppIconButton.filled(
+          icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+          tooltip: isPlaying
+              ? context.l10n.previewStop
+              : context.l10n.previewPlay,
+          onPressed: () => ref
+              .read(musicPlayerControllerProvider)
+              .togglePlayPause(isPlaying),
+        );
+      }
       return AppIconButton(
         iconSize: size,
         padding: EdgeInsets.zero,
@@ -98,6 +116,28 @@ class PreviewButton extends ConsumerWidget {
             : PreviewStatus.idle,
       ),
     );
+
+    if (filled) {
+      return AppIconButton.filled(
+        icon: switch (status) {
+          PreviewStatus.loading => AppLoadingIndicator(
+            size: 20,
+            strokeWidth: 2,
+            color: colorScheme.onPrimary,
+          ),
+          PreviewStatus.playing => const Icon(Icons.pause),
+          PreviewStatus.paused ||
+          PreviewStatus.idle => const Icon(Icons.play_arrow),
+        },
+        tooltip: switch (status) {
+          PreviewStatus.loading ||
+          PreviewStatus.playing => context.l10n.previewStop,
+          PreviewStatus.paused ||
+          PreviewStatus.idle => context.l10n.previewPlay,
+        },
+        onPressed: () => _onPressed(context, ref),
+      );
+    }
 
     final Widget icon;
     final String tooltip;

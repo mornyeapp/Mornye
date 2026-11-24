@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -96,20 +96,24 @@ void main() {
     ColorScheme shown(WidgetTester tester) =>
         Theme.of(tester.element(find.byKey(probe))).colorScheme;
 
-    Widget host(String? artUri, ThemeData theme, {bool reduceMotion = false}) =>
-        MaterialApp(
-          theme: theme,
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(disableAnimations: reduceMotion),
-            child: child!,
-          ),
-          home: PlayerArtworkTheme(
-            artUri: artUri,
-            child: const SizedBox(key: probe),
-          ),
-        );
+    Widget host(
+      String? artUri,
+      ThemeData theme, {
+      bool reduceMotion = false,
+      bool fadesSurfaceOnly = false,
+      Widget child = const SizedBox(key: probe),
+    }) => MaterialApp(
+      theme: theme,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(disableAnimations: reduceMotion),
+        child: child!,
+      ),
+      home: PlayerArtworkTheme(
+        artUri: artUri,
+        fadesSurfaceOnly: fadesSurfaceOnly,
+        child: child,
+      ),
+    );
 
     testWidgets('shows a cached cover scheme from the first frame', (
       tester,
@@ -152,6 +156,37 @@ void main() {
       expect(palette.requests, [_coverA, _coverB]);
     });
 
+    testWidgets('makes no animation while it only follows the app scheme, '
+        'then moves to a cover', (tester) async {
+      Listenable animation() => tester
+          .widget<AnimatedBuilder>(
+            find
+                .descendant(
+                  of: find.byType(PlayerArtworkTheme),
+                  matching: find.byType(AnimatedBuilder),
+                )
+                .first,
+          )
+          .listenable;
+
+      final theme = AppTheme.light();
+      await tester.pumpWidget(host(null, theme));
+      final element = tester.element(find.byKey(probe));
+      expect(shown(tester), theme.colorScheme);
+      expect(animation(), kAlwaysCompleteAnimation);
+
+      palette.cached[_coverA] = red;
+      await tester.pumpWidget(host(_coverA, theme));
+      expect(animation(), isA<AnimationController>());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(shown(tester).primary, isNot(theme.colorScheme.primary));
+      expect(shown(tester).primary, isNot(red.primary));
+      await tester.pumpAndSettle();
+      expect(shown(tester), red);
+      expect(tester.element(find.byKey(probe)), same(element));
+    });
+
     testWidgets('returns to the app scheme without readable artwork', (
       tester,
     ) async {
@@ -183,6 +218,124 @@ void main() {
       expect(shown(tester), green);
     });
 
+    group('moving only the page background', () {
+      var builds = 0;
+      // Builds whenever the scheme it reads changes.
+      final page = PlayerArtworkSurface(
+        surface: Colors.pink,
+        child: Builder(
+          builder: (context) {
+            builds++;
+            Theme.of(context);
+            return const SizedBox(key: probe);
+          },
+        ),
+      );
+      Color background(WidgetTester tester) => tester
+          .widget<ColoredBox>(
+            find.descendant(
+              of: find.byType(PlayerArtworkSurface),
+              matching: find.byType(ColoredBox),
+            ),
+          )
+          .color;
+
+      setUp(() => builds = 0);
+
+      testWidgets('swaps the scheme in one step while the background moves', (
+        tester,
+      ) async {
+        final theme = AppTheme.light();
+        palette.cached[_coverA] = red;
+        await tester.pumpWidget(
+          host(_coverA, theme, fadesSurfaceOnly: true, child: page),
+        );
+        expect(shown(tester), red);
+        expect(background(tester), red.surface);
+
+        await tester.pumpWidget(
+          host(_coverB, theme, fadesSurfaceOnly: true, child: page),
+        );
+        palette.complete(_coverB, green);
+        await tester.pump();
+        final before = builds;
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 40));
+        expect(shown(tester), green);
+        final midway = background(tester);
+        expect(midway, isNot(red.surface));
+        expect(midway, isNot(green.surface));
+        for (var i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        await tester.pumpAndSettle();
+        // The page under the theme built only for the swap itself.
+        expect(builds - before, lessThanOrEqualTo(1));
+        expect(background(tester), green.surface);
+      });
+
+      testWidgets('a skip partway through starts from the colour on screen', (
+        tester,
+      ) async {
+        final theme = AppTheme.light();
+        palette.cached[_coverA] = red;
+        palette.cached[_coverB] = green;
+        await tester.pumpWidget(
+          host(_coverA, theme, fadesSurfaceOnly: true, child: page),
+        );
+        await tester.pumpWidget(
+          host(_coverB, theme, fadesSurfaceOnly: true, child: page),
+        );
+        await tester.pump(const Duration(milliseconds: 40));
+        final midway = background(tester);
+        expect(midway, isNot(green.surface));
+
+        await tester.pumpWidget(
+          host(_coverA, theme, fadesSurfaceOnly: true, child: page),
+        );
+        expect(shown(tester), red);
+        expect(background(tester), midway);
+        await tester.pumpAndSettle();
+        expect(background(tester), red.surface);
+      });
+
+      testWidgets('reduced motion swaps the background with the scheme', (
+        tester,
+      ) async {
+        final theme = AppTheme.light();
+        palette.cached[_coverA] = red;
+        palette.cached[_coverB] = green;
+        await tester.pumpWidget(
+          host(
+            _coverA,
+            theme,
+            reduceMotion: true,
+            fadesSurfaceOnly: true,
+            child: page,
+          ),
+        );
+        await tester.pumpWidget(
+          host(
+            _coverB,
+            theme,
+            reduceMotion: true,
+            fadesSurfaceOnly: true,
+            child: page,
+          ),
+        );
+        expect(shown(tester), green);
+        expect(background(tester), green.surface);
+      });
+
+      testWidgets('outside it the background is the given surface', (
+        tester,
+      ) async {
+        palette.cached[_coverA] = red;
+        await tester.pumpWidget(host(_coverA, AppTheme.light(), child: page));
+        expect(background(tester), Colors.pink);
+      });
+    });
+
     testWidgets('AMOLED keeps the page background pure black', (tester) async {
       final amoled = _seeded(
         Colors.purple,
@@ -212,10 +365,14 @@ void main() {
     );
     final cover = _seeded(Colors.teal);
 
-    Widget app(Widget home, {required bool mornye}) => ProviderScope(
+    Widget app(
+      Widget home, {
+      required bool mornye,
+      Stream<MediaItem?>? items,
+    }) => ProviderScope(
       overrides: [
         currentMediaItemProvider.overrideWithBuild(
-          (ref, notifier) => Stream.value(track),
+          (ref, notifier) => items ?? Stream.value(track),
         ),
         playbackStateProvider.overrideWith(
           (ref) => Stream.value(PlaybackState()),
@@ -293,6 +450,123 @@ void main() {
       expect(Theme.of(tester.element(find.text('Song'))).colorScheme, cover);
     });
 
+    testWidgets('the Material mini player uses the shell scope for its cover', (
+      tester,
+    ) async {
+      palette.cached[_coverA] = cover;
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            bottomNavigationBar: PlayerArtworkTheme(
+              artUri: track.artUri.toString(),
+              child: const MiniPlayer(),
+            ),
+          ),
+          mornye: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(PlayerArtworkTheme), findsOneWidget);
+      expect(palette.requests, [_coverA]);
+      expect(Theme.of(tester.element(find.text('Song'))).colorScheme, cover);
+    });
+
+    for (final (name, outer) in [
+      (
+        'another cover',
+        const PlayerArtworkTheme(artUri: _coverB, child: MiniPlayer()),
+      ),
+      (
+        'a surface-only scope',
+        PlayerArtworkTheme(
+          artUri: Uri.file(_coverA).toString(),
+          fadesSurfaceOnly: true,
+          child: const MiniPlayer(),
+        ),
+      ),
+    ]) {
+      testWidgets('the Material mini player keeps its own scope under $name', (
+        tester,
+      ) async {
+        palette.cached[_coverA] = cover;
+        palette.cached[_coverB] = _seeded(Colors.purple);
+        await tester.pumpWidget(
+          app(Scaffold(bottomNavigationBar: outer), mornye: false),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(PlayerArtworkTheme), findsNWidgets(2));
+        expect(Theme.of(tester.element(find.text('Song'))).colorScheme, cover);
+      });
+    }
+
+    testWidgets('under the shell scope the mini player moves with the bar '
+        'on every frame of a skip', (tester) async {
+      final items = StreamController<MediaItem?>.broadcast();
+      addTearDown(items.close);
+      final red = _seeded(Colors.red);
+      palette.cached[_coverA] = cover;
+      palette.cached[_coverB] = red;
+      const probe = Key('bar');
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            bottomNavigationBar: Consumer(
+              builder: (context, ref, child) => PlayerArtworkTheme(
+                artUri: ref.watch(
+                  currentMediaItemProvider.select(
+                    (item) => item.value?.artUri?.toString(),
+                  ),
+                ),
+                child: child!,
+              ),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  MiniPlayer(),
+                  SizedBox(key: probe, height: 1),
+                ],
+              ),
+            ),
+          ),
+          mornye: false,
+          items: items.stream,
+        ),
+      );
+      items.add(track);
+      await tester.pumpAndSettle();
+      expect(find.byType(PlayerArtworkTheme), findsOneWidget);
+
+      ColorScheme bar() =>
+          Theme.of(tester.element(find.byKey(probe))).colorScheme;
+      ColorScheme mini() => Theme.of(
+        tester.element(
+          find
+              .descendant(
+                of: find.byType(MiniPlayer),
+                matching: find.byType(InkWell),
+              )
+              .first,
+        ),
+      ).colorScheme;
+      expect(mini(), cover);
+
+      for (final (next, target) in [
+        (track.copyWith(id: 'b', artUri: Uri.file(_coverB)), red),
+        (MediaItem(id: 'none', title: 'Plain'), AppTheme.light().colorScheme),
+      ]) {
+        items.add(next);
+        await tester.pump();
+        var moving = 0;
+        for (var i = 0; i < 40; i++) {
+          await tester.pump(const Duration(milliseconds: 8));
+          if (bar() != target) moving++;
+          expect(mini(), bar());
+        }
+        expect(moving, greaterThan(2));
+        expect(mini(), target);
+      }
+    });
+
     testWidgets('the Material full player takes the cover scheme', (
       tester,
     ) async {
@@ -314,22 +588,22 @@ void main() {
       );
       palette.cached[_coverA] = cover;
       await tester.pumpWidget(app(const NowPlayingScreen(), mornye: false));
-      // The card, whose scaffold shows the scheme's surface.
+      // The card, whose page shows the scheme's surface.
       ProviderScope.containerOf(
         tester.element(find.byType(NowPlayingScreen)),
       ).read(settingsProvider.notifier).setPlayerCoverStyle('default');
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
 
-      final scaffold = tester.widget<Scaffold>(
+      final background = tester.widget<ColoredBox>(
         find
             .descendant(
-              of: find.byType(NowPlayingScreen),
-              matching: find.byType(Scaffold),
+              of: find.byType(PlayerArtworkSurface),
+              matching: find.byType(ColoredBox),
             )
             .first,
       );
-      expect(scaffold.backgroundColor, cover.surface);
+      expect(background.color, cover.surface);
       expect(Theme.of(tester.element(find.text('Song'))).colorScheme, cover);
     });
 

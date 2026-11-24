@@ -13,7 +13,9 @@ import 'package:mornye/models/download_item.dart';
 import 'package:mornye/models/download_result.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/download_lyrics_translation_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/providers/download_verification_retry_guard.dart';
@@ -35,6 +37,7 @@ import 'package:mornye/services/download_retry_backoff.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/download_request_payload.dart';
+import 'package:mornye/services/folder_cover_file.dart';
 import 'package:mornye/services/folder_path_template.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_reorganizer.dart';
@@ -632,6 +635,8 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
       autoConvertMaxSampleRate: normalizeAutoConvertSampleRate(
         settings.autoConvertMaxSampleRate,
       ),
+      autoConvertSmartDither: settings.autoConvertSmartDither,
+      autoConvertSmartDitherHighPass: settings.autoConvertSmartDitherHighPass,
       trackNumber: normalizedTrackNumber,
       playlistPosition: _validPlaylistPosition(item),
       discNumber: normalizedDiscNumber,
@@ -928,6 +933,11 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
 
     state = state.withItemReplacements({index: next});
 
+    if (status == DownloadStatus.completed &&
+        current.status != DownloadStatus.completed) {
+      _translateLyricsOf(next);
+    }
+
     if (Platform.isAndroid && status == DownloadStatus.finalizing) {
       PlatformBridge.clearItemProgress(id).catchError((_) {});
       final queueCount = state.lookup.queuedCount;
@@ -946,6 +956,21 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
         status == DownloadStatus.skipped) {
       _saveQueueToStorage();
     }
+  }
+
+  /// Hands a finished download to Translate Downloads while it is on.
+  void _translateLyricsOf(DownloadItem item) {
+    final source = item.filePath;
+    if (source == null ||
+        source.isEmpty ||
+        !ref.read(settingsProvider).lyricsTranslateDownloads) {
+      return;
+    }
+    ref.read(downloadLyricsTranslatorProvider).enqueue((
+      source: source,
+      title: item.track.name,
+      artist: item.track.artistName,
+    ));
   }
 
   void _recordFailedDownload(
@@ -997,6 +1022,22 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
     settings,
     customFolderPath: customFolderPath,
     playlistName: playlistName,
+  );
+
+  @visibleForTesting
+  Future<bool> holdsAlbumFilesFor(
+    DownloadItem item,
+    AppSettings settings, {
+    required String filePath,
+    String? relativeDir,
+    String quality = 'LOSSLESS',
+  }) => _holdsAlbumFiles(
+    item.track,
+    item,
+    settings,
+    quality,
+    filePath: filePath,
+    relativeDir: relativeDir,
   );
 
   DownloadItem? _findItemById(String id) {

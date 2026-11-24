@@ -79,6 +79,9 @@ internal fun DownloadService.configureNativeWorkerNetworkPolicy(settingsJson: St
             while (NativeWorkerPolicy.requiresWifi(nativeWorkerDownloadNetworkMode)) {
                 delay(5_000)
                 refreshNativeWorkerNetworkPause()
+                // The progress coordinator sleeps while the queue waits, so
+                // this poll renews the wake lock it depends on.
+                refreshNativeWorkerWakeLock()
                 if (nativeWorkerJob?.isActive != true) break
             }
         }
@@ -115,6 +118,7 @@ internal fun DownloadService.refreshNativeWorkerNetworkPause() {
     if (shouldPause == nativeWorkerNetworkPaused) return
 
     nativeWorkerNetworkPaused = shouldPause
+    onNativeWorkerStateChanged()
     if (nativeWorkerJob?.isActive != true) return
 
     if (shouldPause) {
@@ -126,6 +130,13 @@ internal fun DownloadService.refreshNativeWorkerNetworkPause() {
         cancelActiveNativeItemForPause()
         updateNotification(0L, 0L)
     } else {
+        if (NativeWorkerPolicy.shouldHoldWifiReturnGrace(
+                userPaused = isNativeWorkerUserPaused(),
+                verificationPaused = nativeWorkerVerificationPaused,
+            )
+        ) {
+            holdWifiReturnGraceWakeLock()
+        }
         currentStatus = if (nativeWorkerVerificationPaused) {
             "verification_required"
         } else {

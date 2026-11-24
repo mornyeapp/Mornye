@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -76,6 +76,7 @@ class _ListeningStatisticsScreenState
         child: CustomScrollView(
           slivers: [
             AppSliverHeader.page(title: context.l10n.listeningStats),
+            AppRefreshIndicator.sliver(),
             // Centered at the reading width on tablets, under the title.
             SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),

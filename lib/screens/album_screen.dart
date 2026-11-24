@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/cover_palette.dart';
@@ -28,6 +28,7 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/provider_resource_ids.dart';
 import 'package:mornye/utils/ttl_cache.dart';
 import 'package:mornye/widgets/animation_utils.dart';
+import 'package:mornye/widgets/loaded_sliver_fade_in.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/cross_extension_share_sheet.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
@@ -484,10 +485,24 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
               description: _description!,
             ),
           ),
-        if (_isLoading)
-          // The skeleton rows carry the list's own inset.
-          const SliverToBoxAdapter(
-            child: AlbumTrackListSkeleton(itemCount: 10),
+        if (_isLoading || (_error == null && tracks.isNotEmpty))
+          // The desktop table fades in once over its skeleton's place;
+          // phone rows stagger in on their own.
+          LoadedSliverFadeIn(
+            key: const ValueKey('album-tracks'),
+            loading: _isLoading,
+            enabled: isDesktopPlatform,
+            sliver: _isLoading
+                // The skeleton rows carry the list's own inset.
+                ? const SliverToBoxAdapter(
+                    child: AlbumTrackListSkeleton(itemCount: 10),
+                  )
+                : _buildTrackList(
+                    context,
+                    colorScheme,
+                    tracks,
+                    commonQualityTrack,
+                  ),
           ),
         if (_error != null)
           SliverToBoxAdapter(
@@ -501,7 +516,6 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
             ),
           ),
         if (!_isLoading && _error == null && tracks.isNotEmpty) ...[
-          _buildTrackList(context, colorScheme, tracks, commonQualityTrack),
           _buildAlbumFooter(context, colorScheme, tracks),
           if (!isSelectionMode)
             CollectionSuggestionsSliver(

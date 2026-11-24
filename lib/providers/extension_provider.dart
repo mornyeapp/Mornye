@@ -11,6 +11,7 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/extension_storage_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/providers/repo_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 
 export 'package:mornye/models/extension.dart';
@@ -21,14 +22,12 @@ final _log = AppLogger('ExtensionProvider');
 
 const _metadataProviderPriorityKey = 'metadata_provider_priority';
 const _providerPriorityKey = 'provider_priority';
-const _storeRegistryUrlPrefKey = 'store_registry_url';
 
 final extensionSettingsProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, extensionId) {
       return PlatformBridge.getExtensionSettings(extensionId);
     });
 
-/// Result of restoring extensions from a backup.
 class ExtensionNotifier extends Notifier<ExtensionState> {
   static const _extensionHealthDefaultCacheTtl = Duration(minutes: 10);
   static const _extensionHealthMinimumCacheTtl = Duration(minutes: 1);
@@ -508,8 +507,10 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
     }
   }
 
-  Future<bool> upgradeExtension(String filePath) async {
-    state = state.copyWith(isLoading: true, error: null);
+  /// A [quiet] upgrade (a background one) shows neither the loading state nor
+  /// a failure; the native side keeps the old version when it fails.
+  Future<bool> upgradeExtension(String filePath, {bool quiet = false}) async {
+    if (!quiet) state = state.copyWith(isLoading: true, error: null);
 
     try {
       await ensureInitialized();
@@ -518,11 +519,13 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
         'Upgraded extension: ${result['display_name']} to v${result['version']}',
       );
       await refreshExtensions();
-      state = state.copyWith(isLoading: false);
+      if (!quiet) state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {
       _log.e('Failed to upgrade extension: $e');
-      state = state.copyWith(isLoading: false, error: e.toString());
+      if (!quiet) {
+        state = state.copyWith(isLoading: false, error: e.toString());
+      }
       return false;
     }
   }
@@ -627,26 +630,27 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
     return keys;
   }
 
-  /// Builds the extensions section of a backup: the store registry URL, the
-  /// installed extensions with their id, version, enabled flag and settings,
-  /// and the download and metadata provider priority order.
+  /// Builds the extensions section of a backup: the store repositories
+  /// (`registry_urls`, and the first as `registry_url` for older app
+  /// versions), the installed extensions with their id, version, enabled
+  /// flag, settings and pinned repository, and the download and metadata
+  /// provider priority order.
   /// Secret-flagged settings (tokens, API keys) are only included when
   /// [includeSecrets] is true.
   Future<Map<String, dynamic>> exportBackup({
     required bool includeSecrets,
   }) async {
     if (!PlatformBridge.supportsExtensionSystem) {
-      return {'registry_url': '', 'items': const <Map<String, dynamic>>[]};
+      return {
+        'registry_urls': const <String>[],
+        'registry_url': '',
+        'items': const <Map<String, dynamic>>[],
+      };
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    // The native repository is initialized lazily when Repo is opened. Keep
-    // its persisted URL in backups made before that first visit.
-    var registryUrl = (prefs.getString(_storeRegistryUrlPrefKey) ?? '').trim();
-    try {
-      final activeUrl = (await PlatformBridge.getRepoRegistryUrl()).trim();
-      if (activeUrl.isNotEmpty) registryUrl = activeUrl;
-    } catch (_) {}
+    // The saved list is the configured one, also before Repo is opened.
+    final registryUrls = await RepoNotifier.savedRegistryUrls();
+    final pins = await RepoNotifier.savedExtensionSources();
 
     List<Map<String, dynamic>> installed;
     try {
@@ -684,22 +688,25 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
         'version': raw['version']?.toString() ?? '',
         'enabled': raw['enabled'] == true,
         'settings': filtered,
+        'registry_url': ?pins[id.toLowerCase()],
         if (omittedSecret) 'secrets_omitted': true,
       });
     }
 
     return {
-      'registry_url': registryUrl,
+      'registry_urls': registryUrls,
+      'registry_url': registryUrls.firstOrNull ?? '',
       'items': items,
       ...providerPriorityBackup(),
     };
   }
 
   /// Restores extensions from a backup section produced by [exportBackup]:
-  /// re-applies the store registry URL, reinstalls each extension from the
-  /// store when missing, then merges settings and restores the enabled flag.
-  /// Missing settings (e.g. omitted secrets) are merged with the current values
-  /// so they are not wiped.
+  /// adds the backup's store repositories that are missing, reinstalls each
+  /// missing extension from its pinned repository (or the first that lists
+  /// it), keeps those pins, then merges settings and restores the enabled
+  /// flag. Missing settings (e.g. omitted secrets) are merged with the
+  /// current values so they are not wiped.
   Future<ExtensionRestoreResult> restoreFromBackup(
     Map<String, dynamic> data,
   ) async {
@@ -709,12 +716,13 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
 
     await ensureInitialized();
 
-    final prefs = await SharedPreferences.getInstance();
-    final backupUrl = (data['registry_url'] as String?)?.trim() ?? '';
-    // Older backups may have omitted the URL when Repo had not been opened.
-    final registryUrl = backupUrl.isNotEmpty
-        ? backupUrl
-        : (prefs.getString(_storeRegistryUrlPrefKey) ?? '').trim();
+    final listedUrls = data['registry_urls'];
+    final legacyUrl = (data['registry_url'] as String?)?.trim() ?? '';
+    // Older backups carry one URL, or none when Repo had not been opened;
+    // the device's own repositories stay either way.
+    final backupUrls = listedUrls is List
+        ? normalizeRegistryUrls(listedUrls.whereType<String>())
+        : [if (legacyUrl.isNotEmpty) legacyUrl];
     final itemsRaw = data['items'];
     final items = itemsRaw is List
         ? itemsRaw
@@ -723,20 +731,24 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
               .toList()
         : <Map<String, dynamic>>[];
 
+    final repo = ref.read(repoProvider.notifier);
     Directory? destDir;
+    var configuredUrls = const <String>[];
     try {
+      // The store keeps its normal cache directory; only downloads go to a
+      // temporary one.
+      await repo.initializeToDefaultPaths();
+      if (backupUrls.isNotEmpty) await repo.appendRegistryUrls(backupUrls);
+      final repoState = ref.read(repoProvider);
+      if (repoState.isInitialized) configuredUrls = repoState.registryUrls;
       final tmp = await getTemporaryDirectory();
       destDir = await Directory(
         '${tmp.path}/mornye_restore_ext',
       ).create(recursive: true);
-      await PlatformBridge.initExtensionRepo(destDir.path);
-      if (registryUrl.isNotEmpty) {
-        await PlatformBridge.setRepoRegistryUrl(registryUrl);
-        await prefs.setString(_storeRegistryUrlPrefKey, registryUrl);
-      }
     } catch (e) {
       _log.w('Restore: failed to prepare extension store: $e');
     }
+    final restoredPins = <String, String>{};
 
     await refreshExtensions();
     final installedIds = state.extensions
@@ -753,9 +765,11 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
       if (id == null || id.isEmpty) continue;
       final enabled = item['enabled'] != false;
       var present = installedIds.contains(id.toLowerCase());
+      final pin = (item['registry_url'] as String?)?.trim() ?? '';
+      final pinConfigured = pin.isNotEmpty && configuredUrls.contains(pin);
 
       if (!present) {
-        if (destDir == null) {
+        if (destDir == null || configuredUrls.isEmpty) {
           failed++;
           failedIds.add(id);
           continue;
@@ -764,6 +778,7 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
           final path = await PlatformBridge.downloadRepoExtension(
             id,
             destDir.path,
+            registryUrl: pinConfigured ? pin : '',
           );
           final ok = await installExtension(path);
           if (ok) {
@@ -783,6 +798,7 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
       }
 
       if (!present) continue;
+      if (pinConfigured) restoredPins[id] = pin;
 
       final settings = item['settings'];
       if (settings is Map && settings.isNotEmpty) {
@@ -804,6 +820,12 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
     }
 
     await refreshExtensions();
+    try {
+      await repo.saveExtensionSources(restoredPins);
+      if (configuredUrls.isNotEmpty) await repo.refresh();
+    } catch (e) {
+      _log.w('Restore: failed to save extension sources: $e');
+    }
     // Reinstalled and re-enabled extensions now exist, so the saved order can
     // be applied in full instead of defaults winning.
     await restoreProviderPriorityBackup(data);

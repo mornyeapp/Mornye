@@ -129,6 +129,26 @@ fn exclusive_publication_preserves_racing_output_and_cleans_cancelled_stage() {
     assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 1);
 }
 
+#[test]
+fn stage_names_have_no_leading_dot_and_a_partial_suffix() {
+    let root = tempfile::tempdir().unwrap();
+    let files = Arc::new(FileRegistry::default())
+        .extension(root.path())
+        .unwrap();
+    let path = files.resolve("track.flac").unwrap();
+    let _stage = path.stage().unwrap();
+    let names: Vec<_> = std::fs::read_dir(root.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    // A dot name can become a hidden attribute that the rename keeps.
+    assert_eq!(names.len(), 1, "{names:?}");
+    assert!(
+        names[0].starts_with("mornye-") && names[0].ends_with(".partial"),
+        "{names:?}"
+    );
+}
+
 fn check_directory_operations(root: &Path) {
     let files = Arc::new(FileRegistry::default()).extension(root).unwrap();
     let album = files.resolve("音乐 collection").unwrap();

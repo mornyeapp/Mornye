@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/extension_provider.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -496,8 +497,14 @@ class _ServiceChip extends StatelessWidget {
       );
     }
     // The chip stays compact; the tap area around it is the 48dp minimum.
+    // A selection tint, on the fast effects spring.
+    final tint = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 200), Curves.linear),
+    );
     final chip = AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+      duration: tint.duration,
+      curve: tint.curve,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: isSelected

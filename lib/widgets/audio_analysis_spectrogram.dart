@@ -13,6 +13,10 @@ class _SpectrogramView extends StatelessWidget {
   /// Saves the plot as an image; null while a save or channel load runs.
   final VoidCallback? onSave;
 
+  /// Shows the save button. Off for plots that are not a file's own, such
+  /// as the null test residual.
+  final bool canSave;
+
   const _SpectrogramView({
     required this.image,
     required this.sampleRate,
@@ -23,6 +27,7 @@ class _SpectrogramView extends StatelessWidget {
     required this.channelLoading,
     required this.onChannelChanged,
     required this.onSave,
+    this.canSave = true,
   });
 
   @override
@@ -37,57 +42,61 @@ class _SpectrogramView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 4, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: channels > 1
-                      ? SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              AppChoiceChip(
-                                singleChoice: true,
-                                label: Text(context.l10n.audioAnalysisChannels),
-                                selected: selectedChannel < 0,
-                                onSelected: channelLoading
-                                    ? null
-                                    : (_) => onChannelChanged(-1),
-                              ),
-                              for (
-                                var channel = 0;
-                                channel < channels;
-                                channel++
-                              ) ...[
-                                const SizedBox(width: 6),
+          if (channels > 1 || canSave)
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 4, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: channels > 1
+                        ? SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
                                 AppChoiceChip(
                                   singleChoice: true,
-                                  label: Text('Ch ${channel + 1}'),
-                                  selected: selectedChannel == channel,
+                                  label: Text(
+                                    context.l10n.audioAnalysisChannels,
+                                  ),
+                                  selected: selectedChannel < 0,
                                   onSelected: channelLoading
                                       ? null
-                                      : (_) => onChannelChanged(channel),
+                                      : (_) => onChannelChanged(-1),
                                 ),
+                                for (
+                                  var channel = 0;
+                                  channel < channels;
+                                  channel++
+                                ) ...[
+                                  const SizedBox(width: 6),
+                                  AppChoiceChip(
+                                    singleChoice: true,
+                                    label: Text('Ch ${channel + 1}'),
+                                    selected: selectedChannel == channel,
+                                    onSelected: channelLoading
+                                        ? null
+                                        : (_) => onChannelChanged(channel),
+                                  ),
+                                ],
                               ],
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-                AppIconButton(
-                  key: const ValueKey('audio-analysis-save-spectrogram'),
-                  icon: const AppIcon.adaptive(
-                    Icons.download_outlined,
-                    size: 20,
+                            ),
+                          )
+                        : const SizedBox.shrink(),
                   ),
-                  tooltip: context.l10n.audioAnalysisSaveSpectrogram,
-                  color: labelColor,
-                  onPressed: onSave,
-                ),
-              ],
+                  if (canSave)
+                    AppIconButton(
+                      key: const ValueKey('audio-analysis-save-spectrogram'),
+                      icon: const AppIcon.adaptive(
+                        Icons.download_outlined,
+                        size: 20,
+                      ),
+                      tooltip: context.l10n.audioAnalysisSaveSpectrogram,
+                      color: labelColor,
+                      onPressed: onSave,
+                    ),
+                ],
+              ),
             ),
-          ),
           if (channelLoading)
             const Padding(
               padding: EdgeInsets.fromLTRB(12, 0, 12, 0),

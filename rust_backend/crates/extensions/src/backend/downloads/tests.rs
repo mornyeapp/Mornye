@@ -91,6 +91,65 @@ fn unavailable_catalog_match_reports_the_provider_reason() {
 }
 
 #[test]
+fn download_caller_heartbeat_slows_down_while_the_planner_works() {
+    let directory = tempfile::tempdir().unwrap();
+    let sources = directory.path().join("sources");
+    let provider = sources.join("example.slow");
+    std::fs::create_dir_all(&provider).unwrap();
+    std::fs::write(
+        provider.join("manifest.json"),
+        json!({
+            "name":"example.slow", "version":"1", "description":"Generic slow fixture",
+            "type":["download_provider"]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    std::fs::write(
+        provider.join("index.js"),
+        r#"registerExtension({
+        checkAvailability(){const end=Date.now()+300;while(Date.now()<end){}
+            return {available:false,reason:'No verified track match found'};}
+    });"#,
+    )
+    .unwrap();
+    let backend = Backend::new(
+        &sources,
+        &directory.path().join("data"),
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "1",
+        RuntimeLimits::default(),
+    )
+    .unwrap();
+    backend.load_all().unwrap();
+    backend.set_enabled("example.slow", true).unwrap();
+    backend
+        .set_provider_priority("download", vec!["example.slow".into()])
+        .unwrap();
+    let checks = std::sync::atomic::AtomicUsize::new(0);
+    let response = backend
+        .download_by_strategy(
+            &json!({
+                "service":"example.slow", "use_extensions":true, "use_fallback":true,
+                "output_dir":directory.path().join("output"), "track_name":"Signal",
+                "quality":"best"
+            })
+            .to_string(),
+            &|| {
+                checks.fetch_add(1, Ordering::Relaxed);
+                Ok(())
+            },
+        )
+        .unwrap();
+    let result: Value = serde_json::from_str(&response).unwrap();
+    assert_eq!(result["error_type"], "not_found");
+    // A 5 ms heartbeat would check about 60 times during the 300 ms call.
+    let checks = checks.into_inner();
+    assert!(checks <= 20, "{checks} caller checks");
+    backend.shutdown();
+}
+
+#[test]
 fn source_enrichment_upgrades_artwork_without_supplemental_artwork_overrides() {
     let mut request = DownloadRequest {
         cover_url: "https://example.test/selected/300.jpg".into(),

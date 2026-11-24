@@ -20,7 +20,7 @@
 import 'dart:io';
 
 import 'package:ffmpeg_kit_flutter_platform_interface/ffmpeg_kit_flutter_platform_interface.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../arch_detect.dart';
@@ -175,9 +175,29 @@ class FFmpegKitInitializer {
         break;
       default:
         {
-          stdout.write(text);
+          _printToStdout(text);
         }
     }
+  }
+
+  bool _stdoutFailed = false;
+  bool _listeningToStdoutDone = false;
+
+  // dart:io reports a failed stdout write later, as an error on stdout.done,
+  // and that error is uncaught unless something listens. A Windows GUI app
+  // started without redirected output has no stdout handle, so every write
+  // there fails.
+  void _printToStdout(String text) {
+    if (_stdoutFailed) {
+      return;
+    }
+    if (!_listeningToStdoutDone) {
+      _listeningToStdoutDone = true;
+      stdout.done.catchError((Object _) {
+        _stdoutFailed = true;
+      });
+    }
+    stdout.write(text);
   }
 
   void _processStatisticsCallbackEvent(Map<dynamic, dynamic> event) {

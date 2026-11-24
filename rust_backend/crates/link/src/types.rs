@@ -93,6 +93,25 @@ pub struct LinkConfig {
     pub port: u16,
     pub ffmpeg_path: Option<PathBuf>,
     pub app_version: String,
+    /// The host's own platform (`macos`, `android`, ...), announced in the
+    /// info, the welcome and the mDNS TXT record; empty announces nothing.
+    pub platform: String,
+    /// The optional abilities the app answers (`downloads`, `open`,
+    /// `library.jobs`). None announces nothing, which clients read as an
+    /// older host that has them all.
+    pub features: Option<Vec<String>>,
+}
+
+impl LinkConfig {
+    /// Adds `platform` and `features` to an info or welcome object.
+    pub(crate) fn announce(&self, object: &mut Value) {
+        if !self.platform.is_empty() {
+            object["platform"] = Value::from(self.platform.as_str());
+        }
+        if let Some(features) = &self.features {
+            object["features"] = Value::from(features.clone());
+        }
+    }
 }
 
 /// An authenticated client.
@@ -111,6 +130,8 @@ pub struct Shared {
     pub host: Arc<dyn Host>,
     /// Replaced as a whole by `linkSetCatalog`.
     pub catalog: RwLock<Arc<Catalog>>,
+    /// The files the app lends for songs only it can open.
+    pub(crate) leases: crate::source::Leases,
 }
 
 impl Shared {

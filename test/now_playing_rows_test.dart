@@ -1,5 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,7 +15,10 @@ import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
+
+import 'support/tooltip_finder.dart';
 
 /// Long enough for the effect and spatial springs to settle.
 const _settle = Duration(seconds: 1);
@@ -39,8 +44,11 @@ Widget _app(
   String? artUri,
   bool playing = true,
   bool reduceMotion = false,
+  bool? tapPlays,
 }) => ProviderScope(
   overrides: [
+    // Without a choice these tests play songs with a tap on the row.
+    librarySongTapPlaysProvider.overrideWithValue(tapPlays ?? true),
     currentMediaItemProvider.overrideWithBuild(
       (ref, notifier) => Stream.value(
         currentId == null
@@ -497,6 +505,53 @@ void main() {
       expect(rowClip(tester).clipBehavior, Clip.none);
     });
 
+    testWidgets('a flat row fades its fill in without passing through dark', (
+      tester,
+    ) async {
+      final current = ValueNotifier(false);
+      addTearDown(current.dispose);
+      await tester.pumpWidget(
+        _app(
+          ValueListenableBuilder<bool>(
+            valueListenable: current,
+            builder: (context, value, _) => TrackCard(
+              leading: const SizedBox.square(dimension: 56),
+              title: 'Song',
+              style: TrackCardStyle.flat,
+              isCurrent: value,
+              isPlaying: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final scheme = _scheme(tester, find.text('Song'));
+      Color fill() => Color.alphaBlend(
+        (tester
+                    .renderObject<RenderDecoratedBox>(
+                      find
+                          .descendant(
+                            of: find.byType(AppContentCard),
+                            matching: find.byType(DecoratedBox),
+                          )
+                          .first,
+                    )
+                    .decoration
+                as BoxDecoration)
+            .color!,
+        scheme.surface,
+      );
+      expect(fill(), scheme.surface);
+
+      current.value = true;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      final low = scheme.primaryContainer.computeLuminance();
+      final high = scheme.surface.computeLuminance();
+      final mid = fill().computeLuminance();
+      expect(mid, inInclusiveRange(math.min(low, high), math.max(low, high)));
+    });
+
     testWidgets('selection uses solid secondaryContainer', (tester) async {
       await tester.pumpWidget(_app(card(selected: true)));
       await tester.pump();
@@ -523,7 +578,9 @@ void main() {
       expect(find.byType(NowPlayingIndicator), findsOneWidget);
     });
 
-    testWidgets('Mornye ignores the current track', (tester) async {
+    testWidgets('Mornye shows the current track in its title colour alone', (
+      tester,
+    ) async {
       await tester.pumpWidget(_app(card(current: true), mornye: true));
       await tester.pump();
 
@@ -533,6 +590,12 @@ void main() {
       );
       expect(surface.color, Colors.transparent);
       expect(_textStyle(tester, 'Song')?.fontWeight, FontWeight.w500);
+      final accent = _scheme(tester, find.text('Song')).primary;
+      expect(_textStyle(tester, 'Song')?.color, accent);
+
+      await tester.pumpWidget(_app(card(), mornye: true));
+      await tester.pump();
+      expect(_textStyle(tester, 'Song')?.color, isNot(accent));
     });
 
     testWidgets('Mornye keeps its selection tint', (tester) async {
@@ -544,6 +607,64 @@ void main() {
         find.byType(AppContentCard),
       );
       expect(surface.color, scheme.primaryContainer.withValues(alpha: 0.3));
+    });
+
+    testWidgets('a Mornye flat row takes its selection tint without dark', (
+      tester,
+    ) async {
+      final selected = ValueNotifier(false);
+      addTearDown(selected.dispose);
+      await tester.pumpWidget(
+        _app(
+          ValueListenableBuilder<bool>(
+            valueListenable: selected,
+            builder: (context, value, _) => TrackCard(
+              leading: const SizedBox.square(dimension: 56),
+              title: 'Song',
+              style: TrackCardStyle.flat,
+              isSelectionMode: true,
+              isSelected: value,
+            ),
+          ),
+          mornye: true,
+        ),
+      );
+      await tester.pump();
+      final scheme = _scheme(tester, find.text('Song'));
+      final target = Color.alphaBlend(
+        scheme.primaryContainer.withValues(alpha: 0.3),
+        scheme.surface,
+      );
+      final low = math.min(
+        target.computeLuminance(),
+        scheme.surface.computeLuminance(),
+      );
+      final high = math.max(
+        target.computeLuminance(),
+        scheme.surface.computeLuminance(),
+      );
+      Color fill() {
+        final box = tester.renderObject<RenderPhysicalShape>(
+          find
+              .descendant(
+                of: find.byType(AppContentCard),
+                matching: find.byType(PhysicalShape),
+              )
+              .first,
+        );
+        return Color.alphaBlend(box.color, scheme.surface);
+      }
+
+      selected.value = true;
+      await tester.pump();
+      // The Mornye card does not animate its colour: the tint cuts in, as
+      // an iOS selection does, so there is no frame between the two.
+      expect(fill(), target);
+      for (var frame = 0; frame < 20; frame++) {
+        expect(fill().computeLuminance(), inInclusiveRange(low, high));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(fill(), target);
     });
   });
 
@@ -563,11 +684,11 @@ void main() {
     );
 
     testWidgets('marks the current track and offers pause', (tester) async {
-      await tester.pumpWidget(_app(tile(current: true)));
+      await tester.pumpWidget(_app(tile(current: true), tapPlays: false));
       await _pumpFor(tester, _settle);
 
       expect(find.byType(NowPlayingIndicator), findsOneWidget);
-      expect(find.byTooltip('Pause'), findsOneWidget);
+      expect(findByTooltip('Pause'), findsOneWidget);
       final button = tester.widget<IconButton>(find.byType(IconButton));
       final scheme = _scheme(tester, find.text('Song'));
       expect(
@@ -577,11 +698,22 @@ void main() {
     });
 
     testWidgets('other tracks show no glyph', (tester) async {
-      await tester.pumpWidget(_app(tile(current: false)));
+      await tester.pumpWidget(_app(tile(current: false), tapPlays: false));
       await tester.pump();
 
       expect(find.byType(NowPlayingIndicator), findsNothing);
-      expect(find.byTooltip('Play'), findsOneWidget);
+      expect(findByTooltip('Play'), findsOneWidget);
+    });
+
+    testWidgets('a tap that plays keeps the current track marked', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_app(tile(current: true)));
+      await _pumpFor(tester, _settle);
+
+      expect(find.byType(NowPlayingIndicator), findsOneWidget);
+      expect(findByTooltip('Show details'), findsOneWidget);
+      expect(findByTooltip('Pause'), findsNothing);
     });
   });
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:mornye/l10n/l10n.dart';
@@ -8,6 +8,7 @@ import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
+import 'package:mornye/widgets/desktop/desktop_row_ink.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
 
@@ -377,8 +378,12 @@ class _QualityKey implements Comparable<_QualityKey> {
   }
 }
 
-/// How fast a Mornye row's hover actions appear.
-const _mornyeRowFade = Duration(milliseconds: 100);
+/// How a row's hover actions appear: quickly, on the fast effects spring of
+/// the style.
+AppMotionSpec _rowActionFade(BuildContext context) => AppMotion.effectsFast(
+  context,
+  AppMotionSpec(context.tokens.motionFast, Curves.linear),
+);
 
 String _formatDuration(Duration duration) {
   final hours = duration.inHours;
@@ -655,8 +660,8 @@ class _TrackTableRowViewState extends State<_TrackTableRowView> {
                 opacity: hovered || selected || current || _trailingFocused
                     ? 1
                     : 0,
-                duration: material ? tokens.motionFast : _mornyeRowFade,
-                curve: material ? Curves.linear : Curves.easeIn,
+                duration: _rowActionFade(context).duration,
+                curve: _rowActionFade(context).curve,
                 child: child,
               ),
               child: row.trailing,
@@ -749,6 +754,7 @@ class _TrackTableRowViewState extends State<_TrackTableRowView> {
     final selectedFill = context.isMornye
         ? colorScheme.primary.withValues(alpha: 0.16)
         : colorScheme.secondaryContainer;
+    final press = desktopRowInk(context, content: content);
     final ink = InkWell(
       onTap: onTap,
       onHover: (hovered) => _hovered.value = hovered,
@@ -756,6 +762,8 @@ class _TrackTableRowViewState extends State<_TrackTableRowView> {
       hoverColor: material
           ? (content ?? colorScheme.onSurface).withValues(alpha: 0.08)
           : null,
+      splashFactory: press.splashFactory,
+      highlightColor: press.highlightColor,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           minHeight: TrackTableLayout.rowMinHeightFor(context),
@@ -893,8 +901,8 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
             onFocusChange: (focused) => setState(() => _focused = focused),
             child: AnimatedOpacity(
               opacity: active ? 1 : 0,
-              duration: context.isMornye ? _mornyeRowFade : tokens.motionFast,
-              curve: context.isMornye ? Curves.easeIn : Curves.linear,
+              duration: _rowActionFade(context).duration,
+              curve: _rowActionFade(context).curve,
               child: Builder(
                 builder: (buttonContext) => IconButton(
                   tooltip: l10n.showMenuTooltip,
@@ -951,6 +959,10 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
     final selectedFill = context.isMornye
         ? scheme.primary.withValues(alpha: 0.16)
         : scheme.secondaryContainer;
+    final press = desktopRowInk(
+      context,
+      content: widget.selected ? scheme.onSecondaryContainer : null,
+    );
     return Semantics(
       selected: widget.selected,
       label: [row.title, ?widget.artist].join(', '),
@@ -968,6 +980,8 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
             onTap: widget.onTap,
             onHover: (hovered) => setState(() => _hovered = hovered),
             hoverColor: Colors.transparent,
+            splashFactory: press.splashFactory,
+            highlightColor: press.highlightColor,
             child: ConstrainedBox(
               constraints: const BoxConstraints(
                 minHeight: TrackTableLayout.albumRowHeight,

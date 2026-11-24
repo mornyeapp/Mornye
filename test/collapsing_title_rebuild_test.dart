@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -272,6 +272,8 @@ void main() {
         await scrollTo(700);
         final shown = _titleOpacities(tester);
         await scrollTo(0);
+        // Mornye's effects spring settles in a long, quiet tail.
+        await tester.pump(const Duration(seconds: 1));
 
         expect(pageBuilds, 0);
         expect(_titleOpacities(tester), hidden);

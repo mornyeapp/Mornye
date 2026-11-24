@@ -120,7 +120,10 @@ fn pump_commands(commands: &FfmpegCommands, running: &AtomicBool, ffmpeg: Option
 mod staging {
     use super::*;
 
-    pub(super) const PREFIX: &str = ".mornye-ffmpeg-mornye-desktop-";
+    /// No leading dot: Samba and NTFS drivers with hide_dot_files keep a dot
+    /// name's hidden attribute through the rename onto the song. Library
+    /// scans skip the `.partial.<ext>` stage instead.
+    pub(super) const PREFIX: &str = "mornye-ffmpeg-mornye-desktop-";
 
     static SWEPT: Mutex<Option<HashSet<PathBuf>>> = Mutex::new(None);
 
@@ -128,7 +131,11 @@ mod staging {
         for entry in fs::read_dir(directory)? {
             let entry = entry?;
             let name = entry.file_name();
-            let Some(suffix) = name.to_str().and_then(|name| name.strip_prefix(PREFIX)) else {
+            // Earlier versions put a dot in front of the same prefix.
+            let Some(suffix) = name
+                .to_str()
+                .and_then(|name| name.strip_prefix('.').unwrap_or(name).strip_prefix(PREFIX))
+            else {
                 continue;
             };
             let token = suffix.get(..36).unwrap_or("");
@@ -160,7 +167,7 @@ mod staging {
             .extension()
             .map(|extension| extension.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let staged = directory.join(format!("{PREFIX}{}.{extension}", paths::uuid()));
+        let staged = directory.join(format!("{PREFIX}{}.partial.{extension}", paths::uuid()));
         fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -218,6 +225,7 @@ pub(crate) fn run_ffmpeg(
 ) -> Outcome {
     use std::io::Read;
     use std::process::{Command, Stdio};
+    use std::sync::mpsc::{self, RecvTimeoutError};
     use std::time::Duration;
 
     let Some(ffmpeg) = ffmpeg else {
@@ -254,12 +262,17 @@ pub(crate) fn run_ffmpeg(
             );
         }
     };
+    // Both pipes reach end of file when FFmpeg exits, which wakes the wait
+    // below instead of leaving it asleep until the next poll.
+    let (closed, pipe_closed) = mpsc::channel::<()>();
     let drain = |stream: Option<Box<dyn Read + Send>>| {
+        let closed = closed.clone();
         std::thread::spawn(move || {
             let mut text = Vec::new();
             if let Some(mut stream) = stream {
                 let _ = stream.read_to_end(&mut text);
             }
+            let _ = closed.send(());
             String::from_utf8_lossy(&text).into_owned()
         })
     };
@@ -275,6 +288,8 @@ pub(crate) fn run_ffmpeg(
             .take()
             .map(|s| Box::new(s) as Box<dyn Read + Send>),
     );
+    drop(closed);
+    let mut open_pipes = 2;
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break Ok(status),
@@ -283,7 +298,13 @@ pub(crate) fn run_ffmpeg(
                 let _ = child.wait();
                 break Err("cancelled".to_owned());
             }
-            Ok(None) => std::thread::sleep(Duration::from_millis(200)),
+            // The process is reaped shortly after its pipes close.
+            Ok(None) if open_pipes == 0 => std::thread::sleep(Duration::from_millis(5)),
+            Ok(None) => match pipe_closed.recv_timeout(Duration::from_millis(200)) {
+                Ok(()) => open_pipes -= 1,
+                Err(RecvTimeoutError::Disconnected) => open_pipes = 0,
+                Err(RecvTimeoutError::Timeout) => {}
+            },
             Err(error) => {
                 let _ = child.kill();
                 let _ = child.wait();
@@ -349,12 +370,10 @@ mod tests {
         let result = execute_command(&command(&output), &|| false, &|arguments, _| {
             let staged = PathBuf::from(arguments.last().unwrap());
             assert_ne!(staged, output);
+            let name = staged.file_name().unwrap().to_string_lossy().into_owned();
             assert!(
-                staged
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .starts_with(staging::PREFIX)
+                name.starts_with(staging::PREFIX) && name.ends_with(".partial.flac"),
+                "{name}"
             );
             fs::write(&staged, b"new").unwrap();
             seen.borrow_mut().push(staged);
@@ -363,6 +382,25 @@ mod tests {
         assert_eq!(result, (true, "log".into()));
         assert_eq!(fs::read(&output).unwrap(), b"new");
         assert!(!seen.borrow()[0].exists());
+    }
+
+    #[test]
+    fn first_command_sweeps_current_and_earlier_dotted_stages() {
+        let directory = tempfile::tempdir().unwrap();
+        let current =
+            directory
+                .path()
+                .join(format!("{}{}.partial.flac", staging::PREFIX, paths::uuid()));
+        let dotted = directory
+            .path()
+            .join(format!(".{}{}.flac", staging::PREFIX, paths::uuid()));
+        let foreign = directory.path().join("mornye-ffmpeg-other-app-x.flac");
+        for path in [&current, &dotted, &foreign] {
+            fs::write(path, b"left over").unwrap();
+        }
+        let staged = staging::create(&directory.path().join("song.flac")).unwrap();
+        assert!(!current.exists() && !dotted.exists());
+        assert!(foreign.exists() && staged.exists());
     }
 
     #[test]
@@ -420,5 +458,32 @@ mod tests {
         assert!(success);
         assert!(output.contains("args:-i 0"), "{output}");
         assert!(!run("1").0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn returns_when_the_process_exits_instead_of_at_the_next_poll() {
+        let arguments = ["-c".to_owned(), "sleep 0.02".to_owned()];
+        let started = std::time::Instant::now();
+        for _ in 0..5 {
+            assert!(run_ffmpeg(Some(Path::new("/bin/sh")), &arguments, &|| false).0);
+        }
+        // A 200 ms poll took at least 1 s for five 20 ms commands.
+        let elapsed = started.elapsed();
+        assert!(
+            elapsed < std::time::Duration::from_millis(600),
+            "{elapsed:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancellation_still_stops_a_running_process() {
+        let arguments = ["-c".to_owned(), "exec sleep 5".to_owned()];
+        let started = std::time::Instant::now();
+        let cancelled = || started.elapsed() > std::time::Duration::from_millis(50);
+        let outcome = run_ffmpeg(Some(Path::new("/bin/sh")), &arguments, &cancelled);
+        assert_eq!(outcome, (false, "cancelled".into()));
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
     }
 }

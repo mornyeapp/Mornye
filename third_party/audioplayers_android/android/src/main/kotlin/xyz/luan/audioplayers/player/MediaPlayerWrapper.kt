@@ -53,7 +53,7 @@ class MediaPlayerWrapper(
                 if (!released) wrappedPlayer.onBuffering(percent)
             }
         }
-        wrappedPlayer.context.setAttributesOnPlayer(mediaPlayer)
+        wrappedPlayer.context.setAttributesOnPlayer(mediaPlayer, wrappedPlayer.spatialAudio)
         if (wrappedPlayer.context.stayAwake) {
             mediaPlayer.setWakeMode(wrappedPlayer.applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
         }
@@ -72,12 +72,14 @@ class MediaPlayerWrapper(
         mediaPlayer.setVolume(leftVolume, rightVolume)
     }
 
+    /** Applies [rate] with the player's pitch (see [WrappedPlayer.pitchAt]). */
     override fun setRate(rate: Float) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pitch = wrappedPlayer.pitchAt(rate)
             // Normal playback does not need the platform's time-stretch path.
             // Once changed, still apply 1.0 to restore the original speed.
-            if (rate == 1.0f && !playbackParamsApplied) return
-            mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(rate)
+            if (rate == 1.0f && pitch == 1.0f && !playbackParamsApplied) return
+            mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(rate).setPitch(pitch)
             playbackParamsApplied = true
         } else if (rate != 1.0f) {
             error("Changing the playback rate is only available for Android M/23+ or using LOW_LATENCY mode.")
@@ -86,6 +88,8 @@ class MediaPlayerWrapper(
 
     override fun setSource(source: Source) {
         reset()
+        // Idle again, so the current spatialization choice applies to this source.
+        wrappedPlayer.context.setAttributesOnPlayer(mediaPlayer, wrappedPlayer.spatialAudio)
         source.setForMediaPlayer(mediaPlayer)
     }
 
@@ -126,7 +130,7 @@ class MediaPlayerWrapper(
     }
 
     override fun updateContext(context: AudioContextAndroid) {
-        context.setAttributesOnPlayer(mediaPlayer)
+        context.setAttributesOnPlayer(mediaPlayer, wrappedPlayer.spatialAudio)
         if (context.stayAwake) {
             mediaPlayer.setWakeMode(wrappedPlayer.applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
         }

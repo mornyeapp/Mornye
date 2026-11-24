@@ -27,6 +27,19 @@ class _Settings extends SettingsNotifier {
   }
 }
 
+/// Saved settings from a build before multiple folders, holding [path].
+class _LegacySettings extends SettingsNotifier {
+  _LegacySettings(this.path);
+
+  final String path;
+
+  @override
+  AppSettings build() => AppSettings(localLibraryPath: path);
+
+  @override
+  Future<void> ensureLoaded() async {}
+}
+
 class _LibraryDatabase implements LibraryDatabase {
   _LibraryDatabase(this.sources);
 
@@ -332,6 +345,56 @@ void main() {
     expect(loaded.totalCount, 2);
   });
 
+  test('network availability decides network sources only', () async {
+    database.sources = [
+      const LocalLibrarySource(
+        id: 'device',
+        path: 'network://device/',
+        displayName: 'Device',
+        trackCount: 2,
+      ),
+      const LocalLibrarySource(
+        id: 'nas',
+        path: 'network://nas/Music/',
+        displayName: 'NAS / Music',
+        trackCount: 2,
+        available: false,
+      ),
+    ];
+    container.read(localLibraryProvider);
+    await _waitFor(() => !container.read(localLibraryProvider).isLoading);
+    bool available(String id) => container
+        .read(localLibraryProvider)
+        .sources
+        .firstWhere((source) => source.id == id)
+        .available;
+
+    // No decision yet: both keep their stored state.
+    await library.refreshSourceAvailability(scanReconnected: true);
+    expect(available('device'), isTrue);
+    expect(available('nas'), isFalse);
+
+    bool? device;
+    await library.setNetworkSourceAvailability(
+      (source) => source == 'device' ? device : null,
+    );
+    expect(available('device'), isTrue);
+    device = false;
+    await library.refreshSourceAvailability();
+    expect(available('device'), isFalse);
+    expect(available('nas'), isFalse);
+
+    device = true;
+    await library.refreshSourceAvailability(scanReconnected: true);
+    expect(available('device'), isTrue);
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      library.scannedSources,
+      isEmpty,
+      reason: 'A Link device refreshes its own songs when it connects',
+    );
+  });
+
   test(
     'unchanged overlapping availability refreshes share one probe',
     () async {
@@ -483,6 +546,34 @@ void main() {
       container.read(localLibraryProvider).hasTrack('song', 'artist'),
       false,
     );
+  });
+
+  test('a removed old-style folder stays removed after a reload', () async {
+    container.dispose();
+    database.sources = [];
+    final gone = '${music.path}/gone';
+    container = ProviderContainer(
+      overrides: [
+        settingsProvider.overrideWith(() => _LegacySettings(gone)),
+        localLibraryProvider.overrideWith(
+          () => LocalLibraryNotifier(database: database),
+        ),
+      ],
+    );
+    container.read(localLibraryProvider);
+    await _waitFor(() => !container.read(localLibraryProvider).isLoading);
+    final migrated = container.read(localLibraryProvider).sources.single;
+    expect(migrated.id, LibraryDatabase.legacySourceId);
+    expect(migrated.path, gone);
+    expect(migrated.available, isFalse);
+    // The folder list holds it from now on.
+    expect(container.read(settingsProvider).localLibraryPath, isEmpty);
+
+    final notifier = container.read(localLibraryProvider.notifier);
+    await notifier.removeSource(migrated.id);
+    // Saving a song's metadata reloads the library.
+    await notifier.reloadFromStorage();
+    expect(container.read(localLibraryProvider).sources, isEmpty);
   });
 
   test('an unavailable folder remains attached instead of vanishing', () async {

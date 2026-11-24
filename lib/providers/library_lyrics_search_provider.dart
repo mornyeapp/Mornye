@@ -56,21 +56,93 @@ final libraryLyricsIndexProvider =
       );
     });
 
-final libraryLyricsSearchProvider = FutureProvider.autoDispose
-    .family<List<LibrarySearchHit>, LibrarySearchRequest>((ref, request) async {
-      if (LibrarySearchQuery(request.query).terms.isEmpty) return [];
-      final includeLocal = ref.watch(
-        settingsProvider.select((s) => s.localLibraryEnabled),
-      );
-      final progress = ref.watch(libraryLyricsIndexProvider);
-      if (progress.hasError) {
-        Error.throwWithStackTrace(progress.error!, progress.stackTrace!);
-      }
-      final store = await ref.watch(libraryLyricsSearchStoreProvider.future);
-      return store.search(
+final libraryLyricsSearchProvider = AsyncNotifierProvider.autoDispose
+    .family<
+      LibraryLyricsSearchNotifier,
+      List<LibrarySearchHit>,
+      LibrarySearchRequest
+    >(LibraryLyricsSearchNotifier.new);
+
+/// Searches again when an indexing pass starts or ends, and in between only
+/// when the index publishes a new revision. Those refreshes keep the current
+/// hits on screen and replace them only when the result changed.
+class LibraryLyricsSearchNotifier
+    extends AsyncNotifier<List<LibrarySearchHit>> {
+  LibraryLyricsSearchNotifier(this.request);
+
+  final LibrarySearchRequest request;
+  bool _includeLocal = true;
+  int _generation = 0;
+
+  @override
+  Future<List<LibrarySearchHit>> build() async {
+    _generation++;
+    if (LibrarySearchQuery(request.query).terms.isEmpty) return [];
+    _includeLocal = ref.watch(
+      settingsProvider.select((s) => s.localLibraryEnabled),
+    );
+    final error = ref.watch(
+      libraryLyricsIndexProvider.select(
+        (progress) =>
+            progress.hasError ? (progress.error!, progress.stackTrace!) : null,
+      ),
+    );
+    if (error case (final error, final stackTrace)) {
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+    ref.watch(
+      libraryLyricsIndexProvider.select(
+        (progress) => progress.value?.complete ?? false,
+      ),
+    );
+    ref.listen(
+      libraryLyricsIndexProvider.select((progress) => progress.value?.revision),
+      (_, _) => _refresh(),
+    );
+    return _search(await ref.watch(libraryLyricsSearchStoreProvider.future));
+  }
+
+  Future<List<LibrarySearchHit>> _search(LibraryLyricsSearchStore store) =>
+      store.search(
         query: request.query,
-        includeLocal: includeLocal,
+        includeLocal: _includeLocal,
         limit: request.limit,
         offset: request.offset,
       );
-    });
+
+  Future<void> _refresh() async {
+    final refresh = ++_generation;
+    try {
+      final hits = await _search(
+        await ref.read(libraryLyricsSearchStoreProvider.future),
+      );
+      if (!ref.mounted || refresh != _generation) return;
+      final current = state.value;
+      if (current != null && _sameHits(current, hits)) return;
+      state = AsyncData(hits);
+    } catch (error, stackTrace) {
+      if (ref.mounted && refresh == _generation) {
+        state = AsyncError(error, stackTrace);
+      }
+    }
+  }
+}
+
+bool _sameHits(List<LibrarySearchHit> a, List<LibrarySearchHit> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    final x = a[i];
+    final y = b[i];
+    if (x.kind != y.kind ||
+        x.id != y.id ||
+        x.title != y.title ||
+        x.artist != y.artist ||
+        x.source != y.source ||
+        x.cover != y.cover ||
+        x.samplePath != y.samplePath ||
+        x.trackCount != y.trackCount) {
+      return false;
+    }
+  }
+  return true;
+}

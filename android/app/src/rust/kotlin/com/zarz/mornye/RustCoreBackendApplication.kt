@@ -131,21 +131,20 @@ internal fun RustCoreBackend.dispatchApplication(method: String, arguments: Any?
             initializeRepository(string("cache_dir"))
             return null
         }
-        "setRepoRegistryUrl" -> {
-            repositoryOwner().setRegistryUrl(string("registry_url"))
+        "setRepoRegistryUrls" -> {
+            val values = args["registry_urls"] as? List<*> ?: error("Expected registry_urls string list")
+            val urls = values.map { it as? String ?: error("Expected registry_urls string list") }
+            repositoryOwner().setRegistryUrls(urls)
             return null
         }
-        "getRepoRegistryUrl" -> return repositoryOwner().registryUrl()
-        "clearRepoRegistryUrl" -> {
-            repositoryOwner().clearRegistryUrl()
-            return null
-        }
-        "getRepoExtensions" -> return repositoryOwner().extensions(
+        "resolveRepoRegistryUrl" -> return repositoryOwner().resolveRegistryUrl(string("registry_url"))
+        "getRepoCatalog" -> return repositoryOwner().catalog(
             args["force_refresh"] as? Boolean ?: false,
         )
         "downloadRepoExtension" -> return repositoryOwner().download(
             string("extension_id"),
             string("dest_dir"),
+            string("registry_url"),
         )
     }
     val current = owner()

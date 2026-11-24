@@ -2,13 +2,14 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
@@ -22,6 +23,7 @@ import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/widgets/destructive_selection_button.dart';
@@ -29,6 +31,7 @@ import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/tooltip_finder.dart';
 
 final _tracks = [
   for (final name in ['First', 'Unavailable', 'Selected', 'Last'])
@@ -42,8 +45,13 @@ final _tracks = [
 ];
 
 class _Settings extends SettingsNotifier {
+  _Settings({this.includeLocal = false});
+
+  final bool includeLocal;
+
   @override
-  AppSettings build() => const AppSettings(playerMode: 'internal');
+  AppSettings build() =>
+      AppSettings(playerMode: 'internal', localLibraryEnabled: includeLocal);
 
   @override
   void setPlayerMode(String mode) => state = state.copyWith(playerMode: mode);
@@ -52,6 +60,7 @@ class _Settings extends SettingsNotifier {
 class _Handler extends Fake implements MusicPlayerHandler {}
 
 class _Player extends MusicPlayerController {
+  int initializations = 0;
   List<PlayableMedia> queue = [];
   int? index;
   bool? shuffle;
@@ -67,7 +76,10 @@ class _Player extends MusicPlayerController {
   }
 
   @override
-  Future<MusicPlayerHandler?> ensureInitialized() async => _Handler();
+  Future<MusicPlayerHandler?> ensureInitialized() async {
+    initializations++;
+    return _Handler();
+  }
 
   @override
   Future<void> setShuffle(bool enabled) async => shuffle = enabled;
@@ -83,6 +95,8 @@ class _Player extends MusicPlayerController {
 }
 
 class _Playback extends PlaybackController {
+  _Playback({super.openExternal});
+
   final List<List<String>> resolvedRequests = [];
   final Map<String, String?> paths = {
     'First': 'content://library/first',
@@ -197,10 +211,18 @@ class _RemovalCollections extends _Collections {
 }
 
 class _Library extends LocalLibraryNotifier {
+  _Library({this.matches = const {}});
+
+  final Map<String, LocalLibraryItem> matches;
   final removedFiles = <String>[];
 
   @override
   LocalLibraryState build() => LocalLibraryState();
+
+  @override
+  Future<List<LocalLibraryItem?>> findExistingBatchAsync(
+    List<LocalLibraryBatchLookupRequest> requests,
+  ) async => [for (final request in requests) matches[request.trackName]];
 
   @override
   Future<void> removePhysicalFiles(Iterable<String> paths) async {
@@ -229,9 +251,10 @@ Widget _selectionApp({
   _Library? library,
   _History? history,
   bool internalPlayer = true,
+  bool includeLocal = false,
 }) => ProviderScope(
   overrides: [
-    settingsProvider.overrideWith(_Settings.new),
+    settingsProvider.overrideWith(() => _Settings(includeLocal: includeLocal)),
     playerUiEnabledProvider.overrideWithValue(internalPlayer),
     musicPlayerControllerProvider.overrideWithValue(player),
     playbackProvider.overrideWith(() => playback),
@@ -246,7 +269,7 @@ Widget _selectionApp({
   ],
   child: MaterialApp(
     theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.light(),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: const SelectionOverlayHost(
       child: LibraryTracksFolderScreen(
@@ -351,6 +374,87 @@ void main() {
           },
         );
       }
+    }
+
+    for (final desktop in [false, true]) {
+      testWidgets(
+        'playlist queues eligible FLAC selections ($mornye, $desktop)',
+        (tester) async {
+          debugDesktopPlatformOverride = desktop;
+          addTearDown(() => debugDesktopPlatformOverride = null);
+          tester.view.physicalSize = desktop
+              ? const Size(1000, 900)
+              : const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final library = _Library(
+            matches: {
+              for (final (name, format) in [
+                ('First', 'mp3'),
+                ('Selected', 'FLAC'),
+                ('Last', 'm4a'),
+              ])
+                name: LocalLibraryItem(
+                  id: name,
+                  trackName: name,
+                  artistName: 'Artist',
+                  albumName: 'Album',
+                  filePath: 'content://library/$name',
+                  scannedAt: DateTime(2026),
+                  format: format,
+                ),
+            },
+          );
+          final player = _Player();
+          await tester.pumpWidget(
+            _selectionApp(
+              mornye: mornye,
+              player: player,
+              playback: _Playback(),
+              library: library,
+              includeLocal: true,
+            ),
+          );
+          await _selectAllTracks(tester);
+          final queue = find.widgetWithText(
+            SelectionActionButton,
+            'Queue FLAC (2)',
+          );
+          expect(queue, findsOneWidget);
+          await tester.ensureVisible(queue);
+          await tester.tap(queue);
+          await tester.pumpAndSettle();
+          final l10n = lookupAppLocalizations(const Locale('en'));
+          expect(find.text(l10n.queueFlacConfirmMessage(2)), findsOneWidget);
+          await tester.tap(find.text('Cancel'));
+          await tester.pumpAndSettle();
+          expect(find.byType(SelectionBottomBar), findsOneWidget);
+          expect(library.removedFiles, isEmpty);
+          expect(player.queue, isEmpty);
+
+          if (desktop) {
+            tester
+                .widget<SelectionBottomBar>(find.byType(SelectionBottomBar))
+                .onClose();
+            await tester.pumpAndSettle();
+            await tester.ensureVisible(find.text('First'));
+            final gesture = await tester.startGesture(
+              tester.getCenter(find.text('First')),
+              kind: PointerDeviceKind.mouse,
+              buttons: kSecondaryButton,
+            );
+            await gesture.up();
+            await tester.pumpAndSettle();
+            expect(find.text('Queue FLAC (1)'), findsOneWidget);
+            await tester.tap(find.text('Queue FLAC (1)'));
+            await tester.pumpAndSettle();
+            expect(find.text(l10n.queueFlacConfirmMessage(1)), findsOneWidget);
+            await tester.tap(find.text('Cancel'));
+            await tester.pumpAndSettle();
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
 
     testWidgets('playlist desktop menu acts on its clicked track ($mornye)', (
@@ -539,7 +643,7 @@ void main() {
             theme: mornye
                 ? MornyeTheme.build(Brightness.dark)
                 : AppTheme.light(),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const LibraryTracksFolderScreen(
               mode: LibraryTracksFolderMode.playlist,
@@ -598,7 +702,7 @@ void main() {
             theme: mornye
                 ? MornyeTheme.build(Brightness.dark)
                 : AppTheme.light(),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const LibraryTracksFolderScreen(
               mode: LibraryTracksFolderMode.wishlist,
@@ -665,7 +769,7 @@ void main() {
                 theme: mornye
                     ? MornyeTheme.build(Brightness.dark)
                     : AppTheme.light(),
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                localizationsDelegates: appLocalizationsDelegates,
                 supportedLocales: AppLocalizations.supportedLocales,
                 home: LibraryTracksFolderScreen(
                   mode: mode,
@@ -706,64 +810,77 @@ void main() {
   }
 
   for (final mornye in [false, true]) {
-    testWidgets('playlist row queues its neighbors (Mornye: $mornye)', (
-      tester,
-    ) async {
-      final player = _Player();
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            settingsProvider.overrideWith(_Settings.new),
-            musicPlayerControllerProvider.overrideWithValue(player),
-            playbackProvider.overrideWith(_Playback.new),
-            libraryCollectionsProvider.overrideWith(_Collections.new),
-            localLibraryProvider.overrideWith(_Library.new),
-            downloadHistoryProvider.overrideWith(_History.new),
-            downloadHistoryVisibleBatchExistsProvider.overrideWith(
-              (ref, request) => {
-                for (final track in request.tracks)
-                  if (track.spotifyId != 'Unavailable') track.lookupKey,
-              },
-            ),
-            localLibraryCoverProvider.overrideWith(
-              (ref, request) async => null,
-            ),
-            localLibraryFirstCoverProvider.overrideWith(
-              (ref, request) async => null,
-            ),
-          ],
-          child: MaterialApp(
-            theme: mornye
-                ? MornyeTheme.build(Brightness.dark)
-                : AppTheme.light(),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: const LibraryTracksFolderScreen(
-              mode: LibraryTracksFolderMode.playlist,
-              playlistId: 'playlist',
+    for (final tapPlays in [false, true]) {
+      testWidgets('playlist row queues its neighbors from '
+          '${tapPlays ? 'a tap' : 'its Play button'} (Mornye: $mornye)', (
+        tester,
+      ) async {
+        final player = _Player();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              settingsProvider.overrideWith(_Settings.new),
+              librarySongTapPlaysProvider.overrideWithValue(tapPlays),
+              musicPlayerControllerProvider.overrideWithValue(player),
+              playbackProvider.overrideWith(_Playback.new),
+              libraryCollectionsProvider.overrideWith(_Collections.new),
+              localLibraryProvider.overrideWith(_Library.new),
+              downloadHistoryProvider.overrideWith(_History.new),
+              downloadHistoryVisibleBatchExistsProvider.overrideWith(
+                (ref, request) => {
+                  for (final track in request.tracks)
+                    if (track.spotifyId != 'Unavailable') track.lookupKey,
+                },
+              ),
+              localLibraryCoverProvider.overrideWith(
+                (ref, request) async => null,
+              ),
+              localLibraryFirstCoverProvider.overrideWith(
+                (ref, request) async => null,
+              ),
+            ],
+            child: MaterialApp(
+              theme: mornye
+                  ? MornyeTheme.build(Brightness.dark)
+                  : AppTheme.light(),
+              localizationsDelegates: appLocalizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const LibraryTracksFolderScreen(
+                mode: LibraryTracksFolderMode.playlist,
+                playlistId: 'playlist',
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final row = find.ancestor(
-        of: find.text('Selected'),
-        matching: find.byType(TrackCard),
-      );
-      await tester.scrollUntilVisible(row, 200);
-      await tester.tap(
-        find.descendant(of: row, matching: findAppIcon(Icons.play_arrow)),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
+        final row = find.ancestor(
+          of: find.text('Selected'),
+          matching: find.byType(TrackCard),
+        );
+        await tester.scrollUntilVisible(row, 200);
+        expect(
+          find.descendant(of: row, matching: findByTooltip('Show details')),
+          tapPlays ? findsOneWidget : findsNothing,
+        );
+        await tester.tap(
+          tapPlays
+              ? find.text('Selected')
+              : find.descendant(
+                  of: row,
+                  matching: findAppIcon(Icons.play_arrow),
+                ),
+        );
+        await tester.pumpAndSettle();
 
-      expect(player.queue.map((item) => item.title), [
-        'First',
-        'Selected',
-        'Last',
-      ]);
-      expect(player.index, 1);
-      expect(tester.takeException(), isNull);
-    });
+        expect(player.queue.map((item) => item.title), [
+          'First',
+          'Selected',
+          'Last',
+        ]);
+        expect(player.index, 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
 
     testWidgets('playlist header shuffles every song (Mornye: $mornye)', (
       tester,
@@ -793,7 +910,7 @@ void main() {
             theme: mornye
                 ? MornyeTheme.build(Brightness.dark)
                 : AppTheme.light(),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const LibraryTracksFolderScreen(
               mode: LibraryTracksFolderMode.playlist,
@@ -844,7 +961,7 @@ void main() {
             theme: mornye
                 ? MornyeTheme.build(Brightness.dark)
                 : AppTheme.light(),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const LibraryTracksFolderScreen(
               mode: LibraryTracksFolderMode.playlist,
@@ -858,7 +975,7 @@ void main() {
       final width = tester.view.physicalSize.width;
       // Back sits at the reading start, the right edge in Arabic.
       expect(
-        tester.getCenter(find.byTooltip('رجوع').first).dx,
+        tester.getCenter(findByTooltip('رجوع').first).dx,
         greaterThan(width / 2),
       );
       // Download All, Play and Shuffle run from the right, and only Play
@@ -904,6 +1021,26 @@ void main() {
         'Last',
       ]);
       expect(player.index, player.queue.length - 1);
+    },
+  );
+
+  test(
+    'single-file and catalog playback keep the genre for Autoplay',
+    () async {
+      final controller = container.read(playbackProvider.notifier);
+      await controller.playLocalPath(
+        path: '/jazz.flac',
+        title: 'Jazz',
+        artist: 'Artist',
+        genre: 'Jazz',
+      );
+      expect(player.queue.single.genre, 'Jazz');
+
+      await controller.playTrackList([
+        _tracks.first.copyWith(genre: 'Rock'),
+        _tracks.last.copyWith(genre: 'Pop'),
+      ]);
+      expect(player.queue.map((item) => item.genre), ['Rock', 'Pop']);
     },
   );
 
@@ -1016,22 +1153,79 @@ void main() {
   });
 
   test(
-    'external mode routes a network fallback to the internal queue',
+    'external mode opens the selected network fallback without an internal queue',
     () async {
       container.read(settingsProvider.notifier).setPlayerMode('external');
-      playback.paths['Selected'] = 'network://storage/track.flac';
+      final opened = <String>[];
+      playback = _Playback(openExternal: (source) async => opened.add(source))
+        ..paths['Selected'] = 'network://storage/track.flac';
       await container
           .read(playbackProvider.notifier)
           .playTrackList(_tracks, startIndex: 1);
-      expect(
-        player.queue[player.index!].source,
-        'network://storage/track.flac',
-      );
-      expect(playback.resolvedRequests.take(2), [
+      expect(opened, ['network://storage/track.flac']);
+      expect(player.queue, isEmpty);
+      expect(player.initializations, 0);
+      expect(playback.resolvedRequests, [
         ['Unavailable'],
         ['Selected'],
       ]);
-      expect(playback.resolvedRequests.last, _tracks.map((track) => track.id));
+    },
+  );
+
+  for (final source in [
+    'network://storage/track.flac',
+    'network://paired-computer/track.m4a',
+  ]) {
+    test(
+      'external mode respects single and queued playback of $source',
+      () async {
+        final opened = <String>[];
+        playback = _Playback(openExternal: (path) async => opened.add(path));
+        container.read(settingsProvider.notifier).setPlayerMode('external');
+        final controller = container.read(playbackProvider.notifier);
+        await controller.playLocalPath(
+          path: source,
+          title: 'Song',
+          artist: 'Artist',
+        );
+        await controller.playMediaQueue(
+          [
+            PlayableMedia(
+              id: source,
+              source: source,
+              title: 'Song',
+              artist: 'Artist',
+            ),
+          ],
+          startIndex: 0,
+          externalPath: source,
+        );
+        expect(opened, [source, source]);
+        expect(player.queue, isEmpty);
+        expect(player.initializations, 0);
+      },
+    );
+  }
+
+  test(
+    'external launch failure never falls back to the internal player',
+    () async {
+      playback = _Playback(
+        openExternal: (_) async => throw StateError('no player'),
+      );
+      container.read(settingsProvider.notifier).setPlayerMode('external');
+      await expectLater(
+        container
+            .read(playbackProvider.notifier)
+            .playLocalPath(
+              path: 'network://storage/track.flac',
+              title: 'Song',
+              artist: 'Artist',
+            ),
+        throwsStateError,
+      );
+      expect(player.initializations, 0);
+      expect(player.queue, isEmpty);
     },
   );
 }

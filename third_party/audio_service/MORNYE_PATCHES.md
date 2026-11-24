@@ -100,6 +100,22 @@ from the upstream package are not vendored.
   their pixels; the notification's 256 px large icon is now scaled from the
   512 px bitmap instead of from up to 1023 px (owner-approved). The app's
   instrumented `MediaControlMetadataTest` covers the 512 px bound.
+- Android: reuse the session's and notification's copies of the current
+  cover while it is the same bitmap. The app's lock screen lyrics send the
+  playing item again with each lyric line as its title, and each send copied
+  the cover twice at 512 px for the session (`ALBUM_ART`, `DISPLAY_ICON`)
+  and once at 256 px for the notification's large icon, about 2.3 MB on the
+  main thread per line. `ArtCopies` (new, covered by `ArtCopiesTest.java`
+  under `android/src/test`) keeps one copy per key for the current
+  `artBitmap`; `MediaArtwork.forSession(metadata, copies)` and
+  `MediaArtwork.copy(source, size, copies, key)` use it, the one-argument
+  `forSession` (used by `MediaControlMetadataTest`) still copies. Each key
+  still gets its own copy, a recycled copy is made again, a recycled cover
+  has none (as before), another cover drops the kept copies without
+  recycling them, and `onDestroy` clears them. `publishMetadata` also skips
+  its playback state refresh when the state already names the item's media
+  ID, since the refresh only adds that ID. The notification is still
+  rebuilt, as its title changes.
 - Darwin: `setMediaItem` reuses the last `MPMediaItemArtwork` while its
   `artCacheFile` has the same path, device, inode, size and modification time
   (`artworkForFile:`), instead of reading the file into a new image and
@@ -162,6 +178,20 @@ from the upstream package are not vendored.
   next/previous keys still dispatch immediately, and a pending gesture is
   discarded when the media session is released. `HeadsetClickTrackerTest.java`
   covers the gesture mapping.
+- Dart: on Android, `_observeQueue` holds back a queue whose window has the
+  same start, length and entries as the last send except for the `artUri`
+  or `extras` of some entries (same id and other fields; `rating` by
+  identity) for `AudioService.androidQueueArtworkDelay` (3 s). The app swaps
+  in a downloaded song's embedded cover just after the song starts, and
+  re-sending up to 500 entries then landed in the song change. The playing
+  item still goes out at once through `setMediaItem`, so the notification,
+  lock screen and session show the new cover immediately; only the queue
+  row (Android Auto, system queue views) keeps the old cover until the held
+  send. Further artwork-only changes join it. Any other change, a window
+  move, or a held send's timer sends the newest window; a failed send
+  forgets the last window, so the next change goes out at once. In-app
+  listeners and other platforms are unaffected. The queue-platform test
+  covers it.
 
 Android 13+ still chooses the positions and built-in transport icons in System
 UI. We preserve real play/pause/previous/next semantics for headsets, lock screen
@@ -172,6 +202,7 @@ and Android Auto instead of disguising them as unrelated custom actions.
 Compared against the pub.dev 0.18.19 package in the local pub cache:
 
 - `android/build.gradle.kts`, `android/gradle/wrapper/gradle-wrapper.properties`
+- `android/src/main/java/com/ryanheise/audioservice/ArtCopies.java` (new)
 - `android/src/main/java/com/ryanheise/audioservice/AudioService.java`
 - `android/src/main/java/com/ryanheise/audioservice/AudioServicePlugin.java`
 - `android/src/main/java/com/ryanheise/audioservice/MediaArtwork.java` (new)
@@ -180,6 +211,7 @@ Compared against the pub.dev 0.18.19 package in the local pub cache:
 - `android/src/main/java/com/ryanheise/audioservice/PinnedMetadataCache.java` (new)
 - `android/src/main/java/com/ryanheise/audioservice/RecentArtCache.java` (new)
 - `android/src/main/java/com/ryanheise/audioservice/QueueItemIndex.java` (new)
+- `android/src/test/java/com/ryanheise/audioservice/ArtCopiesTest.java` (new)
 - `android/src/test/java/com/ryanheise/audioservice/PinnedMetadataCacheTest.java` (new)
 - `android/src/test/java/com/ryanheise/audioservice/RecentArtCacheTest.java` (new)
 - `android/src/test/java/com/ryanheise/audioservice/QueueItemIndexTest.java` (new)

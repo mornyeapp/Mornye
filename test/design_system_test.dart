@@ -5,7 +5,7 @@ import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
@@ -19,6 +19,7 @@ import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/mornye_selection_pill.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
@@ -27,6 +28,7 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/tooltip_finder.dart';
 
 /// Every Dart source file under `lib/`, used by the source-level contracts
 /// below. Those contracts exist because the duplication they guard against was
@@ -293,14 +295,13 @@ void main() {
           ),
         ),
       );
-      expect(
-        tester.widget<AnimatedAlign>(find.byType(AnimatedAlign)).duration,
-        Duration.zero,
-      );
+      expect(find.byType(MornyeSelectionPill), findsOneWidget);
       expect(find.text('Dark'), findsOneWidget);
       await tester.tap(find.text('Dark'));
       await tester.pump();
       expect(selected, 2);
+      // The pill is at the new selection at once: nothing is left to draw.
+      expect(tester.binding.hasScheduledFrame, isFalse);
       expect(
         tester.getCenter(find.text('System')).dx <
             tester.getCenter(find.text('Dark')).dx,
@@ -342,7 +343,7 @@ void main() {
       await tester.pump();
       expect(changes, ['Album']);
       expect(submitted, 'Album');
-      await tester.tap(find.byTooltip('Clear search'));
+      await tester.tap(findByTooltip('Clear search'));
       await tester.pump();
       expect(controller.text, isEmpty);
       expect(cleared, isTrue);
@@ -563,6 +564,75 @@ void main() {
       );
     }
 
+    testWidgets('title trailing button stays on the title line', (
+      tester,
+    ) async {
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      var taps = 0;
+      const title = 'Good afternoon, someone with a long name';
+      const avatar = Key('avatar');
+      await tester.binding.setSurfaceSize(const Size(430, 932));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MornyeTheme.build(
+            Brightness.light,
+          ).copyWith(platform: TargetPlatform.iOS),
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(430, 932),
+              padding: EdgeInsets.only(top: 59),
+            ),
+            child: Scaffold(
+              body: CustomScrollView(
+                controller: controller,
+                slivers: [
+                  AppSliverHeader.tabRoot(
+                    title: title,
+                    titleTrailing: IconButton(
+                      key: avatar,
+                      constraints: const BoxConstraints(
+                        minWidth: 56,
+                        minHeight: 56,
+                      ),
+                      onPressed: () => taps++,
+                      icon: const SizedBox.square(dimension: 44),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 1200)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      void expectOnTitleLine() {
+        final text = tester.getRect(find.text(title));
+        final button = tester.getRect(find.byKey(avatar));
+        expect(button.center.dy, moreOrLessEquals(text.center.dy, epsilon: 1));
+        expect(button.right, 430 - 12);
+        expect(text.right, lessThanOrEqualTo(button.left));
+      }
+
+      expectOnTitleLine();
+      await tester.tap(find.byKey(avatar));
+      expect(taps, 1);
+
+      controller.jumpTo(AppTokens.standard.headerExpandedHeight);
+      await tester.pump();
+      expectOnTitleLine();
+      final bar = tester.getRect(find.byKey(avatar));
+      expect(
+        bar.center.dy,
+        moreOrLessEquals(59 + kToolbarHeight / 2, epsilon: 2),
+      );
+      await tester.tap(find.byKey(avatar));
+      expect(taps, 2);
+    });
+
     test('is the only collapsing header implementation left', () {
       final offenders = _libSources()
           .where(
@@ -722,8 +792,15 @@ void main() {
         ),
       );
 
+      // Transparent, in the current-row fill's hue so that fill fades in.
       final card = tester.widget<AppContentCard>(find.byType(AppContentCard));
-      expect(card.color, Colors.transparent);
+      expect(card.color?.a, 0);
+      expect(
+        card.color?.withValues(alpha: 1),
+        Theme.of(
+          tester.element(find.text('Song')),
+        ).colorScheme.primaryContainer,
+      );
     });
 
     testWidgets('flat style keeps trailing actions near the card edge', (
@@ -822,6 +899,7 @@ void main() {
         const overlayHosts = {
           'selection_bottom_bar.dart',
           'app_menu_button.dart',
+          'context_menu.dart',
         };
         final offenders = _libSources()
             .where(

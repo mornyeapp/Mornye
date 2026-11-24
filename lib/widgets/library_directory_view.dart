@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart';
@@ -46,8 +46,10 @@ import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/sliver_layout_info_builder.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 /// One Library folder: its path and counts, Play and Shuffle over every
@@ -305,13 +307,19 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
     );
   }
 
-  Future<void> _openDetails(UnifiedLibraryItem item) {
+  Future<void> _openDetails(UnifiedLibraryItem item) async {
     final local = [for (final item in _items) ?item.localItem];
     final downloads = [for (final item in _items) ?item.historyItem];
     // The details pager steps through one kind of record.
     final localOnly = local.length == _items.length;
     final downloadsOnly = downloads.length == _items.length;
-    return pushPage<void>(
+    await prepareTrackDetailsCover(
+      context,
+      item.filePath,
+      fallback: item.localCoverPath ?? item.coverUrl,
+    );
+    if (!mounted) return;
+    await pushPage<void>(
       context,
       (_) => TrackMetadataScreen(
         item: item.historyItem,
@@ -468,6 +476,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
           ..._desktopHeader(context, folder)
         else if (widget.showHeader)
           AppSliverHeader.page(title: title),
+        AppRefreshIndicator.sliver(),
         ...body,
         // Same reserve as the Library list, so the last rows can scroll
         // clear of the selection bar; desktop pages scroll under the
@@ -838,6 +847,12 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
         final playback = ref.watch(
           mediaItemPlaybackUiProvider(_playbackKey(item)),
         );
+        final VoidCallback play = playback.isCurrent
+            ? () => ref
+                  .read(musicPlayerControllerProvider)
+                  .togglePlayPause(playback.isPlaying)
+            : () => _play(items, start: item);
+        void openDetails() => _openDetails(item);
         return TrackCard(
           style: context.isMornye ? TrackCardStyle.flat : TrackCardStyle.filled,
           leading: _SongArtwork(item: item, size: context.tokens.coverList),
@@ -850,32 +865,37 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
           ),
           isCurrent: playback.isCurrent,
           isPlaying: playback.isPlaying,
-          trailing: AppIconButton(
-            tooltip: playback.isPlaying
-                ? context.l10n.actionPause
-                : context.l10n.tooltipPlay,
-            icon: Icon(
-              playback.isPlaying
-                  ? Icons.pause_rounded
-                  : Icons.play_arrow_rounded,
+          trailing: SongRowButton(
+            playButton: AppIconButton(
+              tooltip: playback.isPlaying
+                  ? context.l10n.actionPause
+                  : context.l10n.tooltipPlay,
+              icon: Icon(
+                playback.isPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
+              ),
+              onPressed: play,
             ),
-            // The current song pauses and resumes in place.
-            onPressed: playback.isCurrent
-                ? () => ref
-                      .read(musicPlayerControllerProvider)
-                      .togglePlayPause(playback.isPlaying)
-                : () => _play(items, start: item),
+            onOpenDetails: openDetails,
+            path: item.filePath,
           ),
           isSelectionMode: isSelectionMode,
           isSelected: selectedIds.contains(item.id),
           onTap: isSelectionMode
               ? () => toggleSelection(item.id)
-              : () => _openDetails(item),
+              : songRowTap(
+                  ref,
+                  path: item.filePath,
+                  openDetails: openDetails,
+                  play: play,
+                ),
           onLongPress: isSelectionMode
               ? () => toggleSelection(item.id)
               : () => enterSelectionMode(item.id),
           onContextMenu: (position) =>
               showSelectionMenu(item.id, () => _showSongMenu(item, position)),
+          queueSwipe: libraryItemQueueSwipe(ref, item),
         );
       },
     );

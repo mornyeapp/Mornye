@@ -4,9 +4,14 @@ import 'package:flutter/painting.dart' show PaintingBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path/path.dart' as p;
 import 'package:mornye/models/library_scan_failure.dart';
+import 'package:mornye/models/track.dart';
+import 'package:mornye/providers/library_album_artwork_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/library_cleanup.dart';
+import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/network_library_scanner.dart';
 import 'package:mornye/services/network_storage_service.dart';
@@ -148,6 +153,11 @@ class LocalLibraryState {
 typedef LocalLibraryAvailabilityProbe =
     Future<bool?> Function(String path, {String? bookmark});
 
+/// Whether the songs of the `network://` source [source] (its host) show:
+/// true or false, or null to keep them as they are. Mornye Link decides it,
+/// so a paired device's songs hide while it is not connected.
+typedef NetworkSourceAvailability = bool? Function(String source);
+
 class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
   LocalLibraryNotifier({
     LibraryDatabase? database,
@@ -161,6 +171,10 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
   final NetworkStorageService _networkStorage;
   void Function()? _unsubscribeNetworkRemoval;
   final LocalLibraryAvailabilityProbe? _availabilityProbe;
+
+  /// Network outages are transient: without a decision here a network
+  /// source keeps its state, so its indexed songs stay visible.
+  NetworkSourceAvailability? _networkAvailability;
   final NotificationService _notificationService = NotificationService();
   static const _progressPollingInterval = Duration(milliseconds: 350);
   static const _progressStreamBootstrapTimeout = Duration(milliseconds: 900);
@@ -477,6 +491,15 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
     await _refreshSummaryFromStorage();
   }
 
+  /// Applies [availability] to the network sources now and at every later
+  /// availability refresh.
+  Future<void> setNetworkSourceAvailability(
+    NetworkSourceAvailability availability,
+  ) {
+    _networkAvailability = availability;
+    return refreshSourceAvailability();
+  }
+
   Future<void> refreshSourceAvailability({bool scanReconnected = false}) {
     _availabilityRequestVersion++;
     _scanReconnectedOnRefresh |= scanReconnected;
@@ -782,6 +805,16 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
       return findByTrackAndArtistAsync(trackName, artistName);
     }
     return null;
+  }
+
+  /// Reads the persisted index even while the in-memory summary is loading.
+  Future<List<LocalLibraryItem?>> findExistingBatchAsync(
+    List<LocalLibraryBatchLookupRequest> requests,
+  ) async {
+    final rows = await _db.findExistingBatch(requests);
+    return rows
+        .map((row) => row == null ? null : LocalLibraryItem.fromJson(row))
+        .toList(growable: false);
   }
 }
 

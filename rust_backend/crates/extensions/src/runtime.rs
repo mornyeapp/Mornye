@@ -14,7 +14,10 @@ mod tests;
 mod vm;
 
 pub(crate) use control::Control;
-use vm::{CompiledSource, run_worker};
+pub(crate) use vm::CompiledSource;
+use vm::run_worker;
+#[cfg(test)]
+pub(crate) use vm::source_compiles;
 
 const MAX_INPUT_BYTES: usize = 8 * 1024 * 1024;
 const MAX_TIMEOUT_MS: u64 = 300_000;

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:ffmpeg_kit_flutter_new_audio/media_information.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/services/audio_analysis_ffmpeg.dart';
@@ -60,7 +61,7 @@ double? _estimateEffectiveSpectralCutoffFileInIsolate(
   );
 }
 
-class _MediaInfo {
+class AudioAnalysisMediaInfo {
   final int fileSize;
   final String codecName;
   final String codec;
@@ -74,7 +75,7 @@ class _MediaInfo {
   final AudioAnalysisBitrate bitrate;
   final int totalSamples;
 
-  const _MediaInfo({
+  const AudioAnalysisMediaInfo({
     required this.fileSize,
     required this.codecName,
     required this.codec,
@@ -412,7 +413,7 @@ class AudioAnalysisRunner {
     }
   }
 
-  Future<_MediaInfo> _getMediaInfo(String filePath) async {
+  Future<AudioAnalysisMediaInfo> _getMediaInfo(String filePath) async {
     final info = await FFmpegExecution.mediaInformation(filePath);
 
     if (info == null) {
@@ -424,6 +425,15 @@ class AudioAnalysisRunner {
       fileSize = await File(filePath).length();
     } catch (_) {}
 
+    return parseMediaInfo(info, fileSize: fileSize);
+  }
+
+  /// Reads the first audio stream of an ffprobe result. Throws when the
+  /// file has no audio stream.
+  static AudioAnalysisMediaInfo parseMediaInfo(
+    MediaInformation info, {
+    int fileSize = 0,
+  }) {
     final streams = info.getStreams();
     final audioStream = streams.firstWhere(
       (s) => s.getAllProperties()?['codec_type'] == 'audio',
@@ -487,7 +497,7 @@ class AudioAnalysisRunner {
       }
     }
 
-    return _MediaInfo(
+    return AudioAnalysisMediaInfo(
       fileSize: fileSize,
       codecName: codecName,
       codec: _formatCodecLabel(codecName, codecLongName),
@@ -508,7 +518,7 @@ class AudioAnalysisRunner {
     );
   }
 
-  String _formatCodecLabel(String codecName, String codecLongName) {
+  static String _formatCodecLabel(String codecName, String codecLongName) {
     final name = codecName.trim();
     final longName = _normalizeAnalysisLabel(codecLongName);
     if (name.isEmpty) return longName;
@@ -518,21 +528,24 @@ class AudioAnalysisRunner {
     return '${name.toUpperCase()} ($longName)';
   }
 
-  String _formatContainerLabel(String formatName, String formatLongName) {
+  static String _formatContainerLabel(
+    String formatName,
+    String formatLongName,
+  ) {
     final longName = _normalizeAnalysisLabel(formatLongName);
     if (longName.isNotEmpty) return longName;
     final name = formatName.trim();
     return name.isEmpty ? '' : name.toUpperCase();
   }
 
-  String _normalizeAnalysisLabel(String value) {
+  static String _normalizeAnalysisLabel(String value) {
     final trimmed = value.trim();
     final lower = trimmed.toLowerCase();
     if (lower.isEmpty || lower == 'unknown' || lower == 'n/a') return '';
     return trimmed;
   }
 
-  int _estimateTotalSamples({
+  static int _estimateTotalSamples({
     required Map<dynamic, dynamic> props,
     required double duration,
     required int sampleRate,
@@ -565,7 +578,7 @@ class AudioAnalysisRunner {
     return 0;
   }
 
-  bool _codecHasStoredBitDepth(String codecName) {
+  static bool _codecHasStoredBitDepth(String codecName) {
     if (codecName.isEmpty) return false;
     return codecName == 'flac' ||
         codecName == 'alac' ||

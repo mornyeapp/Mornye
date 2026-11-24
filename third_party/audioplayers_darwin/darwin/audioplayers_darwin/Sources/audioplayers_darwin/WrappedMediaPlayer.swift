@@ -35,16 +35,87 @@ enum ReleaseMode: String {
   private var player: AVPlayer
   private var equalizer = EqualizerAudioTap()
   private var equalizerConfiguration: [String: Any] = [:]
-  private var equalizerAttached = false
+  /// The current item carries `equalizer`'s tap. It stays attached (and
+  /// passes audio through) when neither the equalizer nor a pitch shift
+  /// needs it any more; the next item gets one only when needed.
+  private var tapAttached = false
+  private var tapAttaching: (item: AVPlayerItem, task: Task<Void, Error>)?
 
   func setEqualizer(_ configuration: [String: Any]) async throws {
     equalizerConfiguration = configuration
     equalizer.dsp.configure(configuration)
-    if configuration["enabled"] as? Bool == true, !equalizerAttached, let item = player.currentItem {
-      try await EqualizerAudioTap.attach(to: item, processor: equalizer)
-      if player.currentItem === item { equalizerAttached = true }
+    if configuration["enabled"] as? Bool == true {
+      try await attachTap(feature: "Equalizer")
     }
   }
+
+  /// Pitch shift in semitones (inside the tap, duration kept), and whether
+  /// the pitch follows the playback rate (varispeed) or stays (spectral).
+  /// Applies to the current item and every new one.
+  private var semitones = 0.0
+  private var pitchFollowsRate = false
+
+  func setPitch(semitones: Double, followsRate: Bool) async throws {
+    self.semitones = semitones
+    pitchFollowsRate = followsRate
+    equalizer.pitch.setSemitones(semitones)
+    updateTimePitch()
+    if semitones != 0 {
+      try await attachTap(feature: "Pitch shift")
+    }
+  }
+
+  /// Attaches the tap to the current item once, also when the equalizer and
+  /// the pitch shift ask for it at the same time.
+  private func attachTap(feature: String) async throws {
+    guard !tapAttached, let item = player.currentItem else { return }
+    if let pending = tapAttaching, pending.item === item {
+      if (try? await pending.task.value) != nil { return }
+      // Attach again so the error names this feature.
+      guard !tapAttached, player.currentItem === item else { return }
+    }
+    let processor = equalizer
+    let task = Task { @MainActor in
+      try await EqualizerAudioTap.attach(to: item, processor: processor, feature: feature)
+    }
+    tapAttaching = (item, task)
+    defer { if tapAttaching?.item === item { tapAttaching = nil } }
+    try await task.value
+    if player.currentItem === item, equalizer === processor { tapAttached = true }
+  }
+
+  /// Both algorithms sound the same at rate 1, and a change rebuilds the
+  /// playing item's audio chain (a short stall), so the current item gets a
+  /// new algorithm only at a rate that needs it. New items get it at once.
+  private func updateTimePitch() {
+    guard playbackRate != 1, let item = player.currentItem else { return }
+    Self.applyTimePitch(followsRate: pitchFollowsRate, to: item)
+  }
+
+  /// Varispeed lets the pitch follow the rate like a record; spectral keeps
+  /// it at any rate, with the best quality for music.
+  static func applyTimePitch(followsRate: Bool, to item: AVPlayerItem) {
+    let algorithm: AVAudioTimePitchAlgorithm = followsRate ? .varispeed : .spectral
+    if item.audioTimePitchAlgorithm != algorithm { item.audioTimePitchAlgorithm = algorithm }
+  }
+
+  /// Whether the system may spatialize this player's audio: mono, stereo
+  /// and multichannel when true, nothing when false. Applies to the current
+  /// item and every new one.
+  private var spatialAudio = true
+
+  func setSpatialAudio(_ enabled: Bool) {
+    spatialAudio = enabled
+    if let item = player.currentItem { Self.applySpatialAudio(enabled, to: item) }
+  }
+
+  /// Audio-only items otherwise default to multichannel only.
+  static func applySpatialAudio(_ enabled: Bool, to item: AVPlayerItem) {
+    if #available(iOS 14.0, macOS 11.0, *) {
+      item.allowedAudioSpatializationFormats = enabled ? .monoStereoAndMultichannel : []
+    }
+  }
+
   private var playbackRate: Double
   private var volume: Double
   private var url: String?
@@ -94,10 +165,22 @@ enum ReleaseMode: String {
       // or format storage with the next item.
       equalizer = EqualizerAudioTap()
       equalizer.dsp.configure(equalizerConfiguration)
-      equalizerAttached = false
+      equalizer.pitch.setSemitones(semitones)
+      tapAttached = false
+      tapAttaching = nil
       // Need to observe item status immediately after creating:
       try await setUpPlayerItemStatusObservation(playerItem)
       guard player.currentItem === playerItem else { throw CancellationError() }
+      // The app sends the shift once; every later source keeps it. The
+      // equalizer is attached by the app's setEqualizer after the source.
+      if semitones != 0 {
+        do {
+          try await attachTap(feature: "Pitch shift")
+        } catch {
+          eventHandler.onLog(message: "Pitch shift unavailable for this source: \(error)")
+        }
+        guard player.currentItem === playerItem else { throw CancellationError() }
+      }
       // Needs to be called after the preparation has completed.
       self.updateDuration()
 
@@ -159,10 +242,51 @@ enum ReleaseMode: String {
 
   func setPlaybackRate(playbackRate: Double) {
     self.playbackRate = playbackRate
+    // Before the rate, so the item never plays it with the old algorithm.
+    // Paused items stay paused.
+    updateTimePitch()
     if isPlaying {
       // Setting the rate causes the player to resume playing. So setting it only, when already playing.
-      player.rate = Float(playbackRate)
+      setRateKeepingTime(Float(playbackRate))
     }
+  }
+
+  /// A plain `rate` change holds the item's clock while the audio restarts
+  /// at the new rate, so every change leaves the song 21 to 26 ms further
+  /// behind (measured on macOS with every time pitch algorithm, also
+  /// between two rates other than 1). Small repeated changes, as Mornye
+  /// Link Play together makes, then never close a gap. Pinning the item
+  /// time at this host instant keeps the clock continuous. A player that
+  /// waits for data or is not moving changes its rate the plain way, and so
+  /// does an item with the tap (equalizer or pitch shift): there both ways
+  /// moved the clock by tens of milliseconds per change, the pinned one up
+  /// to 200 ms when leaving a rate.
+  private func setRateKeepingTime(_ rate: Float) {
+    let clock = CMClockGetHostTimeClock()
+    var current: Float64 = 0
+    var anchorItem = CMTime.zero
+    var anchorHost = CMTime.zero
+    guard !tapAttached, tapAttaching == nil,
+      player.timeControlStatus == .playing, player.rate != 0,
+      let item = player.currentItem, item.status == .readyToPlay,
+      let timebase = item.timebase,
+      CMSyncGetRelativeRateAndAnchorTime(
+        timebase, relativeTo: clock, relativeRateOut: &current,
+        anchorTimeOut: &anchorItem, relativeToAnchorTimeOut: &anchorHost) == noErr,
+      current > 0
+    else {
+      player.rate = rate
+      return
+    }
+    let host = CMClockGetTime(clock)
+    let itemTime = CMTimeAdd(
+      anchorItem, CMTimeMultiplyByFloat64(CMTimeSubtract(host, anchorHost), multiplier: current))
+    // The anchored call raises unless the player is told not to wait; the
+    // setting comes back at once, so later stalls are handled as before.
+    let waits = player.automaticallyWaitsToMinimizeStalling
+    player.automaticallyWaitsToMinimizeStalling = false
+    player.setRate(rate, time: itemTime, atHostTime: host)
+    player.automaticallyWaitsToMinimizeStalling = waits
   }
 
   func seek(time: CMTime) async {
@@ -246,7 +370,8 @@ enum ReleaseMode: String {
       }
     }
     let playerItem = AVPlayerItem(asset: AVURLAsset(url: assetUrl, options: options))
-    playerItem.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithm.timeDomain
+    Self.applyTimePitch(followsRate: pitchFollowsRate, to: playerItem)
+    Self.applySpatialAudio(spatialAudio, to: playerItem)
     return playerItem
   }
 

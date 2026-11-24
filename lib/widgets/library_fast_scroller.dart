@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -218,6 +218,12 @@ class _LibraryFastScrollerState extends State<LibraryFastScroller> {
         Curves.easeOutCubic,
       ),
     );
+    // The thumb shows and hides on the fast effects spring; reduced motion
+    // keeps the short dissolve.
+    final fade = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 200), Curves.linear),
+    );
     // NestedScrollView's body slides behind its pinned header. Reserve only
     // the part of that header currently overlapping this body's viewport.
     final remainingHeader = _outerPosition?.hasContentDimensions == true
@@ -273,7 +279,8 @@ class _LibraryFastScrollerState extends State<LibraryFastScroller> {
                                 onVerticalDragCancel: _endDrag,
                                 child: AnimatedOpacity(
                                   opacity: _visible || _dragging ? 1 : 0,
-                                  duration: const Duration(milliseconds: 200),
+                                  duration: fade.duration,
+                                  curve: fade.curve,
                                   child: Align(
                                     alignment: AlignmentDirectional.centerEnd,
                                     child: AnimatedContainer(

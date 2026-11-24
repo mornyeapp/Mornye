@@ -77,6 +77,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     // press gesture without making a normal play/pause press feel sluggish.
     private static final long HEADSET_MULTI_CLICK_TIMEOUT_MS = 300L;
     private static final int ART_CACHE_ENTRIES = 3;
+    private static final String NOTIFICATION_ART = "notification";
     private static final long AUTO_ENABLED_ACTIONS = PlaybackStateCompat.ACTION_STOP
             | PlaybackStateCompat.ACTION_PAUSE
             | PlaybackStateCompat.ACTION_PLAY
@@ -300,6 +301,8 @@ public class AudioService extends MediaBrowserServiceCompat {
     private int[] compactActionIndices;
     private MediaMetadataCompat mediaMetadata;
     private Bitmap artBitmap;
+    // The session's and notification's copies of the current cover.
+    private final ArtCopies<Bitmap> artCopies = MediaArtwork.newCopies();
     private String notificationChannelId;
     private RecentArtCache<Bitmap> artBitmapCache;
     private boolean playing = false;
@@ -396,6 +399,7 @@ public class AudioService extends MediaBrowserServiceCompat {
         queue = Collections.emptyList();
         controls.clear();
         artBitmapCache.evictAll();
+        artCopies.clear();
         compactActionIndices = null;
         releaseMediaSession();
         ServiceCompat.stopForeground(this, config.androidResumeOnClick
@@ -691,7 +695,7 @@ public class AudioService extends MediaBrowserServiceCompat {
             if (description.getDescription() != null)
                 builder.setSubText(description.getDescription());
             if (artBitmap != null)
-                builder.setLargeIcon(MediaArtwork.copy(artBitmap, 256));
+                builder.setLargeIcon(MediaArtwork.copy(artBitmap, 256, artCopies, NOTIFICATION_ART));
         }
         if (config.androidNotificationClickStartsActivity)
             builder.setContentIntent(mediaSession.getController().getSessionActivity());
@@ -893,7 +897,7 @@ public class AudioService extends MediaBrowserServiceCompat {
         if (destroyed || mediaSession == null) return;
         mediaMetadata = MediaArtwork.sanitize(mediaMetadata);
         try {
-            mediaSession.setMetadata(MediaArtwork.forSession(mediaMetadata));
+            mediaSession.setMetadata(MediaArtwork.forSession(mediaMetadata, artCopies));
         } catch (IllegalArgumentException | IllegalStateException error) {
             Log.w("AudioService", "Artwork rejected by media session; publishing text metadata", error);
             mediaMetadata = MediaArtwork.withoutArtwork(mediaMetadata);
@@ -905,13 +909,20 @@ public class AudioService extends MediaBrowserServiceCompat {
         this.mediaMetadata = mediaMetadata;
         artBitmap = bitmap != null && !bitmap.isRecycled() ? bitmap : null;
         PlaybackStateCompat state = mediaSession.getController().getPlaybackState();
-        if (state != null) {
+        String mediaId = mediaMetadata.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID);
+        // The same item again (a lock screen lyric line) leaves the state as it is.
+        if (state != null && !hasMediaId(state, mediaId)) {
             Bundle extras = state.getExtras() == null ? new Bundle() : new Bundle(state.getExtras());
-            extras.putString(MediaConstants.PLAYBACK_STATE_EXTRAS_KEY_MEDIA_ID,
-                    mediaMetadata.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID));
+            extras.putString(MediaConstants.PLAYBACK_STATE_EXTRAS_KEY_MEDIA_ID, mediaId);
             mediaSession.setPlaybackState(new PlaybackStateCompat.Builder(state).setExtras(extras).build());
         }
         updateNotification();
+    }
+
+    private static boolean hasMediaId(PlaybackStateCompat state, String mediaId) {
+        Bundle extras = state.getExtras();
+        return mediaId != null && extras != null
+                && mediaId.equals(extras.getString(MediaConstants.PLAYBACK_STATE_EXTRAS_KEY_MEDIA_ID));
     }
 
     private MediaMetadataCompat putArtToMetadata(MediaMetadataCompat mediaMetadata, Bitmap bitmap) {

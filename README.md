@@ -3,7 +3,7 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo/svg/mornye-lockup-horizontal-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="assets/brand/logo/svg/mornye-lockup-horizontal-light.svg">
-  <img alt="Mornye" src="assets/brand/logo/svg/mornye-lockup-horizontal-light.svg" width="650" height="auto">
+  <img alt="Mornye" src="assets/brand/logo/svg/mornye-lockup-horizontal-light.svg" width="400" height="auto">
 </picture>
 
 <p align="center">
@@ -51,7 +51,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/showcase-dark.png">
-  <img src="assets/readme/showcase-light.png" width="100%" alt="Mornye screens: Home, Library, Now Playing and Equalizer">
+  <img src="assets/readme/showcase-light.png" width="100%" alt="Mornye 5.4 screens: Library, Now Playing, Lyrics and Equalizer">
 </picture>
 
 ---

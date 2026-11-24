@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart';
 
 /// Retains visited tabs without scrolling their pages out of the viewport.
@@ -89,7 +89,7 @@ class _LazyTabViewState extends State<LazyTabView> {
             excluding: index != widget.index,
             child: TickerMode(
               enabled: index == widget.index,
-              child: _TabInsets(
+              child: HiddenTabMediaQuery(
                 hidden: index != widget.index,
                 child: _mountedTabs.contains(_tabKey(index))
                     ? widget.children[index]
@@ -102,18 +102,24 @@ class _LazyTabViewState extends State<LazyTabView> {
   );
 }
 
-/// Keeps hidden tabs at their last visible window size and without a keyboard.
-class _TabInsets extends StatefulWidget {
-  const _TabInsets({required this.hidden, required this.child});
+/// Keeps hidden tabs at their last visible window size and without a keyboard,
+/// so resizes and pane motion rebuild only the tab on screen. A tab gets the
+/// current size when it shows again.
+class HiddenTabMediaQuery extends StatefulWidget {
+  const HiddenTabMediaQuery({
+    super.key,
+    required this.hidden,
+    required this.child,
+  });
 
   final bool hidden;
   final Widget child;
 
   @override
-  State<_TabInsets> createState() => _TabInsetsState();
+  State<HiddenTabMediaQuery> createState() => _HiddenTabMediaQueryState();
 }
 
-class _TabInsetsState extends State<_TabInsets> {
+class _HiddenTabMediaQueryState extends State<HiddenTabMediaQuery> {
   Size? _visibleSize;
 
   @override

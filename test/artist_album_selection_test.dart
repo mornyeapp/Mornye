@@ -1,5 +1,5 @@
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +14,8 @@ import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/tooltip_finder.dart';
 
 final _albums = [
   for (var i = 0; i < 5; i++)
@@ -34,8 +36,10 @@ Future<void> _pumpArtist(
   List<ArtistAlbum>? albums,
 }) async {
   SharedPreferences.setMockInitialValues({});
-  await tester.binding.setSurfaceSize(const Size(1200, 1800));
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+  // The view size, so MediaQuery matches the window that menus fit into.
+  tester.view.physicalSize = const Size(1200, 1800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
   const channel = MethodChannel('com.zarz.mornye/backend');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -209,7 +213,7 @@ void main() {
       await mouse.addPointer(location: Offset.zero);
       await mouse.moveTo(tester.getCenter(_card(2)));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Scroll forward'));
+      await tester.tap(findByTooltip('Scroll forward'));
       await tester.pumpAndSettle();
       final offset = tester.widget<ListView>(list).controller!.offset;
       expect(offset, greaterThan(0));

@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:clock/clock.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -401,6 +401,65 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
+
+    for (final reducedMotion in [false, true]) {
+      testWidgets('$style panel fades the title on a track change '
+          '(reduced motion: $reducedMotion)', (tester) async {
+        tester.view.physicalSize = const Size(360, 140);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        if (reducedMotion) {
+          tester.platformDispatcher.accessibilityFeaturesTestValue =
+              const FakeAccessibilityFeatures(disableAnimations: true);
+          addTearDown(
+            tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+          );
+        }
+        final items = StreamController<MediaItem?>();
+        addTearDown(items.close);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              currentMediaItemProvider.overrideWithBuild(
+                (ref, notifier) => items.stream,
+              ),
+              playbackStateProvider.overrideWith(
+                (ref) => Stream.value(PlaybackState()),
+              ),
+            ],
+            child: MaterialApp(
+              theme: mornye
+                  ? MornyeTheme.build(Brightness.dark)
+                  : AppTheme.dark(),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: DesktopMiniPlayer(
+                metadataControllerFactory: () => PlayerMetadataController(
+                  readMetadata: (_) async => const {},
+                ),
+              ),
+            ),
+          ),
+        );
+        items.add(_track);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+        items.add(_track.copyWith(id: 'next', title: 'Next song'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(
+          find.text('A song'),
+          reducedMotion ? findsNothing : findsOneWidget,
+        );
+        expect(find.text('Next song'), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(find.text('A song'), findsNothing);
+        expect(find.text('Next song'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
 
     testWidgets('$style switches the retained shell through native resizing', (
       tester,

@@ -1,6 +1,8 @@
 part of 'queue_tab.dart';
 
-class _GroupedAlbum {
+sealed class _LibraryAlbumGroup {}
+
+class _GroupedAlbum extends _LibraryAlbumGroup {
   final String albumName;
   final String artistName;
   final String? coverUrl;
@@ -27,7 +29,7 @@ class _GroupedAlbum {
   int get displayTrackCount => trackCount ?? tracks.length;
 }
 
-class _GroupedLocalAlbum {
+class _GroupedLocalAlbum extends _LibraryAlbumGroup {
   final String albumKey;
   final String albumName;
   final String artistName;
@@ -61,6 +63,7 @@ class _FilterContentData {
   final List<UnifiedLibraryItem> filteredUnifiedItems;
   final List<_GroupedAlbum> filteredGroupedAlbums;
   final List<_GroupedLocalAlbum> filteredGroupedLocalAlbums;
+  final List<_LibraryAlbumGroup> orderedAlbums;
   final bool showFilteringIndicator;
   final int? totalTrackCountOverride;
   final int? totalAlbumCountOverride;
@@ -70,6 +73,7 @@ class _FilterContentData {
     required this.filteredUnifiedItems,
     required this.filteredGroupedAlbums,
     required this.filteredGroupedLocalAlbums,
+    required this.orderedAlbums,
     required this.showFilteringIndicator,
     this.totalTrackCountOverride,
     this.totalAlbumCountOverride,
@@ -188,6 +192,7 @@ class _QueueLibraryPageData implements QueueLibraryPageContent {
   final List<LocalLibraryItem> localItems;
   final List<_GroupedAlbum> groupedAlbums;
   final List<_GroupedLocalAlbum> groupedLocalAlbums;
+  final List<_LibraryAlbumGroup> orderedAlbums;
   final QueueLibraryDbCursor? nextCursor;
 
   const _QueueLibraryPageData({
@@ -196,6 +201,7 @@ class _QueueLibraryPageData implements QueueLibraryPageContent {
     this.localItems = const [],
     this.groupedAlbums = const [],
     this.groupedLocalAlbums = const [],
+    this.orderedAlbums = const [],
     this.nextCursor,
   });
 
@@ -253,8 +259,10 @@ class _QueueLibraryPageData implements QueueLibraryPageContent {
         );
       }
       albums.sort((a, b) => b.latestDownload.compareTo(a.latestDownload));
+      final selectedAlbums = albums.take(limit).toList(growable: false);
       return _QueueLibraryPageData(
-        groupedAlbums: albums.take(limit).toList(growable: false),
+        groupedAlbums: selectedAlbums,
+        orderedAlbums: selectedAlbums,
       );
     }
 
@@ -288,6 +296,7 @@ class _QueueLibraryPageData implements QueueLibraryPageContent {
     final localItems = <LocalLibraryItem>[];
     final groupedAlbums = <_GroupedAlbum>[];
     final groupedLocalAlbums = <_GroupedLocalAlbum>[];
+    final orderedAlbums = <_LibraryAlbumGroup>[];
 
     for (final page in pages) {
       items.addAll(page.items);
@@ -295,6 +304,7 @@ class _QueueLibraryPageData implements QueueLibraryPageContent {
       localItems.addAll(page.localItems);
       groupedAlbums.addAll(page.groupedAlbums);
       groupedLocalAlbums.addAll(page.groupedLocalAlbums);
+      orderedAlbums.addAll(page.orderedAlbums);
     }
 
     return _QueueLibraryPageData(
@@ -303,6 +313,7 @@ class _QueueLibraryPageData implements QueueLibraryPageContent {
       localItems: localItems,
       groupedAlbums: groupedAlbums,
       groupedLocalAlbums: groupedLocalAlbums,
+      orderedAlbums: orderedAlbums,
       nextCursor: pages.last.nextCursor,
     );
   }
@@ -316,6 +327,7 @@ class _QueueLibraryPageData implements QueueLibraryPageContent {
       filteredUnifiedItems: items,
       filteredGroupedAlbums: groupedAlbums,
       filteredGroupedLocalAlbums: groupedLocalAlbums,
+      orderedAlbums: orderedAlbums,
       showFilteringIndicator: false,
       totalTrackCountOverride: totalTrackCount,
       totalAlbumCountOverride: totalAlbumCount,
@@ -374,42 +386,44 @@ final _queueLibraryPageProvider = FutureProvider.autoDispose
         final rows = page.rows;
         final groupedAlbums = <_GroupedAlbum>[];
         final groupedLocalAlbums = <_GroupedLocalAlbum>[];
+        final orderedAlbums = <_LibraryAlbumGroup>[];
         for (final row in rows) {
           final source = row['queue_source'] as String? ?? '';
           final latestMillis = (row['sort_added'] as num?)?.toInt() ?? 0;
           final latest = DateTime.fromMillisecondsSinceEpoch(latestMillis);
           if (source == 'local') {
-            groupedLocalAlbums.add(
-              _GroupedLocalAlbum(
-                albumKey: row['album_key'] as String? ?? '',
-                albumName: row['album_name'] as String? ?? '',
-                artistName: row['artist_name'] as String? ?? '',
-                coverPath: row['cover_path'] as String?,
-                sampleFilePath: row['sample_file_path'] as String? ?? '',
-                tracks: const [],
-                trackCount: (row['track_count'] as num?)?.toInt() ?? 0,
-                completeness: AlbumCompleteness.fromRow(row),
-                latestScanned: latest,
-              ),
+            final album = _GroupedLocalAlbum(
+              albumKey: row['album_key'] as String? ?? '',
+              albumName: row['album_name'] as String? ?? '',
+              artistName: row['artist_name'] as String? ?? '',
+              coverPath: row['cover_path'] as String?,
+              sampleFilePath: row['sample_file_path'] as String? ?? '',
+              tracks: const [],
+              trackCount: (row['track_count'] as num?)?.toInt() ?? 0,
+              completeness: AlbumCompleteness.fromRow(row),
+              latestScanned: latest,
             );
+            groupedLocalAlbums.add(album);
+            orderedAlbums.add(album);
           } else if (source == 'downloaded') {
-            groupedAlbums.add(
-              _GroupedAlbum(
-                albumName: row['album_name'] as String? ?? '',
-                artistName: row['artist_name'] as String? ?? '',
-                coverUrl: row['cover_url'] as String?,
-                sampleFilePath: row['sample_file_path'] as String? ?? '',
-                tracks: const [],
-                trackCount: (row['track_count'] as num?)?.toInt() ?? 0,
-                completeness: AlbumCompleteness.fromRow(row),
-                latestDownload: latest,
-              ),
+            final album = _GroupedAlbum(
+              albumName: row['album_name'] as String? ?? '',
+              artistName: row['artist_name'] as String? ?? '',
+              coverUrl: row['cover_url'] as String?,
+              sampleFilePath: row['sample_file_path'] as String? ?? '',
+              tracks: const [],
+              trackCount: (row['track_count'] as num?)?.toInt() ?? 0,
+              completeness: AlbumCompleteness.fromRow(row),
+              latestDownload: latest,
             );
+            groupedAlbums.add(album);
+            orderedAlbums.add(album);
           }
         }
         return _QueueLibraryPageData(
           groupedAlbums: groupedAlbums,
           groupedLocalAlbums: groupedLocalAlbums,
+          orderedAlbums: orderedAlbums,
           nextCursor: page.nextCursor,
         );
       }

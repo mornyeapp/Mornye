@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -10,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
+import 'package:mornye/providers/library_album_artwork_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/audio_analysis_cache.dart';
@@ -142,6 +144,8 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
     await DownloadedEmbeddedCoverResolver.clearPersistentCache();
     final cacheDir = await getApplicationCacheDirectory();
     await CacheMaintenanceService.clearDirectoryContents(cacheDir.path);
+    // Covers on the pages under this one still point at the deleted files.
+    DownloadedEmbeddedCoverResolver.announcePreviewsCleared();
   }
 
   Future<void> _clearTempCache() async {
@@ -154,7 +158,9 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
   }
 
   Future<void> _clearMotionArtwork() async {
+    // Copies of folder covers live in the same directory.
     await ref.read(motionArtworkStoreProvider).clear();
+    ref.read(motionArtworkFolderProvider).forget();
     if (mounted) ref.invalidate(playerMotionArtworkProvider);
   }
 
@@ -165,6 +171,13 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
       libraryCoverDir,
       await LibraryDatabase.instance.database,
     );
+    // Covers found online for albums come back from their saved addresses
+    // without a scan or a new search.
+    if (mounted) {
+      unawaited(
+        ref.read(libraryAlbumArtworkProvider.notifier).restoreMissing(),
+      );
+    }
   }
 
   Future<void> _clearAudioAnalysisCache() async {

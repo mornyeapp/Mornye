@@ -358,11 +358,24 @@ typedef HapticPulse = Future<void> Function(double intensity, double sharpness);
 
 const _channel = MethodChannel('com.zarz.mornye/haptics');
 
-Future<void> nativeHapticPulse(double intensity, double sharpness) =>
-    _channel.invokeMethod<void>('pulse', {
-      'intensity': intensity,
-      'sharpness': sharpness,
-    });
+/// Which system setting a pulse answers to on Android. Music pulses follow
+/// media vibration; UI feedback follows touch feedback. iOS ignores it.
+enum HapticPulseUsage { media, touch }
+
+Future<void> nativeHapticPulse(
+  double intensity,
+  double sharpness, {
+  HapticPulseUsage usage = HapticPulseUsage.media,
+}) => _channel.invokeMethod<void>('pulse', {
+  'intensity': intensity,
+  'sharpness': sharpness,
+  // Absent means media, which older callers rely on.
+  if (usage == HapticPulseUsage.touch) 'usage': 'touch',
+});
+
+/// A pulse for UI feedback, such as a swipe crossing its threshold.
+Future<void> nativeTouchHapticPulse(double intensity, double sharpness) =>
+    nativeHapticPulse(intensity, sharpness, usage: HapticPulseUsage.touch);
 
 /// Plays a song's pulses against the live playback position.
 ///

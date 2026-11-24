@@ -1,11 +1,5 @@
 part of 'track_metadata_screen.dart';
 
-const _trackMetadataHeroScheme = ColorScheme.dark(
-  surface: Colors.black,
-  onSurface: Colors.white,
-  onSurfaceVariant: Colors.white70,
-);
-
 /// Content width, inside the page padding, at which the cards split into two
 /// columns of about 470 or more each.
 const double _trackMetadataTwoColumnMinWidth = 960;
@@ -17,36 +11,39 @@ double _trackMetadataContentMaxWidth(double width) =>
     ? math.min(width, desktopMaterialContentMaxWidth)
     : adaptiveContentMaxWidth(width);
 
-final ImageFilter _trackMetadataBackdropBlur = ImageFilter.blur(
-  sigmaX: 32,
-  sigmaY: 32,
-);
+/// Inner padding of a section, the same as the analysis cards below them.
+const double _trackMetadataSectionPadding = 20;
+
+/// The song's facts by the section that shows them. [all] keeps them in
+/// reading order for Copy all.
+typedef _MetadataFacts = ({
+  List<_MetadataItem> tags,
+  List<_MetadataItem> release,
+  List<_MetadataItem> audio,
+  List<_MetadataItem> file,
+  List<_MetadataItem> all,
+});
 
 extension _TrackMetadataCards on _TrackMetadataScreenState {
-  List<Widget> _headerMetadataItems(BuildContext context) => [
-    if (_displayAudioQuality != null && _displayAudioQuality!.isNotEmpty)
-      HeaderMetaItem(_displayAudioQuality!),
-    if (duration != null) HeaderMetaItem(formatClock(duration!)),
-    if (_service == 'local')
-      HeaderMetaItem(
-        context.l10n.librarySourceLocal,
-        icon: context.isMornye ? CupertinoIcons.folder : Icons.folder,
-      )
-    else if (_service.isNotEmpty)
-      HeaderMetaItem(_service[0].toUpperCase() + _service.substring(1)),
-  ];
-
   Widget _buildAnimatedTrackContent(
     BuildContext context,
     WidgetRef ref,
     ColorScheme colorScheme,
   ) {
     final currentKey = ValueKey<String>('metadata_content_$_itemId');
+    final incoming = AppMotion.effects(
+      context,
+      AppMotionSpec(context.tokens.motionMedium, Curves.easeOutCubic),
+    );
+    final outgoing = AppMotion.effectsFast(
+      context,
+      AppMotionSpec(context.tokens.motionFast, Curves.easeInCubic),
+    );
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 240),
-      reverseDuration: const Duration(milliseconds: 180),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
+      duration: incoming.duration,
+      reverseDuration: outgoing.duration,
+      switchInCurve: incoming.curve,
+      switchOutCurve: outgoing.leaving,
       layoutBuilder: (currentChild, previousChildren) {
         return Stack(
           alignment: Alignment.topCenter,
@@ -63,90 +60,107 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
           isIncoming ? 0.18 * direction : -0.18 * direction,
           0,
         );
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
         return ClipRect(
           child: SlideTransition(
             position: Tween<Offset>(
               begin: begin,
               end: Offset.zero,
-            ).animate(curved),
+            ).animate(animation),
             child: FadeTransition(opacity: animation, child: child),
           ),
         );
       },
       child: Padding(
         key: currentKey,
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.tokens.gapLg),
         child: LayoutBuilder(
           builder: (context, constraints) {
+            final gap = SizedBox(height: context.tokens.gapLg);
+            final facts = _metadataFacts(context);
             final details = [
-              _buildMetadataCard(context, colorScheme, _fileSize),
-              const SizedBox(height: 16),
-              _buildFileInfoCard(context, colorScheme, _fileExists, _fileSize),
+              _buildFactsSection(
+                context,
+                colorScheme,
+                title: context.l10n.trackMetadata,
+                items: facts.tags,
+                all: facts.all,
+              ),
+              if (facts.release.isNotEmpty || upc != null || _hasServiceLink)
+                _buildFactsSection(
+                  context,
+                  colorScheme,
+                  title: context.l10n.trackSectionRelease,
+                  items: facts.release,
+                  all: facts.all,
+                  footer: [
+                    if (upc case final barcodeValue?)
+                      MetadataBarcode(
+                        value: barcodeValue,
+                        label: context.l10n.editMetadataFieldUpc,
+                        onCopy: () => _copyToClipboard(context, barcodeValue),
+                      ),
+                    if (_hasServiceLink) _buildOpenServiceButton(context),
+                  ],
+                ),
+              if (facts.audio.isNotEmpty)
+                _buildFactsSection(
+                  context,
+                  colorScheme,
+                  title: context.l10n.trackSectionAudio,
+                  items: facts.audio,
+                  all: facts.all,
+                ),
+              _buildFileInfoCard(context, colorScheme, facts),
             ];
             final media = [
               _buildLyricsCard(context, colorScheme),
               if (_fileExists) ...[
-                const SizedBox(height: 16),
                 AudioAnalysisCard(
                   filePath: _filePath,
                   codecHint: _storedAudioFormat,
                   exportName: _buildSaveBaseName(),
                 ),
-                if (HiResCheckCard.isCandidate(
-                  _filePath,
-                  _storedAudioFormat,
-                )) ...[
-                  const SizedBox(height: 16),
+                if (HiResCheckCard.isCandidate(_filePath, _storedAudioFormat))
                   HiResCheckCard(
                     filePath: _filePath,
                     formatHint: _storedAudioFormat,
+                    name: '$artistName - $trackName',
                   ),
-                ],
               ],
             ];
             Widget column(List<Widget> children) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: children,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (index, child) in children.indexed) ...[
+                  if (index > 0) gap,
+                  child,
+                ],
+              ],
             );
             final twoColumns =
                 constraints.maxWidth >= _trackMetadataTwoColumnMinWidth;
             return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (_fileAccessMessage(context) case final message?
-                    when !context.isMornye)
+                if (_fileAccessMessage(context) case final message?)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Text(
-                      message,
-                      style: TextStyle(color: colorScheme.error),
-                    ),
+                    padding: EdgeInsets.only(bottom: context.tokens.gapLg),
+                    child: ErrorCard(error: message, colorScheme: colorScheme),
                   ),
                 // Wide windows put the tags and file facts beside lyrics and
                 // analysis instead of one long column of stretched rows.
                 if (twoColumns)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: context.tokens.gapLg,
                     children: [
                       Expanded(child: column(details)),
-                      const SizedBox(width: 16),
                       Expanded(child: column(media)),
                     ],
                   )
                 else
-                  column([...details, const SizedBox(height: 16), ...media]),
-
-                if (!context.isMornye) ...[
-                  const SizedBox(height: 24),
-                  _buildActionButtons(context, ref, colorScheme, _fileExists),
-                ],
-
-                const SizedBox(height: 32),
+                  column([...details, ...media]),
+                SizedBox(height: context.tokens.gapLg * 2),
               ],
             );
           },
@@ -155,286 +169,148 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
     );
   }
 
-  Widget _buildHeaderBackground(
-    BuildContext context,
-    ColorScheme colorScheme,
-    double expandedHeight,
-    bool showContent,
-  ) {
-    final coverCacheWidth = coverCacheWidthForViewport(context);
-    final backdropCacheWidth = metadataBackdropCacheExtent(context);
-    // Downloaded-item entry points must await resolveOrExtract before pushing
-    // this route. That precondition keeps the Hero, foreground, and backdrop
-    // on one source from the first frame; this synchronous lookup also covers
-    // cached rebuilds and in-screen swipe navigation.
-    final sharedEmbeddedCoverPath = _hasPath(_embeddedCoverPreviewPath)
-        ? _embeddedCoverPreviewPath
-        : DownloadedEmbeddedCoverResolver.resolve(_filePath);
-    final artworkSource = resolveMetadataArtworkSource(
-      embeddedCoverPath: sharedEmbeddedCoverPath,
-      localCoverPath: _localCoverPath,
-      remoteCoverUrl: _coverUrl,
-    );
+  bool get _hasServiceLink => _spotifyId != null && _spotifyId!.isNotEmpty;
 
-    Widget artworkImage({required int cacheWidth, int? cacheHeight}) {
-      final source = artworkSource;
-      if (source == null) {
-        return Container(
-          color: colorScheme.surfaceContainerHighest,
-          child: Icon(
-            Icons.music_note,
-            size: 80,
-            color: colorScheme.onSurfaceVariant,
-          ),
-        );
-      }
+  /// The service this song's catalog ID belongs to.
+  String get _linkedService =>
+      _serviceForTrackId(_spotifyId!, fallbackService: _service.toLowerCase());
 
-      if (isHttpCoverUrl(source)) {
-        return CachedCoverImage(
-          imageUrl: source,
-          fit: BoxFit.cover,
-          memCacheWidth: cacheWidth,
-          memCacheHeight: cacheHeight,
-          placeholder: (_, _) => Container(color: colorScheme.surface),
-          errorWidget: (_, _, _) => Container(color: colorScheme.surface),
-        );
-      }
+  _MetadataFacts _metadataFacts(BuildContext context) {
+    final l10n = context.l10n;
+    String? edited(String key) =>
+        normalizeOptionalString(_editedMetadata?[key]?.toString());
+    final replayGainTrackGain = edited('replaygain_track_gain');
+    final replayGainTrackPeak = edited('replaygain_track_peak');
+    final replayGainAlbumGain = edited('replaygain_album_gain');
+    final replayGainAlbumPeak = edited('replaygain_album_peak');
 
-      final filePath = coverFilePath(source);
-      if (filePath == null) return Container(color: colorScheme.surface);
-      return Image.file(
-        File(filePath),
-        fit: BoxFit.cover,
-        cacheWidth: cacheWidth,
-        cacheHeight: cacheHeight,
-        gaplessPlayback: true,
-        filterQuality: FilterQuality.low,
-        errorBuilder: (_, _, _) => Container(color: colorScheme.surface),
-      );
-    }
+    final tags = <_MetadataItem>[
+      _MetadataItem(l10n.trackTrackName, trackName),
+      _MetadataItem(l10n.trackArtist, artistName),
+      if (albumArtist != null && albumArtist != artistName)
+        _MetadataItem(l10n.trackAlbumArtist, albumArtist!),
+      _MetadataItem(l10n.trackAlbum, albumName),
+      if (trackNumber != null && trackNumber! > 0)
+        _MetadataItem(l10n.trackTrackNumber, trackNumber.toString()),
+      if (totalTracks != null && totalTracks! > 0)
+        _MetadataItem(l10n.editMetadataFieldTrackTotal, totalTracks.toString()),
+      if (discNumber != null && discNumber! > 0)
+        _MetadataItem(l10n.trackDiscNumber, discNumber.toString()),
+      if (totalDiscs != null && totalDiscs! > 0)
+        _MetadataItem(l10n.editMetadataFieldDiscTotal, totalDiscs.toString()),
+      if (releaseDate != null && releaseDate!.isNotEmpty)
+        _MetadataItem(l10n.trackReleaseDate, releaseDate!),
+      if (genre != null && genre!.isNotEmpty)
+        _MetadataItem(l10n.trackGenre, genre!),
+      if (edited('mood') case final String mood)
+        _MetadataItem(l10n.trackMood, mood),
+      if (composer != null && composer!.isNotEmpty)
+        _MetadataItem(l10n.editMetadataFieldComposer, composer!),
+      if (comment != null)
+        _MetadataItem(l10n.editMetadataFieldComment, comment!),
+    ];
 
-    Widget coverImage() => artworkImage(cacheWidth: coverCacheWidth);
-    Widget backdropImage() => artworkImage(
-      cacheWidth: backdropCacheWidth,
-      cacheHeight: backdropCacheWidth,
-    );
-
-    // Centered square cover over a blurred backdrop (same layout as the album
-    // header) so the Hero flight from a list thumbnail keeps its square shape.
-    // Landscape headers are short: the cover also yields to the height left
-    // below the toolbar after the title block, so nothing rises into it.
-    final toolbarBottom = MediaQuery.paddingOf(context).top + kToolbarHeight;
-    const textBlockHeight = 190.0;
-    // Desktop allows up to 260, close to the desktop album header's cover.
-    final coverSize = math.min(
-      (MediaQuery.sizeOf(context).width * 0.5).clamp(
-        150.0,
-        isDesktopPlatform ? 260.0 : 210.0,
-      ),
-      math.max(96.0, expandedHeight - toolbarBottom - textBlockHeight),
-    );
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        RepaintBoundary(
-          key: ValueKey<String>('metadata_backdrop_$_itemId'),
-          child: ImageFiltered(
-            imageFilter: _trackMetadataBackdropBlur,
-            child: backdropImage(),
-          ),
+    final release = <_MetadataItem>[
+      if (albumType != null) _MetadataItem(l10n.trackAlbumType, albumType!),
+      if (label != null && label!.isNotEmpty)
+        _MetadataItem(l10n.trackLabel, label!),
+      if (copyright != null && copyright!.isNotEmpty)
+        _MetadataItem(l10n.trackCopyright, copyright!),
+      if (isrc != null && isrc!.isNotEmpty)
+        _MetadataItem(
+          'ISRC',
+          formatIsrcForDisplay(isrc),
+          rawValue: canonicalIsrcForCopy(isrc),
+          copyable: true,
         ),
-        Container(color: Colors.black.withValues(alpha: 0.35)),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: expandedHeight * 0.65,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.85),
-                ],
-              ),
-            ),
-          ),
+      if (!_isLocalItem && _hasServiceLink)
+        _MetadataItem(
+          switch (_linkedService) {
+            MusicServices.deezer => 'Deezer ID',
+            MusicServices.amazon => 'Amazon ASIN',
+            MusicServices.tidal => 'Tidal ID',
+            MusicServices.qobuz => 'Qobuz ID',
+            _ => 'Spotify ID',
+          },
+          _displayServiceTrackId(_spotifyId!),
+          copyable: true,
         ),
-        Positioned(
-          left: 20,
-          right: 20,
-          bottom: 40,
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 150),
-            opacity: showContent ? 1.0 : 0.0,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Hero(
-                  tag: _coverHeroTag,
-                  child: Container(
-                    width: coverSize,
-                    height: coverSize,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: SizedBox(
-                        width: coverSize,
-                        height: coverSize,
-                        child: coverImage(),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ExplicitTrackTitle(
-                  title: trackName,
-                  explicit: isExplicit,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    height: 1.2,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  colorScheme: _trackMetadataHeroScheme,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  artistName,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  albumName,
-                  style: const TextStyle(color: Colors.white54, fontSize: 14),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-                HeaderPalette(
-                  scheme: _trackMetadataHeroScheme,
-                  child: HeaderMetaRow(items: _headerMetadataItems(context)),
-                ),
-              ],
-            ),
-          ),
+    ];
+
+    final audio = <_MetadataItem>[
+      if (duration != null)
+        _MetadataItem(l10n.trackDuration, formatClock(duration!)),
+      if (_displayAudioQuality case final quality?)
+        _MetadataItem(l10n.trackAudioQuality, quality),
+      if (_editedMetadata?['bpm'] case final int bpm when bpm > 0)
+        _MetadataItem(l10n.trackBpm, bpm.toString()),
+      if (replayGainTrackGain != null)
+        _MetadataItem(l10n.trackReplayGainTrackGain, replayGainTrackGain),
+      if (replayGainTrackPeak != null)
+        _MetadataItem(l10n.trackReplayGainTrackPeak, replayGainTrackPeak),
+      if (replayGainAlbumGain != null)
+        _MetadataItem(l10n.trackReplayGainAlbumGain, replayGainAlbumGain),
+      if (replayGainAlbumPeak != null)
+        _MetadataItem(l10n.trackReplayGainAlbumPeak, replayGainAlbumPeak),
+    ];
+
+    final file = <_MetadataItem>[
+      if (_embeddedCoverDimensions case final dimensions?)
+        _MetadataItem(
+          l10n.trackCoverResolution,
+          '${dimensions.width} × ${dimensions.height} px',
         ),
-      ],
+      _MetadataItem(l10n.trackMetadataService, _service.toUpperCase()),
+      _MetadataItem(l10n.trackDownloaded, _formatFullDate(_addedAt)),
+    ];
+
+    return (
+      tags: tags,
+      release: release,
+      audio: audio,
+      file: file,
+      all: [...tags, ...release, ...audio, ...file],
     );
   }
 
-  RoundedRectangleBorder _sectionCardShape(ColorScheme colorScheme) {
-    return RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
-      side: BorderSide(
-        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-      ),
-    );
-  }
+  Widget _buildSectionTitle(BuildContext context, String title) => Text(
+    title,
+    style: Theme.of(
+      context,
+    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+  );
 
-  Widget _buildMetadataCard(
+  /// One titled section of facts, with [footer] widgets under its rows.
+  Widget _buildFactsSection(
     BuildContext context,
-    ColorScheme colorScheme,
-    int? fileSize,
-  ) {
+    ColorScheme colorScheme, {
+    required String title,
+    required List<_MetadataItem> items,
+    required List<_MetadataItem> all,
+    List<Widget> footer = const [],
+  }) {
+    final tokens = context.tokens;
     return _metadataSectionSurface(
       context,
       colorScheme,
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(_trackMetadataSectionPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              context.l10n.trackMetadata,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
+            _buildSectionTitle(context, title),
+            SizedBox(height: tokens.gapSm),
+            for (final (index, item) in items.indexed)
+              _buildFactRow(
+                context,
+                colorScheme,
+                item,
+                all: all,
+                showDivider: index != items.length - 1,
               ),
-            ),
-            const SizedBox(height: 16),
-
-            _buildMetadataGrid(context, colorScheme),
-
-            if (upc case final barcodeValue?) ...[
-              const SizedBox(height: 16),
-              MetadataBarcode(
-                value: barcodeValue,
-                label: context.l10n.editMetadataFieldUpc,
-                onCopy: () => _copyToClipboard(context, barcodeValue),
-              ),
-            ],
-
-            if (_spotifyId != null && _spotifyId!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Builder(
-                builder: (context) {
-                  final openService = _serviceForTrackId(
-                    _spotifyId!,
-                    fallbackService: _service.toLowerCase(),
-                  );
-                  String buttonLabel;
-                  if (openService == MusicServices.deezer) {
-                    buttonLabel = context.l10n.trackOpenInDeezer;
-                  } else if (openService == MusicServices.amazon) {
-                    buttonLabel = context.l10n.trackOpenInService(
-                      'Amazon Music',
-                    );
-                  } else if (openService == MusicServices.tidal) {
-                    buttonLabel = context.l10n.trackOpenInService('Tidal');
-                  } else if (openService == MusicServices.qobuz) {
-                    buttonLabel = context.l10n.trackOpenInService('Qobuz');
-                  } else {
-                    buttonLabel = context.l10n.trackOpenInSpotify;
-                  }
-                  if (context.isMornye) {
-                    return HeaderFilledButton(
-                      icon: CupertinoIcons.arrow_up_right_square,
-                      label: buttonLabel,
-                      onPressed: () => _openServiceUrl(context),
-                    );
-                  }
-                  return ExpressiveButton(
-                    outlined: true,
-                    onPressed: () => _openServiceUrl(context),
-                    icon: const Icon(Icons.open_in_new, size: 18),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(buttonLabel),
-                  );
-                },
-              ),
+            for (final widget in footer) ...[
+              SizedBox(height: tokens.gapMd),
+              widget,
             ],
           ],
         ),
@@ -442,16 +318,106 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
     );
   }
 
+  /// A label and its value. A tap copies a [_MetadataItem.copyable] value;
+  /// a long press offers to copy the value, the field or every fact.
+  Widget _buildFactRow(
+    BuildContext context,
+    ColorScheme colorScheme,
+    _MetadataItem item, {
+    required List<_MetadataItem> all,
+    required bool showDivider,
+  }) {
+    final tokens = context.tokens;
+    final textTheme = Theme.of(context).textTheme;
+    final onTap = item.copyable
+        ? () => _copyToClipboard(context, item.rawValue)
+        : null;
+    void onLongPress() =>
+        _showMetadataCopySheet(context, metadata: item, allMetadata: all);
+    final copy = item.copyable
+        ? AppIcon.adaptive(
+            Icons.copy,
+            size: 16,
+            color: colorScheme.onSurfaceVariant,
+          )
+        : null;
+    if (context.isMornye) {
+      return MornyeMetadataRow(
+        label: item.label,
+        value: item.value,
+        showDivider: showDivider,
+        trailing: copy,
+        onTap: onTap,
+        onLongPress: onLongPress,
+      );
+    }
+    return InkWell(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      borderRadius: tokens.borderRadiusThumb,
+      // Every row keeps the minimum touch target for its long press.
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: tokens.minTouchTarget),
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: tokens.gapSm),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            spacing: tokens.gapMd,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(
+                  item.label,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: Text(item.value, style: textTheme.bodyLarge),
+              ),
+              ?copy,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Opens the song in the service its catalog ID belongs to.
+  Widget _buildOpenServiceButton(BuildContext context) {
+    final l10n = context.l10n;
+    final label = switch (_linkedService) {
+      MusicServices.deezer => l10n.trackOpenInDeezer,
+      MusicServices.amazon => l10n.trackOpenInService('Amazon Music'),
+      MusicServices.tidal => l10n.trackOpenInService('Tidal'),
+      MusicServices.qobuz => l10n.trackOpenInService('Qobuz'),
+      _ => l10n.trackOpenInSpotify,
+    };
+    if (context.isMornye) {
+      return HeaderFilledButton(
+        icon: CupertinoIcons.arrow_up_right_square,
+        label: label,
+        tonal: true,
+        onPressed: () => _openServiceUrl(context),
+      );
+    }
+    return ExpressiveButton(
+      outlined: true,
+      onPressed: () => _openServiceUrl(context),
+      icon: const AppIcon.adaptive(Icons.open_in_new, size: 18),
+      child: Text(label),
+    );
+  }
+
   Future<void> _openServiceUrl(BuildContext context) async {
     if (_spotifyId == null) return;
 
-    final openService = _serviceForTrackId(
-      _spotifyId!,
-      fallbackService: _service.toLowerCase(),
-    );
     // Unknown services open as Spotify, as this button always has.
     final link = ServiceTrackLink(
-      openService,
+      _linkedService,
       _displayServiceTrackId(_spotifyId!),
     );
     final webUrl = link.webUrl;
@@ -487,209 +453,6 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
         }
       }
     }
-  }
-
-  Widget _buildMetadataGrid(BuildContext context, ColorScheme colorScheme) {
-    final audioQualityStr = _displayAudioQuality;
-    final replayGainTrackGain = normalizeOptionalString(
-      _editedMetadata?['replaygain_track_gain']?.toString(),
-    );
-    final replayGainTrackPeak = normalizeOptionalString(
-      _editedMetadata?['replaygain_track_peak']?.toString(),
-    );
-    final replayGainAlbumGain = normalizeOptionalString(
-      _editedMetadata?['replaygain_album_gain']?.toString(),
-    );
-    final replayGainAlbumPeak = normalizeOptionalString(
-      _editedMetadata?['replaygain_album_peak']?.toString(),
-    );
-
-    final items = <_MetadataItem>[
-      _MetadataItem(context.l10n.trackTrackName, trackName),
-      _MetadataItem(context.l10n.trackArtist, artistName),
-      if (albumArtist != null && albumArtist != artistName)
-        _MetadataItem(context.l10n.trackAlbumArtist, albumArtist!),
-      _MetadataItem(context.l10n.trackAlbum, albumName),
-      if (trackNumber != null && trackNumber! > 0)
-        _MetadataItem(context.l10n.trackTrackNumber, trackNumber.toString()),
-      if (totalTracks != null && totalTracks! > 0)
-        _MetadataItem(
-          context.l10n.editMetadataFieldTrackTotal,
-          totalTracks.toString(),
-        ),
-      if (discNumber != null && discNumber! > 0)
-        _MetadataItem(context.l10n.trackDiscNumber, discNumber.toString()),
-      if (totalDiscs != null && totalDiscs! > 0)
-        _MetadataItem(
-          context.l10n.editMetadataFieldDiscTotal,
-          totalDiscs.toString(),
-        ),
-      if (duration != null)
-        _MetadataItem(context.l10n.trackDuration, formatClock(duration!)),
-      if (audioQualityStr != null)
-        _MetadataItem(context.l10n.trackAudioQuality, audioQualityStr),
-      if (_editedMetadata?['bpm'] case final int bpm when bpm > 0)
-        _MetadataItem(context.l10n.trackBpm, bpm.toString()),
-      if (normalizeOptionalString(_editedMetadata?['mood']?.toString())
-          case final String mood)
-        _MetadataItem(context.l10n.trackMood, mood),
-      if (replayGainTrackGain != null)
-        _MetadataItem(
-          context.l10n.trackReplayGainTrackGain,
-          replayGainTrackGain,
-        ),
-      if (replayGainTrackPeak != null)
-        _MetadataItem(
-          context.l10n.trackReplayGainTrackPeak,
-          replayGainTrackPeak,
-        ),
-      if (replayGainAlbumGain != null)
-        _MetadataItem(
-          context.l10n.trackReplayGainAlbumGain,
-          replayGainAlbumGain,
-        ),
-      if (replayGainAlbumPeak != null)
-        _MetadataItem(
-          context.l10n.trackReplayGainAlbumPeak,
-          replayGainAlbumPeak,
-        ),
-      if (_embeddedCoverDimensions case final dimensions?)
-        _MetadataItem(
-          context.l10n.trackCoverResolution,
-          '${dimensions.width} × ${dimensions.height} px',
-        ),
-      if (releaseDate != null && releaseDate!.isNotEmpty)
-        _MetadataItem(context.l10n.trackReleaseDate, releaseDate!),
-      if (genre != null && genre!.isNotEmpty)
-        _MetadataItem(context.l10n.trackGenre, genre!),
-      if (label != null && label!.isNotEmpty)
-        _MetadataItem(context.l10n.trackLabel, label!),
-      if (copyright != null && copyright!.isNotEmpty)
-        _MetadataItem(context.l10n.trackCopyright, copyright!),
-      if (composer != null && composer!.isNotEmpty)
-        _MetadataItem(context.l10n.editMetadataFieldComposer, composer!),
-      if (albumType != null)
-        _MetadataItem(context.l10n.trackAlbumType, albumType!),
-      if (comment != null)
-        _MetadataItem(context.l10n.editMetadataFieldComment, comment!),
-      if (isrc != null && isrc!.isNotEmpty)
-        _MetadataItem(
-          'ISRC',
-          formatIsrcForDisplay(isrc),
-          rawValue: canonicalIsrcForCopy(isrc),
-        ),
-    ];
-
-    if (!_isLocalItem && _spotifyId != null && _spotifyId!.isNotEmpty) {
-      final idService = _serviceForTrackId(
-        _spotifyId!,
-        fallbackService: _service.toLowerCase(),
-      );
-      final cleanId = _displayServiceTrackId(_spotifyId!);
-      String idLabel;
-      switch (idService) {
-        case MusicServices.deezer:
-          idLabel = 'Deezer ID';
-        case MusicServices.amazon:
-          idLabel = 'Amazon ASIN';
-        case MusicServices.tidal:
-          idLabel = 'Tidal ID';
-        case MusicServices.qobuz:
-          idLabel = 'Qobuz ID';
-        default:
-          idLabel = 'Spotify ID';
-      }
-      items.add(_MetadataItem(idLabel, cleanId));
-    }
-
-    items.add(
-      _MetadataItem(context.l10n.trackMetadataService, _service.toUpperCase()),
-    );
-    items.add(
-      _MetadataItem(context.l10n.trackDownloaded, _formatFullDate(_addedAt)),
-    );
-
-    return Column(
-      children: items.map((metadata) {
-        final isCopyable =
-            metadata.label == 'ISRC' ||
-            metadata.label == 'Spotify ID' ||
-            metadata.label == 'Deezer ID' ||
-            metadata.label == 'Amazon ASIN' ||
-            metadata.label == 'Tidal ID' ||
-            metadata.label == 'Qobuz ID';
-        if (context.isMornye) {
-          return MornyeMetadataRow(
-            label: metadata.label,
-            value: metadata.value,
-            showDivider: metadata != items.last,
-            trailing: isCopyable
-                ? Icon(
-                    CupertinoIcons.doc_on_doc,
-                    size: 16,
-                    color: colorScheme.onSurfaceVariant,
-                  )
-                : null,
-            onTap: isCopyable
-                ? () => _copyToClipboard(context, metadata.rawValue)
-                : null,
-            onLongPress: () => _showMetadataCopySheet(
-              context,
-              metadata: metadata,
-              allMetadata: items,
-            ),
-          );
-        }
-        return InkWell(
-          onTap: isCopyable
-              ? () => _copyToClipboard(context, metadata.rawValue)
-              : null,
-          onLongPress: () => _showMetadataCopySheet(
-            context,
-            metadata: metadata,
-            allMetadata: items,
-          ),
-          borderRadius: BorderRadius.circular(8),
-          // Copyable rows keep the 48dp minimum touch target.
-          child: Container(
-            constraints: BoxConstraints(
-              minHeight: context.tokens.minTouchTarget,
-            ),
-            alignment: AlignmentDirectional.centerStart,
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                SizedBox(
-                  width: 100,
-                  child: Text(
-                    metadata.label,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    metadata.value,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-                if (isCopyable)
-                  Icon(
-                    Icons.copy,
-                    size: 14,
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                  ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
   }
 
   Future<void> _showMetadataCopySheet(
@@ -785,38 +548,33 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
   /// One file detail pill. Only the format is emphasized, so the group keeps
   /// a single strong container; the others stay neutral.
   Widget _fileInfoPill(
+    BuildContext context,
     ColorScheme colorScheme,
     String label, {
     bool emphasized = false,
-    IconData? icon,
   }) {
-    final foreground = emphasized
-        ? colorScheme.onPrimaryContainer
-        : colorScheme.onSurfaceVariant;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
+    final tokens = context.tokens;
+    return DecoratedBox(
+      decoration: ShapeDecoration(
         color: emphasized
             ? colorScheme.primaryContainer
             : colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
+        shape: const StadiumBorder(),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: foreground),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              color: foreground,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: tokens.gapMd,
+          vertical: tokens.gapSm * 0.75,
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: emphasized
+                ? colorScheme.onPrimaryContainer
+                : colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -824,51 +582,45 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
   Widget _buildFileInfoCard(
     BuildContext context,
     ColorScheme colorScheme,
-    bool fileExists,
-    int? fileSize,
+    _MetadataFacts facts,
   ) {
+    final tokens = context.tokens;
+    final fileSize = _fileSize;
     final displayFilePath = _formatPathForDisplay(rawFilePath);
     final fileName = _extractFileNameFromPathOrUri(rawFilePath);
     final fileExtension = _displayFormatLabelForFile(fileName);
     final resolvedQuality = _displayAudioQuality;
     final lossyBitrateLabel = _extractLossyBitrateLabel(resolvedQuality);
+    Widget pill(String label, {bool emphasized = false}) =>
+        _fileInfoPill(context, colorScheme, label, emphasized: emphasized);
 
     return _metadataSectionSurface(
       context,
       colorScheme,
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(_trackMetadataSectionPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              context.l10n.trackFileInfo,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 16),
-
+            _buildSectionTitle(context, context.l10n.trackFileInfo),
+            SizedBox(height: tokens.gapLg),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: tokens.gapSm,
+              runSpacing: tokens.gapSm,
               children: [
-                _fileInfoPill(colorScheme, fileExtension, emphasized: true),
-                if (fileSize != null)
-                  _fileInfoPill(colorScheme, formatBytes(fileSize)),
+                pill(fileExtension, emphasized: true),
+                if (fileSize != null) pill(formatBytes(fileSize)),
                 if (_isBitrateFormatLabel(fileExtension) &&
                     lossyBitrateLabel != null)
-                  _fileInfoPill(colorScheme, lossyBitrateLabel)
+                  pill(lossyBitrateLabel)
                 else if (_audioBitrate != null &&
                     _audioBitrate! > 0 &&
                     _isBitrateFormatLabel(fileExtension))
-                  _fileInfoPill(colorScheme, '${_audioBitrate}kbps')
+                  pill('${_audioBitrate}kbps')
                 else if (bitDepth != null &&
                     bitDepth! > 0 &&
                     sampleRate != null)
-                  _fileInfoPill(
-                    colorScheme,
+                  pill(
                     buildDisplayAudioQuality(
                           bitDepth: bitDepth,
                           sampleRate: sampleRate,
@@ -878,55 +630,49 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
                 if (!_isBitrateFormatLabel(fileExtension) &&
                     _audioBitrate != null &&
                     _audioBitrate! > 0)
-                  _fileInfoPill(colorScheme, '${_audioBitrate}kbps'),
-                _fileInfoPill(
-                  colorScheme,
-                  _service.toUpperCase(),
-                  icon: _getServiceIcon(_service),
-                ),
+                  pill('${_audioBitrate}kbps'),
               ],
             ),
-
-            const SizedBox(height: 16),
-
+            SizedBox(height: tokens.gapSm),
+            for (final item in facts.file)
+              _buildFactRow(
+                context,
+                colorScheme,
+                item,
+                all: facts.all,
+                showDivider: true,
+              ),
+            // The path is a flat copy row like the facts above it, in both
+            // styles, instead of a filled box inside the card.
             InkWell(
               onTap: () => _copyToClipboard(context, cleanFilePath),
-              borderRadius: BorderRadius.circular(12),
-              // Material keeps the path as a flat copy row like the metadata
-              // rows above, instead of a filled box inside the card.
-              child: Container(
-                constraints: BoxConstraints(
-                  minHeight: context.tokens.minTouchTarget,
-                ),
-                padding: context.isMornye
-                    ? const EdgeInsets.all(12)
-                    : const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                decoration: context.isMornye
-                    ? BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
-                      )
-                    : null,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        displayFilePath,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontFamily: 'monospace',
-                          color: colorScheme.onSurfaceVariant,
+              borderRadius: tokens.borderRadiusThumb,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: tokens.minTouchTarget),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: tokens.gapSm),
+                  child: Row(
+                    spacing: tokens.gapSm,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayFilePath,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                fontFamily: 'monospace',
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      context.isMornye ? CupertinoIcons.doc_on_doc : Icons.copy,
-                      size: 18,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ],
+                      AppIcon.adaptive(
+                        Icons.copy,
+                        size: 18,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

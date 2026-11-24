@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_easy/liquid_glass_easy.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_liquid_backdrop.dart';
 
@@ -59,7 +61,7 @@ class MornyeSelectionPill extends StatefulWidget {
 }
 
 class _MornyeSelectionPillState extends State<MornyeSelectionPill>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   int? _dragIndex;
   bool _dragCancelled = false;
   bool _pressed = false;
@@ -67,8 +69,27 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
   double? _dragAlignment;
   int? _activePointer;
   final _foregroundKey = GlobalKey();
-  late final AnimationController _pressController;
-  late final CurvedAnimation _pressAnimation;
+
+  /// How far the held lens has swollen, on the fast spring.
+  late final AnimationController _press = AnimationController.unbounded(
+    vsync: this,
+  )..addListener(() => setState(() {}));
+
+  /// Where the pill stands, as a directional alignment. A drag places it
+  /// under the finger; otherwise the snappy spring carries it to its slot,
+  /// starting from the finger's velocity on release and from its own
+  /// velocity when a new selection interrupts it.
+  late final AnimationController _slide = AnimationController.unbounded(
+    vsync: this,
+    value: _slotAlignment(widget.selectedIndex),
+  );
+
+  /// The slot the pill is moving to, or null after a drag placed it.
+  double? _slideTarget;
+
+  /// The finger's velocity, in alignment units a second, for the next move.
+  double? _releaseVelocity;
+  bool _slideShown = false;
   ui.FragmentProgram? _maskProgram;
   Widget? _items;
   int? _itemsSelected;
@@ -76,17 +97,61 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
   @override
   void initState() {
     super.initState();
-    _pressController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 240),
-    );
-    _pressAnimation = CurvedAnimation(
-      parent: _pressController,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    )..addListener(() => setState(() {}));
+    _slideTarget = _slide.value;
+    _slideShown =
+        widget.selectedIndex >= 0 &&
+        widget.selectedIndex < widget.labels.length;
     if (widget.selectionColor != null) unawaited(_loadMaskProgram());
   }
+
+  double _slotAlignment(int index) {
+    final count = widget.labels.length;
+    return count <= 1 ? 0 : -1 + 2 * index / (count - 1);
+  }
+
+  void _animatePress(double target) {
+    _press.animateWith(
+      SpringSimulation(
+        MornyeMotion.fastSpring,
+        _press.value,
+        target,
+        _press.velocity,
+        snapToEnd: true,
+      ),
+    );
+  }
+
+  /// Sends the pill to [selected]'s slot unless a drag holds it. Runs during
+  /// build, after the parent has applied a new selection, so a released pill
+  /// never heads for the old slot first.
+  void _followSelection(int selected, int count) {
+    if (_dragAlignment != null) return;
+    final shown = selected >= 0 && selected < count;
+    final target = _slotAlignment(selected);
+    final velocity = _releaseVelocity;
+    _releaseVelocity = null;
+    if (!shown || !_slideShown || MediaQuery.disableAnimationsOf(context)) {
+      _slideShown = shown;
+      _slideTarget = target;
+      if (_slide.value != target) _slide.value = target;
+      return;
+    }
+    if (target == _slideTarget && velocity == null) return;
+    _slideTarget = target;
+    _slide.animateWith(
+      SpringSimulation(
+        MornyeMotion.snappySpring,
+        _slide.value,
+        target,
+        velocity ?? _slide.velocity,
+        snapToEnd: true,
+      ),
+    );
+  }
+
+  /// The pill's alignment on screen. It may bounce between slots, but stops
+  /// at the ends of the bar rather than running past them.
+  double get _shownAlignment => _slide.value.clamp(-1.0, 1.0);
 
   Future<void> _loadMaskProgram() async {
     try {
@@ -104,8 +169,8 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
 
   @override
   void dispose() {
-    _pressAnimation.dispose();
-    _pressController.dispose();
+    _press.dispose();
+    _slide.dispose();
     super.dispose();
   }
 
@@ -146,12 +211,25 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
                       (width - 2 * halfItem)) *
                   2 -
               1;
+    final alignment = Directionality.of(context) == TextDirection.rtl
+        ? -position
+        : position;
     setState(() {
       _dragIndex = logical;
-      _dragAlignment = Directionality.of(context) == TextDirection.rtl
-          ? -position
-          : position;
+      _dragAlignment = alignment;
     });
+    _slideTarget = null;
+    _slide.value = alignment;
+  }
+
+  /// The pill's velocity for a horizontal finger [velocity] in pixels a
+  /// second across a bar [width] wide: [_preview] spreads the travel between
+  /// the first and last slot centers over two alignment units.
+  double _alignmentVelocity(double velocity, double width) {
+    final travel = width * (1 - 1 / widget.labels.length);
+    if (travel <= 0) return 0;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    return velocity * 2 / travel * (rtl ? -1 : 1);
   }
 
   @override
@@ -159,13 +237,14 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
     final count = widget.labels.length;
     if (count == 0) return const SizedBox.shrink();
     final selected = _dragIndex ?? _pressedIndex ?? widget.selectedIndex;
+    _followSelection(selected, count);
     final scheme = Theme.of(context).colorScheme;
     final lensEnabled =
         widget.liquidInteraction &&
         ui.ImageFilter.isShaderFilterSupported &&
         !MediaQuery.disableAnimationsOf(context) &&
         !(widget.contrastBlocked ?? MediaQuery.highContrastOf(context));
-    final pressProgress = lensEnabled ? _pressAnimation.value : 0.0;
+    final pressProgress = lensEnabled ? _press.value.clamp(0.0, 1.0) : 0.0;
     final restingOpacity = 1 - pressProgress;
     final content = Listener(
       // An accepted drag can end with a PointerCancelEvent. Do not navigate
@@ -188,12 +267,12 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
               ? count - visual - 1
               : visual;
         });
-        _pressController.forward();
+        _animatePress(1);
       },
       onPointerUp: (event) {
         if (event.pointer != _activePointer) return;
         _activePointer = null;
-        _pressController.reverse();
+        _animatePress(0);
         setState(() {
           _pressed = false;
           _pressedIndex = null;
@@ -203,7 +282,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
       onPointerCancel: (event) {
         if (event.pointer != _activePointer) return;
         _activePointer = null;
-        _pressController.reverse();
+        _animatePress(0);
         setState(() {
           _dragCancelled = true;
           _pressed = false;
@@ -220,11 +299,16 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
                 _preview(event.localPosition.dx, constraints.maxWidth),
             onHorizontalDragUpdate: (event) =>
                 _preview(event.localPosition.dx, constraints.maxWidth),
-            onHorizontalDragEnd: (_) {
+            onHorizontalDragEnd: (details) {
               final index = _dragIndex;
               setState(() {
                 _dragIndex = null;
                 _dragAlignment = null;
+                // The pill leaves the finger at the finger's speed.
+                _releaseVelocity = _alignmentVelocity(
+                  details.velocity.pixelsPerSecond.dx,
+                  constraints.maxWidth,
+                );
               });
               if (index != null && !_dragCancelled) widget.onChanged(index);
             },
@@ -239,19 +323,11 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
                 if (selected >= 0 && selected < count)
                   Positioned.fill(
                     child: IgnorePointer(
-                      child: AnimatedAlign(
-                        duration:
-                            _dragAlignment != null ||
-                                MediaQuery.disableAnimationsOf(context)
-                            ? Duration.zero
-                            : const Duration(milliseconds: 220),
-                        curve: Curves.easeOutCubic,
-                        alignment: AlignmentDirectional(
-                          _dragAlignment ??
-                              (count == 1
-                                  ? 0
-                                  : -1 + 2 * selected / (count - 1)),
-                          0,
+                      child: AnimatedBuilder(
+                        animation: _slide,
+                        builder: (context, child) => Align(
+                          alignment: AlignmentDirectional(_shownAlignment, 0),
+                          child: child,
                         ),
                         child: FractionallySizedBox(
                           widthFactor: 1 / count,
@@ -376,22 +452,13 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
   ) {
     final color = widget.selectionColor;
     if (color == null) return child;
-    return TweenAnimationBuilder<double>(
-      tween: Tween(
-        end:
-            _dragAlignment ??
-            (count == 1 ? 0 : -1 + 2 * selected / (count - 1)),
-      ),
-      duration:
-          _dragAlignment != null || MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-      builder: (context, alignment, child) => _SelectionForegroundScope(
+    return AnimatedBuilder(
+      animation: _slide,
+      builder: (context, child) => _SelectionForegroundScope(
         rowKey: _foregroundKey,
         alignment: Directionality.of(context) == TextDirection.rtl
-            ? -alignment
-            : alignment,
+            ? -_shownAlignment
+            : _shownAlignment,
         count: count,
         scaleX: 1 + _heldWidthGrowth * pressProgress,
         scaleY: 1 + _heldHeightGrowth * pressProgress,
@@ -411,14 +478,11 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
     double progress,
   ) => Positioned.fill(
     child: IgnorePointer(
-      child: AnimatedAlign(
-        duration: _dragAlignment != null
-            ? Duration.zero
-            : const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        alignment: AlignmentDirectional(
-          _dragAlignment ?? (count == 1 ? 0 : -1 + 2 * selected / (count - 1)),
-          0,
+      child: AnimatedBuilder(
+        animation: _slide,
+        builder: (context, child) => Align(
+          alignment: AlignmentDirectional(_shownAlignment, 0),
+          child: child,
         ),
         child: FractionallySizedBox(
           widthFactor: 1 / count,

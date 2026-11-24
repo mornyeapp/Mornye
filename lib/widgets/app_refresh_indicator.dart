@@ -1,13 +1,22 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:cupertino_ui/cupertino_ui.dart'
+    show CupertinoSliverRefreshControl;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/material_expressive.dart';
+import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 
 /// Pull-to-refresh with the expressive shape-morphing indicator on Material.
-/// Mornye and reduced motion keep Flutter's [RefreshIndicator].
+/// Reduced motion keeps Flutter's [RefreshIndicator].
+///
+/// Mornye phones, whose lists bounce, use the iOS refresh control instead.
+/// It is a sliver, so a [CustomScrollView] under this widget places
+/// [AppRefreshIndicator.sliver] right after its large title. Mornye on
+/// desktop, or with bouncing off (low-end phones), keeps [RefreshIndicator].
 ///
 /// The page on screen also refreshes through [refreshVisible], which the
 /// desktop Refresh command (Cmd/Ctrl+R) runs.
@@ -24,6 +33,12 @@ class AppRefreshIndicator extends StatefulWidget {
   final Widget child;
 
   static final _mounted = <_AppRefreshIndicatorState>[];
+
+  /// The iOS refresh control where the enclosing [AppRefreshIndicator]
+  /// uses it, and an empty sliver elsewhere. [enabled] false hides it, for
+  /// pages whose `notificationPredicate` turns refreshing off.
+  static Widget sliver({bool enabled = true}) =>
+      _AppRefreshSliver(enabled: enabled);
 
   /// Refreshes the most recently opened page that is on screen, showing its
   /// indicator. Returns whether one was found.
@@ -73,9 +88,22 @@ class _AppRefreshIndicatorState extends State<AppRefreshIndicator> {
     super.dispose();
   }
 
+  // The iOS control has no programmatic show; it only runs on phones, which
+  // have no Refresh command.
   Future<void> _show() => _usesExpressive
       ? _expressive.show()
       : _materialKey.currentState?.show() ?? widget.onRefresh();
+
+  static bool _bounces(BuildContext context) {
+    ScrollPhysics? physics = ScrollConfiguration.of(
+      context,
+    ).getScrollPhysics(context);
+    while (physics != null) {
+      if (physics is BouncingScrollPhysics) return true;
+      physics = physics.parent;
+    }
+    return false;
+  }
 
   bool _trackPull(OverscrollNotification notification) {
     final delta = notification.dragDetails?.delta.dy;
@@ -96,6 +124,9 @@ class _AppRefreshIndicatorState extends State<AppRefreshIndicator> {
   @override
   Widget build(BuildContext context) {
     _usesExpressive = materialExpressiveEnabled(context);
+    if (context.isMornye && !isDesktopPlatform && _bounces(context)) {
+      return _RefreshScope(onRefresh: widget.onRefresh, child: widget.child);
+    }
     if (!_usesExpressive) {
       return RefreshIndicator(
         key: _materialKey,
@@ -159,5 +190,30 @@ class _PullEdgeScrollPhysics extends ScrollPhysics {
       return value - position.pixels;
     }
     return super.applyBoundaryConditions(position, value);
+  }
+}
+
+/// Hands the refresh callback to [AppRefreshIndicator.sliver] when the iOS
+/// refresh control replaces the indicator.
+class _RefreshScope extends InheritedWidget {
+  const _RefreshScope({required this.onRefresh, required super.child});
+
+  final RefreshCallback onRefresh;
+
+  @override
+  bool updateShouldNotify(_RefreshScope oldWidget) =>
+      onRefresh != oldWidget.onRefresh;
+}
+
+class _AppRefreshSliver extends StatelessWidget {
+  const _AppRefreshSliver({required this.enabled});
+
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<_RefreshScope>();
+    if (scope == null || !enabled) return const SliverToBoxAdapter();
+    return CupertinoSliverRefreshControl(onRefresh: scope.onRefresh);
   }
 }

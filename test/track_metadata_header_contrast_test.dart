@@ -1,14 +1,16 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/cover_palette.dart' show HeaderPalette;
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -115,6 +117,13 @@ void main() {
         expect(find.byIcon(CupertinoIcons.back), findsOneWidget);
         expect(find.byIcon(CupertinoIcons.ellipsis), findsOneWidget);
         expect(find.byType(Card), findsNothing);
+        // The sections are built as they scroll in, below the header.
+        await tester.scrollUntilVisible(
+          find.text('Track name'),
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
         final row = find.widgetWithText(MornyeMetadataRow, 'Track name');
         expect(
           find.ancestor(of: row, matching: find.byType(MornyeGlass)),
@@ -187,13 +196,23 @@ void main() {
 
     final headerMeta = find.byType(HeaderMetaRow);
     expect(headerMeta, findsOneWidget);
-    expect(find.byType(ExplicitBadge), findsNWidgets(2));
+    expect(
+      find.descendant(of: headerMeta, matching: find.byType(ExplicitBadge)),
+      findsOneWidget,
+    );
     expect(find.text('Explicit'), findsNothing);
+    // The header takes its colors from the artwork over the theme's surface,
+    // so the details are dark on light here instead of white on a scrim.
+    final scheme = HeaderPalette.of(tester.element(headerMeta));
+    expect(
+      scheme.surface.computeLuminance() - scheme.onSurface.computeLuminance(),
+      greaterThan(0.5),
+    );
     for (final label in const ['16-bit/44.1kHz', '4:10', 'Provider-a']) {
       final text = tester.widget<Text>(
         find.descendant(of: headerMeta, matching: find.text(label)),
       );
-      expect(text.style?.color, Colors.white);
+      expect(text.style?.color, scheme.onSurface);
     }
 
     final separators = tester.widgetList<Text>(
@@ -201,10 +220,15 @@ void main() {
     );
     expect(separators, isNotEmpty);
     expect(
-      separators.every((text) => text.style?.color == Colors.white70),
+      separators.every((text) => text.style?.color == scheme.onSurfaceVariant),
       isTrue,
     );
 
+    await tester.scrollUntilVisible(
+      find.text('Duration'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     final durationLabel = find.text('Duration');
     final metadataRow = find
         .ancestor(of: durationLabel, matching: find.byType(Row))
@@ -214,4 +238,104 @@ void main() {
     expect(row.crossAxisAlignment, CrossAxisAlignment.baseline);
     expect(row.textBaseline, TextBaseline.alphabetic);
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets('the cover keeps rounded corners while it flies between a '
+        'list row and the header (mornye=$mornye)', (tester) async {
+      final item = LocalLibraryItem(
+        id: 'flight-track',
+        filePath: '/missing/flight-track.flac',
+        trackName: 'Track',
+        artistName: 'Artist',
+        albumName: 'Album',
+        scannedAt: DateTime(2026),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: GestureDetector(
+                    key: const ValueKey('row'),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => TrackMetadataScreen(localItem: item),
+                      ),
+                    ),
+                    child: const Hero(
+                      tag: 'cover_lib_flight-track',
+                      child: SizedBox.square(
+                        dimension: 48,
+                        child: ColoredBox(color: Colors.green),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      // The row thumbnail's corner, and the header's, read from the page at
+      // rest below.
+      final thumbCorner = tester
+          .element(find.byKey(const ValueKey('row')))
+          .tokens
+          .radiusThumb;
+      late double headerCorner;
+      Set<double> corners() => {
+        for (final clip in tester.widgetList<ClipRRect>(find.byType(ClipRRect)))
+          if (clip.borderRadius case final BorderRadius radius)
+            radius.topLeft.x,
+      };
+      // Corners that changed between two moments of a flight: the cover's.
+      Future<Set<double>> movingCorners() async {
+        await tester.pump(const Duration(milliseconds: 60));
+        final early = corners();
+        await tester.pump(const Duration(milliseconds: 60));
+        return corners().difference(early);
+      }
+
+      await tester.tap(find.byKey(const ValueKey('row')));
+      await tester.pump();
+      await tester.pump();
+      final arriving = await movingCorners();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      headerCorner =
+          (tester
+                      .widget<ClipRRect>(
+                        find
+                            .ancestor(
+                              of: find.byType(Hero),
+                              matching: find.byType(ClipRRect),
+                            )
+                            .first,
+                      )
+                      .borderRadius
+                  as BorderRadius)
+              .topLeft
+              .x;
+      expect(headerCorner, greaterThan(thumbCorner));
+      expect(arriving, hasLength(1));
+      expect(arriving.single, inExclusiveRange(thumbCorner, headerCorner));
+
+      Navigator.of(tester.element(find.byType(TrackMetadataScreen))).pop();
+      await tester.pump();
+      await tester.pump();
+      final leaving = await movingCorners();
+      expect(leaving, hasLength(1));
+      expect(leaving.single, inExclusiveRange(thumbCorner, headerCorner));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -14,14 +14,18 @@ import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/screens/lyrics_share_screen.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/utils/file_access.dart';
+import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
+import 'package:mornye/utils/synced_lyrics_scroll.dart';
+import 'package:mornye/utils/view_display.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -34,7 +38,10 @@ import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
+import 'package:mornye/widgets/playback_source_label.dart';
+import 'package:mornye/widgets/playback_tempo_sheet.dart';
 import 'package:mornye/widgets/lyrics_options_button.dart';
+import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/lyrics_screen_awake.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
@@ -52,12 +59,28 @@ import 'package:mornye/widgets/mornye_player_background.dart';
 import 'package:mornye/widgets/mornye_artwork_contrast.dart';
 import 'package:mornye/widgets/mornye_player_actions_sheet.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
+import 'package:mornye/widgets/mornye_cover_glow.dart';
+import 'package:mornye/widgets/mornye_motion_glow.dart';
 import 'package:mornye/widgets/mornye_player_artwork.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
+import 'package:mornye/services/motion_artwork_store.dart';
 
 export 'package:mornye/routes/now_playing_route.dart';
 
+final _log = AppLogger('NowPlaying');
+
 /// Portrait's "Playing on" row, kept while empty.
+/// Light bar icons over the player. `SystemUiOverlayStyle.light` would also
+/// paint Android's navigation bar black, cutting the background off above it.
+const _overCoverBars = SystemUiOverlayStyle(
+  statusBarBrightness: Brightness.dark,
+  statusBarIconBrightness: Brightness.light,
+  systemNavigationBarColor: Colors.transparent,
+  systemNavigationBarDividerColor: Colors.transparent,
+  systemNavigationBarIconBrightness: Brightness.light,
+  systemNavigationBarContrastEnforced: false,
+);
+
 const _playingOnRowHeight = 36.0;
 
 /// Screens shorter than this keep Mornye's volume row clear by leaving the
@@ -124,7 +147,15 @@ class NowPlayingScreen extends ConsumerStatefulWidget {
 class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   ProviderSubscription<AsyncValue<MediaItem?>>? _mediaItemSub;
   ProviderSubscription<bool>? _lyricsPlayingSub;
-  ProviderSubscription<bool>? _lyricsAutoHideSub;
+  ProviderSubscription<(bool, bool)>? _lyricsAutoHideSub;
+  ProviderSubscription<bool>? _lyricsLayoutSub;
+  ProviderSubscription<bool>? _lyricLineSub;
+
+  /// Whether to read the song file itself, even an SAF document playback
+  /// plays directly (it publishes no resolved copy then): only while lyrics
+  /// show, on the lyrics page or in the lyric line under the title.
+  bool get _readsSongFile =>
+      _currentPage == 1 || ref.read(settingsProvider).playerShowLyricSnippet;
   late final _trackMetadata =
       widget.metadataControllerFactory?.call() ?? PlayerMetadataController();
   late final LyricsTranslationController _lyricsTranslation;
@@ -134,12 +165,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   String? _measuredMotionSource;
   double? _motionAspectRatio;
   String? _failedMotionSource;
+
+  /// The motion artwork last shown, kept while the next song's is looked up,
+  /// and the shape its layout used.
+  MotionArtwork? _shownMotionArtwork;
+  double? _shownMotionRatio;
   bool _lyricsControlsHidden = false;
+  bool _lyricsControlsHiddenManually = false;
   bool _lyricsOptionsOpen = false;
   bool _audioOutputOpen = false;
   bool _sharingLyrics = false;
   double _lyricsScrollDistance = 0;
   Timer? _lyricsIdleTimer;
+  String? _lastLyricsControlsStatus;
   final _lyricsPointers = <int, Offset>{};
   bool _lyricsPointerMoved = false;
   // Skipping, seeking or opening the queue from the compact player keeps it
@@ -151,7 +189,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   final _expandedArtworkKey = GlobalKey();
   final _compactArtworkKey = GlobalKey();
   final _motionArtworkKey = GlobalKey();
-  final _artworkForeground = ValueNotifier<Map<String, Color>>({});
+  final _artworkDim = ValueNotifier(0.0);
+
+  /// The still cover [_artworkDim] belongs to, and what was read for the
+  /// covers shown before: a cover seen again starts with its layer, so the
+  /// player does not open bright and darken once the first reading lands.
+  String? _artworkDimCover;
+  static final _coverDim = <String, double>{};
   final _seekPreview = PlaybackSeekPreview();
   NowPlayingRoute? _artworkRoute;
 
@@ -167,7 +211,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         unawaited(
           _trackMetadata.load(
             next.value,
-            inspectUnresolvedContentUri: _currentPage == 1,
+            inspectUnresolvedContentUri: _readsSongFile,
+          ),
+        );
+      },
+    );
+    _lyricLineSub = ref.listenManual<bool>(
+      settingsProvider.select((settings) => settings.playerShowLyricSnippet),
+      (_, enabled) {
+        if (!enabled) return;
+        unawaited(
+          _trackMetadata.load(
+            ref.read(currentMediaItemProvider).value,
+            inspectUnresolvedContentUri: true,
           ),
         );
       },
@@ -177,21 +233,35 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       playing,
     ) {
       if (!playing && _lyricsControlsHidden) {
-        setState(() => _lyricsControlsHidden = false);
+        setState(_showLyricsControls);
       }
       _scheduleLyricsControlsHide();
     });
-    _lyricsAutoHideSub = ref.listenManual<bool>(
-      settingsProvider.select((settings) => settings.autoHideLyricsControls),
-      (_, enabled) {
-        if (!enabled) {
+    _lyricsAutoHideSub = ref.listenManual<(bool, bool)>(
+      settingsProvider.select(
+        (settings) => (
+          settings.autoHideLyricsControls,
+          settings.autoHideLyricsControlsWithAccessibility,
+        ),
+      ),
+      (_, _) {
+        if (!_lyricsAutoHideEnabled) {
           _lyricsPointers.clear();
           _lyricsScrollDistance = 0;
           if (_lyricsControlsHidden) {
-            setState(() => _lyricsControlsHidden = false);
+            setState(_showLyricsControls);
           }
         }
         _scheduleLyricsControlsHide();
+      },
+    );
+    _lyricsLayoutSub = ref.listenManual<bool>(
+      settingsProvider.select((settings) => settings.landscapeLyricsArtwork),
+      (_, _) {
+        if (!_lyricsAutoHideLayout && _lyricsControlsHidden) {
+          setState(_showLyricsControls);
+        }
+        _scheduleLyricsControlsHide(restart: false);
       },
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -199,7 +269,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       unawaited(
         _trackMetadata.load(
           ref.read(currentMediaItemProvider).value,
-          inspectUnresolvedContentUri: _currentPage == 1,
+          inspectUnresolvedContentUri: _readsSongFile,
         ),
       );
     });
@@ -210,10 +280,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     super.didChangeDependencies();
     final size = MediaQuery.sizeOf(context);
     _landscape = context.isMornye && size.width > size.height;
-    if (!_lyricsAutoHideLayout || MediaQuery.accessibleNavigationOf(context)) {
-      _lyricsControlsHidden = false;
+    if (!_lyricsAutoHideLayout ||
+        (!_lyricsAutoHideEnabled && !_lyricsControlsHiddenManually)) {
+      _showLyricsControls();
     }
-    _scheduleLyricsControlsHide();
+    _scheduleLyricsControlsHide(restart: false);
   }
 
   void _onInspectorChanged() {
@@ -265,9 +336,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _mediaItemSub?.close();
     _lyricsPlayingSub?.close();
     _lyricsAutoHideSub?.close();
+    _lyricsLayoutSub?.close();
+    _lyricLineSub?.close();
     _lyricsTranslation.cancel(owner: this);
     _trackMetadata.dispose();
-    _artworkForeground.dispose();
+    _artworkDim.dispose();
     _seekPreview.dispose();
     super.dispose();
   }
@@ -294,9 +367,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       child: mornye
           ? _buildPlayer(context, mediaItem, fullScreenCover: fullScreenCover)
           // Material takes the track's artwork scheme. The providers it needs
-          // are read above, so the scoped builder reads none.
+          // are read above, so the scoped builder reads none. A skip moves
+          // only the page background, so the whole player is not rebuilt
+          // on every frame of the colour change.
           : PlayerArtworkTheme(
               artUri: mediaItem?.artUri?.toString(),
+              fadesSurfaceOnly: true,
               child: Builder(
                 builder: (context) => _buildPlayer(
                   context,
@@ -335,26 +411,45 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     }
 
     final source = mediaItem.extras?['source']?.toString() ?? '';
+    final materialBackdrop = !mornye && fullScreenCover;
+    // Two-pane landscape keeps its side-by-side cover over the blurred surface.
+    final materialFullScreen =
+        materialBackdrop &&
+        MediaQuery.orientationOf(context) == Orientation.portrait;
+    // Material plays motion artwork only as the full-screen cover; the card
+    // cover stays still.
     final motionState =
-        mornye &&
+        (mornye || materialFullScreen) &&
             ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) &&
             !MediaQuery.disableAnimationsOf(context)
         ? ref.watch(
-            playerMotionArtworkProvider((
+            songMotionArtworkProvider((
               album: mediaItem.album ?? '',
               artist: mediaItem.artist ?? '',
+              source: source,
             )),
           )
         : null;
-    final resolvedMotion = motionState?.value;
+    // A new song looks up its artwork for a few frames. The outgoing motion
+    // cover keeps its layout meanwhile, so the gradient and its fade do not
+    // drop to the still cover's layout and come back.
+    final lookingUp =
+        motionState != null && motionState.isLoading && !motionState.hasValue;
+    final resolvedMotion = lookingUp ? _shownMotionArtwork : motionState?.value;
+    _shownMotionArtwork = resolvedMotion;
     final motionArtwork = resolvedMotion?.source == _failedMotionSource
         ? null
         : resolvedMotion;
-    final motionRatio =
-        motionArtwork?.aspectRatio ??
-        (_measuredMotionSource == motionArtwork?.source
-            ? _motionAspectRatio
-            : null);
+    final motionRatio = motionArtwork == null
+        ? null
+        : motionArtwork.aspectRatio ??
+              (_measuredMotionSource == motionArtwork.source
+                  ? _motionAspectRatio
+                  : null) ??
+              // The outgoing video stays on screen until the next one
+              // measures itself, so its shape keeps the layout until then.
+              _shownMotionRatio;
+    _shownMotionRatio = motionRatio;
     final squareArtwork =
         motionArtwork == null || (motionRatio != null && motionRatio >= 0.95);
     // Motion artwork is always full-bleed in Mornye; still covers follow the
@@ -369,11 +464,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               ? 1.0
               : (screen.width / (screen.height * 0.56)).clamp(0.5, 1.0)
         : motionRatio;
-    final materialBackdrop = !mornye && fullScreenCover;
-    // Two-pane landscape keeps its side-by-side cover over the blurred surface.
-    final materialFullScreen =
-        materialBackdrop &&
-        MediaQuery.orientationOf(context) == Orientation.portrait;
     final overCover = materialFullScreen && _currentPage != 1;
     // Portrait keeps the "Playing on" row while empty, so the controls stay
     // put when a computer takes over playback. On an iPhone the row reaches
@@ -387,9 +477,17 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         reservesPlayingOnRow && Theme.of(context).platform == TargetPlatform.iOS
         ? bottomInset.clamp(0.0, _homeIndicatorBelowRow)
         : null;
-    if (!fullBleed && _artworkForeground.value.isNotEmpty) {
-      _artworkForeground.value = {};
+    // Labels stay white. Moving artwork is always dimmed behind them; a still
+    // cover is sampled to decide by how much.
+    final samplesArtwork = fullBleed && motionArtwork == null;
+    final dimCover = samplesArtwork ? mediaItem.artUri?.toString() : null;
+    if (!samplesArtwork) {
+      _artworkDim.value = 0;
+    } else if (dimCover != _artworkDimCover) {
+      // An unread cover keeps the layer it follows until its reading.
+      _artworkDim.value = _coverDim[dimCover] ?? _artworkDim.value;
     }
+    _artworkDimCover = dimCover;
     Widget artwork() => MornyePlayerArtwork(
       mediaItem: mediaItem,
       videoUrl: motionArtwork?.source,
@@ -452,11 +550,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         );
       };
     }
+    final contentFade = CurveTween(
+      curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
+    );
     final contentOpacity = mornye
         ? kAlwaysCompleteAnimation
-        : routeAnimation.drive(
-            CurveTween(curve: const Interval(0.4, 1.0, curve: Curves.easeOut)),
-          );
+        : route is NowPlayingRoute
+        // Holds through the shrink back to the mini player.
+        ? route.contentOpacity(contentFade)
+        : routeAnimation.drive(contentFade);
 
     // The embedded desktop player keeps a toolbar for its minimize button,
     // which a route reaches by swiping down instead.
@@ -472,22 +574,29 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         !widget.embedded &&
         MediaQuery.orientationOf(context) == Orientation.landscape &&
         ref.watch(settingsProvider.select((s) => s.landscapeLyricsArtwork));
+    // The Material page background is painted below the scaffold, where it
+    // moves to the next track's colour on its own.
     final player = Scaffold(
       extendBodyBehindAppBar: materialLandscapeArtwork,
-      backgroundColor: mornye || materialBackdrop
-          ? Colors.transparent
-          : colorScheme.surface,
+      backgroundColor: Colors.transparent,
       appBar: _FadingAppBar(
         opacity: contentOpacity,
         hidden: !mornye && _lyricsImmersive,
         child: AppBar(
-          backgroundColor: mornye || materialBackdrop
-              ? Colors.transparent
-              : colorScheme.surface,
+          backgroundColor: Colors.transparent,
           foregroundColor: overCover ? Colors.white : colorScheme.onSurface,
           surfaceTintColor: Colors.transparent,
-          systemOverlayStyle: mornye || overCover
-              ? SystemUiOverlayStyle.light
+          systemOverlayStyle: mornye
+              ? _overCoverBars
+              : overCover
+              // The Material player ends on the app's surface, which can be
+              // light, while its status bar stays over the cover.
+              ? _overCoverBars.copyWith(
+                  systemNavigationBarIconBrightness:
+                      colorScheme.brightness == Brightness.dark
+                      ? Brightness.light
+                      : Brightness.dark,
+                )
               : null,
           toolbarHeight: mornyeToolbarHeight ?? kToolbarHeight,
           automaticallyImplyLeading: false,
@@ -571,6 +680,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         onNotification: _onLyricsScroll,
                         child: MornyePlayerLayout(
                           mediaItem: mediaItem,
+                          showSourceLabel: !reservesPlayingOnRow,
                           metadata: _trackMetadata,
                           seekPreview: _seekPreview,
                           colorScheme: colorScheme,
@@ -591,7 +701,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             expanded: _expandedArtworkKey,
                             compact: _compactArtworkKey,
                           ),
-                          artworkForeground: _artworkForeground,
                           lyricsControlsHidden: _lyricsControlsHidden,
                           lyricsOptionsOpen: _lyricsOptionsOpen,
                           lyricsBuilder: (showOptions) => _lyricsSection(
@@ -615,6 +724,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                       )
                     : MaterialPlayerLayout(
                         mediaItem: mediaItem,
+                        showSourceLabel: !reservesPlayingOnRow,
                         metadata: _trackMetadata,
                         seekPreview: _seekPreview,
                         colorScheme: colorScheme,
@@ -633,6 +743,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         ),
                         lyricsBuilder: (_) =>
                             _lyricsSection(colorScheme, isActive: true),
+                        onOpenLyrics: _toggleMaterialLyrics,
                         onOpenQueue: () =>
                             _showQueueSheet(context, colorScheme),
                       ),
@@ -747,6 +858,24 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               child: LinkPlayingOnLabel(
                                 color: mornye ? Colors.white : null,
                                 height: _playingOnRowHeight,
+                                // Where the music plays and where it comes
+                                // from read from one place.
+                                idle: PlaybackSourceLabel(
+                                  item: mediaItem,
+                                  color: mornye
+                                      ? Colors.white
+                                      : colorScheme.primary,
+                                  style: mornye
+                                      ? Theme.of(
+                                          context,
+                                        ).textTheme.labelMedium?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        )
+                                      : Theme.of(context).textTheme.labelLarge,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -764,7 +893,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       ),
     );
     if (!mornye) {
-      if (!materialBackdrop) return _lyricsPointerListener(player);
+      if (!materialBackdrop) {
+        return _lyricsPointerListener(
+          PlayerArtworkSurface(surface: colorScheme.surface, child: player),
+        );
+      }
       return Stack(
         fit: StackFit.expand,
         children: [
@@ -772,11 +905,21 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             mediaItem: mediaItem,
             colorScheme: colorScheme,
             showArtwork: materialFullScreen && _currentPage != 1,
+            playsMotionArtwork: true,
+            videoUrl: motionArtwork?.source,
+            resolvingVideo: motionState?.isLoading == true,
+            onVideoError: () {
+              if (mounted) {
+                setState(() => _failedMotionSource = motionArtwork?.source);
+              }
+            },
           ),
           _lyricsPointerListener(player),
         ],
       );
     }
+    final showsFullArtwork = fullBleed && !_landscape && _currentPage == 0;
+    final fadeStart = stillFullBleed ? 0.72 : 0.58;
     return HeroMode(
       // A route Hero renders outside the panel's gradient and slide, briefly
       // exposing a detached rectangle. Keep Mornye artwork inside its panel.
@@ -787,31 +930,70 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
           fit: StackFit.expand,
           children: [
             MornyeArtworkContrast(
-              enabled: fullBleed && !_landscape && _currentPage == 0,
-              continuous: motionArtwork != null,
+              enabled: samplesArtwork && !_landscape && _currentPage == 0,
               targets: {
                 'header': _artworkHeaderKey,
                 'controls': _artworkControlsKey,
                 'volume': _artworkVolumeKey,
               },
-              onChanged: (colors) {
+              onDim: (dim) {
                 if (!mounted) return;
-                _artworkForeground.value = colors;
+                _artworkDim.value = dim;
+                final cover = _artworkDimCover;
+                if (cover == null) return;
+                if (_coverDim.length >= 64 && !_coverDim.containsKey(cover)) {
+                  _coverDim.remove(_coverDim.keys.first);
+                }
+                _coverDim[cover] = dim;
               },
-              child: MornyePlayerBackground(
-                artUri: mediaItem.artUri,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  MornyePlayerBackground(
+                    artUri: mediaItem.artUri,
+                    squareArtwork: squareArtwork,
+                    artworkAspectRatio: artworkRatio,
+                    fadeStart: fadeStart,
+                    artwork: showsFullArtwork
+                        ? PlayerTransitionArtwork(
+                            artworkKey: _motionArtworkKey,
+                            child: Hero(
+                              tag: kNowPlayingArtworkHeroTag,
+                              child: artwork(),
+                            ),
+                          )
+                        : null,
+                  ),
+                  // Inside the sample: the labels sit on its colour.
+                  MornyeCoverGlow(
+                    artUri: mediaItem.artUri?.toString(),
+                    visible: showsFullArtwork && stillFullBleed,
+                    squareArtwork: squareArtwork,
+                    artworkAspectRatio: artworkRatio,
+                    fadeStart: fadeStart,
+                  ),
+                ],
+              ),
+            ),
+            MornyeMotionGlow(
+              videoUrl: motionArtwork?.source,
+              visible: showsFullArtwork,
+              resolvingVideo: motionState?.isLoading == true,
+              squareArtwork: squareArtwork,
+              artworkAspectRatio: artworkRatio,
+              fadeStart: fadeStart,
+            ),
+            ValueListenableBuilder<double>(
+              valueListenable: _artworkDim,
+              builder: (context, dim, _) => MornyeControlsDim(
+                strength: !showsFullArtwork
+                    ? 0
+                    : motionArtwork != null
+                    ? 1
+                    : dim,
                 squareArtwork: squareArtwork,
                 artworkAspectRatio: artworkRatio,
-                fadeStart: stillFullBleed ? 0.72 : 0.58,
-                artwork: fullBleed && !_landscape && _currentPage == 0
-                    ? PlayerTransitionArtwork(
-                        artworkKey: _motionArtworkKey,
-                        child: Hero(
-                          tag: kNowPlayingArtworkHeroTag,
-                          child: artwork(),
-                        ),
-                      )
-                    : null,
+                fadeStart: fadeStart,
               ),
             ),
             _lyricsPointerListener(player),
@@ -823,34 +1005,39 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
   /// A touch on the lyrics page holds the controls; a tap brings hidden
   /// ones back.
-  Widget _lyricsPointerListener(Widget child) => Listener(
-    behavior: HitTestBehavior.translucent,
-    onPointerDown: (event) {
-      if (!_canAutoHideLyricsControls) return;
-      if (_lyricsPointers.isEmpty) _lyricsPointerMoved = false;
-      _lyricsPointers[event.pointer] = event.position;
-      _lyricsIdleTimer?.cancel();
-    },
-    onPointerMove: (event) {
-      final origin = _lyricsPointers[event.pointer];
-      if (origin != null && (event.position - origin).distance > 12) {
-        _lyricsPointerMoved = true;
-      }
-    },
-    onPointerUp: (event) => _endLyricsInteraction(event.pointer),
-    onPointerCancel: (event) =>
-        _endLyricsInteraction(event.pointer, cancelled: true),
-    child: child,
+  Widget _lyricsPointerListener(Widget child) => LyricsOptionsActivity(
+    child: Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) {
+        if (_currentPage != 1 || !_lyricsAutoHideLayout) return;
+        if (_lyricsPointers.isEmpty) _lyricsPointerMoved = false;
+        _lyricsPointers[event.pointer] = event.position;
+        _lyricsIdleTimer?.cancel();
+        if (!_lyricsControlsHidden) _logLyricsAutoHideBlockers();
+      },
+      onPointerMove: (event) {
+        final origin = _lyricsPointers[event.pointer];
+        if (origin != null && (event.position - origin).distance > 12) {
+          _lyricsPointerMoved = true;
+        }
+      },
+      onPointerUp: (event) => _endLyricsInteraction(event.pointer),
+      onPointerCancel: (event) =>
+          _endLyricsInteraction(event.pointer, cancelled: true),
+      child: child,
+    ),
   );
 
   void _toggleMaterialLyrics() {
     if (_toggleInspector(1)) return;
     setState(() {
       _currentPage = _currentPage == 1 ? 0 : 1;
-      _lyricsControlsHidden = false;
+      _showLyricsControls();
+      _lastLyricsControlsStatus = null;
     });
     _scheduleLyricsControlsHide();
     if (_currentPage == 1) {
+      _logLyricsAutoHideBlockers();
       unawaited(
         _trackMetadata.load(
           ref.read(currentMediaItemProvider).value,
@@ -868,11 +1055,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     if (_toggleInspector(page)) return;
     setState(() {
       _currentPage = page;
-      _lyricsControlsHidden = false;
+      _showLyricsControls();
+      _lastLyricsControlsStatus = null;
       _lyricsScrollDistance = 0;
     });
     _scheduleLyricsControlsHide();
     if (_currentPage == 1) {
+      _logLyricsAutoHideBlockers();
       unawaited(
         _trackMetadata.load(
           ref.read(currentMediaItemProvider).value,
@@ -893,30 +1082,86 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             (MediaQuery.orientationOf(context) == Orientation.portrait ||
                 ref.read(settingsProvider).landscapeLyricsArtwork);
 
+  bool get _lyricsAutoHideEnabled => ref
+      .read(settingsProvider)
+      .shouldAutoHideLyricsControls(
+        accessibleNavigation: MediaQuery.accessibleNavigationOf(context),
+      );
+
   bool get _canAutoHideLyricsControls =>
       _lyricsAutoHideLayout &&
-      ref.read(settingsProvider).autoHideLyricsControls &&
+      _lyricsAutoHideEnabled &&
       _currentPage == 1 &&
-      ref.read(playbackPlayingProvider) &&
-      !MediaQuery.accessibleNavigationOf(context);
+      ref.read(playbackPlayingProvider);
 
-  void _scheduleLyricsControlsHide() {
-    _lyricsIdleTimer?.cancel();
+  /// Names what keeps the controls from hiding when lyrics open, so a log
+  /// from a device where automatic fullscreen lyrics never starts says why.
+  void _logLyricsAutoHideBlockers() {
+    // The desktop player has no automatic fullscreen lyrics.
+    if (widget.embedded) return;
+    final size = MediaQuery.sizeOf(context);
+    final blockers = [
+      if (!_lyricsAutoHideLayout)
+        'layout ${size.width.round()}x${size.height.round()}',
+      if (!ref.read(settingsProvider).autoHideLyricsControls) 'setting off',
+      if (!ref.read(playbackPlayingProvider)) 'not playing',
+      if (MediaQuery.accessibleNavigationOf(context) &&
+          !ref.read(settingsProvider).autoHideLyricsControlsWithAccessibility)
+        'accessible navigation',
+      if (_lyricsPointers.isNotEmpty) 'touch held',
+      if (_lyricsOptionsOpen) 'lyrics menu open',
+      if (_audioOutputOpen) 'audio output menu open',
+    ];
+    if (blockers.isEmpty) return;
+    _logLyricsControlsStatus(
+      'Lyrics controls stay visible: ${blockers.join(', ')}',
+    );
+  }
+
+  void _logLyricsControlsStatus(String status) {
+    if (_lastLyricsControlsStatus == status) return;
+    _lastLyricsControlsStatus = status;
+    _log.i(status);
+  }
+
+  void _scheduleLyricsControlsHide({bool restart = true}) {
     if (!_canAutoHideLyricsControls ||
         _lyricsOptionsOpen ||
         _audioOutputOpen ||
         _lyricsControlsHidden ||
         _lyricsPointers.isNotEmpty) {
+      _lyricsIdleTimer?.cancel();
+      if (_currentPage == 1 && !_lyricsControlsHidden) {
+        _logLyricsAutoHideBlockers();
+      }
       return;
     }
+    // Viewport and inherited-widget updates are not user activity. Keep an
+    // eligible countdown running while system chrome or window metrics change.
+    if (!restart && (_lyricsIdleTimer?.isActive ?? false)) return;
+    _lyricsIdleTimer?.cancel();
     _lyricsIdleTimer = Timer(const Duration(seconds: 5), () {
-      if (!mounted || !_canAutoHideLyricsControls) return;
+      if (!mounted) return;
+      if (!_canAutoHideLyricsControls) {
+        _logLyricsAutoHideBlockers();
+        return;
+      }
       if (ModalRoute.of(context)?.isCurrent == false) {
+        _logLyricsControlsStatus(
+          'Lyrics controls stay visible: another route is active',
+        );
         _scheduleLyricsControlsHide();
         return;
       }
-      setState(() => _lyricsControlsHidden = true);
+      setState(() {
+        _lyricsControlsHidden = true;
+        _lyricsControlsHiddenManually = false;
+      });
+      _logLyricsControlsStatus('Lyrics controls hidden automatically');
     });
+    _logLyricsControlsStatus(
+      'Lyrics controls auto-hide timer started: 5 seconds',
+    );
   }
 
   void _endLyricsInteraction(int pointer, {bool cancelled = false}) {
@@ -929,15 +1174,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         !_lyricsPointerMoved &&
         !compactTouch &&
         _lyricsControlsHidden) {
-      setState(() => _lyricsControlsHidden = false);
+      setState(_showLyricsControls);
     }
     _scheduleLyricsControlsHide();
   }
 
   bool _onLyricsScroll(ScrollUpdateNotification notification) {
     if (_currentPage != 1 ||
-        !ref.read(settingsProvider).autoHideLyricsControls ||
-        _landscape ||
+        !_lyricsAutoHideLayout ||
         notification.dragDetails == null ||
         notification.metrics.axis != Axis.vertical) {
       return false;
@@ -948,11 +1192,22 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     if (_lyricsScrollDistance.abs() >= 16) {
       final hidden = _lyricsScrollDistance > 0;
       if (hidden != _lyricsControlsHidden) {
-        setState(() => _lyricsControlsHidden = hidden);
+        setState(() {
+          _lyricsControlsHidden = hidden;
+          _lyricsControlsHiddenManually = hidden;
+        });
+        _logLyricsControlsStatus(
+          'Lyrics controls ${hidden ? 'hidden' : 'shown'} by scrolling',
+        );
       }
       _lyricsScrollDistance = 0;
     }
     return false;
+  }
+
+  void _showLyricsControls() {
+    _lyricsControlsHidden = false;
+    _lyricsControlsHiddenManually = false;
   }
 
   bool get _lyricsImmersive =>
@@ -1009,10 +1264,44 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         mediaItem: mediaItem,
         lyrics: _trackMetadata.lyrics,
         initial: line,
+        position: line == null ? _lyricsDrawnPosition() : null,
+        offset: Duration(
+          milliseconds: ref.read(
+            lyricsOffsetMsForSongProvider(songLyricsOffsetKeyOf(mediaItem)),
+          ),
+        ),
       );
     } finally {
       _sharingLyrics = false;
     }
+  }
+
+  /// The position synced lyrics are drawn for, as [SyncedLyricsView] reads
+  /// it: the scrub preview, else the audio position plus the display lead
+  /// while playing. Null while Mornye shows no line yet (loading, or not
+  /// started), so sharing then opens with nothing selected.
+  Duration? _lyricsDrawnPosition() {
+    final preview = _seekPreview.value;
+    if (preview != null) return preview;
+    final state = ref.read(playbackStateProvider).value;
+    if (state == null) return null;
+    final loading =
+        state.processingState == AudioProcessingState.loading ||
+        state.processingState == AudioProcessingState.buffering;
+    if (context.isMornye &&
+        (loading || (!state.playing && state.position <= Duration.zero))) {
+      return null;
+    }
+    if (!state.playing ||
+        loading ||
+        !state.speed.isFinite ||
+        state.speed <= 0) {
+      return state.position;
+    }
+    final lead = lyricsDisplayLead(
+      displayOf(View.maybeOf(context))?.refreshRate,
+    );
+    return state.position + lead * state.speed;
   }
 
   /// Completes once a load already in flight (started elsewhere) finishes.
@@ -1115,14 +1404,18 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   }) async {
     final controller = ref.read(musicPlayerControllerProvider);
     final sleepTimerEndsAt = controller.sleepTimerEndsAt;
-    final sleepTimerSubtitle = sleepTimerEndsAt == null
+    final sleepTimerSubtitle = controller.sleepAtEndOfSong
+        ? context.l10n.nowPlayingSleepTimerEndOfSongActive
+        : sleepTimerEndsAt == null
         ? null
         : context.l10n.nowPlayingSleepTimerActive(
             MaterialLocalizations.of(
               context,
             ).formatTimeOfDay(TimeOfDay.fromDateTime(sleepTimerEndsAt)),
           );
-    final volumeShown = ref.read(settingsProvider).playerShowVolume;
+    final settings = ref.read(settingsProvider);
+    final volumeShown = settings.playerShowVolume;
+    final tempoSubtitle = playbackTempoSettingsSummary(context.l10n, settings);
     final linkClient = ref.read(linkPhoneClientProvider);
     final transfer = await linkTransferSongsOfPlaying(
       ref,
@@ -1143,8 +1436,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             builder: (_) => MornyePlayerActionsSheet(
               mediaItem: mediaItem,
               sleepTimerSubtitle: sleepTimerSubtitle,
+              tempoSubtitle: tempoSubtitle,
               volumeShown: volumeShown,
               sendToDesktop: sendToDesktop,
+              sendToPhoneHost: linkClient?.server.isPhone ?? false,
               saveToPhone: saveToPhone,
             ),
           )
@@ -1154,7 +1449,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             backgroundColor: colorScheme.surfaceContainerHigh,
             title: mediaItem.title,
             subtitle: mediaItem.artist,
-            builder: (sheetContext) => Padding(
+            maxHeightFactor: 0.85,
+            // The list scrolls under its fixed title on a short screen.
+            builder: (sheetContext) => SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: 16),
               child: SettingsGroup(
                 children: [
@@ -1174,9 +1471,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     title: sheetContext.l10n.lyricsShareTitle,
                     onTap: () => Navigator.of(sheetContext).pop('shareLyrics'),
                   ),
-                  if (sendToDesktop != null)
+                  if (sendToDesktop != null && linkClient != null)
                     SettingsItem(
-                      icon: Icons.computer,
+                      icon: linkSendToHostIcon(linkClient),
                       title: sheetContext.l10n.linkSendToDesktop(sendToDesktop),
                       onTap: () => Navigator.of(sheetContext).pop('linkSend'),
                     ),
@@ -1203,6 +1500,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     icon: Icons.equalizer,
                     title: sheetContext.l10n.equalizerTitle,
                     onTap: () => Navigator.of(sheetContext).pop('equalizer'),
+                  ),
+                  SettingsItem(
+                    icon: Icons.speed,
+                    title: sheetContext.l10n.playbackTempoTitle,
+                    subtitle: tempoSubtitle,
+                    onTap: () => Navigator.of(sheetContext).pop('tempo'),
                   ),
                   SettingsItem(
                     icon: volumeShown
@@ -1286,6 +1589,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       case 'equalizer':
         await pushPage<void>(context, (_) => const EqualizerScreen());
         break;
+      case 'tempo':
+        await showPlaybackTempoSheet(context);
+        break;
       case 'volume':
         ref.read(settingsProvider.notifier).setPlayerShowVolume(!volumeShown);
         break;
@@ -1301,13 +1607,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     ColorScheme colorScheme,
   ) async {
     const durations = [15, 30, 45, 60];
-    final isActive = controller.sleepTimerEndsAt != null;
+    final endOfSong = controller.sleepAtEndOfSong;
+    final isActive = controller.sleepTimerEndsAt != null || endOfSong;
     final selection = await showAppBottomSheet<String>(
       context: context,
       useRootNavigator: true,
       backgroundColor: colorScheme.surfaceContainerHigh,
       title: context.l10n.nowPlayingSleepTimer,
-      builder: (sheetContext) => Padding(
+      maxHeightFactor: 0.85,
+      builder: (sheetContext) => SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 16),
         child: SettingsGroup(
           children: [
@@ -1315,9 +1623,18 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               SettingsItem(
                 icon: Icons.timer_outlined,
                 title: sheetContext.l10n.nowPlayingSleepTimerMinutes(minutes),
-                showDivider: isActive || minutes != durations.last,
                 onTap: () => Navigator.of(sheetContext).pop('$minutes'),
               ),
+            SettingsItem(
+              icon: Icons.music_note_outlined,
+              title: sheetContext.l10n.nowPlayingSleepTimerEndOfSong,
+              selected: endOfSong,
+              trailing: endOfSong
+                  ? AppIcon(Icons.check, color: colorScheme.primary)
+                  : null,
+              showDivider: isActive,
+              onTap: () => Navigator.of(sheetContext).pop('endOfSong'),
+            ),
             if (isActive)
               SettingsItem(
                 icon: Icons.timer_off_outlined,
@@ -1335,6 +1652,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       controller.cancelSleepTimer();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.nowPlayingSleepTimerCancelled)),
+      );
+      return;
+    }
+
+    if (selection == 'endOfSong') {
+      controller.setSleepTimerEndOfSong();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.nowPlayingSleepTimerEndOfSongSet)),
       );
       return;
     }

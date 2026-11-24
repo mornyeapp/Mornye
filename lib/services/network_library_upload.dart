@@ -5,6 +5,7 @@ import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/services/folder_path_template.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
+import 'package:mornye/services/lyrics_sidecar.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/file_access.dart'
@@ -55,39 +56,38 @@ class NetworkUploadSong {
   final String path;
   final String title;
 
-  /// `Album Artist/Album`, as Save offline and the default download layout
-  /// name folders.
+  /// The folders under the chosen folder, as the download folder settings
+  /// arrange a download of the song; empty for the chosen folder itself.
   final String relativeDir;
   final String fileName;
 }
 
-/// The uploadable songs of [items], once each by file.
-List<NetworkUploadSong> networkUploadSongs(Iterable<UnifiedLibraryItem> items) {
+/// The songs of [items] stored on this device, once each by file.
+List<UnifiedLibraryItem> networkUploadItems(
+  Iterable<UnifiedLibraryItem> items,
+) {
   final paths = <String>{};
   return [
     for (final item in items)
-      if (canUploadLibraryItem(item) && paths.add(item.filePath))
-        NetworkUploadSong(
-          path: item.filePath,
-          title: item.trackName,
-          relativeDir: networkUploadRelativeDir(item),
-          fileName: networkUploadFileName(item),
-        ),
+      if (canUploadLibraryItem(item) && paths.add(item.filePath)) item,
   ];
 }
 
-String networkUploadRelativeDir(UnifiedLibraryItem item) {
-  final albumArtist =
-      item.localItem?.albumArtist ?? item.historyItem?.albumArtist;
-  final artist = albumArtist?.trim().isNotEmpty ?? false
-      ? albumArtist!
-      : item.artistName;
-  final album = item.albumName.trim();
-  return [
-    FolderPathTemplate.sanitizeComponent(artist),
-    if (album.isNotEmpty) FolderPathTemplate.sanitizeComponent(album),
-  ].join('/');
-}
+/// The uploadable songs of [items], once each by file, each in the folder
+/// [folderFor] gives it: where the download folder settings put a download
+/// of it, so the copies are laid out like the songs on this device.
+Future<List<NetworkUploadSong>> networkUploadSongs(
+  Iterable<UnifiedLibraryItem> items, {
+  required Future<String> Function(UnifiedLibraryItem item) folderFor,
+}) async => [
+  for (final item in networkUploadItems(items))
+    NetworkUploadSong(
+      path: item.filePath,
+      title: item.trackName,
+      relativeDir: await folderFor(item),
+      fileName: networkUploadFileName(item),
+    ),
+];
 
 /// The file's own name, so the copy matches the original. A content URI's
 /// name comes from its download record or its document id, else the default
@@ -210,6 +210,7 @@ class NetworkLibraryUploader {
     required this.prepare,
     required this.publish,
     this.openFile = openNetworkUploadFile,
+    this.readDocumentLyrics = _readDocumentLyrics,
   });
 
   final Future<List<NetworkConnection>> Function() connections;
@@ -223,6 +224,9 @@ class NetworkLibraryUploader {
   prepare;
   final NetworkUploadPublish publish;
   final Future<NetworkUploadFile> Function(String path) openFile;
+
+  /// The `.lrc` text beside an Android document, which has no file path.
+  final Future<String?> Function(String uri) readDocumentLyrics;
 
   Future<NetworkUploadResult> upload(
     List<NetworkUploadSong> songs, {
@@ -293,17 +297,32 @@ class NetworkLibraryUploader {
     );
   }
 
-  /// A `.lrc` beside a plain file goes along, as network downloads do; it is
-  /// optional, so a lyrics failure leaves the song uploaded.
+  /// A `.lrc` beside the file goes along, as network downloads do; it is
+  /// optional, so a lyrics failure leaves the song uploaded. An Android
+  /// document's sidecar is read through its storage access into a
+  /// temporary file first.
   Future<void> _publishLyrics(
     NetworkUploadSong song,
     String target,
     void Function() checkpoint,
   ) async {
-    if (isContentUri(song.path)) return;
-    final lyrics = File(p.setExtension(song.path, '.lrc'));
+    Directory? temporary;
     try {
-      if (!await lyrics.exists()) return;
+      final File lyrics;
+      final String transferId;
+      if (isContentUri(song.path)) {
+        final text = await readDocumentLyrics(song.path);
+        checkpoint();
+        if (text == null || text.trim().isEmpty) return;
+        temporary = await Directory.systemTemp.createTemp('mornye-upload-');
+        lyrics = File(p.join(temporary.path, 'lyrics.lrc'));
+        await lyrics.writeAsString(text);
+        transferId = 'library/${song.path}.lrc';
+      } else {
+        lyrics = File(p.setExtension(song.path, '.lrc'));
+        if (!await lyrics.exists()) return;
+        transferId = 'library/${lyrics.path}';
+      }
       final uri = Uri.parse(target);
       await publish(
         NetworkStorageService.source(
@@ -311,7 +330,7 @@ class NetworkLibraryUploader {
           p.posix.setExtension(uri.pathSegments.join('/'), '.lrc'),
         ),
         lyrics,
-        'library/${lyrics.path}',
+        transferId,
         checkpoint: checkpoint,
         progress: (_, _) {},
       );
@@ -319,6 +338,15 @@ class NetworkLibraryUploader {
       rethrow;
     } on Object {
       // Kept local only; never replaces a remote file of that name.
+    } finally {
+      try {
+        await temporary?.delete(recursive: true);
+      } on Object {
+        // A leftover temporary copy is not worth failing the song.
+      }
     }
   }
 }
+
+Future<String?> _readDocumentLyrics(String uri) =>
+    const LyricsSidecarStore(extension: lrcExtension).read(uri);

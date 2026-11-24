@@ -1,12 +1,17 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:mornye/routes/now_playing_route.dart';
+import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/widgets/mornye_player_artwork.dart';
 import 'package:mornye/widgets/player_artwork.dart';
+import 'package:mornye/widgets/player_track_crossfade.dart';
 
 /// Full-screen cover style for the Material player: the cover fills the top
 /// of the page edge to edge, then fades into a blurred copy of itself.
@@ -19,6 +24,10 @@ class MaterialPlayerBackdrop extends StatelessWidget {
     required this.mediaItem,
     required this.colorScheme,
     required this.showArtwork,
+    this.playsMotionArtwork = false,
+    this.videoUrl,
+    this.resolvingVideo = false,
+    this.onVideoError,
   });
 
   final MediaItem mediaItem;
@@ -26,6 +35,19 @@ class MaterialPlayerBackdrop extends StatelessWidget {
 
   /// False behind lyrics, where only the blurred surface remains.
   final bool showArtwork;
+
+  /// Plays [videoUrl] in place of the sharp cover, which shows until the
+  /// video is ready. The phone player sets it; desktop keeps a still cover.
+  final bool playsMotionArtwork;
+
+  /// Motion artwork for [playsMotionArtwork].
+  final String? videoUrl;
+
+  /// True while a newer [videoUrl] is still being looked up, so the current
+  /// video keeps playing instead of dropping back to the still cover.
+  final bool resolvingVideo;
+
+  final VoidCallback? onVideoError;
 
   @override
   Widget build(BuildContext context) {
@@ -38,9 +60,15 @@ class MaterialPlayerBackdrop extends StatelessWidget {
     if (size.width > size.height) return blurredCover;
     final artUri = mediaItem.artUri?.toString();
     final appBarHeight = MediaQuery.paddingOf(context).top + kToolbarHeight;
-    final motion = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 300);
+    // The cover and its shade fade together on the effects spring when the
+    // lyrics cover them.
+    final motion = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+    );
+    // A skip fades the next cover in over this one, as the card cover does.
+    // It fills the box edge to edge, so it fades without growing.
+    final trackChange = playerTrackChangeMotion(context);
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -56,17 +84,31 @@ class MaterialPlayerBackdrop extends StatelessWidget {
               : size.width.clamp(0.0, size.height * 0.62),
           child: AnimatedOpacity(
             opacity: showArtwork ? 1 : 0,
-            duration: motion,
-            curve: Curves.easeInOutCubic,
+            duration: motion.duration,
+            curve: motion.curve,
             child: Hero(
               tag: kNowPlayingArtworkHeroTag,
               // The flying cover must keep its fade in the route overlay.
               child: _FadedArtwork(
-                child: PlayerArtwork(
-                  artUri: artUri,
-                  colorScheme: colorScheme,
-                  cacheWidth: PlayerArtwork.transitionCacheWidth(context),
-                ),
+                child: !playsMotionArtwork
+                    ? PlayerArtwork(
+                        artUri: artUri,
+                        colorScheme: colorScheme,
+                        cacheWidth: PlayerArtwork.transitionCacheWidth(context),
+                        crossfade: trackChange,
+                      )
+                    // Paused while hidden behind lyrics.
+                    : TickerMode(
+                        enabled: showArtwork,
+                        child: MornyePlayerArtwork(
+                          mediaItem: mediaItem,
+                          videoUrl: videoUrl,
+                          resolvingVideo: resolvingVideo,
+                          squareWhileLoading: false,
+                          onError: onVideoError,
+                          crossfade: trackChange,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -79,7 +121,8 @@ class MaterialPlayerBackdrop extends StatelessWidget {
           height: appBarHeight + 32,
           child: AnimatedOpacity(
             opacity: showArtwork ? 1 : 0,
-            duration: motion,
+            duration: motion.duration,
+            curve: motion.curve,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -227,8 +270,12 @@ class _RenderFadeBand extends RenderProxyBox {
   }
 }
 
-/// The surface, the blurred cover and its tint, drawn once into an image so
-/// a playing track does not blur the whole screen again on every frame.
+/// The blurred cover, drawn once into an image so a playing track does not
+/// blur the whole screen again on every frame. The surface under it and the
+/// tint over it stay live layers, so the artwork scheme moving to the next
+/// track's colours never draws the blur again. A new cover's blur fades in
+/// over the previous one with the track change. While a window resize goes
+/// on, the previous blur stretches over the box until the size settles.
 class _BlurredCover extends StatefulWidget {
   const _BlurredCover({required this.artUri, required this.colorScheme});
 
@@ -239,7 +286,8 @@ class _BlurredCover extends StatefulWidget {
   State<_BlurredCover> createState() => _BlurredCoverState();
 }
 
-class _BlurredCoverState extends State<_BlurredCover> {
+class _BlurredCoverState extends State<_BlurredCover>
+    with SingleTickerProviderStateMixin {
   static const _sigma = 48.0;
   static const _artWidth = PlayerArtwork.miniCacheWidth;
 
@@ -251,6 +299,24 @@ class _BlurredCoverState extends State<_BlurredCover> {
   ImageInfo? _art;
   ui.Image? _blur;
   Object? _blurInputs;
+
+  /// The size [_blur] was drawn for. Null draws it again at the next layout.
+  Size? _blurSize;
+
+  /// Draws [_blur] again once a resize has settled; until then the previous
+  /// blur is stretched over the box.
+  Timer? _resizeSettle;
+  static const _resizeSettleDelay = Duration(milliseconds: 150);
+
+  /// The previous cover's blur, kept under the new one while it fades in.
+  ui.Image? _outgoing;
+  late final _fade = AnimationController(vsync: this, value: 1)
+    ..addStatusListener((status) {
+      if (status.isCompleted && _outgoing != null && mounted) {
+        setState(_dropOutgoing);
+      }
+    });
+  AppMotionSpec _motion = const AppMotionSpec(Duration.zero, Curves.linear);
 
   @override
   void initState() {
@@ -283,17 +349,37 @@ class _BlurredCoverState extends State<_BlurredCover> {
     setState(() {
       _art?.dispose();
       _art = art;
-      if (art != null) return;
-      _blur?.dispose();
+      if (art == null) {
+        _dropOutgoing();
+        _blur?.dispose();
+        _blur = _blurInputs = null;
+        return;
+      }
+      // The first cover, and any cover under reduced motion, swaps at once.
+      final previous = _blur;
+      if (previous == null || _motion.duration == Duration.zero) return;
+      _outgoing?.dispose();
+      _outgoing = previous;
       _blur = _blurInputs = null;
+      _fade
+        ..duration = _motion.duration
+        ..forward(from: 0);
     });
+  }
+
+  void _dropOutgoing() {
+    _outgoing?.dispose();
+    _outgoing = null;
   }
 
   @override
   void dispose() {
     _stream?.removeListener(_listener);
+    _resizeSettle?.cancel();
+    _fade.dispose();
     _art?.dispose();
     _blur?.dispose();
+    _outgoing?.dispose();
     super.dispose();
   }
 
@@ -301,7 +387,7 @@ class _BlurredCoverState extends State<_BlurredCover> {
   /// leaves without visible detail. The live filter blurs in logical pixels
   /// under the device pixel ratio; this canvas has no transform, so sigma
   /// takes the same dpr / 4 scale and still spans 48 dp once drawn back.
-  static ui.Image _render(ui.Image art, Size size, double dpr, Color surface) {
+  static ui.Image _render(ui.Image art, Size size, double dpr) {
     final scale = dpr / 4;
     final width = math.max(1, (size.width * scale).ceil());
     final height = math.max(1, (size.height * scale).ceil());
@@ -309,7 +395,6 @@ class _BlurredCoverState extends State<_BlurredCover> {
     final sigma = _sigma * scale;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder)
-      ..drawRect(rect, Paint()..color = surface)
       ..saveLayer(
         rect,
         Paint()
@@ -322,9 +407,7 @@ class _BlurredCoverState extends State<_BlurredCover> {
       fit: BoxFit.cover,
       filterQuality: FilterQuality.low,
     );
-    canvas
-      ..restore()
-      ..drawRect(rect, Paint()..color = surface.withValues(alpha: 0.72));
+    canvas.restore();
     final picture = recorder.endRecording();
     try {
       return picture.toImageSync(width, height);
@@ -333,43 +416,83 @@ class _BlurredCoverState extends State<_BlurredCover> {
     }
   }
 
+  /// Whether the blur drawn for [drawn] can stand in for [size] while a
+  /// window resize goes on: the box keeps about its shape.
+  static bool _stretches(Size drawn, Size size) {
+    if (drawn.isEmpty || size.isEmpty) return false;
+    final change = size.aspectRatio / drawn.aspectRatio;
+    return change > 0.8 && change < 1.25;
+  }
+
+  void _settleResize() {
+    if (mounted) setState(() => _blurSize = null);
+  }
+
+  static Widget _image(ui.Image? image) => RawImage(
+    image: image,
+    fit: BoxFit.fill,
+    filterQuality: FilterQuality.low,
+  );
+
   @override
   Widget build(BuildContext context) {
+    _motion = playerTrackChangeMotion(context);
     final surface = widget.colorScheme.surface;
     final art = _art?.image;
+    final Widget blurred;
     if (art == null) {
       // Blur live while the cover decodes and for the placeholder.
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          ColoredBox(color: surface),
-          ImageFiltered(
-            imageFilter: ui.ImageFilter.blur(sigmaX: _sigma, sigmaY: _sigma),
-            child: PlayerArtwork(
-              artUri: widget.artUri,
-              colorScheme: widget.colorScheme,
-              cacheWidth: _artWidth,
-            ),
-          ),
-          ColoredBox(color: surface.withValues(alpha: 0.72)),
-        ],
+      blurred = ImageFiltered(
+        imageFilter: ui.ImageFilter.blur(sigmaX: _sigma, sigmaY: _sigma),
+        child: PlayerArtwork(
+          artUri: widget.artUri,
+          colorScheme: widget.colorScheme,
+          cacheWidth: _artWidth,
+        ),
+      );
+    } else {
+      final dpr = MediaQuery.devicePixelRatioOf(context);
+      blurred = LayoutBuilder(
+        builder: (context, constraints) {
+          final size = constraints.biggest;
+          final inputs = (art, dpr);
+          final drawn = _blurSize;
+          if (inputs != _blurInputs ||
+              drawn == null ||
+              !_stretches(drawn, size)) {
+            _resizeSettle?.cancel();
+            _blur?.dispose();
+            _blur = _render(art, size, dpr);
+            _blurInputs = inputs;
+            _blurSize = size;
+          } else {
+            _resizeSettle?.cancel();
+            if (size != drawn) {
+              _resizeSettle = Timer(_resizeSettleDelay, _settleResize);
+            }
+          }
+          final outgoing = _outgoing;
+          if (outgoing == null) return _image(_blur);
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              _image(outgoing),
+              FadeTransition(
+                opacity: _fade.drive(CurveTween(curve: _motion.curve)),
+                child: _image(_blur),
+              ),
+            ],
+          );
+        },
       );
     }
-    final dpr = MediaQuery.devicePixelRatioOf(context);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final inputs = (art, constraints.biggest, dpr, surface);
-        if (inputs != _blurInputs) {
-          _blur?.dispose();
-          _blur = _render(art, constraints.biggest, dpr, surface);
-          _blurInputs = inputs;
-        }
-        return RawImage(
-          image: _blur,
-          fit: BoxFit.fill,
-          filterQuality: FilterQuality.low,
-        );
-      },
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PlayerArtworkSurface(surface: surface),
+        blurred,
+        PlayerArtworkSurface(surface: surface, opacity: 0.72),
+      ],
     );
   }
 }

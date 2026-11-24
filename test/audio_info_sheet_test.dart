@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,6 +88,28 @@ void main() {
     expect(
       audioBitPerfectStatus(directActive: false, exclusiveActive: false),
       AudioBitPerfectStatus.systemMixed,
+    );
+  });
+
+  test('a direct path fed by a lossy decoder is not called bit-perfect', () {
+    expect(
+      audioBitPerfectStatus(
+        directActive: true,
+        exclusiveActive: false,
+        lossySource: true,
+      ),
+      AudioBitPerfectStatus.lossySource,
+    );
+  });
+
+  test('a direct path resampled for the DAC is not called bit-perfect', () {
+    expect(
+      audioBitPerfectStatus(
+        directActive: true,
+        exclusiveActive: false,
+        resampled: true,
+      ),
+      AudioBitPerfectStatus.resampled,
     );
   });
 
@@ -415,6 +437,54 @@ void main() {
     expect(find.text('2.0 ms · 96 frames'), findsOneWidget);
   });
 
+  testWidgets('iOS says its mixer, not a setting, rules out bit-perfect', (
+    tester,
+  ) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          _route,
+          (call) async => {
+            'platform': 'ios',
+            'mixerSampleRate': 48000,
+            'device': {'type': 'usb', 'name': 'Example DAC'},
+          },
+        );
+    final metadata = PlayerMetadataController();
+    addTearDown(metadata.dispose);
+    await metadata.load(
+      const MediaItem(
+        id: 'track',
+        title: 'Track',
+        extras: {
+          'source': 'https://example.com/track.flac',
+          'format': 'flac',
+          'bit_depth': 16,
+          'sample_rate': 44100,
+        },
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showAudioInfoSheet(context, metadata: metadata),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('Bit-perfect'), 200);
+    expect(find.text('No, iOS mixes all app audio'), findsOneWidget);
+    expect(find.text('No, mixed by the system'), findsNothing);
+    expect(find.text('44.1 kHz → 48 kHz'), findsOneWidget);
+  });
+
   for (final mornye in [false, true]) {
     testWidgets('USB changes refresh an open audio sheet (Mornye=$mornye)', (
       tester,
@@ -516,6 +586,17 @@ void main() {
       (tester) async {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(_route, (call) async => null);
+        // The song has no .lrc file. An unanswered platform call never
+        // completes under fake time and would keep the tags loading.
+        const backend = MethodChannel('com.zarz.mornye/backend');
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(backend, (call) async => null);
+        addTearDown(
+          () => TestDefaultBinaryMessengerBinding
+              .instance
+              .defaultBinaryMessenger
+              .setMockMethodCallHandler(backend, null),
+        );
         final tags = Completer<Map<String, dynamic>>();
         var reads = 0;
         final metadata = PlayerMetadataController(

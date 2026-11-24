@@ -1,23 +1,24 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:material_ui/material_ui.dart' as material_ui;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/screens/main_shell.dart';
 import 'package:mornye/screens/setup_screen.dart';
 import 'package:mornye/screens/tutorial_screen.dart';
-import 'package:mornye/screens/whats_new_screen.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/equalizer_provider.dart';
 import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/app_orientation.dart';
 import 'package:mornye/services/link/client/link_client_controller.dart';
+import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
+import 'package:mornye/services/link/link_source_presence.dart';
+import 'package:mornye/services/link/sync/link_sound_sync_runner.dart';
 import 'package:mornye/services/link/sync/link_sync_runner.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/dynamic_color_wrapper.dart';
-import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/l10n/supported_locales.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/android_tv.dart';
@@ -34,11 +35,9 @@ import 'package:mornye/widgets/tv_navigation.dart';
 String initialLocationForAppState({
   required bool isFirstLaunch,
   required bool hasCompletedTutorial,
-  bool hasSeenWhatsNew = true,
 }) {
   if (isFirstLaunch) return '/setup';
   if (!hasCompletedTutorial) return '/tutorial';
-  if (!hasSeenWhatsNew) return '/whats-new';
   return '/';
 }
 
@@ -48,10 +47,6 @@ final _routerProvider = Provider<GoRouter>((ref) {
       (settings) => (
         isFirstLaunch: settings.isFirstLaunch,
         hasCompletedTutorial: settings.hasCompletedTutorial,
-        // Desktop shows the tour as a dialog over the shell instead.
-        hasSeenWhatsNew:
-            isDesktopPlatform ||
-            settings.whatsNewSeen == AppInfo.whatsNewRelease,
       ),
     ),
   );
@@ -59,7 +54,6 @@ final _routerProvider = Provider<GoRouter>((ref) {
   final initialLocation = initialLocationForAppState(
     isFirstLaunch: routingSettings.isFirstLaunch,
     hasCompletedTutorial: routingSettings.hasCompletedTutorial,
-    hasSeenWhatsNew: routingSettings.hasSeenWhatsNew,
   );
 
   return GoRouter(
@@ -72,10 +66,6 @@ final _routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/tutorial',
         builder: (context, state) => const TutorialScreen(),
-      ),
-      GoRoute(
-        path: '/whats-new',
-        builder: (context, state) => const WhatsNewScreen(),
       ),
     ],
     // Safety net: if a deep link URL (e.g. Spotify/Deezer) somehow reaches
@@ -124,10 +114,12 @@ ScrollBehavior appScrollBehavior({required bool disableOverscrollEffects}) {
   return const _FluidScrollBehavior();
 }
 
-/// Fades the app content in after an orientation change or a width change
-/// across the shell's rail breakpoint (fold/unfold, split-screen resize) —
-/// Flutter reflows the layout in a single frame, so without this the new
-/// layout pops in.
+/// Fades the app content in on phones and tablets after an orientation change
+/// or a width change across the shell's rail breakpoint (fold/unfold,
+/// split-screen resize). Flutter reflows the layout in a single frame, so
+/// without this the new layout pops in. Desktop windows skip it: maximize,
+/// Snap and edge drags would blink the whole window from opacity 0, and the
+/// desktop shell does not use this breakpoint.
 class _OrientationFade extends StatefulWidget {
   final Widget child;
 
@@ -163,6 +155,14 @@ class _OrientationFadeState extends State<_OrientationFade>
         useNavigationRailForWidth(_lastWidth!) !=
             useNavigationRailForWidth(width);
     if (orientationChanged || crossedRailBreakpoint) {
+      // The new layout fades in on the style's effects spring. It starts
+      // from nothing on purpose: the layout under it has just changed.
+      final fade = AppMotion.effects(
+        context,
+        const AppMotionSpec(Duration(milliseconds: 300), Curves.easeOut),
+      );
+      _controller.duration = fade.duration;
+      _opacity.curve = fade.curve;
       _controller.forward(from: 0);
     }
     _lastOrientation = orientation;
@@ -190,15 +190,14 @@ Widget buildAppContent(
   Widget? child, {
   required bool heroAnimationsEnabled,
 }) {
-  Widget appContent = _OrientationFade(
-    child: AppScaffoldMessenger(
-      child: PlaybackFeedback(
-        child: DesktopLibraryDropTarget(
-          child: child ?? const SizedBox.shrink(),
-        ),
-      ),
+  Widget appContent = AppScaffoldMessenger(
+    child: PlaybackFeedback(
+      child: DesktopLibraryDropTarget(child: child ?? const SizedBox.shrink()),
     ),
   );
+  if (!isDesktopPlatform) {
+    appContent = _OrientationFade(child: appContent);
+  }
   // HeroMode only affects heroes below a *route* subtree. At this level it
   // sits above the router's Navigator, so the controller never encounters it
   // while collecting heroes. Removing the inherited controller disables
@@ -228,15 +227,19 @@ Widget buildAppContent(
 /// Treats the display as one continuous surface so bottom sheets and dialogs
 /// stay centered on large/foldable devices. The window metrics are read here
 /// rather than in [buildAppContent], so a resize rebuilds only these layers
-/// and passes the app content through unchanged.
-class _AppMediaQuery extends StatelessWidget {
+/// and passes the app content through unchanged. The Interface size setting
+/// scales everything below it.
+class _AppMediaQuery extends ConsumerWidget {
   final Widget child;
 
   const _AppMediaQuery({required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final mediaQuery = MediaQuery.of(context);
+    final interfaceScale = ref.watch(
+      settingsProvider.select((settings) => settings.interfaceScale),
+    );
     return MediaQuery(
       data: mediaQuery.copyWith(
         displayFeatures: const [],
@@ -244,7 +247,9 @@ class _AppMediaQuery extends StatelessWidget {
             ? NavigationMode.directional
             : mediaQuery.navigationMode,
       ),
-      child: MornyeGlassPreparation(child: AdaptiveUiScaler(child: child)),
+      child: MornyeGlassPreparation(
+        child: AdaptiveUiScaler(userScale: interfaceScale, child: child),
+      ),
     );
   }
 }
@@ -263,13 +268,22 @@ class MornyeApp extends ConsumerWidget {
     if (ref.read(linkClientSupportedProvider)) {
       ref.listen(linkClientControllerProvider, (_, _) {});
       ref.listen(linkSyncRunnerProvider, (_, _) {});
+      ref.listen(linkSoundSyncRunnerProvider, (_, _) {});
       ref.listen(linkPhoneFeaturesProvider, (_, _) {});
       ref.listen(linkTransferOfferNoticesProvider, (_, _) {});
+      // Hides a computer's songs while it is not connected.
+      ref.listen(linkSourcePresenceProvider, (_, _) {});
+      // Shares this phone with other phones when the owner turned it on.
+      if (!isDesktopPlatform) ref.listen(linkDesktopHostProvider, (_, _) {});
     }
     final router = ref.watch(_routerProvider);
     final localeString = ref.watch(settingsProvider.select((s) => s.locale));
     final heroAnimationsEnabled = ref.watch(
       settingsProvider.select((s) => s.heroAnimationsEnabled),
+    );
+    // The motion presets read the pace as each animation starts.
+    MotionPace.speed = ref.watch(
+      settingsProvider.select((s) => s.animationSpeed),
     );
     final scrollBehavior = appScrollBehavior(
       disableOverscrollEffects: disableOverscrollEffects,
@@ -301,13 +315,7 @@ class MornyeApp extends ConsumerWidget {
               supportedLocales,
             );
           },
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            material_ui.GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
+          localizationsDelegates: appLocalizationsDelegates,
           // ARB files below the translation threshold remain bundled so
           // translators can test them, but production users should only be
           // offered locales selected by the completion checker.

@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
@@ -12,7 +12,8 @@ import 'package:mornye/widgets/link/link_transfer_tile.dart';
 import 'package:mornye/widgets/link/link_transfers_view.dart';
 
 /// Opens the same device choices as the phone player. Active transfers ring
-/// the glyph without changing the player bar's layout.
+/// the glyph without changing the player bar's layout, and playing together
+/// with a phone shows in its tooltip and, in Material, its colour.
 class DesktopLinkDevicesButton extends ConsumerWidget {
   const DesktopLinkDevicesButton({super.key});
 
@@ -24,7 +25,11 @@ class DesktopLinkDevicesButton extends ConsumerWidget {
     final progress = ref.watch(
       linkTransfersProvider.select(linkTransfersProgress),
     );
+    final together = ref.watch(
+      linkDesktopHostProvider.select((state) => state.togetherPhone != null),
+    );
     final mornye = context.isMornye;
+    final colorScheme = Theme.of(context).colorScheme;
     final size = mornye ? 18.0 : 24.0;
     final glyph = AppIcon(
       mornye ? CupertinoIcons.device_phone_portrait : Icons.phonelink,
@@ -33,8 +38,17 @@ class DesktopLinkDevicesButton extends ConsumerWidget {
     final outset = size / 6;
     return AppIconButton(
       key: const ValueKey('desktop-link-devices-button'),
-      tooltip: context.l10n.linkDevicesTitle,
-      color: mornye ? Theme.of(context).colorScheme.onSurface : null,
+      // Playing together names itself, and Material draws `primary` as the
+      // phone's button does while the computer plays. Mornye keeps its
+      // neutral ink: its accent would read as a warning here.
+      tooltip: together
+          ? context.l10n.linkPlayTogether
+          : context.l10n.linkDevicesTitle,
+      color: mornye
+          ? colorScheme.onSurface
+          : together
+          ? colorScheme.primary
+          : null,
       onPressed: () => showDesktopLinkDevicesSheet(context),
       icon: progress == null
           ? glyph

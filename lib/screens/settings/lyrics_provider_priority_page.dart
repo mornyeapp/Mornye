@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_switch.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +9,7 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/discard_changes_dialog.dart';
 import 'package:mornye/widgets/priority_settings_scaffold.dart';
 import 'package:mornye/widgets/reorderable_priority_item.dart';
+import 'package:mornye/widgets/scaled_drag_proxy.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/constants/music_services.dart';
 
@@ -103,6 +104,7 @@ class _LyricsProviderPriorityPageState
               horizontal: 16 + wideListInset(context),
             ),
             sliver: SliverReorderableList(
+              proxyDecorator: ScaledDragProxy.plain,
               itemCount: _enabledProviders.length,
               itemBuilder: (context, index) {
                 final id = _enabledProviders[index];
@@ -115,6 +117,7 @@ class _LyricsProviderPriorityPageState
                   key: ValueKey(id),
                   index: index,
                   isFirst: index == 0,
+                  isLast: index == _enabledProviders.length - 1,
                   icon: info.icon,
                   iconColor: Theme.of(context).colorScheme.primary,
                   name: info.name,
@@ -159,6 +162,8 @@ class _LyricsProviderPriorityPageState
                 return _DisabledProviderItem(
                   key: ValueKey(id),
                   info: info,
+                  isFirst: index == 0,
+                  isLast: index == disabled.length - 1,
                   onToggle: () => _enableProvider(id),
                 );
               }, childCount: disabled.length),
@@ -304,11 +309,15 @@ class _LyricsProviderPriorityPageState
 
 class _DisabledProviderItem extends StatelessWidget {
   final _LyricsProviderInfo info;
+  final bool isFirst;
+  final bool isLast;
   final VoidCallback onToggle;
 
   const _DisabledProviderItem({
     super.key,
     required this.info,
+    required this.isFirst,
+    required this.isLast,
     required this.onToggle,
   });
 
@@ -324,15 +333,16 @@ class _DisabledProviderItem extends StatelessWidget {
           )
         : colorScheme.surfaceContainerLow;
 
+    final radius = priorityRowRadius(context, first: isFirst, last: isLast);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: priorityRowGap(context, last: isLast)),
       child: Opacity(
         opacity: 0.6,
         child: Material(
           color: backgroundColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: radius,
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: radius,
             onTap: onToggle,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

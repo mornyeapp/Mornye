@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -52,13 +52,23 @@ final List<_Sheet> _library = [
   ),
   (
     (l) => l.libraryDefaultView,
-    ['last', 'all', 'albums', 'singles', 'artists', 'playlists', 'folders'],
+    [
+      'last',
+      'all',
+      'albums',
+      'singles',
+      'artists',
+      'genres',
+      'playlists',
+      'folders',
+    ],
     [
       Icons.history,
       Icons.music_note,
       Icons.album,
       Icons.audiotrack,
       Icons.person,
+      Icons.category_outlined,
       Icons.queue_music,
       Icons.folder_outlined,
     ],

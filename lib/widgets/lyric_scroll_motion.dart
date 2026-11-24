@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import 'dart:math' as math;
+
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/physics.dart';
 
 /// One shared clock adds a small, staggered spring to upcoming visible rows.
@@ -27,18 +29,12 @@ class LyricScrollMotion extends StatefulWidget {
 
   static const duration = Duration(milliseconds: 800);
 
-  /// The list scroll to a new line. It starts from rest and settles without
-  /// overshoot, so a line change never opens with a jump.
+  /// The list scroll to a new line. It starts from rest with no acceleration
+  /// either and settles without overshoot. A plain critically damped spring
+  /// accelerates hardest on its first frame, which read as a jerk, above all
+  /// when that frame was late; this one arrives just as soon.
   static const scrollDuration = Duration(milliseconds: 550);
-  static final Curve scrollCurve = _SpringCurve(
-    SpringSimulation(
-      SpringDescription.withDampingRatio(mass: 1, stiffness: 196, ratio: 1),
-      0,
-      1,
-      0,
-    ),
-    scrollDuration,
-  );
+  static final Curve scrollCurve = _SoftSpringCurve(20, scrollDuration);
 
   // Softer than the scroll, so later rows keep trailing it.
   static final _spring = SpringSimulation(
@@ -101,18 +97,24 @@ class _LyricScrollMotionState extends State<LyricScrollMotion> {
   }
 }
 
-/// A spring sampled over [duration] and scaled to end exactly at 1.
-class _SpringCurve extends Curve {
-  _SpringCurve(this.simulation, Duration duration)
-    : _seconds = duration.inMicroseconds / Duration.microsecondsPerSecond,
-      _end = simulation.x(
-        duration.inMicroseconds / Duration.microsecondsPerSecond,
-      );
+/// Two critically damped springs in a row, the second following the first:
+/// position, speed and acceleration all start at zero. Sampled over
+/// [duration] and scaled to end exactly at 1. [rate] is in 1/s.
+class _SoftSpringCurve extends Curve {
+  _SoftSpringCurve(this.rate, Duration duration)
+    : _seconds = duration.inMicroseconds / Duration.microsecondsPerSecond {
+    _end = _position(_seconds);
+  }
 
-  final SpringSimulation simulation;
+  final double rate;
   final double _seconds;
-  final double _end;
+  late final double _end;
+
+  double _position(double seconds) {
+    final x = rate * seconds;
+    return 1 - math.exp(-x) * (1 + x + x * x / 2);
+  }
 
   @override
-  double transformInternal(double t) => simulation.x(t * _seconds) / _end;
+  double transformInternal(double t) => _position(t * _seconds) / _end;
 }

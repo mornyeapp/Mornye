@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/models/album_track_order.dart';
 import 'package:mornye/services/listening_statistics.dart';
 
 import 'support/link_sync_support.dart';
@@ -21,6 +22,36 @@ const _two = ListeningTrack(
 );
 
 void main() {
+  test('album plays add up a song across days, whatever its case', () async {
+    final database = await SqliteProcessDatabase.open();
+    addTearDown(database.close);
+    await database.execute('''
+      CREATE TABLE listening (
+        day TEXT, track_key TEXT, title TEXT, artist TEXT, album TEXT,
+        artwork TEXT, milliseconds INTEGER, plays INTEGER
+      )
+    ''');
+    Future<void> add(String day, String title, String album, int plays) =>
+        database.insert('listening', {
+          'day': day,
+          'track_key': '$day-$title',
+          'title': title,
+          'artist': 'Artist',
+          'album': album,
+          'milliseconds': 1000,
+          'plays': plays,
+        });
+    await add('2026-11-01', 'First', 'Album', 2);
+    await add('2026-11-02', 'FIRST', 'ALBUM', 3);
+    await add('2026-11-02', 'Second', 'Album', 1);
+    await add('2026-11-02', 'Skipped', 'Album', 0);
+    await add('2026-11-02', 'Elsewhere', 'Other', 9);
+
+    final plays = await readAlbumPlays(database, 'album');
+    expect(plays.length, 2);
+    expect(albumTrackPlayRanks(plays), {'first': -5, 'second': -1});
+  });
+
   test(
     'counts elapsed playback once, excluding pauses and seek-like updates',
     () async {

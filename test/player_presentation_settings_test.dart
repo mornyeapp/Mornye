@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +15,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
+import 'package:mornye/widgets/settings_group.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -32,6 +33,11 @@ void main() {
     expect(restored.musicHaptics, isFalse);
     expect(restored.landscapeLyricsArtwork, isFalse);
     expect(restored.autoHideLyricsControls, isTrue);
+    expect(restored.autoHideLyricsControlsWithAccessibility, isFalse);
+    expect(
+      restored.shouldAutoHideLyricsControls(accessibleNavigation: true),
+      isFalse,
+    );
   });
 
   test('cover style and music haptics survive a round trip', () {
@@ -65,6 +71,32 @@ void main() {
       expect(restored.playerCoverStyle, isEmpty);
       expect(restored.musicHaptics, isTrue);
     }
+  });
+
+  test('fullscreen lyrics accessibility opt-in survives a round trip', () {
+    final legacy = AppSettings.fromJson({'autoHideLyricsControls': true});
+    expect(
+      legacy.shouldAutoHideLyricsControls(accessibleNavigation: false),
+      isTrue,
+    );
+    expect(
+      legacy.shouldAutoHideLyricsControls(accessibleNavigation: true),
+      isFalse,
+    );
+    final chosen = legacy.copyWith(
+      autoHideLyricsControlsWithAccessibility: true,
+    );
+    final restored = AppSettings.fromJson(chosen.toJson());
+    expect(
+      restored.shouldAutoHideLyricsControls(accessibleNavigation: true),
+      isTrue,
+    );
+    expect(
+      restored
+          .copyWith(autoHideLyricsControls: false)
+          .shouldAutoHideLyricsControls(accessibleNavigation: true),
+      isFalse,
+    );
   });
 
   testWidgets('landscape artwork is selectable, saved and searchable', (
@@ -166,6 +198,17 @@ void main() {
           jsonDecode(prefs.getString('app_settings')!) as Map<String, dynamic>,
         );
         expect(restored.autoHideLyricsControls, isFalse);
+        // Enabling the option is an explicit choice even if the system only
+        // reports accessible navigation later, on the player route.
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+        final chosen = AppSettings.fromJson(
+          jsonDecode(prefs.getString('app_settings')!) as Map<String, dynamic>,
+        );
+        expect(
+          chosen.shouldAutoHideLyricsControls(accessibleNavigation: true),
+          isTrue,
+        );
         final l10n = AppLocalizations.of(tester.element(option));
         expect(
           SettingsSearchCatalog(l10n).playback.where(
@@ -178,6 +221,66 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets('fullscreen lyrics switch reflects accessible navigation '
+        '(Mornye: $mornye)', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      debugDesktopPlatformOverride = false;
+      addTearDown(() => debugDesktopPlatformOverride = null);
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final container = ProviderContainer(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(const AppSettings()),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : AppTheme.light(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(accessibleNavigation: true),
+              child: child!,
+            ),
+            home: const PlaybackSettingsPage(),
+          ),
+        ),
+      );
+      final option = find.byKey(const ValueKey('auto-hide-lyrics-controls'));
+      await tester.scrollUntilVisible(
+        option,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.widget<SettingsSwitchItem>(option).value, isFalse);
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+      expect(tester.widget<SettingsSwitchItem>(option).value, isTrue);
+      final prefs = await SharedPreferences.getInstance();
+      AppSettings saved() => AppSettings.fromJson(
+        jsonDecode(prefs.getString('app_settings')!) as Map<String, dynamic>,
+      );
+      expect(
+        saved().shouldAutoHideLyricsControls(accessibleNavigation: true),
+        isTrue,
+      );
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+      expect(tester.widget<SettingsSwitchItem>(option).value, isFalse);
+      expect(saved().autoHideLyricsControls, isFalse);
+      expect(saved().autoHideLyricsControlsWithAccessibility, isFalse);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('full-screen Material cover keeps the entire app bar readable', (

@@ -84,115 +84,119 @@ extension _QueueTabItemWidgets on _QueueTabState {
         onDismissed: (_) {
           ref.read(downloadQueueProvider.notifier).dismissItem(item.id);
         },
-        child: DownloadSuccessOverlay(
-          showSuccess: isCompleted,
-          child: TrackCard(
-            onTap: isCompleted
-                ? () => _navigateToMetadataScreen(item)
-                : item.status == DownloadStatus.failed ||
-                      item.status == DownloadStatus.skipped
-                ? () => _showDownloadErrorDialog(context, item)
-                : null,
-            onLongPress: item.status == DownloadStatus.queued
-                ? () => _showQueuedItemMenu(context, item)
-                : null,
-            onContextMenu: item.status == DownloadStatus.queued
-                ? (position) =>
-                      _showQueuedItemMenu(context, item, position: position)
-                : null,
-            background: item.status == DownloadStatus.downloading
-                ? SmoothedProgressBuilder(
-                    builder: (context, progress, child) => Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: FractionallySizedBox(
-                        widthFactor: progress,
-                        child: child,
-                      ),
+        child: TrackCard(
+          onTap: isCompleted
+              ? songRowTap(
+                  ref,
+                  openDetails: () => _navigateToMetadataScreen(item),
+                  play: () => _playCompletedDownload(item),
+                )
+              : item.status == DownloadStatus.failed ||
+                    item.status == DownloadStatus.skipped
+              ? () => _showDownloadErrorDialog(context, item)
+              : null,
+          onLongPress: item.status == DownloadStatus.queued
+              ? () => _showQueuedItemMenu(context, item)
+              : null,
+          onContextMenu: item.status == DownloadStatus.queued
+              ? (position) =>
+                    _showQueuedItemMenu(context, item, position: position)
+              : null,
+          background: item.status == DownloadStatus.downloading
+              ? SmoothedProgressBuilder(
+                  builder: (context, progress, child) => Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: FractionallySizedBox(
+                      widthFactor: progress,
+                      child: child,
                     ),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: AlignmentDirectional.centerStart,
-                          end: AlignmentDirectional.centerEnd,
-                          colors: [
-                            colorScheme.primary.withValues(alpha: 0.16),
-                            colorScheme.primary.withValues(alpha: 0.04),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
-                : null,
-            leading: isCompleted
-                ? Hero(
-                    tag: 'cover_${item.id}',
-                    child: _buildCoverArt(item, colorScheme),
-                  )
-                : _buildCoverArt(item, colorScheme),
-            title: item.track.name,
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClickableArtistName(
-                  artistName: item.track.artistName,
-                  artistId: item.track.artistId,
-                  coverUrl: item.track.coverUrl,
-                  extensionId: item.track.source,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
                   ),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: AlignmentDirectional.centerStart,
+                        end: AlignmentDirectional.centerEnd,
+                        colors: [
+                          colorScheme.primary.withValues(alpha: 0.16),
+                          colorScheme.primary.withValues(alpha: 0.04),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              : null,
+          leading: isCompleted
+              ? Hero(
+                  tag: 'cover_${item.id}',
+                  child: _buildCoverArt(item, colorScheme),
+                )
+              : _buildCoverArt(item, colorScheme),
+          title: item.track.name,
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClickableArtistName(
+                artistName: item.track.artistName,
+                artistId: item.track.artistId,
+                coverUrl: item.track.coverUrl,
+                extensionId: item.track.source,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
-                if (item.status == DownloadStatus.downloading) ...[
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      AppIcon(
-                        Icons.download_rounded,
-                        size: 12,
-                        color: colorScheme.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: SmoothedProgressBuilder(
-                          builder: (context, progress, child) => Text(
-                            _formatDownloadStatusLine(
-                              context,
-                              item,
-                              visualProgress: progress,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                if (item.status == DownloadStatus.finalizing &&
-                    item.preparationStage == 'network_upload') ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    '${context.l10n.networkUploading}${item.bytesTotal > 0 ? ' • ${(100 * item.bytesReceived / item.bytesTotal).round()}%' : ''}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              ),
+              if (item.status == DownloadStatus.downloading) ...[
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    AppIcon(
+                      Icons.download_rounded,
+                      size: 12,
                       color: colorScheme.primary,
                     ),
-                  ),
-                ],
-                if (item.status == DownloadStatus.failed) ...[
-                  const SizedBox(height: 4),
-                  _buildDownloadFailureMessage(context, item, colorScheme),
-                ],
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: SmoothedProgressBuilder(
+                        builder: (context, progress, child) => Text(
+                          _formatDownloadStatusLine(
+                            context,
+                            item,
+                            visualProgress: progress,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
-            ),
-            trailing: _buildActionButtons(context, item, colorScheme),
+              if (item.status == DownloadStatus.finalizing &&
+                  item.preparationStage == 'network_upload') ...[
+                const SizedBox(height: 4),
+                Text(
+                  '${context.l10n.networkUploading}${item.bytesTotal > 0 ? ' • ${(100 * item.bytesReceived / item.bytesTotal).round()}%' : ''}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: colorScheme.primary),
+                ),
+              ],
+              if (item.status == DownloadStatus.failed) ...[
+                const SizedBox(height: 4),
+                _buildDownloadFailureMessage(context, item, colorScheme),
+              ],
+            ],
+          ),
+          trailing: DownloadStateSwitcher(
+            state: item.status,
+            child: _buildActionButtons(context, item, colorScheme),
           ),
         ),
       ),
@@ -468,6 +472,28 @@ extension _QueueTabItemWidgets on _QueueTabState {
     );
   }
 
+  void _openCompletedDownload(DownloadItem item) => _openFile(
+    item.filePath!,
+    title: item.track.name,
+    artist: item.track.artistName,
+    album: item.track.albumName,
+    coverUrl: item.track.coverUrl ?? '',
+  );
+
+  /// A tap on a completed download that does what its play button does; a
+  /// download whose file is missing has none and opens its details.
+  void _playCompletedDownload(DownloadItem item) {
+    final path = item.filePath;
+    if (path == null || !_fileExistsListenable(path).value) {
+      _navigateToMetadataScreen(item);
+      return;
+    }
+    _LibraryPlaybackButton.run(ref, (
+      id: '',
+      path: _cleanFilePath(path),
+    ), () => _openCompletedDownload(item));
+  }
+
   Widget _buildActionButtons(
     BuildContext context,
     DownloadItem item,
@@ -546,19 +572,19 @@ extension _QueueTabItemWidgets on _QueueTabState {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (fileExists)
-                  _LibraryPlaybackButton(
-                    playbackKey: (id: '', path: _cleanFilePath(item.filePath!)),
-                    playTooltip: context.l10n.a11yPlayTrackByArtist(
-                      item.track.name,
-                      item.track.artistName,
+                  SongRowButton(
+                    playButton: _LibraryPlaybackButton(
+                      playbackKey: (
+                        id: '',
+                        path: _cleanFilePath(item.filePath!),
+                      ),
+                      playTooltip: context.l10n.a11yPlayTrackByArtist(
+                        item.track.name,
+                        item.track.artistName,
+                      ),
+                      onPlay: () => _openCompletedDownload(item),
                     ),
-                    onPlay: () => _openFile(
-                      item.filePath!,
-                      title: item.track.name,
-                      artist: item.track.artistName,
-                      album: item.track.albumName,
-                      coverUrl: item.track.coverUrl ?? '',
-                    ),
+                    onOpenDetails: () => _navigateToMetadataScreen(item),
                   )
                 else
                   Semantics(
@@ -667,11 +693,14 @@ extension _QueueTabItemWidgets on _QueueTabState {
     double? size,
   ]) {
     final isDownloaded = item.source == LibraryItemSource.downloaded;
+    // Grid badges line up with the card's other corner overlays.
+    final badgeInset = size == null ? 4.0 : 0.0;
 
     // Scanned SAF tracks also recover artwork after a transient provider error.
     if (isDownloaded || item.filePath.startsWith('content://')) {
       return OfflineAvailabilityCover(
         item: item,
+        inset: badgeInset,
         child: ValueListenableBuilder<int>(
           valueListenable: _embeddedCoverVersion,
           builder: (context, _, child) => _buildUnifiedCoverImageInner(
@@ -686,6 +715,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
 
     return OfflineAvailabilityCover(
       item: item,
+      inset: badgeInset,
       child: _buildUnifiedCoverImageInner(
         item,
         colorScheme,
@@ -877,8 +907,8 @@ extension _QueueTabItemWidgets on _QueueTabState {
     );
   }
 
-  /// A desktop click on a library song opens its details, as a tap does on
-  /// a phone; modifier clicks select.
+  /// A desktop click on a library song runs [open], what a tap does on a
+  /// phone; modifier clicks select.
   void _desktopLibraryItemClick(
     UnifiedLibraryItem item,
     List<UnifiedLibraryItem> libraryItems,
@@ -908,6 +938,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
       filterMode,
       items,
       Theme.of(context).colorScheme,
+      openAction,
     );
     final byId = table.byId;
     final sort = switch (_sortMode) {
@@ -944,10 +975,22 @@ extension _QueueTabItemWidgets on _QueueTabState {
             ],
             selectedIds: _selectedIds,
             onSelect: _applyDesktopClick,
-            // A click opens the song's details, as a tap does on a phone.
+            // A click does what a tap does on a phone: by the Library song
+            // tap setting, plays as the row's button does or opens the
+            // details.
             onActivate: (id) {
               final item = byId[id];
-              if (item != null) openAction(item)();
+              if (item == null) return;
+              songRowTap(
+                ref,
+                path: item.filePath,
+                openDetails: openAction(item),
+                play: () => _LibraryPlaybackButton.run(
+                  ref,
+                  _libraryPlaybackKey(item),
+                  () => _playLibraryItem(item, items),
+                ),
+              )();
             },
             onContextMenu: (id, position) {
               final item = byId[id];
@@ -996,6 +1039,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
     String filterMode,
     List<UnifiedLibraryItem> items,
     ColorScheme colorScheme,
+    VoidCallback Function(UnifiedLibraryItem item) openAction,
   ) {
     final qualityMode = _libraryQualityLabelMode;
     final cached = _songTableByMode[filterMode];
@@ -1003,7 +1047,9 @@ extension _QueueTabItemWidgets on _QueueTabState {
         cached != null &&
         cached.qualityMode == qualityMode &&
         cached.colorScheme == colorScheme;
-    if (reusable && identical(cached.items, items)) return cached;
+    if (reusable && identical(cached.items, items)) {
+      return cached..openAction = openAction;
+    }
     final previous = reusable ? cached.rowByItem : null;
     final rows = <TrackTableRow>[];
     final rowByItem = Map<UnifiedLibraryItem, TrackTableRow>.identity();
@@ -1023,6 +1069,28 @@ extension _QueueTabItemWidgets on _QueueTabState {
               _ => null,
             },
             leading: _buildUnifiedCoverImage(item, colorScheme, 32),
+            titleTrailing: Builder(
+              builder: (context) => SongRowButton(
+                playButton: _LibraryPlaybackButton(
+                  playbackKey: _libraryPlaybackKey(item),
+                  playTooltip: context.l10n.a11yPlayTrackByArtist(
+                    item.trackName,
+                    item.artistName,
+                  ),
+                  // Cached rows must use the current page and sort order.
+                  onPlay: () => _playLibraryItem(
+                    item,
+                    _songTableByMode[filterMode]?.items ?? items,
+                  ),
+                  inline: true,
+                ),
+                onOpenDetails: () =>
+                    (_songTableByMode[filterMode]?.openAction ?? openAction)(
+                      item,
+                    )(),
+                path: item.filePath,
+              ),
+            ),
             playback: mediaItemPlaybackUiProvider(_libraryPlaybackKey(item)),
           );
       rows.add(row);
@@ -1036,6 +1104,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
       rows: rows,
       rowByItem: rowByItem,
       byId: byId,
+      openAction: openAction,
     );
   }
 
@@ -1156,17 +1225,31 @@ extension _QueueTabItemWidgets on _QueueTabState {
         );
       },
     );
+    void play() => _playLibraryItem(item, libraryItems);
+    // A song whose file is missing has no play action and keeps opening.
+    final tap = songRowTap(
+      ref,
+      path: item.filePath,
+      openDetails: open,
+      play: () => fileExistsListenable.value
+          ? _LibraryPlaybackButton.run(ref, playbackKey, play)
+          : open(),
+    );
     final trailing = ValueListenableBuilder<bool>(
       valueListenable: fileExistsListenable,
       builder: (context, fileExists, child) {
         if (fileExists) {
-          return _LibraryPlaybackButton(
-            playbackKey: playbackKey,
-            playTooltip: context.l10n.a11yPlayTrackByArtist(
-              item.trackName,
-              item.artistName,
+          return SongRowButton(
+            playButton: _LibraryPlaybackButton(
+              playbackKey: playbackKey,
+              playTooltip: context.l10n.a11yPlayTrackByArtist(
+                item.trackName,
+                item.artistName,
+              ),
+              onPlay: play,
             ),
-            onPlay: () => _playLibraryItem(item, libraryItems),
+            onOpenDetails: open,
+            path: item.filePath,
           );
         }
         return Tooltip(
@@ -1179,6 +1262,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
         );
       },
     );
+    final swipe = libraryItemQueueSwipe(ref, item);
     Widget card({bool current = false, bool playing = false}) => TrackCard(
       isSelectionMode: _isSelectionMode,
       isSelected: isSelected,
@@ -1186,10 +1270,10 @@ extension _QueueTabItemWidgets on _QueueTabState {
       isPlaying: playing,
       leadingArtwork: true,
       onTap: isDesktopPlatform
-          ? () => _desktopLibraryItemClick(item, libraryItems, open)
+          ? () => _desktopLibraryItemClick(item, libraryItems, tap)
           : _isSelectionMode
           ? () => _toggleSelection(item.id)
-          : open,
+          : tap,
       onContextMenu: (position) => _showLibraryItemMenu(
         context,
         item,
@@ -1206,26 +1290,20 @@ extension _QueueTabItemWidgets on _QueueTabState {
       title: item.trackName,
       subtitle: subtitle,
       trailing: trailing,
+      queueSwipe: swipe,
     );
 
     return Semantics(
       label: context.l10n.a11yTrackByArtist(item.trackName, item.artistName),
       selected: isSelected,
-      // Material rows follow their own file, so a track change rebuilds only
-      // the rows involved. Mornye rows show no current-track state.
-      child: context.isMornye
-          ? card()
-          : Consumer(
-              builder: (context, ref, _) {
-                final playback = ref.watch(
-                  mediaItemPlaybackUiProvider(playbackKey),
-                );
-                return card(
-                  current: playback.isCurrent,
-                  playing: playback.isPlaying,
-                );
-              },
-            ),
+      // Rows follow their own file, so a track change rebuilds only the rows
+      // involved.
+      child: Consumer(
+        builder: (context, ref, _) {
+          final playback = ref.watch(mediaItemPlaybackUiProvider(playbackKey));
+          return card(current: playback.isCurrent, playing: playback.isPlaying);
+        },
+      ),
     );
   }
 
@@ -1252,6 +1330,17 @@ extension _QueueTabItemWidgets on _QueueTabState {
       localNavigationItems: localNavigationItems,
       localNavigationIndex: localNavigationIndex,
     );
+    final playbackKey = _libraryPlaybackKey(item);
+    void play() => _playLibraryItem(item, libraryItems);
+    // A song whose file is missing has no play action and keeps opening.
+    final tap = songRowTap(
+      ref,
+      path: item.filePath,
+      openDetails: open,
+      play: () => fileExistsListenable.value
+          ? _LibraryPlaybackButton.run(ref, playbackKey, play)
+          : open(),
+    );
 
     return TrackGridCard(
       isSelected: _isSelectionMode && isSelected,
@@ -1260,10 +1349,10 @@ extension _QueueTabItemWidgets on _QueueTabState {
         item.artistName,
       ),
       onTap: isDesktopPlatform
-          ? () => _desktopLibraryItemClick(item, libraryItems, open)
+          ? () => _desktopLibraryItemClick(item, libraryItems, tap)
           : _isSelectionMode
           ? () => _toggleSelection(item.id)
-          : open,
+          : tap,
       onContextMenu: (position) => _showLibraryItemMenu(
         context,
         item,
@@ -1318,14 +1407,19 @@ extension _QueueTabItemWidgets on _QueueTabState {
               valueListenable: fileExistsListenable,
               builder: (context, fileExists, child) {
                 if (fileExists) {
-                  return _LibraryPlaybackButton(
-                    playbackKey: _libraryPlaybackKey(item),
-                    playTooltip: context.l10n.a11yPlayTrackByArtist(
-                      item.trackName,
-                      item.artistName,
+                  return SongRowButton(
+                    playButton: _LibraryPlaybackButton(
+                      playbackKey: playbackKey,
+                      playTooltip: context.l10n.a11yPlayTrackByArtist(
+                        item.trackName,
+                        item.artistName,
+                      ),
+                      onPlay: play,
+                      grid: true,
                     ),
-                    onPlay: () => _playLibraryItem(item, libraryItems),
-                    grid: true,
+                    onOpenDetails: open,
+                    size: SongRowButtonSize.grid,
+                    path: item.filePath,
                   );
                 }
                 return Tooltip(
@@ -1388,29 +1482,51 @@ class _LibraryPlaybackButton extends ConsumerWidget {
     required this.playTooltip,
     required this.onPlay,
     this.grid = false,
+    this.inline = false,
   });
 
   final PlaybackRowKey playbackKey;
   final String playTooltip;
   final VoidCallback onPlay;
   final bool grid;
+  final bool inline;
+
+  /// What the button does for [playback]: nothing while its song loads,
+  /// pause or resume for the current song, and [onPlay] for any other.
+  static VoidCallback? action(
+    WidgetRef ref,
+    MediaPlaybackUi playback,
+    VoidCallback onPlay,
+  ) => playback.isLoading
+      ? null
+      : () {
+          if (playback.isCurrent) {
+            ref
+                .read(musicPlayerControllerProvider)
+                .togglePlayPause(playback.isPlaying);
+          } else {
+            onPlay();
+          }
+        };
+
+  /// Runs [action] for the song's playback state at the time of the call, as
+  /// a row tap that does what the button does.
+  static void run(
+    WidgetRef ref,
+    PlaybackRowKey playbackKey,
+    VoidCallback onPlay,
+  ) => action(
+    ref,
+    ref.read(mediaItemPlaybackUiProvider(playbackKey)),
+    onPlay,
+  )?.call();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playback = ref.watch(mediaItemPlaybackUiProvider(playbackKey));
     final icon = playback.isPlaying ? Icons.pause : Icons.play_arrow;
     final tooltip = playback.isPlaying ? context.l10n.actionPause : playTooltip;
-    final onPressed = playback.isLoading
-        ? null
-        : () {
-            if (playback.isCurrent) {
-              ref
-                  .read(musicPlayerControllerProvider)
-                  .togglePlayPause(playback.isPlaying);
-            } else {
-              onPlay();
-            }
-          };
+    final onPressed = action(ref, playback, onPlay);
 
     if (grid) {
       return TrackGridPlayButton(
@@ -1421,6 +1537,35 @@ class _LibraryPlaybackButton extends ConsumerWidget {
     }
 
     final colorScheme = Theme.of(context).colorScheme;
+    if (inline) {
+      return AppIconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        iconSize: 24,
+        padding: EdgeInsets.zero,
+        constraints: BoxConstraints.tightFor(
+          width: context.tokens.minTouchTarget,
+          height: context.tokens.minTouchTarget,
+        ),
+        icon: playback.isLoading
+            ? AppLoadingIndicator(
+                size: 18,
+                strokeWidth: 2,
+                color: colorScheme.primary,
+              )
+            : Icon(
+                playback.isPlaying
+                    ? Icons.pause_circle_filled_rounded
+                    : playback.isCurrent
+                    ? Icons.play_circle_fill_rounded
+                    : Icons.play_circle_outline_rounded,
+                color: playback.isCurrent
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+              ),
+      );
+    }
+
     // Material draws a filled tonal icon button: a solid role pair rather
     // than a faded primary container.
     final material = !context.isMornye;
@@ -1446,13 +1591,14 @@ class _LibraryPlaybackButton extends ConsumerWidget {
 /// The desktop Songs table rows of one song list, with the inputs they were
 /// built from.
 class _LibrarySongTableRows {
-  const _LibrarySongTableRows({
+  _LibrarySongTableRows({
     required this.items,
     required this.qualityMode,
     required this.colorScheme,
     required this.rows,
     required this.rowByItem,
     required this.byId,
+    required this.openAction,
   });
 
   final List<UnifiedLibraryItem> items;
@@ -1461,4 +1607,8 @@ class _LibrarySongTableRows {
   final List<TrackTableRow> rows;
   final Map<UnifiedLibraryItem, TrackTableRow> rowByItem;
   final Map<String, UnifiedLibraryItem> byId;
+
+  /// Opens a song's details with the latest build's navigation lists, for
+  /// the details buttons of rows kept from an earlier build.
+  VoidCallback Function(UnifiedLibraryItem item) openAction;
 }

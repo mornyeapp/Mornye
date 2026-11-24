@@ -130,6 +130,55 @@ void main() {
   );
 
   test(
+    'a file whose cover read failed is read again when played, not in a list',
+    () async {
+      final source = await createAudioFixture('failed-once');
+      var now = DateTime(2026, 11, 17);
+      DownloadedEmbeddedCoverResolver.setValidationClockForTesting(() => now);
+      var extractions = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(backendChannel, (call) async {
+            expect(call.method, 'extractCoverToFile');
+            extractions++;
+            if (extractions == 1) {
+              throw PlatformException(
+                code: 'ERROR',
+                message: 'Rust backend is not initialized',
+              );
+            }
+            final args = call.arguments as Map<Object?, Object?>;
+            await File(args['output_path']! as String).writeAsBytes([7, 8, 9]);
+            return jsonEncode({'success': true});
+          });
+      expect(
+        await DownloadedEmbeddedCoverResolver.resolveOrExtract(source),
+        isNull,
+      );
+      expect(extractions, 1);
+
+      // Within the wait, playing it again does not read the file again.
+      expect(
+        await DownloadedEmbeddedCoverResolver.resolveOrExtract(source),
+        isNull,
+      );
+      expect(extractions, 1);
+
+      // A list never reads a failed file again, however long it has been.
+      now = now.add(const Duration(seconds: 31));
+      expect(DownloadedEmbeddedCoverResolver.resolve(source), isNull);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(extractions, 1);
+
+      final recovered = await DownloadedEmbeddedCoverResolver.resolveOrExtract(
+        source,
+      );
+      expect(recovered, isNotNull);
+      expect(await File(recovered!).readAsBytes(), [7, 8, 9]);
+      expect(extractions, 2);
+    },
+  );
+
+  test(
     'a preview without a source timestamp stays on disk after memory eviction',
     () async {
       const untimed = 'content://example.documents/tree/nas/document/u.flac';

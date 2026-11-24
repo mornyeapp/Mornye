@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/unified_library_item.dart';
@@ -55,6 +55,9 @@ IconData linkLibraryActionIcon(LinkLibraryAction action) => switch (action) {
   LinkLibraryAction.saveLyrics => Icons.lyrics_outlined,
 };
 
+/// Whether [items] hold songs of the linked device, whose files only that
+/// device can change: [runLinkLibraryAction] takes them, also for a host
+/// that changes no files, so they never reach this phone's own file actions.
 bool hasLinkLibrarySongs(
   ProviderContainer container,
   List<UnifiedLibraryItem> items,
@@ -91,11 +94,18 @@ Future<void> runLinkLibraryAction(
     }
   }
 
+  final name = linkDesktopName(client);
+  // A phone host changes no files for other phones; it says so in `features`.
+  if (!client.server.supports(LinkHostFeatures.libraryJobs)) {
+    // No other selection would work, and its sheet would cover the message.
+    onAccepted?.call();
+    notify(context.l10n.linkFileChangesUnavailable(name));
+    return;
+  }
   if (items.length > 100 || ids.contains(null)) {
     notify(context.l10n.linkFileSelectionOneDevice);
     return;
   }
-  final name = linkDesktopName(client);
   final controller = container.read(linkLibraryJobsProvider.notifier);
   final songIds = ids.cast<String>();
   final options = <String, dynamic>{};
@@ -163,6 +173,8 @@ Future<void> runLinkLibraryAction(
                 'maxSampleRate': quality.maxSampleRate,
                 'dither': processing.dither,
                 'resampler': processing.resampler,
+                'resamplerQuality': processing.resamplerQuality,
+                'ditherHighPass': processing.highPass,
               }),
         ),
       );
@@ -249,7 +261,9 @@ Future<void> runLinkLibraryAction(
         );
         return;
       }
-      if (!await showReEnrichReviewSheet(context, previews: previews) ||
+      // The other device runs the job, so its songs keep their automatic
+      // results here.
+      if (await showReEnrichReviewSheet(context, previews: previews) == null ||
           !context.mounted) {
         return;
       }

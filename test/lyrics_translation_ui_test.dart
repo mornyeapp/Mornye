@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -18,14 +19,17 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/settings/lyrics_ai_translation_page.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
+import 'package:mornye/services/lyrics_sidecar.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/lyrics_options_button.dart';
+import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -58,6 +62,27 @@ class _MemoryCache extends LyricsTranslationCache {
 
   @override
   Future<void> clear() async => entries.clear();
+}
+
+class _Events extends SourceMetadataEvents {
+  final published = <String>[];
+
+  @override
+  Future<void> publish(String source) async => published.add(source);
+}
+
+class _MemorySidecar extends LyricsSidecarStore {
+  final files = <String, String>{};
+
+  @override
+  bool canWrite(String source) => true;
+
+  @override
+  Future<String?> read(String source) async => files[source];
+
+  @override
+  Future<void> write(String source, String content) async =>
+      files[source] = content;
 }
 
 class _MediaItems extends CurrentMediaItemNotifier {
@@ -218,6 +243,236 @@ void main() {
   }
 
   for (final mornye in [false, true]) {
+    testWidgets('lyrics options honor accessible navigation opt-in ($mornye)', (
+      tester,
+    ) async {
+      final metadata = _Lyrics(_lyrics);
+      addTearDown(metadata.dispose);
+      await tester.pumpWidget(
+        _app(
+          mornye: mornye,
+          overrides: [
+            initialSettingsProvider.overrideWithValue(
+              const AppSettings(lyricsAiModel: 'gpt-4.1-mini'),
+            ),
+            lyricsAiKeyStoreProvider.overrideWithValue(
+              MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+            ),
+            lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+          ],
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(accessibleNavigation: true),
+              child: LyricsOptionsActivity(
+                child: Scaffold(
+                  body: Center(
+                    child: LyricsOptionsButton(
+                      metadata: metadata,
+                      colorScheme: const ColorScheme.dark(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final options = find.byKey(const ValueKey('lyrics-language-options'));
+      await tester.pump(const Duration(seconds: 6));
+      expect(options.hitTestable(), findsOneWidget);
+      final settings = ProviderScope.containerOf(
+        tester.element(find.byType(LyricsOptionsButton)),
+      ).read(settingsProvider.notifier);
+      settings.setAutoHideLyricsControls(true);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(options.hitTestable(), findsNothing);
+      settings.setAutoHideLyricsControls(false);
+      await tester.pumpAndSettle();
+      expect(options.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('lyrics options sit at the end and fade with fullscreen lyrics '
+        'off ($mornye)', (tester) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final metadata = _Lyrics(_lyrics);
+      final preview = PlaybackSeekPreview();
+      addTearDown(metadata.dispose);
+      addTearDown(preview.dispose);
+      await tester.pumpWidget(
+        _app(
+          mornye: mornye,
+          overrides: [
+            initialSettingsProvider.overrideWithValue(
+              const AppSettings(
+                lyricsAiModel: 'gpt-4.1-mini',
+                autoHideLyricsControls: false,
+              ),
+            ),
+            playbackStateProvider.overrideWith(
+              (ref) => const Stream<PlaybackState>.empty(),
+            ),
+            musicPlayerControllerProvider.overrideWith(
+              (ref) => throw StateError('Unexpected audio access'),
+            ),
+            currentMediaItemProvider.overrideWith(_MediaItems.new),
+            lyricsAiKeyStoreProvider.overrideWithValue(
+              MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+            ),
+            lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+          ],
+          home: Scaffold(
+            body: PlayerLyricsSection(
+              metadata: metadata,
+              seekPreview: preview,
+              colorScheme: const ColorScheme.dark(),
+              isActive: true,
+              options: LyricsOptionsButton(
+                metadata: metadata,
+                colorScheme: const ColorScheme.dark(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final options = find.byKey(const ValueKey('lyrics-language-options'));
+      final pane = tester.getRect(find.byType(PlayerLyricsSection));
+      expect(tester.getCenter(options).dx, greaterThan(pane.center.dx));
+      expect(options.hitTestable(), findsOneWidget);
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      expect(options.hitTestable(), findsNothing);
+      await tester.tapAt(Offset(pane.left + 4, pane.top + 8));
+      await tester.pumpAndSettle();
+      expect(options.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final desktop in [false, true]) {
+      testWidgets('lyrics options fade and reveal without interrupting a menu '
+          '(desktop=$desktop, mornye=$mornye)', (tester) async {
+        debugDesktopPlatformOverride = desktop;
+        addTearDown(() => debugDesktopPlatformOverride = null);
+        tester.view.physicalSize = Size(desktop ? 1200 : 420, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final metadata = _Lyrics(_lyrics);
+        final preview = PlaybackSeekPreview();
+        addTearDown(metadata.dispose);
+        addTearDown(preview.dispose);
+        await tester.pumpWidget(
+          _app(
+            mornye: mornye,
+            overrides: [
+              initialSettingsProvider.overrideWithValue(
+                const AppSettings(lyricsAiModel: 'gpt-4.1-mini'),
+              ),
+              playbackStateProvider.overrideWith(
+                (ref) => const Stream<PlaybackState>.empty(),
+              ),
+              musicPlayerControllerProvider.overrideWith(
+                (ref) => throw StateError('Unexpected audio access'),
+              ),
+              currentMediaItemProvider.overrideWith(_MediaItems.new),
+              lyricsAiKeyStoreProvider.overrideWithValue(
+                MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+              ),
+              lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+            ],
+            home: Scaffold(
+              body: PlayerLyricsSection(
+                metadata: metadata,
+                seekPreview: preview,
+                colorScheme: const ColorScheme.dark(),
+                isActive: true,
+                options: LyricsOptionsButton(
+                  metadata: metadata,
+                  colorScheme: const ColorScheme.dark(),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final options = find.byKey(const ValueKey('lyrics-language-options'));
+        final pane = tester.getRect(find.byType(PlayerLyricsSection));
+        final blank = Offset(pane.right - 4, pane.top + 8);
+        expect(options.hitTestable(), findsOneWidget);
+        await tester.pump(const Duration(seconds: 6));
+        await tester.pumpAndSettle();
+        expect(options.hitTestable(), findsNothing);
+
+        final touch = await tester.startGesture(blank);
+        await tester.pump(const Duration(seconds: 6));
+        await tester.pumpAndSettle();
+        expect(options.hitTestable(), findsOneWidget);
+        await touch.up();
+        await tester.pumpAndSettle();
+        await tester.tap(options);
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 6));
+        expect(find.text('Other Language…').hitTestable(), findsOneWidget);
+        await tester.tapAt(blank);
+        await tester.pumpAndSettle();
+        expect(find.text('Other Language…'), findsNothing);
+        await tester.pump(const Duration(seconds: 6));
+        await tester.pumpAndSettle();
+        expect(options.hitTestable(), findsNothing);
+        await tester.tapAt(blank);
+        await tester.pumpAndSettle();
+        expect(options.hitTestable(), findsOneWidget);
+        if (desktop) {
+          final mouse = await tester.createGesture(
+            kind: PointerDeviceKind.mouse,
+          );
+          await mouse.addPointer(location: blank);
+          await tester.pumpAndSettle();
+          await mouse.moveTo(tester.getCenter(options));
+          await tester.pumpAndSettle();
+          await tester.pump(const Duration(seconds: 6));
+          expect(options.hitTestable(), findsOneWidget);
+          await mouse.moveTo(blank);
+          await tester.pumpAndSettle();
+          await tester.pump(const Duration(seconds: 6));
+          await tester.pumpAndSettle();
+          expect(options.hitTestable(), findsNothing);
+          await mouse.moveTo(blank + const Offset(0, 2));
+          await tester.pumpAndSettle();
+          expect(options.hitTestable(), findsOneWidget);
+          await mouse.removePointer();
+        }
+        final focus = Focus.of(tester.element(options));
+        focus.requestFocus();
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 6));
+        expect(options.hitTestable(), findsOneWidget);
+        focus.unfocus();
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 6));
+        await tester.pumpAndSettle();
+        expect(options.hitTestable(), findsNothing);
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(PlayerLyricsSection)),
+        );
+        container
+            .read(settingsProvider.notifier)
+            .setAutoHideLyricsControls(false);
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 6));
+        // The switch is about the player's controls; this button still fades.
+        expect(options.hitTestable(), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+
     testWidgets('linked AI translation refreshes open lyrics ($mornye)', (
       tester,
     ) async {
@@ -363,14 +618,18 @@ void main() {
         final container = ProviderScope.containerOf(
           tester.element(find.byType(PlayerLyricsSection)),
         );
+        // A language picked here stays with the song.
         expect(
           container.read(settingsProvider).lyricsTranslationLanguage,
-          'de',
+          pick ? 'en' : 'de',
         );
 
-        // The existing toggle now offers the original lyrics only.
+        // The existing toggle now offers the original lyrics only, and the
+        // lyrics are not offered for the language they are shown in.
         await tester.tap(options);
         await tester.pumpAndSettle();
+        expect(find.text('Translate to Deutsch'), findsNothing);
+        expect(find.text('Translate Into…'), findsOneWidget);
         expect(find.text('Hide Translation'), findsOneWidget);
         await tester.tap(find.text('Hide Translation'));
         await tester.pumpAndSettle();
@@ -379,6 +638,386 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
       });
     }
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets('the lyrics menu saves the translation to the file ($mornye)', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final playback = StreamController<PlaybackState>.broadcast();
+      addTearDown(playback.close);
+      final saved = <(String, String)>[];
+      final events = _Events();
+      final metadata = PlayerMetadataController(
+        readMetadata: (path) async => {
+          'lyrics': '[00:00.00]Hello there\n[00:03.00]Second line',
+        },
+        parseLyrics: (raw) async => LyricsParser.parse(raw),
+        saveOnlineLyrics: (source, raw) async => saved.add((source, raw)),
+        metadataEvents: events,
+      );
+      final preview = PlaybackSeekPreview();
+      addTearDown(metadata.dispose);
+      addTearDown(preview.dispose);
+      await metadata.load(
+        const MediaItem(
+          id: '/music/Album/song.flac',
+          title: 'Song',
+          artist: 'Artist',
+          extras: {'source': '/music/Album/song.flac'},
+        ),
+      );
+      await tester.pumpWidget(
+        _app(
+          mornye: mornye,
+          overrides: [
+            initialSettingsProvider.overrideWithValue(
+              const AppSettings(
+                lyricsAiModel: 'gpt-4.1-mini',
+                lyricsTranslationLanguage: 'de',
+              ),
+            ),
+            playbackStateProvider.overrideWith((ref) => playback.stream),
+            musicPlayerControllerProvider.overrideWith(
+              (ref) => throw StateError('Unexpected audio access'),
+            ),
+            currentMediaItemProvider.overrideWith(_MediaItems.new),
+            lyricsAiKeyStoreProvider.overrideWithValue(
+              MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+            ),
+            lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+            lyricsAiHttpClientProvider.overrideWithValue(
+              () => MockClient((request) async => _translated(request, 'de:')),
+            ),
+          ],
+          home: Scaffold(
+            body: PlayerLyricsSection(
+              metadata: metadata,
+              seekPreview: preview,
+              colorScheme: const ColorScheme.dark(),
+              isActive: true,
+              options: LyricsOptionsButton(
+                metadata: metadata,
+                colorScheme: const ColorScheme.dark(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final options = find.byKey(const ValueKey('lyrics-language-options'));
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      // Nothing is translated yet, so nothing can be saved.
+      expect(find.text('Save Translation to File'), findsNothing);
+      await tester.tap(find.text('Translate to Deutsch'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save Translation to File'));
+      await tester.pumpAndSettle();
+
+      String tag(int ms, String text) =>
+          '[x-translation:$ms:${base64.encode(utf8.encode(text))}]';
+      expect(saved, [
+        (
+          '/music/Album/song.flac',
+          '[00:00.00]Hello there\n'
+              '${tag(0, 'de:Hello there')}\n'
+              '[00:03.00]Second line\n'
+              '${tag(3000, 'de:Second line')}',
+        ),
+      ]);
+      expect(find.text("Translation saved to the song's file"), findsOneWidget);
+      expect(events.published, ['/music/Album/song.flac']);
+      expect(metadata.lyrics.lines.map((line) => line.translation), [
+        'de:Hello there',
+        'de:Second line',
+      ]);
+
+      // The file holds the translation now, so the action goes.
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      expect(find.text('Hide Translation'), findsOneWidget);
+      expect(find.text('Save Translation to File'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  String tag(String kind, int key, String text) =>
+      '[x-$kind:$key:${base64.encode(utf8.encode(text))}]';
+
+  Future<
+    ({
+      PlayerMetadataController metadata,
+      _MemorySidecar sidecar,
+      Finder options,
+    })
+  >
+  pumpSavedLyrics(
+    WidgetTester tester, {
+    required bool mornye,
+    required String lyrics,
+    required AppSettings settings,
+    required List<String> saved,
+  }) async {
+    tester.view.physicalSize = const Size(420, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final playback = StreamController<PlaybackState>.broadcast();
+    addTearDown(playback.close);
+    final sidecar = _MemorySidecar();
+    final metadata = PlayerMetadataController(
+      readMetadata: (path) async => {'lyrics': lyrics},
+      parseLyrics: (raw) async => LyricsParser.parse(raw),
+      saveOnlineLyrics: (source, raw) async => saved.add(raw),
+      metadataEvents: _Events(),
+      sidecar: sidecar,
+    );
+    final preview = PlaybackSeekPreview();
+    addTearDown(metadata.dispose);
+    addTearDown(preview.dispose);
+    await metadata.load(
+      const MediaItem(
+        id: '/music/Album/song.flac',
+        title: 'Song',
+        artist: 'Artist',
+        extras: {'source': '/music/Album/song.flac'},
+      ),
+    );
+    await tester.pumpWidget(
+      _app(
+        mornye: mornye,
+        overrides: [
+          initialSettingsProvider.overrideWithValue(settings),
+          playbackStateProvider.overrideWith((ref) => playback.stream),
+          musicPlayerControllerProvider.overrideWith(
+            (ref) => throw StateError('Unexpected audio access'),
+          ),
+          currentMediaItemProvider.overrideWith(_MediaItems.new),
+          lyricsAiKeyStoreProvider.overrideWithValue(
+            MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+          ),
+          lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+          lyricsAiHttpClientProvider.overrideWithValue(
+            () => MockClient((request) async => _translated(request, 'de:')),
+          ),
+        ],
+        home: Scaffold(
+          body: PlayerLyricsSection(
+            metadata: metadata,
+            seekPreview: preview,
+            colorScheme: const ColorScheme.dark(),
+            isActive: true,
+            options: LyricsOptionsButton(
+              metadata: metadata,
+              colorScheme: const ColorScheme.dark(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    return (
+      metadata: metadata,
+      sidecar: sidecar,
+      options: find.byKey(const ValueKey('lyrics-language-options')),
+    );
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets('plain lyrics translate and save to a .mlrc file ($mornye)', (
+      tester,
+    ) async {
+      final saved = <String>[];
+      final (:metadata, :sidecar, :options) = await pumpSavedLyrics(
+        tester,
+        mornye: mornye,
+        lyrics: 'Hello there\nSecond line',
+        settings: const AppSettings(
+          lyricsAiModel: 'gpt-4.1-mini',
+          lyricsTranslationLanguage: 'de',
+          // Plain lyrics translate when asked, never by themselves.
+          lyricsAutoTranslate: true,
+        ),
+        saved: saved,
+      );
+      expect(find.text('Hello there\nSecond line'), findsOneWidget);
+
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      expect(find.text('Save Translation to File'), findsNothing);
+      await tester.tap(find.text('Translate to Deutsch'));
+      await tester.pumpAndSettle();
+      expect(find.text('Hello there'), findsOneWidget);
+      expect(find.text('de:Hello there'), findsOneWidget);
+      expect(find.text('de:Second line'), findsOneWidget);
+
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save Translation to File'));
+      await tester.pumpAndSettle();
+      expect(find.text('Translation saved to a .mlrc file'), findsOneWidget);
+      // The song's own plain lyrics stay as they are.
+      expect(saved, isEmpty);
+      expect(sidecar.files, {
+        '/music/Album/song.flac':
+            '[x-mlrc:1]\n'
+            'Hello there\n'
+            '${tag('translation', 0, 'de:Hello there')}\n'
+            'Second line\n'
+            '${tag('translation', 1, 'de:Second line')}\n',
+      });
+      expect(metadata.lyrics.lines.map((line) => line.translation), [
+        'de:Hello there',
+        'de:Second line',
+      ]);
+
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      expect(find.text('Save Translation to File'), findsNothing);
+      await tester.tap(find.text('Hide Translation'));
+      await tester.pumpAndSettle();
+      expect(find.text('de:Hello there'), findsNothing);
+      expect(find.text('Hello there\nSecond line'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('translations save by themselves when asked', (tester) async {
+    final saved = <String>[];
+    final (:metadata, :sidecar, :options) = await pumpSavedLyrics(
+      tester,
+      mornye: false,
+      lyrics: '[00:00.00]Hello there\n[00:03.00]Second line',
+      settings: const AppSettings(
+        lyricsAiModel: 'gpt-4.1-mini',
+        lyricsTranslationLanguage: 'de',
+        lyricsTranslationSaveTo: lyricsTranslationSaveToMlrc,
+        lyricsTranslationAutoSave: true,
+      ),
+      saved: saved,
+    );
+    expect(sidecar.files, isEmpty);
+    await tester.tap(options);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Translate to Deutsch'));
+    await tester.pumpAndSettle();
+
+    expect(sidecar.files, {
+      '/music/Album/song.flac':
+          '[x-mlrc:1]\n'
+          '[00:00.00]Hello there\n'
+          '${tag('translation', 0, 'de:Hello there')}\n'
+          '[00:03.00]Second line\n'
+          '${tag('translation', 3000, 'de:Second line')}\n',
+    });
+    expect(saved, isEmpty);
+    // An automatic save stays quiet.
+    expect(find.text('Translation saved to a .mlrc file'), findsNothing);
+    expect(metadata.rawLyrics, '[00:00.00]Hello there\n[00:03.00]Second line');
+    expect(metadata.lyrics.lines.map((line) => line.translation), [
+      'de:Hello there',
+      'de:Second line',
+    ]);
+    await tester.tap(options);
+    await tester.pumpAndSettle();
+    expect(find.text('Save Translation to File'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final language in ['en', 'de']) {
+    testWidgets('English lyrics ${language == 'en' ? 'skip' : 'offer'} '
+        'Translate to $language', (tester) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final playback = StreamController<PlaybackState>.broadcast();
+      addTearDown(playback.close);
+      final english = [
+        'I know you never like the way it was',
+        'But we can be all that you want now',
+        'When the night is over you will know',
+        "It's just my heart and your love",
+      ];
+      final metadata = _Lyrics(
+        ParsedLyrics(
+          synced: true,
+          wordSynced: false,
+          lines: [
+            for (final (index, text) in english.indexed)
+              LyricLine(
+                time: Duration(seconds: index * 3),
+                end: Duration(seconds: index * 3 + 3),
+                text: text,
+              ),
+          ],
+          plainText: english.join('\n'),
+        ),
+      );
+      final preview = PlaybackSeekPreview();
+      addTearDown(metadata.dispose);
+      addTearDown(preview.dispose);
+      await tester.pumpWidget(
+        _app(
+          mornye: false,
+          overrides: [
+            initialSettingsProvider.overrideWithValue(
+              AppSettings(
+                lyricsAiModel: 'gpt-4.1-mini',
+                lyricsTranslationLanguage: language,
+              ),
+            ),
+            playbackStateProvider.overrideWith((ref) => playback.stream),
+            musicPlayerControllerProvider.overrideWith(
+              (ref) => throw StateError('Unexpected audio access'),
+            ),
+            currentMediaItemProvider.overrideWith(_MediaItems.new),
+            lyricsAiKeyStoreProvider.overrideWithValue(
+              MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+            ),
+            lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+          ],
+          home: Scaffold(
+            body: PlayerLyricsSection(
+              metadata: metadata,
+              seekPreview: preview,
+              colorScheme: const ColorScheme.dark(),
+              isActive: true,
+              options: LyricsOptionsButton(
+                metadata: metadata,
+                colorScheme: const ColorScheme.dark(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('lyrics-language-options')));
+      await tester.pumpAndSettle();
+      if (language == 'en') {
+        expect(find.textContaining('Translate to'), findsNothing);
+        expect(find.text('Translate Into…'), findsOneWidget);
+      } else {
+        expect(find.text('Translate to Deutsch'), findsOneWidget);
+        expect(find.text('Other Language…'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   testWidgets('the menu stays hidden until a provider is set up', (
@@ -417,6 +1056,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('lyrics-language-options')), findsNothing);
+    // Synced lyrics still offer their timing.
+    expect(find.byKey(const ValueKey('lyrics-options')), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -482,6 +1123,61 @@ void main() {
       expect(
         find.text('The provider did not accept the API key'),
         findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('settings pick where translations are saved ($mornye)', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(420, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        _app(
+          mornye: mornye,
+          overrides: [
+            initialSettingsProvider.overrideWithValue(const AppSettings()),
+            lyricsAiKeyStoreProvider.overrideWithValue(
+              MemoryLyricsAiKeyStore(),
+            ),
+            lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+          ],
+          home: const LyricsAiTranslationPage(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(LyricsAiTranslationPage)),
+      );
+      final saveTo = find.byKey(const ValueKey('lyrics-ai-save-to'));
+      await tester.ensureVisible(saveTo);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: saveTo, matching: find.text('Song File')),
+        findsOneWidget,
+      );
+      await tester.tap(saveTo);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('.mlrc File'));
+      await tester.pumpAndSettle();
+      expect(
+        container.read(settingsProvider).lyricsTranslationSaveTo,
+        lyricsTranslationSaveToMlrc,
+      );
+      expect(
+        find.descendant(of: saveTo, matching: find.text('.mlrc File')),
+        findsOneWidget,
+      );
+
+      final autoSave = find.text('Save Automatically');
+      await tester.ensureVisible(autoSave);
+      await tester.pumpAndSettle();
+      await tester.tap(autoSave);
+      await tester.pumpAndSettle();
+      expect(
+        container.read(settingsProvider).lyricsTranslationAutoSave,
+        isTrue,
       );
       expect(tester.takeException(), isNull);
     });

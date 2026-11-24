@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart' show ValueListenable;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 
 class AnimatedLibrarySliverGrid extends StatefulWidget {
   final double maxCrossAxisExtent;
@@ -42,11 +44,8 @@ class _AnimatedLibrarySliverGridState extends State<AnimatedLibrarySliverGrid>
     super.initState();
     _beginExtent = widget.maxCrossAxisExtent;
     _endExtent = widget.maxCrossAxisExtent;
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 130),
-    )..value = 1;
-    _curve = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    _controller = AnimationController(vsync: this, value: 1);
+    _curve = CurvedAnimation(parent: _controller, curve: Curves.linear);
   }
 
   @override
@@ -69,7 +68,17 @@ class _AnimatedLibrarySliverGridState extends State<AnimatedLibrarySliverGrid>
         MediaQuery.disableAnimationsOf(context)) {
       _controller.value = 1;
     } else {
-      _controller.forward(from: 0);
+      // The extent sets the column count, so it must not overshoot and
+      // flip the columns twice: Material's standard spatial spring and
+      // Mornye's fast spring both stop at it. It goes on from the extent on
+      // screen.
+      final motion = context.isMornye
+          ? MornyeMotion.fast
+          : AppMotion.materialPage;
+      _curve.curve = motion.curve;
+      _controller
+        ..duration = motion.duration
+        ..forward(from: 0);
     }
   }
 

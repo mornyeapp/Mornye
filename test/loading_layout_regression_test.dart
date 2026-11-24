@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,7 +15,7 @@ class _LoadingRepo extends RepoNotifier {
   RepoState build() => const RepoState(
     isLoading: true,
     isInitialized: true,
-    registryUrl: 'https://example.invalid/registry.json',
+    registryUrls: ['https://example.invalid/registry.json'],
   );
 
   @override

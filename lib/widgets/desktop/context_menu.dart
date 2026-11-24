@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart' show kPrimaryButton;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
+import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -41,15 +45,21 @@ const double _mornyeMenuWidth = 280;
 
 /// Shows [groups] as a context menu at [position], in global coordinates.
 ///
-/// Material opens a [MenuAnchor] with the M3 Expressive menu container;
-/// Mornye opens the dense [MornyeContextMenu]. Empty groups are dropped and
-/// the remaining ones are separated by dividers. The chosen action runs after
-/// the menu closes, so it can open its own dialog or sheet. The future
-/// completes after that action has started, with whether a row was chosen.
+/// Material opens the M3E menu popup of More buttons, or under reduced
+/// motion a [MenuAnchor] with the M3 Expressive menu container; Mornye
+/// opens the dense [MornyeContextMenu]. Empty groups are dropped and the
+/// remaining ones are set apart (dividers, or separate M3E surfaces). The
+/// chosen action runs once the menu has been dismissed, so it can open its
+/// own dialog or sheet. The future completes after that action has started,
+/// with whether a row was chosen.
+///
+/// The Mornye menu opens out of [origin], the control that asked for it,
+/// or else out of [position].
 Future<bool> showContextMenu(
   BuildContext context, {
   required Offset position,
   required List<List<ContextMenuAction>> groups,
+  Offset? origin,
 }) async {
   final visible = [
     for (final group in groups)
@@ -64,6 +74,8 @@ Future<bool> showContextMenu(
       // The layout aligns the menu's trailing edge with the anchor's, so a
       // menu-wide anchor puts its leading edge at the pointer.
       anchor: Rect.fromLTWH(position.dx, position.dy - 8, _mornyeMenuWidth, 0),
+      // That anchor is as wide as the menu, so its center is not the control.
+      origin: origin ?? position,
       maxWidth: _mornyeMenuWidth,
       builder: (menuContext) => MornyeContextMenu(
         dense: true,
@@ -87,6 +99,9 @@ Future<bool> showContextMenu(
     chosen?.onSelected?.call();
     return chosen != null;
   }
+  if (materialExpressiveEnabled(context)) {
+    return _showExpressiveContextMenu(context, position, visible);
+  }
   var chosen = false;
   await navigator.push(
     _MaterialContextMenuRoute(
@@ -100,6 +115,110 @@ Future<bool> showContextMenu(
   // The menu pops first and runs the chosen row after that frame.
   await SchedulerBinding.instance.endOfFrame;
   return chosen;
+}
+
+/// The expressive Material context menu: the M3E menu popup that More
+/// buttons open (`AppMenuButton`), anchored at [position], so right-click
+/// and More menus share one skin and one spring. It grows from the pointer
+/// on the spatial spring, takes clicks from its first frame, focuses its
+/// first enabled row, and handles the arrow keys, type-ahead and Escape;
+/// Back closes it through the page route's local history. Reduced motion
+/// keeps the instant [MenuAnchor] route.
+Future<bool> _showExpressiveContextMenu(
+  BuildContext context,
+  Offset position,
+  List<List<ContextMenuAction>> groups,
+) {
+  final overlay = Overlay.of(context, rootOverlay: true);
+  final overlayBox = overlay.context.findRenderObject();
+  final point = overlayBox is RenderBox
+      ? overlayBox.globalToLocal(position)
+      : position;
+  final themes = InheritedTheme.capture(from: context, to: overlay.context);
+  final route = ModalRoute.of(context);
+  final actions = groups.expand((group) => group).toList(growable: false);
+  final result = Completer<bool>();
+  void finish(bool chosen) {
+    if (!result.isCompleted) result.complete(chosen);
+  }
+
+  var index = 0;
+  final children = [
+    for (final group in groups)
+      M3EMenuGroup(
+        children: [
+          for (final action in group)
+            if (action.checked)
+              M3EMenuSelectable(
+                label: action.label,
+                value: index++,
+                leading: AppIcon(action.icon, size: 20),
+                selected: true,
+                enabled: action.onSelected != null,
+              )
+            else
+              M3EMenuEntry(
+                label: action.label,
+                value: index++,
+                leading: AppIcon(action.icon, size: 20),
+                isDestructive: action.destructive,
+                enabled: action.onSelected != null,
+              ),
+        ],
+      ),
+  ];
+  late final OverlayEntry entry;
+  // Once dismissed, the closing menu lets clicks through to the page.
+  var closing = false;
+  void close() {
+    closing = true;
+    entry.markNeedsBuild();
+  }
+
+  entry = OverlayEntry(
+    builder: (context) => IgnorePointer(
+      ignoring: closing,
+      child: themes.wrap(
+        MaterialExpressiveScope(
+          // The popup draws its own scrollbar; the app's desktop scroll
+          // behavior would stack a second one beside it.
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: M3EMenuPopup<int>(
+              anchor: Rect.fromLTWH(point.dx, point.dy, 0, 0),
+              historyRoute: route,
+              position: M3EMenuAnchorPosition.bottomStart,
+              children: children,
+              onSelected: (value) {
+                close();
+                if (value is! int) return finish(false);
+                // As a menu item does, run the row once the popup has
+                // started closing and the frame has settled focus.
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  FocusManager.instance.applyFocusChangesIfNeeded();
+                  actions[value].onSelected?.call();
+                  finish(true);
+                });
+              },
+              onDismiss: () {
+                close();
+                finish(false);
+              },
+              onRemove: () {
+                entry.remove();
+                entry.dispose();
+                finish(false);
+              },
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  overlay.insert(entry);
+  return result.future;
 }
 
 /// The center of [context]'s render box, where keyboard-opened menus appear.

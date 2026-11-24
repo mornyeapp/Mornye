@@ -28,12 +28,21 @@ typedef BrowserQueue = ({List<PlayableMedia> items, int index, bool shuffle});
 /// files directly in its [folders] as
 /// `content://<authority>/<folder name>/<file name>`.
 class BrowserCoverProvider {
-  const BrowserCoverProvider({required this.authority, required this.folders});
+  const BrowserCoverProvider({
+    required this.authority,
+    required this.folders,
+    this.aliases = const {},
+  });
 
   final String authority;
 
   /// The folders the provider serves, by the name their URIs start with.
   final Map<String, String> folders;
+
+  /// The other paths the system gives a folder, by the folder's name.
+  /// Android reaches one app's files as both `/data/user/0/<package>` and
+  /// `/data/data/<package>`, and stored cover paths use either.
+  final Map<String, List<String>> aliases;
 
   static const _channel = MethodChannel('com.zarz.mornye/covers');
 
@@ -45,12 +54,19 @@ class BrowserCoverProvider {
       final info = await _channel.invokeMapMethod<String, Object?>('provider');
       final authority = info?['authority'];
       final folders = info?['folders'];
+      final aliases = info?['aliases'];
       if (authority is! String || folders is! Map) return null;
       return BrowserCoverProvider(
         authority: authority,
         folders: {
           for (final MapEntry(:key, :value) in folders.entries)
             if (key is String && value is String) key: value,
+        },
+        aliases: {
+          if (aliases is Map)
+            for (final MapEntry(:key, :value) in aliases.entries)
+              if (key is String && value is List)
+                key: value.whereType<String>().toList(),
         },
       );
     } on Object {
@@ -70,7 +86,8 @@ class BrowserCoverProvider {
     if (name.isEmpty || name.startsWith('.')) return null;
     final parent = p.dirname(normalized);
     for (final MapEntry(key: folder, value: directory) in folders.entries) {
-      if (p.equals(parent, directory)) {
+      if (p.equals(parent, directory) ||
+          (aliases[folder]?.any((alias) => p.equals(parent, alias)) ?? false)) {
         return Uri(
           scheme: 'content',
           host: authority,
@@ -346,10 +363,15 @@ class MediaLibraryBrowser {
           key: row['album_key'] as String?,
           name: row['album_name'] as String? ?? '',
           artist: row['artist_name'] as String? ?? '',
-          cover: row['cover_url'] as String?,
+          cover: _rowCover(row),
         ),
     ];
   }
+
+  /// The cover of an album or artist row: the cover file of scanned songs,
+  /// else the web cover of downloaded ones.
+  static String? _rowCover(Map<String, dynamic> row) =>
+      row['cover_path'] as String? ?? row['cover_url'] as String?;
 
   Future<List<MediaItem>> _artistItems() async {
     final rows = await library.getQueueArtistPage(
@@ -358,10 +380,7 @@ class MediaLibraryBrowser {
     return [
       for (final row in rows)
         if ((row['artist_name'] as String? ?? '').isNotEmpty)
-          _artistItem(
-            row['artist_name'] as String,
-            cover: row['cover_url'] as String?,
-          ),
+          _artistItem(row['artist_name'] as String, cover: _rowCover(row)),
     ];
   }
 

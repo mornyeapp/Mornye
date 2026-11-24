@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/widgets/mornye_playback_button.dart';
 
@@ -75,8 +75,10 @@ void main() {
     expect(tester.getSize(disc).width, 32);
 
     final press = await tester.startGesture(bounds.center);
+    // Held until the fast spring settles, before a long press would show
+    // the tooltip.
     await tester.pump(const Duration(milliseconds: 100));
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 380));
     expect(tester.getRect(icon).width, closeTo(iconWidth * 0.9, 0.01));
     expect(tester.getRect(button), bounds);
     final grown = tester.widget<Transform>(disc).transform.getMaxScaleOnAxis();
@@ -140,7 +142,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 60));
       final peak = feedbackOpacity(tester);
       expect(peak, greaterThan(entering));
-      await tester.pump(const Duration(milliseconds: 220));
+      // Frame by frame, so the fade out starts when the fade in settles.
+      for (var frame = 0; frame < 14; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
       expect(feedbackOpacity(tester), lessThan(peak));
       expect(tester.getRect(button), bounds);
       await tester.pumpAndSettle();
@@ -174,6 +179,44 @@ void main() {
       },
     );
   }
+
+  testWidgets('a skip pressed mid-advance carries the glyph on from where it '
+      'is', (tester) async {
+    var calls = 0;
+    await pumpButton(
+      tester,
+      icon: CupertinoIcons.forward_fill,
+      onPressed: () => calls++,
+    );
+    final button = find.byType(IconButton);
+    final moving = find.byIcon(CupertinoIcons.play_fill).at(1);
+    await tester.tap(button);
+    await tester.pump();
+    final start = tester.getRect(moving).left;
+    for (var frame = 0; frame < 6; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final midway = tester.getRect(moving).left;
+    expect(midway, greaterThan(start + 2));
+
+    await tester.tap(button);
+    await tester.pump();
+    expect(calls, 2);
+    // The advance goes on instead of starting again from its first frame.
+    expect(tester.getRect(moving).left, greaterThanOrEqualTo(midway));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(tester.getRect(moving).left, greaterThan(midway));
+
+    // A second advance follows the first.
+    for (var frame = 0; frame < 25; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(find.byIcon(CupertinoIcons.play_fill), findsNWidgets(3));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(CupertinoIcons.forward_fill), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.play_fill), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Reduce Motion keeps skip glyphs stationary and actions usable', (
     tester,

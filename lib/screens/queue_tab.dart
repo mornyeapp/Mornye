@@ -1,16 +1,19 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' show Random;
 import 'package:mornye/widgets/open_audio_button.dart';
 import 'package:flutter/foundation.dart'
     show ValueListenable, listEquals, setEquals;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/settings_group.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/swipe_delete_dismissible.dart';
+import 'package:mornye/widgets/download_state_switcher.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
@@ -24,29 +27,28 @@ import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/expressive_button.dart';
+import 'package:mornye/widgets/album_detail_header.dart'
+    show HeaderFilledButton;
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/library_directory_view.dart';
 import 'package:mornye/widgets/library_search_results.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
+import 'package:mornye/widgets/library_view_toggle.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/library_playlist_drag_source.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/create_playlist_sheet.dart';
 import 'package:mornye/widgets/tool_button_group.dart';
+import 'package:flutter/rendering.dart' show RenderSliver;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
-import 'package:material_3_expressive/material_3_expressive.dart'
-    show
-        M3EButtonGroup,
-        M3EButtonGroupAction,
-        M3EButtonGroupType,
-        M3EButtonSize,
-        M3EButtonStyle;
 import 'package:mornye/providers/library_browse_provider.dart';
+import 'package:mornye/providers/library_genres_provider.dart';
 import 'package:mornye/providers/library_counts_provider.dart';
+import 'package:mornye/providers/library_search_provider.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/widgets/app_shape.dart';
 import 'package:mornye/widgets/library_fast_scroller.dart';
@@ -81,7 +83,9 @@ import 'package:mornye/screens/listening_rewind_screen.dart';
 import 'package:mornye/screens/favorite_artists_screen.dart';
 import 'package:mornye/screens/downloaded_album_screen.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/screens/library_artist_screen.dart';
 import 'package:mornye/screens/library_tracks_folder_screen.dart';
+import 'package:mornye/screens/library_mix_screen.dart';
 import 'package:mornye/screens/local_album_screen.dart';
 import 'package:mornye/screens/mornye_library_screen.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
@@ -95,6 +99,7 @@ import 'package:mornye/widgets/animated_library_sliver_grid.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/smoothed_progress.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/two_finger_pinch_listener.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
@@ -120,9 +125,13 @@ const _historyItemForCompletionBridge = CompletionBridgeTracker.historyItemFor;
 
 class QueueTab extends ConsumerStatefulWidget {
   final String? librarySection;
-  final bool isTabActive;
 
-  const QueueTab({super.key, this.librarySection, this.isTabActive = true});
+  /// Whether the shell shows this tab; it does when this is null. A
+  /// listenable, so a switch of tab reaches the tab without building it
+  /// again.
+  final ValueListenable<bool>? tabActive;
+
+  const QueueTab({super.key, this.librarySection, this.tabActive});
 
   @override
   ConsumerState<QueueTab> createState() => _QueueTabState();
@@ -169,12 +178,13 @@ class _QueueTabState extends ConsumerState<QueueTab> {
 
   PageController? _filterPageController;
 
-  /// Pages of the Library pager: Songs, Albums, Artists, Playlists and
-  /// Folders. Singles share the Albums page behind [_albumsShowSingles].
+  /// Pages of the Library pager: Songs, Albums, Artists, Genres, Playlists
+  /// and Folders. Singles share the Albums page behind [_albumsShowSingles].
   final List<String> _filterModes = [
     'all',
     'albums',
     'artists',
+    'genres',
     'playlists',
     'folders',
   ];
@@ -194,6 +204,14 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   bool _wasTabVisible = false;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final ScrollController _libraryScrollController = ScrollController();
+  final GlobalKey<NestedScrollViewState> _libraryScrollKey = GlobalKey();
+  final GlobalKey _searchFieldKey = GlobalKey();
+
+  /// The search field has scrolled under the pinned header, which then
+  /// offers a Search action that brings it back.
+  final ValueNotifier<bool> _searchFieldHidden = ValueNotifier(false);
+  bool _searchFieldCheckScheduled = false;
   String _searchQuery = '';
   Timer? _searchDebounce;
   final CompletionBridgeTracker _completionBridgeTracker =
@@ -212,8 +230,11 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     final settings = ref.read(settingsProvider);
     final mode = settings.historySortMode;
     final section = widget.librarySection ?? settings.historyFilterMode;
-    // Playlists have no file size. Keep the saved song order for returning.
-    return section == 'playlists' && mode.startsWith('size-') ? 'latest' : mode;
+    // Playlists have no size or release year. Keep the saved song order.
+    return section == 'playlists' &&
+            (mode.startsWith('size-') || mode.startsWith('year-'))
+        ? 'latest'
+        : mode;
   }
 
   String _libraryQualityLabelMode = AppSettings.libraryQualityLabelBitDepthOnly;
@@ -258,8 +279,11 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   );
 
   double _queueCoverSize() {
-    final shortestSide = MediaQuery.sizeOf(context).shortestSide;
-    final scale = (shortestSide / 390).clamp(0.82, 1.0);
+    // A desktop pane's shortest side is always past 390, so desktop skips
+    // the size read and resizes do not rebuild Library through it.
+    final scale = isDesktopPlatform
+        ? 1.0
+        : (MediaQuery.sizeOf(context).shortestSide / 390).clamp(0.82, 1.0);
     final textScale = effectiveTextScale(context);
     return (56 * scale * (1 + ((textScale - 1) * 0.12))).clamp(46.0, 56.0);
   }
@@ -291,9 +315,14 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   @override
   void initState() {
     super.initState();
+    widget.tabActive?.addListener(_applyDefaultLibraryViewOnTabVisible);
+    DownloadedEmbeddedCoverResolver.previewsCleared.addListener(
+      _onEmbeddedCoverChanged,
+    );
     _completionBridgePlayableProbe = CompletionBridgePlayableProbeCache(
       onPlayable: _fileExistsCache.markExists,
     );
+    _libraryScrollController.addListener(_scheduleSearchFieldCheck);
   }
 
   void _initializePageController() {
@@ -326,7 +355,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     if (widget.librarySection != null) return;
     // Route transitions also disable TickerMode. Only a shell tab change
     // should reset the user's current album/single view.
-    final isVisible = widget.isTabActive;
+    final isVisible = widget.tabActive?.value ?? true;
     final becameVisible = isVisible && !_wasTabVisible;
     _wasTabVisible = isVisible;
     if (!becameVisible) return;
@@ -352,7 +381,20 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   }
 
   @override
+  void didUpdateWidget(QueueTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(widget.tabActive, oldWidget.tabActive)) {
+      oldWidget.tabActive?.removeListener(_applyDefaultLibraryViewOnTabVisible);
+      widget.tabActive?.addListener(_applyDefaultLibraryViewOnTabVisible);
+    }
+  }
+
+  @override
   void dispose() {
+    widget.tabActive?.removeListener(_applyDefaultLibraryViewOnTabVisible);
+    DownloadedEmbeddedCoverResolver.previewsCleared.removeListener(
+      _onEmbeddedCoverChanged,
+    );
     _hideSelectionOverlay();
     _hidePlaylistSelectionOverlay();
     _fileExistsCache.dispose();
@@ -362,6 +404,8 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     _filterPageController?.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _libraryScrollController.dispose();
+    _searchFieldHidden.dispose();
     _searchDebounce?.cancel();
     super.dispose();
   }
@@ -386,6 +430,77 @@ class _QueueTabState extends ConsumerState<QueueTab> {
       _resetLibraryPaging();
     });
   }
+
+  void _scheduleSearchFieldCheck() {
+    if (_searchFieldCheckScheduled) return;
+    _searchFieldCheckScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFieldCheckScheduled = false;
+      if (mounted) _searchFieldHidden.value = _isSearchFieldHidden();
+    });
+  }
+
+  /// Less than half of the search field shows below the pinned header,
+  /// which paints over the part of the field it overlaps.
+  bool _isSearchFieldHidden() {
+    final sliver = _searchFieldKey.currentContext?.findRenderObject();
+    if (sliver is! RenderSliver) return false;
+    final geometry = sliver.geometry;
+    if (geometry == null || geometry.scrollExtent <= 0) return false;
+    final shown = geometry.paintExtent - sliver.constraints.overlap;
+    return shown < geometry.scrollExtent / 2;
+  }
+
+  /// Brings the search field back from under the header and focuses it.
+  /// A scrolled list jumps to its start first, so only the header and the
+  /// field move.
+  Future<void> _revealSearchField() async {
+    final outer = _libraryScrollController;
+    if (outer.hasClients && outer.offset > 0) {
+      final inner = _libraryScrollKey.currentState?.innerController;
+      if (inner != null &&
+          inner.positions.any((position) => position.pixels > 0)) {
+        inner.jumpTo(0);
+      }
+      if (MediaQuery.disableAnimationsOf(context)) {
+        outer.jumpTo(0);
+      } else {
+        final motion = AppMotion.spatialSlow(
+          context,
+          const AppMotionSpec(Duration(milliseconds: 300), Curves.easeOutCubic),
+        );
+        await outer.animateTo(
+          0,
+          duration: motion.duration,
+          curve: motion.curve,
+        );
+      }
+    }
+    if (mounted) _searchFocusNode.requestFocus();
+  }
+
+  Widget _buildSearchAction() => ValueListenableBuilder<bool>(
+    valueListenable: _searchFieldHidden,
+    builder: (context, hidden, _) {
+      final motion = AppMotion.effectsFast(
+        context,
+        const AppMotionSpec(Duration(milliseconds: 150), Curves.easeOut),
+      );
+      return AnimatedSwitcher(
+        duration: motion.duration,
+        switchInCurve: motion.curve,
+        switchOutCurve: motion.leaving,
+        child: hidden
+            ? AppIconButton(
+                key: const ValueKey('library-search-action'),
+                icon: const AppIcon(Icons.search),
+                tooltip: context.l10n.mornyeSearch,
+                onPressed: _revealSearchField,
+              )
+            : const SizedBox.shrink(),
+      );
+    },
+  );
 
   void _resetLibraryPaging() => _pager.resetPaging();
 
@@ -733,10 +848,11 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     }
 
     final activePageRequest = pageRequest(historyFilterMode);
-    // The Artists and Folders pages browse their own queries.
+    // The Artists, Genres and Folders pages browse their own queries.
     final activePageValue =
         searchingLibrary ||
             historyFilterMode == 'artists' ||
+            historyFilterMode == 'genres' ||
             historyFilterMode == 'folders'
         ? const AsyncData(_QueueLibraryPageData())
         : ref.watch(_queueLibraryPageProvider(activePageRequest));
@@ -809,7 +925,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     final currentTotalCount = switch (historyFilterMode) {
       'albums' => queueCounts.albumCount,
       'singles' => queueCounts.singleTrackCount,
-      'playlists' || 'artists' || 'folders' => 0,
+      'playlists' || 'artists' || 'genres' || 'folders' => 0,
       _ => queueCounts.allTrackCount,
     };
     final hasMoreLibrary = currentLoadedCount < currentTotalCount;
@@ -833,6 +949,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
         hasAnyLibraryItems ||
         hasCollections ||
         hasActiveSearch;
+    final showSearchField = shouldShowLibraryControls || hasQueueItems;
     final listInset = wideListInset(context);
     if (!searchingLibrary) {
       _scheduleBlankLibraryRepair(
@@ -884,22 +1001,29 @@ class _QueueTabState extends ConsumerState<QueueTab> {
               context,
             ).copyWith(overscroll: false),
             child: NestedScrollView(
+              key: _libraryScrollKey,
+              controller: _libraryScrollController,
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
                 if (widget.librarySection == null)
                   AppSliverHeader.tabRoot(
                     title: context.l10n.navLibrary,
                     alignToContent: true,
-                    actions: const [OpenAudioButton()],
+                    actions: [
+                      if (showSearchField) _buildSearchAction(),
+                      const OpenAudioButton(),
+                    ],
                   )
                 else
                   AppSliverHeader.page(
                     title: widget.librarySection == 'playlists'
                         ? context.l10n.searchPlaylists
                         : context.l10n.searchSongs,
+                    actions: [if (showSearchField) _buildSearchAction()],
                   ),
 
-                if (shouldShowLibraryControls || hasQueueItems)
+                if (showSearchField)
                   SliverToBoxAdapter(
+                    key: _searchFieldKey,
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(
                         16 + listInset,
@@ -948,6 +1072,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                           // Artist totals need a full scan; the tab shows
                           // none rather than a guess.
                           (context.l10n.searchArtists, null),
+                          (context.l10n.libraryGenres, null),
                           (
                             context.l10n.searchPlaylists,
                             _getVisibleCollectionEntries(
@@ -966,15 +1091,10 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                       slivers: [
                         LibrarySearchResults(
                           query: _searchQuery,
+                          songList: _searchSongList(),
                           onOpenArtist: (artist) => pushPage<void>(
                             context,
-                            (_) => Scaffold(
-                              body: MornyeLibraryScreen(
-                                page: MornyeLibraryPage.albums,
-                                artist: artist,
-                                onOpenSection: (_) {},
-                              ),
-                            ),
+                            (_) => LibraryArtistScreen(artist: artist),
                           ),
                         ),
                         const NavBarSliverSpacer(),
@@ -995,12 +1115,20 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                     )
                   : PageView.builder(
                       controller: _filterPageController!,
-                      physics: const ClampingScrollPhysics(),
+                      // While song rows swipe to queue, the tabs alone
+                      // change pages, so the two sideways swipes never
+                      // compete.
+                      physics: queueSwipeEnabled(ref)
+                          ? const NeverScrollableScrollPhysics()
+                          : const ClampingScrollPhysics(),
                       onPageChanged: _onFilterPageChanged,
                       itemCount: _filterModes.length,
                       itemBuilder: (context, index) {
                         if (_filterModes[index] == 'artists') {
                           return _buildArtistsPage(context, colorScheme);
+                        }
+                        if (_filterModes[index] == 'genres') {
+                          return _buildGenresPage(context, colorScheme);
                         }
                         if (_filterModes[index] == 'folders') {
                           return const LibraryDirectoryView(showHeader: false);
@@ -1075,15 +1203,51 @@ class _QueueTabState extends ConsumerState<QueueTab> {
         final isPaused = ref.watch(
           downloadQueueProvider.select((state) => state.isPaused),
         );
+        // The header opens on the default spatial spring and fades on the
+        // effects spring, both on one switcher clock; it leaves in the
+        // fade's shorter time. Reduced motion switches at once.
+        const still = AppMotionSpec(Duration.zero, Curves.linear);
+        final reveal = AppMotion.spatial(
+          context,
+          still,
+          mornye: MornyeMotion.standard,
+        );
+        final fade = AppMotion.effects(
+          context,
+          still,
+          mornye: MornyeMotion.effects,
+        );
+        final length = reveal.duration > fade.duration
+            ? reveal.duration
+            : fade.duration;
+        Curve over(AppMotionSpec spec) => length == Duration.zero
+            ? Curves.linear
+            : Interval(
+                0,
+                spec.duration.inMicroseconds / length.inMicroseconds,
+                curve: spec.curve,
+              );
         return SliverToBoxAdapter(
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 260),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
+            duration: length,
+            reverseDuration: fade.duration,
+            // Played backwards, the entrance springs would hold the leaving
+            // header open and opaque for most of its exit.
             transitionBuilder: (child, animation) => SizeTransition(
-              sizeFactor: animation,
+              sizeFactor: CurvedAnimation(
+                parent: animation,
+                curve: over(reveal),
+                reverseCurve: fade.leaving,
+              ),
               alignment: Alignment.topCenter,
-              child: FadeTransition(opacity: animation, child: child),
+              child: FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: over(fade),
+                  reverseCurve: fade.leaving,
+                ),
+                child: child,
+              ),
             ),
             child: queueCount == 0
                 ? const SizedBox(

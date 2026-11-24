@@ -1,10 +1,13 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/widgets/audio_output_button.dart';
+import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/utils/android_tv.dart';
 
 /// Landscape opens on the player. Lyrics can hide their bottom actions until
@@ -24,6 +27,7 @@ class MornyeLandscapePlayer extends StatefulWidget {
     this.lyricsOptions,
     this.controlsHeldOpen = false,
     this.autoHideLyricsControls = true,
+    this.autoHideLyricsControlsWithAccessibility = false,
   });
 
   final Widget artwork;
@@ -38,6 +42,7 @@ class MornyeLandscapePlayer extends StatefulWidget {
   final bool isPlaying;
   final bool controlsHeldOpen;
   final bool autoHideLyricsControls;
+  final bool autoHideLyricsControlsWithAccessibility;
   final ValueChanged<int> onPageChanged;
   final Widget? lyricsOptions;
 
@@ -50,12 +55,16 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
   bool _actionsVisible = true;
   bool _audioOutputOpen = false;
 
+  bool get _accessibilityBlocksAutoHide =>
+      MediaQuery.accessibleNavigationOf(context) &&
+      !widget.autoHideLyricsControlsWithAccessibility;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!widget.autoHideLyricsControls ||
         isAndroidTv ||
-        MediaQuery.accessibleNavigationOf(context)) {
+        _accessibilityBlocksAutoHide) {
       _actionsVisible = true;
       _hideTimer?.cancel();
     } else {
@@ -68,7 +77,9 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.page != widget.page ||
         oldWidget.isPlaying != widget.isPlaying ||
-        oldWidget.autoHideLyricsControls != widget.autoHideLyricsControls) {
+        oldWidget.autoHideLyricsControls != widget.autoHideLyricsControls ||
+        oldWidget.autoHideLyricsControlsWithAccessibility !=
+            widget.autoHideLyricsControlsWithAccessibility) {
       _actionsVisible = true;
       _scheduleHide();
     } else if (oldWidget.controlsHeldOpen != widget.controlsHeldOpen) {
@@ -85,7 +96,7 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
         widget.controlsHeldOpen ||
         !_actionsVisible ||
         _audioOutputOpen ||
-        MediaQuery.accessibleNavigationOf(context)) {
+        _accessibilityBlocksAutoHide) {
       return;
     }
     _hideTimer = Timer(const Duration(seconds: 5), () {
@@ -109,6 +120,15 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
     super.dispose();
   }
 
+  // Pages dissolve on Mornye's effects spring and the actions on its fast
+  // one; reduced motion cuts.
+  static const _still = AppMotionSpec(Duration.zero, Curves.linear);
+  AppMotionSpec get _pageFade =>
+      MediaQuery.disableAnimationsOf(context) ? _still : MornyeMotion.effects;
+  AppMotionSpec get _actionsFade => MediaQuery.disableAnimationsOf(context)
+      ? _still
+      : MornyeMotion.effectsFast;
+
   @override
   Widget build(BuildContext context) => Listener(
     onPointerDown: (_) => _hideTimer?.cancel(),
@@ -124,7 +144,7 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
               onTap:
                   widget.page == 1 &&
                       !isAndroidTv &&
-                      !MediaQuery.accessibleNavigationOf(context)
+                      !_accessibilityBlocksAutoHide
                   ? () {
                       setState(() => _actionsVisible = !_actionsVisible);
                       _scheduleHide();
@@ -154,9 +174,9 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
                         fit: StackFit.expand,
                         children: [
                           AnimatedSwitcher(
-                            duration: MediaQuery.disableAnimationsOf(context)
-                                ? Duration.zero
-                                : const Duration(milliseconds: 180),
+                            duration: _pageFade.duration,
+                            switchInCurve: _pageFade.curve,
+                            switchOutCurve: _pageFade.leaving,
                             layoutBuilder: (current, previous) => Stack(
                               fit: StackFit.expand,
                               children: [
@@ -206,7 +226,7 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
                                               ),
                                               if (widget.lyricsOptions != null)
                                                 PositionedDirectional(
-                                                  start: 20,
+                                                  end: 20,
                                                   bottom: 52,
                                                   child: IgnorePointer(
                                                     ignoring: !_actionsVisible,
@@ -215,13 +235,8 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
                                                           ? 1
                                                           : 0,
                                                       duration:
-                                                          MediaQuery.disableAnimationsOf(
-                                                            context,
-                                                          )
-                                                          ? Duration.zero
-                                                          : const Duration(
-                                                              milliseconds: 180,
-                                                            ),
+                                                          _actionsFade.duration,
+                                                      curve: _actionsFade.curve,
                                                       child:
                                                           widget.lyricsOptions!,
                                                     ),
@@ -246,10 +261,8 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
                                   excluding: !_actionsVisible,
                                   child: AnimatedOpacity(
                                     opacity: _actionsVisible ? 1 : 0,
-                                    duration:
-                                        MediaQuery.disableAnimationsOf(context)
-                                        ? Duration.zero
-                                        : const Duration(milliseconds: 180),
+                                    duration: _actionsFade.duration,
+                                    curve: _actionsFade.curve,
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 20,
@@ -352,15 +365,17 @@ class _LandscapeLyricsViewport extends ConsumerWidget {
       key: const ValueKey('landscape-lyrics-viewport'),
       child: TweenAnimationBuilder<double>(
         tween: Tween(end: controlsVisible ? 1 : 0),
+        // Follows the actions it makes room for.
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
-            : const Duration(milliseconds: 180),
+            : MornyeMotion.effectsFast.duration,
+        curve: MornyeMotion.effectsFast.curve,
         child: child,
         builder: (context, progress, child) => Stack(
           fit: StackFit.expand,
           children: [
-            ShaderMask(
-              blendMode: BlendMode.dstIn,
+            MornyeLyricsFadeMask(
+              opaque: progress == 0,
               shaderCallback: (bounds) => LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -377,11 +392,61 @@ class _LandscapeLyricsViewport extends ConsumerWidget {
                   1,
                 ],
               ).createShader(bounds),
-              child: child,
+              child: LyricsMaskEdgeClip(child: child!),
             ),
           ],
         ),
       ),
     );
+  }
+}
+
+/// A lyrics fade that paints its child directly while [opaque] says the
+/// whole gradient is opaque, which [BlendMode.dstIn] leaves unchanged. It
+/// stays in the tree in both states, so the lyric list never remounts.
+class MornyeLyricsFadeMask extends ShaderMask {
+  const MornyeLyricsFadeMask({
+    super.key,
+    required this.opaque,
+    required super.shaderCallback,
+    super.child,
+  }) : super(blendMode: BlendMode.dstIn);
+
+  final bool opaque;
+
+  @override
+  RenderShaderMask createRenderObject(BuildContext context) =>
+      _RenderLyricsFadeMask(opaque: opaque, shaderCallback: shaderCallback);
+
+  @override
+  void updateRenderObject(BuildContext context, RenderShaderMask renderObject) {
+    super.updateRenderObject(context, renderObject);
+    (renderObject as _RenderLyricsFadeMask).opaque = opaque;
+  }
+}
+
+class _RenderLyricsFadeMask extends RenderShaderMask {
+  _RenderLyricsFadeMask({required bool opaque, required super.shaderCallback})
+    : _opaque = opaque,
+      super(blendMode: BlendMode.dstIn);
+
+  bool _opaque;
+
+  set opaque(bool value) {
+    if (_opaque == value) return;
+    _opaque = value;
+    markNeedsPaint();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final lyrics = child;
+    if (_opaque && lyrics != null) {
+      // Drop the layer retained from a frame that faded the lyrics.
+      layer = null;
+      context.paintChild(lyrics, offset);
+    } else {
+      super.paint(context, offset);
+    }
   }
 }

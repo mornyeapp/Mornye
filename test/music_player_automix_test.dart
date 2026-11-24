@@ -38,6 +38,7 @@ void main() {
       expect(defaults.usbDirect, isFalse);
       expect(defaults.usbDsdOverPcm, isFalse);
       expect(defaults.usbAllowFixedVolume, isFalse);
+      expect(defaults.usbMaxSampleRate, 0);
       expect(defaults.dapExclusive, isFalse);
       final upgraded = AppSettings.fromJson({
         'usbBitPerfect': true,
@@ -49,6 +50,7 @@ void main() {
         usbDirect: true,
         usbDsdOverPcm: true,
         usbAllowFixedVolume: true,
+        usbMaxSampleRate: 48000,
         autoMix: true,
         playbackNormalization: true,
       );
@@ -57,6 +59,7 @@ void main() {
       expect(restored.usbDirect, isTrue);
       expect(restored.usbDsdOverPcm, isTrue);
       expect(restored.usbAllowFixedVolume, isTrue);
+      expect(restored.usbMaxSampleRate, 48000);
       expect(
         AppSettings.fromJson(
           defaults.copyWith(dapExclusive: true).toJson(),
@@ -119,6 +122,16 @@ void main() {
       );
       await handler.enqueue(manual);
       expect(handler.queue.value[1].id, 'manual');
+      musicPlayerRuntime.configure(
+        musicPlayerRuntime.settings.copyWith(autoplayRandomness: 0.75),
+      );
+      await _until(() => handler.queue.value.length == 4);
+      expect(handler.queue.value.take(2).map((item) => item.id), [
+        'one',
+        'manual',
+      ]);
+      expect(handler.mediaItem.value?.id, 'one');
+      expect(handler.playbackState.value.playing, isTrue);
       await handler.setShuffleMode(AudioServiceShuffleMode.all);
       expect(handler.queue.value[1].id, 'manual');
       await handler.setShuffleMode(AudioServiceShuffleMode.none);
@@ -131,6 +144,66 @@ void main() {
       expect(handler.queue.value.map((item) => item.id), ['one', 'manual']);
     },
   );
+
+  for (final refresh in [
+    'new search',
+    'new search after shuffle',
+    'toggle',
+    'randomness',
+  ]) {
+    test('Autoplay rotates recent suggestions after $refresh', () async {
+      final candidates = [
+        for (var i = 0; i < 12; i++)
+          PlayableMedia(
+            id: 'suggestion-$i',
+            source: '/suggestion-$i.flac',
+            title: 'Suggestion $i',
+            artist: 'Artist $i',
+            genre: i < 6 ? 'Pop; Dance' : 'Rock',
+          ),
+      ];
+      autoplayLoader = (_) async => candidates;
+      setAutoplayEnabled(true);
+      await handler.setQueueAndPlay([
+        const PlayableMedia(
+          id: 'search-pop',
+          source: '/search-pop.flac',
+          title: 'Search Pop',
+          artist: 'Seed',
+          genre: 'Pop',
+        ),
+      ]);
+      await _until(() => handler.queue.value.length == 7);
+      final first = handler.queue.value.skip(1).map((item) => item.id).toSet();
+      expect(first, candidates.take(6).map((item) => item.id).toSet());
+
+      if (refresh == 'new search after shuffle') {
+        await handler.setShuffleMode(AudioServiceShuffleMode.all);
+      }
+      if (refresh == 'toggle') {
+        setAutoplayEnabled(false);
+        setAutoplayEnabled(true);
+      } else if (refresh == 'randomness') {
+        musicPlayerRuntime.configure(
+          musicPlayerRuntime.settings.copyWith(autoplayRandomness: 1),
+        );
+      } else {
+        await handler.setQueueAndPlay([
+          const PlayableMedia(
+            id: 'search-dance',
+            source: '/search-dance.flac',
+            title: 'Search Dance',
+            artist: 'Another seed',
+            genre: 'Dance',
+          ),
+        ]);
+      }
+      await _until(() => handler.queue.value.length == 7);
+      final next = handler.queue.value.skip(1).map((item) => item.id).toSet();
+      expect(next.intersection(first), isEmpty);
+      expect(next, candidates.skip(6).map((item) => item.id).toSet());
+    });
+  }
 
   test(
     'pending Autoplay is discarded after disabling or replacing the queue',
@@ -147,6 +220,28 @@ void main() {
       expect(native.sources['music-player'], '/three.flac');
     },
   );
+
+  test('Autoplay remembers a manual play from a replaced queue', () async {
+    final played = _tracks.first;
+    await handler.setQueueAndPlay([played]);
+    final fresh = [
+      for (var i = 0; i < 6; i++)
+        PlayableMedia(
+          id: 'fresh-$i',
+          source: '/fresh-$i.flac',
+          title: 'Fresh $i',
+          artist: played.artist,
+        ),
+    ];
+    autoplayLoader = (_) async => [played, ...fresh];
+    await handler.setQueueAndPlay([_tracks.last]);
+    setAutoplayEnabled(true);
+    await _until(() => handler.queue.value.length == 7);
+    expect(
+      handler.queue.value.skip(1).map((item) => item.id).toSet(),
+      fresh.map((item) => item.id).toSet(),
+    );
+  });
 
   test('pause during an Autoplay refill prevents automatic resume', () async {
     final pending = Completer<List<PlayableMedia>>();
@@ -647,6 +742,88 @@ void main() {
     },
   );
 
+  group('no duplicates in queue', () {
+    const four = PlayableMedia(
+      id: 'four',
+      source: '/four.flac',
+      title: 'Four',
+      artist: 'Artist',
+    );
+
+    void setNoDuplicates(bool enabled) => musicPlayerRuntime.configure(
+      musicPlayerRuntime.settings.copyWith(queueNoDuplicates: enabled),
+    );
+
+    List<String> ids() => [for (final item in handler.queue.value) item.id];
+
+    setUp(() {
+      setNoDuplicates(true);
+      addTearDown(() => setNoDuplicates(false));
+    });
+
+    test('Play next and Add to queue move an upcoming entry', () async {
+      await handler.setQueueAndPlay([..._tracks, four]);
+      await handler.enqueue(four, playNext: true);
+      expect(ids(), ['one', 'four', 'two', 'three']);
+      await handler.enqueue(_tracks[1]);
+      expect(ids(), ['one', 'four', 'three', 'two']);
+      expect(handler.playbackState.value.queueIndex, 0);
+      expect(handler.mediaItem.value?.id, 'one');
+    });
+
+    test('the current and played songs are queued again', () async {
+      await handler.setQueueAndPlay(_tracks);
+      await handler.skipToQueueItem(1);
+      await handler.enqueueAll([_tracks[0], _tracks[1]]);
+      expect(ids(), ['one', 'two', 'three', 'one', 'two']);
+      expect(handler.playbackState.value.queueIndex, 1);
+      expect(handler.mediaItem.value?.id, 'two');
+    });
+
+    test('adding many keeps each song once, in the order given', () async {
+      await handler.setQueueAndPlay(_tracks);
+      await handler.enqueueAll([four, _tracks[2], four], playNext: true);
+      expect(ids(), ['one', 'four', 'three', 'two']);
+    });
+
+    test('a song matches by its source, whatever its id', () async {
+      await handler.setQueueAndPlay(_tracks);
+      await handler.enqueue(
+        const PlayableMedia(
+          id: 'library-3',
+          source: '/three.flac',
+          title: 'Three',
+          artist: 'Artist',
+        ),
+        playNext: true,
+      );
+      expect(ids(), ['one', 'library-3', 'two']);
+    });
+
+    test('shuffle keeps one entry, also once unshuffled', () async {
+      await handler.setQueueAndPlay(_tracks);
+      await handler.setShuffleMode(AudioServiceShuffleMode.all);
+      final current = handler.mediaItem.value!.id;
+      final upcoming = ids().skip(1).first;
+      await handler.enqueue(
+        _tracks.firstWhere((track) => track.id == upcoming),
+      );
+      expect(ids().where((id) => id == upcoming), hasLength(1));
+      expect(ids().last, upcoming);
+      await handler.setShuffleMode(AudioServiceShuffleMode.none);
+      expect(ids().toSet(), {'one', 'two', 'three'});
+      expect(ids(), hasLength(3));
+      expect(handler.mediaItem.value!.id, current);
+    });
+
+    test('off: a second copy is queued', () async {
+      setNoDuplicates(false);
+      await handler.setQueueAndPlay(_tracks);
+      await handler.enqueue(_tracks[1]);
+      expect(ids(), ['one', 'two', 'three', 'two']);
+    });
+  });
+
   test(
     'queue removal preserves duplicates, current audio and unshuffled order',
     () async {
@@ -817,6 +994,40 @@ void main() {
     await _until(() => (native.lastVolume(incoming) ?? 0) > 0);
     return incoming;
   }
+
+  test('the end-of-song sleep timer drops a prepared mix', () async {
+    await prepare();
+    expect(native.live, hasLength(2));
+    handler.setSleepTimerEndOfSong();
+    await _until(() => native.live.length == 1);
+    // The planned start passes without a mix.
+    native.positions['music-player'] = 55000;
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(handler.mediaItem.value?.id, 'one');
+    expect(native.live, {'music-player'});
+
+    await native.event('music-player', 'audio.onComplete');
+    await _until(() => handler.mediaItem.value?.id == 'two');
+    expect(handler.playbackState.value.playing, isFalse);
+    expect(native.playing, isEmpty);
+    expect(handler.sleepAtEndOfSong, isFalse);
+  });
+
+  test(
+    'a crossfade under way finishes; the song it brought in ends the session',
+    () async {
+      final incoming = await startMix();
+      handler.setSleepTimerEndOfSong();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(native.playing, contains(incoming));
+      expect(handler.mediaItem.value?.id, 'two');
+
+      await native.event(incoming, 'audio.onComplete');
+      await _until(() => handler.mediaItem.value?.id == 'three');
+      expect(handler.playbackState.value.playing, isFalse);
+      expect(handler.sleepAtEndOfSong, isFalse);
+    },
+  );
 
   test(
     'haptics survives an AutoMix handoff followed by a manual skip',
@@ -1595,6 +1806,83 @@ void main() {
     expect(start.at, inInclusiveRange(195000, 195100));
     expect(start.cue, 0);
     expect(start.rate, 1);
+  });
+
+  group('at double speed', () {
+    setUp(
+      () => musicPlayerRuntime.configure(
+        musicPlayerRuntime.settings.copyWith(playbackSpeed: 2),
+      ),
+    );
+    tearDown(
+      () => musicPlayerRuntime.configure(
+        musicPlayerRuntime.settings.copyWith(playbackSpeed: 1),
+      ),
+    );
+
+    fakeTimeTest('a song mixes at its planned moment in song time', () async {
+      setLengths(const Duration(seconds: 200));
+      setAutoMixEnabled(true);
+      await handler.setQueueAndPlay(_tracks);
+      expect(native.rates['music-player'], 2);
+      expect(handler.playbackState.value.speed, 2);
+      playFrom(0);
+      final clock = time.stopwatch()..start();
+      await playUntil(
+        () => handler.mediaItem.value?.id == 'two',
+        const Duration(seconds: 100),
+      );
+      // 195 s of song in under 100 s.
+      expect(clock.elapsed, lessThan(const Duration(seconds: 99)));
+      final incoming = mixDecks().single;
+      final start = mixStart(incoming);
+      expect(start.at, inInclusiveRange(195000, 195200));
+      expect(start.cue, 0);
+      // The incoming deck plays at the listener's speed as well.
+      expect(start.rate, 2);
+      expect(handler.playbackState.value.speed, 2);
+
+      // The 5 s fade covers the same 5 s of song, which take 2.5 s.
+      final fade = time.stopwatch()..start();
+      await playUntil(
+        () => !native.live.contains('music-player'),
+        const Duration(seconds: 5),
+      );
+      expect(fade.elapsed.inMilliseconds, inInclusiveRange(2200, 2900));
+      expect(native.lastVolume(incoming), closeTo(1, 0.0001));
+    });
+
+    fakeTimeTest(
+      'the session reports each new speed from where it was',
+      () async {
+        await handler.setQueueAndPlay(_tracks);
+        playFrom(10000);
+        await Future<void>.delayed(const Duration(seconds: 1));
+        final before = handler.playbackState.value.position;
+        musicPlayerRuntime.configure(
+          musicPlayerRuntime.settings.copyWith(playbackSpeed: 0.5),
+        );
+        final state = handler.playbackState.value;
+        expect(state.speed, 0.5);
+        expect(state.updatePosition, greaterThanOrEqualTo(before));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(native.rates['music-player'], 0.5);
+        expect(playbackTempoSupport.value, isNot(PlaybackTempoSupport.none));
+      },
+    );
+
+    fakeTimeTest('the preparation lead grows with the speed', () async {
+      setLengths(const Duration(minutes: 6));
+      setAutoMixEnabled(true);
+      await handler.setQueueAndPlay(_tracks);
+      // 300 s of song before the end still leave 150 s to prepare.
+      native.positions['music-player'] = 59000;
+      await Future<void>.delayed(const Duration(seconds: 1));
+      expect(analyzer.calls, isEmpty);
+      native.positions['music-player'] = 61000;
+      await _until(() => analyzer.calls.isNotEmpty);
+      expect(analyzer.calls, ['/one.flac', '/two.flac']);
+    });
   });
 
   fakeTimeTest('a long beat-matched song mixes on its planned beat', () async {

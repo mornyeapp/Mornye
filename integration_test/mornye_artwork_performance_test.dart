@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider/path_provider.dart';
@@ -80,11 +80,9 @@ void runArtworkPerformanceTests({required bool mornye}) {
     final page = ValueNotifier(0);
     final metadata = PlayerMetadataController();
     final seek = PlaybackSeekPreview();
-    final foreground = ValueNotifier(<String, Color>{});
     addTearDown(page.dispose);
     addTearDown(metadata.dispose);
     addTearDown(seek.dispose);
-    addTearDown(foreground.dispose);
     final keys = (
       header: GlobalKey(),
       controls: GlobalKey(),
@@ -159,7 +157,6 @@ void runArtworkPerformanceTests({required bool mornye}) {
                         insetArtwork: true,
                         artworkTopInset: 0,
                         artworkKeys: keys,
-                        artworkForeground: foreground,
                         lyricsControlsHidden: false,
                         lyricsOptionsOpen: false,
                         lyricsBuilder: (_) => ListView.builder(

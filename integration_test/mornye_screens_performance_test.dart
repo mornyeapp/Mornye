@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +26,7 @@ import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/lazy_tab_view.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 
+import '../test/support/tooltip_finder.dart';
 import 'performance_probe.dart';
 
 final _tracks = List.generate(
@@ -191,7 +192,7 @@ void main() {
         'Album completeness unknown',
         'All',
       ]) {
-        await tester.tap(find.byTooltip('Filters').hitTestable());
+        await tester.tap(findByTooltip('Filters').hitTestable());
         await probe.wait(const Duration(milliseconds: 350));
         await tester.tap(find.text(label).hitTestable().last);
         await probe.wait(const Duration(milliseconds: 350));
@@ -205,7 +206,7 @@ void main() {
       warmup: filterRoundTrip,
     );
     await tester.runAsync(() async {
-      await tester.tap(find.byTooltip('Search your library').hitTestable());
+      await tester.tap(findByTooltip('Search your library').hitTestable());
       await probe.wait(const Duration(milliseconds: 400));
       FocusManager.instance.primaryFocus?.unfocus();
     });
@@ -217,7 +218,7 @@ void main() {
       field.onChanged?.call('Album 01');
       await probe.wait(const Duration(milliseconds: 500));
       expect(requests.last.search, 'Album 01');
-      await tester.tap(find.byTooltip('Clear').hitTestable());
+      await tester.tap(findByTooltip('Clear').hitTestable());
       await probe.wait(const Duration(milliseconds: 500));
       expect(requests.last.search, isEmpty);
     }
@@ -252,7 +253,7 @@ void main() {
       }
       await probe.wait(const Duration(milliseconds: 900));
       expect(search._resultCount, greaterThan(0));
-      await tester.tap(find.byTooltip('Clear').hitTestable());
+      await tester.tap(findByTooltip('Clear').hitTestable());
       await probe.wait(const Duration(milliseconds: 400));
       expect(field.controller.text, isEmpty);
     }

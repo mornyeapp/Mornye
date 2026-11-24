@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/app_switch.dart';
 import 'package:mornye/widgets/extension_row.dart';
@@ -81,6 +81,7 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
           slivers: [
             AppSliverHeader.page(title: context.l10n.extensionsTitle),
 
+            const SliverToBoxAdapter(child: ExtensionStorageRecoveryNotice()),
             const SliverToBoxAdapter(child: ExtensionStorageSetting()),
 
             if (extState.isLoading)

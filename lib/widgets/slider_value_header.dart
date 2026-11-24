@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 
@@ -18,7 +18,6 @@ class SliderValueHeader extends StatelessWidget {
     this.enabled = true,
   });
 
-  /// What the slider adjusts.
   final String title;
 
   /// The formatted value with its unit, such as `45 s` or `+1.5 dB`.

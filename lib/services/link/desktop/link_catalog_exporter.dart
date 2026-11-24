@@ -11,6 +11,7 @@ import 'package:mornye/services/link/desktop/link_web_covers.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/sqlite_helpers.dart';
+import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/isrc_utils.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -106,6 +107,28 @@ String? linkLocalFilePath(Object? raw) {
   return File(path).isAbsolute ? path : null;
 }
 
+/// [raw] as the path of a song a Link host shares: an absolute local file
+/// path, or an Android storage access document (`content://`), which the
+/// server borrows through the app (`server/files/open`). Null for network
+/// storage, Link devices' songs and relative paths.
+String? linkSharedSongPath(Object? raw) {
+  final text = linkCleanPath(raw is String ? raw.trim() : '');
+  return isContentUri(text) ? text : linkLocalFilePath(text);
+}
+
+/// The file name of the storage access document [uri]: the download's saved
+/// name, else the end of its decoded document id.
+String _contentName(Map<dynamic, dynamic> item, String uri) {
+  if (_text(item['safFileName']) case final name?) return name;
+  String decoded;
+  try {
+    decoded = Uri.decodeComponent(uri);
+  } on Object {
+    decoded = uri;
+  }
+  return decoded.split(RegExp(r'[\\/:]')).last;
+}
+
 String? _text(Object? value) {
   if (value is! String) return null;
   final trimmed = value.trim();
@@ -151,13 +174,16 @@ String? _webCoverUrl(Object? value) {
   return url != null && isLinkWebCoverUrl(Uri.parse(url)) ? url : null;
 }
 
-/// Maps Library Songs rows (`{'source', 'item'}`) to catalog lines. Rows
-/// whose file is not a readable local file are left out. A song without a
-/// local cover file whose audio file is known to embed no picture
-/// ([pictures] by [linkPictureStamp]) names its web cover's copy in
-/// [webCovers] (by [linkCoverUrlId]) as `webCoverPath` when held, which the
-/// server tries after every other cover. Runs in an isolate: it checks every
-/// file on disk.
+/// Maps Library Songs rows (`{'source', 'item'}`) to catalog lines: the
+/// device's own songs ([linkSharedSongPath]), a local file that exists or a
+/// storage access document. Network storage and Link devices' songs are
+/// left out. A song without a local cover file whose audio file is known to
+/// embed no picture ([pictures] by [linkPictureStamp]) names its web cover's
+/// copy in [webCovers] (by [linkCoverUrlId]) as `webCoverPath` when held,
+/// which the server tries after every other cover. Runs in an isolate: it
+/// checks every local file on disk, but never opens a storage access
+/// document, whose size and tags come from its row and which therefore gets
+/// no web cover copy.
 LinkCatalogPage mapLinkCatalogRows(
   List<Map<String, dynamic>> rows, {
   Map<String, String> webCovers = const {},
@@ -183,17 +209,23 @@ LinkCatalogPage mapLinkCatalogRows(
       _ => null,
     };
     final recordId = _text(item['id']?.toString());
-    final path = linkLocalFilePath(item['filePath']);
+    final path = linkSharedSongPath(item['filePath']);
     if (prefix == null || recordId == null || path == null) continue;
-    final FileStat stat;
-    try {
-      stat = FileStat.statSync(path);
-    } on Object {
-      continue;
+    final document = isContentUri(path);
+    FileStat? stat;
+    if (!document) {
+      final FileStat found;
+      try {
+        found = FileStat.statSync(path);
+      } on Object {
+        continue;
+      }
+      if (found.type != FileSystemEntityType.file) continue;
+      stat = found;
     }
-    if (stat.type != FileSystemEntityType.file) continue;
+    final name = document ? _contentName(item, path) : path;
 
-    final title = _text(item['trackName']) ?? _basenameWithoutExtension(path);
+    final title = _text(item['trackName']) ?? _basenameWithoutExtension(name);
     final artist = _text(item['artistName']) ?? '';
     final album = _text(item['albumName']);
     final albumArtist = _text(item['albumArtist']);
@@ -213,7 +245,7 @@ LinkCatalogPage mapLinkCatalogRows(
         : null;
     final webCover = coverPath == null ? _webCoverUrl(item['coverUrl']) : null;
     String? webCoverPath;
-    if (webCover != null) {
+    if (webCover != null && stat != null) {
       final stamp = linkPictureStamp(path, stat);
       webCoverSongs.add((path: path, stamp: stamp, url: webCover));
       // A picture in the file comes first; the web copy only stands in.
@@ -252,8 +284,8 @@ LinkCatalogPage mapLinkCatalogRows(
       'genre': _text(item['genre']),
       'durationMs': song.durationMs,
       'path': path,
-      'size': _positiveInt(item['fileSize']) ?? stat.size,
-      'suffix': _suffix(path) ?? _text(item['format'])?.toLowerCase(),
+      'size': _positiveInt(item['fileSize']) ?? stat?.size,
+      'suffix': _suffix(name) ?? _text(item['format'])?.toLowerCase(),
       'bitRate': _positiveInt(item['bitrate']),
       'sampleRate': _positiveInt(item['sampleRate']),
       'bitDepth': _positiveInt(item['bitDepth']),

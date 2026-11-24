@@ -8,21 +8,19 @@ import 'package:mornye/services/remote_playback.dart';
 /// song, queue, state and volume. The session's buttons drive it. Browsing,
 /// searching and playing a Library item go to [local], so a song picked in
 /// the car plays on this device; [onLocal] runs first to hand the session back.
+///
+/// While this device sounds too ([ownVolume], as when the two play
+/// together), Android's volume keys stay on this device.
 class RemoteMediaSession extends BaseAudioHandler {
   RemoteMediaSession(
     this.remote, {
     required AudioHandler local,
     required void Function() onLocal,
+    bool ownVolume = false,
   }) : _local = local,
-       _onLocal = onLocal {
-    // Keep Android's volume keys on the remote while its first value arrives.
-    androidPlaybackInfo.add(
-      RemoteAndroidPlaybackInfo(
-        volumeControlType: AndroidVolumeControlType.fixed,
-        maxVolume: _maxVolume,
-        volume: 0,
-      ),
-    );
+       _onLocal = onLocal,
+       _ownVolume = ownVolume {
+    _showVolumeTarget();
     _subscriptions = [
       remote.mediaItems.listen(mediaItem.add),
       remote.queues.listen(queue.add),
@@ -40,25 +38,45 @@ class RemoteMediaSession extends BaseAudioHandler {
   late final List<StreamSubscription<Object?>> _subscriptions;
   PlaybackState? _shown;
   int? _volumeIndex;
+  bool _ownVolume;
   bool _disposed = false;
+
+  /// Whether this device sounds too, so its volume keys set its own volume.
+  set ownVolume(bool value) {
+    if (_disposed || value == _ownVolume) return;
+    _ownVolume = value;
+    _showVolumeTarget();
+  }
+
+  /// Tells Android what its volume keys set: this device, or the remote at
+  /// the volume last heard. The keys stay on the remote while its first
+  /// value arrives.
+  void _showVolumeTarget() {
+    final index = _volumeIndex;
+    androidPlaybackInfo.add(
+      _ownVolume
+          ? LocalAndroidPlaybackInfo()
+          : RemoteAndroidPlaybackInfo(
+              volumeControlType: index == null
+                  ? AndroidVolumeControlType.fixed
+                  : AndroidVolumeControlType.absolute,
+              maxVolume: _maxVolume,
+              volume: index ?? 0,
+            ),
+    );
+  }
 
   void _showVolume(double volume) {
     if (_disposed || !volume.isFinite) return;
     final index = (volume.clamp(0.0, 1.0) * _maxVolume).round();
     if (index == _volumeIndex) return;
     _volumeIndex = index;
-    androidPlaybackInfo.add(
-      RemoteAndroidPlaybackInfo(
-        volumeControlType: AndroidVolumeControlType.absolute,
-        maxVolume: _maxVolume,
-        volume: index,
-      ),
-    );
+    if (!_ownVolume) _showVolumeTarget();
   }
 
   @override
   Future<void> androidSetRemoteVolume(int volumeIndex) async {
-    if (_disposed || _volumeIndex == null) return;
+    if (_disposed || _ownVolume || _volumeIndex == null) return;
     final index = volumeIndex.clamp(0, _maxVolume);
     if (index == _volumeIndex) return;
     final volume = index / _maxVolume;

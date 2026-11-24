@@ -2,9 +2,10 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
@@ -248,6 +249,12 @@ class MornyeArtistHeader extends StatelessWidget {
 
   List<Widget> buildSlivers(BuildContext context) {
     final surface = Theme.of(context).colorScheme.surface;
+    // The title dissolves in on the effects spring, and with reduced motion
+    // as well.
+    final titleFade = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 180), Curves.linear),
+    );
     final back = Padding(
       padding: EdgeInsetsDirectional.only(start: isDesktopPlatform ? 8 : 12),
       child: Align(
@@ -333,7 +340,8 @@ class MornyeArtistHeader extends StatelessWidget {
                     showTitle,
                     (showTitle) => AnimatedOpacity(
                       opacity: showTitle ? 1 : 0,
-                      duration: const Duration(milliseconds: 180),
+                      duration: titleFade.duration,
+                      curve: titleFade.curve,
                       child: Text(
                         name,
                         maxLines: 1,

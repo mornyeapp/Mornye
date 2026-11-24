@@ -1,23 +1,84 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/network_upload_provider.dart';
+import 'package:mornye/providers/playback_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
+import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/link_source_names.dart';
 import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/services/network_certificate.dart';
+import 'package:mornye/services/network_library_upload.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/services/music_player_service.dart'
+    show MusicPlayerHandler;
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_action_button.dart';
+import 'package:mornye/widgets/settings_group.dart';
+
+import 'support/tooltip_finder.dart';
+
+/// Scrolls [finder] into view. The page header shrinks while scrolling, so
+/// the first pass stops short; a second one, with the header collapsed,
+/// lands on the widget.
+Future<void> _reveal(WidgetTester tester, Finder finder) async {
+  for (var pass = 0; pass < 2; pass++) {
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+  }
+}
 
 void main() {
+  testWidgets('network browser honors external player mode', (tester) async {
+    final opened = <String>[];
+    final played = <PlayableMedia>[];
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_ExternalSettings.new),
+          musicPlayerControllerProvider.overrideWithValue(
+            _PlayedController(played),
+          ),
+          playbackProvider.overrideWith(
+            () => PlaybackController(
+              openExternal: (source) async => opened.add(source),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: NetworkStorageScreen(
+            service: _CoverFolder(),
+            path: 'Album',
+            connection: const NetworkConnection(
+              id: 'nas',
+              name: 'NAS',
+              protocol: NetworkProtocol.webdav,
+              address: 'https://nas.test/music/',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Song.flac'));
+    await tester.pumpAndSettle();
+    expect(opened, ['network://nas/Album/Song.flac']);
+    expect(played, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('playing a folder passes its cover image as a reference', (
     tester,
   ) async {
@@ -86,7 +147,7 @@ void main() {
         const NetworkEntry('Initial.flac', 'Initial.flac'),
       ]);
       await tester.pumpAndSettle();
-      final refresh = find.byTooltip('Refresh');
+      final refresh = findByTooltip('Refresh');
       // Two taps before the disabled state is painted can overlap requests.
       await tester.tap(refresh);
       await tester.tap(refresh);
@@ -128,7 +189,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Add connection'));
+    await tester.tap(findByTooltip('Add connection'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('Name')), 'NAS');
     await tester.enterText(
@@ -136,7 +197,7 @@ void main() {
       'smb://server/share',
     );
     final save = find.widgetWithText(AppActionButton, 'Connect and save');
-    await tester.ensureVisible(save);
+    await _reveal(tester, save);
     await tester.pumpAndSettle();
     await tester.tap(save);
     await tester.pumpAndSettle();
@@ -171,7 +232,7 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
-          await tester.tap(find.byTooltip('Add connection'));
+          await tester.tap(findByTooltip('Add connection'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('HTTP(S)').hitTestable());
           await tester.pumpAndSettle();
@@ -181,7 +242,7 @@ void main() {
             'http://nas.test:8080/music/',
           );
           final save = find.widgetWithText(AppActionButton, 'Connect and save');
-          await tester.ensureVisible(save);
+          await _reveal(tester, save);
           await tester.pumpAndSettle();
           await tester.tap(save);
           await tester.pumpAndSettle();
@@ -262,7 +323,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Add connection'));
+        await tester.tap(findByTooltip('Add connection'));
         await tester.pumpAndSettle();
         // The connected button group also lays out an offstage copy of each
         // label to measure it; tap the visible one.
@@ -273,7 +334,7 @@ void main() {
         await tester.enterText(address, 'https://nas.test:6008/music');
         await tester.pumpAndSettle();
         final save = find.widgetWithText(AppActionButton, 'Connect and save');
-        await tester.ensureVisible(save);
+        await _reveal(tester, save);
         await tester.pumpAndSettle();
         await tester.tap(save);
         await tester.pumpAndSettle();
@@ -341,7 +402,7 @@ void main() {
         expect(find.text('Song.flac'), findsOneWidget);
         expect(service.paths, ['', 'Album/']);
         service.fail = true;
-        await tester.tap(find.byTooltip('Refresh').last);
+        await tester.tap(findByTooltip('Refresh').last);
         await tester.pumpAndSettle();
         expect(
           find.textContaining('Could not access the network source.'),
@@ -354,6 +415,62 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+    testWidgets('the upload stays reachable here (Mornye: $mornye)', (
+      tester,
+    ) async {
+      final upload = _Uploading(
+        const NetworkUploadStatus(
+          LinkOfflineProgress(done: 1, total: 3, title: 'Second song'),
+        ),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [networkUploadProvider.overrideWith(() => upload)],
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : ThemeData(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: NetworkStorageScreen(service: _NetworkFixture()),
+          ),
+        ),
+      );
+      // The Material progress bar waves without end; pump, never settle.
+      Future<void> settle() async {
+        for (var frame = 0; frame < 10; frame++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+      }
+
+      await settle();
+      expect(find.text('Uploading to network storage'), findsOneWidget);
+      await tester.tap(find.text('1 / 3 · Second song'));
+      await settle();
+      // The progress sheet again, with its Cancel.
+      expect(find.text('1 / 3'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+
+      upload.finish(
+        const NetworkUploadResult(
+          saved: 2,
+          skipped: 1,
+          failed: 0,
+          cancelled: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Cancel'), findsNothing);
+      expect(find.text('Last upload'), findsOneWidget);
+      expect(
+        find.text('Uploaded 2, already there 1, failed 0'),
+        findsOneWidget,
+      );
+      await tester.tap(findByTooltip('Clear'));
+      await tester.pumpAndSettle();
+      expect(find.text('Last upload'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
     testWidgets('a paired computer shows as Mornye Link (Mornye: $mornye)', (
       tester,
     ) async {
@@ -394,8 +511,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Mornye Link · 192.168.1.20'), findsOneWidget);
       expect(find.text('Subsonic · nas.test'), findsOneWidget);
+      // The connections are rows of one group, not a card each.
+      final group = find.ancestor(
+        of: find.text('My NAS'),
+        matching: find.byType(SettingsGroup),
+      );
+      expect(tester.widget<SettingsGroup>(group).children, hasLength(2));
       // Link manages the computer, so only the NAS can be edited here.
-      expect(find.byTooltip('Edit connection'), findsOneWidget);
+      expect(findByTooltip('Edit connection'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
     testWidgets(
@@ -419,7 +542,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Add connection'));
+        await tester.tap(findByTooltip('Add connection'));
         await tester.pumpAndSettle();
         expect(
           find.byType(CupertinoTextFormFieldRow),
@@ -444,7 +567,7 @@ void main() {
           'smb://nas.test/Music/',
         );
         final save = find.widgetWithText(AppActionButton, 'Connect and save');
-        await tester.ensureVisible(save);
+        await _reveal(tester, save);
         await tester.pumpAndSettle();
         await tester.tap(save);
         await tester.pumpAndSettle();
@@ -476,16 +599,37 @@ class _CoverFolder extends NetworkStorageService {
   }
 }
 
+class _ExternalSettings extends SettingsNotifier {
+  @override
+  AppSettings build() => const AppSettings(playerMode: 'external');
+}
+
+class _ReadyHandler extends Fake implements MusicPlayerHandler {}
+
 class _PlayedController extends MusicPlayerController {
   _PlayedController(this.played);
 
   final List<PlayableMedia> played;
 
   @override
+  Future<MusicPlayerHandler?> ensureInitialized() async => _ReadyHandler();
+
+  @override
   Future<void> playAll(
     List<PlayableMedia> items, {
     int initialIndex = 0,
   }) async => played.addAll(items);
+}
+
+class _Uploading extends NetworkUploadNotifier {
+  _Uploading(this.initial);
+  final NetworkUploadStatus initial;
+
+  @override
+  NetworkUploadStatus? build() => initial;
+
+  void finish(NetworkUploadResult result) =>
+      state = NetworkUploadStatus(state!.progress, result: result);
 }
 
 class _NetworkFixture extends NetworkStorageService {

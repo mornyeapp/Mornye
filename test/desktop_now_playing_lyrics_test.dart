@@ -1,24 +1,31 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
+import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_now_playing.dart';
+import 'package:mornye/widgets/playback_tempo_sheet.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
+
+import 'support/app_icon_finder.dart';
 
 const _track = MediaItem(
   id: 'track',
@@ -327,4 +334,96 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets('${mornye ? 'Mornye' : 'Material'} desktop shows a changed '
+        'speed and opens Speed and pitch as a dialog', (tester) async {
+      tester.view.physicalSize = const Size(1520, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentMediaItemProvider.overrideWithBuild(
+              (ref, notifier) => Stream.value(_track),
+            ),
+            playbackStateProvider.overrideWith(
+              (ref) => Stream.value(
+                PlaybackState(processingState: AudioProcessingState.ready),
+              ),
+            ),
+            playQueueProvider.overrideWith(
+              (ref) => Stream.value(const [_track]),
+            ),
+            systemVolumeProvider.overrideWith((ref) => Stream.value(0.5)),
+          ],
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : AppTheme.dark(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: DesktopNowPlaying(
+                metadataControllerFactory: () => PlayerMetadataController(
+                  readMetadata: (_) async => const {},
+                  parseLyrics: (raw) async => LyricsParser.parse(raw ?? ''),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      Future<void> settle() async {
+        for (var i = 0; i < 30; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+      }
+
+      await settle();
+      const badge = ValueKey('playback-tempo-badge');
+      expect(find.byKey(badge), findsNothing);
+      final settings = ProviderScope.containerOf(
+        tester.element(find.byType(DesktopNowPlaying)),
+      ).read(settingsProvider.notifier);
+      settings.setPlaybackSpeed(0.75);
+      await settle();
+      expect(find.byKey(badge).hitTestable(), findsOneWidget);
+      expect(find.text('0.75x'), findsOneWidget);
+
+      await tester.tap(find.byKey(badge));
+      await settle();
+      expect(find.byType(PlaybackTempoControls), findsOneWidget);
+      expect(find.byType(AppSheetDialog), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle();
+      expect(find.byType(PlaybackTempoControls), findsNothing);
+
+      if (mornye) {
+        await tester.tap(findAppIcon(CupertinoIcons.ellipsis).hitTestable());
+        await settle();
+        expect(find.text('Speed and pitch'), findsOneWidget);
+        expect(find.text('0.75x'), findsNWidgets(2));
+        await tester.tap(find.text('Speed and pitch'));
+        await settle();
+        expect(find.byType(PlaybackTempoControls), findsOneWidget);
+        expect(find.byType(AppSheetDialog), findsOneWidget);
+      } else {
+        // The Material player has no More menu; its Speed button opens it.
+        const button = ValueKey('desktop-now-playing-tempo');
+        await tester.tap(find.byKey(button).hitTestable());
+        await settle();
+        expect(find.byType(PlaybackTempoControls), findsOneWidget);
+        expect(find.byType(AppSheetDialog), findsOneWidget);
+      }
+      expect(
+        find.byKey(const ValueKey('desktop-now-playing-tempo')),
+        mornye ? findsNothing : findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 }

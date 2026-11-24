@@ -31,9 +31,10 @@ data class AudioContextAndroid(
         audioMode = AudioManager.MODE_NORMAL,
     )
 
-    fun setAttributesOnPlayer(player: MediaPlayer) {
+    /** [spatialAudio] false asks Android 12L and later never to spatialize. */
+    fun setAttributesOnPlayer(player: MediaPlayer, spatialAudio: Boolean = true) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            player.setAudioAttributes(buildAttributes())
+            player.setAudioAttributes(buildAttributes(spatialAudio))
         } else {
             @Suppress("DEPRECATION")
             player.setAudioStreamType(getStreamType())
@@ -41,11 +42,17 @@ data class AudioContextAndroid(
     }
 
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
-    fun buildAttributes(): AudioAttributes {
-        return Builder()
+    fun buildAttributes(spatialAudio: Boolean = true): AudioAttributes {
+        val builder = Builder()
             .setUsage(usageType)
             .setContentType(contentType)
-            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
+            builder.setSpatializationBehavior(
+                if (spatialAudio) AudioAttributes.SPATIALIZATION_BEHAVIOR_AUTO
+                else AudioAttributes.SPATIALIZATION_BEHAVIOR_NEVER,
+            )
+        }
+        return builder.build()
     }
 
     @Deprecated("This is used for Android older than LOLLIPOP", replaceWith = ReplaceWith("buildAttributes"))

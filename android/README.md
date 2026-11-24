@@ -189,6 +189,7 @@ without checking with the maintainer.
 | --- | --- |
 | `com.zarz.mornye/concert_calendar`, `com.zarz.mornye/audio_output` | `android/app/src/main/kotlin/com/zarz/mornye/MainActivitySmallChannels.kt` |
 | `com.zarz.mornye/usb_pcm`, `com.zarz.mornye/usb_pcm/events` (EventChannel), `com.zarz.mornye/audio_route` | `android/app/src/main/kotlin/com/zarz/mornye/UsbBitPerfectPlugin.kt` |
+| `com.zarz.mornye/media3_player`, `com.zarz.mornye/media3_player/events/<playerId>` (EventChannel) | `android/app/src/main/kotlin/com/zarz/mornye/Media3PlayerPlugin.kt` |
 | `com.zarz.mornye/haptics` | `android/app/src/main/kotlin/com/zarz/mornye/MusicHapticsPlugin.kt` |
 | `com.zarz.mornye/local_network` | `android/app/src/main/kotlin/com/zarz/mornye/LocalNetworkPlugin.kt` |
 | `com.zarz.mornye/player_widget` | `android/app/src/main/kotlin/com/zarz/mornye/PlayerWidgetProvider.kt` |

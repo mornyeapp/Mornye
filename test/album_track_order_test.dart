@@ -12,6 +12,44 @@ AlbumTrackOrder<_AlbumTrack> _order(Iterable<_AlbumTrack> tracks) =>
     );
 
 void main() {
+  group('ranks', () {
+    const source = <_AlbumTrack>[
+      (name: 'One', disc: 1, number: 1),
+      (name: 'Two', disc: 1, number: 2),
+      (name: 'Three', disc: 2, number: 1),
+      (name: 'Four', disc: 2, number: 2),
+    ];
+    AlbumTrackOrder<_AlbumTrack> ranked(Map<String, int>? ranks) =>
+        AlbumTrackOrder(
+          source,
+          discNumber: (track) => track.disc,
+          trackNumber: (track) => track.number,
+          trackName: (track) => track.name,
+          ranks: ranks,
+        );
+    List<String> names(AlbumTrackOrder<_AlbumTrack> order) =>
+        order.tracks.map((track) => track.name).toList();
+
+    test('most played songs lead, the rest keep album order', () {
+      final order = ranked(albumTrackPlayRanks({'FOUR': 9, 'two': 3}));
+      expect(names(order), ['Four', 'Two', 'One', 'Three']);
+      // A rank cuts across discs, so there are no disc sections to show.
+      expect(order.discNumbers, [1]);
+      expect(order.discGroups[1], order.tracks);
+    });
+
+    test('a custom order keeps songs it does not name last', () {
+      final order = ranked(albumTrackCustomRanks(['three', 'one']));
+      expect(names(order), ['Three', 'One', 'Two', 'Four']);
+    });
+
+    test('no ranks keep disc sections', () {
+      final order = ranked(null);
+      expect(names(order), ['One', 'Two', 'Three', 'Four']);
+      expect(order.discNumbers, [1, 2]);
+    });
+  });
+
   test('album queue and disc sections share ordering with incomplete tags', () {
     final source = <_AlbumTrack>[
       (name: 'Disc two', disc: 2, number: 1),

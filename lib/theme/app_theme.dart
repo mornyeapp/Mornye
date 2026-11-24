@@ -1,8 +1,8 @@
-import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/page_transitions.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
 class AppTheme {
@@ -16,23 +16,6 @@ class AppTheme {
 
   /// Full ROND for the Expressive brand roles of [bundledFontFamily].
   static const double brandRoundness = 100;
-
-  // Override Flutter's default page transitions. Recent Flutter defaults the
-  // Android route transition to PredictiveBackPageTransitionsBuilder, whose
-  // gesture detector mis-routes the predictive-back gesture to a nested
-  // Navigator instead of the topmost route (flutter#152323). That pops the page
-  // *behind* a root modal/sheet/dialog instead of closing the modal first — a
-  // regression introduced by the Flutter upgrade. Forcing a non-predictive
-  // builder restores the correct back order (close modal, then pop page), at the
-  // cost of the predictive-back preview animation.
-  static const PageTransitionsTheme _pageTransitionsTheme =
-      PageTransitionsTheme(
-        builders: <TargetPlatform, PageTransitionsBuilder>{
-          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
-          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-        },
-      );
 
   static ThemeData light({
     ColorScheme? dynamicScheme,
@@ -52,7 +35,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      pageTransitionsTheme: _pageTransitionsTheme,
+      pageTransitionsTheme: materialPageTransitionsTheme,
       appBarTheme: _appBarTheme(scheme),
       cardTheme: _cardTheme(scheme),
       elevatedButtonTheme: _elevatedButtonTheme(scheme),
@@ -74,6 +57,7 @@ class AppTheme {
       menuButtonTheme: _menuButtonTheme,
       tabBarTheme: _tabBarTheme(scheme),
       dividerTheme: _dividerTheme(scheme),
+      tooltipTheme: _tooltipTheme,
       extensions: <ThemeExtension<dynamic>>[
         isDesktopPlatform ? AppTokens.desktop : AppTokens.standard,
       ],
@@ -102,7 +86,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      pageTransitionsTheme: _pageTransitionsTheme,
+      pageTransitionsTheme: materialPageTransitionsTheme,
       scaffoldBackgroundColor: isAmoled ? Colors.black : null,
       appBarTheme: _appBarTheme(scheme, isAmoled: isAmoled),
       cardTheme: _cardTheme(scheme),
@@ -125,6 +109,7 @@ class AppTheme {
       menuButtonTheme: _menuButtonTheme,
       tabBarTheme: _tabBarTheme(scheme),
       dividerTheme: _dividerTheme(scheme),
+      tooltipTheme: _tooltipTheme,
       extensions: <ThemeExtension<dynamic>>[
         isDesktopPlatform ? AppTokens.desktop : AppTokens.standard,
       ],
@@ -400,4 +385,11 @@ class AppTheme {
 
   static DividerThemeData _dividerTheme(ColorScheme scheme) =>
       DividerThemeData(color: scheme.outlineVariant, thickness: 1, space: 1);
+
+  /// Desktop hover waits half a second before a tooltip shows, the initial
+  /// tooltip delay of the Windows and Linux toolkits, so sweeping across the
+  /// rail or the player bar does not flash a string of labels.
+  static TooltipThemeData? get _tooltipTheme => isDesktopPlatform
+      ? const TooltipThemeData(waitDuration: Duration(milliseconds: 500))
+      : null;
 }

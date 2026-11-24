@@ -27,21 +27,18 @@ final musicPlayerRuntimeProvider = Provider<MusicPlayerRuntime>(
 /// The app root overrides it with Mornye Link's paired desktop.
 final activeRemotePlaybackProvider = Provider<RemotePlayback?>((ref) => null);
 
-/// External apps own local-file playback. Link and network files still need
-/// the in-app controls when they use a Mornye player.
-final playerUiEnabledProvider = Provider<bool>((ref) {
-  if (ref.watch(settingsProvider.select((s) => s.playerMode == 'internal')) ||
-      ref.watch(activeRemotePlaybackProvider) != null) {
-    return true;
-  }
-  return ref.watch(
-    localMediaItemProvider.select(
-      (state) =>
-          state.value?.extras?['source']?.toString().startsWith('network://') ??
-          false,
-    ),
-  );
-});
+/// Whether this device sounds too while [activeRemotePlaybackProvider]
+/// plays, so its volume controls set its own volume. The app root overrides
+/// it with Mornye Link's Play together.
+final soundsBesideRemoteProvider = Provider<bool>((ref) => false);
+
+/// External apps own playback on this device. A remote Mornye player keeps
+/// its controls while this device is only controlling it.
+final playerUiEnabledProvider = Provider<bool>(
+  (ref) =>
+      ref.watch(settingsProvider.select((s) => s.playerMode == 'internal')) ||
+      ref.watch(activeRemotePlaybackProvider) != null,
+);
 
 /// The active remote device's volume, 0 to 1; no value while this device
 /// plays.
@@ -99,10 +96,17 @@ class LocalMediaItemNotifier extends CurrentMediaItemNotifier {
 }
 
 /// A dismissed session stays available on Home without restoring the player.
-final playbackResumeProvider = FutureProvider<PlaybackResumePreview?>((ref) {
+/// With the scanned Library switched off, a session on one of its songs is
+/// not offered.
+final playbackResumeProvider = FutureProvider<PlaybackResumePreview?>((
+  ref,
+) async {
   if (!ref.watch(settingsProvider.select((s) => s.playerMode == 'internal'))) {
     return null;
   }
+  final localLibraryEnabled = ref.watch(
+    settingsProvider.select((s) => s.localLibraryEnabled),
+  );
   final hasCurrent = ref.watch(
     currentMediaItemProvider.select((state) => state.value != null),
   );
@@ -115,7 +119,17 @@ final playbackResumeProvider = FutureProvider<PlaybackResumePreview?>((ref) {
       ref.invalidateSelf();
     }),
   );
-  return loadPlaybackResumePreview(runtime);
+  return resumePreviewForLibrary(
+    await loadPlaybackResumePreview(runtime),
+    localLibraryEnabled: localLibraryEnabled,
+    libraryItem: (media) => _libraryItemForMedia(
+      ref,
+      id: media.id,
+      source: media.source,
+      title: media.title,
+      artist: media.artist,
+    ),
+  );
 });
 
 /// [libraryItemForMedia] with the download History the app has loaded.
@@ -184,8 +198,6 @@ final playbackLoadingProvider = Provider<bool>((ref) {
   );
 });
 
-/// Whether a list row is the current track, and if so whether it plays or
-/// loads.
 typedef MediaPlaybackUi = ({bool isCurrent, bool isPlaying, bool isLoading});
 
 const MediaPlaybackUi _notCurrent = (
@@ -403,6 +415,8 @@ class MusicPlayerController {
 
   DateTime? get sleepTimerEndsAt => _handler?.sleepTimerEndsAt;
 
+  bool get sleepAtEndOfSong => _handler?.sleepAtEndOfSong ?? false;
+
   Future<MusicPlayerHandler?> ensureInitialized() async {
     try {
       return await _runtime.initialize();
@@ -522,6 +536,8 @@ class MusicPlayerController {
 
   void setSleepTimer(Duration duration) => _handler?.setSleepTimer(duration);
 
+  void setSleepTimerEndOfSong() => _handler?.setSleepTimerEndOfSong();
+
   void cancelSleepTimer() => _handler?.cancelSleepTimer();
 
   Future<void> togglePlayPause(bool isPlaying) async {
@@ -544,7 +560,10 @@ class MusicPlayerController {
 
   Future<void> setShuffle(bool enabled) async {
     if (remote case final remote?) return remote.setShuffle(enabled);
-    await _handler?.setShuffleMode(
+    // A Shuffle button can be the first thing that starts the player. A
+    // player that has not started has no shuffle to turn off.
+    final handler = enabled ? await ensureInitialized() : _handler;
+    await handler?.setShuffleMode(
       enabled ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
     );
   }
@@ -603,6 +622,14 @@ class MusicPlayerController {
 
   Future<void> jumpTo(int index) async =>
       remote?.jumpTo(index) ?? _handler?.skipToQueueItem(index);
+
+  /// Queues a copy of [item], an entry of the local queue other than the
+  /// current one, right after the current song. False when nothing was
+  /// queued: the entry left the queue, or another device plays.
+  Future<bool> playQueuedItemNext(MediaItem item) async {
+    if (remote != null) return false;
+    return await _handler?.playQueuedItemNext(item) ?? false;
+  }
 
   void moveQueueItem(int oldIndex, int newIndex) {
     if (remote case final remote?) {

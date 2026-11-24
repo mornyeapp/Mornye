@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_database_models.dart';
@@ -18,8 +18,10 @@ import 'package:mornye/services/link/features/link_phone_sender.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
@@ -176,6 +178,12 @@ Future<void> linkOpenUrlOnDesktop(
   }
 }
 
+/// Whether the host of [client] can take a shared link at all: a phone host
+/// neither opens nor downloads one.
+bool linkTakesSharedUrls(LinkClientApi client) =>
+    client.server.supports(LinkHostFeatures.open) ||
+    client.server.supports(LinkHostFeatures.downloads);
+
 /// The choices for a link shared to the app while a desktop is paired:
 /// open it in the desktop app, or let the desktop download it.
 Future<void> showLinkSharedUrlSheet(
@@ -184,7 +192,7 @@ Future<void> showLinkSharedUrlSheet(
   String url,
 ) async {
   final client = ref.read(linkPhoneClientProvider);
-  if (client == null) return;
+  if (client == null || !linkTakesSharedUrls(client)) return;
   final name = linkDesktopName(client);
   final root = Navigator.of(context, rootNavigator: true).context;
   await showAppBottomSheet<void>(
@@ -195,22 +203,24 @@ Future<void> showLinkSharedUrlSheet(
     builder: (sheetContext) => Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AppSheetOption(
-          leading: const AppIcon.adaptive(Icons.open_in_new),
-          title: Text(sheetContext.l10n.linkOpenOnDesktop(name)),
-          onTap: () {
-            Navigator.pop(sheetContext);
-            linkOpenUrlOnDesktop(root, ref, url);
-          },
-        ),
-        AppSheetOption(
-          leading: const AppIcon.adaptive(Icons.download),
-          title: Text(sheetContext.l10n.linkDownloadOnDesktop(name)),
-          onTap: () {
-            Navigator.pop(sheetContext);
-            linkDownloadOnDesktop(root, ref, linkDownloadUrlBody(url));
-          },
-        ),
+        if (client.server.supports(LinkHostFeatures.open))
+          AppSheetOption(
+            leading: const AppIcon.adaptive(Icons.open_in_new),
+            title: Text(sheetContext.l10n.linkOpenOnDesktop(name)),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              linkOpenUrlOnDesktop(root, ref, url);
+            },
+          ),
+        if (client.server.supports(LinkHostFeatures.downloads))
+          AppSheetOption(
+            leading: const AppIcon.adaptive(Icons.download),
+            title: Text(sheetContext.l10n.linkDownloadOnDesktop(name)),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              linkDownloadOnDesktop(root, ref, linkDownloadUrlBody(url));
+            },
+          ),
         const SizedBox(height: 8),
       ],
     ),
@@ -328,7 +338,9 @@ class LinkDownloadOnDesktopButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final client = ref.watch(linkPhoneClientProvider);
-    if (client == null) return const SizedBox.shrink();
+    if (client == null || !client.server.supports(LinkHostFeatures.downloads)) {
+      return const SizedBox.shrink();
+    }
     return HeaderCircleButton(
       icon: Icons.computer,
       tooltip: context.l10n.linkDownloadOnDesktop(linkDesktopName(client)),
@@ -352,6 +364,12 @@ List<UnifiedLibraryItem> linkPhoneSongItemsOf(
   for (final item in items)
     if (isLinkPhoneSongItem(item)) item,
 ];
+
+/// The icon of sending a song to the paired device: a computer, or a phone
+/// with an arrow when the host is another phone, which keeps it apart from
+/// "Save to this phone" beside it.
+IconData linkSendToHostIcon(LinkClientApi client) =>
+    client.server.isPhone ? Icons.send_to_mobile : Icons.computer;
 
 /// The app bar actions of a Library album: "Send to (desktop)" when [items]
 /// hold this phone's own songs and "Save to this phone" when they hold the
@@ -377,7 +395,7 @@ class LinkTransferButtons extends ConsumerWidget {
       children: [
         if (phoneSongs.isNotEmpty)
           HeaderCircleButton(
-            icon: Icons.computer,
+            icon: linkSendToHostIcon(client),
             tooltip: context.l10n.linkSendToDesktop(linkDesktopName(client)),
             onPressed: () => linkSendSongsToDesktop(context, ref, phoneSongs),
           ),
@@ -392,78 +410,76 @@ class LinkTransferButtons extends ConsumerWidget {
   }
 }
 
-/// The app bar action of a Library playlist: a sheet that sends this
+/// The More menu action of a Library playlist: a sheet that sends this
 /// phone's own songs among [tracks] to the paired desktop or saves the
 /// desktop's to this phone, while that desktop is connected. The songs are
-/// looked up when one is chosen. Empty otherwise.
-class LinkTrackTransferButton extends ConsumerWidget {
-  const LinkTrackTransferButton({super.key, required this.tracks});
-
-  final List<Track> tracks;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final client = ref.watch(linkPhoneClientProvider);
-    if (client == null || tracks.isEmpty || !_watchConnected(ref)) {
-      return const SizedBox.shrink();
-    }
-    return HeaderCircleButton(
-      icon: Icons.devices,
-      iconSize: 20,
-      tooltip: context.l10n.linkTransferPhoneWith(linkDesktopName(client)),
-      onPressed: () => _showSheet(context, ref, client),
-    );
+/// looked up when one is chosen. Null otherwise.
+ContextMenuAction? linkTrackTransferAction(
+  BuildContext context,
+  WidgetRef ref,
+  List<Track> tracks,
+) {
+  final client = ref.read(linkPhoneClientProvider);
+  if (client == null || tracks.isEmpty || !linkTransfersAvailable(ref)) {
+    return null;
   }
+  return ContextMenuAction(
+    icon: Icons.devices,
+    label: context.l10n.linkTransferPhoneWith(linkDesktopName(client)),
+    onSelected: () =>
+        unawaited(_showTrackTransferSheet(context, ref, client, tracks)),
+  );
+}
 
-  Future<void> _showSheet(
-    BuildContext context,
-    WidgetRef ref,
-    LinkClientApi client,
-  ) async {
-    final name = linkDesktopName(client);
-    final root = Navigator.of(context, rootNavigator: true).context;
-    Future<List<UnifiedLibraryItem>> items() => linkLibraryItemsFor(
-      tracks,
-      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
-    );
-    await showAppBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      title: context.l10n.linkTransferPhoneWith(name),
-      builder: (sheetContext) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppSheetOption(
-            leading: const AppIcon.adaptive(Icons.computer),
-            title: Text(sheetContext.l10n.linkSendToDesktop(name)),
-            onTap: () async {
-              Navigator.pop(sheetContext);
-              final found = await items();
-              if (root.mounted) await linkSendSongsToDesktop(root, ref, found);
-            },
-          ),
-          AppSheetOption(
-            leading: const AppIcon.adaptive(Icons.phone_android),
-            title: Text(sheetContext.l10n.linkSaveToPhone),
-            onTap: () async {
-              Navigator.pop(sheetContext);
-              final found = await items();
-              if (!root.mounted) return;
-              final songs = linkOfflineSongs([
-                for (final item in found) ?item.localItem,
-              ], client.server);
-              if (songs.isEmpty) {
-                _notify(root, root.l10n.linkTransferPhoneNothing(name));
-              } else {
-                linkSaveSongsToPhone(root, ref, songs);
-              }
-            },
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
+Future<void> _showTrackTransferSheet(
+  BuildContext context,
+  WidgetRef ref,
+  LinkClientApi client,
+  List<Track> tracks,
+) async {
+  final name = linkDesktopName(client);
+  final root = Navigator.of(context, rootNavigator: true).context;
+  Future<List<UnifiedLibraryItem>> items() => linkLibraryItemsFor(
+    tracks,
+    includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+  );
+  await showAppBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    title: context.l10n.linkTransferPhoneWith(name),
+    builder: (sheetContext) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AppSheetOption(
+          leading: AppIcon.adaptive(linkSendToHostIcon(client)),
+          title: Text(sheetContext.l10n.linkSendToDesktop(name)),
+          onTap: () async {
+            Navigator.pop(sheetContext);
+            final found = await items();
+            if (root.mounted) await linkSendSongsToDesktop(root, ref, found);
+          },
+        ),
+        AppSheetOption(
+          leading: const AppIcon.adaptive(Icons.phone_android),
+          title: Text(sheetContext.l10n.linkSaveToPhone),
+          onTap: () async {
+            Navigator.pop(sheetContext);
+            final found = await items();
+            if (!root.mounted) return;
+            final songs = linkOfflineSongs([
+              for (final item in found) ?item.localItem,
+            ], client.server);
+            if (songs.isEmpty) {
+              _notify(root, root.l10n.linkTransferPhoneNothing(name));
+            } else {
+              linkSaveSongsToPhone(root, ref, songs);
+            }
+          },
+        ),
+        const SizedBox(height: 8),
+      ],
+    ),
+  );
 }
 
 /// The Library selection toolbar's Mornye Link actions for the selected
@@ -486,7 +502,7 @@ List<Widget> linkTransferSelectionActions(
   return [
     if (phoneSongs.isNotEmpty)
       SelectionActionButton(
-        icon: Icons.computer,
+        icon: linkSendToHostIcon(client),
         label: context.l10n.linkSendToDesktop(linkDesktopName(client)),
         colorScheme: colors,
         onPressed: () {

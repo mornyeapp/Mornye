@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
@@ -19,7 +19,7 @@ import 'package:mornye/widgets/link/link_transfers_view.dart';
 /// The phones connected to the desktop's Mornye Link server. The app root
 /// starts the host on desktop; a menu never starts it.
 List<LinkClientInfo> _connectedPhones(WidgetRef ref) {
-  if (!isDesktopPlatform || !ref.exists(linkDesktopHostProvider)) {
+  if (!isDesktopPlatform || !ref.read(linkDesktopHostProvider.exists)) {
     return const [];
   }
   final host = ref.read(linkDesktopHostProvider);
@@ -33,7 +33,7 @@ String _phoneName(LinkClientInfo phone) =>
 /// connected. Rebuilds the page when that changes.
 bool watchDesktopLinkPhones(WidgetRef ref) =>
     isDesktopPlatform &&
-    ref.exists(linkDesktopHostProvider) &&
+    ref.read(linkDesktopHostProvider.exists) &&
     ref.watch(linkDevicesAvailableProvider);
 
 /// The Mornye Link rows of a desktop song menu acting on [items] (contract

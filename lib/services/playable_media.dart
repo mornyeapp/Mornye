@@ -49,6 +49,29 @@ class PlayableMedia {
     this.displayMetadata = const {},
   });
 
+  /// This song as one the listener queued: an Autoplay addition loses its
+  /// [autoplay] mark, so Autoplay never replaces or reorders the copy.
+  PlayableMedia get chosenByListener => !autoplay
+      ? this
+      : PlayableMedia(
+          id: id,
+          source: source,
+          originSource: originSource,
+          title: title,
+          artist: artist,
+          album: album,
+          artUri: artUri,
+          networkArtworkSource: networkArtworkSource,
+          duration: duration,
+          bitDepth: bitDepth,
+          sampleRate: sampleRate,
+          bitrate: bitrate,
+          format: format,
+          explicit: explicit,
+          genre: genre,
+          displayMetadata: displayMetadata,
+        );
+
   /// The `network://` cover the cover store keeps for this song:
   /// [networkArtworkSource], or [artUri] when it names one, as a cover
   /// reference listening statistics recorded does.
@@ -213,6 +236,7 @@ PlayableMedia playableFromTrack(Track track, String path) {
         : null,
     duration: track.duration > 0 ? Duration(seconds: track.duration) : null,
     explicit: track.isExplicit,
+    genre: track.genre,
   );
 }
 

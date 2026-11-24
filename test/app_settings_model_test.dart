@@ -1,10 +1,154 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/utils/artist_utils.dart';
 
 void main() {
+  test('Autoplay randomness defaults to least recent and restores safely', () {
+    expect(const AppSettings().autoplayRandomness, 0);
+    expect(AppSettings.fromJson({}).autoplayRandomness, 0);
+    for (final value in [0.0, 0.5, 1.0]) {
+      final settings = const AppSettings().copyWith(autoplayRandomness: value);
+      final restored = AppSettings.fromJson(settings.toJson());
+      expect(restored.autoplayRandomness, value);
+      expect(restored.copyWith(locale: 'id').autoplayRandomness, value);
+    }
+    for (final invalid in [null, '', double.nan, double.infinity]) {
+      expect(
+        AppSettings.fromJson({
+          'autoplayRandomness': invalid,
+        }).autoplayRandomness,
+        0,
+      );
+    }
+    expect(
+      AppSettings.fromJson({'autoplayRandomness': -5}).autoplayRandomness,
+      0,
+    );
+    expect(
+      AppSettings.fromJson({'autoplayRandomness': 5}).autoplayRandomness,
+      1,
+    );
+  });
+
+  test('Interface size defaults to normal and restores within range', () {
+    expect(const AppSettings().interfaceScale, 1);
+    expect(AppSettings.fromJson({}).interfaceScale, 1);
+    for (final value in [0.8, 0.9, 1.25, 1.3]) {
+      final settings = const AppSettings().copyWith(interfaceScale: value);
+      final restored = AppSettings.fromJson(settings.toJson());
+      expect(restored.interfaceScale, value);
+      expect(restored.copyWith(locale: 'id').interfaceScale, value);
+    }
+    for (final invalid in ['', double.nan, double.infinity]) {
+      expect(
+        AppSettings.fromJson({'interfaceScale': invalid}).interfaceScale,
+        1,
+      );
+    }
+    expect(AppSettings.fromJson({'interfaceScale': 0.2}).interfaceScale, 0.8);
+    expect(AppSettings.fromJson({'interfaceScale': 3}).interfaceScale, 1.3);
+  });
+
+  test('Animation speed defaults to normal and restores within range', () {
+    expect(const AppSettings().animationSpeed, 1);
+    expect(AppSettings.fromJson({}).animationSpeed, 1);
+    for (final value in [0.5, 0.75, 1.5, 2.0]) {
+      final settings = const AppSettings().copyWith(animationSpeed: value);
+      final restored = AppSettings.fromJson(settings.toJson());
+      expect(restored.animationSpeed, value);
+      expect(restored.copyWith(locale: 'id').animationSpeed, value);
+    }
+    for (final invalid in ['', double.nan, double.infinity]) {
+      expect(
+        AppSettings.fromJson({'animationSpeed': invalid}).animationSpeed,
+        1,
+      );
+    }
+    expect(AppSettings.fromJson({'animationSpeed': 0.1}).animationSpeed, 0.5);
+    expect(AppSettings.fromJson({'animationSpeed': 9}).animationSpeed, 2);
+  });
+
+  test('Playback speed and pitch default to normal and restore in range', () {
+    const defaults = AppSettings();
+    expect(defaults.playbackSpeed, 1);
+    expect(defaults.playbackKeepPitch, isTrue);
+    expect(defaults.playbackPitch, 0);
+    final empty = AppSettings.fromJson({});
+    expect(empty.playbackSpeed, 1);
+    expect(empty.playbackKeepPitch, isTrue);
+    expect(empty.playbackPitch, 0);
+
+    final changed = defaults.copyWith(
+      playbackSpeed: 1.25,
+      playbackKeepPitch: false,
+      playbackPitch: -3,
+    );
+    final restored = AppSettings.fromJson(changed.toJson());
+    expect(restored.playbackSpeed, 1.25);
+    expect(restored.playbackKeepPitch, isFalse);
+    expect(restored.playbackPitch, -3);
+    // Half semitones from earlier builds restore as whole ones.
+    expect(AppSettings.fromJson({'playbackPitch': 2.5}).playbackPitch, 3);
+    expect(AppSettings.fromJson({'playbackPitch': -1.4}).playbackPitch, -1);
+    expect(restored.copyWith(locale: 'id').playbackSpeed, 1.25);
+
+    for (final invalid in ['', double.nan, double.infinity]) {
+      final settings = AppSettings.fromJson({
+        'playbackSpeed': invalid,
+        'playbackPitch': invalid,
+      });
+      expect(settings.playbackSpeed, 1);
+      expect(settings.playbackPitch, 0);
+    }
+    final clamped = AppSettings.fromJson({
+      'playbackSpeed': 9,
+      'playbackPitch': -40,
+    });
+    expect(clamped.playbackSpeed, maxPlaybackSpeed);
+    expect(clamped.playbackPitch, -maxPlaybackPitch);
+  });
+
+  test('Link hides disconnected devices by default and remembers off', () {
+    expect(const AppSettings().linkHideDisconnectedSongs, isTrue);
+    expect(AppSettings.fromJson({}).linkHideDisconnectedSongs, isTrue);
+    final off = const AppSettings().copyWith(linkHideDisconnectedSongs: false);
+    expect(AppSettings.fromJson(off.toJson()).linkHideDisconnectedSongs, false);
+    expect(off.copyWith(locale: 'id').linkHideDisconnectedSongs, isFalse);
+  });
+
+  test('Swipe to queue is on by default and remembers off', () {
+    expect(const AppSettings().swipeToQueue, isTrue);
+    expect(AppSettings.fromJson({}).swipeToQueue, isTrue);
+    final off = const AppSettings().copyWith(swipeToQueue: false);
+    expect(AppSettings.fromJson(off.toJson()).swipeToQueue, isFalse);
+    expect(off.copyWith(locale: 'id').swipeToQueue, isFalse);
+  });
+
+  test('A Library song tap opens details by default and remembers play', () {
+    expect(
+      const AppSettings().librarySongTap,
+      AppSettings.librarySongTapDetails,
+    );
+    // Settings saved before the choice existed keep opening the details.
+    expect(
+      AppSettings.fromJson({'swipeToQueue': true}).librarySongTap,
+      AppSettings.librarySongTapDetails,
+    );
+    final play = const AppSettings().copyWith(
+      librarySongTap: AppSettings.librarySongTapPlay,
+    );
+    expect(
+      AppSettings.fromJson(play.toJson()).librarySongTap,
+      AppSettings.librarySongTapPlay,
+    );
+    expect(
+      play.copyWith(locale: 'id').librarySongTap,
+      AppSettings.librarySongTapPlay,
+    );
+  });
+
   test('AI translation defaults to Fast and remembers either mode', () {
     expect(const AppSettings().lyricsAiWordSync, isFalse);
     expect(AppSettings.fromJson({}).lyricsAiWordSync, isFalse);
@@ -29,6 +173,25 @@ void main() {
       final restored = AppSettings.fromJson(settings.toJson());
       expect(restored.historySortMode, sort);
       expect(restored.copyWith(historyViewMode: 'list').historySortMode, sort);
+    }
+  });
+
+  test('album sort restores either year order and tolerates old settings', () {
+    expect(AppSettings.fromJson({}).libraryAlbumSortMode, 'a-z');
+    for (final invalid in [null, '', 'unsupported', 42]) {
+      expect(
+        AppSettings.fromJson({
+          'libraryAlbumSortMode': invalid,
+        }).libraryAlbumSortMode,
+        'a-z',
+      );
+    }
+    for (final mode in ['year-asc', 'year-desc']) {
+      final settings = const AppSettings().copyWith(libraryAlbumSortMode: mode);
+      expect(
+        AppSettings.fromJson(settings.toJson()).libraryAlbumSortMode,
+        mode,
+      );
     }
   });
 
@@ -83,6 +246,8 @@ void main() {
       expect(settings.autoConvertBitrate, '320k');
       expect(settings.autoConvertMaxBitDepth, 16);
       expect(settings.autoConvertMaxSampleRate, 48000);
+      expect(settings.autoConvertSmartDither, isTrue);
+      expect(settings.autoConvertSmartDitherHighPass, isFalse);
       expect(
         settings.libraryQualityLabelMode,
         AppSettings.libraryQualityLabelBitDepthOnly,
@@ -168,6 +333,8 @@ void main() {
         autoConvertBitrate: '192k',
         autoConvertMaxBitDepth: 24,
         autoConvertMaxSampleRate: 96000,
+        autoConvertSmartDither: false,
+        autoConvertSmartDitherHighPass: true,
         libraryQualityLabelMode: AppSettings.libraryQualityLabelBitDepthOnly,
         embeddedCoverMaxDimension: 1500,
       );
@@ -201,6 +368,13 @@ void main() {
       expect(decoded.autoConvertBitrate, '192k');
       expect(decoded.autoConvertMaxBitDepth, 24);
       expect(decoded.autoConvertMaxSampleRate, 96000);
+      expect(decoded.autoConvertSmartDither, isFalse);
+      expect(decoded.autoConvertSmartDitherHighPass, isTrue);
+      expect(decoded.copyWith(locale: 'id').autoConvertSmartDither, isFalse);
+      expect(
+        decoded.copyWith(autoConvertSmartDither: true).autoConvertSmartDither,
+        isTrue,
+      );
       expect(decoded.embeddedCoverMaxDimension, 1500);
     });
   });

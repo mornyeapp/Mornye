@@ -66,13 +66,9 @@ pub struct MediaServer {
 }
 
 impl MediaServer {
-    /// Listens on the local address that routes to `receiver`. Call inside a
-    /// Tokio runtime, which then runs the server.
-    pub async fn for_receiver(receiver: IpAddr) -> io::Result<Self> {
-        Self::bind(local_address_towards(receiver)?).await
-    }
-
-    /// Listens on `address` with an OS-assigned port; tests bind loopback.
+    /// Listens on `address` with an OS-assigned port, inside a Tokio runtime,
+    /// which then runs the server. The app binds the address a receiver can
+    /// reach; tests bind loopback.
     pub async fn bind(address: IpAddr) -> io::Result<Self> {
         let listener = TcpListener::bind(SocketAddr::new(address, 0)).await?;
         let local = listener.local_addr()?;
@@ -130,9 +126,51 @@ impl Drop for MediaServer {
     }
 }
 
+/// The local address `receiver` can reach. An interface on the receiver's own
+/// network wins: a VPN can own the route to the LAN (Android routes each app
+/// through its VPN), and a receiver cannot reach the VPN's address.
+pub(crate) fn local_address_towards(receiver: IpAddr) -> io::Result<IpAddr> {
+    let interfaces = if_addrs::get_if_addrs().unwrap_or_default();
+    let on_link = interfaces
+        .iter()
+        .filter(|interface| !interface.is_loopback() && !interface.is_p2p())
+        .map(|interface| match &interface.addr {
+            if_addrs::IfAddr::V4(address) => (IpAddr::V4(address.ip), address.prefixlen),
+            if_addrs::IfAddr::V6(address) => (IpAddr::V6(address.ip), address.prefixlen),
+        });
+    match address_sharing_network(on_link, receiver) {
+        Some(address) => Ok(address),
+        None => routed_address_towards(receiver),
+    }
+}
+
+/// The address among `(address, prefix length)` whose network holds
+/// `receiver`, the narrowest network first. Link-local IPv6 is left to the
+/// route: every interface has that network.
+fn address_sharing_network(
+    addresses: impl Iterator<Item = (IpAddr, u8)>,
+    receiver: IpAddr,
+) -> Option<IpAddr> {
+    let bits = |address: IpAddr| match address {
+        IpAddr::V4(address) => u128::from(u32::from(address)) << 96,
+        IpAddr::V6(address) => u128::from(address),
+    };
+    addresses
+        .filter(|&(address, prefix)| {
+            let link_local =
+                matches!(address, IpAddr::V6(address) if address.is_unicast_link_local());
+            address.is_ipv4() == receiver.is_ipv4()
+                && !link_local
+                && (1..=128).contains(&prefix)
+                && (bits(address) ^ bits(receiver)) >> (128 - u32::from(prefix)) == 0
+        })
+        .max_by_key(|&(_, prefix)| prefix)
+        .map(|(address, _)| address)
+}
+
 /// The local address the OS would use to reach `receiver`. Connecting a UDP
 /// socket only selects the route; nothing is sent.
-fn local_address_towards(receiver: IpAddr) -> io::Result<IpAddr> {
+fn routed_address_towards(receiver: IpAddr) -> io::Result<IpAddr> {
     let any = match receiver {
         IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
         IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
@@ -430,6 +468,40 @@ mod tests {
         assert_eq!(parse_range("bytes=0-1,2-3", 4), ByteRange::Full);
         assert_eq!(parse_range("items=0-1", 4), ByteRange::Full);
         assert_eq!(parse_range("bytes=3-1", 4), ByteRange::Full);
+    }
+
+    #[test]
+    fn the_receiver_is_served_from_its_own_network() {
+        let v4 = |text: &str, prefix| (text.parse::<IpAddr>().unwrap(), prefix);
+        let tv: IpAddr = "192.168.1.50".parse().unwrap();
+        let chosen = |addresses: &[(IpAddr, u8)]| {
+            address_sharing_network(addresses.iter().copied(), tv).map(|ip| ip.to_string())
+        };
+        // A VPN address is never offered to a TV on the Wi-Fi network.
+        assert_eq!(
+            chosen(&[v4("10.8.0.2", 32), v4("192.168.1.7", 24)]).as_deref(),
+            Some("192.168.1.7")
+        );
+        // The narrowest network that holds the TV wins.
+        assert_eq!(
+            chosen(&[v4("192.168.200.1", 16), v4("192.168.1.7", 24)]).as_deref(),
+            Some("192.168.1.7")
+        );
+        // No shared network: the route decides.
+        assert_eq!(chosen(&[v4("10.8.0.2", 24), v4("192.168.2.7", 24)]), None);
+        assert_eq!(chosen(&[v4("192.168.1.7", 0), v4("fd00::7", 64)]), None);
+
+        let v6_tv: IpAddr = "fd00::50".parse().unwrap();
+        let v6 = [v4("192.168.1.7", 24), v4("fe80::7", 64), v4("fd00::7", 64)];
+        assert_eq!(
+            address_sharing_network(v6.iter().copied(), v6_tv),
+            Some("fd00::7".parse().unwrap())
+        );
+        let link_local: IpAddr = "fe80::50".parse().unwrap();
+        assert_eq!(
+            address_sharing_network(v6.iter().copied(), link_local),
+            None
+        );
     }
 
     #[test]

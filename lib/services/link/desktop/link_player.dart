@@ -383,6 +383,7 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
     bool? shuffle,
   }) async {
     final handler = await _runtime.initialize();
+    // A queue that waits loads without a sound, not started and paused.
     await handler.setQueueAndPlay(
       items,
       initialIndex: index,
@@ -391,8 +392,8 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
           shuffle ??
           (handler.playbackState.value.shuffleMode !=
               AudioServiceShuffleMode.none),
+      startPaused: !playing,
     );
-    if (!playing) await handler.pause();
   }
 
   @override

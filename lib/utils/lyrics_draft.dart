@@ -27,7 +27,6 @@ class LyricsDraftLine {
   /// When the line is sung, or null while it has no time yet.
   final Duration? time;
 
-  /// The words shown in the player.
   final String text;
 
   /// The singer prefix, such as `v2:`, written before the text.
@@ -93,7 +92,7 @@ class LyricsDraft {
     caseSensitive: false,
   );
   static final _supplement = RegExp(
-    r'^\[x-(romaji-words|romaji|translation):(\d+):([^\]]*)\]$',
+    r'^\[x-(romaji-words|romaji|translation-words|translation):(\d+):([^\]]*)\]$',
     caseSensitive: false,
   );
   static final _background = RegExp(r'^\[bg:(.*)\]$', caseSensitive: false);
@@ -346,14 +345,15 @@ class LyricsDraft {
     if (deltaMs == 0) return supplements;
     return [
       for (final (kind, payload) in supplements)
-        kind == 'romaji-words'
-            ? (kind, _shiftRomanizationWords(payload, deltaMs))
+        kind.endsWith('-words')
+            ? (kind, _shiftSupplementWords(payload, deltaMs))
             : (kind, payload),
     ];
   }
 
-  /// Pronunciation word timing is absolute JSON; it moves with its line.
-  static String _shiftRomanizationWords(String payload, int deltaMs) {
+  /// Pronunciation and translation word timing is absolute JSON; it moves
+  /// with its line.
+  static String _shiftSupplementWords(String payload, int deltaMs) {
     try {
       final words = jsonDecode(utf8.decode(base64.decode(payload)));
       if (words is! List) return payload;

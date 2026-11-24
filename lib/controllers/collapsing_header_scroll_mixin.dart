@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Expanded height of the album-style collapsing header, shared with the
 /// loading screens that show the same header before the tracks arrive.

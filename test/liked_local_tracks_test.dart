@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,6 +21,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/fixed_settings.dart';
+import 'support/page_back.dart';
 
 class _Database extends Fake implements LibraryCollectionsDatabase {
   final loved = <String, Map<String, dynamic>>{};
@@ -165,7 +166,7 @@ void main() {
 
         await open();
         expect(find.text('Downloaded song'), findsOneWidget);
-        await tester.pageBack();
+        await pageBack(tester);
         await tester.pumpAndSettle();
         await collections.toggleLoved(local);
         // Reload the persisted JSON so the test also covers reopening after
@@ -176,7 +177,7 @@ void main() {
         expect(find.text('Local song'), findsOneWidget);
         expect(find.text('Downloaded song'), findsOneWidget);
         expect(find.byType(TrackCard), findsNWidgets(2));
-        await tester.pageBack();
+        await pageBack(tester);
         await tester.pumpAndSettle();
         await open();
         expect(find.text('Local song'), findsOneWidget);

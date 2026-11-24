@@ -74,7 +74,6 @@ class CoverCacheManager {
     }
   }
 
-  /// Writes pending cover index changes now.
   static Future<void> flush() => _repository?.flush() ?? Future<void>.value();
 
   static void _flushInBackground() => unawaited(flush());
@@ -114,7 +113,6 @@ class CoverCacheManager {
     return next;
   }
 
-  /// Runs the byte budget sweep with a test budget.
   @visibleForTesting
   static Future<void> trimForTesting({
     required int maxBytes,

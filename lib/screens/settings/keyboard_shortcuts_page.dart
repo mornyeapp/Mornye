@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/settings_provider.dart';
@@ -46,6 +46,13 @@ class KeyboardShortcutsPage extends ConsumerWidget {
     };
 
     final sections = <(String, List<(String, List<SingleActivator>)>)>[
+      (
+        l10n.desktopMenuFile,
+        [
+          (l10n.openAudioFiles, keys(DesktopCommand.openAudioFiles)),
+          (l10n.openAudioFolder, keys(DesktopCommand.openAudioFolder)),
+        ],
+      ),
       (
         l10n.desktopMenuControls,
         [

@@ -248,13 +248,94 @@ class NativeFinalizationPolicyTest {
         assertFalse(NativeFinalizationPolicy.autoConversionAlreadySatisfied(target, "flac", null))
         assertFalse(NativeFinalizationPolicy.autoConversionAlreadySatisfied(target, "aac", null, 16, 44100))
 
-        val highResolution = NativeFinalizationPolicy.flacAutoConversionArguments(target, "in.flac", "out.flac", 24, 96000)
-        assertTrue(highResolution.contains("aresample=resampler=swr:osr=48000:osf=s16"))
-        val lowerRate = NativeFinalizationPolicy.flacAutoConversionArguments(target, "in.flac", "out.flac", 24, 44100)
-        assertTrue(lowerRate.contains("aresample=resampler=swr:osf=s16"))
+        val highResolution = NativeFinalizationPolicy.losslessAutoConversionArguments(target, "in.flac", "out.flac", 24, 96000)
+        assertTrue(highResolution.contains("aresample=resampler=swr:osr=48000:osf=s16:dither_method=triangular:output_sample_bits=16"))
+        val lowerRate = NativeFinalizationPolicy.losslessAutoConversionArguments(target, "in.flac", "out.flac", 24, 44100)
+        assertTrue(lowerRate.contains("aresample=resampler=swr:osf=s16:dither_method=triangular:output_sample_bits=16"))
         assertFalse(lowerRate.any { it.contains("osr=") })
         val original = checkNotNull(NativeFinalizationPolicy.autoConversionTarget(true, "flac", "", 0, 0))
         assertTrue(NativeFinalizationPolicy.autoConversionAlreadySatisfied(original, "flac", null, 24, 96000))
+    }
+
+    @Test
+    fun alacAutomaticConversionUsesLosslessRulesInM4a() {
+        val target = checkNotNull(NativeFinalizationPolicy.autoConversionTarget(true, "ALAC", "256k"))
+        assertEquals("alac", target.codec)
+        assertEquals(".m4a", target.extension)
+        assertEquals(0, target.bitrateKbps)
+        assertEquals(16, target.maxBitDepth)
+        assertEquals(48000, target.maxSampleRate)
+        assertTrue(NativeFinalizationPolicy.autoConversionAlreadySatisfied(target, "alac", null, 16, 44100))
+        assertFalse(NativeFinalizationPolicy.autoConversionAlreadySatisfied(target, "alac", null, 24, 96000))
+        // An AAC or FLAC source is never taken as ALAC.
+        assertFalse(NativeFinalizationPolicy.autoConversionAlreadySatisfied(target, "aac", null, 16, 44100))
+        assertFalse(NativeFinalizationPolicy.autoConversionAlreadySatisfied(target, "flac", null, 16, 44100))
+
+        val reduced = NativeFinalizationPolicy.losslessAutoConversionArguments(
+            target, "in.flac", "out.m4a", 24, 96000,
+        )
+        assertTrue(reduced.contains("aresample=resampler=swr:osr=48000:osf=s16p:dither_method=triangular:output_sample_bits=16"))
+        assertEquals("alac", reduced[reduced.indexOf("-c:a") + 1])
+        assertEquals("s16p", reduced[reduced.indexOf("-sample_fmt") + 1])
+        assertEquals("ipod", reduced[reduced.indexOf("-f") + 1])
+        assertFalse(reduced.contains("-compression_level"))
+        val to24 = NativeFinalizationPolicy.losslessAutoConversionArguments(
+            target.copy(maxBitDepth = 24), "in.wav", "out.m4a", 32, 48000,
+        )
+        assertTrue(to24.contains("aresample=resampler=swr:osf=s32p:dither_method=triangular:output_sample_bits=24"))
+        assertEquals("s32p", to24[to24.indexOf("-sample_fmt") + 1])
+        assertEquals("24", to24[to24.indexOf("-bits_per_raw_sample") + 1])
+        val original = NativeFinalizationPolicy.losslessAutoConversionArguments(
+            target.copy(maxBitDepth = null, maxSampleRate = null), "in.flac", "out.m4a", 24, 96000,
+        )
+        assertFalse(original.contains("-af"))
+        assertFalse(original.contains("-sample_fmt"))
+    }
+
+    @Test
+    fun smartDitherOnlyAppliesToKnownBitDepthReductions() {
+        val target = checkNotNull(NativeFinalizationPolicy.autoConversionTarget(true, "flac", ""))
+        assertTrue(target.smartDither)
+        for (sourceDepth in listOf(16, null)) {
+            val arguments = NativeFinalizationPolicy.losslessAutoConversionArguments(
+                target, "in.flac", "out.flac", sourceDepth, 96000,
+            )
+            assertFalse(arguments.any { it.contains("dither_method=") })
+        }
+        val disabled = NativeFinalizationPolicy.losslessAutoConversionArguments(
+            target.copy(smartDither = false), "in.flac", "out.flac", 24, 96000,
+        )
+        assertFalse(disabled.any { it.contains("dither_method=") })
+        val to24 = NativeFinalizationPolicy.losslessAutoConversionArguments(
+            target.copy(maxBitDepth = 24), "in.wav", "out.flac", 32, 48000,
+        )
+        assertTrue(to24.contains("aresample=resampler=swr:osf=s32:dither_method=triangular:output_sample_bits=24"))
+        val original = NativeFinalizationPolicy.losslessAutoConversionArguments(
+            target.copy(maxBitDepth = null), "in.flac", "out.flac", 24, 96000,
+        )
+        assertFalse(original.any { it.contains("dither_method=") })
+    }
+
+    @Test
+    fun smartDitherHighPassSelectsTpdfHp() {
+        val target = checkNotNull(
+            NativeFinalizationPolicy.autoConversionTarget(
+                true, "flac", "", smartDitherHighPass = true,
+            ),
+        )
+        assertTrue(target.smartDitherHighPass)
+        val reduced = NativeFinalizationPolicy.losslessAutoConversionArguments(
+            target, "in.flac", "out.flac", 24, 48000,
+        )
+        assertTrue(reduced.contains("aresample=resampler=swr:osf=s16:dither_method=triangular_hp:output_sample_bits=16"))
+        val kept = NativeFinalizationPolicy.losslessAutoConversionArguments(
+            target, "in.flac", "out.flac", 16, 48000,
+        )
+        assertFalse(kept.any { it.contains("dither_method=") })
+        val disabled = NativeFinalizationPolicy.losslessAutoConversionArguments(
+            target.copy(smartDither = false), "in.flac", "out.flac", 24, 48000,
+        )
+        assertFalse(disabled.any { it.contains("dither_method=") })
     }
 
     @Test

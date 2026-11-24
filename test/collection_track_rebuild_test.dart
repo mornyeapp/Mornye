@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -18,6 +18,7 @@ import 'package:mornye/widgets/track_list_tile.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
 
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 const _track = Track(
   id: 'example-track',
@@ -256,7 +257,7 @@ void main() {
         expect(actionBuilds, greaterThan(0));
         final context = tester.element(find.byType(HeaderCircleButton).first);
         expect(
-          find.byTooltip(context.l10n.trackOptionRemoveFromLoved),
+          findByTooltip(context.l10n.trackOptionRemoveFromLoved),
           findsWidgets,
         );
         expect(tester.takeException(), isNull);

@@ -38,6 +38,10 @@ struct Line {
     romanization: Option<String>,
     romanization_words: Vec<Word>,
     translation: Option<String>,
+    // Saved AI translation timing is rare; leave it out of the bridge
+    // payload when a line has none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    translation_words: Vec<Word>,
     voice: Option<Voice>,
     is_background: bool,
     vocal_group: Option<i64>,
@@ -86,6 +90,7 @@ impl Line {
             romanization: None,
             romanization_words: vec![],
             translation: None,
+            translation_words: vec![],
         }
     }
 }

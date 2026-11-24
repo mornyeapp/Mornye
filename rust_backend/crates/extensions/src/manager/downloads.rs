@@ -144,24 +144,19 @@ impl ExtensionManager {
         &self,
         entry: &'a Installed,
         lease: Option<&Arc<RequestLease>>,
-    ) -> Result<std::sync::MutexGuard<'a, Engine>, ManagerError> {
-        loop {
-            self.check()?;
-            if let Some(lease) = lease {
-                lease
-                    .check_active()
-                    .map_err(|failure| error(failure.to_string()))?;
-            }
-            match entry.engine.try_lock() {
-                Ok(engine) => return Ok(engine),
-                Err(std::sync::TryLockError::WouldBlock) => {
-                    std::thread::sleep(std::time::Duration::from_millis(5));
+    ) -> Result<EngineGuard<'a>, ManagerError> {
+        entry.engine.wait(
+            || {
+                self.check()?;
+                if let Some(lease) = lease {
+                    lease
+                        .check_active()
+                        .map_err(|failure| error(failure.to_string()))?;
                 }
-                Err(std::sync::TryLockError::Poisoned(_)) => {
-                    return Err(error("extension engine lock poisoned"));
-                }
-            }
-        }
+                Ok(())
+            },
+            lease,
+        )
     }
 
     pub(super) fn invalidate_download_pool(&self, pool: &mut Pool) -> u64 {

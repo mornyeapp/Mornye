@@ -6,11 +6,14 @@
 
 use super::{Failure, Payload, payload, required};
 use crate::catalog::Catalog;
-use crate::types::SubsonicRequest;
+use crate::source::{self, Readable};
+use crate::types::{Shared, SubsonicRequest};
 use mornye_core::lyrics::{file, lrc};
 use regex::Regex;
 use serde_json::{Value, json};
 use std::fs::File;
+use std::io::{Seek, SeekFrom};
+use std::path::Path;
 use std::sync::LazyLock;
 
 /// One or more leading `[mm:ss.xx]` stamps (a line sung more than once).
@@ -27,22 +30,27 @@ static HEADER: LazyLock<Regex> =
 /// A song without lyrics answers an empty `structuredLyrics`; an unknown id
 /// answers error 70.
 pub(super) async fn by_song_id(
+    shared: &Shared,
     catalog: &Catalog,
     request: &SubsonicRequest,
 ) -> Result<Payload, Failure> {
     let id = required(request, "id")?;
     let song = catalog.song(id).ok_or_else(|| Failure::not_found("Song"))?;
     let path = song.path.to_string_lossy().into_owned();
-    let raw = tokio::task::spawn_blocking(move || {
-        file::extract(
-            &path,
-            &|path| File::open(path).map_err(|error| error.to_string()),
-            &|| Ok(()),
-        )
-    })
-    .await
-    .ok()
-    .and_then(Result::ok)
+    let raw = if source::needs_app(&song.path) {
+        lent_lyrics(shared, &song.path, path).await
+    } else {
+        tokio::task::spawn_blocking(move || {
+            file::extract(
+                &path,
+                &|path| File::open(path).map_err(|error| error.to_string()),
+                &|| Ok(()),
+            )
+        })
+        .await
+        .ok()
+        .and_then(Result::ok)
+    }
     .unwrap_or_default();
     let entries = if lrc::has_usable_content(&raw) {
         vec![structured(&song.artist, &song.title, raw)]
@@ -53,6 +61,32 @@ pub(super) async fn by_song_id(
         "lyricsList",
         json!({ "structuredLyrics": entries }),
     ))
+}
+
+/// The lyrics embedded in a file the app lends. A URI has no sidecar beside
+/// it, so only the file itself is read.
+async fn lent_lyrics(shared: &Shared, uri: &Path, path: String) -> Option<String> {
+    let Readable { file, lease, .. } = source::open(shared, uri).await.ok()?;
+    let file = file.into_std().await;
+    tokio::task::spawn_blocking(move || {
+        let _lease = lease;
+        file::extract(
+            &path,
+            &|wanted| {
+                if wanted != path {
+                    return Err("only the song itself is lent".to_owned());
+                }
+                let mut copy = file.try_clone().map_err(|error| error.to_string())?;
+                copy.seek(SeekFrom::Start(0))
+                    .map_err(|error| error.to_string())?;
+                Ok(copy)
+            },
+            &|| Ok(()),
+        )
+    })
+    .await
+    .ok()
+    .and_then(Result::ok)
 }
 
 fn structured(artist: &str, title: &str, raw: String) -> Value {

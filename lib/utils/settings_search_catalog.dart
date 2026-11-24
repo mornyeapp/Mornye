@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/services/spatial_audio.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/exclusive_output_labels.dart';
 
@@ -153,6 +155,18 @@ class SettingsSearchCatalog {
           keywords: const ['backdrop blur', 'performance'],
         ),
         SettingsSearchEntry(
+          icon: Icons.format_size,
+          title: l10n.appearanceInterfaceSize,
+          subtitle: l10n.appearanceInterfaceSizeDescription,
+          keywords: const ['scale', 'zoom', 'ui size', 'density', 'skala'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.play_circle_outline,
+          title: l10n.homeContinueListening,
+          subtitle: l10n.appearanceContinueListeningSubtitle,
+          keywords: const ['home', 'resume', 'last song', 'hide'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.language,
           title: l10n.appearanceLanguage,
           keywords: const ['locale', 'translation'],
@@ -185,6 +199,19 @@ class SettingsSearchCatalog {
             'mp3',
             'kbps',
           ],
+        ),
+        if (!isDesktopPlatform && !isAndroidTv)
+          SettingsSearchEntry(
+            icon: Icons.queue_music,
+            title: l10n.swipeToQueue,
+            subtitle: l10n.swipeToQueueSubtitle,
+            keywords: const ['gesture', 'play next', 'add to queue'],
+          ),
+        SettingsSearchEntry(
+          icon: Icons.play_circle_outline,
+          title: l10n.librarySongTap,
+          subtitle: '${l10n.tooltipPlay}, ${l10n.nowPlayingDetails}',
+          keywords: const ['tap', 'click', 'info', 'metadata', 'song details'],
         ),
         SettingsSearchEntry(
           icon: Icons.library_music_outlined,
@@ -239,6 +266,18 @@ class SettingsSearchCatalog {
           ],
         ),
         SettingsSearchEntry(
+          icon: Icons.image_search_outlined,
+          title: l10n.libraryFindArtwork,
+          subtitle: l10n.libraryFindArtworkSubtitle,
+          keywords: const [
+            'album art',
+            'cover',
+            'artwork',
+            'animated cover',
+            'motion cover',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.cleaning_services_outlined,
           title: l10n.libraryCleanupMissingFiles,
           subtitle: l10n.libraryCleanupMissingFilesSubtitle,
@@ -258,13 +297,32 @@ class SettingsSearchCatalog {
         ),
       ],
       playback = [
-        if (isDesktopPlatform)
-          SettingsSearchEntry(
-            icon: Icons.history_rounded,
-            title: 'Last.fm',
-            subtitle: l10n.lastfmDescription,
-            keywords: const ['lastfm', 'scrobble', 'scrobbling', 'now playing'],
-          ),
+        SettingsSearchEntry(
+          icon: Icons.history_rounded,
+          title: 'Last.fm',
+          subtitle: l10n.lastfmDescription,
+          keywords: const ['lastfm', 'scrobble', 'scrobbling', 'now playing'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.history_rounded,
+          title: 'Libre.fm',
+          subtitle: l10n.scrobbleServiceDescription('Libre.fm'),
+          keywords: const ['librefm', 'libre fm', 'scrobble', 'scrobbling'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.history_rounded,
+          title: 'ListenBrainz',
+          subtitle: l10n.scrobbleServiceDescription('ListenBrainz'),
+          keywords: const [
+            'listenbrainz',
+            'listen brainz',
+            'musicbrainz',
+            'scrobble',
+            'scrobbling',
+            'listens',
+            'token',
+          ],
+        ),
         SettingsSearchEntry(
           icon: Icons.equalizer,
           title: l10n.equalizerTitle,
@@ -280,10 +338,31 @@ class SettingsSearchCatalog {
           ],
         ),
         SettingsSearchEntry(
+          icon: Icons.speed,
+          title: l10n.playbackTempoTitle,
+          subtitle: l10n.playbackTempoDescription,
+          keywords: const [
+            'speed',
+            'tempo',
+            'pitch',
+            'key',
+            'semitone',
+            'faster',
+            'slower',
+            'nightcore',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.playlist_play_rounded,
           title: l10n.autoplayFromLibrary,
           subtitle: l10n.autoplayDescription,
           keywords: const ['autoplay', 'queue', 'recommendation'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.shuffle_rounded,
+          title: l10n.autoplayRandomness,
+          subtitle: l10n.autoplayRandomnessDescription,
+          keywords: const ['random', 'variety', 'repeat', 'recent', 'shuffle'],
         ),
         SettingsSearchEntry(
           icon: Icons.auto_awesome_outlined,
@@ -296,6 +375,18 @@ class SettingsSearchCatalog {
           title: l10n.songAnalysis,
           subtitle: l10n.songAnalysisDescription,
           keywords: const ['sound', 'tempo', 'bpm', 'key', 'recommendation'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.playlist_remove,
+          title: l10n.queueNoDuplicates,
+          subtitle: l10n.queueNoDuplicatesDescription,
+          keywords: const ['duplicate', 'queue', 'twice', 'play next', 'once'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.lock_outline,
+          title: l10n.queueLock,
+          subtitle: l10n.queueLockDescription,
+          keywords: const ['lock', 'queue', 'reorder', 'swipe', 'accidental'],
         ),
         SettingsSearchEntry(
           icon: Icons.insights_outlined,
@@ -332,6 +423,21 @@ class SettingsSearchCatalog {
             'lufs',
             'preamp',
             'album gain',
+          ],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.volume_up_outlined,
+          title: l10n.confirmLoudVolume,
+          subtitle: l10n.confirmLoudVolumeDescription,
+          keywords: const [
+            'volume',
+            'limit',
+            'limiter',
+            'loud',
+            'hearing',
+            'ears',
+            'safe',
+            'warning',
           ],
         ),
         SettingsSearchEntry(
@@ -377,12 +483,23 @@ class SettingsSearchCatalog {
           subtitle: l10n.playbackPauseOnMuteDescription,
           keywords: const ['mute', 'volume', 'pause', 'resume'],
         ),
-        SettingsSearchEntry(
-          icon: Icons.headphones_outlined,
-          title: l10n.playbackOnHeadphonesConnected,
-          subtitle: l10n.playbackOnHeadphonesConnectedDescription,
-          keywords: const ['earphone', 'headphone', 'bluetooth', 'connect'],
-        ),
+        if (!isDesktopPlatform)
+          SettingsSearchEntry(
+            icon: Icons.headphones_outlined,
+            title: l10n.playbackOnHeadphonesConnected,
+            subtitle: l10n.playbackHeadphonesChoices,
+            keywords: const [
+              'earphone',
+              'headphone',
+              'car',
+              'bluetooth',
+              'connect',
+              'reconnect',
+              'disconnect',
+              'resume',
+              'car',
+            ],
+          ),
         SettingsSearchEntry(
           icon: Icons.linear_scale,
           title: l10n.gaplessPlayback,
@@ -405,6 +522,26 @@ class SettingsSearchCatalog {
         ),
         if (androidAudio) ...[
           SettingsSearchEntry(
+            icon: Icons.play_circle_outline,
+            title: l10n.newPlaybackEngine,
+            subtitle: l10n.newPlaybackEngineDescription,
+            keywords: const [
+              'engine',
+              'beta',
+              'crackle',
+              'static',
+              'distortion',
+              'media player',
+            ],
+          ),
+          if (!isAndroidTv)
+            SettingsSearchEntry(
+              icon: Icons.fast_forward_outlined,
+              title: l10n.skipSilence,
+              subtitle: l10n.skipSilenceDescription,
+              keywords: const ['silence', 'quiet', 'gap', 'skip', 'hening'],
+            ),
+          SettingsSearchEntry(
             icon: Icons.usb,
             title: l10n.usbBitPerfect,
             subtitle: l10n.usbBitPerfectDescription,
@@ -418,6 +555,24 @@ class SettingsSearchCatalog {
             targetLabel: l10n.usbBitPerfect,
           ),
         ],
+        // Windows and Linux leave spatial audio to the system; Android TV
+        // output is HDMI or a soundbar.
+        if ((androidAudio ||
+                spatialAudioPlatform != SpatialAudioPlatform.none) &&
+            !isAndroidTv)
+          SettingsSearchEntry(
+            icon: Icons.spatial_audio_outlined,
+            title: l10n.spatialAudio,
+            subtitle: l10n.spatialAudioDescription,
+            keywords: const [
+              'spatial',
+              'surround',
+              'head tracking',
+              'dolby atmos',
+              '3d',
+              'spasial',
+            ],
+          ),
         if (isDesktopPlatform)
           SettingsSearchEntry(
             icon: Icons.speaker_outlined,
@@ -495,6 +650,43 @@ class SettingsSearchCatalog {
           subtitle: l10n.lyricsKeepScreenOnSubtitle,
           keywords: const ['screen timeout', 'awake', 'sleep', 'layar'],
         ),
+        if (!isDesktopPlatform)
+          SettingsSearchEntry(
+            icon: Icons.screen_lock_portrait_outlined,
+            title: l10n.lyricsLockScreen,
+            keywords: const ['lockscreen', 'notification', 'media controls'],
+          ),
+        SettingsSearchEntry(
+          icon: Icons.lyrics_outlined,
+          title: l10n.lyricsPlayerPreview,
+          subtitle: l10n.lyricsPlayerPreviewSubtitle,
+          keywords: const [
+            'lyric preview',
+            'snippet',
+            'now playing',
+            'karaoke',
+          ],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.record_voice_over_outlined,
+          title: l10n.lyricsRomanize,
+          subtitle: l10n.lyricsRomanizeSubtitle,
+          keywords: const [
+            'romanization',
+            'pronunciation',
+            'romaji',
+            'pinyin',
+            'transliteration',
+            'latin',
+            'offline',
+          ],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.swap_vert_rounded,
+          title: l10n.lyricsRomanizedMainLine,
+          subtitle: l10n.lyricsRomanizedMainLineSubtitle,
+          keywords: const ['romanization', 'romaji', 'pinyin', 'main line'],
+        ),
         SettingsSearchEntry(
           icon: Icons.auto_awesome_outlined,
           title: l10n.lyricsAiTranslation,
@@ -522,6 +714,16 @@ class SettingsSearchCatalog {
           icon: Icons.source_outlined,
           title: l10n.lyricsProvidersTitle,
           keywords: const ['lyrics priority', 'lyrics source'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.timer_outlined,
+          title: l10n.lyricsPreferBestTiming,
+          keywords: const [
+            'synced lyrics',
+            'word synced',
+            'karaoke',
+            'plain lyrics',
+          ],
         ),
         SettingsSearchEntry(
           icon: Icons.translate_outlined,
@@ -582,6 +784,8 @@ class SettingsSearchCatalog {
             'm4a',
             'aac',
             'opus',
+            'alac',
+            'apple lossless',
             'bitrate',
           ],
         ),
@@ -666,6 +870,18 @@ class SettingsSearchCatalog {
           keywords: const ['single naming', 'file template'],
         ),
         SettingsSearchEntry(
+          icon: Icons.image_outlined,
+          title: l10n.downloadSaveFolderCover,
+          subtitle: l10n.downloadSaveFolderCoverSubtitle,
+          keywords: const ['folder.jpg', 'cover file', 'album art', 'artwork'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.motion_photos_on_outlined,
+          title: l10n.downloadSaveMotionArtwork,
+          subtitle: l10n.downloadSaveMotionArtworkSubtitle,
+          keywords: const ['cover.mp4', 'motion cover', 'video', 'animation'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.library_music_outlined,
           title: l10n.downloadSeparateSinglesFolder,
           keywords: const ['singles directory'],
@@ -727,6 +943,18 @@ class SettingsSearchCatalog {
           ],
         ),
         SettingsSearchEntry(
+          icon: Icons.folder_delete_outlined,
+          title: l10n.removeEmptyFoldersTitle,
+          subtitle: l10n.removeEmptyFoldersSubtitle,
+          keywords: const [
+            'empty folders',
+            'delete folder',
+            'artist folder',
+            'album folder',
+            'clean up',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.folder_special_outlined,
           title: l10n.allFilesAccess,
           subtitle: l10n.allFilesAccessDescription,
@@ -739,6 +967,12 @@ class SettingsSearchCatalog {
           title: l10n.optionsExtensionStore,
           subtitle: l10n.optionsExtensionStoreSubtitle,
           keywords: const ['repository', 'plugin store'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.update,
+          title: l10n.optionsAutoUpdateExtensions,
+          subtitle: l10n.optionsAutoUpdateExtensionsSubtitle,
+          keywords: const ['extension updates', 'auto update', 'repository'],
         ),
         SettingsSearchEntry(
           icon: Icons.open_in_browser,

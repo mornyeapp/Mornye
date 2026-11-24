@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/link/client/link_client_pairing.dart';
@@ -12,7 +12,6 @@ import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_switch.dart';
 import 'package:mornye/widgets/app_text_field.dart';
 
-/// The message for a pairing failure.
 String linkPairingErrorMessage(AppLocalizations l10n, LinkPairingError error) =>
     switch (error) {
       LinkPairingError.badPin => l10n.linkErrorBadPin,

@@ -172,13 +172,14 @@ class LinkMusicPhonePlayer implements LinkPhonePlayer {
   }) async {
     if (items.isEmpty) return;
     final handler = await _runtime.initialize();
+    // A queue that waits loads without a sound, not started and paused.
     await handler.setQueueAndPlay(
       items,
       initialIndex: index,
       initialPosition: position,
       shuffle: shuffle ?? false,
+      startPaused: !playing,
     );
-    if (!playing) await handler.pause();
   }
 
   @override

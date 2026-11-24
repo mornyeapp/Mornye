@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Hides the desktop scrollbars below it, for panes that read as chrome
 /// (settings, side panels, the sidebar) rather than long lists. Scrolling

@@ -4,7 +4,10 @@ class _AudioInfoCard extends StatelessWidget {
   final AudioAnalysisData data;
   final VoidCallback? onRescan;
 
-  const _AudioInfoCard({required this.data, this.onRescan});
+  /// Opens the null test against another file; null hides the action.
+  final VoidCallback? onCompare;
+
+  const _AudioInfoCard({required this.data, this.onRescan, this.onCompare});
 
   @override
   Widget build(BuildContext context) {
@@ -218,6 +221,39 @@ class _AudioInfoCard extends StatelessWidget {
                     cs: cs,
                   );
                 }).toList(),
+              ),
+            ],
+            if (onCompare != null) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: context.isMornye
+                    ? AppActionButton(
+                        key: const ValueKey('audio-analysis-compare'),
+                        outlined: true,
+                        tonal: true,
+                        onPressed: onCompare,
+                        icon: const Icon(Icons.compare_arrows),
+                        label: Text(context.l10n.audioCompareAction),
+                      )
+                    : ExpressiveButton(
+                        key: const ValueKey('audio-analysis-compare'),
+                        tonal: true,
+                        onPressed: onCompare,
+                        icon: const Icon(Icons.compare_arrows, size: 20),
+                        child: Text(context.l10n.audioCompareAction),
+                      ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                context.l10n.audioCompareActionHint,
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+              ),
+            ] else if (!audioCompareAvailable) ...[
+              const SizedBox(height: 16),
+              Text(
+                context.l10n.audioCompareUnavailable,
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
               ),
             ],
           ],

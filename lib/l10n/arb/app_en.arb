@@ -9,7 +9,12 @@
   "extensionsUnsecuredStorage": "Use unsecured extension storage",
   "extensionsUnsecuredStorageDescription": "Run extensions without a Linux keyring. The key is saved locally, so anyone with access to your app files can read extension credentials. Off uses the system keyring.",
   "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",
-  "extensionsStorageKeyConflict": "The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
+  "extensionsStorageStartOverTitle": "Start over without the key?",
+  "extensionsStorageStartOverMessage": "Or start over now. Your extensions stay installed, but their saved settings and sign-ins are set aside and you set them up again.",
+  "extensionsStorageStartOver": "Start over",
+  "extensionsStorageRecoveredTitle": "Extension sign-ins were reset",
+  "extensionsStorageRecoveredMessage": "This device lost the key that protects extension settings and sign-ins, so they could not be read. Your extensions are still installed. Set them up and sign in again.",
+  "extensionsStorageKeyConflict":"The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
   "extensionsStorageKeyringUnavailable": "The system keyring is unavailable or locked. Start or unlock it before switching to secure storage. Your local key has been preserved.",
   "linkFileActionOn": "{action} on {name}",
   "@linkFileActionOn": {
@@ -58,6 +63,15 @@
   },
   "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
   "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
+  "linkFileChangesUnavailable": "Songs on {name} cannot be changed from this phone.",
+  "@linkFileChangesUnavailable": {
+    "description": "Snackbar when a file action (edit tags, convert, delete) is chosen for songs of a linked device that changes no files for others, such as another phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "linkFileJobProgress": "{finished} of {total} {total, plural, =1{song} other{songs}}",
   "@linkFileJobProgress": {
     "placeholders": {
@@ -125,6 +139,10 @@
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
   },
+  "networkEditSaving": "Saving to network storage",
+  "@networkEditSaving": {
+    "description": "Notification title while an edited song is saved back to network storage with the screen off"
+  },
   "networkUpload": "Upload to network storage",
   "@networkUpload": {
     "description": "Library song action that copies songs stored on this device to a NAS or WebDAV folder; also the title of the folder choice sheet"
@@ -137,9 +155,9 @@
   "@networkUploadHere": {
     "description": "Action in the network folder browser that picks the current folder as the upload destination"
   },
-  "networkUploadDescription": "Songs go into Artist/Album folders here. Files already on the server are never replaced.",
+  "networkUploadDescription": "Songs go into folders here the way Folder Organization arranges your downloads. Files already on the server are never replaced.",
   "@networkUploadDescription": {
-    "description": "Help below the upload destination action describing the folder layout and that existing server files are kept"
+    "description": "Help below the upload destination action describing the folder layout and that existing server files are kept. Folder Organization is the name of the download folder settings section"
   },
   "networkUploadResult": "Uploaded {saved}, already there {skipped}, failed {failed}",
   "@networkUploadResult": {
@@ -153,6 +171,18 @@
   "networkUploadCancelled": "Upload stopped",
   "@networkUploadCancelled": {
     "description": "Snackbar when the listener cancels uploading Library songs to network storage"
+  },
+  "networkUploadContinues": "The upload continues. Network storage shows its progress.",
+  "@networkUploadContinues": {
+    "description": "Snackbar after the upload progress sheet is closed while songs still upload; Network storage is the settings page that lists the upload"
+  },
+  "networkUploadView": "View",
+  "@networkUploadView": {
+    "description": "Snackbar action that opens the progress of the running upload to network storage again"
+  },
+  "networkUploadLast": "Last upload",
+  "@networkUploadLast": {
+    "description": "Title of the Network storage row that shows how the last upload of Library songs ended"
   },
   "networkUploadFailed": "Couldn't upload the songs. Check the server connection and that this account can write to the folder.",
   "@networkUploadFailed": {
@@ -270,6 +300,14 @@
   "@networkDomain": {
     "description": "Optional connection form field shown only for SMB; refers to the authentication domain, not the server's internet domain name"
   },
+  "networkSmbEncrypt": "Encrypt connection (SMB3)",
+  "@networkSmbEncrypt": {
+    "description": "Switch in the SMB connection form that requires SMB3 encryption; preserve the name SMB3"
+  },
+  "networkSmbEncryptDescription": "Turn on when the server requires encryption. The server must support SMB3, and the address must include the shared folder, such as smb://server/Music/.",
+  "@networkSmbEncryptDescription": {
+    "description": "Explains the SMB3 encryption switch: when to use it, that it needs SMB3, and that shared folders cannot be listed so the address needs the share name"
+  },
   "networkConnectSave": "Connect and save",
   "@networkConnectSave": {
     "description": "Connection form action that checks access to the network source before saving the connection"
@@ -307,6 +345,143 @@
   "sectionPlayer": "Player",
   "sectionVolumeAndTransitions": "Volume and transitions",
   "sectionAudioOutput": "Audio output",
+  "newPlaybackEngine": "New playback engine",
+  "@newPlaybackEngine": {
+    "description": "Android Playback setting, marked Beta, that plays music through the app's own audio engine instead of the system media player"
+  },
+  "newPlaybackEngineDescription": "Plays through the app's own engine instead of the phone's media player. Turn it off if songs fail to play or sound wrong. Applies from the next song.",
+  "@newPlaybackEngineDescription": {
+    "description": "Subtitle of the New playback engine switch. 'Crackle' means short clicks or static in the sound"
+  },
+  "skipSilence": "Skip silence",
+  "@skipSilence": {
+    "description": "Android Playback setting that jumps over silent passages in songs"
+  },
+  "skipSilenceDescription": "Jumps over silent parts of songs. While on, songs are decoded at 16-bit.",
+  "skipSilenceNeedsEngine": "Turn on the new playback engine to use this.",
+  "@skipSilenceNeedsEngine": {
+    "description": "Added to the Skip silence subtitle while the New playback engine is off, which disables the switch"
+  },
+  "skipSilenceAutoMix": "Off while AutoMix is on.",
+  "@skipSilenceAutoMix": {
+    "description": "Added to the Skip silence subtitle while AutoMix is on, which suspends silence skipping"
+  },
+  "spatialAudio": "Spatial audio",
+  "@spatialAudio": {
+    "description": "Playback setting (Android, iOS, macOS) that lets the system's own spatial audio process songs"
+  },
+  "spatialAudioDescription": "Lets the system spatialize songs on headphones and speakers that support it. Off plays every song without it.",
+  "spatialAudioNextSong": "With the old playback engine, a change applies from the next song.",
+  "@spatialAudioNextSong": {
+    "description": "Added to the Spatial audio subtitle on Android while the New playback engine is off"
+  },
+  "spatialAudioSystemOff": "Spatial audio is off in system settings.",
+  "@spatialAudioSystemOff": {
+    "description": "Spatial audio status: the setting is on in the app, but the phone's own spatial audio setting is off"
+  },
+  "spatialAudioUnavailable": "Not available on this device or output.",
+  "@spatialAudioUnavailable": {
+    "description": "Spatial audio status: the device or the connected output cannot spatialize"
+  },
+  "spatialAudioStereo": "Stereo music is spatialized.",
+  "spatialAudioStereoHeadTracking": "Stereo music is spatialized, with head tracking available.",
+  "spatialAudioMultichannelOnly": "Only multichannel songs (such as 5.1 or Dolby Atmos) are spatialized on this device.",
+  "@spatialAudioMultichannelOnly": {
+    "description": "Spatial audio status: the device spatializes only songs with more than two channels, not ordinary stereo music"
+  },
+  "spatialAudioDirectUsb": "Not used with direct USB output.",
+  "@spatialAudioDirectUsb": {
+    "description": "Spatial audio status while the hi-res direct USB output plays, which bypasses the system's spatial audio"
+  },
+  "spatialAudioDirectAAudio": "Not used with AAudio exclusive output.",
+  "spatialAudioExclusive": "Not used with exclusive output.",
+  "@spatialAudioExclusive": {
+    "description": "Spatial audio status on macOS while exclusive output (hog mode) is on, which bypasses the system's spatial audio"
+  },
+  "spatialAudioOutputOn": "Spatial audio is on for this output.",
+  "spatialAudioOutputOff": "Not available with this output, or turned off in Control Center.",
+  "@spatialAudioOutputOff": {
+    "description": "Spatial audio status on iOS: the current output has no spatial audio, or the user turned it off in Control Center"
+  },
+  "playbackTempoTitle": "Speed and pitch",
+  "@playbackTempoTitle": {
+    "description": "Now Playing menu item, Playback settings row and sheet title for the playback speed and pitch controls"
+  },
+  "playbackTempoDescription": "Play songs faster or slower, or in another key",
+  "@playbackTempoDescription": {
+    "description": "Subtitle of the Speed and pitch row in Playback settings"
+  },
+  "playbackTempoSpeed": "Speed",
+  "@playbackTempoSpeed": {
+    "description": "Title of the playback speed slider in the Speed and pitch sheet"
+  },
+  "playbackTempoSpeedValue": "{speed}x",
+  "@playbackTempoSpeedValue": {
+    "description": "Playback speed with its unit, such as 1.25x; speed is a number already formatted for the language",
+    "placeholders": {
+      "speed": {
+        "type": "String"
+      }
+    }
+  },
+  "playbackTempoKeepPitch": "Keep pitch",
+  "@playbackTempoKeepPitch": {
+    "description": "Switch in the Speed and pitch sheet: on keeps the key while the speed changes"
+  },
+  "playbackTempoKeepPitchDescription": "Off lets the pitch follow the speed, like a record played faster or slower",
+  "@playbackTempoKeepPitchDescription": {
+    "description": "Subtitle of the Keep pitch switch"
+  },
+  "playbackTempoPitch": "Pitch",
+  "@playbackTempoPitch": {
+    "description": "Title of the pitch shift slider in the Speed and pitch sheet, in semitones"
+  },
+  "playbackTempoSemitones": "{count, plural, =1{{value} semitone} other{{value} semitones}}",
+  "@playbackTempoSemitones": {
+    "description": "Pitch shift shown under the Speed and pitch menu item, such as '+2 semitones'; value is the signed, formatted number and count its size",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "playbackTempoPitchFollows": "Pitch follows speed",
+  "@playbackTempoPitchFollows": {
+    "description": "Shown under the Speed and pitch menu item while Keep pitch is off"
+  },
+  "playbackTempoReset": "Reset",
+  "@playbackTempoReset": {
+    "description": "Button in the Speed and pitch sheet that returns to normal speed, the pitch kept and the original key"
+  },
+  "playbackTempoUnavailable": "The audio doesn't pass through the app on this output, for example while casting or with direct USB output, so speed and pitch can't change.",
+  "@playbackTempoUnavailable": {
+    "description": "Note in the Speed and pitch sheet while every control is disabled because the current output plays the audio outside the app"
+  },
+  "playbackTempoSpeedOnly": "Only the speed can change on this output; the pitch stays as recorded.",
+  "@playbackTempoSpeedOnly": {
+    "description": "Note in the Speed and pitch sheet while Keep pitch and the pitch slider are disabled because the current output cannot shift pitch"
+  },
+  "sectionPlaybackQueue": "Queue",
+  "@sectionPlaybackQueue": {
+    "description": "Playback settings section for how the play queue behaves"
+  },
+  "queueNoDuplicates": "No duplicates in queue",
+  "@queueNoDuplicates": {
+    "description": "Playback setting: adding a song already coming up in the queue moves it instead of adding a second copy"
+  },
+  "queueNoDuplicatesDescription": "Adding a song that is already coming up moves it instead of queueing it twice. The playing song and songs already played stay where they are.",
+  "queueLock": "Lock queue",
+  "@queueLock": {
+    "description": "Playback setting and queue header toggle tooltip that stops reordering and swiping songs out of the play queue"
+  },
+  "queueUnlock": "Unlock queue",
+  "@queueUnlock": {
+    "description": "Tooltip of the queue header toggle while the queue is locked"
+  },
+  "queueLockDescription": "Stops songs in the queue from being dragged or swiped away. Adding songs still works. The queue has the same switch.",
   "usbBitPerfect": "Hi-res and bit-perfect audio",
   "usbBitPerfectDescription": "Preserve source precision on compatible outputs. Choose direct USB or AAudio exclusive below; otherwise Android USB output requires Android 14 or later. Applies from the next track, without AutoMix or normalization. System volume may not control direct USB.",
   "usbHardwareVolume": "DAC hardware volume",
@@ -335,11 +510,15 @@
   "exclusiveOutputDeviceFirst": "First sound card",
   "exclusiveOutputNoDevices": "No ALSA playback devices found",
   "usbDirect": "Direct USB driver",
-  "usbDirectDescription": "Use exclusive USB audio for FLAC/WAV, DSF/DFF and WavPack DSD, with Android USB permission. Native DSD requires a recognized compatible DAC. Other PCM formats use normal playback. Applies from the next track.",
+  "usbDirectDescription": "Use exclusive USB audio with Android USB permission. FLAC, WAV, ALAC, DSF/DFF and WavPack DSD stay bit-perfect; AAC, MP3, Opus and Vorbis are decoded by the phone and sent directly. Native DSD requires a recognized compatible DAC. Applies from the next track.",
   "usbDsdOverPcm": "DSD over PCM (DoP)",
   "usbDsdOverPcmDescription": "Enable only if your DAC explicitly supports DoP. Sends DSF/DFF and WavPack DSD inside a PCM carrier when native DSD is unavailable. An incompatible device may play noise; leave off for ordinary USB headsets.",
-  "usbDsdUnsupported": "This DSD format or connected DAC is not supported. Playback stopped.",
+  "usbMaxSampleRate": "Highest sample rate",
+  "usbMaxSampleRateDescription": "Songs above this rate are converted down to it. Set it when a DAC stays silent on high-resolution songs. Applies from the next track.",
+  "usbMaxSampleRateAuto": "Automatic",
+  "usbDsdUnsupported":"This DSD format or connected DAC is not supported. Playback stopped.",
   "usbPermissionDenied": "USB permission was not granted. Using normal playback.",
+  "usbPermissionDeclined": "USB access was declined. Turn the Direct USB driver off and on, or plug the DAC in again, to be asked again. Using normal playback.",
   "usbBitPerfectPending": "Waiting for the next track and a compatible USB output.",
   "usbOutputReady": "USB output is ready. Start playback to activate it.",
   "usbOutputPreparing": "Preparing USB audio output...",
@@ -347,6 +526,36 @@
   "usbBitPerfectNoDevice": "No USB DAC connected. Using normal audio output.",
   "usbBitPerfectFallback": "This device or audio format does not support bit-perfect output. Using normal playback.",
   "usbBitPerfectRouteChanged": "The USB audio route changed. Playback paused; select a track to reconnect.",
+  "usbFormatUnsupported": "This song's format ({format}) cannot be sent directly to the DAC yet. Using normal playback.",
+  "@usbFormatUnsupported": {
+    "description": "Format is a codec with an optional bit depth, such as ALAC 24-bit",
+    "placeholders": {"format": {"type": "String"}}
+  },
+  "usbFormatUnsupportedGeneric": "This song's format cannot be sent directly to the DAC yet. Using normal playback.",
+  "usbDecoderUnavailable": "This phone has no {codec} decoder for direct DAC output. Using normal playback.",
+  "@usbDecoderUnavailable": {"placeholders": {"codec": {"type": "String"}}},
+  "usbChannelsUnsupported": "This song has {channels} channels. Direct DAC output plays mono and stereo only. Using normal playback.",
+  "@usbChannelsUnsupported": {"placeholders": {"channels": {"type": "int"}}},
+  "usbDacFormatRejected": "The DAC refused {format}. Using normal playback.",
+  "@usbDacFormatRejected": {
+    "description": "Format is a bit depth and sample rate, such as 32-bit 384 kHz",
+    "placeholders": {"format": {"type": "String"}}
+  },
+  "usbDacFormatRejectedGeneric": "The DAC refused this song's format. Using normal playback.",
+  "usbFormatMono": "mono {format}",
+  "@usbFormatMono": {"placeholders": {"format": {"type": "String"}}},
+  "usbDacUnsupported": "This DAC does not work with the direct USB driver yet. Using normal playback.",
+  "usbDacOpenFailed": "Could not open the DAC. Another app may be using it. Using normal playback.",
+  "usbPrepareTimeout": "The song took too long to start on the DAC. Using normal playback.",
+  "usbDecodeFailed": "This song stopped decoding during direct playback. Playback paused; select a track to continue.",
+  "usbAndroidVersion": "Bit-perfect USB output needs Android 14 or later. Try the direct USB driver. Using normal playback.",
+  "usbOutputLossySource": "{codec}, lossy source",
+  "@usbOutputLossySource": {"placeholders": {"codec": {"type": "String"}}},
+  "usbOutputResampled": "{rate}, resampled to {output}",
+  "@usbOutputResampled": {
+    "description": "USB output status: the DAC refused the song's sample rate, so the song is converted. Both values are rates such as 96.0 kHz",
+    "placeholders": {"rate": {"type": "String"}, "output": {"type": "String"}}
+  },
   "upgradeIntroContinue": "Continue",
   "cacheMotionArtwork": "Offline motion covers",
   "cacheMotionArtworkDesc": "Album videos saved with downloads. Removing them keeps your music files and static covers.",
@@ -426,6 +635,14 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
+  "homeNothingYetTitle": "Nothing here yet",
+  "@homeNothingYetTitle": {
+    "description": "Title on the Mornye Home when the Library is empty and nothing was played"
+  },
+  "homeNothingYetMessage": "Songs you add to your Library or play show up here.",
+  "@homeNothingYetMessage": {
+    "description": "Message under homeNothingYetTitle"
+  },
   "homeRecent": "Recent",
   "@homeRecent": {
     "description": "Section header for recent searches"
@@ -488,6 +705,14 @@
   "@libraryFoldersLoadFailed": {
     "description": "Shown when the Folders view fails to load"
   },
+  "libraryGenres": "Genres",
+  "@libraryGenres": {
+    "description": "Library view that groups downloaded and scanned songs by their genre tag"
+  },
+  "libraryGenresEmpty": "Genres appear here once your downloaded or scanned songs have a genre tag.",
+  "@libraryGenresEmpty": {
+    "description": "Shown in the Genres view when no Library song has a genre"
+  },
   "settingsTitle": "Settings",
   "@settingsTitle": {
     "description": "Settings screen title"
@@ -527,6 +752,30 @@
   "downloadSingleFilenameFormatDescription": "Filename pattern for singles and EPs. Uses the same tags as the album format.",
   "@downloadSingleFilenameFormatDescription": {
     "description": "Subtitle description for single filename format setting"
+  },
+  "downloadSaveFolderCover": "Save Album Covers",
+  "@downloadSaveFolderCover": {
+    "description": "Files setting that saves an album's cover image into the album's download folder"
+  },
+  "downloadSaveFolderCoverSubtitle": "Adds the album's cover to its folder as folder.jpg, for albums that have their own folder",
+  "@downloadSaveFolderCoverSubtitle": {
+    "description": "Subtitle of the Save Album Covers switch. Keep 'folder.jpg' as is: it is a file name"
+  },
+  "downloadFolderCoverSize": "Album Cover File Size",
+  "@downloadFolderCoverSize": {
+    "description": "Files setting for the pixel size of the album cover saved as folder.jpg"
+  },
+  "downloadFolderCoverSizeDescription": "Downscale the cover before saving it as folder.jpg. Images already within the limit are kept unchanged.",
+  "@downloadFolderCoverSizeDescription": {
+    "description": "Description of the Album Cover File Size picker. Keep 'folder.jpg' as is: it is a file name"
+  },
+  "downloadSaveMotionArtwork": "Save Animated Covers",
+  "@downloadSaveMotionArtwork": {
+    "description": "Files setting that copies an album's animated cover video into the album's download folder"
+  },
+  "downloadSaveMotionArtworkSubtitle": "Adds the album's animated cover to its folder as cover.mp4, for albums that have their own folder",
+  "@downloadSaveMotionArtworkSubtitle": {
+    "description": "Subtitle of the Save Animated Covers switch. Keep 'cover.mp4' as is: it is a file name"
   },
   "downloadFolderOrganization": "Folder Organization",
   "@downloadFolderOrganization": {
@@ -781,6 +1030,24 @@
   "@optionsExtensionStoreSubtitle": {
     "description": "Subtitle for extension repo toggle"
   },
+  "optionsAutoUpdateExtensions": "Update extensions automatically",
+  "@optionsAutoUpdateExtensions": {
+    "description": "App settings switch that installs extension updates from the extension repository in the background"
+  },
+  "optionsAutoUpdateExtensionsSubtitle": "Installs updates for enabled extensions in the background when no download is running.",
+  "@optionsAutoUpdateExtensionsSubtitle": {
+    "description": "Subtitle of the Update extensions automatically switch. Disabled extensions are not updated, and updates wait until downloads finish"
+  },
+  "extensionsAutoUpdatedCount": "{count, plural, =1{Updated 1 extension} other{Updated {count} extensions}}",
+  "@extensionsAutoUpdatedCount": {
+    "description": "Short notice shown after extensions were updated automatically in the background",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Number of extensions that were updated"
+      }
+    }
+  },
   "optionsCheckUpdates": "Check for Updates",
   "@optionsCheckUpdates": {
     "description": "Auto update check toggle"
@@ -878,9 +1145,9 @@
   "@aboutMobileDeveloper": {
     "description": "Role description for mobile dev"
   },
-  "aboutLogoArtist": "The talented artist who created our beautiful app logo!",
-  "@aboutLogoArtist": {
-    "description": "Role description for logo artist"
+  "aboutAppManager": "App manager and moderator",
+  "@aboutAppManager": {
+    "description": "Role description for the contributor who manages the app's community and moderates it"
   },
   "aboutTranslators": "Translators",
   "@aboutTranslators": {
@@ -1163,7 +1430,7 @@
   "@setupNearbyEnable": {
     "description": "Setup step title and button for the Android Nearby devices permission; Nearby devices is the Android permission name"
   },
-  "setupNearbyDescription": "Mornye Link uses it to find your computer on the same network, and network storage needs it to reach a server at home.",
+  "setupNearbyDescription": "Mornye Link uses it to find your other devices on the same network, and network storage needs it to reach a server at home.",
   "@setupNearbyDescription": {
     "description": "Setup step explaining why Android's Nearby devices permission is needed"
   },
@@ -1174,50 +1441,6 @@
   "permissionNearbyDevices": "Nearby devices",
   "@permissionNearbyDevices": {
     "description": "Nearby devices permission type label; use Android's name for this permission"
-  },
-  "whatsNewLinkNearbyAllow": "Allow nearby devices",
-  "@whatsNewLinkNearbyAllow": {
-    "description": "Main button on the Nearby devices page of the What's New tour that asks for Android's Nearby devices permission"
-  },
-  "whatsNewLinkNearbyGranted": "Nearby devices allowed",
-  "@whatsNewLinkNearbyGranted": {
-    "description": "Shown on the Nearby devices page of the What's New tour after the Nearby devices permission is granted"
-  },
-  "whatsNewNearbyTitle": "Nearby devices",
-  "@whatsNewNearbyTitle": {
-    "description": "Title of the What's New page that asks for Android's Nearby devices permission; use Android's name for this permission"
-  },
-  "whatsNewNearbyDesc": "Android now asks before an app can reach other devices on your network. Mornye needs this for:",
-  "@whatsNewNearbyDesc": {
-    "description": "Description on the Nearby devices page of the What's New tour, followed by a list of uses"
-  },
-  "whatsNewNearbyLinkTitle": "Finding your computer",
-  "@whatsNewNearbyLinkTitle": {
-    "description": "Use of the Nearby devices permission: Mornye Link finds the computer"
-  },
-  "whatsNewNearbyLinkBody": "Mornye Link looks for your computer on the same Wi-Fi and stays connected to it.",
-  "@whatsNewNearbyLinkBody": {
-    "description": "Explains how Mornye Link uses the Nearby devices permission"
-  },
-  "whatsNewNearbyStorageTitle": "Network storage",
-  "@whatsNewNearbyStorageTitle": {
-    "description": "Use of the Nearby devices permission: SMB and WebDAV servers at home"
-  },
-  "whatsNewNearbyStorageBody": "Play music from a NAS or a server at home over SMB or WebDAV.",
-  "@whatsNewNearbyStorageBody": {
-    "description": "Explains how network storage uses the Nearby devices permission"
-  },
-  "whatsNewNearbyPrivateTitle": "Only your own devices",
-  "@whatsNewNearbyPrivateTitle": {
-    "description": "Reassurance on the Nearby devices page of the What's New tour"
-  },
-  "whatsNewNearbyPrivateBody": "Mornye uses it only to reach devices on your network, never to find where you are.",
-  "@whatsNewNearbyPrivateBody": {
-    "description": "Explains that the Nearby devices permission is not used for location"
-  },
-  "whatsNewNearbyRefused": "Not allowed. Mornye Link and network storage stay off until you allow Nearby devices for Mornye in Android settings.",
-  "@whatsNewNearbyRefused": {
-    "description": "Shown on the Nearby devices page of the What's New tour after the permission is refused"
   },
   "setupNext": "Next",
   "@setupNext": {
@@ -2035,6 +2258,42 @@
   },
   "lyricsKeepScreenOn": "Keep screen on while viewing lyrics",
   "lyricsKeepScreenOnSubtitle": "Prevent screen timeout while lyrics are open, including when playback is paused.",
+  "lyricsLockScreen": "Lyrics on lock screen",
+  "@lyricsLockScreen": {
+    "description": "Lyrics setting that shows the line being sung in place of the song title in the system media controls"
+  },
+  "lyricsLockScreenSubtitle": "Show the line being sung in place of the song title while the phone is locked. Cars and watches show it too.",
+  "@lyricsLockScreenSubtitle": {
+    "description": "Subtitle of the Lyrics on lock screen switch on Android"
+  },
+  "lyricsLockScreenSubtitleIos": "Show the line being sung in place of the song title while Mornye is in the background. Cars and watches show it too.",
+  "@lyricsLockScreenSubtitleIos": {
+    "description": "Subtitle of the Lyrics on lock screen switch on iOS, where it also shows in Control Center. Keep 'Mornye' as is: it is the app name"
+  },
+  "lyricsPlayerPreview": "Lyric line in player",
+  "@lyricsPlayerPreview": {
+    "description": "Lyrics setting that shows the synced line being sung under the song title on the Now Playing screen"
+  },
+  "lyricsPlayerPreviewSubtitle": "Show the line being sung under the song title. Tap it to open the full lyrics.",
+  "@lyricsPlayerPreviewSubtitle": {
+    "description": "Subtitle of the Lyric line in player switch"
+  },
+  "lyricsRomanize": "Romanize lyrics",
+  "@lyricsRomanize": {
+    "description": "Lyrics setting that shows lyrics written in other alphabets in Latin letters, worked out offline on the device"
+  },
+  "lyricsRomanizeSubtitle": "Show how Korean, Cyrillic, Hindi, Punjabi, Chinese and Japanese kana lyrics are sung, worked out on this device. AI translation can romanize the rest.",
+  "@lyricsRomanizeSubtitle": {
+    "description": "Subtitle of the Romanize lyrics switch. Japanese kanji are not covered offline, hence 'kana'"
+  },
+  "lyricsRomanizedMainLine": "Romanization as main line",
+  "@lyricsRomanizedMainLine": {
+    "description": "Lyrics setting that shows the romanized text as the lyric line itself"
+  },
+  "lyricsRomanizedMainLineSubtitle": "Show the romanized text in place of each line, with the original under it.",
+  "@lyricsRomanizedMainLineSubtitle": {
+    "description": "Subtitle of the Romanization as main line switch"
+  },
   "lyricsMode": "Lyrics Mode",
   "@lyricsMode": {
     "description": "Setting - how to save lyrics"
@@ -2148,6 +2407,14 @@
   "trackFileInfo": "File Info",
   "@trackFileInfo": {
     "description": "Tab title - file information"
+  },
+  "trackSectionRelease": "Release",
+  "@trackSectionRelease": {
+    "description": "Section title on the track details page: facts about the release the song belongs to (label, copyright, ISRC, barcode)"
+  },
+  "trackSectionAudio": "Audio",
+  "@trackSectionAudio": {
+    "description": "Section title on the track details page: facts about the sound (duration, quality, tempo, ReplayGain)"
   },
   "trackLyrics": "Lyrics",
   "@trackLyrics": {
@@ -2392,7 +2659,50 @@
   },
   "storeChangeRepoTooltip": "Change repository",
   "@storeChangeRepoTooltip": {
-    "description": "Tooltip for the change-repository icon button in the app bar"
+    "description": "Extension store page - title of the sheet that picks which repository an extension installs or updates from"
+  },
+  "storeRepositoriesTitle": "Repositories",
+  "@storeRepositoriesTitle": {
+    "description": "Title of the page that lists the extension repositories, and tooltip of the store header button that opens it"
+  },
+  "storeRemoveRepoTooltip": "Remove repository",
+  "@storeRemoveRepoTooltip": {
+    "description": "Tooltip of the remove button on a repository row, and title of its confirmation dialog"
+  },
+  "storeRemoveRepoMessage": "{name} and its extensions leave the store. Installed extensions stay installed and get updates from another repository that lists them.",
+  "@storeRemoveRepoMessage": {
+    "description": "Confirmation message before removing an extension repository",
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "storeRepoAlreadyAdded": "This repository is already added",
+  "@storeRepoAlreadyAdded": {
+    "description": "Error when adding a repository that is already in the list"
+  },
+  "storeExtensionRepository": "Repository",
+  "@storeExtensionRepository": {
+    "description": "Extension store page - row label naming the repository the extension installs and updates from"
+  },
+  "storeSourceMissing": "This extension is no longer in its repository, so it gets no updates. Change the repository to one that lists it.",
+  "@storeSourceMissing": {
+    "description": "Extension store page notice when the repository the extension is pinned to no longer lists it, and another repository does"
+  },
+  "storeSourceMissingNoOther": "This extension is no longer in its repository, so it gets no updates.",
+  "@storeSourceMissingNoOther": {
+    "description": "Extension store page notice when the repository the extension is pinned to no longer lists it, and no other repository does"
+  },
+  "storeSourceMissingShort": "Not in its repository",
+  "@storeSourceMissingShort": {
+    "description": "Short label on a store row whose pinned repository no longer lists the extension"
+  },
+  "storeRepositoryChanged": "{name} now updates from {repository}",
+  "@storeRepositoryChanged": {
+    "description": "Snackbar after moving an installed extension to another repository",
+    "placeholders": {
+      "name": {"type": "String"},
+      "repository": {"type": "String"}
+    }
   },
   "storeRepoDialogTitle": "Extension Repository",
   "@storeRepoDialogTitle": {
@@ -2648,6 +2958,10 @@
   "downloadAutoConvertAllFormatsSubtitle": "Convert completed downloads or limit FLAC bit depth and sample rate. The original is replaced only after conversion succeeds.",
   "downloadAutoConvertOutputSubtitle": "Choose the output format for newly completed downloads.",
   "downloadAutoConvertFlacSubtitle": "Lossless FLAC with quality limits. Lower bit depths and sample rates are preserved.",
+  "downloadAutoConvertAlacSubtitle": "Lossless Apple audio in an M4A file, with the same quality limits as FLAC.",
+  "@downloadAutoConvertAlacSubtitle": {
+    "description": "ALAC (Apple Lossless in M4A) automatic conversion option description"
+  },
   "downloadAutoConvertMaxBitDepth": "Maximum bit depth",
   "downloadAutoConvertMaxSampleRate": "Maximum sample rate",
   "downloadAutoConvertFlacLimitsSubtitle": "These are upper limits. For example, a 44.1 kHz source stays at 44.1 kHz when 48 kHz is selected. Lossy sources are kept in their original format.",
@@ -2750,6 +3064,42 @@
   "appearanceForceBlurSubtitle": "Enable the navigation bar blur even on devices where it is off by default. May cost performance.",
   "@appearanceForceBlurSubtitle": {
     "description": "Subtitle for the force-blur toggle"
+  },
+  "appearanceContinueListeningSubtitle": "Show the last song on Home",
+  "@appearanceContinueListeningSubtitle": {
+    "description": "Subtitle of the switch that shows or hides Home's Continue listening card"
+  },
+  "appearanceInterfaceSize": "Interface size",
+  "@appearanceInterfaceSize": {
+    "description": "Title of the slider that scales the whole app"
+  },
+  "appearanceInterfaceSizeDescription": "Makes everything in the app smaller or larger. Smaller sizes also make buttons smaller to tap.",
+  "@appearanceInterfaceSizeDescription": {
+    "description": "Explanation under the Interface size slider"
+  },
+  "appearanceInterfaceSizeSmaller": "Smaller",
+  "@appearanceInterfaceSizeSmaller": {
+    "description": "Label at the small end of the Interface size slider"
+  },
+  "appearanceInterfaceSizeLarger": "Larger",
+  "@appearanceInterfaceSizeLarger": {
+    "description": "Label at the large end of the Interface size slider"
+  },
+  "appearanceAnimationSpeed": "Animation speed",
+  "@appearanceAnimationSpeed": {
+    "description": "Title of the slider that makes the app's animations play slower or faster"
+  },
+  "appearanceAnimationSpeedDescription": "How fast pages, sheets and controls move. Lyrics keep time with the song.",
+  "@appearanceAnimationSpeedDescription": {
+    "description": "Explanation under the Animation speed slider"
+  },
+  "appearanceAnimationSpeedSlower": "Slower",
+  "@appearanceAnimationSpeedSlower": {
+    "description": "Label at the slow end of the Animation speed slider"
+  },
+  "appearanceAnimationSpeedFaster": "Faster",
+  "@appearanceAnimationSpeedFaster": {
+    "description": "Label at the fast end of the Animation speed slider"
   },
   "queueClearAll": "Clear All",
   "@queueClearAll": {
@@ -3028,7 +3378,7 @@
       }
     }
   },
-  "discographySkippedDownloaded": "{added} added, {skipped} already downloaded",
+  "discographySkippedDownloaded": "{added} added, {skipped} already downloaded or queued",
   "@discographySkippedDownloaded": {
     "description": "Snackbar - with skipped tracks count",
     "placeholders": {
@@ -3395,6 +3745,89 @@
   "@libraryReEnrichAllBusy": {
     "description": "Snackbar when Re-enrich All is started during a Library scan"
   },
+  "libraryFindArtwork": "Find Missing Artwork",
+  "@libraryFindArtwork": {
+    "description": "Library settings action - look up covers online for albums without one, kept in the app"
+  },
+  "libraryFindArtworkSubtitle": "Look up covers for albums without one. Your music files stay unchanged.",
+  "@libraryFindArtworkSubtitle": {
+    "description": "Subtitle for the Find Missing Artwork action"
+  },
+  "libraryFindArtworkCovers": "Missing Covers",
+  "@libraryFindArtworkCovers": {
+    "description": "Find Missing Artwork option - only covers for albums that have none"
+  },
+  "libraryFindArtworkCoversSubtitle": "Albums whose songs have no cover",
+  "@libraryFindArtworkCoversSubtitle": {
+    "description": "Subtitle for the Missing Covers option"
+  },
+  "libraryFindArtworkMotion": "Missing Covers and Animated Covers",
+  "@libraryFindArtworkMotion": {
+    "description": "Find Missing Artwork option - covers for albums without one plus animated covers for every album"
+  },
+  "libraryFindArtworkMotionSubtitle": "Checks every album, so it takes longer",
+  "@libraryFindArtworkMotionSubtitle": {
+    "description": "Subtitle for the option that also looks up animated covers"
+  },
+  "libraryFindArtworkRunning": "Finding artwork...",
+  "@libraryFindArtworkRunning": {
+    "description": "Title of the progress row while artwork is looked up"
+  },
+  "libraryFindArtworkProgress": "{done} of {total} albums",
+  "@libraryFindArtworkProgress": {
+    "description": "Progress of the artwork lookup",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryFindArtworkStopping": "Stopping...",
+  "@libraryFindArtworkStopping": {
+    "description": "Progress row text after the artwork lookup was stopped, while the last albums finish"
+  },
+  "libraryFindArtworkNoProvider": "Enable a metadata extension to look up artwork.",
+  "@libraryFindArtworkNoProvider": {
+    "description": "Snackbar when no enabled extension can look up albums"
+  },
+  "libraryFindArtworkNothing": "Every album already has its artwork.",
+  "@libraryFindArtworkNothing": {
+    "description": "Snackbar when no album needs a cover or animated cover"
+  },
+  "libraryFindArtworkResult": "{covers, plural, =0{No new covers} =1{Found 1 cover} other{Found {covers} covers}}{motion, plural, =0{} =1{ · 1 animated cover} other{ · {motion} animated covers}}{failed, plural, =0{} =1{ · 1 album not checked} other{ · {failed} albums not checked}}",
+  "@libraryFindArtworkResult": {
+    "description": "Snackbar after Find Missing Artwork: covers found, animated covers found, then albums no extension could be asked about",
+    "placeholders": {
+      "covers": {
+        "type": "int"
+      },
+      "motion": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "albumFindArtwork": "Find Artwork",
+  "@albumFindArtwork": {
+    "description": "Local album menu action - look up this album's cover and animated cover online"
+  },
+  "albumFindArtworkNotFound": "No matching album found",
+  "@albumFindArtworkNotFound": {
+    "description": "Snackbar when Find Artwork finds no provider album that matches"
+  },
+  "albumRemoveFoundArtwork": "Remove Found Artwork",
+  "@albumRemoveFoundArtwork": {
+    "description": "Local album menu action - remove a cover and animated cover found online, for a wrong match"
+  },
+  "albumRemoveFoundArtworkDone": "Removed. Find Missing Artwork leaves this album alone now.",
+  "@albumRemoveFoundArtworkDone": {
+    "description": "Snackbar after removing found artwork from an album"
+  },
   "libraryFilterDownloaded": "Downloaded",
   "@libraryFilterDownloaded": {
     "description": "Filter chip - show only downloaded items"
@@ -3490,6 +3923,14 @@
   "libraryFilterSortAlbumDesc": "Album (Z-A)",
   "@libraryFilterSortAlbumDesc": {
     "description": "Sort option - album descending"
+  },
+  "libraryFilterSortYearAsc": "Year (Oldest first)",
+  "@libraryFilterSortYearAsc": {
+    "description": "Library sort option - release year ascending"
+  },
+  "libraryFilterSortYearDesc": "Year (Newest first)",
+  "@libraryFilterSortYearDesc": {
+    "description": "Library sort option - release year descending"
   },
   "libraryFilterSortGenreAsc": "Genre (A-Z)",
   "@libraryFilterSortGenreAsc": {
@@ -3620,73 +4061,6 @@
   "tutorialReadyMessage": "You're ready. Select your extensions, then search or paste a supported link.",
   "@tutorialReadyMessage": {
     "description": "Tutorial completion message"
-  },
-  "whatsNewIntroTitle": "Mornye {version} is here",
-  "@whatsNewIntroTitle": {
-    "description": "First page of the tour shown once after updating; version is like 5.3",
-    "placeholders": {
-      "version": {"type": "String"}
-    }
-  },
-  "whatsNewIntroDesc": "Our biggest update yet. Here's a quick look at what's new.",
-  "whatsNewLinkTitle": "Mornye Link",
-  "whatsNewLinkDesc": "Pair your phone and computer on the same network. Mornye Link is in beta.",
-  "whatsNewLinkPlayTitle": "Play across devices",
-  "whatsNewLinkPlayBody": "Browse your computer's library on your phone, control what it plays, and hand playback over without losing your place.",
-  "whatsNewLinkTransferTitle": "Move songs both ways",
-  "whatsNewLinkTransferBody": "Send songs to your computer or save them to your phone, right from the song menu.",
-  "whatsNewLinkSyncTitle": "Stay in sync",
-  "whatsNewLinkSyncBody": "Collections and listening history stay the same on paired devices.",
-  "whatsNewHomeTitle": "A Home that learns",
-  "whatsNewHomeDesc": "Mixes and autoplay now follow how you actually listen.",
-  "whatsNewHomeMixesTitle": "Mixes from your Library",
-  "whatsNewHomeMixesBody": "New mixes built from your own songs, including a mix for each genre.",
-  "whatsNewHomeAutoplayTitle": "Smarter autoplay",
-  "whatsNewHomeAutoplayBody": "Autoplay follows your listening session and learns from your favorites, playlists and replays.",
-  "whatsNewHomeAnalysisTitle": "Song analysis",
-  "whatsNewHomeAnalysisBody": "Mornye can analyze how your songs sound for closer picks. It stays off until you turn it on in Settings.",
-  "whatsNewPlayerTitle": "Player and lyrics",
-  "whatsNewPlayerDesc": "Smoother playback, and lyrics in any language.",
-  "whatsNewPlayerGaplessTitle": "Gapless playback",
-  "whatsNewPlayerGaplessBody": "Albums flow from one song into the next without a pause.",
-  "whatsNewPlayerTranslateTitle": "Translate lyrics",
-  "whatsNewPlayerTranslateBody": "Translate or romanize lyrics with an AI provider you set up.",
-  "whatsNewPlayerTimingTitle": "Lyrics timing",
-  "whatsNewPlayerTimingBody": "Move synced lyrics earlier or later when they drift from the song.",
-  "whatsNewPlayerAutoTitle": "Android Auto",
-  "whatsNewPlayerAutoBody": "Browse and play your Library from your car's screen.",
-  "whatsNewPlayerExclusiveTitle": "Exclusive output",
-  "whatsNewPlayerExclusiveBody": "Send audio straight to your output device without the system mixer.",
-  "whatsNewLibraryTitle": "Library and search",
-  "whatsNewLibraryDesc": "New ways to find and organize your music.",
-  "whatsNewLibraryFoldersTitle": "Browse by folder",
-  "whatsNewLibraryFoldersBody": "Explore your Library the way it's stored on disk.",
-  "whatsNewLibrarySuggestionsTitle": "Suggested songs",
-  "whatsNewLibrarySuggestionsBody": "Albums, singles and playlists now suggest songs that fit.",
-  "whatsNewLibraryRecognizeTitle": "Recognize music",
-  "whatsNewLibraryRecognizeBody": "Tap the microphone in Search to find out what's playing nearby.",
-  "whatsNewLibraryPlaylistsTitle": "Better playlists",
-  "whatsNewLibraryPlaylistsBody": "Reorder songs, create a playlist from a folder, or import playlist files.",
-  "whatsNewFasterTitle": "Faster everywhere",
-  "whatsNewFasterDesc": "Quicker and lighter, especially with large libraries.",
-  "whatsNewFasterLibraryTitle": "A quicker Library",
-  "whatsNewFasterLibraryBody": "Tabs and albums open faster, and scrolling stays smooth.",
-  "whatsNewFasterNetworkTitle": "Faster network music",
-  "whatsNewFasterNetworkBody": "Network shares scan many times faster, and Subsonic servers sync with far fewer requests.",
-  "whatsNewFasterQueueTitle": "Long queues that last",
-  "whatsNewFasterQueueBody": "Large queues save quickly and come back after a restart.",
-  "whatsNewFasterBackgroundTitle": "Lighter in the background",
-  "whatsNewFasterBackgroundBody": "The app starts faster and does less work while music plays.",
-  "whatsNewDone": "Start listening",
-  "@whatsNewDone": {
-    "description": "Button on the last page of the What's New tour"
-  },
-  "whatsNewAboutTitle": "What's new in {version}",
-  "@whatsNewAboutTitle": {
-    "description": "About page row that reopens the What's New tour; version is like 5.3",
-    "placeholders": {
-      "version": {"type": "String"}
-    }
   },
   "libraryForceFullScan": "Force Full Scan",
   "@libraryForceFullScan": {
@@ -3819,6 +4193,36 @@
   "playbackNormalizationPreampHint": "Lower values play quieter. Normalization only turns tracks down, so it never clips.",
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
+  },
+  "confirmLoudVolume": "Confirm loud volume",
+  "@confirmLoudVolume": {
+    "description": "Switch title: the app's volume bar asks before going above a chosen level"
+  },
+  "confirmLoudVolumeDescription": "Ask before the volume bar goes above the level you choose. Volume buttons are not affected.",
+  "@confirmLoudVolumeDescription": {
+    "description": "Subtitle of the Confirm loud volume switch; hardware volume buttons are never limited"
+  },
+  "confirmLoudVolumeLevel": "Ask above",
+  "@confirmLoudVolumeLevel": {
+    "description": "Label over the choice of volume level (60, 70, 80 or 90 percent) above which the volume bar asks first"
+  },
+  "confirmLoudVolumeTitle": "Turn the volume up?",
+  "@confirmLoudVolumeTitle": {
+    "description": "Title of the dialog shown when the volume bar is moved above the chosen level"
+  },
+  "confirmLoudVolumeMessage": "Volume above {level} may hurt your hearing. Do you want to continue?",
+  "@confirmLoudVolumeMessage": {
+    "description": "Message of the loud volume dialog",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "80%"
+      }
+    }
+  },
+  "confirmLoudVolumeContinue": "Continue",
+  "@confirmLoudVolumeContinue": {
+    "description": "Dialog action that lets the volume go above the chosen level"
   },
   "cacheAudioAnalysis": "Audio analysis cache",
   "@cacheAudioAnalysis": {
@@ -4055,6 +4459,113 @@
   "trackReEnrichApplyChanges": "Apply changes",
   "@trackReEnrichApplyChanges": {
     "description": "Confirmation button in the batch metadata review sheet"
+  },
+  "trackReEnrichReviewSelected": "{selected} of {total} changes selected",
+  "@trackReEnrichReviewSelected": {
+    "description": "Summary above the changes of one song in the re-enrich review, where each change has its own switch",
+    "placeholders": {
+      "selected": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "trackReEnrichAlreadyMatches": "This result matches the song's current metadata, so there is nothing to change.",
+  "@trackReEnrichAlreadyMatches": {
+    "description": "Shown instead of an empty review when the picked re-enrich result would change nothing"
+  },
+  "trackReEnrichSmallerCover": "Smaller than the current cover",
+  "@trackReEnrichSmallerCover": {
+    "description": "Note under a proposed cover in the re-enrich review; the change starts switched off"
+  },
+  "trackReEnrichHasLyrics": "Has lyrics",
+  "@trackReEnrichHasLyrics": {
+    "description": "Current value of the lyrics row in the re-enrich review when the song already has lyrics"
+  },
+  "trackReEnrichUndo": "Undo re-enrich",
+  "@trackReEnrichUndo": {
+    "description": "Song metadata menu action that restores the metadata the song had before its last re-enrich"
+  },
+  "trackReEnrichUndoAction": "Undo",
+  "@trackReEnrichUndoAction": {
+    "description": "Action in the re-enrich result for one song that restores its previous metadata"
+  },
+  "trackReEnrichUndoAll": "Undo all",
+  "@trackReEnrichUndoAll": {
+    "description": "Action in the result of a re-enrich of several songs that restores the previous metadata of every song it changed"
+  },
+  "trackReEnrichUndoConfirmTitle": "Undo re-enrich?",
+  "@trackReEnrichUndoConfirmTitle": {
+    "description": "Title of the confirmation before restoring a song's metadata from before its last re-enrich"
+  },
+  "trackReEnrichUndoConfirmMessage": "The tags, cover and lyrics the last re-enrich changed go back to what the song had before. Edits made to them since are replaced.",
+  "@trackReEnrichUndoConfirmMessage": {
+    "description": "Message of the confirmation before undoing a re-enrich"
+  },
+  "trackReEnrichUndoProgress": "Restoring previous metadata...",
+  "@trackReEnrichUndoProgress": {
+    "description": "Progress title while undoing a re-enrich of several songs"
+  },
+  "trackReEnrichUndoDone": "Previous metadata restored",
+  "@trackReEnrichUndoDone": {
+    "description": "Result after undoing the re-enrich of one song"
+  },
+  "trackReEnrichUndoAllDone": "Restored {count} of {total} songs",
+  "@trackReEnrichUndoAllDone": {
+    "description": "Result after undoing the re-enrich of several songs",
+    "placeholders": {
+      "count": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "trackReEnrichUndoCoverKept": "The cover re-enrich added stays, because a cover cannot be removed from a song that had none.",
+  "@trackReEnrichUndoCoverKept": {
+    "description": "Added to the undo result when re-enrich gave a song its first cover, which undo cannot remove"
+  },
+  "reEnrichBestMatches": "Best matches",
+  "@reEnrichBestMatches": {
+    "description": "Header above the online results that fit the song, in the re-enrich result picker"
+  },
+  "reEnrichOtherResults": "Other results",
+  "@reEnrichOtherResults": {
+    "description": "Header above online results that do not fit the song well, in the re-enrich result picker"
+  },
+  "reEnrichNoCloseMatch": "No close match",
+  "@reEnrichNoCloseMatch": {
+    "description": "Header in the re-enrich result picker when no online result fits the song well"
+  },
+  "reEnrichShowOtherResults": "Show {count, plural, =1{1 more result} other{{count} more results}}",
+  "@reEnrichShowOtherResults": {
+    "description": "Row that unfolds the online results that do not fit the song well",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "reEnrichMatchExact": "Same ISRC",
+  "@reEnrichMatchExact": {
+    "description": "Shown on an online result whose ISRC equals the song's"
+  },
+  "reEnrichMatchStrong": "Same title, artist and album",
+  "@reEnrichMatchStrong": {
+    "description": "Shown on an online result whose title, artist and album fit the song"
+  },
+  "reEnrichMatchWeak": "Same title and artist",
+  "@reEnrichMatchWeak": {
+    "description": "Shown on an online result whose title and artist fit the song, but not the album"
+  },
+  "reEnrichChooseMatch": "Choose a result",
+  "@reEnrichChooseMatch": {
+    "description": "Row in the re-enrich review for a song no online result fitted well enough to apply on its own"
+  },
+  "reEnrichChooseMatchSubtitle": "No result fitted well enough to apply on its own",
+  "@reEnrichChooseMatchSubtitle": {
+    "description": "Subtitle of the Choose a result row in the re-enrich review"
+  },
+  "reEnrichChangeMatch": "Change result",
+  "@reEnrichChangeMatch": {
+    "description": "Row in the re-enrich review that picks another online result for a song"
+  },
+  "reEnrichNoResults": "No results found online for this song",
+  "@reEnrichNoResults": {
+    "description": "Message when a re-enrich search finds nothing for one song"
   },
   "trackReEnrichRefreshOnline": "Refresh from online",
   "@trackReEnrichRefreshOnline": {
@@ -4634,6 +5145,18 @@
   "lyricsProvidersTitle": "Lyrics Provider Priority",
   "@lyricsProvidersTitle": {
     "description": "Settings item title for lyrics provider order"
+  },
+  "lyricsPreferBestTiming": "Best timing first",
+  "@lyricsPreferBestTiming": {
+    "description": "Lyrics settings switch: choose lyrics by timing quality across providers instead of by provider order alone"
+  },
+  "lyricsPreferBestTimingEnabled": "Word-synced lyrics beat synced lyrics, and synced beat plain text, from any enabled provider. May ask more providers per song.",
+  "@lyricsPreferBestTimingEnabled": {
+    "description": "Subtitle of the best timing first switch when on"
+  },
+  "lyricsPreferBestTimingDisabled": "Provider order only: the first provider with lyrics is used.",
+  "@lyricsPreferBestTimingDisabled": {
+    "description": "Subtitle of the best timing first switch when off"
   },
   "lyricsProvidersDescription": "Enable, disable and reorder lyrics sources. Providers are tried top-to-bottom until lyrics are found.",
   "@lyricsProvidersDescription": {
@@ -5605,17 +6128,9 @@
   "@hiResCheckTitle": {
     "description": "Title of the fake Hi-Res check card"
   },
-  "hiResCheckSummary": "Inspect the spectrum and active bit depth for signs of upsampling or padding.",
-  "@hiResCheckSummary": {
-    "description": "Introductory text for the sampled Hi-Res analysis"
-  },
   "hiResCheckLimitedBandwidth": "Limited bandwidth",
   "@hiResCheckLimitedBandwidth": {
     "description": "Neutral finding: a limited spectrum alone does not prove upsampling"
-  },
-  "hiResCheckNoEvidence": "No upsampling or padding detected",
-  "@hiResCheckNoEvidence": {
-    "description": "No evidence was detected; this does not certify the master"
   },
   "hiResCheckEstimatedCutoff": "Estimated cutoff",
   "@hiResCheckEstimatedCutoff": {
@@ -5628,15 +6143,6 @@
   "hiResCheckBandwidthExplanation": "A lower cutoff can come from mastering. It does not, by itself, prove upsampling.",
   "@hiResCheckBandwidthExplanation": {
     "description": "Explains why the limited-bandwidth finding is neutral"
-  },
-  "hiResCheckSampledExplanation": "Based on {seconds} seconds of audio. This analysis cannot certify the original master.",
-  "@hiResCheckSampledExplanation": {
-    "description": "Limits of the sampled Hi-Res analysis; seconds is a formatted duration",
-    "placeholders": {
-      "seconds": {
-        "type": "String"
-      }
-    }
   },
   "hiResCheckImagingEvidence": "The spectrum contains mirrored bands consistent with upsampling.",
   "@hiResCheckImagingEvidence": {
@@ -5664,17 +6170,9 @@
   "@hiResCheckRun": {
     "description": "Button that starts the Hi-Res authenticity check"
   },
-  "hiResCheckChecking": "Checking Hi-Res authenticity...",
-  "@hiResCheckChecking": {
-    "description": "Loading text while the Hi-Res check runs"
-  },
   "hiResCheckVerdictFake": "Likely fake Hi-Res",
   "@hiResCheckVerdictFake": {
     "description": "Verdict: the file claims Hi-Res but does not measure as it"
-  },
-  "hiResCheckVerdictStandard": "Standard definition, nothing to flag",
-  "@hiResCheckVerdictStandard": {
-    "description": "Verdict: neither sample rate nor bit depth claims Hi-Res"
   },
   "hiResCheckVerdictInconclusive": "Inconclusive: the analyzed segment is too quiet or short",
   "@hiResCheckVerdictInconclusive": {
@@ -5701,6 +6199,367 @@
         "type": "int"
       },
       "effective": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportSummary": "Reads the whole file and checks its integrity, real bit depth, frequency range and traces of lossy compression.",
+  "@hiResReportSummary": {
+    "description": "What the Hi-Res authenticity inspection does, shown before it runs"
+  },
+  "hiResReportChecking": "Reading the whole file. Long tracks take a little longer.",
+  "@hiResReportChecking": {
+    "description": "Loading text while the whole-file inspection runs"
+  },
+  "hiResReportGradeCorrupt": "Damaged file",
+  "@hiResReportGradeCorrupt": {
+    "description": "Inspection outcome: the audio fails its checksum or cannot be decoded in full"
+  },
+  "hiResReportGradeCorruptBody": "The audio in this file is not what was written when it was made. Get a fresh copy.",
+  "@hiResReportGradeCorruptBody": {
+    "description": "Explains the damaged-file outcome"
+  },
+  "hiResReportGradeLossy": "Made from a lossy file",
+  "@hiResReportGradeLossy": {
+    "description": "Inspection outcome: a lossless file whose audio went through a lossy codec"
+  },
+  "hiResReportGradeLossyBody": "The audio carries the frame pattern of {codec} compression. It was lossy before it was saved as lossless, and that detail does not come back.",
+  "@hiResReportGradeLossyBody": {
+    "description": "Explains the lossy-source outcome; codec is a format name such as AAC",
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportGradeUpscaledBody": "The file claims more resolution than its audio has.",
+  "@hiResReportGradeUpscaledBody": {
+    "description": "Explains the fake Hi-Res outcome"
+  },
+  "hiResReportGradeSuspect": "Signs of a lower-quality source",
+  "@hiResReportGradeSuspect": {
+    "description": "Inspection outcome: evidence of a lossy or lower-resolution source that falls short of proof"
+  },
+  "hiResReportGradeSuspectBody": "Some of the evidence points to a lossy or lower-resolution source. It is not enough to be sure.",
+  "@hiResReportGradeSuspectBody": {
+    "description": "Explains the suspect outcome"
+  },
+  "hiResReportGradeClean": "No problems found",
+  "@hiResReportGradeClean": {
+    "description": "Inspection outcome: nothing was flagged"
+  },
+  "hiResReportGradeCleanBody": "Nothing in the audio points to damage, upscaling or lossy compression.",
+  "@hiResReportGradeCleanBody": {
+    "description": "Explains the clean outcome"
+  },
+  "hiResReportIntegrity": "Integrity",
+  "@hiResReportIntegrity": {
+    "description": "Report section: whether the file's audio is intact"
+  },
+  "hiResReportIntegrityVerified": "The audio matches the checksum stored in the file.",
+  "@hiResReportIntegrityVerified": {
+    "description": "Integrity finding: checksum verified"
+  },
+  "hiResReportIntegrityUnverified": "The file stores no checksum to compare. All of it decoded without errors.",
+  "@hiResReportIntegrityUnverified": {
+    "description": "Integrity finding: no checksum available, decoding succeeded"
+  },
+  "hiResReportIntegrityMismatch": "The decoded audio does not match the checksum stored in the file.",
+  "@hiResReportIntegrityMismatch": {
+    "description": "Integrity finding: checksum mismatch"
+  },
+  "hiResReportIntegrityLength": "The file holds {decoded} of the {declared} it declares.",
+  "@hiResReportIntegrityLength": {
+    "description": "Integrity finding: the audio is shorter or longer than declared; both are formatted durations",
+    "placeholders": {
+      "decoded": {
+        "type": "String"
+      },
+      "declared": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportIntegrityDecodeError": "Decoding stopped at {position}. The file is cut short or damaged.",
+  "@hiResReportIntegrityDecodeError": {
+    "description": "Integrity finding: a decode error; position is a formatted time",
+    "placeholders": {
+      "position": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportChecksum": "Checksum (MD5)",
+  "@hiResReportChecksum": {
+    "description": "Label of the audio checksum row"
+  },
+  "hiResReportBitDepth": "Bit depth",
+  "@hiResReportBitDepth": {
+    "description": "Report section: the real resolution of the samples"
+  },
+  "hiResReportBitDepthFull": "All {bits} bits carry audio.",
+  "@hiResReportBitDepthFull": {
+    "description": "Bit depth finding: the declared depth is real",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportBitDepthCoarse": "Every bit is in use, but quiet samples are spaced like {bits}-bit audio. The file was probably scaled up from a lower resolution.",
+  "@hiResReportBitDepthCoarse": {
+    "description": "Bit depth finding: the samples lie further apart than the declared depth allows; bits is a formatted number",
+    "placeholders": {
+      "bits": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportBitDepthNear16": "The samples sit on a 16-bit grid with low-level noise on top: a 16-bit source stored as {declared}-bit.",
+  "@hiResReportBitDepthNear16": {
+    "description": "Bit depth finding: 16-bit audio with dither in a wider word",
+    "placeholders": {
+      "declared": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportBitDepthFloat": "Floating-point audio has no fixed bit depth to check.",
+  "@hiResReportBitDepthFloat": {
+    "description": "Bit depth finding for floating-point files"
+  },
+  "hiResReportBitDepthUnmeasured": "Too few quiet samples to measure the real resolution.",
+  "@hiResReportBitDepthUnmeasured": {
+    "description": "Bit depth finding when the resolution could not be measured"
+  },
+  "hiResReportMeasuredResolution": "Measured resolution",
+  "@hiResReportMeasuredResolution": {
+    "description": "Label of the measured bit resolution row"
+  },
+  "hiResReportBitsValue": "{bits} bits",
+  "@hiResReportBitsValue": {
+    "description": "A bit count; bits is a formatted number",
+    "placeholders": {
+      "bits": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportFrequency": "Frequency range",
+  "@hiResReportFrequency": {
+    "description": "Report section: how far up the audio reaches"
+  },
+  "hiResReportLowpass": "Low-pass",
+  "@hiResReportLowpass": {
+    "description": "Label of the low-pass filter row"
+  },
+  "hiResReportLowpassValue": "{frequency}, {drop} dB drop",
+  "@hiResReportLowpassValue": {
+    "description": "Where the spectrum is cut and by how much",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      },
+      "drop": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassNone": "No sharp cut stands out in the spectrum.",
+  "@hiResReportLowpassNone": {
+    "description": "Frequency finding: no low-pass filter"
+  },
+  "hiResReportLowpassFormat": "Cut at {frequency}, just below the limit of this sample rate: the format's own filter.",
+  "@hiResReportLowpassFormat": {
+    "description": "Frequency finding: the normal anti-alias filter",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassSourceRate": "Cut at {frequency}, where a 44.1 or 48 kHz recording ends. The higher sample rate holds no music above it.",
+  "@hiResReportLowpassSourceRate": {
+    "description": "Frequency finding: a Hi-Res file with the bandwidth of a lower sample rate",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassHigh": "Cut at {frequency}. A mastering filter does this, and so do MP3 at 320 kbps and Opus.",
+  "@hiResReportLowpassHigh": {
+    "description": "Frequency finding: a cut that is not evidence by itself",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassMedium": "Cut at {frequency}, where lossy encoders near 192 kbps cut. A full-quality master rarely stops this low.",
+  "@hiResReportLowpassMedium": {
+    "description": "Frequency finding: a cut typical of mid-bitrate lossy encoders",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassLow": "Cut at {frequency}, where lossy encoders near 128 kbps cut.",
+  "@hiResReportLowpassLow": {
+    "description": "Frequency finding: a cut typical of low-bitrate lossy encoders",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLossy": "Lossy compression",
+  "@hiResReportLossy": {
+    "description": "Report section: traces of a lossy codec in the audio"
+  },
+  "hiResReportLossyFound": "Found the frame pattern of {codec}: one block every {samples} samples, in step through the whole file. Audio that was never compressed does not have it.",
+  "@hiResReportLossyFound": {
+    "description": "Lossy finding: a codec frame grid was detected; codec is a format name",
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      },
+      "samples": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportLossySuspectedPattern": "A faint MP3 frame pattern showed, too weak to be sure.",
+  "@hiResReportLossySuspectedPattern": {
+    "description": "Lossy finding: weak evidence of an MP3 frame grid"
+  },
+  "hiResReportLossySuspectedLowpass": "No frame pattern was found, but the low-pass above is where a lossy encoder would cut.",
+  "@hiResReportLossySuspectedLowpass": {
+    "description": "Lossy finding: only the low-pass points to a lossy source"
+  },
+  "hiResReportLossyNotFound": "No frame pattern of AAC, Vorbis or MP3 was found. Opus leaves none, and resampling after decoding erases the others, so this does not rule out a lossy source.",
+  "@hiResReportLossyNotFound": {
+    "description": "Lossy finding: nothing detected, with the limits of the test"
+  },
+  "hiResReportLossyHighRate": "Not checked. Above 48 kHz a lossy source would have been resampled, which hides its frame pattern.",
+  "@hiResReportLossyHighRate": {
+    "description": "Lossy finding: the test does not apply to high sample rates"
+  },
+  "hiResReportLossyTooShort": "Not checked: too little audio to measure.",
+  "@hiResReportLossyTooShort": {
+    "description": "Lossy finding: the file is too short or too quiet for the test"
+  },
+  "hiResReportPatternStrength": "Pattern strength",
+  "@hiResReportPatternStrength": {
+    "description": "Label of the codec frame pattern score row"
+  },
+  "hiResReportPatternStrengthValue": "{score} (found from {threshold})",
+  "@hiResReportPatternStrengthValue": {
+    "description": "The frame pattern score next to the score that counts as found",
+    "placeholders": {
+      "score": {
+        "type": "String"
+      },
+      "threshold": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportSpectrum": "Average spectrum",
+  "@hiResReportSpectrum": {
+    "description": "Caption of the spectrum chart"
+  },
+  "hiResReportSpectrumSemantics": "Average spectrum, content up to {frequency}",
+  "@hiResReportSpectrumSemantics": {
+    "description": "Screen reader description of the spectrum chart",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportWholeFile": "Read all {duration} of the audio. No analysis can certify the original master.",
+  "@hiResReportWholeFile": {
+    "description": "Scope and limits of the inspection; duration is a formatted time",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportShare": "Share report",
+  "@hiResReportShare": {
+    "description": "Button that shares the Hi-Res authenticity report as text"
+  },
+  "hiResBatchAction": "Authenticity",
+  "@hiResBatchAction": {
+    "description": "Menu action that runs the Hi-Res authenticity check on an album or on several selected songs. Keep it to one or two short words: it shares a row with actions such as Play next"
+  },
+  "hiResBatchProgress": "Reading song {current} of {total}",
+  "@hiResBatchProgress": {
+    "description": "Progress of the authenticity check of several songs",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchWaiting": "Waiting",
+  "@hiResBatchWaiting": {
+    "description": "Status of a song the authenticity check has not reached yet"
+  },
+  "hiResBatchReading": "Reading the whole file",
+  "@hiResBatchReading": {
+    "description": "Status of the song the authenticity check is reading now"
+  },
+  "hiResBatchSummary": "{flagged, plural, =0{No problems found in {total, plural, =1{1 song} other{{total} songs}}.} =1{1 of {total} songs needs a look.} other{{flagged} of {total} songs need a look.}}",
+  "@hiResBatchSummary": {
+    "description": "Result of the authenticity check of several songs: how many showed a warning or a problem",
+    "placeholders": {
+      "flagged": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchFailed": "{count, plural, =1{1 song could not be read.} other{{count} songs could not be read.}}",
+  "@hiResBatchFailed": {
+    "description": "How many songs the authenticity check could not read",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchSkipped": "{count, plural, =1{1 song in another format was left out.} other{{count} songs in other formats were left out.}} Only FLAC and WAV can be checked.",
+  "@hiResBatchSkipped": {
+    "description": "How many songs were not checked because of their format",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchMixedFormats": "The songs do not share one format: {formats}. An album from one master usually does.",
+  "@hiResBatchMixedFormats": {
+    "description": "Note that the checked songs differ in bit depth or sample rate; formats is a list such as 24-bit/96kHz (8), 16-bit/44.1kHz (4)",
+    "placeholders": {
+      "formats": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResBatchSpectrumSemantics": "Average spectrum of {count} songs, one line for each",
+  "@hiResBatchSpectrumSemantics": {
+    "description": "Screen reader description of the chart that draws the spectra of several checked songs together",
+    "placeholders": {
+      "count": {
         "type": "int"
       }
     }
@@ -7086,6 +7945,18 @@
   "@nowPlayingSleepTimerCancelled": {
     "description": "Confirmation after cancelling the playback sleep timer"
   },
+  "nowPlayingSleepTimerEndOfSong": "End of song",
+  "@nowPlayingSleepTimerEndOfSong": {
+    "description": "Sleep timer choice that pauses playback when the current song ends"
+  },
+  "nowPlayingSleepTimerEndOfSongActive": "Ends after this song",
+  "@nowPlayingSleepTimerEndOfSongActive": {
+    "description": "Active end-of-song sleep timer shown in the player menu"
+  },
+  "nowPlayingSleepTimerEndOfSongSet": "Playback pauses when this song ends",
+  "@nowPlayingSleepTimerEndOfSongSet": {
+    "description": "Confirmation after choosing the end-of-song sleep timer"
+  },
   "nowPlayingOpenInExternalPlayer": "Open in external player",
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"
@@ -7143,9 +8014,65 @@
   "@nowPlayingTranslateOtherLanguage": {
     "description": "Player lyrics menu action that opens a sheet to translate the current lyrics into a language other than the one in settings"
   },
+  "nowPlayingTranslateInto": "Translate Into…",
+  "@nowPlayingTranslateInto": {
+    "description": "Player lyrics menu action that opens a sheet to pick a translation language, shown instead of 'Other Language…' when the lyrics are already in, or already translated into, the language from settings"
+  },
   "nowPlayingCancelTranslation": "Cancel Translation",
   "@nowPlayingCancelTranslation": {
     "description": "Player lyrics menu action that stops an AI lyrics translation in progress"
+  },
+  "nowPlayingSaveTranslation": "Save Translation to File",
+  "@nowPlayingSaveTranslation": {
+    "description": "Player lyrics menu action that writes the shown lyrics translation into the song's audio file, next to its original lyrics, so it stays with the file"
+  },
+  "nowPlayingTranslationSaved": "Translation saved to the song's file",
+  "@nowPlayingTranslationSaved": {
+    "description": "Snackbar after the shown lyrics translation was written into the song's audio file"
+  },
+  "nowPlayingTranslationSavedMlrc": "Translation saved to a .mlrc file",
+  "@nowPlayingTranslationSavedMlrc": {
+    "description": "Snackbar after the shown lyrics translation was written into a .mlrc lyrics file next to the song. Keep '.mlrc' as is: it is a file extension"
+  },
+  "lyricsAiSectionFiles": "Files",
+  "@lyricsAiSectionFiles": {
+    "description": "AI Translation settings section about saving translations with the songs"
+  },
+  "lyricsAiSaveTo": "Save To",
+  "@lyricsAiSaveTo": {
+    "description": "AI Translation setting that picks where a saved lyrics translation is written"
+  },
+  "lyricsAiSaveToSongFile": "Song File",
+  "@lyricsAiSaveToSongFile": {
+    "description": "Choice that saves lyrics translations inside the song's own audio file"
+  },
+  "lyricsAiSaveToSongFileDescription": "Inside the song's lyrics. Lyrics in TTML or without timing go to a .mlrc file, because other apps would show the added lines.",
+  "@lyricsAiSaveToSongFileDescription": {
+    "description": "Description of the Song File choice. Keep '.mlrc' as is: it is a file extension"
+  },
+  "lyricsAiSaveToMlrc": ".mlrc File",
+  "@lyricsAiSaveToMlrc": {
+    "description": "Choice that saves lyrics translations in a separate .mlrc file next to the song. Keep '.mlrc' as is: it is a file extension"
+  },
+  "lyricsAiSaveToMlrcDescription": "A separate file next to the song with its lyrics, translation and pronunciation. The song file stays as it is.",
+  "@lyricsAiSaveToMlrcDescription": {
+    "description": "Description of the .mlrc File choice"
+  },
+  "lyricsAiAutoSave": "Save Automatically",
+  "@lyricsAiAutoSave": {
+    "description": "AI Translation switch that saves every lyrics translation to the song once it is shown"
+  },
+  "lyricsAiAutoSaveSubtitle": "Saves each translation once it's shown, so it stays with the song",
+  "@lyricsAiAutoSaveSubtitle": {
+    "description": "Subtitle of the automatic save switch for lyrics translations"
+  },
+  "lyricsAiTranslateDownloads": "Translate Downloads",
+  "@lyricsAiTranslateDownloads": {
+    "description": "AI Translation switch that translates the lyrics of every downloaded song and saves them with it"
+  },
+  "lyricsAiTranslateDownloadsSubtitle": "Translates each downloaded song's lyrics and saves them with it, so they show offline. Every download uses your API key",
+  "@lyricsAiTranslateDownloadsSubtitle": {
+    "description": "Subtitle of the switch that translates the lyrics of downloaded songs"
   },
   "nowPlayingTranslatingLyrics": "Translating lyrics, {percent}%",
   "@nowPlayingTranslatingLyrics": {
@@ -7302,6 +8229,51 @@
   "@lyricsAiTargetLanguage": {
     "description": "AI translation setting for the target language"
   },
+  "artistSavedCopyNotice": "You're offline. This is the artist page as you last saw it.",
+  "@artistSavedCopyNotice": {
+    "description": "Note on an artist page shown from its saved copy"
+  },
+  "libraryArtistPage": "Artist Page",
+  "@libraryArtistPage": {
+    "description": "Button on a Library artist's albums that opens the full artist page"
+  },
+  "albumSortSongs": "Sort Songs",
+  "@albumSortSongs": {
+    "description": "Tooltip of the album header button that orders the album's songs"
+  },
+  "albumSortAlbumOrder": "Album Order",
+  "@albumSortAlbumOrder": {
+    "description": "Album song order: disc and track number"
+  },
+  "albumSortMostPlayed": "Most Played",
+  "@albumSortMostPlayed": {
+    "description": "Album song order: most listened songs first"
+  },
+  "albumSortCustom": "Custom Order",
+  "@albumSortCustom": {
+    "description": "Album song order chosen by dragging songs"
+  },
+  "lyricsAiSecondLanguage": "Second Language",
+  "@lyricsAiSecondLanguage": {
+    "description": "AI translation setting: the language for songs already in the target language"
+  },
+  "lyricsAiSecondLanguageSubtitle": "For songs already in your first language",
+  "@lyricsAiSecondLanguageSubtitle": {
+    "description": "Explains the second translation language"
+  },
+  "lyricsAiSecondLanguageOff": "None",
+  "@lyricsAiSecondLanguageOff": {
+    "description": "Second translation language choice that leaves such songs untranslated"
+  },
+  "lyricsTranslateSongDefault": "Default ({language})",
+  "@lyricsTranslateSongDefault": {
+    "description": "Language sheet row that clears this song's own language and follows the settings",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
   "lyricsAiTargetLanguageApp": "App language ({language})",
   "@lyricsAiTargetLanguageApp": {
     "description": "Target language choice that follows the app language",
@@ -7343,7 +8315,7 @@
   "@lyricsAiRomanize": {
     "description": "AI translation switch that also asks for romanized lyrics"
   },
-  "lyricsAiRomanizeSubtitle": "Shows how lyrics in other alphabets are sung, such as romaji for Japanese or pinyin for Chinese",
+  "lyricsAiRomanizeSubtitle": "Also romanizes the lines this device can't, such as Japanese kanji, Thai or Arabic",
   "@lyricsAiRomanizeSubtitle": {
     "description": "Subtitle of the AI romanization switch"
   },
@@ -7476,6 +8448,71 @@
   "linkPlayingOn": "Playing on {name}",
   "@linkPlayingOn": {
     "description": "Mornye Link: shown in the player while the paired desktop plays in the phone's place",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPlayTogether": "Play together",
+  "@linkPlayTogether": {
+    "description": "Mornye Link Devices sheet: plays the same queue on this phone and the paired desktop at the same time"
+  },
+  "linkPlayTogetherSubtitle": "This phone and {name}",
+  "@linkPlayTogetherSubtitle": {
+    "description": "Mornye Link Devices sheet: under Play together, the two devices that play",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPlayTogetherSubtitle": "This computer and {name}",
+  "@linkDesktopPlayTogetherSubtitle": {
+    "description": "Mornye Link desktop Devices sheet: under Play together, the computer and the phone that play at the same time",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPlayTogetherTiming": "Phone timing",
+  "@linkPlayTogetherTiming": {
+    "description": "Mornye Link Devices sheet: slider that plays this phone earlier or later than the desktop while playing together"
+  },
+  "linkPlayTogetherTimingValue": "{value} ms",
+  "@linkPlayTogetherTimingValue": {
+    "description": "Mornye Link Devices sheet: the phone timing in milliseconds, signed",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPlayTogetherEarlier": "Earlier",
+  "@linkPlayTogetherEarlier": {
+    "description": "Mornye Link Devices sheet: start label of the phone timing slider"
+  },
+  "linkPlayTogetherLater": "Later",
+  "@linkPlayTogetherLater": {
+    "description": "Mornye Link Devices sheet: end label of the phone timing slider"
+  },
+  "linkPlayTogetherTimingHint": "Move it earlier if this phone sounds late, as with Bluetooth",
+  "@linkPlayTogetherTimingHint": {
+    "description": "Mornye Link Devices sheet: help under the phone timing slider"
+  },
+  "linkPlayTogetherFailed": "Could not play together with {name}",
+  "@linkPlayTogetherFailed": {
+    "description": "Mornye Link: Play together could not start",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPlayTogetherNeedsUpdate": "Update Mornye on {name} to play together",
+  "@linkPlayTogetherNeedsUpdate": {
+    "description": "Mornye Link: the paired desktop runs a version without Play together",
     "placeholders": {
       "name": {
         "type": "String"
@@ -7633,6 +8670,18 @@
   "linkSaveToPhoneCancelled": "Saving stopped",
   "@linkSaveToPhoneCancelled": {
     "description": "Mornye Link: the listener cancelled saving desktop songs to the phone"
+  },
+  "linkKeepOnPhone": "Keep on this phone",
+  "@linkKeepOnPhone": {
+    "description": "Mornye Link: playlist or Loved menu action; while the paired computer is connected, the collection's songs that live on the computer are saved to this phone by themselves"
+  },
+  "linkKeepOnPhoneStop": "Stop keeping on this phone",
+  "@linkKeepOnPhoneStop": {
+    "description": "Mornye Link: playlist or Loved menu action that ends Keep on this phone; songs already saved stay"
+  },
+  "linkKeptOnPhone": "Kept on this phone",
+  "@linkKeptOnPhone": {
+    "description": "Mornye Link: short label in a playlist's or Loved's header while it is kept on this phone"
   },
   "linkTransferPhoneReceiving": "{count, plural, =1{Saving {title} from {name}} other{Saving {count} songs from {name}}}",
   "@linkTransferPhoneReceiving": {
@@ -7864,6 +8913,30 @@
   "@trackConvertResampler": {
     "description": "Section label for lossless conversion resampler options"
   },
+  "trackConvertDitherSmart": "Smart",
+  "@trackConvertDitherSmart": {
+    "description": "Automatic dither option for lossless file conversion"
+  },
+  "trackConvertDitherSmartDescription": "Automatically applies dither only when lowering bit depth.",
+  "@trackConvertDitherSmartDescription": {
+    "description": "Explains when Smart Dither adds dither during file conversion"
+  },
+  "downloadAutoConvertSmartDither": "Smart Dither",
+  "@downloadAutoConvertSmartDither": {
+    "description": "Toggle for automatic dither during FLAC download conversion"
+  },
+  "trackConvertDitherSmartType": "Smart Dither type",
+  "@trackConvertDitherSmartType": {
+    "description": "Label of the choice between plain TPDF and high-pass TPDF for Smart Dither"
+  },
+  "trackConvertDitherPlainDescription": "Smart Dither adds plain TPDF, which spreads the added noise evenly across all frequencies.",
+  "@trackConvertDitherPlainDescription": {
+    "description": "Explains the plain TPDF option of Smart Dither"
+  },
+  "trackConvertDitherHighPassDescription": "Smart Dither adds high-pass TPDF, which moves the added noise to high frequencies where it is harder to hear.",
+  "@trackConvertDitherHighPassDescription": {
+    "description": "Explains the high-pass option of Smart Dither"
+  },
   "trackConvertDitherNone": "None",
   "@trackConvertDitherNone": {
     "description": "Lossless conversion dither option with no dithering applied"
@@ -7872,7 +8945,7 @@
   "@trackConvertDitherTriangular": {
     "description": "Lossless conversion triangular probability density function dither option"
   },
-  "trackConvertDitherTriangularHp": "Triangular HP",
+  "trackConvertDitherTriangularHp": "TPDF HP",
   "@trackConvertDitherTriangularHp": {
     "description": "Lossless conversion high-pass triangular dither option"
   },
@@ -7883,6 +8956,64 @@
   "trackConvertResamplerSoxr": "SoXr",
   "@trackConvertResamplerSoxr": {
     "description": "Lossless conversion SoX resampler option"
+  },
+  "trackConvertResamplerQuality": "Quality",
+  "@trackConvertResamplerQuality": {
+    "description": "Title of the resampler quality slider in the convert sheet"
+  },
+  "trackConvertResamplerQualityFast": "Fast",
+  "@trackConvertResamplerQualityFast": {
+    "description": "Lowest resampler quality level"
+  },
+  "trackConvertResamplerQualityMedium": "Medium",
+  "@trackConvertResamplerQualityMedium": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityHigh": "High",
+  "@trackConvertResamplerQualityHigh": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityVeryHigh": "Very high",
+  "@trackConvertResamplerQualityVeryHigh": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityBest": "Best",
+  "@trackConvertResamplerQualityBest": {
+    "description": "Highest resampler quality level"
+  },
+  "trackConvertResamplerQualityDescription": "Higher levels resample more accurately and take longer.",
+  "@trackConvertResamplerQualityDescription": {
+    "description": "Explains the resampler quality slider"
+  },
+  "trackConvertResamplerSwrDetail": "{taps}-tap filter",
+  "@trackConvertResamplerSwrDetail": {
+    "description": "What the chosen SWR quality level uses: the length of its filter",
+    "placeholders": {
+      "taps": {
+        "type": "int"
+      }
+    }
+  },
+  "trackConvertResamplerSoxrDetail": "{bits}-bit precision",
+  "@trackConvertResamplerSoxrDetail": {
+    "description": "What the chosen SoXR quality level uses: its calculation precision",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      }
+    }
+  },
+  "trackConvertResamplerSoxrPresetDetail": "{bits}-bit precision, SoX {preset}",
+  "@trackConvertResamplerSoxrPresetDetail": {
+    "description": "What the chosen SoXR quality level uses, with the SoX name of that preset (HQ or VHQ)",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      },
+      "preset": {
+        "type": "String"
+      }
+    }
   },
   "updateSeeReleaseNotes": "See release notes for details.",
   "@updateSeeReleaseNotes": {
@@ -7899,6 +9030,34 @@
   "trackAddToQueue": "Add to queue",
   "@trackAddToQueue": {
     "description": "Menu action to add a track to the playback queue"
+  },
+  "swipeToQueue": "Swipe songs to queue",
+  "@swipeToQueue": {
+    "description": "Library setting: a horizontal swipe on a song row plays it next or adds it to the queue"
+  },
+  "swipeToQueueSubtitle": "Swipe a song one way to play it next and the other way to add it to the queue",
+  "@swipeToQueueSubtitle": {
+    "description": "Subtitle of the swipe songs to queue setting"
+  },
+  "librarySongTap": "Tapping a song",
+  "@librarySongTap": {
+    "description": "Library setting choosing whether a tap on a song row plays it or opens its details"
+  },
+  "librarySongTapOpenDetails": "Open details",
+  "@librarySongTapOpenDetails": {
+    "description": "Choice of the tapping a song setting: a tap on the song opens its details. Name the action of the tap, not the button on the row. Keep it short: it shares one segmented control with the other choice"
+  },
+  "librarySongTapPlaySong": "Play song",
+  "@librarySongTapPlaySong": {
+    "description": "Choice of the tapping a song setting: a tap on the song plays it. Name the action of the tap, not the button on the row. Keep it short: it shares one segmented control with the other choice"
+  },
+  "librarySongTapPlayDescription": "A tap plays the song. The button beside it opens its details.",
+  "@librarySongTapPlayDescription": {
+    "description": "Description of the tapping a song setting while a tap plays"
+  },
+  "librarySongTapDetailsDescription": "A tap opens the song's details. The play button plays it.",
+  "@librarySongTapDetailsDescription": {
+    "description": "Description of the tapping a song setting while a tap opens the details"
   },
   "snackbarExtensionInstalledEnable": "{extensionName} installed. Enable it in Settings > Extensions",
   "@snackbarExtensionInstalledEnable": {
@@ -8203,9 +9362,13 @@
   "@autoHideLyricsControls": {
     "description": "Playback switch that lets lyrics take more screen space after five idle seconds"
   },
-  "autoHideLyricsControlsDescription": "Hide player controls after 5 seconds while lyrics are open. Turn off to keep the current view",
+  "autoHideLyricsControlsDescription": "Hide player controls after 5 seconds while lyrics are open. Turn off to keep controls visible while idle",
   "@autoHideLyricsControlsDescription": {
     "description": "Subtitle explaining the five-second Now Playing lyrics timeout"
+  },
+  "autoHideLyricsControlsAccessibilityDescription": "Controls stay visible by default when accessibility is active. Turn on to hide them after 5 seconds while lyrics are open. Tap the lyrics to show them again",
+  "@autoHideLyricsControlsAccessibilityDescription": {
+    "description": "Explains that the fullscreen lyrics switch explicitly allows auto-hide with accessible navigation active"
   },
   "compactPlayer": "Compact player",
   "@compactPlayer": {
@@ -8260,7 +9423,11 @@
   "autoplayFromLibrary": "Autoplay from your Library",
   "autoplayDescription": "Continue with related songs from your Library when the queue ends.",
   "autoplayPersonalization": "Personalized autoplay",
-  "autoplayPersonalizationDescription": "Learn from songs you listen to and skip, privately on this device. Turning this off stops learning and restores ordinary autoplay.",
+  "autoplayPersonalizationDescription": "Learn from songs you listen to and skip, privately on this device. Turning this off stops preference learning. Song analysis and repeat prevention still work.",
+  "autoplayRandomness": "Autoplay randomness",
+  "autoplayRandomnessDescription": "Lower values favor related songs that have not played or been suggested recently. Higher values broaden the mix. Works with or without personalized autoplay.",
+  "autoplayLeastRecent": "Least recent",
+  "autoplayMoreRandom": "More random",
   "autoplayResetLearning": "Reset recommendation learning",
   "autoplayResetLearningConfirmTitle": "Reset recommendation learning?",
   "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
@@ -8328,6 +9495,24 @@
       }
     }
   },
+  "songAnalysisProgressWithSkipped": "{analyzed} of {total} songs analyzed; {skipped} skipped (missing, unreadable or silent)",
+  "@songAnalysisProgressWithSkipped": {
+    "description": "Song analysis progress with files that could not be described, counted as finished rather than pending",
+    "placeholders": {
+      "analyzed": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "skipped": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
   "songAnalysisClear": "Clear song analysis",
   "songAnalysisClearConfirmTitle": "Clear song analysis?",
   "songAnalysisClearConfirmMessage": "Autoplay forgets how your songs sound. While song analysis is on, your Library is analyzed again.",
@@ -8342,6 +9527,90 @@
   "profileRemovePhoto": "Remove photo",
   "profilePhotoError": "Choose a valid image smaller than 20 MB.",
   "profileSaveError": "Could not save your profile. Please try again.",
+  "profileEditAction": "Edit profile",
+  "profileNowPlaying": "Now playing",
+  "profileListeningSince": "Listening since {date}",
+  "@profileListeningSince": {
+    "description": "Line under the profile name; date is the month and year of the first recorded listening, such as November 2026",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "profileHours": "{hours} h",
+  "@profileHours": {
+    "description": "A listening time in hours; hours is an already formatted number such as 12.5 or 240",
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "profileAllTime": "All time",
+  "profileStatListening": "Listening time",
+  "profileStatSongs": "Songs played",
+  "profileStatArtists": "Artists played",
+  "profileStatActiveDays": "Listening days",
+  "profileStatStreak": "Current streak",
+  "profileDays": "{count, plural, =1{1 day} other{{count} days}}",
+  "@profileDays": {
+    "description": "A number of days, as the value of a streak or of the days with listening",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileLast30Days": "Last 30 days",
+  "profileTaste": "Music taste",
+  "profileTasteNote": "Share of your listening time, for songs whose genre your Library knows.",
+  "profileTasteEmpty": "The songs you played have no genre in your Library yet.",
+  "profileTasteMostly": "Mostly {genre}",
+  "@profileTasteMostly": {
+    "description": "Line under the profile name when one genre takes at least half of the listening time",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTasteMostlyWith": "Mostly {genre}, with {others}",
+  "@profileTasteMostlyWith": {
+    "description": "Line under the profile name when one genre takes at least half of the listening time; others is one or two more genres, such as Rock, Jazz",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      },
+      "others": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTasteMix": "A mix of {genres}",
+  "@profileTasteMix": {
+    "description": "Line under the profile name when no genre takes half of the listening time; genres is two or three genres, such as Pop, Rock, Jazz",
+    "placeholders": {
+      "genres": {
+        "type": "String"
+      }
+    }
+  },
+  "profileHabits": "Listening habits",
+  "profileAverageDay": "On a listening day",
+  "profileTopAlbums": "Top albums",
+  "profileCollection": "Your collection",
+  "profileListeningOff": "Record listening is off, so your listening is not shown here.",
+  "profileWeekdayChart": "Listening time by day of the week, most on {day}",
+  "@profileWeekdayChart": {
+    "description": "Screen reader description of the chart of listening time per weekday; day is a weekday name such as Saturday",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "profileRecentChart": "Listening time on each of the last 30 days",
   "homeGreetingMorning1": "Good morning",
   "homeGreetingMorning2": "Rise and shine",
   "homeGreetingMorning3": "Fresh start",
@@ -8394,9 +9663,25 @@
   "@homeOnRepeat": {
     "description": "Home section header for the most played tracks of the last four weeks"
   },
+  "homeFromYourLibrary": "From your Library",
+  "@homeFromYourLibrary": {
+    "description": "Home section header for the day's albums from the Library, shown in On repeat's place while listening is not recorded"
+  },
   "homeShortcuts": "Shortcuts",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
+  },
+  "homeShortcutChange": "Change shortcut",
+  "@homeShortcutChange": {
+    "description": "Menu item and sheet title for replacing one Home shortcut with another"
+  },
+  "homeShortcutChangeSubtitle": "A shortcut already on Home swaps places with this one",
+  "@homeShortcutChangeSubtitle": {
+    "description": "Subtitle of the sheet that replaces a Home shortcut"
+  },
+  "homeShortcutsReset": "Reset shortcuts",
+  "@homeShortcutsReset": {
+    "description": "Menu item that restores the default Home shortcuts"
   },
   "searchResults": "Search Results",
   "@searchResults": {
@@ -8660,6 +9945,8 @@
   "listeningRewindSlide": "Slide {index} of {count}",
   "@listeningRewindSlide": { "placeholders": { "index": { "type": "int" }, "count": { "type": "int" } } },
   "listeningRewindShare": "Share",
+  "listeningRewindShareCard": "Share summary card",
+  "listeningRewindShareSlide": "Share this slide",
   "listeningRewindShareError": "Could not share your Rewind",
   "listeningRewindNext": "Next",
   "listeningRewindPrevious": "Previous",
@@ -8748,8 +10035,32 @@
     }
   },
   "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
-  "playbackOnHeadphonesConnected": "Play when headphones connect",
-  "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
+  "playbackOnHeadphonesConnected": "Play when headphones or a car connect",
+  "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones, or a car over Bluetooth, connect. Disconnecting pauses playback. Built-in player only.",
+  "@playbackOnHeadphonesConnectedDescription": {
+    "description": "Description of the Always choice of Play when headphones or a car connect"
+  },
+  "playbackResumeOnReconnectDescription": "If headphones, a car or another Bluetooth device disconnect while music plays, playback resumes when one connects again within 30 minutes. Songs you paused stay paused. Built-in player only.",
+  "@playbackResumeOnReconnectDescription": {
+    "description": "Description of the After disconnect choice of Play when headphones or a car connect"
+  },
+  "playbackHeadphonesOff": "Off",
+  "@playbackHeadphonesOff": {
+    "description": "Play when headphones or a car connect choice: connecting headphones never starts playback. Keep it short; three choices share one row"
+  },
+  "playbackHeadphonesAfterDisconnect": "Reconnect",
+  "@playbackHeadphonesAfterDisconnect": {
+    "description": "Play when headphones or a car connect choice: resume only a recent pause caused by headphones disconnecting. Keep it short; three choices share one row"
+  },
+  "playbackHeadphonesAlways": "Always",
+  "@playbackHeadphonesAlways": {
+    "description": "Play when headphones or a car connect choice: resume on every connection and pause on disconnect. Keep it short; three choices share one row"
+  },
+  "playbackHeadphonesOffDescription": "Connecting headphones or a car does not start playback.",
+  "playbackHeadphonesChoices": "Off, after a disconnect, or every time headphones or a car connect.",
+  "@playbackHeadphonesChoices": {
+    "description": "Settings search summary of the Play when headphones or a car connect choices"
+  },
   "appearanceCustomFont": "Custom font",
   "appearanceCustomFontSubtitle": "Import a TTF or OTF file (up to 10 MB). Overrides the theme and system font.",
   "appearanceCustomFontInvalid": "Could not load this font. Choose a valid TTF or OTF file up to 10 MB.",
@@ -8918,8 +10229,17 @@
   "audioInfoBitPerfect": "Bit-perfect",
   "audioInfoBitPerfectActive": "Yes, unaltered samples",
   "audioInfoBitPerfectNo": "No, mixed by the system",
+  "audioInfoBitPerfectNoIos": "No, iOS mixes all app audio",
+  "@audioInfoBitPerfectNoIos": {
+    "description": "Audio info sheet, Bit-perfect row on iPhone and iPad: iOS sends every app's sound through its mixer, so no setting can make playback bit-perfect"
+  },
   "audioInfoBitPerfectUnverified": "Not verified",
   "audioInfoBitPerfectProcessed": "No, audio processing is active",
+  "audioInfoBitPerfectLossy": "No, decoded from a lossy source",
+  "audioInfoBitPerfectResampled": "No, resampled to a rate the DAC accepts",
+  "@audioInfoBitPerfectResampled": {
+    "description": "Audio info sheet, Bit-perfect row: the USB DAC refused the song's sample rate, so the app converts the song to another rate"
+  },
   "audioInfoDevice": "Device",
   "audioInfoDeviceType": "{type, select, speaker{Phone speaker} earpiece{Earpiece} wired_headphones{Wired headphones} wired_headset{Wired headset} line{Line out} bluetooth{Bluetooth} bluetooth_le{Bluetooth LE Audio} usb{USB audio} usb_headset{USB headset} hdmi{HDMI} dock{Dock} cast{Cast} hearing_aid{Hearing aid} airplay{AirPlay} car{Car audio} other{Other}}",
   "@audioInfoDeviceType": {
@@ -8940,6 +10260,135 @@
   "audioInfoBluetoothUnavailableHint": "Android may show the active codec in Bluetooth settings without making it available to Mornye. This is separate from the song's file format.",
   "audioAnalysisFileBitrate": "Average file bitrate",
   "audioAnalysisFileBitrateHint": "Includes tags and container overhead. It can differ from the audio stream bitrate and is not the Bluetooth bitrate.",
+  "audioCompareAction": "Compare with another file",
+  "audioCompareActionHint": "Null test: lines up another version of this song and shows what differs.",
+  "audioCompareUnavailable": "Comparing with another file needs a file picker, which this device does not have.",
+  "audioComparePickTitle": "Choose the file to compare",
+  "audioCompareSameFile": "That is the same file. Choose another version of the song.",
+  "audioCompareTitle": "Compare files",
+  "audioCompareStagePreparing": "Reading both files",
+  "audioCompareStageAligning": "Lining up the files",
+  "audioCompareStageMeasuring": "Measuring the difference",
+  "audioCompareStageSpectrogram": "Drawing the difference",
+  "audioCompareStepLabel": "Step {step} of {total}",
+  "@audioCompareStepLabel": {
+    "description": "Progress of the null test",
+    "placeholders": {
+      "step": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareErrorUnreadable": "{file} could not be read as audio.",
+  "@audioCompareErrorUnreadable": {
+    "description": "Null test error when a file has no audio stream",
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareErrorTooShort": "Both files need at least two seconds of audio.",
+  "audioCompareErrorDecode": "One of the files could not be decoded.",
+  "audioCompareErrorGeneric": "The comparison failed: {error}",
+  "@audioCompareErrorGeneric": {
+    "description": "Null test error with a reason",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareLevelIdentical": "The files are identical: the audio cancels completely.",
+  "audioCompareLevelNearlyIdentical": "The files are the same audio, apart from differences far below hearing.",
+  "audioCompareLevelMostlyIdentical": "The files are the same audio with small differences, such as resampling or dither.",
+  "audioCompareLevelModerate": "The files share a source but differ clearly, as lossy encoding or a filter does.",
+  "audioCompareLevelLarge": "The files differ a lot, as a remaster or a different mix does.",
+  "audioCompareBandHigh": "Most of the difference is in the high frequencies.",
+  "audioCompareBandLow": "Most of the difference is below 8 kHz.",
+  "audioCompareBandBroadband": "The difference is spread across the whole range.",
+  "audioComparePeak": "Largest difference at {time}: {level}",
+  "@audioComparePeak": {
+    "description": "Time and level of the loudest residual window",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareNoticeTitle": "This comparison may not mean much",
+  "audioCompareNoticeWeakAlignment": "The files could not be lined up with confidence, so they may not be the same recording.",
+  "audioCompareNoticeResidualHigh": "The difference stays as loud as the music for the whole song, so these are probably different recordings or mixes.",
+  "audioCompareNoticeDrift": "The timing drifts by {ms} ms between the start and later in the song, so one file plays at a slightly different speed.",
+  "@audioCompareNoticeDrift": {
+    "description": "Null test notice when the alignment changes over the song",
+    "placeholders": {
+      "ms": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareNoticeDuration": "The lengths differ by {seconds} s, so one file has extra or missing audio.",
+  "@audioCompareNoticeDuration": {
+    "description": "Null test notice when the aligned durations differ",
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareNoticeFooter": "The figures below are shown as measured.",
+  "audioCompareTimelineTitle": "Difference over time",
+  "audioCompareTimelineHint": "Tap or drag on the graph to read a moment.",
+  "audioCompareTimelineCaption": "Level of the difference relative to the music, in dB. Lower is closer; -120 dB means the files cancel.",
+  "audioComparePlayFromHere": "Play from here",
+  "audioCompareChannelBoth": "Both",
+  "audioCompareChannelLeft": "Left",
+  "audioCompareChannelRight": "Right",
+  "audioCompareSummaryTitle": "Summary",
+  "audioCompareReference": "This song",
+  "audioCompareOther": "Compared file",
+  "audioCompareOffset": "Offset",
+  "audioCompareOffsetValue": "{samples} samples ({ms} ms)",
+  "@audioCompareOffsetValue": {
+    "description": "Alignment offset in samples and milliseconds",
+    "placeholders": {
+      "samples": {
+        "type": "String"
+      },
+      "ms": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareOffsetLater": "The audio starts this much later in the compared file.",
+  "audioCompareOffsetEarlier": "The audio starts this much earlier in the compared file.",
+  "audioCompareGain": "Level match",
+  "audioCompareGainDetail": "Applied to the compared file before subtracting.",
+  "audioCompareGainInverted": "Applied to the compared file before subtracting. Its polarity is inverted.",
+  "audioCompareOverall": "Overall difference",
+  "audioCompareOverallDetail": "Energy of the difference relative to the music over the whole song.",
+  "audioCompareMatch": "Alignment match",
+  "audioCompareNoteResampled": "The files were compared at {rate}; one was resampled, which adds a small difference of its own.",
+  "@audioCompareNoteResampled": {
+    "description": "Null test note when a file was resampled",
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "audioCompareNoteChannels": "The files have different channel layouts and were mixed to the same one.",
+  "audioCompareSpectrogramTitle": "Spectrogram of the difference",
+  "audioCompareSpectrogramCaption": "What is left after subtracting the files. Dark means they cancel.",
+  "audioCompareExplainTitle": "What is a null test?",
+  "audioCompareExplainBody": "A null test lines up two versions of a song, matches their level, then subtracts one from the other. Whatever is left is the difference between them. Identical audio cancels to silence. Lossy encoding leaves a quiet residue, mostly in the highs. A different master or mix leaves almost the music itself. A small residue does not mean you can hear it, and a file can sound the same while measuring differently.",
   "audioInfoSystemDefaultRate": "System default sample rate",
   "audioInfoAndroidPcmRates": "Android PCM sample rates",
   "audioInfoAndroidPcmFormats": "Android PCM formats",
@@ -8998,6 +10447,18 @@
         "example": "0.3"
       }
     }
+  },
+  "lyricsOffsetThisSong": "This song",
+  "@lyricsOffsetThisSong": {
+    "description": "Player lyrics timing sheet: slider label for the timing offset of the playing song only"
+  },
+  "lyricsOffsetAllSongs": "All songs",
+  "@lyricsOffsetAllSongs": {
+    "description": "Player lyrics timing sheet: slider label for the app-wide timing offset, used for every song on this device"
+  },
+  "lyricsOffsetOptions": "Lyrics options",
+  "@lyricsOffsetOptions": {
+    "description": "Tooltip for the player lyrics menu button when it offers lyrics timing (and editing) but no language options"
   },
   "appCrashTitle": "The app previously crashed",
   "appAnrTitle": "The app previously stopped responding",
@@ -9510,75 +10971,99 @@
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
   },
-  "linkSettingsTitle": "Mornye on your computer",
+  "linkSettingsTitle": "Mornye on other devices",
   "@linkSettingsTitle": {
-    "description": "Phone Settings entry that pairs the phone with the Mornye desktop app on the local network"
+    "description": "Phone Settings entry that pairs the phone with Mornye on a computer or on another phone on the local network"
   },
-  "linkSettingsSubtitle": "Play and control your computer's library",
+  "linkSettingsSubtitle": "Play and control the library of a computer or another phone",
   "@linkSettingsSubtitle": {
-    "description": "Subtitle of the Mornye on your computer entry in phone Settings"
+    "description": "Subtitle of the Mornye on other devices entry in phone Settings"
   },
-  "linkPageTitle": "Computers",
+  "linkPageTitle": "Devices",
   "@linkPageTitle": {
-    "description": "Title of the page listing computers running Mornye that the phone can pair with; kept short for the large title"
+    "description": "Title of the page listing computers and phones running Mornye that the phone can pair with; kept short for the large title"
   },
-  "linkPageDescription": "Pair with Mornye on your computer to play its library on this phone and control what it plays. Both devices need to be on the same network.",
+  "linkPageDescription": "Pair with Mornye on a computer or another phone to play its library on this phone and control what it plays. Both devices need to be on the same network.",
   "@linkPageDescription": {
-    "description": "Introduction at the top of the computers page"
+    "description": "Introduction at the top of the page listing computers and phones the phone can pair with"
   },
-  "linkPairedSection": "Paired computers",
+  "linkPairedSection": "Paired devices",
   "@linkPairedSection": {
-    "description": "Section header for computers this phone is paired with"
+    "description": "Section header for computers and phones this phone is paired with"
   },
   "linkPhoneSection": "This phone",
   "@linkPhoneSection": {
-    "description": "Section header for what this phone shares with and how it follows its paired computer"
+    "description": "Section header for what this phone shares with and how it follows its paired computer or phone"
   },
-  "linkShareSongsTitle": "Show songs on the computer",
+  "linkShareSongsTitle": "Show songs on the other device",
   "@linkShareSongsTitle": {
-    "description": "Switch title: this phone's songs appear in the paired computer's Library"
+    "description": "Switch title: this phone's songs appear in the Library of the paired computer or phone"
   },
-  "linkShareSongsSubtitle": "Songs on this phone appear in the computer's Library and play there while this phone is connected",
+  "linkShareSongsSubtitle": "Songs on this phone appear in the other device's Library and play there while this phone is connected",
   "@linkShareSongsSubtitle": {
-    "description": "Switch subtitle for showing this phone's songs on the computer"
+    "description": "Switch subtitle for showing this phone's songs on the paired computer or phone"
   },
-  "linkFollowDesktopTitle": "Follow the computer's playback",
+  "linkShowComputerSongsTitle": "Show songs from paired devices",
+  "@linkShowComputerSongsTitle": {
+    "description": "Switch title: songs from paired computers and phones appear in this phone's Library"
+  },
+  "linkShowComputerSongsSubtitle": "Hide songs from paired devices without disconnecting Mornye Link. Songs saved to this phone stay in Library.",
+  "@linkShowComputerSongsSubtitle": {
+    "description": "Switch subtitle: hiding a paired device's songs preserves the Link connection and songs saved on the phone"
+  },
+  "linkFollowDesktopTitle": "Follow the other device's playback",
   "@linkFollowDesktopTitle": {
-    "description": "Switch title: the phone's player shows the computer when the computer starts playing"
+    "description": "Switch title: the phone's player shows the paired computer or phone when that device starts playing"
   },
-  "linkFollowDesktopSubtitle": "When the computer starts playing, this phone shows and controls it",
+  "linkFollowDesktopSubtitle": "When the other device starts playing, this phone shows and controls it",
   "@linkFollowDesktopSubtitle": {
-    "description": "Switch subtitle for following the computer's playback"
+    "description": "Switch subtitle for following the paired device's playback"
+  },
+  "linkHideDisconnectedTitle": "Hide songs while disconnected",
+  "@linkHideDisconnectedTitle": {
+    "description": "Mornye Link switch, on the phone and on the computer: hide a paired device's songs from the Library while it is not connected"
+  },
+  "linkHideDisconnectedSubtitle": "Songs from a paired device leave Library while it is not connected and return when it connects",
+  "@linkHideDisconnectedSubtitle": {
+    "description": "Subtitle of the Hide songs while disconnected switch"
+  },
+  "linkSyncSoundTitle": "Sync sound settings",
+  "@linkSyncSoundTitle": {
+    "description": "Mornye Link phone switch: the user's saved sound settings travel between this phone and the paired computer or phone"
+  },
+  "linkSyncSoundSubtitle": "Equalizer presets, volume normalization level and mix transitions stay the same on this phone and the other device",
+  "@linkSyncSoundSubtitle": {
+    "description": "Subtitle of the Sync sound settings switch; names what is synced"
   },
   "linkNearbySection": "On this network",
   "@linkNearbySection": {
     "description": "Section header for computers running Mornye found on the local network"
   },
-  "linkSearching": "Looking for computers...",
+  "linkSearching": "Looking for devices...",
   "@linkSearching": {
-    "description": "Row shown while the phone searches the local network for computers"
+    "description": "Row shown while the phone searches the local network for computers and phones"
   },
-  "linkNoneFoundTitle": "No computers found",
+  "linkNoneFoundTitle": "No devices found",
   "@linkNoneFoundTitle": {
-    "description": "Row shown when the phone is not searching and found no computer"
+    "description": "Row shown when the phone is not searching and found no computer or phone"
   },
-  "linkNoneFound": "Open Mornye on your computer and turn on Share with Mornye on your phone in its settings.",
+  "linkNoneFound": "Open Mornye on your computer and turn on Share with Mornye on your phone in its settings, or turn on Share with other phones on another phone.",
   "@linkNoneFound": {
-    "description": "Hint under the search row when no computer was found yet; Share with Mornye on your phone is the name of the desktop setting"
+    "description": "Hint under the search row when nothing was found yet; Share with Mornye on your phone is the name of the desktop setting, Share with other phones the name of the phone setting"
   },
   "linkAddManually": "Add by address",
   "@linkAddManually": {
-    "description": "Button and dialog title for pairing with a computer by typing its address and port"
+    "description": "Button and dialog title for pairing with a computer or phone by typing its address and port"
   },
-  "linkManualHost": "Computer address",
+  "linkManualHost": "Device address",
   "@linkManualHost": {
-    "description": "Field label for the computer's IP address or host name"
+    "description": "Field label for the IP address or host name of the computer or phone to pair with"
   },
   "linkManualPort": "Port",
   "@linkManualPort": {
-    "description": "Field label for the network port of the Mornye desktop server"
+    "description": "Field label for the network port Mornye shares on, on the computer or phone to pair with"
   },
-  "linkManualMessage": "Mornye on your computer shows its address and port where you turn on sharing.",
+  "linkManualMessage": "Mornye on the other device shows its address and port where you turn on sharing.",
   "@linkManualMessage": {
     "description": "Explains where to find the address and port to type"
   },
@@ -9598,9 +11083,9 @@
   "@linkStateDisconnected": {
     "description": "Status of the paired computer when it cannot be reached"
   },
-  "linkStateInactive": "Tap to use this computer",
+  "linkStateInactive": "Tap to use this device",
   "@linkStateInactive": {
-    "description": "Status of a paired computer other than the one in use; tapping it makes it the one in use"
+    "description": "Status of a paired computer or phone other than the one in use; tapping it makes it the one in use"
   },
   "linkActive": "In use",
   "@linkActive": {
@@ -9636,7 +11121,7 @@
       }
     }
   },
-  "linkPinMessage": "Enter the 6-digit PIN shown on your computer.",
+  "linkPinMessage": "Enter the 6-digit PIN shown on the other device.",
   "@linkPinMessage": {
     "description": "Instruction in the pairing PIN dialog"
   },
@@ -9644,7 +11129,7 @@
   "@linkPinField": {
     "description": "Label of the pairing PIN field"
   },
-  "linkPinCode": "Your computer shows the code {code} next to the PIN. Pair only if it matches.",
+  "linkPinCode": "The other device shows the code {code} next to the PIN. Pair only if it matches.",
   "@linkPinCode": {
     "description": "Security check in the PIN dialog; the placeholder is 8 hexadecimal characters of the computer's certificate fingerprint, grouped as 'ab12 cd34'",
     "placeholders": {
@@ -9653,7 +11138,7 @@
       }
     }
   },
-  "linkPinNotOpen": "Pairing is not open yet. Start pairing in Mornye on your computer to show a PIN.",
+  "linkPinNotOpen": "Pairing is not open yet. Start pairing in Mornye on the other device to show a PIN.",
   "@linkPinNotOpen": {
     "description": "Note in the PIN dialog when the computer reports that no pairing window is open"
   },
@@ -9664,6 +11149,15 @@
   "linkPaired": "Paired with {name}. Its music is being added to Library.",
   "@linkPaired": {
     "description": "Message after pairing succeeded",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPairedWithoutLibrary": "Paired with {name}. Its songs stay hidden from Library.",
+  "@linkPairedWithoutLibrary": {
+    "description": "Message after pairing succeeded while songs from paired devices are hidden from this phone's Library",
     "placeholders": {
       "name": {
         "type": "String"
@@ -9925,11 +11419,11 @@
       }
     }
   },
-  "linkErrorBadPin": "That PIN is not right. Check the PIN on your computer and try again.",
+  "linkErrorBadPin": "That PIN is not right. Check the PIN on the other device and try again.",
   "@linkErrorBadPin": {
     "description": "Pairing error when the PIN is wrong"
   },
-  "linkErrorPairingClosed": "Pairing is not open on your computer. Start pairing there, then try again.",
+  "linkErrorPairingClosed": "Pairing is not open on the other device. Start pairing there, then try again.",
   "@linkErrorPairingClosed": {
     "description": "Pairing error when the computer has no pairing window open"
   },
@@ -9937,23 +11431,23 @@
   "@linkErrorTooManyAttempts": {
     "description": "Pairing error when the computer rate limits pairing attempts"
   },
-  "linkErrorCertificateTitle": "Computer not verified",
+  "linkErrorCertificateTitle": "Device not verified",
   "@linkErrorCertificateTitle": {
     "description": "Title of the warning shown when the computer's certificate does not match what it reported"
   },
-  "linkErrorCertificate": "The computer's security certificate does not match what it reported. Someone on this network may be intercepting the connection, so pairing stopped.",
+  "linkErrorCertificate": "The device's security certificate does not match what it reported. Someone on this network may be intercepting the connection, so pairing stopped.",
   "@linkErrorCertificate": {
     "description": "Warning shown when the certificate seen during the connection differs from the computer's reported fingerprint"
   },
-  "linkErrorIncompatible": "This computer runs a Mornye version that cannot pair with this phone. Update Mornye on both devices.",
+  "linkErrorIncompatible": "That device runs a Mornye version that cannot pair with this phone. Update Mornye on both devices.",
   "@linkErrorIncompatible": {
     "description": "Pairing error when the computer is not a compatible Mornye desktop"
   },
-  "linkErrorUnreachable": "The computer could not be reached. Check that Mornye is open on it and that both devices are on the same network.",
+  "linkErrorUnreachable": "The device could not be reached. Check that Mornye is open on it and that both devices are on the same network.",
   "@linkErrorUnreachable": {
     "description": "Pairing error when the computer cannot be reached"
   },
-  "linkErrorTimeout": "The computer did not answer in time. Try again.",
+  "linkErrorTimeout": "The device did not answer in time. Try again.",
   "@linkErrorTimeout": {
     "description": "Pairing error when the computer does not answer"
   },
@@ -9969,7 +11463,7 @@
   "@linkLocalNetworkTitle": {
     "description": "Title of the notice shown when the phone is not allowed to use the local network"
   },
-  "linkLocalNetworkMessage": "Mornye needs local network access to find your computer and connect to it.",
+  "linkLocalNetworkMessage": "Mornye needs local network access to find your other devices and connect to them.",
   "@linkLocalNetworkMessage": {
     "description": "Explains why local network access is needed"
   },
@@ -9981,7 +11475,7 @@
   "@linkWifiOffTitle": {
     "description": "Title of the notice shown when the phone is not connected to Wi-Fi or Ethernet"
   },
-  "linkWifiOffMessage": "Connect this phone to the same Wi-Fi network as your computer.",
+  "linkWifiOffMessage": "Connect this phone to the same Wi-Fi network as the other device.",
   "@linkWifiOffMessage": {
     "description": "Explains that the phone must join the computer's Wi-Fi network"
   },
@@ -9994,7 +11488,7 @@
       }
     }
   },
-  "linkIssueCertificate": "{name} presented a different security certificate. Pair again only if you reinstalled or reset Mornye on that computer.",
+  "linkIssueCertificate": "{name} presented a different security certificate. Pair again only if you reinstalled or reset Mornye on that device.",
   "@linkIssueCertificate": {
     "description": "Warning when a paired computer's certificate changed",
     "placeholders": {
@@ -10011,6 +11505,47 @@
         "type": "String"
       }
     }
+  },
+  "linkPhoneHostSection": "Share this phone",
+  "@linkPhoneHostSection": {
+    "description": "Section header on the phone's Mornye Link page for letting other phones use this phone's songs"
+  },
+  "linkPhoneHostTitle": "Share with other phones",
+  "@linkPhoneHostTitle": {
+    "description": "Switch that lets other phones running Mornye pair with this phone and play its songs"
+  },
+  "linkPhoneHostSubtitle": "Other phones can browse and play your songs while Mornye is open or playing",
+  "@linkPhoneHostSubtitle": {
+    "description": "Subtitle of the Share with other phones switch while it is off"
+  },
+  "linkPhoneHostNameHint": "Other phones show this name when they find this phone",
+  "@linkPhoneHostNameHint": {
+    "description": "Hint in the rename dialog of a phone shared with other phones"
+  },
+  "linkPhoneHostSecurityCodeHint": "The other phone shows the same code when it pairs",
+  "@linkPhoneHostSecurityCodeHint": {
+    "description": "Subtitle of the security code row of a phone shared with other phones"
+  },
+  "linkPhoneHostPairSubtitle": "Show a code to enter on the other phone",
+  "@linkPhoneHostPairSubtitle": {
+    "description": "Subtitle of Pair a phone on a phone shared with other phones"
+  },
+  "linkPhoneHostPairInstructions": "Open Mornye on the other phone, choose this phone and enter this code.",
+  "@linkPhoneHostPairInstructions": {
+    "description": "Instruction in the pairing dialog of a phone shared with other phones"
+  },
+  "linkPhoneHostPairCheckCode": "Check that the other phone shows security code {code}.",
+  "@linkPhoneHostPairCheckCode": {
+    "description": "Security check in the pairing dialog of a phone shared with other phones; the placeholder is 8 hexadecimal characters grouped as 'ab12 cd34'",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPhoneHostRevokeMessage": "It has to pair again before it can connect to this phone.",
+  "@linkPhoneHostRevokeMessage": {
+    "description": "Message of the dialog that removes a phone paired with this phone"
   },
   "playlistEditOrder": "Edit order",
   "@playlistEditOrder": {
@@ -10062,6 +11597,18 @@
   "playlistFolderPickerEmpty": "No scanned tracks yet. Add a Library folder and scan it first.",
   "@playlistFolderPickerEmpty": {
     "description": "Shown when no Library folder has tracks to create a playlist from"
+  },
+  "playlistBrowseFolder": "Browse for a folder…",
+  "@playlistBrowseFolder": {
+    "description": "Desktop row in the create playlist folder sheet that opens the system folder picker"
+  },
+  "playlistBrowseFolderSubtitle": "Includes every subfolder inside it",
+  "@playlistBrowseFolderSubtitle": {
+    "description": "Subtitle of the browse for a folder row: the playlist gets the Library tracks of all nested folders"
+  },
+  "playlistBrowseFolderNoTracks": "No tracks from that folder are in your Library yet. Add it as a Library folder and scan it first.",
+  "@playlistBrowseFolderNoTracks": {
+    "description": "Snackbar when the picked folder holds no Library tracks"
   },
   "playlistCreatedWithTracks": "Created {name} with {count, plural, =1{1 track} other{{count} tracks}}",
   "@playlistCreatedWithTracks": {
@@ -10246,7 +11793,7 @@
   "lastfmConnect": "Connect Last.fm",
   "lastfmConnecting": "Connecting to Last.fm...",
   "lastfmFinishConnection": "Finish connecting",
-  "lastfmAuthorizeHelp": "Approve access in your browser, then return here and choose Finish connecting.",
+  "lastfmAuthorizeHelp": "Approve access in your browser, then come back to Mornye. If it does not connect on its own, choose Finish connecting.",
   "lastfmScrobbling": "Scrobbling",
   "lastfmScrobblingDescription": "Send songs you listen to in the built-in player to Last.fm.",
   "lastfmNowPlaying": "Show Now Playing",
@@ -10266,6 +11813,98 @@
       "count": { "type": "int" }
     }
   },
+  "scrobbleServiceDescription": "Track your listening and show what is playing on {service}.",
+  "@scrobbleServiceDescription": {
+    "description": "Settings row subtitle of a scrobbling service such as Libre.fm or ListenBrainz",
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceConnect": "Connect {service}",
+  "@scrobbleServiceConnect": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceConnecting": "Connecting to {service}...",
+  "@scrobbleServiceConnecting": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceScrobblingDescription": "Send songs you listen to in the built-in player to {service}.",
+  "@scrobbleServiceScrobblingDescription": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceNowPlayingDescription": "Show the current song on your {service} profile.",
+  "@scrobbleServiceNowPlayingDescription": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceDisconnect": "Disconnect {service}",
+  "@scrobbleServiceDisconnect": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceConnectionError": "{service} could not be reached. Saved scrobbles will be retried automatically.",
+  "@scrobbleServiceConnectionError": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceStorageError": "{service} settings could not be saved. Check access to this device's secure storage and try again.",
+  "@scrobbleServiceStorageError": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceReauthenticate": "Your {service} connection expired. Connect again to resume scrobbling.",
+  "@scrobbleServiceReauthenticate": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceUnavailable": "{service} is not accepting scrobbles from Mornye right now.",
+  "@scrobbleServiceUnavailable": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "scrobbleServiceRejected": "{service} rejected a scrobble. Check the song's title and artist tags.",
+  "@scrobbleServiceRejected": {
+    "placeholders": {
+      "service": { "type": "String", "example": "Libre.fm" }
+    }
+  },
+  "listenBrainzConnectHelp": "Paste the user token from your ListenBrainz settings page.",
+  "@listenBrainzConnectHelp": {
+    "description": "Subtitle of the sheet that signs in to ListenBrainz"
+  },
+  "listenBrainzToken": "User token",
+  "listenBrainzOpenSettings": "Open ListenBrainz settings",
+  "@listenBrainzOpenSettings": {
+    "description": "Button in the sign-in sheet that opens the ListenBrainz web page showing the user token"
+  },
+  "listenBrainzServer": "Server address (optional)",
+  "listenBrainzServerHelp": "Leave empty to use ListenBrainz, or enter the address of a compatible server.",
+  "listenBrainzServerInvalid": "Enter an address that starts with http:// or https://.",
+  "listenBrainzServerInsecure": "Use an https:// address. Plain http:// works only for a server on this device or your local network.",
+  "@listenBrainzServerInsecure": {
+    "description": "Shown when a custom ListenBrainz server uses http:// outside the local network, since the user token would travel unencrypted"
+  },
+  "listenBrainzServerSubtitle": "Server: {server}",
+  "@listenBrainzServerSubtitle": {
+    "description": "Subtitle of the connected ListenBrainz account when it uses a self-hosted server",
+    "placeholders": {
+      "server": { "type": "String", "example": "https://music.example.com" }
+    }
+  },
+  "listenBrainzInvalidToken": "This token was not accepted. Check it and try again.",
+  "listenBrainzReauthenticate": "Your ListenBrainz token no longer works. Connect again with a new token to resume scrobbling.",
   "audioOutputSystem": "This device and Bluetooth",
   "audioOutputCast": "Cast to TV",
   "audioOutputCastDescription": "Google Cast devices on the same Wi-Fi network",
@@ -10303,6 +11942,14 @@
   "reorganizeLibrarySubtitle": "Move and rename downloads and Local Library files in your download folder so they follow the folder and filename rules above",
   "@reorganizeLibrarySubtitle": {
     "description": "Subtitle of the apply-rules-to-existing-files action"
+  },
+  "removeEmptyFoldersTitle": "Remove Empty Folders",
+  "@removeEmptyFoldersTitle": {
+    "description": "Files settings switch that deletes album and artist folders once the last song in them is deleted"
+  },
+  "removeEmptyFoldersSubtitle": "When you delete the last song in an album or artist folder, delete the folder too",
+  "@removeEmptyFoldersSubtitle": {
+    "description": "Subtitle of the switch that deletes folders left empty by deleted songs"
   },
   "reorganizeLibraryScanning": "Checking your files…",
   "@reorganizeLibraryScanning": {

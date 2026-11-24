@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter/material.dart' show Icons;
+import 'package:material_ui/material_ui.dart' show Icons;
 import 'package:material_symbols_icons/symbols.dart';
 
 /// Material Symbols Rounded counterpart of a legacy Material icon.
@@ -218,6 +218,7 @@ final Map<IconData, IconData> _filledSymbols = {
   Icons.trending_up: Symbols.trending_up_rounded,
   Icons.tune: Symbols.tune_rounded,
   Icons.tune_rounded: Symbols.tune_rounded,
+  Icons.undo: Symbols.undo_rounded,
   Icons.update: Symbols.update_rounded,
   Icons.usb: Symbols.usb_rounded,
   Icons.usb_rounded: Symbols.usb_rounded,
@@ -345,6 +346,7 @@ final Map<IconData, IconData> _outlinedSymbols = {
   Icons.remove_circle_outline: Symbols.remove_circle_rounded,
   Icons.report_gmailerrorred_outlined: Symbols.report_gmailerrorred_rounded,
   Icons.save_outlined: Symbols.save_rounded,
+  Icons.screen_lock_portrait_outlined: Symbols.screen_lock_portrait_rounded,
   Icons.sd_storage_outlined: Symbols.sd_storage_rounded,
   Icons.security_outlined: Symbols.security_rounded,
   Icons.segment_outlined: Symbols.segment_rounded,
@@ -353,6 +355,7 @@ final Map<IconData, IconData> _outlinedSymbols = {
   Icons.share_outlined: Symbols.share_rounded,
   Icons.smart_display_outlined: Symbols.smart_display_rounded,
   Icons.source_outlined: Symbols.source_rounded,
+  Icons.spatial_audio_outlined: Symbols.spatial_audio_rounded,
   Icons.speaker_group_outlined: Symbols.speaker_group_rounded,
   Icons.speed_outlined: Symbols.speed_rounded,
   Icons.storage_outlined: Symbols.storage_rounded,

@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +16,8 @@ import 'package:mornye/services/sqlite_helpers.dart';
 import 'package:mornye/utils/desktop_folders.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/native_platform_name.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Settings extends SettingsNotifier {
   @override
@@ -330,7 +332,7 @@ void main() {
         expect(find.text(output.path), findsOneWidget);
         expect(output.existsSync(), isFalse);
 
-        await tester.tap(find.byTooltip('Change folder'));
+        await tester.tap(findByTooltip('Change folder'));
         for (var frame = 0; picker.calls == 0 && frame < 30; frame++) {
           await tester.runAsync(
             () => Future<void>.delayed(const Duration(milliseconds: 10)),

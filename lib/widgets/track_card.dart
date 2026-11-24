@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -10,6 +10,7 @@ import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 /// How a [TrackCard] paints its container.
@@ -107,6 +108,7 @@ class TrackCard extends StatelessWidget {
     this.isCurrent = false,
     this.isPlaying = false,
     this.leadingArtwork = false,
+    this.queueSwipe,
   });
 
   /// Track number, cover art, or anything else that identifies the row.
@@ -150,7 +152,8 @@ class TrackCard extends StatelessWidget {
   /// The row is the player's current track. The Material style fills it with
   /// `primaryContainer` of the track's artwork scheme ([PlayerArtworkTheme]),
   /// rounds its ends into a pill and shows a [NowPlayingIndicator] before
-  /// [trailing]. Mornye ignores it.
+  /// [trailing]. Mornye keeps the row plain and shows the title in its
+  /// accent.
   final bool isCurrent;
 
   /// The current track is playing, so the indicator moves.
@@ -159,6 +162,11 @@ class TrackCard extends StatelessWidget {
   /// [leading] is square artwork, which the Material style rounds toward a
   /// circle while the row is current.
   final bool leadingArtwork;
+
+  /// A sideways swipe that plays the song next or adds it to the queue
+  /// ([QueueSwipe]). Pass the same actions the row's menu offers, or null
+  /// where the menu has none. Selection mode turns it off.
+  final QueueSwipeActions? queueSwipe;
 
   @override
   Widget build(BuildContext context) {
@@ -216,8 +224,18 @@ class TrackCard extends StatelessWidget {
     } else if (current) {
       cardColor = colorScheme.primaryContainer;
       contentColor = colorScheme.onPrimaryContainer;
-    } else if (style == TrackCardStyle.flat || context.isMornye) {
+    } else if (context.isMornye) {
       cardColor = Colors.transparent;
+      contentColor = null;
+    } else if (style == TrackCardStyle.flat) {
+      // Rest on the fill the row may take, at zero alpha, so becoming
+      // current or selected only fades it in instead of passing through
+      // the dark tint between transparent black and the fill.
+      cardColor =
+          (isSelectionMode
+                  ? colorScheme.secondaryContainer
+                  : colorScheme.primaryContainer)
+              .withValues(alpha: 0);
       contentColor = null;
     } else {
       // The card theme's tone, which the expressive card does not read.
@@ -296,6 +314,9 @@ class TrackCard extends StatelessWidget {
       child: Stack(
         children: [
           if (background != null) Positioned.fill(child: background!),
+          // Inside the card, so the swipe's actions join the row's node.
+          if (queueSwipe != null)
+            const Positioned.fill(child: QueueSwipeSemantics()),
           Padding(
             padding: contentPadding,
             child: Row(
@@ -332,7 +353,11 @@ class TrackCard extends StatelessWidget {
                           fontWeight: current
                               ? FontWeight.w700
                               : FontWeight.w500,
-                          color: contentColor,
+                          // The accent as status: Mornye's only sign of
+                          // the current track.
+                          color: isCurrent && !material
+                              ? colorScheme.primary
+                              : contentColor,
                         ),
                       ),
                       if (subtitle != null) ...[
@@ -364,33 +389,48 @@ class TrackCard extends StatelessWidget {
         ],
       ),
     );
+    // The swipe stays in the tree through selection mode, so the row keeps
+    // its state when selection starts or ends.
+    Widget swipe(Widget row) => queueSwipe == null
+        ? row
+        : QueueSwipe(
+            actions: queueSwipe,
+            enabled: !isSelectionMode,
+            margin: cardMargin,
+            borderRadius: borderRadius,
+            child: row,
+          );
     if (material) {
       // The card keeps its connected-group corners; a clip inside the
       // margin rounds the current row's ends into a pill, ripple included.
-      return DesktopContextMenuRegion(
-        onContextMenu: onContextMenu,
-        child: morph(
-          card,
-          from: RoundedRectangleBorder(borderRadius: borderRadius),
-          to: const StadiumBorder(),
-          inset: cardMargin.resolve(textDirection),
+      return swipe(
+        DesktopContextMenuRegion(
+          onContextMenu: onContextMenu,
+          child: morph(
+            card,
+            from: RoundedRectangleBorder(borderRadius: borderRadius),
+            to: const StadiumBorder(),
+            inset: cardMargin.resolve(textDirection),
+          ),
         ),
       );
     }
-    return DesktopContextMenuRegion(
-      onContextMenu: onContextMenu,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          card,
-          Padding(
-            padding: EdgeInsetsDirectional.only(
-              start: tokens.coverList + 40,
-              end: 20,
+    return swipe(
+      DesktopContextMenuRegion(
+        onContextMenu: onContextMenu,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            card,
+            Padding(
+              padding: EdgeInsetsDirectional.only(
+                start: tokens.coverList + 40,
+                end: 20,
+              ),
+              child: const Divider(),
             ),
-            child: const Divider(),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -606,13 +646,19 @@ class TrackGridPlayButton extends StatelessWidget {
     required this.tooltip,
     required this.onPressed,
     this.icon = Icons.play_arrow,
+    this.compact = false,
   });
 
   static const double visualDiameter = 36;
+  static const double compactDiameter = 28;
 
   final String tooltip;
   final VoidCallback? onPressed;
   final IconData icon;
+
+  /// A smaller circle, for a lesser action such as opening the details. The
+  /// touch target stays the same.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -629,14 +675,18 @@ class TrackGridPlayButton extends StatelessWidget {
         padding: EdgeInsets.zero,
       ),
       icon: Container(
-        width: visualDiameter,
-        height: visualDiameter,
+        width: compact ? compactDiameter : visualDiameter,
+        height: compact ? compactDiameter : visualDiameter,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: colorScheme.primary,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: 18, color: colorScheme.onPrimary),
+        child: Icon(
+          icon,
+          size: compact ? 16 : 18,
+          color: colorScheme.onPrimary,
+        ),
       ),
     );
   }

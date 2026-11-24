@@ -1,14 +1,17 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart'
     show M3EShapeKind;
 import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
+import 'package:mornye/utils/lyrics_timeline.dart';
+import 'package:mornye/utils/text_direction.dart';
 import 'package:mornye/utils/widget_capture.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
@@ -25,6 +28,9 @@ const lyricsShareCardSize = Size(360, 640);
 
 typedef LyricsShareLine = ({String text, bool background});
 
+/// Reduced motion: the pickers change at once.
+const _still = AppMotionSpec(Duration.zero, Curves.linear);
+
 /// Lines a card can quote: timed lines in order, or the plain text's lines.
 List<LyricsShareLine> lyricsShareLines(ParsedLyrics lyrics) {
   if (lyrics.lines.isNotEmpty) {
@@ -40,16 +46,50 @@ List<LyricsShareLine> lyricsShareLines(ParsedLyrics lyrics) {
   ];
 }
 
+/// The row in [lyricsShareLines] of the line the player highlights at
+/// [position], the position it draws synced lyrics for (display lead
+/// included), with the listener's timing [offset]. Lines go through the
+/// player's own timeline, so an instrumental gap after a line ends selects
+/// nothing, and a backing vocal selects the line it backs. -1 for plain
+/// lyrics, before the first line and during a gap.
+int lyricsShareRowAt(
+  ParsedLyrics lyrics,
+  Duration position, {
+  Duration offset = Duration.zero,
+}) {
+  if (!lyrics.synced || lyrics.lines.isEmpty) return -1;
+  final timeline = lyricsWithDisplayEnds(
+    lyricsTimelineWithGaps(lyricsShiftedBy(lyrics.lines, offset)),
+  );
+  var active = LyricsParser.activeIndex(timeline, position);
+  if (active < 0) return -1;
+  if (timeline[active].isBackground) {
+    active = LyricDisplayLayout(timeline).leadForLine[active];
+  }
+  if (timeline[active].text.trim().isEmpty) return -1;
+  var row = 0;
+  for (var i = 0; i < active; i++) {
+    if (timeline[i].text.trim().isNotEmpty) row++;
+  }
+  return row;
+}
+
 /// Opens the lyric card editor. [initial] preselects the line the user
-/// long-pressed in the player.
+/// long-pressed in the player. Without it, [position] (see
+/// [lyricsShareRowAt]) preselects the line being sung, so sharing it takes
+/// one tap.
 Future<void> openLyricsShare(
   BuildContext context, {
   required MediaItem mediaItem,
   required ParsedLyrics lyrics,
   LyricLine? initial,
+  Duration? position,
+  Duration offset = Duration.zero,
 }) {
   final lines = lyricsShareLines(lyrics);
-  var selected = -1;
+  var selected = initial == null && position != null
+      ? lyricsShareRowAt(lyrics, position, offset: offset)
+      : -1;
   if (initial != null) {
     var row = 0;
     for (final line in lyrics.lines) {
@@ -96,18 +136,44 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
   final _cardKey = GlobalKey();
   final _shareButtonKey = GlobalKey();
   late final Set<int> _selected = {...widget.initialSelection};
-  late final ScrollController _list = ScrollController(
-    initialScrollOffset: widget.initialSelection.isEmpty
-        ? 0
-        : (widget.initialSelection.first - 2).clamp(0, 1 << 20) * 58.0,
-  );
+  final _initialRow = GlobalKey();
+
+  /// Made at the list's first layout, which gives the viewport height the
+  /// preselected line is centered in.
+  ScrollController? _list;
   LyricsCardBackground _background = LyricsCardBackground.artwork;
   bool _sharing = false;
 
+  /// A one-line row: 56dp tall with a 2dp gap below.
+  static const _rowExtent = 58.0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialSelection.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Lines that wrap make the estimate short; the built row corrects it.
+        final row = _initialRow.currentContext;
+        if (!mounted || row == null) return;
+        Scrollable.ensureVisible(row, alignment: 0.5);
+      });
+    }
+  }
+
   @override
   void dispose() {
-    _list.dispose();
+    _list?.dispose();
     super.dispose();
+  }
+
+  /// Centers the preselected line in a [viewport] tall list, estimating
+  /// rows at one line each so it opens there without a visible jump.
+  double _initialOffset(double viewport) {
+    if (widget.initialSelection.isEmpty || !viewport.isFinite) return 0;
+    final row = widget.initialSelection.first;
+    final content = widget.lines.length * _rowExtent - 2;
+    final centered = (row + 0.5) * _rowExtent - viewport / 2;
+    return centered.clamp(0, (content - viewport).clamp(0, double.infinity));
   }
 
   void _toggle(int index) {
@@ -260,16 +326,23 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
             ),
             Expanded(
               flex: 4,
-              child: ListView.builder(
-                controller: _list,
-                padding: EdgeInsets.symmetric(horizontal: tokens.gapMd),
-                itemCount: widget.lines.length,
-                itemBuilder: (context, index) => _LineChoice(
-                  line: widget.lines[index],
-                  selected: _selected.contains(index),
-                  first: index == 0,
-                  last: index == widget.lines.length - 1,
-                  onTap: () => _toggle(index),
+              child: LayoutBuilder(
+                builder: (context, constraints) => ListView.builder(
+                  controller: _list ??= ScrollController(
+                    initialScrollOffset: _initialOffset(constraints.maxHeight),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: tokens.gapMd),
+                  itemCount: widget.lines.length,
+                  itemBuilder: (context, index) => _LineChoice(
+                    key: index == widget.initialSelection.firstOrNull
+                        ? _initialRow
+                        : null,
+                    line: widget.lines[index],
+                    selected: _selected.contains(index),
+                    first: index == 0,
+                    last: index == widget.lines.length - 1,
+                    onTap: () => _toggle(index),
+                  ),
                 ),
               ),
             ),
@@ -344,7 +417,13 @@ class _BackgroundPicker extends StatelessWidget {
         colors: [Color(0xFFFFFFFF), Color(0xFFE8E4DC)],
       ),
     };
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    // A small control: the fast spatial spring overshoots by itself in
+    // Material, Mornye settles without a bounce, reduced motion jumps.
+    final morph = AppMotion.spatialFast(
+      context,
+      _still,
+      mornye: MornyeMotion.fast,
+    );
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -376,10 +455,8 @@ class _BackgroundPicker extends StatelessWidget {
                         // The chosen swatch morphs from a circle into a larger
                         // rounded square, the Expressive selection cue.
                         child: AnimatedContainer(
-                          duration: reduceMotion
-                              ? Duration.zero
-                              : const Duration(milliseconds: 260),
-                          curve: Curves.easeOutBack,
+                          duration: morph.duration,
+                          curve: morph.curve,
                           width: option == value ? 42 : 32,
                           height: option == value ? 42 : 32,
                           clipBehavior: Clip.antiAlias,
@@ -432,7 +509,6 @@ class _BackgroundPicker extends StatelessWidget {
   }
 }
 
-/// How many lines are quoted, against the card's limit.
 class _SelectionCount extends StatelessWidget {
   const _SelectionCount({required this.count});
 
@@ -443,10 +519,14 @@ class _SelectionCount extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final active = count > 0;
+    final tint = AppMotion.effectsFast(
+      context,
+      _still,
+      mornye: MornyeMotion.effectsFast,
+    );
     return AnimatedContainer(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 200),
+      duration: tint.duration,
+      curve: tint.curve,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: ShapeDecoration(
         color: active ? colors.primaryContainer : colors.surfaceContainerHigh,
@@ -465,6 +545,7 @@ class _SelectionCount extends StatelessWidget {
 
 class _LineChoice extends StatelessWidget {
   const _LineChoice({
+    super.key,
     required this.line,
     required this.selected,
     required this.first,
@@ -492,9 +573,18 @@ class _LineChoice extends StatelessWidget {
             top: first ? outer : inner,
             bottom: last ? outer : inner,
           );
-    final duration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 220);
+    // The row reshapes on the default spatial spring and its check on the
+    // fast one; reduced motion jumps.
+    final reshape = AppMotion.spatial(
+      context,
+      _still,
+      mornye: MornyeMotion.standard,
+    );
+    final check = AppMotion.spatialFast(
+      context,
+      _still,
+      mornye: MornyeMotion.fast,
+    );
     return Padding(
       padding: EdgeInsets.only(bottom: last ? 0 : 2),
       child: MergeSemantics(
@@ -503,8 +593,8 @@ class _LineChoice extends StatelessWidget {
           // The container clips its own ink, so the press highlight follows
           // the corners while they animate.
           child: AnimatedContainer(
-            duration: duration,
-            curve: Curves.easeOutCubic,
+            duration: reshape.duration,
+            curve: reshape.curve,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: selected
@@ -526,8 +616,8 @@ class _LineChoice extends StatelessWidget {
                     child: Row(
                       children: [
                         AnimatedContainer(
-                          duration: duration,
-                          curve: Curves.easeOutBack,
+                          duration: check.duration,
+                          curve: check.curve,
                           width: 24,
                           height: 24,
                           decoration: BoxDecoration(
@@ -551,6 +641,7 @@ class _LineChoice extends StatelessWidget {
                         Expanded(
                           child: Text(
                             line.text,
+                            textDirection: strongTextDirection(line.text),
                             style:
                                 (line.background
                                         ? theme.textTheme.bodyMedium
@@ -618,6 +709,14 @@ class LyricsShareCard extends StatelessWidget {
     final secondary = foreground.withValues(alpha: 0.7);
     final fontSize = fontSizeFor(lines);
     final scheme = Theme.of(context).colorScheme;
+    // A card shrunk to fit keeps the side its first line reads from. Each
+    // line reads in its own direction.
+    final cardDirection =
+        lines
+            .map((line) => strongTextDirection(line.text))
+            .nonNulls
+            .firstOrNull ??
+        Directionality.of(context);
     return MediaQuery.withNoTextScaling(
       child: SizedBox.fromSize(
         size: lyricsShareCardSize,
@@ -692,7 +791,9 @@ class LyricsShareCard extends StatelessWidget {
                           constraints: const BoxConstraints(maxHeight: 380),
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
-                            alignment: AlignmentDirectional.topStart,
+                            alignment: AlignmentDirectional.topStart.resolve(
+                              cardDirection,
+                            ),
                             child: SizedBox(
                               width: lyricsShareCardSize.width - 100,
                               child: lines.isEmpty
@@ -708,7 +809,7 @@ class LyricsShareCard extends StatelessWidget {
                                     )
                                   : Column(
                                       crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                          CrossAxisAlignment.stretch,
                                       children: [
                                         for (final line in lines)
                                           Padding(
@@ -717,6 +818,11 @@ class LyricsShareCard extends StatelessWidget {
                                             ),
                                             child: Text(
                                               line.text,
+                                              textDirection:
+                                                  strongTextDirection(
+                                                    line.text,
+                                                  ) ??
+                                                  cardDirection,
                                               style: TextStyle(
                                                 color: line.background
                                                     ? secondary

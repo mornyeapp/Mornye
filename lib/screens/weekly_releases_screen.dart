@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
@@ -14,7 +14,9 @@ import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 class WeeklyReleasesScreen extends ConsumerStatefulWidget {
-  const WeeklyReleasesScreen({super.key});
+  const WeeklyReleasesScreen({super.key, this.days = 7});
+
+  final int days;
 
   @override
   ConsumerState<WeeklyReleasesScreen> createState() =>
@@ -22,7 +24,7 @@ class WeeklyReleasesScreen extends ConsumerStatefulWidget {
 }
 
 class _WeeklyReleasesScreenState extends ConsumerState<WeeklyReleasesScreen> {
-  int _days = 7;
+  late int _days = widget.days;
   bool _refresh = false;
 
   Future<void> _reload() async {
@@ -48,6 +50,7 @@ class _WeeklyReleasesScreenState extends ConsumerState<WeeklyReleasesScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             AppSliverHeader.page(title: context.l10n.weeklyReleases),
+            AppRefreshIndicator.sliver(),
             // Centered at the reading width on tablets, under the title.
             SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),

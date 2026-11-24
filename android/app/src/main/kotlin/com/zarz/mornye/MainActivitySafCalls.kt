@@ -390,6 +390,82 @@ internal suspend fun MainActivity.handleWriteSafSidecarLrc(call: MethodCall, res
     result.success(response)
 }
 
+internal suspend fun MainActivity.handleWriteSafSidecar(call: MethodCall, result: MethodChannel.Result) {
+    val safUri = call.argument<String>("saf_uri") ?: ""
+    val content = call.argument<String>("content") ?: ""
+    val extension = call.argument<String>("extension") ?: ""
+    val written = withContext(Dispatchers.IO) {
+        try {
+            extension.matches(Regex("[a-z0-9]{1,8}")) &&
+                writeSafSidecar(Uri.parse(safUri), content, extension)
+        } catch (_: Exception) {
+            false
+        }
+    }
+    result.success(written)
+}
+
+internal suspend fun MainActivity.handleReadSafSidecar(call: MethodCall, result: MethodChannel.Result) {
+    val safUri = call.argument<String>("saf_uri") ?: ""
+    val extension = call.argument<String>("extension") ?: ""
+    val content = withContext(Dispatchers.IO) {
+        try {
+            if (extension.matches(Regex("[a-z0-9]{1,8}"))) {
+                readSafSidecar(Uri.parse(safUri), extension)
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+    result.success(content)
+}
+
+internal suspend fun MainActivity.handleFindSafSibling(call: MethodCall, result: MethodChannel.Result) {
+    val safUri = call.argument<String>("saf_uri") ?: ""
+    val name = call.argument<String>("name") ?: ""
+    val sibling = withContext(Dispatchers.IO) {
+        if (isPlainSiblingName(name)) findSafSibling(Uri.parse(safUri), name) else null
+    }
+    result.success(sibling)
+}
+
+internal suspend fun MainActivity.handleFindSafSiblings(call: MethodCall, result: MethodChannel.Result) {
+    val safUri = call.argument<String>("saf_uri") ?: ""
+    val extensions = call.argument<List<String>>("extensions").orEmpty()
+    val names = call.argument<List<String>>("names").orEmpty()
+    val siblings = withContext(Dispatchers.IO) {
+        findSafSiblings(Uri.parse(safUri), extensions, names)
+    }
+    result.success(siblings)
+}
+
+internal suspend fun MainActivity.handleReadSafText(call: MethodCall, result: MethodChannel.Result) {
+    val uri = Uri.parse(call.argument<String>("uri") ?: "")
+    val maxBytes = call.argument<Int>("max_bytes") ?: 0
+    val content = withContext(Dispatchers.IO) {
+        if (uri.scheme == "content" && maxBytes > 0) readSafText(uri, maxBytes) else null
+    }
+    result.success(content)
+}
+
+internal suspend fun MainActivity.handleSafSongFolders(call: MethodCall, result: MethodChannel.Result) {
+    val safUri = call.argument<String>("saf_uri") ?: ""
+    val folders = withContext(Dispatchers.IO) {
+        safSongFolders(Uri.parse(safUri))
+    }
+    result.success(folders)
+}
+
+internal suspend fun MainActivity.handleListSafFolder(call: MethodCall, result: MethodChannel.Result) {
+    val folderUri = call.argument<String>("folder_uri") ?: ""
+    val entries = withContext(Dispatchers.IO) {
+        listSafFolder(Uri.parse(folderUri))
+    }
+    result.success(entries)
+}
+
 internal suspend fun MainActivity.handleGetSafFileModTimes(call: MethodCall, result: MethodChannel.Result) {
     val uris = call.argument<String>("uris") ?: "[]"
     val response = withContext(Dispatchers.IO) {

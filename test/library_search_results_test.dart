@@ -1,18 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/library_search_provider.dart';
 import 'package:mornye/providers/library_lyrics_search_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_search.dart';
@@ -21,13 +23,19 @@ import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
+import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/library_search_results.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/app_icon_finder.dart';
+import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 class _PlaybackRecorder extends PlaybackController {
   final paths = <String>[];
+  final queues = <List<String>>[];
+  final starts = <int>[];
 
   @override
   Future<void> playMediaQueue(
@@ -36,6 +44,8 @@ class _PlaybackRecorder extends PlaybackController {
     required String externalPath,
   }) async {
     paths.add(externalPath);
+    queues.add([for (final media in queue) media.source]);
+    starts.add(startIndex);
   }
 }
 
@@ -77,8 +87,11 @@ void main() {
                   ref.onDispose(() => stopped++);
                   return progress.stream;
                 }),
-                libraryLyricsSearchProvider.overrideWith((ref, request) async {
-                  queries.add(request.query);
+                libraryLyricsSearchProvider.overrideWithBuild((
+                  ref,
+                  notifier,
+                ) async {
+                  queries.add(notifier.request.query);
                   return [_hit(LibrarySearchKind.songs, 0, query: 'Matching')];
                 }),
               ],
@@ -120,6 +133,20 @@ void main() {
           expect(started, 1);
           expect(find.textContaining('8 songs checked'), findsOneWidget);
           expect(find.text('Matching songs 0'), findsOneWidget);
+          expect(find.byType(TrackCard), findsWidgets);
+          var rowBuilds = 0;
+          debugOnRebuildDirtyWidget = (element, _) {
+            if (element.widget is TrackCard) rowBuilds++;
+          };
+          addTearDown(() => debugOnRebuildDirtyWidget = null);
+          for (final checked in [16, 24, 32]) {
+            progress.add(LibraryLyricsIndexProgress(checked: checked));
+            await tester.pump();
+            await tester.pump();
+          }
+          debugOnRebuildDirtyWidget = null;
+          expect(find.textContaining('32 songs checked'), findsOneWidget);
+          expect(rowBuilds, 0);
           query.value = 'dancing';
           await tester.pump();
           await tester.pump();
@@ -139,9 +166,15 @@ void main() {
   }
 
   for (final mornye in [false, true]) {
-    for (final local in [false, true]) {
+    for (final (local, tapPlays) in [
+      (false, false),
+      (true, false),
+      (false, true),
+      (true, true),
+    ]) {
       testWidgets(
-        'search opens metadata; only Play starts audio ($mornye/$local)',
+        'search opens metadata on a tap or its info button and plays on the '
+        'other ($mornye/$local/tapPlays: $tapPlays)',
         (tester) async {
           SharedPreferences.setMockInitialValues({});
           FlutterSecureStorage.setMockInitialValues({});
@@ -191,6 +224,15 @@ void main() {
             ProviderScope(
               overrides: [
                 playbackProvider.overrideWith(() => player),
+                settingsProvider.overrideWith(
+                  () => FixedSettingsNotifier(
+                    AppSettings(
+                      librarySongTap: tapPlays
+                          ? AppSettings.librarySongTapPlay
+                          : AppSettings.librarySongTapDetails,
+                    ),
+                  ),
+                ),
                 librarySearchProvider.overrideWith(
                   (ref, request) async =>
                       request.kind == LibrarySearchKind.songs
@@ -233,7 +275,14 @@ void main() {
             tester.widget<TrackCard>(find.byType(TrackCard)).style,
             mornye ? TrackCardStyle.flat : TrackCardStyle.filled,
           );
-          await tester.tap(find.text('Song'));
+          final song = find.text('Song');
+          final info = findByTooltip('Show details');
+          final play = findByTooltip('Play');
+          expect(info, tapPlays ? findsOneWidget : findsNothing);
+          expect(play, tapPlays ? findsNothing : findsOneWidget);
+          await tester.tap(tapPlays ? info : song);
+          // Details wait a moment for the picture inside the file.
+          await tester.pump(const Duration(milliseconds: 300));
           await tester.pumpAndSettle();
           final details = tester.widget<TrackMetadataScreen>(
             find.byType(TrackMetadataScreen),
@@ -243,14 +292,140 @@ void main() {
           expect(player.paths, isEmpty);
           tester.state<NavigatorState>(find.byType(Navigator).first).pop();
           await tester.pumpAndSettle();
-          await tester.tap(find.byTooltip('Play'));
+          await tester.tap(tapPlays ? song : play);
           await tester.pumpAndSettle();
           expect(player.paths, [path]);
+          // Without a Library list to continue into, the song plays alone.
+          expect(player.queues, [
+            [path],
+          ]);
           expect(find.byType(TrackMetadataScreen), findsNothing);
           expect(tester.takeException(), isNull);
         },
       );
     }
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets(
+      'a played song continues into its Library list from the song ($mornye)',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        FlutterSecureStorage.setMockInitialValues({});
+        UnifiedLibraryItem local(String id) =>
+            UnifiedLibraryItem.fromLocalLibrary(
+              LocalLibraryItem(
+                id: id,
+                trackName: 'Song $id',
+                artistName: 'Artist',
+                albumName: 'Album',
+                filePath: '/music/$id.mp3',
+                scannedAt: DateTime(2026),
+              ),
+            );
+        const LibrarySongListRequest filtered = (
+          filterMode: 'all',
+          sortMode: 'oldest',
+          source: null,
+          quality: 'hires',
+          format: null,
+          metadata: null,
+          includeLocal: true,
+        );
+        const LibrarySongListRequest whole = (
+          filterMode: 'all',
+          sortMode: 'oldest',
+          source: null,
+          quality: null,
+          format: null,
+          metadata: null,
+          includeLocal: true,
+        );
+        final lists = <LibrarySongListRequest>[];
+        final player = _PlaybackRecorder();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              librarySongTapPlaysProvider.overrideWithValue(true),
+              playbackProvider.overrideWith(() => player),
+              librarySearchProvider.overrideWith(
+                (ref, request) async => request.kind == LibrarySearchKind.songs
+                    ? [
+                        // The second song is one the Hi-Res filter hides.
+                        for (final id in ['b', 'x'])
+                          LibrarySearchHit(
+                            kind: LibrarySearchKind.songs,
+                            id: id,
+                            title: 'Song $id',
+                            source: 'local',
+                          ),
+                      ]
+                    : [],
+              ),
+              librarySearchTrackProvider.overrideWith(
+                (ref, key) async => local(key.id),
+              ),
+              librarySongListProvider.overrideWith((ref, request) async {
+                lists.add(request);
+                return [
+                  for (final id
+                      in request == filtered
+                          ? ['a', 'b', 'c']
+                          : ['w', 'x', 'a', 'b', 'c'])
+                    local(id),
+                ];
+              }),
+            ],
+            child: MaterialApp(
+              theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: CustomScrollView(
+                  slivers: [
+                    LibrarySearchResults(
+                      query: 'Song',
+                      songList: filtered,
+                      onOpenArtist: (_) {},
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        // Typing searched only; no list was read for playback yet.
+        expect(lists, isEmpty);
+
+        // A tap on a song plays it as its Play button did.
+        await tester.tap(find.text('Song b'));
+        await tester.pumpAndSettle();
+        expect(lists, [filtered]);
+        expect(player.queues.last, [
+          '/music/a.mp3',
+          '/music/b.mp3',
+          '/music/c.mp3',
+        ]);
+        expect(player.starts.last, 1);
+        expect(player.paths.last, '/music/b.mp3');
+
+        await tester.tap(find.text('Song x'));
+        await tester.pumpAndSettle();
+        // Hidden by the filters, the song plays within every song instead.
+        expect(lists.skip(1), [filtered, whole]);
+        expect(player.queues.last, [
+          '/music/w.mp3',
+          '/music/x.mp3',
+          '/music/a.mp3',
+          '/music/b.mp3',
+          '/music/c.mp3',
+        ]);
+        expect(player.starts.last, 1);
+        expect(player.paths.last, '/music/x.mp3');
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final mornye in [false, true]) {
@@ -292,7 +467,8 @@ void main() {
         requests.map((r) => r.kind).toSet(),
         LibrarySearchKind.values.toSet(),
       );
-      expect(requests.every((r) => r.limit == 6 && r.offset == 0), isTrue);
+      // The overview asks for its largest page in every layout.
+      expect(requests.every((r) => r.limit == 21 && r.offset == 0), isTrue);
       await tester.tap(find.text('Artists').first);
       await tester.pumpAndSettle();
       expect(requests.last.limit, 41);
@@ -309,6 +485,63 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('Material joins the song results into one run', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          librarySearchProvider.overrideWith(
+            (ref, request) async => List.generate(
+              request.limit,
+              (i) => _hit(request.kind, request.offset + i),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: ThemeData(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: CustomScrollView(
+              slivers: [
+                LibrarySearchResults(query: 'Found', onOpenArtist: (_) {}),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Found songs 0'),
+      200,
+      scrollable: scrollable,
+    );
+    TrackCardSegment segment(String title) => tester.widget(
+      find.ancestor(
+        of: find.text(title),
+        matching: find.byType(TrackCardSegment),
+      ),
+    );
+    expect(segment('Found songs 0').first, isTrue);
+    expect(segment('Found songs 0').last, isFalse);
+    // The overview's last song row closes the run although more exist.
+    final last = find.byWidgetPredicate(
+      (widget) => widget is TrackCardSegment && widget.last,
+    );
+    await tester.scrollUntilVisible(last, 200, scrollable: scrollable);
+    expect(tester.widget<TrackCardSegment>(last).first, isFalse);
+    // Other kinds stay flat rows outside any run.
+    expect(
+      find.ancestor(
+        of: find.textContaining('Found albums'),
+        matching: find.byType(TrackCardSegment),
+      ),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('an older query cannot replace newer results', (tester) async {
     final old = Completer<List<LibrarySearchHit>>();
@@ -381,6 +614,7 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
+              librarySongTapPlaysProvider.overrideWithValue(true),
               playbackProvider.overrideWith(() => player),
               librarySearchProvider.overrideWith(
                 (ref, request) async => switch (request.kind) {
@@ -421,7 +655,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.byTooltip('Play'), findsNWidgets(2));
+        expect(findByTooltip('Show details'), findsNWidgets(2));
 
         await tester.longPress(find.text('Song a'));
         await tester.pumpAndSettle();
@@ -430,7 +664,7 @@ void main() {
         expect(find.text('Convert 1 track'), findsOneWidget);
         expect(find.text('Delete 1 track'), findsOneWidget);
         // Selecting hides row actions and keeps taps on the selection.
-        expect(find.byTooltip('Play'), findsNothing);
+        expect(findByTooltip('Show details'), findsNothing);
         await tester.tap(find.text('Song b'));
         await tester.pumpAndSettle();
         expect(find.text('2 selected'), findsOneWidget);
@@ -448,7 +682,7 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(find.textContaining('selected'), findsNothing);
-        expect(find.byTooltip('Play'), findsNWidgets(2));
+        expect(findByTooltip('Show details'), findsNWidgets(2));
 
         await tester.longPress(find.text('Song a'));
         await tester.pumpAndSettle();
@@ -518,12 +752,12 @@ void main() {
       await tester.pumpAndSettle();
       // Rows until the shared view setting picks covers.
       expect(find.byType(TrackCard), findsWidgets);
-      expect(find.byTooltip('Grid'), findsOneWidget);
+      expect(findByTooltip('Grid'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Grid'));
+      await tester.tap(findByTooltip('Grid'));
       await tester.pumpAndSettle();
       expect(find.byType(TrackCard), findsNothing);
-      expect(find.byTooltip('List'), findsOneWidget);
+      expect(findByTooltip('List'), findsOneWidget);
       // The overview: one shelf per kind, songs as covers the albums' size.
       expect(find.byType(SliverGrid), findsNothing);
       final song = find.byKey(const ValueKey('songs:local:0'));
@@ -561,8 +795,60 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(SliverGrid), findsNothing);
       expect(find.byType(TrackCard), findsWidgets);
-      expect(find.byTooltip('List'), findsNothing);
+      expect(findByTooltip('List'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('crossing the cover breakpoint keeps the overview hits', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
+    tester.view.physicalSize = const Size(1280, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final requests = <LibrarySearchRequest>[];
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          librarySearchProvider.overrideWith((ref, request) async {
+            requests.add(request);
+            return List.generate(
+              request.limit,
+              (i) => _hit(request.kind, request.offset + i),
+            );
+          }),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: CustomScrollView(
+              slivers: [
+                LibrarySearchResults(query: 'Found', onOpenArtist: (_) {}),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(findByTooltip('Grid'));
+    await tester.pumpAndSettle();
+    expect(findByTooltip('List'), findsOneWidget);
+    final searched = requests.length;
+
+    // A pane narrowing past the breakpoint, as when the lyrics panel opens
+    // beside it, switches to rows from the hits already found.
+    for (final width in [700.0, 1280.0, 700.0]) {
+      tester.view.physicalSize = Size(width, 1600);
+      await tester.pump();
+      expect(find.byType(AppLoadingIndicator), findsNothing);
+      expect(find.text('Found songs 0'), findsOneWidget);
+      await tester.pumpAndSettle();
+    }
+    expect(requests, hasLength(searched));
+    expect(tester.takeException(), isNull);
+  });
 }

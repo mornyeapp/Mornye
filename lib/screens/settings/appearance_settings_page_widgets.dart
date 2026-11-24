@@ -585,6 +585,152 @@ class _ThemeModeSelector extends StatelessWidget {
   }
 }
 
+/// Scales the whole app. The size applies when the slider is released, so
+/// the slider does not move under the pointer while it is dragged.
+class _InterfaceSizeSlider extends ConsumerWidget {
+  const _InterfaceSizeSlider();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    return _PercentSlider(
+      sliderKey: const ValueKey('interface-size-slider'),
+      title: l10n.appearanceInterfaceSize,
+      description: l10n.appearanceInterfaceSizeDescription,
+      lowLabel: l10n.appearanceInterfaceSizeSmaller,
+      highLabel: l10n.appearanceInterfaceSizeLarger,
+      min: minInterfaceScale,
+      max: maxInterfaceScale,
+      divisions: 10,
+      saved: ref.watch(
+        settingsProvider.select((settings) => settings.interfaceScale),
+      ),
+      onCommitted: ref.read(settingsProvider.notifier).setInterfaceScale,
+    );
+  }
+}
+
+/// How fast the app's own motion plays ([MotionPace]), in quarter steps
+/// from half to twice the designed speed.
+class _AnimationSpeedSlider extends ConsumerWidget {
+  const _AnimationSpeedSlider();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    return _PercentSlider(
+      sliderKey: const ValueKey('animation-speed-slider'),
+      title: l10n.appearanceAnimationSpeed,
+      description: l10n.appearanceAnimationSpeedDescription,
+      lowLabel: l10n.appearanceAnimationSpeedSlower,
+      highLabel: l10n.appearanceAnimationSpeedFaster,
+      min: minAnimationSpeed,
+      max: maxAnimationSpeed,
+      divisions: 6,
+      saved: ref.watch(
+        settingsProvider.select((settings) => settings.animationSpeed),
+      ),
+      onCommitted: ref.read(settingsProvider.notifier).setAnimationSpeed,
+    );
+  }
+}
+
+/// A slider row for a factor shown as a percentage, with a label at each
+/// end and an explanation below. [onCommitted] runs when the slider is
+/// released.
+class _PercentSlider extends StatefulWidget {
+  const _PercentSlider({
+    required this.sliderKey,
+    required this.title,
+    required this.description,
+    required this.lowLabel,
+    required this.highLabel,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.saved,
+    required this.onCommitted,
+  });
+
+  final Key sliderKey;
+  final String title;
+  final String description;
+  final String lowLabel;
+  final String highLabel;
+  final double min;
+  final double max;
+  final int divisions;
+  final double saved;
+  final ValueChanged<double> onCommitted;
+
+  @override
+  State<_PercentSlider> createState() => _PercentSliderState();
+}
+
+class _PercentSliderState extends State<_PercentSlider> {
+  double? _draft;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = (_draft ?? widget.saved).clamp(widget.min, widget.max);
+    final l10n = context.l10n;
+    final tokens = context.tokens;
+    final theme = Theme.of(context);
+    final format = NumberFormat.percentPattern(l10n.localeName);
+    final label = format.format(value);
+    final content = Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: tokens.rowPaddingH,
+        vertical: tokens.rowPaddingV,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SliderValueHeader(title: widget.title, value: label),
+          AppSlider(
+            key: widget.sliderKey,
+            value: value,
+            min: widget.min,
+            max: widget.max,
+            divisions: widget.divisions,
+            label: label,
+            semanticLabel: widget.title,
+            semanticFormatterCallback: format.format,
+            onChanged: (value) => setState(() => _draft = value),
+            onChangeEnd: (value) {
+              widget.onCommitted(value);
+              setState(() => _draft = null);
+            },
+          ),
+          DefaultTextStyle(
+            style: theme.textTheme.bodySmall!.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: Text(widget.lowLabel)),
+                SizedBox(width: tokens.gapMd),
+                Expanded(
+                  child: Text(widget.highLabel, textAlign: TextAlign.end),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: tokens.gapSm),
+          Text(
+            widget.description,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+    return SettingsSearchTarget(label: widget.title, child: content);
+  }
+}
+
 class _HistoryViewSelector extends StatelessWidget {
   final String currentMode;
   final ValueChanged<String> onChanged;

@@ -1,10 +1,8 @@
 // ignore_for_file: invalid_use_of_protected_member
 part of 'artist_screen.dart';
 
-/// Side margin of the artist page's desktop sections.
 const double _mornyeSectionInset = 24;
 
-/// Space between the columns of the artist page's desktop highlights.
 const double _mornyeHighlightGap = 16;
 
 /// Width of a highlight column: two fit the pane, and the right margin shows
@@ -14,7 +12,6 @@ double _mornyeHighlightColumn(double paneWidth) => math.max(
   260,
 );
 
-/// Settles a sideways scroll on the nearest column of [extent].
 class _ColumnSnapPhysics extends ScrollPhysics {
   const _ColumnSnapPhysics({required this.extent, super.parent});
 
@@ -324,6 +321,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
                           : (mornye
                                 ? CupertinoIcons.star
                                 : Icons.favorite_border),
+                      selected: isFavoriteArtist,
                       iconColor: isFavoriteArtist && !mornye
                           ? headerScheme.error
                           : headerScheme.primary,
@@ -777,7 +775,6 @@ extension _ArtistScreenSections on _ArtistScreenState {
     );
   }
 
-  /// The newest release, cover first with its details beside it.
   Widget _buildMornyeLatestRelease(
     BuildContext context,
     ArtistAlbum album,
@@ -798,17 +795,22 @@ extension _ArtistScreenSections on _ArtistScreenState {
         onTap: () => _navigateToAlbum(album),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox.square(
-                dimension: extent,
-                child: album.coverUrl != null
-                    ? CachedCoverImage(
-                        imageUrl: album.coverUrl!,
-                        fit: BoxFit.cover,
-                      )
-                    : const Icon(CupertinoIcons.square_stack, size: 32),
-              ),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox.square(
+                    dimension: extent,
+                    child: album.coverUrl != null
+                        ? CachedCoverImage(
+                            imageUrl: album.coverUrl!,
+                            fit: BoxFit.cover,
+                          )
+                        : const Icon(CupertinoIcons.square_stack, size: 32),
+                  ),
+                ),
+                DesktopCoverHover(borderRadius: BorderRadius.circular(8)),
+              ],
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -1201,8 +1203,21 @@ extension _ArtistScreenSections on _ArtistScreenState {
     String title,
     List<ArtistAlbum> albums,
     ColorScheme colorScheme, {
+    required List<ArtistAlbum> Function() listing,
     bool showTypeBadge = false,
   }) {
+    void showAll() => pushPage<void>(
+      context,
+      (_) => _ArtistAlbumsPage(
+        title: title,
+        albums: listing,
+        loadingMore: () => _isLoadingMoreAlbums,
+        changes: _albumsChanged,
+        onLoadMore: _requestMoreAlbums,
+        onOpen: _navigateToAlbum,
+        showTypeBadge: showTypeBadge,
+      ),
+    );
     if (isDesktopPlatform && context.isMornye) {
       // Four covers to the pane's width: two line up under each highlight
       // column above.
@@ -1215,6 +1230,8 @@ extension _ArtistScreenSections on _ArtistScreenState {
             title,
             albums,
             colorScheme,
+            label: title,
+            onShowAll: showAll,
             showTypeBadge: showTypeBadge,
             tileSize: tile,
             sectionHeight:
@@ -1240,6 +1257,8 @@ extension _ArtistScreenSections on _ArtistScreenState {
       '$title (${albums.length})',
       albums,
       colorScheme,
+      label: title,
+      onShowAll: showAll,
       showTypeBadge: showTypeBadge,
       tileSize: artistAlbumTileSize(context),
       sectionHeight: artistAlbumSectionHeight(context),
@@ -1256,6 +1275,8 @@ extension _ArtistScreenSections on _ArtistScreenState {
     String title,
     List<ArtistAlbum> albums,
     ColorScheme colorScheme, {
+    required String label,
+    required VoidCallback onShowAll,
     required bool showTypeBadge,
     required double tileSize,
     required double sectionHeight,
@@ -1266,9 +1287,48 @@ extension _ArtistScreenSections on _ArtistScreenState {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: headingPadding,
-          child: Text(title, style: headingStyle),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final heading = Text(title, style: headingStyle);
+            final overflows =
+                albums.length * (tileSize + 8) + listPadding * 2 >
+                constraints.maxWidth;
+            final offersAll =
+                !isSelectionMode &&
+                (overflows || (_albumsNext?.isNotEmpty ?? false));
+            return Padding(
+              padding: headingPadding,
+              child: !offersAll
+                  ? heading
+                  : context.isMornye
+                  ? Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: _AlbumShelfChevronHeading(
+                        label: label,
+                        onTap: onShowAll,
+                        child: heading,
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(child: heading),
+                        ExpressiveButton(
+                          text: true,
+                          onPressed: onShowAll,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          child: Text(
+                            context.l10n.searchShowAll,
+                            semanticsLabel: context.l10n.searchShowAllCategory(
+                              label,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            );
+          },
         ),
         NotificationListener<ScrollNotification>(
           onNotification: _onAlbumsScroll,
@@ -1406,6 +1466,11 @@ extension _ArtistScreenSections on _ArtistScreenState {
     required double sectionHeight,
     required bool showTypeBadge,
   }) {
+    // The selection overlay is a tint, on the fast effects spring.
+    final selectionTint = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 200), Curves.linear),
+    );
     return Semantics(
       button: true,
       selected: isSelectionMode && isSelected,
@@ -1449,48 +1514,17 @@ extension _ArtistScreenSections on _ArtistScreenState {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    DownloadableCover(
-                      coverUrl: album.coverUrl,
-                      baseName: '${album.artists} - ${album.name}',
+                    _ArtistAlbumCover(
+                      album: album,
+                      size: tileSize,
                       enabled: !isSelectionMode,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: album.coverUrl != null
-                            ? CachedCoverImage(
-                                imageUrl: album.coverUrl!,
-                                width: tileSize,
-                                height: tileSize,
-                                fit: BoxFit.cover,
-                                memCacheWidth: (tileSize * 2).round(),
-                                memCacheHeight: (tileSize * 2).round(),
-                                placeholder: (context, url) => ShimmerLoading(
-                                  child: Container(
-                                    color: colorScheme.surfaceContainerHighest,
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: colorScheme.surfaceContainerHighest,
-                                  child: Icon(
-                                    Icons.album,
-                                    color: colorScheme.onSurfaceVariant,
-                                    size: 40,
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                color: colorScheme.surfaceContainerHighest,
-                                child: Icon(
-                                  Icons.album,
-                                  color: colorScheme.onSurfaceVariant,
-                                  size: 40,
-                                ),
-                              ),
-                      ),
                     ),
+                    DesktopCoverHover(borderRadius: BorderRadius.circular(8)),
                     if (isSelected || showsSelectionBar)
                       Positioned.fill(
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                          duration: selectionTint.duration,
+                          curve: selectionTint.curve,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
                             color: isSelected
@@ -1518,66 +1552,12 @@ extension _ArtistScreenSections on _ArtistScreenState {
                           ),
                         ),
                       ),
-                    if (showTypeBadge)
-                      PositionedDirectional(
-                        start: 6,
-                        bottom: 6,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            album.albumType == 'ep'
-                                ? context.l10n.releaseTypeEp
-                                : context.l10n.releaseTypeSingle,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
+                    if (showTypeBadge) _ArtistAlbumTypeBadge(album: album),
                   ],
                 ),
               ),
               const SizedBox(height: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        album.name,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      album.totalTracks > 0
-                          ? '${album.releaseDate.length >= 4 ? album.releaseDate.substring(0, 4) : album.releaseDate} ${context.l10n.tracksCount(album.totalTracks)}'
-                          : album.releaseDate.length >= 4
-                          ? album.releaseDate.substring(0, 4)
-                          : album.releaseDate,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
+              Expanded(child: _ArtistAlbumCaption(album: album)),
             ],
           ),
         ),
@@ -1585,7 +1565,9 @@ extension _ArtistScreenSections on _ArtistScreenState {
     );
   }
 
-  void _navigateToAlbum(ArtistAlbum album) {
+  Future<void> _navigateToAlbum(ArtistAlbum album) async {
+    if (_savedCopy && await _openLibraryAlbum(album)) return;
+    if (!mounted) return;
     ref.read(settingsProvider.notifier).setHasSearchedBefore();
 
     if (album.providerId != null && album.providerId!.isNotEmpty) {

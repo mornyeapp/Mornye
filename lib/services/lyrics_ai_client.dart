@@ -46,7 +46,6 @@ enum LyricsAiProvider {
   /// Local servers often run without authentication.
   bool get requiresKey => this != custom;
 
-  /// Speaks the OpenAI chat completions protocol.
   bool get openAiCompatible =>
       this == openAi || this == openRouter || this == custom;
 }
@@ -91,7 +90,6 @@ String normalizeLyricsAiBaseUrl(String value) {
   return url;
 }
 
-/// Whether [value] is an absolute http(s) URL with a host.
 bool isValidLyricsAiBaseUrl(String value) {
   final uri = Uri.tryParse(normalizeLyricsAiBaseUrl(value));
   return uri != null &&
@@ -140,7 +138,6 @@ class LyricsAiException implements Exception {
       'LyricsAiException(${kind.name}${detail == null ? '' : ': $detail'})';
 }
 
-/// One line sent for translation.
 class LyricsAiItem {
   const LyricsAiItem(this.id, this.text, {this.words = const []});
 
@@ -274,7 +271,6 @@ String lyricsTranslationSystemPrompt({
   ].join('\n');
 }
 
-/// Builds the translation request for [config]'s provider.
 LyricsAiRequest buildLyricsTranslationRequest(
   LyricsAiConfig config,
   List<LyricsAiItem> items, {
@@ -384,7 +380,6 @@ LyricsAiRequest buildLyricsTranslationRequest(
   }
 }
 
-/// Builds the request listing [config]'s models.
 LyricsAiRequest buildLyricsModelListRequest(LyricsAiConfig config) =>
     switch (config.provider) {
       LyricsAiProvider.gemini => LyricsAiRequest(
@@ -820,7 +815,6 @@ class LyricsAiClient {
     }
   }
 
-  /// Lists model ids from the provider's catalog.
   Future<List<String>> listModels() async {
     final request = buildLyricsModelListRequest(config);
     final response = await _send(

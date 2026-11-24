@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -90,6 +90,9 @@ void main() {
     final font = FontLoader('Google Sans Flex')
       ..addFont(rootBundle.load('assets/fonts/GoogleSansFlex.ttf'));
     await font.load();
+    // The new font is announced on a real event-loop turn. Take it now, or
+    // it lands after the test and relays out the binding's closing message.
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     final playback = StreamController<PlaybackState>.broadcast();
     final seek = ValueNotifier<Duration?>(null);
     addTearDown(playback.close);

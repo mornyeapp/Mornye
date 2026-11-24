@@ -101,6 +101,49 @@ void main() {
     expect(second.latestCrash(), isNull);
   });
 
+  test('a runtime error long before a force quit is not the report', () async {
+    final errorAt = DateTime(2026, 11, 13, 13, 49);
+    final first = DesktopDiagnostics(
+      directory: directory,
+      processId: 1,
+      now: () => errorAt,
+      osCrashReportDirectory: osReports(),
+    )..beginSession(device: 'test-os 1');
+    first.recordRuntimeError(error: 'StateError', stack: '#0 main', logs: '');
+    first.writeEntry(entry('still working'));
+    await first.close();
+    // The session kept logging for longer, then was force quit.
+    first.logFile.setLastModifiedSync(
+      errorAt.add(
+        DesktopDiagnostics.runtimeErrorExitWindow + const Duration(seconds: 1),
+      ),
+    );
+
+    final second = session(2);
+    expect(second.pendingCrash(), isNull);
+    expect(second.latestCrash(), isNull);
+    await second.close();
+    expect(
+      second.logFile.readAsStringSync(),
+      contains('ended without quitting'),
+    );
+  });
+
+  test('a runtime error right before the exit is the report', () async {
+    final errorAt = DateTime(2026, 11, 13, 13, 49);
+    final first = DesktopDiagnostics(
+      directory: directory,
+      processId: 1,
+      now: () => errorAt,
+      osCrashReportDirectory: osReports(),
+    )..beginSession(device: 'test-os 1');
+    first.recordRuntimeError(error: 'StateError', stack: '#0 main', logs: '');
+    await first.close();
+    first.logFile.setLastModifiedSync(errorAt.add(const Duration(seconds: 2)));
+
+    expect(session(2).pendingCrash()!['reason'], 'App error');
+  });
+
   test('a Rust panic from that session is the report trace', () async {
     final first = session(1);
     await first.close();

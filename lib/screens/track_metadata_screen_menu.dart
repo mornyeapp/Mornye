@@ -26,6 +26,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         _fileExists &&
         remoteItem != null &&
         linkClient != null &&
+        linkClient.server.supports(LinkHostFeatures.libraryJobs) &&
         linkDesktopSongId(remoteItem.filePath, linkClient.server) != null;
     final container = ProviderScope.containerOf(screenContext, listen: false);
     // The computer's copy offers the file actions of a song on this phone,
@@ -84,7 +85,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         ),
       if (phoneSongs.isNotEmpty && linkClient != null)
         _MetadataOption(
-          icon: Icons.computer,
+          icon: linkSendToHostIcon(linkClient),
           label: l10n.linkSendToDesktop(linkDesktopName(linkClient)),
           onTap: () => linkSendSongsToDesktop(screenContext, ref, phoneSongs),
         ),
@@ -130,7 +131,8 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         remote(LinkLibraryAction.editMetadata),
       if (remoteFile)
         remote(LinkLibraryAction.saveCover)
-      else if (!_isNetworkItem && (_coverUrl != null || _fileExists))
+      else if (_canSaveSidecarFiles &&
+          (_coverUrl != null || _fileExists || _hasPath(_localCoverPath)))
         _MetadataOption(
           icon: Icons.image_outlined,
           label: l10n.trackSaveCoverArt,
@@ -138,7 +140,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         ),
       if (remoteFile)
         remote(LinkLibraryAction.saveLyrics)
-      else if (!_isNetworkItem && (_fileExists || !_isLocalItem))
+      else if (_canSaveSidecarFiles)
         _MetadataOption(
           icon: Icons.lyrics_outlined,
           label: l10n.trackSaveLyrics,
@@ -152,6 +154,14 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         )
       else if (remoteFile)
         remote(LinkLibraryAction.reEnrich),
+      // Restored through the metadata editor, so network songs that it can
+      // write qualify too.
+      if (_reEnrichUndoAvailable && _canEditMetadataFile)
+        _MetadataOption(
+          icon: Icons.undo,
+          label: l10n.trackReEnrichUndo,
+          onTap: _undoReEnrich,
+        ),
       if (canEditFile && _isConvertibleFormat)
         _MetadataOption(
           icon: Icons.swap_horiz,

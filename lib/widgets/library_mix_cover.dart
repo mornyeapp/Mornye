@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/services/sqlite_helpers.dart' show normalizeLookupText;
 import 'package:mornye/widgets/app_icon.dart';

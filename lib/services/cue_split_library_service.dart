@@ -24,12 +24,16 @@ class CueSplitLibraryService {
   final Future<Map<String, dynamic>?> Function(String) _readMetadata;
   final Future<FileAccessStat?> Function(String) _stat;
 
+  /// [sourceItemId] names the Library song the split started from. A song
+  /// opened from a list does not carry its folder, so the outputs join the
+  /// folder that song is stored in; [sourceId] applies when there is none.
   Future<void> publish({
     required String cuePath,
     required String audioPath,
     required List<CueSplitTrackInfo> tracks,
     required List<String> outputPaths,
     String sourceId = LocalLibraryItem.legacySourceId,
+    String? sourceItemId,
   }) async {
     if (tracks.isEmpty ||
         tracks.length != outputPaths.length ||
@@ -76,11 +80,24 @@ class CueSplitLibraryService {
     }
     final db = await _database();
     await sqlite.transactionWithBusyRetry(db, (txn) async {
+      var outputSourceId = sourceId;
+      if (sourceItemId != null) {
+        final stored = await txn.query(
+          'library',
+          columns: ['source_id'],
+          where: 'id = ?',
+          whereArgs: [sourceItemId],
+          limit: 1,
+        );
+        if (stored.isNotEmpty) {
+          outputSourceId = stored.first['source_id'] as String;
+        }
+      }
       final batch = txn.batch();
       for (final row in rows) {
         batch.insert(
           'library',
-          LibraryRowMapper.encode(row, sourceId: sourceId),
+          LibraryRowMapper.encode(row, sourceId: outputSourceId),
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
         batch.delete(

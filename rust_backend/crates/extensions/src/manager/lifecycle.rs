@@ -10,6 +10,11 @@ impl ExtensionManager {
         let source: Arc<str> = read_source(&entry.source.join("index.js"), 8 * 1024 * 1024)
             .map_err(|e| cause("failed to read index.js", e))?
             .into();
+        let compiled = entry
+            .compiled
+            .lock()
+            .expect("extension compile lock")
+            .clone();
         let runtime = self
             .environment
             .load_registered_with_lease(
@@ -18,6 +23,7 @@ impl ExtensionManager {
                 self.limits.clone(),
                 mode,
                 lease,
+                compiled,
             )
             .map_err(|error| match error {
                 crate::environment::EnvironmentError::Runtime(ExtensionError::Script(message)) => {
@@ -35,6 +41,12 @@ impl ExtensionManager {
                     .err()
                     .unwrap_or_else(|| error_from_environment(other)),
             })?;
+        // Disabled packages are validated without keeping their compile.
+        if mode == LoadMode::Register || entry.status.read().expect("extension status lock").enabled
+        {
+            *entry.compiled.lock().expect("extension compile lock") =
+                Some(Arc::clone(&runtime.compiled_source));
+        }
         // Keep the same source allocation as the VM/isolated-worker cache.
         // The loader copied the input into its owned CompiledSource.
         let source = runtime.shared_source();
@@ -100,6 +112,11 @@ impl ExtensionManager {
         }
         engine.initialized = false;
         engine.source = None;
+        entry
+            .compiled
+            .lock()
+            .expect("extension compile lock")
+            .take();
     }
 
     pub(super) fn failed(&self, entry: &Installed, failure: &ManagerError) {

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/services/link/desktop/link_phone_host_backend.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 
 String _string(Object? value) => value is String ? value.trim() : '';
 
@@ -147,6 +149,13 @@ class LinkPairedEvent extends LinkPairingEvent {
     required this.platform,
   });
 
+  factory LinkPairedEvent.fromJson(Map<String, dynamic> json) =>
+      LinkPairedEvent(
+        deviceId: _string(json['deviceId']),
+        name: _string(json['name']),
+        platform: _string(json['platform']),
+      );
+
   final String deviceId;
   final String name;
   final String platform;
@@ -156,14 +165,29 @@ class LinkPairedEvent extends LinkPairingEvent {
 class LinkPairingEndedEvent extends LinkPairingEvent {
   const LinkPairingEndedEvent(this.reason);
 
+  /// From the `reason` the server sends; an unknown one reads as cancelled.
+  factory LinkPairingEndedEvent.fromReason(String? reason) =>
+      LinkPairingEndedEvent(
+        LinkPairingEndReason.values.asNameMap()[reason] ??
+            LinkPairingEndReason.cancelled,
+      );
+
   final LinkPairingEndReason reason;
 }
 
 /// The desktop server calls of the link contract (section 6) and its
 /// inbound events. [PlatformLinkDesktopBackend] goes through
-/// [PlatformBridge]; tests fake it.
+/// [PlatformBridge], [ChannelLinkHostBackend] runs the same server on a
+/// phone; tests fake it.
 abstract interface class LinkDesktopBackend {
-  Future<LinkHostServer> start({required String name, int? port});
+  /// Starts the server as [name], announcing [platform] and the optional
+  /// abilities [features] ([LinkHostFeatures]) to clients.
+  Future<LinkHostServer> start({
+    required String name,
+    int? port,
+    String platform = '',
+    List<String>? features,
+  });
   Future<void> stop();
 
   /// The server as it runs now, or null while stopped.
@@ -200,6 +224,14 @@ class LinkRequestEvent {
     required this.args,
   });
 
+  factory LinkRequestEvent.fromJson(Map<String, dynamic> json) =>
+      LinkRequestEvent(
+        requestId: _string(json['requestId']),
+        op: _string(json['op']),
+        deviceId: _string(json['deviceId']),
+        args: _map(json['args']),
+      );
+
   final String requestId;
   final String op;
   final String deviceId;
@@ -209,6 +241,12 @@ class LinkRequestEvent {
 /// A phone's WebSocket message (`linkMessage`).
 class LinkMessageEvent {
   const LinkMessageEvent({required this.deviceId, required this.message});
+
+  factory LinkMessageEvent.fromJson(Map<String, dynamic> json) =>
+      LinkMessageEvent(
+        deviceId: _string(json['deviceId']),
+        message: _map(json['message']),
+      );
 
   final String deviceId;
   final Map<String, dynamic> message;
@@ -229,10 +267,19 @@ class PlatformLinkDesktopBackend implements LinkDesktopBackend {
   const PlatformLinkDesktopBackend();
 
   @override
-  Future<LinkHostServer> start({required String name, int? port}) async =>
-      LinkHostServer.fromJson(
-        await PlatformBridge.linkStart(name: name, port: port),
-      );
+  Future<LinkHostServer> start({
+    required String name,
+    int? port,
+    String platform = '',
+    List<String>? features,
+  }) async => LinkHostServer.fromJson(
+    await PlatformBridge.linkStart(
+      name: name,
+      port: port,
+      platform: platform,
+      features: features,
+    ),
+  );
 
   @override
   Future<void> stop() => PlatformBridge.linkStop();
@@ -292,23 +339,11 @@ class PlatformLinkDesktopBackend implements LinkDesktopBackend {
 
   @override
   Stream<LinkRequestEvent> get requests =>
-      PlatformBridge.linkRequestEvents().map(
-        (json) => LinkRequestEvent(
-          requestId: _string(json['requestId']),
-          op: _string(json['op']),
-          deviceId: _string(json['deviceId']),
-          args: _map(json['args']),
-        ),
-      );
+      PlatformBridge.linkRequestEvents().map(LinkRequestEvent.fromJson);
 
   @override
   Stream<LinkMessageEvent> get messages =>
-      PlatformBridge.linkMessageEvents().map(
-        (json) => LinkMessageEvent(
-          deviceId: _string(json['deviceId']),
-          message: _map(json['message']),
-        ),
-      );
+      PlatformBridge.linkMessageEvents().map(LinkMessageEvent.fromJson);
 
   @override
   Stream<List<LinkClientInfo>> get clients => PlatformBridge.linkClientEvents()
@@ -316,18 +351,9 @@ class PlatformLinkDesktopBackend implements LinkDesktopBackend {
 
   @override
   Stream<LinkPairingEvent> get pairing => _mergePairing(
-    PlatformBridge.linkPairedEvents().map(
-      (json) => LinkPairedEvent(
-        deviceId: _string(json['deviceId']),
-        name: _string(json['name']),
-        platform: _string(json['platform']),
-      ),
-    ),
+    PlatformBridge.linkPairedEvents().map(LinkPairedEvent.fromJson),
     PlatformBridge.linkPairingEndedEvents().map(
-      (reason) => LinkPairingEndedEvent(
-        LinkPairingEndReason.values.asNameMap()[reason] ??
-            LinkPairingEndReason.cancelled,
-      ),
+      LinkPairingEndedEvent.fromReason,
     ),
   );
 }
@@ -347,7 +373,11 @@ Stream<LinkPairingEvent> _mergePairing(
   };
 }, isBroadcast: true);
 
-/// The server calls the desktop host uses. Tests override it.
-final linkDesktopBackendProvider = Provider<LinkDesktopBackend>(
-  (ref) => const PlatformLinkDesktopBackend(),
-);
+/// The server calls the host uses: the desktop's own backend, or the phone's
+/// Link channels. Tests override it.
+final linkDesktopBackendProvider = Provider<LinkDesktopBackend>((ref) {
+  if (isDesktopPlatform) return const PlatformLinkDesktopBackend();
+  final backend = ChannelLinkHostBackend();
+  ref.onDispose(backend.dispose);
+  return backend;
+});

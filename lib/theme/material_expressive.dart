@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
-import 'package:material_ui/material_ui.dart' as material_ui;
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/skip_autofocus.dart';
 
@@ -24,20 +23,20 @@ class MaterialExpressiveScope extends StatelessWidget {
   /// autofocuses its first segment, which would take Space from playback on
   /// desktop.
   final bool skipAutofocus;
-  static final _themes = Expando<material_ui.ThemeData>();
+  static final _themes = Expando<ThemeData>();
   static final _expressiveThemes = Expando<M3EThemeData>();
 
-  static material_ui.ThemeData _adapt(ThemeData theme) {
+  static ThemeData _adapt(ThemeData theme) {
     final cached = _themes[theme];
     if (cached != null) return cached;
     final c = theme.colorScheme;
     final t = theme.textTheme;
-    final adapted = material_ui.ThemeData(
+    final adapted = ThemeData(
       brightness: theme.brightness,
       platform: theme.platform,
       useMaterial3: true,
       scaffoldBackgroundColor: theme.scaffoldBackgroundColor,
-      colorScheme: material_ui.ColorScheme(
+      colorScheme: ColorScheme(
         brightness: c.brightness,
         primary: c.primary,
         onPrimary: c.onPrimary,
@@ -86,7 +85,7 @@ class MaterialExpressiveScope extends StatelessWidget {
         scrim: c.scrim,
         surfaceTint: c.surfaceTint,
       ),
-      textTheme: material_ui.TextTheme(
+      textTheme: TextTheme(
         displayLarge: t.displayLarge,
         displayMedium: t.displayMedium,
         displaySmall: t.displaySmall,
@@ -110,7 +109,8 @@ class MaterialExpressiveScope extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = _adapt(Theme.of(context));
+    final host = Theme.of(context);
+    final theme = _adapt(host);
     final expressive = _expressiveThemes[theme] ??=
         M3EThemeData.fromMaterial(theme).copyWith(
           fontFamily: theme.textTheme.bodyMedium?.fontFamily,
@@ -119,15 +119,17 @@ class MaterialExpressiveScope extends StatelessWidget {
     final content = M3ETheme(
       data: expressive,
       // M3E's projection omits fixed color roles. Keep the complete host theme
-      // nearest the widgets so it also retains AMOLED and platform typography.
-      child: material_ui.Theme(
-        data: theme,
+      // nearest the widgets so it also retains AMOLED, platform typography,
+      // component themes and extensions. The app and M3E share one Theme
+      // type, so the adapted theme here would hide them from the app widgets.
+      child: Theme(
+        data: host,
         child: skipAutofocus ? SkipAutofocus(child: child) : child,
       ),
     );
-    if (Localizations.of<material_ui.MaterialLocalizations>(
+    if (Localizations.of<MaterialLocalizations>(
           context,
-          material_ui.MaterialLocalizations,
+          MaterialLocalizations,
         ) !=
         null) {
       return content;
@@ -135,7 +137,7 @@ class MaterialExpressiveScope extends StatelessWidget {
     // Also support isolated sheets/previews hosted by a Flutter MaterialApp.
     return Localizations.override(
       context: context,
-      delegates: const [material_ui.GlobalMaterialLocalizations.delegate],
+      delegates: const [GlobalMaterialLocalizations.delegate],
       child: Directionality(
         textDirection: Directionality.of(context),
         child: content,

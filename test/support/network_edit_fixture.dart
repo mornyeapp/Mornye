@@ -16,6 +16,12 @@ class NetworkEditFixture {
   bool rejectWrites = false;
   bool rejectPublish = false;
   bool losePublishReply = false;
+  int? temporaryListedSize;
+  int? smbUploadStatSize;
+  int smbUploadVerifications = 0;
+  bool omitTemporarySize = false;
+  bool hideTemporaryFiles = false;
+  List<int> Function(List<int> bytes)? transformUpload;
   void Function(String from, String to)? beforeMove;
   int openHandles = 0;
   int openSessions = 0;
@@ -56,7 +62,7 @@ class NetworkEditFixture {
   }
 
   bool _publish(String from, String to) =>
-      from.startsWith('.mornye-edit-') && to == 'song.flac';
+      from.startsWith('mornye-edit-') && to == 'song.flac';
 
   void move(String from, String to) {
     methods.add('MOVE $from $to');
@@ -99,12 +105,20 @@ class NetworkEditFixture {
         request.response.statusCode = 207;
         request.response.write('<d:multistatus xmlns:d="DAV:">');
         for (final name in path.isEmpty ? files.keys : [path]) {
+          final temporary = name.startsWith('mornye-');
+          if (temporary && hideTemporaryFiles && path.isEmpty) continue;
+          final size = temporary
+              ? temporaryListedSize ?? files[name]!.length
+              : files[name]!.length;
+          final lengthProperty = temporary && omitTemporarySize
+              ? ''
+              : '<d:getcontentlength>$size</d:getcontentlength>';
           final href = Uri(
             path: '/music/$name',
           ).toString().replaceAll('&', '&amp;');
           request.response.write(
             '<d:response><d:href>$href</d:href><d:propstat><d:prop>'
-            '<d:resourcetype/><d:getcontentlength>${files[name]!.length}</d:getcontentlength>'
+            '<d:resourcetype/>$lengthProperty'
             '</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>',
           );
         }
@@ -115,10 +129,11 @@ class NetworkEditFixture {
           request.response.statusCode = 403;
           break;
         }
-        files[path] = await request.fold<List<int>>(
+        final bytes = await request.fold<List<int>>(
           [],
           (all, chunk) => all..addAll(chunk),
         );
+        files[path] = transformUpload?.call(bytes) ?? bytes;
         request.response.statusCode = 201;
       case 'MOVE':
         final to = Uri.decodeComponent(
@@ -168,6 +183,7 @@ class _Handle {
 class _Share implements NetworkSmbShare {
   _Share(this.fixture);
   final NetworkEditFixture fixture;
+  static final _uploadName = RegExp(r'^mornye-[0-9a-f]{64}\.part$');
 
   List<int> _file(String path) =>
       fixture.files[path] ??
@@ -188,7 +204,9 @@ class _Share implements NetworkSmbShare {
     final now = DateTime.utc(2026);
     return Smb2Stat(
       type: Smb2FileType.file,
-      size: _file(path).length,
+      size: _uploadName.hasMatch(path)
+          ? fixture.smbUploadStatSize ?? _file(path).length
+          : _file(path).length,
       modified: now,
       created: now,
       accessed: now,
@@ -213,8 +231,11 @@ class _Share implements NetworkSmbShare {
   }
 
   @override
-  Future<(Object, int)> openFileWithSize(String path) async =>
-      (await openFile(path), _file(path).length);
+  Future<(Object, int)> openFileWithSize(String path) async {
+    if (_uploadName.hasMatch(path)) fixture.smbUploadVerifications++;
+    return (await openFile(path), _file(path).length);
+  }
+
   @override
   Future<Object> openFileWrite(String path) async {
     fixture.methods.add('PUT $path');
@@ -253,7 +274,12 @@ class _Share implements NetworkSmbShare {
   }
 
   @override
-  Future<void> fsyncHandle(Object handle) async {}
+  Future<void> fsyncHandle(Object handle) async {
+    final path = (handle as _Handle).path;
+    final transform = fixture.transformUpload;
+    if (transform != null) fixture.files[path] = transform(_file(path));
+  }
+
   @override
   Future<void> closeHandle(Object handle) async {
     fixture.openHandles--;

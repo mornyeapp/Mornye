@@ -113,7 +113,6 @@ class LibraryReorganizationResult {
 String joinRelativeLibraryPath(String dir, String name) =>
     dir.isEmpty ? name : '$dir/$name';
 
-/// Collapses separators and drops empty, `.` and `..` segments.
 String normalizeRelativeLibraryDir(String value) => value
     .replaceAll('\\', '/')
     .split('/')
@@ -425,9 +424,7 @@ class LibraryReorganizer {
     return _Recorded.complete;
   }
 
-  // ---------------------------------------------------------------------------
   // Local storage
-  // ---------------------------------------------------------------------------
 
   Future<_Outcome> _moveLocal(
     String root,
@@ -555,9 +552,7 @@ class LibraryReorganizer {
     }
   }
 
-  // ---------------------------------------------------------------------------
   // Storage Access Framework (Android)
-  // ---------------------------------------------------------------------------
 
   Future<_Outcome> _moveSaf(
     String treeUri,

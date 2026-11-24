@@ -33,6 +33,7 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
           required bitrate,
           required deleteOriginal,
           required losslessQuality,
+          required losslessProcessing,
         }) => FFmpegConversion.convertAudioFormat(
           inputPath: inputPath,
           targetFormat: targetFormat,
@@ -40,18 +41,118 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
           metadata: const {},
           deleteOriginal: deleteOriginal,
           losslessQuality: losslessQuality,
+          losslessProcessing: losslessProcessing,
         ),
     replaceSafFile: _replaceSafFileVia,
     warn: _log.w,
     info: _log.i,
   );
 
+  /// Saves what a finished download keeps beside the song: the album's cover
+  /// file and its animated cover. The arguments are those of
+  /// [_saveDownloadedMotionArtwork].
+  Future<void> _saveDownloadedAlbumFiles(
+    Ref ref,
+    DownloadItem item,
+    Track track,
+    Map<String, dynamic> result, {
+    required AppSettings settings,
+    required String quality,
+    String? filePath,
+    String? treeUri,
+    String? relativeDir,
+    Track? folderTrack,
+  }) => Future.wait([
+    _saveDownloadedFolderCover(
+      ref,
+      item,
+      track,
+      result,
+      settings: settings,
+      quality: quality,
+      filePath: filePath,
+      treeUri: treeUri,
+      relativeDir: relativeDir,
+      folderTrack: folderTrack,
+    ),
+    _saveDownloadedMotionArtwork(
+      ref,
+      item,
+      track,
+      result,
+      settings: settings,
+      quality: quality,
+      filePath: filePath,
+      treeUri: treeUri,
+      relativeDir: relativeDir,
+      folderTrack: folderTrack,
+    ),
+  ]);
+
+  /// Saves the album's cover as `folder.jpg` beside [filePath] when the
+  /// settings ask and the song sits in the album's own folder.
+  Future<void> _saveDownloadedFolderCover(
+    Ref ref,
+    DownloadItem item,
+    Track track,
+    Map<String, dynamic> result, {
+    required AppSettings settings,
+    required String quality,
+    String? filePath,
+    String? treeUri,
+    String? relativeDir,
+    Track? folderTrack,
+  }) async {
+    if (!settings.saveFolderCover || filePath == null) return;
+    try {
+      // The cover the song itself carries: the backend's, then the track's.
+      final url =
+          normalizeRemoteHttpUrl(result['cover_url']?.toString()) ??
+          normalizeRemoteHttpUrl(track.coverUrl) ??
+          normalizeRemoteHttpUrl(item.track.coverUrl);
+      if (url == null ||
+          !await _holdsAlbumFiles(
+            folderTrack ?? track,
+            item,
+            settings,
+            quality,
+            filePath: filePath,
+            relativeDir: relativeDir,
+          ) ||
+          !ref.mounted) {
+        return;
+      }
+      final saved = await ref
+          .read(folderCoverFileProvider)
+          .save(
+            url,
+            maxDimension: settings.folderCoverMaxDimension,
+            song: filePath,
+            treeUri: treeUri,
+            relativeDir: relativeDir,
+          );
+      if (saved) _log.i('Cover saved to the album folder');
+    } catch (error) {
+      _log.w('Optional folder cover was not saved: ${error.runtimeType}');
+    }
+  }
+
+  /// Saves the album's animated cover for the player and, when the settings
+  /// ask, as `cover.mp4` beside [filePath] in the album's own folder: an
+  /// Android document there needs [treeUri] and [relativeDir]. The folder
+  /// was planned from [folderTrack], when it differs from [track].
   Future<void> _saveDownloadedMotionArtwork(
     Ref ref,
     DownloadItem item,
     Track track,
-    Map<String, dynamic> result,
-  ) async {
+    Map<String, dynamic> result, {
+    required AppSettings settings,
+    required String quality,
+    String? filePath,
+    String? treeUri,
+    String? relativeDir,
+    Track? folderTrack,
+  }) async {
     // Store independently of history preferences and the selected UI theme.
     // A later switch to Mornye must still work without network access.
     try {
@@ -82,6 +183,30 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
       if (artwork != null && ref.mounted) {
         ref.invalidate(playerMotionArtworkProvider(album));
       }
+      if (artwork == null ||
+          filePath == null ||
+          !settings.saveMotionArtworkFile ||
+          !ref.mounted ||
+          !await _holdsAlbumFiles(
+            folderTrack ?? track,
+            item,
+            settings,
+            quality,
+            filePath: filePath,
+            relativeDir: relativeDir,
+          ) ||
+          !ref.mounted) {
+        return;
+      }
+      final saved = await ref
+          .read(motionArtworkFolderProvider)
+          .save(
+            File.fromUri(Uri.parse(artwork.source)),
+            song: filePath,
+            treeUri: treeUri,
+            relativeDir: relativeDir,
+          );
+      if (saved) _log.i('Animated cover saved to the album folder');
     } catch (error) {
       _log.w('Optional motion artwork was not saved: ${error.runtimeType}');
     }
@@ -107,6 +232,10 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
     enabled: settings.autoConvertDownloads,
     targetFormat: settings.autoConvertFormat,
     targetBitrate: settings.autoConvertBitrate,
+    losslessProcessing: LosslessConversionProcessing(
+      dither: settings.autoConvertSmartDither ? 'auto' : 'none',
+      highPass: settings.autoConvertSmartDitherHighPass,
+    ),
     losslessQuality: LosslessConversionQuality(
       maxBitDepth: settings.autoConvertMaxBitDepth == 0
           ? null

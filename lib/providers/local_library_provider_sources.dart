@@ -62,7 +62,10 @@ extension _LocalLibrarySources on LocalLibraryNotifier {
           .firstOrNull;
       if (!ref.mounted) return null;
       if (sourceVersion != _sourceVersion) continue;
-      return source?.enabled == true && source?.available == true
+      if (source == null || !source.enabled) return null;
+      // A Link device rescans its songs as it connects, before the
+      // availability refresh that shows them again has written.
+      return source.available || _networkAvailable(source.path) == true
           ? source
           : null;
     }
@@ -126,29 +129,37 @@ extension _LocalLibrarySources on LocalLibraryNotifier {
     _isLoaded = true;
   }
 
+  /// Moves the one folder of builds before multiple folders into the folder
+  /// list, once: the old setting is cleared afterwards. Every reload runs
+  /// this, including the one after each metadata save, so a setting left
+  /// behind would bring a removed folder back as offline.
   Future<void> _migrateLegacySource() async {
     final settings = ref.read(settingsProvider);
     final path = settings.localLibraryPath.trim();
     if (path.isEmpty) return;
-    if (await _db.getSourceByPath(path) != null) return;
-    DateTime? legacyLastScannedAt;
-    try {
-      legacyLastScannedAt = readLocalLibraryLastScannedAt(await _prefs);
-    } catch (_) {}
-    _sourceVersion++;
-    await _db.migrateLegacySource(
-      path: path,
-      displayName: _displayNameForPath(path),
-      bookmark: settings.localLibraryBookmark.trim().isEmpty
-          ? null
-          : settings.localLibraryBookmark,
-      isRemovable: _looksLikeRemovablePath(path),
-      available: await _isPathAvailable(
-        path,
-        bookmark: settings.localLibraryBookmark,
-      ),
-      lastScannedAt: legacyLastScannedAt,
-    );
+    if (await _db.getSourceByPath(path) == null) {
+      DateTime? legacyLastScannedAt;
+      try {
+        legacyLastScannedAt = readLocalLibraryLastScannedAt(await _prefs);
+      } catch (_) {}
+      _sourceVersion++;
+      await _db.migrateLegacySource(
+        path: path,
+        displayName: _displayNameForPath(path),
+        bookmark: settings.localLibraryBookmark.trim().isEmpty
+            ? null
+            : settings.localLibraryBookmark,
+        isRemovable: _looksLikeRemovablePath(path),
+        available: await _isPathAvailable(
+          path,
+          bookmark: settings.localLibraryBookmark,
+        ),
+        lastScannedAt: legacyLastScannedAt,
+      );
+    }
+    // The folder list keeps the path and bookmark from here on.
+    if (!ref.mounted) return;
+    ref.read(settingsProvider.notifier).setLocalLibraryPathAndBookmark('', '');
   }
 
   String _displayNameForPath(String path) {
@@ -187,6 +198,13 @@ extension _LocalLibrarySources on LocalLibraryNotifier {
 
   Future<bool> _isPathAvailable(String path, {String? bookmark}) async {
     return await _probePathAvailability(path, bookmark: bookmark) ?? true;
+  }
+
+  /// The decision for the `network://` [path], null for any other path or
+  /// a network source to leave as it is.
+  bool? _networkAvailable(String path) {
+    if (!path.startsWith('network://')) return null;
+    return _networkAvailability?.call(Uri.tryParse(path)?.host ?? '');
   }
 
   Future<bool?> _probePathAvailability(String path, {String? bookmark}) async {
@@ -233,15 +251,20 @@ extension _LocalLibrarySources on LocalLibraryNotifier {
       final sources = await _db.getSources();
       var inconclusive = false;
       for (final source in sources) {
-        final available = await _probePathAvailability(
-          source.path,
-          bookmark: source.bookmark,
-        );
+        final network = source.path.startsWith('network://');
+        final available = network
+            ? _networkAvailable(source.path)
+            : await _probePathAvailability(
+                source.path,
+                bookmark: source.bookmark,
+              );
         if (!ref.mounted ||
             sourceVersion != _sourceVersion ||
             requestVersion != _availabilityRequestVersion) {
           break;
         }
+        // Without a decision a network source keeps its state.
+        if (available == null && network) continue;
         if (available == null) {
           inconclusive = true;
           _log.w(
@@ -256,7 +279,8 @@ extension _LocalLibrarySources on LocalLibraryNotifier {
             lastSeenAt: available ? DateTime.now() : null,
           );
           changed = true;
-          if (available && source.enabled && source.isIndexed) {
+          // A Link device refreshes its own songs when it connects.
+          if (available && source.enabled && source.isIndexed && !network) {
             reconnected.add(source.id);
           }
         }

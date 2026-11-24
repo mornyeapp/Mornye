@@ -18,6 +18,8 @@ import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/link_transfers.dart';
 import 'package:mornye/utils/desktop_folders.dart';
+import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/file_access.dart';
 import 'package:path/path.dart' as p;
 
 /// A phone song the desktop receives, with its cover when known.
@@ -60,9 +62,9 @@ LinkPhoneSongPath? linkPhoneSongPath(String path) {
 
 /// The catalog id the export gives [item] (`d:` and the history id for a
 /// download, `l:` and the library id for a scanned song), or null for a
-/// song whose file is not on this computer, such as a phone's.
+/// song whose file is not on this device, such as a phone's.
 String? linkDesktopSongIdOf(UnifiedLibraryItem item) {
-  if (linkLocalFilePath(item.filePath) == null) return null;
+  if (linkSharedSongPath(item.filePath) == null) return null;
   final history = item.historyItem;
   if (history != null) return linkDownloadSongId(history.id);
   final local = item.localItem;
@@ -97,7 +99,7 @@ LinkOutgoingSong linkOutgoingSongOf(
 }) {
   final history = item.historyItem;
   final local = item.localItem;
-  final path = linkLocalFilePath(item.filePath) ?? item.filePath;
+  final path = linkSharedSongPath(item.filePath) ?? item.filePath;
   final seconds = history?.duration ?? local?.duration;
   return (
     song: LinkTransferSong(
@@ -137,10 +139,14 @@ Future<List<LinkOutgoingSong>> linkOutgoingSongs(
       continue;
     }
     var size = 0;
-    try {
-      size = await File(linkLocalFilePath(item.filePath)!).length();
-    } on FileSystemException {
-      // The phone learns the size when it downloads the file.
+    // A storage access document is not opened here either.
+    final local = linkLocalFilePath(item.filePath);
+    if (local != null) {
+      try {
+        size = await File(local).length();
+      } on FileSystemException {
+        // The phone learns the size when it downloads the file.
+      }
     }
     songs.add(linkOutgoingSongOf(item, songId: songId, size: size));
   }
@@ -388,8 +394,14 @@ class _AppTransferDownloads implements LinkTransferDownloads {
   final Ref _ref;
 
   @override
-  LinkOfflineDestination destination() =>
-      LinkDesktopDownloadFolder(_ref.read(settingsProvider));
+  LinkOfflineDestination destination() {
+    final settings = _ref.read(settingsProvider);
+    // A phone host saves where its own downloads go, storage access tree
+    // and iOS bookmark included.
+    return isDesktopPlatform
+        ? LinkDesktopDownloadFolder(settings)
+        : LinkDownloadFolderDestination(settings);
+  }
 
   @override
   Future<void> record(DownloadHistoryItem item) =>
@@ -399,7 +411,7 @@ class _AppTransferDownloads implements LinkTransferDownloads {
   Future<bool> has(String id) async {
     final row = await HistoryDatabase.instance.getById(id);
     final path = row?['filePath'];
-    return path is String && path.isNotEmpty && await File(path).exists();
+    return path is String && await fileExists(path);
   }
 }
 

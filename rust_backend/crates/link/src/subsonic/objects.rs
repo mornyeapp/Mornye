@@ -172,11 +172,7 @@ fn album_created(catalog: &Catalog, index: usize) -> String {
 fn display_path(catalog: &Catalog, index: usize) -> String {
     let song = &catalog.songs()[index];
     let album = &catalog.albums()[song.album];
-    let file = song
-        .path
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_else(|| format!("{}.{}", song.title, song.suffix));
+    let file = crate::source::file_name(&song.path, &song.title, &song.suffix);
     format!(
         "{}/{}/{}",
         path_part(&album.artist_name),

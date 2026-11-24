@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
+import 'package:mornye/services/scrobbling/scrobble_store.dart';
 
 class LastfmCredentials {
   const LastfmCredentials({
@@ -9,13 +10,56 @@ class LastfmCredentials {
     this.apiSecret = const String.fromEnvironment('LASTFM_API_SECRET'),
   });
 
+  /// Libre.fm has no client registration: it accepts any 32 character key,
+  /// which only names the client, and does not check signatures. Requests
+  /// are still signed so other compatible servers accept them too. Neither
+  /// value grants access to an account.
+  const LastfmCredentials.librefm()
+    : apiKey = const String.fromEnvironment(
+        'LIBREFM_API_KEY',
+        defaultValue: 'mornyemusicplayerlibrefmclient01',
+      ),
+      apiSecret = const String.fromEnvironment(
+        'LIBREFM_API_SECRET',
+        defaultValue: 'mornye',
+      );
+
   final String apiKey;
   final String apiSecret;
 
   bool get configured => apiKey.isNotEmpty && apiSecret.isNotEmpty;
 }
 
-class LastfmSession {
+/// A server speaking the Last.fm 2.0 API, with its browser approval page.
+class LastfmServer {
+  const LastfmServer({
+    required this.apiHost,
+    required this.authHost,
+    required this.credentials,
+    this.apiPath = '/2.0/',
+    this.authPath = '/api/auth/',
+  });
+
+  static const lastfm = LastfmServer(
+    apiHost: 'ws.audioscrobbler.com',
+    authHost: 'www.last.fm',
+    credentials: LastfmCredentials(),
+  );
+
+  static const librefm = LastfmServer(
+    apiHost: 'libre.fm',
+    authHost: 'libre.fm',
+    credentials: LastfmCredentials.librefm(),
+  );
+
+  final String apiHost;
+  final String apiPath;
+  final String authHost;
+  final String authPath;
+  final LastfmCredentials credentials;
+}
+
+class LastfmSession implements ScrobbleAccount {
   const LastfmSession({required this.username, required this.key});
 
   factory LastfmSession.fromJson(Map<String, dynamic> json) {
@@ -27,6 +71,7 @@ class LastfmSession {
     return LastfmSession(username: username, key: key);
   }
 
+  @override
   final String username;
   final String key;
 
@@ -59,12 +104,18 @@ String lastfmSignature(Map<String, String> parameters, String secret) {
 }
 
 class LastfmApi {
-  LastfmApi({this.credentials = const LastfmCredentials(), http.Client? client})
-    : _client = client ?? http.Client();
+  LastfmApi({
+    this.server = LastfmServer.lastfm,
+    LastfmCredentials? credentials,
+    http.Client? client,
+  }) : credentials = credentials ?? server.credentials,
+       _endpoint = Uri.https(server.apiHost, server.apiPath),
+       _client = client ?? http.Client();
 
+  final LastfmServer server;
   final LastfmCredentials credentials;
   final http.Client _client;
-  static final _endpoint = Uri.https('ws.audioscrobbler.com', '/2.0/');
+  final Uri _endpoint;
 
   Future<Map<String, dynamic>> _request(
     String method,
@@ -104,10 +155,11 @@ class LastfmApi {
     return token;
   }
 
-  Uri authorizationUrl(String token) => Uri.https('www.last.fm', '/api/auth/', {
-    'api_key': credentials.apiKey,
-    'token': token,
-  });
+  Uri authorizationUrl(String token) => Uri.https(
+    server.authHost,
+    server.authPath,
+    {'api_key': credentials.apiKey, 'token': token},
+  );
 
   Future<LastfmSession> session(String token) async {
     final response = await _request('auth.getSession', {'token': token});

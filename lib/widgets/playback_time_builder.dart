@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Updates time labels at media-second boundaries between engine reports.
 class PlaybackTimeBuilder extends StatefulWidget {

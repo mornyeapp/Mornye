@@ -105,6 +105,18 @@ static gboolean set_window_mode(MyApplication* self, const gchar* mode) {
   return TRUE;
 }
 
+// Whether to render with Impeller. Flutter 3.50 draws Impeller frames into a
+// multisample buffer that has no texture, and composites drivers it does not
+// trust to blit (NVIDIA among them) from that missing texture: the window
+// stays blank. Without Impeller the frame has a texture. MORNYE_IMPELLER=1
+// or =0 overrides the choice.
+static gboolean use_impeller() {
+  const gchar* forced = g_getenv("MORNYE_IMPELLER");
+  if (g_strcmp0(forced, "1") == 0) return TRUE;
+  if (g_strcmp0(forced, "0") == 0) return FALSE;
+  return !g_file_test("/proc/driver/nvidia/version", G_FILE_TEST_EXISTS);
+}
+
 static void set_minimum_size(GtkWindow* window, gint width, gint height) {
   GdkGeometry geometry = {};
   geometry.min_width = width;
@@ -413,6 +425,7 @@ static void my_application_activate(GApplication* application) {
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);
+  fl_dart_project_set_enable_impeller(project, use_impeller());
 
   FlView* view = fl_view_new(project);
   GdkRGBA background_color;

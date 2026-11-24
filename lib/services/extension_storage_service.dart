@@ -8,9 +8,21 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/services/secure_storage_options.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/logger.dart';
 
 const _extensionMasterKeyName = 'extension_storage_master_key_v2';
 const _localMasterKeyFileName = '.master_key_unsecured';
+const _keyRecordFileName = '.key_record';
+const _lostSuffix = '.lost';
+
+final _log = AppLogger('ExtensionStorage');
+
+/// What is known about the key in the secure store: whether one was put
+/// there, how often it then went missing, and whether the user still has to
+/// be told that settings and sign-ins were set aside.
+typedef _KeyRecord = ({bool issued, int lost, bool notice});
+
+const _KeyRecord _noKeyRecord = (issued: false, lost: 0, notice: false);
 
 enum ExtensionStorageModeFailure { keyringRequired, conflictingKeys }
 
@@ -59,18 +71,42 @@ class ExtensionStorageService {
     _changingMode = null;
   }
 
-  static Future<bool> isUnsecuredStorageEnabled() async {
-    if (!supportsUnsecuredStorage) return false;
-    await _changingMode;
+  static Future<Directory> _dataDirectory() async {
     final support = await getApplicationSupportDirectory();
-    return await _readLocalMasterKey(
-          Directory(p.join(support.path, 'extension_data')),
-        ) !=
-        null;
+    return Directory(p.join(support.path, 'extension_data'));
   }
 
-  /// The local key file is the durable opt-in. No keyring fallback is automatic.
-  static Future<void> setUnsecuredStorage(bool enabled) {
+  /// Whether the key is kept in a local file: the choice made on Linux, or
+  /// on any platform the fallback for a secure store that does not keep it.
+  static Future<bool> isUnsecuredStorageEnabled() async {
+    await _changingMode;
+    return await _readLocalMasterKey(await _dataDirectory()) != null;
+  }
+
+  /// Whether extension settings and sign-ins were set aside because their
+  /// key was lost, and the user has not been told yet.
+  static Future<bool> hasRecoveryNotice() async =>
+      (await _readKeyRecord(await _dataDirectory())).notice;
+
+  static Future<void> dismissRecoveryNotice() async {
+    final dataDir = await _dataDirectory();
+    final record = await _readKeyRecord(dataDir);
+    if (!record.notice) return;
+    await _writeKeyRecord(dataDir, (
+      issued: record.issued,
+      lost: record.lost,
+      notice: false,
+    ));
+  }
+
+  /// The local key file is the durable choice, and the switch for it is
+  /// Linux-only: Linux may have no keyring at all. A keyring that cannot be
+  /// reached may still hold the key of existing data, so that data is only
+  /// set aside when [startOver] says the user chose to.
+  static Future<void> setUnsecuredStorage(
+    bool enabled, {
+    bool startOver = false,
+  }) {
     if (!supportsUnsecuredStorage) {
       return Future.error(
         UnsupportedError('Unsecured extension storage is Linux-only'),
@@ -99,21 +135,21 @@ class ExtensionStorageService {
           if (enabled) {
             if (local != null) return;
             String? key = prepared?.masterKey;
+            var reachable = true;
             if (key == null) {
               try {
                 key = await _secureStorage.read(key: _extensionMasterKeyName);
               } catch (_) {
-                if (await _hasEncryptedData(dataDir)) {
-                  throw const ExtensionStorageModeException(
-                    ExtensionStorageModeFailure.keyringRequired,
-                  );
-                }
+                reachable = false;
               }
             }
             if (key == null && await _hasEncryptedData(dataDir)) {
-              throw const ExtensionStorageModeException(
-                ExtensionStorageModeFailure.keyringRequired,
-              );
+              if (!reachable && !startOver) {
+                throw const ExtensionStorageModeException(
+                  ExtensionStorageModeFailure.keyringRequired,
+                );
+              }
+              await _recordLoss(dataDir, await _readKeyRecord(dataDir));
             }
             key = key == null ? _generateMasterKey() : _validateMasterKey(key);
             await _writeLocalMasterKey(dataDir, key);
@@ -139,6 +175,12 @@ class ExtensionStorageService {
               );
             }
             await File(p.join(dataDir.path, _localMasterKeyFileName)).delete();
+            // The keyring has earned a fresh start.
+            await _writeKeyRecord(dataDir, (
+              issued: true,
+              lost: 0,
+              notice: (await _readKeyRecord(dataDir)).notice,
+            ));
           }
         })().whenComplete(() {
           _preparing = null;
@@ -192,28 +234,148 @@ class ExtensionStorageService {
   }
 
   static Future<String> _loadOrCreateMasterKey(Directory dataDir) async {
-    if (supportsUnsecuredStorage) {
-      final local = await _readLocalMasterKey(dataDir);
-      if (local != null) return local;
-    }
+    final local = await _readLocalMasterKey(dataDir);
+    if (local != null) return local;
+    // A read that fails (a locked keyring, a keystore that is not ready)
+    // says nothing about the key: it propagates and nothing is touched.
     final existing = await _secureStorage.read(key: _extensionMasterKeyName);
     if (existing != null) {
       return _validateMasterKey(existing);
     }
 
-    // Plaintext settings and salt-based legacy credentials can be migrated with
-    // a new key. Encrypted settings require the original key; generating another
-    // one would leave every installed extension permanently unreadable.
-    if (await _hasEncryptedData(dataDir)) {
-      throw StateError(
-        'The extension storage key is missing. Existing encrypted extension '
-        'data has been preserved.',
-      );
+    // The store answered and has no key. Encrypted files cannot be read
+    // without it, ever, and refusing to start left every extension dead on
+    // each launch. Set them aside and start over with a new key: extensions
+    // stay installed and ask to sign in again. Plaintext settings and
+    // salt-based legacy credentials migrate with any key.
+    var record = await _readKeyRecord(dataDir);
+    if (record.issued || await _hasEncryptedData(dataDir)) {
+      record = await _recordLoss(dataDir, record);
     }
 
     final encoded = _generateMasterKey();
-    await _secureStorage.write(key: _extensionMasterKeyName, value: encoded);
+    if (record.lost < _lossLimit && await _storeSecurely(encoded)) {
+      await _writeKeyRecord(dataDir, (
+        issued: true,
+        lost: record.lost,
+        notice: record.notice,
+      ));
+      return encoded;
+    }
+    _log.w('Extension storage key kept in a local file from now on');
+    await _writeLocalMasterKey(dataDir, encoded);
     return encoded;
+  }
+
+  /// How many lost keys end trust in the secure store. A phone keeps app
+  /// files private to the app and Android backs none of them up, so there a
+  /// local key costs little and one loss is enough. Elsewhere one loss can be
+  /// a restored backup or a changed keyring, so the store gets a second key.
+  static int get _lossLimit =>
+      defaultTargetPlatform == TargetPlatform.android ? 1 : 2;
+
+  /// Sets aside what the lost key encrypted and counts the loss.
+  static Future<_KeyRecord> _recordLoss(
+    Directory dataDir,
+    _KeyRecord record,
+  ) async {
+    final setAside = await _setAsideEncryptedData(dataDir);
+    final _KeyRecord next = (
+      issued: false,
+      lost: record.lost + 1,
+      notice: record.notice || setAside > 0,
+    );
+    await _writeKeyRecord(dataDir, next);
+    _log.w(
+      'Extension storage key is missing (loss ${next.lost}); '
+      '$setAside encrypted files set aside',
+    );
+    return next;
+  }
+
+  /// Whether the secure store took [key] and gives it back. A store that
+  /// accepts a key it does not keep would lose it again on the next launch.
+  static Future<bool> _storeSecurely(String key) async {
+    try {
+      await _secureStorage.write(key: _extensionMasterKeyName, value: key);
+      return await _secureStorage.read(key: _extensionMasterKeyName) == key;
+    } catch (_) {
+      // Linux reports a missing or locked keyring, and the user starts it or
+      // turns on unsecured storage. Elsewhere there is nothing to turn on.
+      if (supportsUnsecuredStorage) rethrow;
+      return false;
+    }
+  }
+
+  static Future<_KeyRecord> _readKeyRecord(Directory dataDir) async {
+    try {
+      final file = File(p.join(dataDir.path, _keyRecordFileName));
+      if (await FileSystemEntity.type(file.path, followLinks: false) !=
+          FileSystemEntityType.file) {
+        return _noKeyRecord;
+      }
+      final json = jsonDecode(await file.readAsString());
+      if (json case {
+        'issued': final bool issued,
+        'lost': final int lost,
+        'notice': final bool notice,
+      } when lost >= 0) {
+        return (issued: issued, lost: lost, notice: notice);
+      }
+    } on FormatException {
+      // An unreadable record counts as none.
+    } on FileSystemException {
+      // The same.
+    }
+    return _noKeyRecord;
+  }
+
+  static Future<void> _writeKeyRecord(Directory dataDir, _KeyRecord record) =>
+      File(p.join(dataDir.path, _keyRecordFileName)).writeAsString(
+        jsonEncode({
+          'issued': record.issued,
+          'lost': record.lost,
+          'notice': record.notice,
+        }),
+        flush: true,
+      );
+
+  /// Renames every encrypted file to `<name>.lost`, replacing the one from an
+  /// earlier loss, and returns how many. Nothing reads those files; they are
+  /// kept, not deleted.
+  static Future<int> _setAsideEncryptedData(Directory dataDir) async {
+    var count = 0;
+    if (await _setAside(p.join(dataDir.path, '.pending-auth.enc'))) count++;
+    final extensions = await dataDir.list(followLinks: false).toList();
+    for (final entry in extensions) {
+      if (entry is! Directory) continue;
+      for (final name in ['settings.enc', '.credentials.enc']) {
+        if (await _setAside(p.join(entry.path, name))) count++;
+      }
+    }
+    return count;
+  }
+
+  static Future<bool> _setAside(String path) async {
+    final type = await FileSystemEntity.type(path, followLinks: false);
+    if (type == FileSystemEntityType.notFound) return false;
+    final lost = '$path$_lostSuffix';
+    switch (await FileSystemEntity.type(lost, followLinks: false)) {
+      case FileSystemEntityType.notFound:
+        break;
+      case FileSystemEntityType.directory:
+        await Directory(lost).delete(recursive: true);
+      case FileSystemEntityType.link:
+        await Link(lost).delete();
+      default:
+        await File(lost).delete();
+    }
+    await switch (type) {
+      FileSystemEntityType.directory => Directory(path).rename(lost),
+      FileSystemEntityType.link => Link(path).rename(lost),
+      _ => File(path).rename(lost),
+    };
+    return true;
   }
 
   static Future<bool> _hasEncryptedData(Directory dataDir) async {
@@ -274,13 +436,16 @@ class ExtensionStorageService {
     final file = File(p.join(dataDir.path, _localMasterKeyFileName));
     await file.create(exclusive: true);
     try {
-      // Set owner-only access before writing any key bytes.
-      final permission = await Process.run('chmod', ['600', file.path]);
-      if (permission.exitCode != 0) {
-        throw FileSystemException(
-          'Could not protect the local extension key',
-          file.path,
-        );
+      // Set owner-only access before writing any key bytes. Phones keep app
+      // files private to the app, and Windows to the user's profile.
+      if (Platform.isLinux || Platform.isMacOS) {
+        final permission = await Process.run('chmod', ['600', file.path]);
+        if (permission.exitCode != 0) {
+          throw FileSystemException(
+            'Could not protect the local extension key',
+            file.path,
+          );
+        }
       }
       await file.writeAsString(key, flush: true);
     } catch (_) {

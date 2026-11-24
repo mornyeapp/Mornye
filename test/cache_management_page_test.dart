@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +14,8 @@ import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/settings_group.dart';
+
+import 'support/tooltip_finder.dart';
 
 const _pathProvider = MethodChannel('plugins.flutter.io/path_provider');
 
@@ -184,7 +186,7 @@ void main() {
           .where((row) => row.title == l10n.cacheExploreFeed)
           .firstOrNull;
       await tester.runAsync(() async {
-        await tester.tap(find.byTooltip(l10n.cacheRefresh));
+        await tester.tap(findByTooltip(l10n.cacheRefresh));
         for (var i = 0; i < 100; i++) {
           await Future<void>.delayed(const Duration(milliseconds: 10));
           await tester.pump();

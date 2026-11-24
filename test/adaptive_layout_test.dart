@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/widgets/desktop/desktop_window.dart';
 
 void main() {
   group('adaptive navigation', () {
@@ -95,5 +96,87 @@ void main() {
       await tester.pump();
       expect(taps, 1);
     });
+
+    testWidgets('applies the Interface size on phones and keeps app state', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2340);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      Size? innerSize;
+      double? innerScale;
+      final counterKey = GlobalKey<_CounterState>();
+      Widget app(double userScale) => MediaQuery(
+        data: MediaQueryData.fromView(tester.view),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: AdaptiveUiScaler(
+            userScale: userScale,
+            child: Builder(
+              builder: (context) {
+                innerSize = MediaQuery.sizeOf(context);
+                innerScale = AdaptiveUiScale.of(context);
+                return _Counter(key: counterKey);
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(app(1));
+      expect(innerSize, const Size(360, 780));
+      expect(innerScale, 1);
+      expect(find.byType(FittedBox), findsNothing);
+      counterKey.currentState!.increment();
+
+      await tester.pumpWidget(app(0.9));
+      expect(innerSize!.width, closeTo(400, 0.01));
+      expect(innerSize!.height, closeTo(780 / 0.9, 0.01));
+      expect(innerScale, 0.9);
+      expect(counterKey.currentState!.count, 1);
+
+      await tester.pumpWidget(app(1));
+      expect(innerSize, const Size(360, 780));
+      expect(counterKey.currentState!.count, 1);
+    });
+
+    testWidgets('keeps the macOS title bar row at its native size', (
+      tester,
+    ) async {
+      late double height;
+      late double controlsWidth;
+      await tester.pumpWidget(
+        AdaptiveUiScale(
+          scale: 0.8,
+          child: Builder(
+            builder: (context) {
+              height = desktopTitleBarHeightFor(context);
+              controlsWidth = desktopWindowControlsWidthFor(context);
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      expect(height * 0.8, closeTo(desktopTitleBarHeight, 0.001));
+      expect(controlsWidth * 0.8, closeTo(desktopWindowControlsWidth, 0.001));
+    });
   });
+}
+
+class _Counter extends StatefulWidget {
+  const _Counter({super.key});
+
+  @override
+  State<_Counter> createState() => _CounterState();
+}
+
+class _CounterState extends State<_Counter> {
+  int count = 0;
+
+  void increment() => setState(() => count++);
+
+  @override
+  Widget build(BuildContext context) => Text('$count');
 }

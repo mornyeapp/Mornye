@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/theme/cover_palette.dart';
@@ -39,43 +39,16 @@ class _MaskedBackground extends StatelessWidget {
       child: CoverSourceColorBuilder(
         imageSource: artUri?.toFilePath(),
         builder: (context, sourceColor) {
-          final dominant = HSLColor.fromColor(
-            sourceColor ?? const Color(0xff808080),
-          );
-          final muted = dominant.withSaturation(
-            dominant.saturation.clamp(0.0, 0.34),
-          );
-          final backdrop = dominant.withSaturation(
-            dominant.saturation.clamp(0.0, 0.2),
-          );
-          const motion = Duration(milliseconds: 380);
+          // The same timing as the background under test.
+          final motion = mornyePlayerPanelMotion(context);
           final size = MediaQuery.sizeOf(context);
           return AnimatedContainer(
-            duration: motion,
-            curve: Curves.easeInOutCubic,
+            duration: motion.duration,
+            curve: motion.curve,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: artwork == null
-                    ? Alignment.topLeft
-                    : Alignment.topCenter,
-                end: artwork == null
-                    ? Alignment.bottomRight
-                    : Alignment.bottomCenter,
-                stops: artwork == null ? null : const [0, 0.5, 1],
-                colors: artwork == null
-                    ? [
-                        muted
-                            .withLightness(0.28 + dominant.lightness * 0.24)
-                            .toColor(),
-                        muted
-                            .withLightness(0.14 + dominant.lightness * 0.20)
-                            .toColor(),
-                      ]
-                    : [
-                        backdrop.withLightness(0.62).toColor(),
-                        backdrop.withLightness(0.54).toColor(),
-                        backdrop.withLightness(0.34).toColor(),
-                      ],
+              gradient: mornyePlayerGradient(
+                sourceColor,
+                fullBleed: artwork != null,
               ),
             ),
             child: Stack(
@@ -104,9 +77,9 @@ class _MaskedBackground extends StatelessWidget {
                       ],
                     ).createShader(bounds),
                     child: AnimatedSwitcher(
-                      duration: motion,
-                      switchInCurve: Curves.easeInOutCubic,
-                      switchOutCurve: Curves.easeInOutCubic,
+                      duration: motion.duration,
+                      switchInCurve: motion.curve,
+                      switchOutCurve: motion.leaving,
                       layoutBuilder: (current, previous) => Stack(
                         fit: StackFit.expand,
                         children: [...previous, ?current],
@@ -160,6 +133,46 @@ Future<Uri> _cover(Directory directory, Color color) async {
 }
 
 void main() {
+  group('background follows the cover', () {
+    double lightest(LinearGradient gradient) => gradient.colors
+        .map((color) => HSLColor.fromColor(color).lightness)
+        .reduce((a, b) => a > b ? a : b);
+
+    for (final fullBleed in [true, false]) {
+      test('a black cover ends near black (fullBleed: $fullBleed)', () {
+        final gradient = mornyePlayerGradient(
+          const Color(0xff050505),
+          fullBleed: fullBleed,
+        );
+        expect(lightest(gradient), lessThan(0.1));
+      });
+
+      test('darker covers never get a lighter surface '
+          '(fullBleed: $fullBleed)', () {
+        var last = 0.0;
+        for (var gray = 0; gray <= 255; gray += 5) {
+          final next = lightest(
+            mornyePlayerGradient(
+              Color.fromARGB(255, gray, gray, gray),
+              fullBleed: fullBleed,
+            ),
+          );
+          expect(next, greaterThanOrEqualTo(last));
+          last = next;
+        }
+      });
+    }
+
+    test('the controls keep their tones when lyrics open', () {
+      for (final source in [const Color(0xffe0e0e0), null]) {
+        expect(
+          mornyePlayerGradient(source, fullBleed: true).colors,
+          mornyePlayerGradient(source, fullBleed: false).colors,
+        );
+      }
+    });
+  });
+
   const masked = ValueKey('masked');
   const overlay = ValueKey('overlay');
 
@@ -317,6 +330,59 @@ void main() {
       ),
     );
     expect(await difference(tester), greaterThan(3));
+  });
+
+  testWidgets('the controls dim keeps white labels readable, even over white', (
+    tester,
+  ) async {
+    const bright = ColoredBox(color: Colors.white);
+    Widget background({required bool dim}) => Stack(
+      fit: StackFit.expand,
+      children: [
+        const MornyePlayerBackground(artUri: null, artwork: bright),
+        MornyeControlsDim(strength: dim ? 1 : 0),
+      ],
+    );
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          children: [
+            side(masked, background(dim: false)),
+            side(overlay, background(dim: true)),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final plain = await pixels(tester, masked);
+    final dimmed = await pixels(tester, overlay);
+    Color at(Uint8List image, int y) {
+      final index = (y * _width.toInt() + _width ~/ 2) * 4;
+      return Color.fromARGB(
+        255,
+        image[index],
+        image[index + 1],
+        image[index + 2],
+      );
+    }
+
+    // The artwork above its fade stays as it was.
+    expect(at(dimmed, 40), at(plain, 40));
+    // The title sits at or below the fade, where white needs 4.5:1.
+    for (final y in const [(_width * 0.8), _width, _height - 10]) {
+      final luminance = at(dimmed, y.toInt()).computeLuminance();
+      expect(
+        1.05 / (luminance + 0.05),
+        greaterThanOrEqualTo(4.5),
+        reason: '$y',
+      );
+      expect(
+        luminance,
+        lessThan(at(plain, y.toInt()).computeLuminance()),
+        reason: '$y',
+      );
+    }
   });
 
   testWidgets('full-bleed artwork fades without an offscreen mask', (

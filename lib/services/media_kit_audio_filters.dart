@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:mornye/models/equalizer_settings.dart';
+import 'package:mornye/services/playback_deck.dart' show PlaybackPitch;
 
 /// One filter in the equalizer's libavfilter graph.
 @immutable
@@ -44,9 +45,16 @@ class MpvAudioFilter {
 /// distribution's full build. Filters listed in `unavailable` are left out;
 /// without `volume` the input gain moves to [volumeGainDb], which the deck
 /// applies through mpv's volume.
+///
+/// [withTempo] adds the pitch shift of an [MpvTempo] to the same `af` value,
+/// after the equalizer.
 @immutable
 class MpvAudioFilterChain {
-  const MpvAudioFilterChain(this.filters, {this.volumeGainDb = 0});
+  const MpvAudioFilterChain(
+    this.filters, {
+    this.volumeGainDb = 0,
+    this.tempoScale,
+  });
 
   static const empty = MpvAudioFilterChain([]);
 
@@ -66,6 +74,10 @@ class MpvAudioFilterChain {
 
   /// Input gain that could not be placed in the graph.
   final double volumeGainDb;
+
+  /// The `scale` of mpv's own `scaletempo` filter after the graph, or null
+  /// for none (see [MpvTempo.tempoScale]).
+  final double? tempoScale;
 
   factory MpvAudioFilterChain.fromEqualizer(
     EqualizerSettings settings, {
@@ -149,19 +161,107 @@ class MpvAudioFilterChain {
     );
   }
 
+  MpvAudioFilterChain withTempo(MpvTempo tempo) => MpvAudioFilterChain(
+    [...filters, ...tempo.filters],
+    volumeGainDb: volumeGainDb,
+    tempoScale: tempo.tempoScale,
+  );
+
   /// The value of mpv's `af` property.
-  String get spec => filters.isEmpty
-      ? ''
-      : '@mornye_format:format=format=floatp,'
-            '@mornye_dsp:lavfi=[${filters.map((filter) => filter.spec).join(',')}]';
+  String get spec {
+    final scale = tempoScale;
+    return [
+      if (filters.isNotEmpty) ...[
+        '@mornye_format:format=format=floatp',
+        '@mornye_dsp:lavfi=[${filters.map((filter) => filter.spec).join(',')}]',
+      ],
+      if (scale != null)
+        '@mornye_tempo:scaletempo=scale=${_number(scale, digits: 6)}',
+    ].join(',');
+  }
 
-  bool get isEmpty => filters.isEmpty;
+  bool get isEmpty => filters.isEmpty && tempoScale == null;
 
-  static String _number(num value) {
-    final text = value.toStringAsFixed(4);
+  static String _number(num value, {int digits = 4}) {
+    final text = value.toStringAsFixed(digits);
     final trimmed = text.contains('.')
         ? text.replaceFirst(RegExp(r'\.?0+$'), '')
         : text;
     return trimmed == '-0' ? '0' : trimmed;
   }
+}
+
+/// How a libmpv deck plays at an effective speed with a [PlaybackPitch].
+///
+/// Without a semitone shift this is mpv's `speed` and
+/// `audio-pitch-correction` alone: correction on keeps the pitch while the
+/// speed changes (mpv's automatic `scaletempo2`), off lets it follow.
+///
+/// A shift is a libavfilter `rubberband` filter in the equalizer's graph
+/// where the build has one (distribution builds on Linux). media_kit's own
+/// libmpv builds have no `rubberband`, `asetrate` or `atempo`, so elsewhere
+/// mpv resamples by the whole frequency factor (`speed` at that factor,
+/// correction off) and its built-in `scaletempo` filter, present in every
+/// build, stretches the tempo back to the effective speed.
+@immutable
+class MpvTempo {
+  const MpvTempo({
+    required this.speed,
+    required this.pitchCorrection,
+    this.filters = const [],
+    this.tempoScale,
+  });
+
+  /// mpv's defaults: normal speed, pitch kept.
+  static const normal = MpvTempo(speed: 1, pitchCorrection: true);
+
+  /// Optional filters a shift prefers, probed like
+  /// [MpvAudioFilterChain.optionalFilters].
+  static const optionalFilters = {'rubberband'};
+
+  factory MpvTempo.of(
+    double speed,
+    PlaybackPitch pitch, {
+    Set<String> unavailable = const {},
+  }) {
+    if (pitch.semitones == 0) {
+      return MpvTempo(speed: speed, pitchCorrection: !pitch.followsRate);
+    }
+    final shift = math.pow(2, pitch.semitones / 12).toDouble();
+    if (!unavailable.contains('rubberband')) {
+      return MpvTempo(
+        speed: speed,
+        pitchCorrection: !pitch.followsRate,
+        filters: [
+          MpvAudioFilter(
+            'pitch',
+            'rubberband',
+            options: {
+              'pitch': MpvAudioFilterChain._number(shift, digits: 6),
+              'pitchq': 'quality',
+            },
+          ),
+        ],
+      );
+    }
+    final factor = pitch.factorAt(speed);
+    return MpvTempo(
+      speed: factor,
+      pitchCorrection: false,
+      tempoScale: speed / factor,
+    );
+  }
+
+  /// mpv's `speed` property.
+  final double speed;
+
+  /// mpv's `audio-pitch-correction` property.
+  final bool pitchCorrection;
+
+  /// Filters after the equalizer in its graph.
+  final List<MpvAudioFilter> filters;
+
+  /// The `scale` of a `scaletempo` filter after the graph, which brings the
+  /// tempo of audio mpv resampled by [speed] back to the effective speed.
+  final double? tempoScale;
 }

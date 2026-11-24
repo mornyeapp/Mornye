@@ -147,6 +147,8 @@ class FakeLinkBrowser implements LinkServiceBrowser {
 class FakeLinkBridge implements LinkLibraryBridge {
   final connections = <String, NetworkConnection>{};
   final calls = <String>[];
+  final librarySources = <String, bool>{};
+  Future<void> Function()? beforeSourceAdd;
 
   /// The latest reachability reported for each connection.
   final reachable = <String, bool>{};
@@ -170,8 +172,27 @@ class FakeLinkBridge implements LinkLibraryBridge {
       calls.add('address $connectionId $address');
 
   @override
-  Future<void> addLibrarySource(NetworkConnection connection) async =>
-      calls.add('source ${connection.id}');
+  Future<void> addLibrarySource(NetworkConnection connection) async {
+    await beforeSourceAdd?.call();
+    librarySources[connection.id] = true;
+    calls.add('source ${connection.id}');
+  }
+
+  @override
+  Future<void> setLibrarySourceEnabled(
+    String connectionId,
+    bool enabled,
+  ) async {
+    if (enabled) {
+      final saved = connections[connectionId];
+      if (saved != null) await addLibrarySource(saved);
+    } else {
+      if (librarySources.containsKey(connectionId)) {
+        librarySources[connectionId] = false;
+      }
+      calls.add('hide $connectionId');
+    }
+  }
 
   @override
   Future<void> rescan(String connectionId) async =>
@@ -180,6 +201,7 @@ class FakeLinkBridge implements LinkLibraryBridge {
   @override
   Future<void> removeConnection(String connectionId) async {
     connections.remove(connectionId);
+    librarySources.remove(connectionId);
     calls.add('remove $connectionId');
   }
 }

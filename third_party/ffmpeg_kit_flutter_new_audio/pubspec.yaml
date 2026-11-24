@@ -2,7 +2,7 @@ name: ffmpeg_kit_flutter_new_audio
 description: FFmpeg Kit Audio for Flutter. Mornye uses native plugins on Android, iOS, macOS and Linux, and Dart helpers on Windows.
 repository: https://github.com/sk3llo/ffmpeg_kit_flutter/tree/audio
 homepage: https://github.com/sk3llo/ffmpeg_kit_flutter
-version: 2.5.7
+version: 2.5.8
 environment:
   sdk: ">=3.1.0 <4.0.0"
   flutter: ">=3.0.0"

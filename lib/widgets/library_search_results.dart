@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
@@ -18,9 +18,11 @@ import 'package:mornye/services/batch_track_actions.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
+import 'package:mornye/services/playable_media.dart' show PlayableMedia;
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
@@ -29,8 +31,10 @@ import 'package:mornye/widgets/desktop/hover_play_button.dart';
 import 'package:mornye/widgets/desktop/library_track_menu.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/sliver_layout_info_builder.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
@@ -45,10 +49,15 @@ class LibrarySearchResults extends ConsumerStatefulWidget {
     required this.query,
     required this.onOpenArtist,
     this.shelves = false,
+    this.songList,
   });
 
   final String query;
   final ValueChanged<String> onOpenArtist;
+
+  /// The Library list a played song continues into, from the song on, as a
+  /// tap in that list plays. Without it a song plays on its own.
+  final LibrarySongListRequest? songList;
 
   /// Groups the overview into artists, albums and
   /// playlists in rows of artwork that scroll sideways, songs as rows, and
@@ -61,6 +70,9 @@ class LibrarySearchResults extends ConsumerStatefulWidget {
 }
 
 class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
+  /// The largest overview page: a shelf in the cover layout.
+  static const _overviewPageLimit = 20;
+
   LibrarySearchKind? _kind;
   bool _lyricsSearch = false;
   int _pages = 1;
@@ -338,6 +350,12 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
           );
           if (!mounted || item == null) return;
           if (!play) {
+            await prepareTrackDetailsCover(
+              context,
+              item.filePath,
+              fallback: item.localCoverPath ?? item.coverUrl,
+            );
+            if (!mounted) return;
             await pushPage<void>(
               context,
               (_) => TrackMetadataScreen(
@@ -347,16 +365,7 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
             );
             return;
           }
-          final media = item.localItem != null
-              ? playableFromLocal(item.localItem!)
-              : playableFromHistory(item.historyItem!);
-          await ref
-              .read(playbackProvider.notifier)
-              .playMediaQueue(
-                [media],
-                startIndex: 0,
-                externalPath: media.source,
-              );
+          await _play(item);
         case LibrarySearchKind.artists:
           widget.onOpenArtist(hit.title);
         case LibrarySearchKind.playlists:
@@ -400,6 +409,42 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
     }
   }
 
+  /// Plays [item] within [LibrarySearchResults.songList] when the Library
+  /// places it there, so playback runs on into the songs after it.
+  Future<void> _play(UnifiedLibraryItem item) async {
+    PlayableMedia media(UnifiedLibraryItem song) => song.localItem != null
+        ? playableFromLocal(song.localItem!)
+        : playableFromHistory(song.historyItem!);
+    final songList = widget.songList;
+    // A list that cannot be read leaves the song to play on its own.
+    final placed = songList == null
+        ? null
+        : await placeInLibrarySongList(
+            ref,
+            item,
+            songList,
+          ).catchError((Object _) => null);
+    if (!mounted) return;
+    final songs = placed == null
+        ? [item]
+        : placed.songs
+              .where(
+                (song) =>
+                    identical(song, placed.item) ||
+                    (song.filePath.trim().isNotEmpty &&
+                        !isCueVirtualPath(song.filePath)),
+              )
+              .toList(growable: false);
+    final start = placed == null ? 0 : songs.indexOf(placed.item);
+    await ref
+        .read(playbackProvider.notifier)
+        .playMediaQueue(
+          songs.map(media),
+          startIndex: start,
+          externalPath: media(item).source,
+        );
+  }
+
   Widget _row(LibrarySearchHit hit) {
     final icon = switch (hit.kind) {
       LibrarySearchKind.songs => Icons.music_note_outlined,
@@ -419,6 +464,14 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
     );
     final song = hit.kind == LibrarySearchKind.songs;
     final key = ValueKey('${hit.kind.name}:${hit.source}:${hit.id}');
+    final swipe = song
+        ? resolvedLibraryItemQueueSwipe(ref, () => _resolve(hit))
+        : null;
+    VoidCallback play(MediaPlaybackUi? playback) => playback?.isCurrent ?? false
+        ? () => ref
+              .read(musicPlayerControllerProvider)
+              .togglePlayPause(playback!.isPlaying)
+        : () => _open(hit, play: true);
     Widget card({MediaPlaybackUi? playback}) => TrackCard(
       key: playback == null ? key : null,
       style: hit.kind == LibrarySearchKind.songs && !context.isMornye
@@ -441,21 +494,20 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
       isPlaying: playback?.isPlaying ?? false,
       leadingArtwork: song,
       trailing: song
-          ? AppIconButton(
-              tooltip: playback?.isPlaying ?? false
-                  ? context.l10n.actionPause
-                  : context.l10n.tooltipPlay,
-              icon: Icon(
-                playback?.isPlaying ?? false
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
+          ? SongRowButton(
+              playButton: AppIconButton(
+                tooltip: playback?.isPlaying ?? false
+                    ? context.l10n.actionPause
+                    : context.l10n.tooltipPlay,
+                icon: Icon(
+                  playback?.isPlaying ?? false
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
+                ),
+                onPressed: play(playback),
               ),
-              // The current track pauses and resumes in place.
-              onPressed: playback?.isCurrent ?? false
-                  ? () => ref
-                        .read(musicPlayerControllerProvider)
-                        .togglePlayPause(playback!.isPlaying)
-                  : () => _open(hit, play: true),
+              onOpenDetails: () => _open(hit),
+              path: hit.samplePath,
             )
           : const Icon(Icons.chevron_right),
       // Long-press selects songs for the Library batch actions; while
@@ -463,17 +515,24 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
       isSelectionMode: song && _selecting,
       isSelected: song && _selected.containsKey(_itemId(hit)),
       onTap: !_selecting
-          ? () => _open(hit)
+          ? song
+                ? songRowTap(
+                    ref,
+                    path: hit.samplePath,
+                    openDetails: () => _open(hit),
+                    play: play(playback),
+                  )
+                : () => _open(hit)
           : song
           ? () => _toggleSelection(hit)
           : null,
       onLongPress: song ? () => _toggleSelection(hit) : null,
       onContextMenu: (position) => _showHitMenu(hit, position),
+      queueSwipe: swipe,
     );
-    if (!song || context.isMornye) return card();
-    // Material song rows follow the file they play, so a track change
-    // rebuilds only the rows involved. Mornye rows show no current-track
-    // state.
+    if (!song) return card();
+    // Song rows follow the file they play, so a track change rebuilds only
+    // the rows involved.
     return Consumer(
       key: key,
       builder: (context, ref, _) => card(
@@ -801,9 +860,18 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
     var loading = false;
     var failed = false;
     if (_lyricsSearch) {
-      final progress = ref.watch(libraryLyricsIndexProvider);
-      loading = !progress.hasError && progress.value?.complete != true;
-      failed = progress.hasError || (progress.value?.failed ?? 0) > 0;
+      // The checked count updates in its own Consumer, not the results.
+      final (indexFailed, complete, readFailed) = ref.watch(
+        libraryLyricsIndexProvider.select(
+          (progress) => (
+            progress.hasError,
+            progress.value?.complete == true,
+            (progress.value?.failed ?? 0) > 0,
+          ),
+        ),
+      );
+      loading = !indexFailed && !complete;
+      failed = indexFailed || readFailed;
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(
@@ -813,9 +881,15 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
               children: [
                 Text(context.l10n.libraryLyricsSearchDescription),
                 if (loading)
-                  Text(
-                    context.l10n.libraryLyricsIndexing(
-                      progress.value?.checked ?? 0,
+                  Consumer(
+                    builder: (context, ref, _) => Text(
+                      context.l10n.libraryLyricsIndexing(
+                        ref.watch(
+                          libraryLyricsIndexProvider.select(
+                            (progress) => progress.value?.checked ?? 0,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 if (failed) Text(context.l10n.libraryLyricsSearchIncomplete),
@@ -870,10 +944,13 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
             : shelf
             ? 20
             : 8;
+        // The overview asks for its largest page in every layout, so a pane
+        // crossing the cover breakpoint (a resize, the lyrics panel) shows
+        // the hits it has instead of searching again behind a spinner.
         final request = (
           query: widget.query,
           kind: kind,
-          limit: pageSize + 1,
+          limit: (_kind != null ? pageSize : _overviewPageLimit) + 1,
           offset: page * pageSize,
         );
         final result = ref.watch(
@@ -928,7 +1005,21 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
                     )
                   : SliverList.builder(
                       itemCount: hits.length.clamp(0, pageSize),
-                      itemBuilder: (context, index) => _row(hits[index]),
+                      // Material joins the filled song rows into one
+                      // connected list, which runs on across pages and ends
+                      // at the last row shown.
+                      itemBuilder: (context, index) =>
+                          kind != LibrarySearchKind.songs
+                          ? _row(hits[index])
+                          : TrackCardSegment(
+                              first: page == 0 && index == 0,
+                              last:
+                                  index == hits.length.clamp(0, pageSize) - 1 &&
+                                  (_kind == null ||
+                                      page == _pages - 1 ||
+                                      hits.length <= pageSize),
+                              child: _row(hits[index]),
+                            ),
                     ),
             );
           }

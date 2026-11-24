@@ -389,10 +389,11 @@ class LinkCollectionSyncStore {
     });
   }
 
-  /// The `network://` covers of this device's rows that [winners] replace
-  /// with a song without a cover. [linkSyncTrack] never sends one, so a
-  /// peer's later edit of such a row, such as a playlist reorder, comes back
-  /// without it; the row keeps it. A cover the peer sends wins.
+  /// The covers only this device can load (a file path, a `network://`
+  /// reference) of its rows that [winners] replace with a song without a
+  /// web cover. [linkSyncTrack] never sends one, so a peer's later edit of
+  /// such a row, such as a playlist reorder, comes back without it; the row
+  /// keeps it. A web cover the peer sends wins.
   Future<Map<_Identity, String>> _keptCovers(
     DatabaseExecutor db,
     List<LinkSyncChange> winners,
@@ -401,10 +402,7 @@ class LinkCollectionSyncStore {
     for (final change in winners) {
       final track = change.data?['track'];
       if (change.deleted || track is! Map) continue;
-      if (track['coverUrl'] case final String cover
-          when cover.trim().isNotEmpty) {
-        continue;
-      }
+      if (linkSyncRemoteArtwork(track['coverUrl']) != null) continue;
       if (_trackTables.containsKey(change.kind) ||
           change.kind == LinkSyncKinds.playlistTrack) {
         groups
@@ -427,7 +425,9 @@ class LinkCollectionSyncStore {
         );
         for (final row in rows) {
           final cover = _decodeMap(row['track_json'])?['coverUrl'];
-          if (cover is String && cover.startsWith('network://')) {
+          if (cover is String &&
+              cover.trim().isNotEmpty &&
+              linkSyncRemoteArtwork(cover) == null) {
             kept[(kind, scope, row['track_key']! as String)] = cover;
           }
         }
@@ -446,9 +446,13 @@ class LinkCollectionSyncStore {
     Map<_Identity, String> kept,
   ) {
     final data = change.data ?? const <String, dynamic>{};
-    final cover = kept[(change.kind, change.playlistId, change.key)];
-    Map<dynamic, dynamic> withCover(Map<dynamic, dynamic> track) =>
-        cover == null ? track : {...track, 'coverUrl': cover};
+    final ownCover = kept[(change.kind, change.playlistId, change.key)];
+    // An older build sends its own file paths, which nothing here can load.
+    Map<dynamic, dynamic> withCover(Map<dynamic, dynamic> track) {
+      final cover = ownCover ?? linkSyncRemoteArtwork(track['coverUrl']);
+      return cover == track['coverUrl'] ? track : {...track, 'coverUrl': cover};
+    }
+
     final addedAt = linkSyncMsToIso(
       linkSyncInt(data['addedMs']) ?? change.updatedMs,
     );

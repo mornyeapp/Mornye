@@ -1,5 +1,5 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,6 +17,8 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/widgets/preview_button.dart';
 import 'package:mornye/widgets/settings_group.dart';
+
+import 'support/tooltip_finder.dart';
 
 Future<ProviderContainer> _pumpPage(
   WidgetTester tester, {
@@ -205,9 +207,9 @@ void main() {
     }
 
     await pump(false);
-    expect(find.byTooltip('Play preview'), findsOneWidget);
+    expect(findByTooltip('Play preview'), findsOneWidget);
     await pump(true);
-    expect(find.byTooltip('Play preview'), findsNothing);
+    expect(findByTooltip('Play preview'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

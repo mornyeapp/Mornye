@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/models/download_item.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
@@ -130,8 +132,49 @@ bool shouldShowBatchDownloadPicker({
   required bool allowQualityVariants,
 }) => forceQualityPicker || askQualityBeforeDownload || allowQualityVariants;
 
+/// What makes two download queue entries the same song.
+Iterable<String> _queueKeys(Track track) sync* {
+  final id = track.id.trim();
+  if (id.isNotEmpty) yield 'id:$id';
+  final isrc = track.isrc?.trim().toUpperCase();
+  if (isrc != null && isrc.isNotEmpty) yield 'isrc:$isrc';
+}
+
+/// Positions of [tracks] already in the Local Library, matched by ISRC and
+/// then title and artist, so files from another app or an older copy count
+/// as downloaded. Empty while the Local Library is off, and empty when the
+/// lookup fails so the caller can still queue.
+Future<Set<int>> localLibraryMatchIndices(
+  WidgetRef ref,
+  List<Track> tracks,
+) async {
+  if (tracks.isEmpty || !ref.read(settingsProvider).localLibraryEnabled) {
+    return const {};
+  }
+  try {
+    final matches = await ref
+        .read(localLibraryProvider.notifier)
+        .findExistingBatchAsync([
+          for (final track in tracks)
+            LocalLibraryBatchLookupRequest(
+              isrc: track.isrc,
+              trackName: track.name,
+              artistName: track.artistName,
+            ),
+        ]);
+    return {
+      for (var i = 0; i < matches.length; i++)
+        if (matches[i] != null) i,
+    };
+  } catch (e) {
+    AppLogger('DownloadFlow').w('Local library duplicate check failed: $e');
+    return const {};
+  }
+}
+
 /// Shared batch "add to queue" flow for detail screens: skips tracks already
-/// present in download history or the local library, then either shows the
+/// present in download history, the local library or the download queue,
+/// then either shows the
 /// quality/service picker or resolves a default service, before enqueueing
 /// the rest.
 ///
@@ -169,18 +212,28 @@ Future<void> queueTracksSkippingDownloaded(
         ).future,
       );
     } catch (e) {
-      // Queueing without the skip beats silently doing nothing: several
-      // callers fire this flow unawaited, so a throw here would vanish.
-      AppLogger('DownloadFlow').w('Duplicate check failed, queueing all: $e');
+      // Several callers do not await this flow. A failed history lookup must
+      // still let the local library check and queueing continue.
+      AppLogger(
+        'DownloadFlow',
+      ).w('Download history duplicate check failed: $e');
     }
   }
   if (!context.mounted) return;
-  final localLibState =
-      (skipExisting &&
-          settings.localLibraryEnabled &&
-          settings.localLibraryShowDuplicates)
-      ? ref.read(localLibraryProvider)
-      : null;
+  final existingLocalIndices = skipExisting
+      ? await localLibraryMatchIndices(ref, tracks)
+      : const <int>{};
+  if (!context.mounted) return;
+  // Quality variants ask for a second copy of a song on purpose.
+  final waiting = settings.allowQualityVariants
+      ? const <String>{}
+      : {
+          for (final item in ref.read(downloadQueueProvider).items)
+            if (item.status == DownloadStatus.queued ||
+                item.status == DownloadStatus.downloading ||
+                item.status == DownloadStatus.finalizing)
+              ..._queueKeys(item.track),
+        };
   final tracksToQueue = <Track>[];
   var skippedCount = 0;
 
@@ -189,15 +242,10 @@ Future<void> queueTracksSkippingDownloaded(
     final isInHistory =
         skipExisting &&
         existingHistoryKeys.contains(historyLookups[i].lookupKey);
-    final isInLocal =
-        localLibState?.existsInLibrary(
-          isrc: track.isrc,
-          trackName: track.name,
-          artistName: track.artistName,
-        ) ??
-        false;
+    final isInLocal = existingLocalIndices.contains(i);
+    final isWaiting = _queueKeys(track).any(waiting.contains);
 
-    if (isInHistory || isInLocal) {
+    if (isInHistory || isInLocal || isWaiting) {
       skippedCount++;
     } else {
       tracksToQueue.add(track);

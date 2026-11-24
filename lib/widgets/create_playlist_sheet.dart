@@ -1,14 +1,16 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/playlist_sources.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/error_card.dart';
@@ -103,7 +105,7 @@ Future<void> _createFromFolder(BuildContext context, WidgetRef ref) async {
   final name = await _promptName(context, folder.name);
   if (name == null || name.isEmpty || !context.mounted) return;
 
-  final tracks = await libraryFolderTracks(folder, library);
+  final tracks = await libraryFolderTreeTracks(folder, library);
   final notifier = ref.read(libraryCollectionsProvider.notifier);
   final id = await notifier.createPlaylist(name);
   final result = await notifier.addTracksToPlaylist(id, tracks);
@@ -154,6 +156,10 @@ Future<void> _importFile(BuildContext context, WidgetRef ref) async {
     match.tracks,
     preserveOccurrences: true,
   );
+  _log.i(
+    'Imported ${result.addedCount} of ${match.tracks.length} playlist '
+    'entries, ${result.alreadyInPlaylistCount} skipped as already present',
+  );
   if (!context.mounted) return;
   showAppSnackBar(
     context,
@@ -163,16 +169,65 @@ Future<void> _importFile(BuildContext context, WidgetRef ref) async {
   );
 }
 
-class _FolderList extends StatelessWidget {
+class _FolderList extends StatefulWidget {
   const _FolderList({required this.folders, required this.controller});
 
   final Future<List<LibraryFolder>> folders;
   final ScrollController controller;
 
   @override
+  State<_FolderList> createState() => _FolderListState();
+}
+
+class _FolderListState extends State<_FolderList> {
+  bool _browsing = false;
+
+  /// Why the last browse added nothing. It shows on the Browse row, as a
+  /// page snackbar would be painted behind this sheet.
+  String? _browseNotice;
+
+  /// Picks any folder with the system dialog and returns it with the tracks
+  /// of all its subfolders.
+  Future<void> _browse() async {
+    final l10n = context.l10n;
+    final String? dir;
+    try {
+      dir = await FilePicker.getDirectoryPath();
+    } catch (e) {
+      _log.e('Folder picker failed: $e');
+      if (!mounted) return;
+      setState(() => _browseNotice = l10n.snackbarFolderPickerFailed('$e'));
+      return;
+    }
+    if (dir == null || dir.isEmpty || !mounted) return;
+    setState(() {
+      _browsing = true;
+      _browseNotice = null;
+    });
+    LibraryFolder? folder;
+    try {
+      folder = await libraryFolderTree(dir, LibraryDatabase.instance);
+    } catch (e) {
+      _log.e('Failed to read Library folder $dir: $e');
+    }
+    if (!mounted) return;
+    if (folder != null && folder.ids.isNotEmpty) {
+      Navigator.pop(context, folder);
+      return;
+    }
+    setState(() {
+      _browsing = false;
+      _browseNotice = folder == null
+          ? l10n.libraryFoldersLoadFailed
+          : l10n.playlistBrowseFolderNoTracks;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
     return FutureBuilder<List<LibraryFolder>>(
-      future: folders,
+      future: widget.folders,
       builder: (context, snapshot) {
         final folders = snapshot.hasError
             ? const <LibraryFolder>[]
@@ -212,25 +267,49 @@ class _FolderList extends StatelessWidget {
             ),
           );
         }
+        // Desktop can also pick any folder with the system dialog, even
+        // when no Library folder is listed yet.
+        final browse = isDesktopPlatform
+            ? AppSheetOption(
+                leading: const AppIcon(Icons.folder_open),
+                title: Text(context.l10n.playlistBrowseFolder),
+                subtitle: Text(
+                  _browseNotice ?? context.l10n.playlistBrowseFolderSubtitle,
+                ),
+                trailing: _browsing
+                    ? const AppLoadingIndicator(size: 24)
+                    : null,
+                enabled: !_browsing,
+                onTap: _browse,
+              )
+            : null;
         if (folders.isEmpty) {
           return SingleChildScrollView(
             controller: controller,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: EmptyState(
-                icon: Icons.folder_outlined,
-                title: context.l10n.playlistFolderPickerEmptyTitle,
-                message: context.l10n.playlistFolderPickerEmpty,
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ?browse,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: EmptyState(
+                    icon: Icons.folder_outlined,
+                    title: context.l10n.playlistFolderPickerEmptyTitle,
+                    message: context.l10n.playlistFolderPickerEmpty,
+                  ),
+                ),
+              ],
             ),
           );
         }
+        final offset = browse == null ? 0 : 1;
         return ListView.builder(
           controller: controller,
           padding: const EdgeInsets.only(bottom: 16),
-          itemCount: folders.length,
+          itemCount: folders.length + offset,
           itemBuilder: (context, index) {
-            final folder = folders[index];
+            if (browse != null && index == 0) return browse;
+            final folder = folders[index - offset];
             final count = context.l10n.tracksCount(folder.ids.length);
             return AppSheetOption(
               leading: const AppIcon(Icons.folder_outlined),

@@ -10,7 +10,7 @@ Uint8List _encodeLyricsInBackground(String raw) =>
 
 ParsedLyrics _parseLyricsInBackground(String raw) => LyricsParser.parse(raw);
 
-ParsedLyrics _hydrateParsedLyricsInBackground(Map<String, dynamic> result) {
+ParsedLyrics _hydrateParsedLyrics(Map<String, dynamic> result) {
   LyricWord word(Map<dynamic, dynamic> value) => LyricWord(
     time: Duration(milliseconds: value['timeMs'] as int),
     end: value['endMs'] == null
@@ -36,6 +36,8 @@ ParsedLyrics _hydrateParsedLyricsInBackground(Map<String, dynamic> result) {
         romanization: row['romanization'] as String?,
         romanizationWords: words(row['romanizationWords']),
         translation: row['translation'] as String?,
+        // Sent only for lines that have it.
+        translationWords: words(row['translationWords'] ?? const <Object>[]),
         voice: voice == null
             ? null
             : LyricVoice(
@@ -206,7 +208,7 @@ class LyricsParser {
     caseSensitive: false,
   );
   static final RegExp _supplementTag = RegExp(
-    r'^\[x-(romaji-words|romaji|translation):(\d+):([^\]]*)\]$',
+    r'^\[x-(romaji-words|romaji|translation-words|translation):(\d+):([^\]]*)\]$',
     caseSensitive: false,
   );
   static final RegExp _writerCredit = RegExp(
@@ -249,13 +251,21 @@ class LyricsParser {
     return _withCredits(text, _parseLrcOrPlain(text));
   }
 
+  /// Lyrics up to this many characters are encoded and rebuilt from the
+  /// native result on the calling isolate: below it, an isolate hop costs
+  /// more than the work.
+  static const inlineNativeParseChars = 64 * 1024;
+
   /// Production parsing runs away from rendering. The synchronous parser
   /// remains the compatibility contract for old native builds and test hosts.
   static Future<ParsedLyrics> parseAsyncNative(String? raw) async {
     if (raw == null || raw.isEmpty) return ParsedLyrics.empty;
+    final inline = raw.length <= inlineNativeParseChars;
     Map<String, dynamic> result;
     try {
-      final bytes = await compute(_encodeLyricsInBackground, raw);
+      final bytes = inline
+          ? utf8.encode(raw)
+          : await compute(_encodeLyricsInBackground, raw);
       result = await PlatformBridge.runNativeDataJob({
         'operation': 'parse_lyrics',
       }, bytes: bytes);
@@ -267,7 +277,8 @@ class LyricsParser {
       if (error.message?.contains('XML nesting exceeds') != true) rethrow;
       return compute(_parseLyricsInBackground, raw);
     }
-    return compute(_hydrateParsedLyricsInBackground, result);
+    if (inline) return _hydrateParsedLyrics(result);
+    return compute(_hydrateParsedLyrics, result);
   }
 
   static ParsedLyrics _withCredits(String raw, ParsedLyrics lyrics) {
@@ -362,6 +373,7 @@ class LyricsParser {
     final romanization = <int, String>{};
     final romanizationWords = <int, List<LyricWord>>{};
     final translation = <int, String>{};
+    final translationWords = <int, List<LyricWord>>{};
     var sawTimestamp = false;
     var sawWordTiming = false;
     var offsetMs = 0;
@@ -380,10 +392,11 @@ class LyricsParser {
           final value = utf8.decode(base64.decode(supplement.group(3)!)).trim();
           if (time != null && value.isNotEmpty) {
             final kind = supplement.group(1)!.toLowerCase();
-            if (kind == 'romaji-words') {
-              final words = _parseRomanizationWords(value);
+            if (kind.endsWith('-words')) {
+              final words = _parseSupplementWords(value);
               if (words.isNotEmpty) {
-                romanizationWords.putIfAbsent(time, () => words);
+                (kind == 'romaji-words' ? romanizationWords : translationWords)
+                    .putIfAbsent(time, () => words);
               }
             } else {
               final target = kind == 'romaji' ? romanization : translation;
@@ -479,29 +492,30 @@ class LyricsParser {
     // before applying offsets, which must not manufacture usable timing.
     final synced = _hasUsableTiming(parsed);
     _sortLines(parsed);
-    final alignedRomanization = _alignSupplements(parsed, romanization);
+    final timed = synced ? _pairTranslations(parsed) : parsed;
+    final alignedRomanization = _alignSupplements(timed, romanization);
     final alignedRomanizationWords = _alignSupplements(
-      parsed,
+      timed,
       romanizationWords,
     );
-    final alignedTranslation = _alignSupplements(parsed, translation);
+    final alignedTranslation = _alignSupplements(timed, translation);
+    final alignedTranslationWords = _alignSupplements(timed, translationWords);
+    // Keep readable text when optional timings are incomplete or belong to a
+    // different revision of the text they time.
+    List<LyricWord> spelled(String? text, List<LyricWord>? words) =>
+        words != null && words.map((word) => word.text).join() == text
+        ? words
+        : const <LyricWord>[];
 
     final adjusted =
         offsetMs == 0 &&
             alignedRomanization.isEmpty &&
             alignedTranslation.isEmpty
-        ? parsed
-        : parsed.map((l) {
-            final romanization = alignedRomanization[l.time.inMilliseconds];
-            final words =
-                alignedRomanizationWords[l.time.inMilliseconds] ??
-                const <LyricWord>[];
-            // Keep readable text when optional timings are incomplete or
-            // belong to a different revision of the transliteration.
-            final validWords =
-                words.map((word) => word.text).join() == romanization
-                ? words
-                : const <LyricWord>[];
+        ? timed
+        : timed.map((l) {
+            final time = l.time.inMilliseconds;
+            final romanization = alignedRomanization[time];
+            final translation = alignedTranslation[time] ?? l.translation;
             return LyricLine(
               time: _shift(l.time, offsetMs),
               end: l.end == null ? null : _shift(l.end!, offsetMs),
@@ -510,8 +524,15 @@ class LyricsParser {
               isBackground: l.isBackground,
               vocalGroup: l.vocalGroup,
               romanization: romanization,
-              romanizationWords: _shiftWords(validWords, offsetMs),
-              translation: alignedTranslation[l.time.inMilliseconds],
+              romanizationWords: _shiftWords(
+                spelled(romanization, alignedRomanizationWords[time]),
+                offsetMs,
+              ),
+              translation: translation,
+              translationWords: _shiftWords(
+                spelled(translation, alignedTranslationWords[time]),
+                offsetMs,
+              ),
               words: _shiftWords(l.words, offsetMs),
             );
           }).toList();
@@ -563,7 +584,8 @@ class LyricsParser {
     return matched.map((time, match) => MapEntry(time, match.$2));
   }
 
-  static List<LyricWord> _parseRomanizationWords(String raw) {
+  /// `[x-romaji-words:...]` and `[x-translation-words:...]` JSON.
+  static List<LyricWord> _parseSupplementWords(String raw) {
     final value = jsonDecode(raw);
     if (value is! List) return const [];
     final words = <LyricWord>[];
@@ -628,11 +650,12 @@ class LyricsParser {
       final word = content.substring(start, end);
       if (word.trim().isEmpty) {
         final previous = words.lastOrNull;
-        if (previous != null && previous.end == null && d >= previous.time) {
+        if (previous != null) {
+          // A closing timestamp can come before the space between words.
           words[words.length - 1] = LyricWord(
             time: previous.time,
-            end: d,
-            text: previous.text,
+            end: previous.end ?? (d >= previous.time ? d : null),
+            text: '${previous.text}$word',
           );
         }
         continue;
@@ -848,6 +871,58 @@ class LyricsParser {
       }
     }
     return result;
+  }
+
+  /// Bilingual LRC files time each translation like the line it translates:
+  /// the original, then its translation, under one timestamp. Lines are read
+  /// so only when most moments of the song are such a pair, so occasional
+  /// simultaneous singers stay separate lines. Mirrors the native parser.
+  static List<LyricLine> _pairTranslations(List<LyricLine> lines) {
+    bool sung(LyricLine line) => !line.isBackground && line.text.isNotEmpty;
+    bool sameVoice(LyricVoice? a, LyricVoice? b) =>
+        b == null ||
+        (a != null &&
+            a.id == b.id &&
+            a.index == b.index &&
+            a.isGroup == b.isGroup);
+    // Each run of lines sharing a timestamp, as its length and whether it is
+    // an original followed by its translation.
+    final runs = <(int, bool)>[];
+    var moments = 0;
+    var pairs = 0;
+    for (var start = 0; start < lines.length;) {
+      var end = start + 1;
+      while (end < lines.length && lines[end].time == lines[start].time) {
+        end++;
+      }
+      final run = lines.sublist(start, end);
+      final pair =
+          run.length == 2 &&
+          sung(run[0]) &&
+          sung(run[1]) &&
+          sameVoice(run[0].voice, run[1].voice);
+      if (run.any(sung)) moments++;
+      if (pair) pairs++;
+      runs.add((run.length, pair));
+      start = end;
+    }
+    if (pairs < 2 || pairs * 2 <= moments) return lines;
+    final paired = <LyricLine>[];
+    var index = 0;
+    for (final (length, pair) in runs) {
+      if (!pair) {
+        paired.addAll(lines.getRange(index, index + length));
+      } else {
+        final line = lines[index];
+        final translation = lines[index + 1].text;
+        // A repeated line is the same words twice, not a translation.
+        paired.add(
+          translation == line.text ? line : line.withTranslation(translation),
+        );
+      }
+      index += length;
+    }
+    return paired;
   }
 
   static void _sortLines(List<LyricLine> lines) {

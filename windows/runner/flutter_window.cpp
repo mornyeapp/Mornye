@@ -22,6 +22,11 @@ constexpr int kMinimumClientHeight = 600;
 // Gap, in logical pixels, between a new mini player and the screen corner.
 constexpr int kMiniPlayerScreenInset = 16;
 
+// Frames asked for after the window first shows, and the time between them.
+constexpr UINT_PTR kStartupRedrawTimer = 0x4D52;
+constexpr UINT kStartupRedrawIntervalMs = 250;
+constexpr int kStartupRedraws = 8;
+
 // Reads a number from the call arguments, or |fallback| when it is missing.
 double NumberArgument(const flutter::EncodableValue* arguments,
                       const char* key, double fallback) {
@@ -51,6 +56,29 @@ std::string StringArgument(const flutter::EncodableValue* arguments,
   if (entry == map->end()) return {};
   const auto* value = std::get_if<std::string>(&entry->second);
   return value == nullptr ? std::string() : *value;
+}
+
+bool BoolArgument(const flutter::EncodableValue* arguments, const char* key) {
+  if (arguments == nullptr) return false;
+  const auto* map = std::get_if<flutter::EncodableMap>(arguments);
+  if (map == nullptr) return false;
+  const auto entry = map->find(flutter::EncodableValue(key));
+  if (entry == map->end()) return false;
+  const auto* value = std::get_if<bool>(&entry->second);
+  return value != nullptr && *value;
+}
+
+std::wstring TaskbarLabel(const flutter::EncodableValue* arguments,
+                         const char* key) {
+  const auto text = StringArgument(arguments, key);
+  const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                       text.c_str(), -1, nullptr, 0);
+  if (length <= 1) return {};
+  std::wstring result(length, L'\0');
+  MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.c_str(), -1,
+                     result.data(), length);
+  result.pop_back();
+  return result;
 }
 
 }  // namespace
@@ -97,10 +125,46 @@ bool FlutterWindow::OnCreate() {
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,
              std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
                  result) { HandleWindowCall(call, std::move(result)); });
+  taskbar_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "com.zarz.mornye/taskbar",
+          &flutter::StandardMethodCodec::GetInstance());
+  taskbar_controls_ = std::make_unique<TaskbarControls>(
+      GetHandle(), [this](const char* action) {
+        taskbar_channel_->InvokeMethod(
+            "button",
+            std::make_unique<flutter::EncodableValue>(std::string(action)));
+      });
+  taskbar_channel_->SetMethodCallHandler(
+      [this](const auto& call, auto result) {
+        if (call.method_name() != "update") {
+          result->NotImplemented();
+          return;
+        }
+        const auto* args = call.arguments();
+        TaskbarPlaybackState state;
+        state.visible = BoolArgument(args, "visible");
+        state.playing = BoolArgument(args, "playing");
+        state.toggle = BoolArgument(args, "toggle");
+        state.previous = BoolArgument(args, "previous");
+        state.next = BoolArgument(args, "next");
+        state.toggle_label = TaskbarLabel(args, "toggleLabel");
+        state.previous_label = TaskbarLabel(args, "previousLabel");
+        state.next_label = TaskbarLabel(args, "nextLabel");
+        taskbar_controls_->Update(std::move(state));
+        result->Success();
+      });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
+    // The engine calls this once it has drawn the first frame, also when
+    // that frame could not reach the window (surface not ready, or a size
+    // change in between). An idle app draws nothing more, so the window
+    // would stay blank: ask for a few more frames while it is visible.
+    startup_redraws_left_ = kStartupRedraws;
+    SetTimer(GetHandle(), kStartupRedrawTimer, kStartupRedrawIntervalMs,
+             nullptr);
   });
 
   // Flutter can complete the first frame before the "show window" callback is
@@ -132,6 +196,8 @@ void FlutterWindow::OpenAudioFiles(const std::vector<std::string>& paths) {
 }
 
 void FlutterWindow::OnDestroy() {
+  taskbar_controls_ = nullptr;
+  taskbar_channel_ = nullptr;
   audio_channel_ = nullptr;
   window_channel_ = nullptr;
   if (flutter_controller_) {
@@ -145,6 +211,14 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_TIMER && wparam == kStartupRedrawTimer) {
+    if (flutter_controller_) flutter_controller_->ForceRedraw();
+    if (--startup_redraws_left_ <= 0) KillTimer(hwnd, kStartupRedrawTimer);
+    return 0;
+  }
+  if (taskbar_controls_ && taskbar_controls_->HandleMessage(message, wparam)) {
+    return 0;
+  }
   if (message == WM_COPYDATA && lparam != 0) {
     const auto* data = reinterpret_cast<const COPYDATASTRUCT*>(lparam);
     if (data->dwData == kOpenAudioMessage) {

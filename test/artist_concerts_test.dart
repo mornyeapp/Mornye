@@ -1,13 +1,15 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/artist_concert.dart';
 import 'package:mornye/screens/artist_concerts_screen.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/artist_concerts_button.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
+
+import 'support/tooltip_finder.dart';
 
 Map<String, dynamic> event({
   String id = 'event-1',
@@ -27,7 +29,7 @@ Widget app(Widget child, {bool mornye = true, String language = 'en'}) =>
       child: MaterialApp(
         theme: mornye ? MornyeTheme.build(Brightness.light) : ThemeData(),
         locale: Locale(language),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: child,
       ),
@@ -123,7 +125,7 @@ void main() {
         expect(find.text('Example City, Region'), findsOneWidget);
         expect(find.text('6'), findsOneWidget);
         expect(find.textContaining('21:00'), findsOneWidget);
-        await tester.tap(find.byTooltip('Back'));
+        await tester.tap(findByTooltip('Back'));
         await tester.pumpAndSettle();
         expect(find.byType(ArtistConcertsScreen), findsNothing);
         expect(find.byType(ArtistConcertsButton), findsOneWidget);

@@ -1,5 +1,5 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -20,10 +20,12 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/library_search_results.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
+import 'package:mornye/widgets/song_row_tap.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/track_list_tile.dart';
 
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 /// The playing track, a different track, and a track another provider lists
 /// under the same catalog id.
@@ -162,6 +164,19 @@ TrackCard _card(WidgetTester tester, String title) => tester.widget<TrackCard>(
   find.ancestor(of: find.text(title), matching: find.byType(TrackCard)),
 );
 
+/// Mornye marks the current row with its title's colour alone.
+void _expectOnlyCurrentAccented(WidgetTester tester) {
+  Color? titleColor(String title) =>
+      tester.widget<Text>(find.text(title)).style?.color;
+  final accent = Theme.of(
+    tester.element(find.text('Current song')),
+  ).colorScheme.primary;
+  expect(titleColor('Current song'), accent);
+  expect(titleColor('Other song'), isNot(accent));
+  expect(titleColor('Same id song'), isNot(accent));
+  expect(find.byType(NowPlayingIndicator), findsNothing);
+}
+
 void _expectOnlyCurrentMarked(WidgetTester tester) {
   expect(_card(tester, 'Current song').isCurrent, isTrue);
   expect(_card(tester, 'Other song').isCurrent, isFalse);
@@ -203,11 +218,12 @@ void main() {
       expect(find.byType(NowPlayingIndicator), findsNothing);
     });
 
-    testWidgets('Mornye rows show no current-track state', (tester) async {
+    testWidgets('Mornye rows show only the current title in the accent', (
+      tester,
+    ) async {
       await tester.pumpWidget(_app(list(), mornye: true));
       await _pumpFor(tester);
-      expect(_card(tester, 'Current song').isCurrent, isFalse);
-      expect(find.byType(NowPlayingIndicator), findsNothing);
+      _expectOnlyCurrentAccented(tester);
     });
   });
 
@@ -349,18 +365,28 @@ void main() {
       ) async {
         debugDesktopPlatformOverride = desktop;
         await tester.pumpWidget(
-          _app(results(), current: current, overrides: searchOverrides),
+          _app(
+            results(),
+            current: current,
+            overrides: [
+              ...searchOverrides,
+              // The rows keep their Play buttons while a tap opens details.
+              librarySongTapPlaysProvider.overrideWithValue(false),
+            ],
+          ),
         );
         await _pumpFor(tester);
         _expectOnlyCurrentMarked(tester);
         // The current row's button pauses rather than restarting.
-        expect(find.byTooltip('Pause'), findsOneWidget);
-        expect(find.byTooltip('Play'), findsNWidgets(2));
+        expect(findByTooltip('Pause'), findsOneWidget);
+        expect(findByTooltip('Play'), findsNWidgets(2));
         expect(tester.takeException(), isNull);
       });
     }
 
-    testWidgets('Mornye rows show no current-track state', (tester) async {
+    testWidgets('Mornye rows show only the current title in the accent', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _app(
           results(),
@@ -370,7 +396,7 @@ void main() {
         ),
       );
       await _pumpFor(tester);
-      expect(find.byType(NowPlayingIndicator), findsNothing);
+      _expectOnlyCurrentAccented(tester);
     });
   });
 }

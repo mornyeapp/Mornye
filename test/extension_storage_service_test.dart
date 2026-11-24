@@ -239,26 +239,146 @@ void main() {
     },
   );
 
-  test(
-    'other platforms keep secure storage even when a local key file exists',
-    () async {
-      values[keyName] = base64Encode(List.filled(32, 1));
-      await seed(
-        'support/extension_data/.master_key_unsecured',
-        utf8.encode(base64Encode(List.filled(32, 2))),
-      );
-      expect(
-        await ExtensionStorageService.isUnsecuredStorageEnabled(),
-        isFalse,
-      );
+  test('other platforms have no switch for the local key', () async {
+    values[keyName] = base64Encode(List.filled(32, 1));
+    for (final enabled in [true, false]) {
       await expectLater(
-        ExtensionStorageService.setUnsecuredStorage(true),
+        ExtensionStorageService.setUnsecuredStorage(enabled),
         throwsUnsupportedError,
       );
-      expect(
-        (await ExtensionStorageService.prepare()).masterKey,
-        values[keyName],
-      );
+    }
+    expect(await ExtensionStorageService.isUnsecuredStorageEnabled(), isFalse);
+    expect(
+      (await ExtensionStorageService.prepare()).masterKey,
+      values[keyName],
+    );
+    expect(await localKey().exists(), isFalse);
+  });
+
+  test('Android moves to a local key when the keystore loses it', () async {
+    final first = (await ExtensionStorageService.prepare()).masterKey;
+    final lostFiles = [
+      await seed('support/extension_data/example/settings.enc', [1]),
+      await seed('support/extension_data/example/.credentials.enc', [2]),
+      await seed('support/extension_data/.pending-auth.enc', [3]),
+    ];
+    final kept = await seed('support/extension_data/example/storage.json', [4]);
+    values.clear();
+    ExtensionStorageService.resetForTesting();
+
+    final recovered = (await ExtensionStorageService.prepare()).masterKey;
+    expect(recovered, isNot(first));
+    expect(await localKey().readAsString(), recovered);
+    expect(values, isEmpty);
+    for (final (index, file) in lostFiles.indexed) {
+      expect(await file.exists(), isFalse);
+      expect(await File('${file.path}.lost').readAsBytes(), [index + 1]);
+    }
+    expect(await kept.readAsBytes(), [4]);
+    expect(await ExtensionStorageService.hasRecoveryNotice(), isTrue);
+
+    // From now on the keystore is not asked, so nothing can be lost again.
+    await seed('support/extension_data/example/settings.enc', [5]);
+    secureCalls.clear();
+    ExtensionStorageService.resetForTesting();
+    expect((await ExtensionStorageService.prepare()).masterKey, recovered);
+    expect(secureCalls, isEmpty);
+    expect(
+      await File(
+        '${root.path}/support/extension_data/example/settings.enc',
+      ).readAsBytes(),
+      [5],
+    );
+
+    await ExtensionStorageService.dismissRecoveryNotice();
+    expect(await ExtensionStorageService.hasRecoveryNotice(), isFalse);
+  });
+
+  test('a lost key with nothing encrypted yet costs no data', () async {
+    await ExtensionStorageService.prepare();
+    values.clear();
+    ExtensionStorageService.resetForTesting();
+    final key = (await ExtensionStorageService.prepare()).masterKey;
+    expect(await localKey().readAsString(), key);
+    expect(await ExtensionStorageService.hasRecoveryNotice(), isFalse);
+  });
+
+  test('other platforms give the secure store a second key', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    final settings = File(
+      '${root.path}/support/extension_data/example/settings.enc',
+    );
+    await seed('support/extension_data/example/settings.enc', [1]);
+
+    final second = (await ExtensionStorageService.prepare()).masterKey;
+    expect(values[keyName], second);
+    expect(await localKey().exists(), isFalse);
+    expect(await File('${settings.path}.lost').readAsBytes(), [1]);
+    expect(await ExtensionStorageService.hasRecoveryNotice(), isTrue);
+
+    await seed('support/extension_data/example/settings.enc', [2]);
+    values.clear();
+    ExtensionStorageService.resetForTesting();
+    final third = (await ExtensionStorageService.prepare()).masterKey;
+    expect(third, isNot(second));
+    expect(await localKey().readAsString(), third);
+    expect(values, isEmpty);
+    // Only the latest unreadable copy is kept.
+    expect(await File('${settings.path}.lost').readAsBytes(), [2]);
+    expect(await settings.exists(), isFalse);
+  });
+
+  for (final failure in ['unkept', 'refused']) {
+    test(
+      'a secure store that cannot keep a key is not used ($failure)',
+      () async {
+        if (failure == 'unkept') {
+          ignoreWrites = true;
+        } else {
+          writeError = PlatformException(code: 'keystore_unavailable');
+        }
+        final key = (await ExtensionStorageService.prepare()).masterKey;
+        expect(await localKey().readAsString(), key);
+        expect(await ExtensionStorageService.hasRecoveryNotice(), isFalse);
+        ExtensionStorageService.resetForTesting();
+        expect((await ExtensionStorageService.prepare()).masterKey, key);
+      },
+    );
+  }
+
+  test('Linux starts over only when asked while the keyring is away', () async {
+    linux();
+    final data = await seed('support/extension_data/example/settings.enc', [7]);
+    readError = PlatformException(code: 'Libsecret error');
+    await expectLater(
+      ExtensionStorageService.setUnsecuredStorage(true),
+      throwsA(isA<ExtensionStorageModeException>()),
+    );
+    expect(await data.readAsBytes(), [7]);
+
+    await ExtensionStorageService.setUnsecuredStorage(true, startOver: true);
+    expect(await data.exists(), isFalse);
+    expect(await File('${data.path}.lost').readAsBytes(), [7]);
+    expect(await ExtensionStorageService.hasRecoveryNotice(), isTrue);
+    expect(
+      (await ExtensionStorageService.prepare()).masterKey,
+      await localKey().readAsString(),
+    );
+    expect(mutations, isEmpty);
+  });
+
+  test(
+    'Linux recovers by itself when the keyring answers without the key',
+    () async {
+      linux();
+      final data = await seed('support/extension_data/example/settings.enc', [
+        7,
+      ]);
+      final key = (await ExtensionStorageService.prepare()).masterKey;
+      expect(values[keyName], key);
+      expect(await localKey().exists(), isFalse);
+      expect(await File('${data.path}.lost').readAsBytes(), [7]);
+      expect(await ExtensionStorageService.hasRecoveryNotice(), isTrue);
     },
   );
 
@@ -296,30 +416,28 @@ void main() {
     expect(await userFile.readAsBytes(), [1, 2]);
     expect(await userData.readAsBytes(), [3]);
     expect(await Directory(storage.extensionsDir).list().toList(), isEmpty);
-    expect(await Directory(storage.dataDir).list().toList(), isEmpty);
+    expect(
+      await Directory(
+        storage.dataDir,
+      ).list().map((entry) => entry.uri.pathSegments.last).toList(),
+      ['.key_record'],
+    );
   });
 
-  test('missing key never replaces encrypted settings and can retry', () async {
+  test('a missing key no longer stops extensions from starting', () async {
     final file = await seed(
       'support/extension_data/example.provider/settings.enc',
       [5, 6, 7],
     );
-    await expectLater(
-      ExtensionStorageService.prepare(),
-      throwsA(
-        isA<StateError>().having(
-          (error) => error.message,
-          'message',
-          contains('key is missing'),
-        ),
-      ),
+    final storage = await ExtensionStorageService.prepare();
+    expect(base64Decode(storage.masterKey), hasLength(32));
+    expect(await file.exists(), isFalse);
+    expect(await File('${file.path}.lost').readAsBytes(), [5, 6, 7]);
+    ExtensionStorageService.resetForTesting();
+    expect(
+      (await ExtensionStorageService.prepare()).masterKey,
+      storage.masterKey,
     );
-    expect(mutations, isEmpty);
-    expect(await file.readAsBytes(), [5, 6, 7]);
-    final key = base64Encode(List.filled(32, 9));
-    values[keyName] = key;
-    expect((await ExtensionStorageService.prepare()).masterKey, key);
-    expect(mutations, isEmpty);
   });
 
   for (final invalid in [

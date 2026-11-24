@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart';
@@ -9,6 +9,9 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_database_models.dart'
     show LocalLibraryItem;
 import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/providers/library_artist_songs_provider.dart';
+import 'package:mornye/providers/library_browse_provider.dart';
+import 'package:mornye/providers/library_genres_provider.dart';
 import 'package:mornye/providers/library_mixes_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/batch_track_actions.dart';
@@ -22,17 +25,20 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/detail_header.dart';
 import 'package:mornye/widgets/desktop/library_track_menu.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
+import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/library_mix_cover.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 /// A mix's name: what it gathers, such as "Hip-Hop Mix".
@@ -92,11 +98,36 @@ String libraryMixSubtitle(AppLocalizations l10n, LibraryMix mix) =>
     };
 
 /// A mix of the Library's own songs: its cover, Play, Shuffle, Save as
-/// playlist and its songs in play order.
+/// playlist and its songs in play order. [LibraryMixScreen.genre] shows the
+/// songs of one Library genre the same way, under the genre's name, and
+/// [LibraryMixScreen.artist] every song of one Library artist.
 class LibraryMixScreen extends ConsumerStatefulWidget {
-  const LibraryMixScreen({super.key, required this.view});
+  const LibraryMixScreen({super.key, required LibraryMixView this.view})
+    : genre = null,
+      artist = null,
+      toolbar = null;
 
-  final LibraryMixView view;
+  /// The songs of [genre], by title.
+  const LibraryMixScreen.genre({
+    super.key,
+    required LibraryBrowseEntry this.genre,
+  }) : view = null,
+       artist = null,
+       toolbar = null;
+
+  /// The songs of the Library artist named [artist], by title, with
+  /// [toolbar] above them.
+  const LibraryMixScreen.artist({
+    super.key,
+    required String this.artist,
+    this.toolbar,
+  }) : view = null,
+       genre = null;
+
+  final LibraryMixView? view;
+  final LibraryBrowseEntry? genre;
+  final String? artist;
+  final Widget? toolbar;
 
   @override
   ConsumerState<LibraryMixScreen> createState() => _LibraryMixScreenState();
@@ -106,8 +137,19 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
     with
         SelectionModeMixin<LibraryMixScreen>,
         CollapsingHeaderScrollMixin<LibraryMixScreen> {
-  /// The mix's songs, less those deleted from this page.
-  late List<UnifiedLibraryItem> _items = widget.view.items;
+  /// The songs, less those deleted from this page.
+  late List<UnifiedLibraryItem> _items = widget.view?.items ?? const [];
+
+  /// Where a genre's or an artist's songs come from; null for a mix.
+  late final _songsProvider = switch (widget) {
+    LibraryMixScreen(:final genre?) => libraryGenreSongsProvider(genre.key),
+    LibraryMixScreen(:final artist?) => libraryArtistSongsProvider(artist),
+    _ => null,
+  };
+
+  /// A genre's or an artist's songs as they load; null for a mix.
+  AsyncValue<List<UnifiedLibraryItem>>? _genreSongs;
+  List<UnifiedLibraryItem>? _loadedGenreSongs;
 
   List<UnifiedLibraryItem> get _selectedItems => [
     for (final item in _items)
@@ -124,8 +166,23 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
     return null;
   }
 
+  String _title(AppLocalizations l10n) =>
+      widget.genre?.name ??
+      widget.artist ??
+      libraryMixTitle(l10n, widget.view!.mix);
+
   @override
   Widget build(BuildContext context) {
+    if (_songsProvider case final provider?) {
+      final songs = ref.watch(provider);
+      _genreSongs = songs;
+      // A new read replaces the list; songs deleted here stay out until then.
+      if (songs.value case final items?
+          when !identical(items, _loadedGenreSongs)) {
+        _loadedGenreSongs = items;
+        _items = items;
+      }
+    }
     if (context.isMornye) {
       return MornyeArtistSurface(
         imageSource: _paletteSource,
@@ -153,7 +210,26 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
         onExitSelectionMode: exitSelectionMode,
         appBar: _buildHeader(context),
         slivers: [
-          if (isDesktopPlatform)
+          if (widget.toolbar case final toolbar?)
+            SliverToBoxAdapter(child: toolbar),
+          if (_genreSongs case final songs? when !songs.hasValue)
+            songs.hasError
+                ? SliverToBoxAdapter(
+                    child: Center(
+                      child: ExpressiveButton(
+                        text: true,
+                        icon: const Icon(Icons.refresh),
+                        onPressed: () => ref.invalidate(_songsProvider!),
+                        child: Text(context.l10n.dialogRetry),
+                      ),
+                    ),
+                  )
+                : SliverToBoxAdapter(
+                    child: TrackListSkeleton(
+                      itemCount: min(widget.genre?.trackCount ?? 8, 8),
+                    ),
+                  )
+          else if (isDesktopPlatform)
             _buildDesktopTable(context, ids)
           else
             _buildTrackList(context),
@@ -258,9 +334,14 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
 
   Widget _buildHeader(BuildContext context) {
     final l10n = context.l10n;
-    final mix = widget.view.mix;
+    final mix = widget.view?.mix;
     final colorScheme = Theme.of(context).colorScheme;
-    final title = libraryMixTitle(l10n, mix);
+    final title = _title(l10n);
+    // A genre counts its songs from the list until they load; an artist's
+    // count is known only then.
+    final count = _songsProvider != null && _loadedGenreSongs == null
+        ? widget.genre?.trackCount
+        : _items.length;
     final minutes =
         _items.fold<int>(
           0,
@@ -280,30 +361,32 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
       coverBuilder: (context, coverSize) =>
           LibraryMixCover(items: _items, size: coverSize),
       // Built inside the header, so desktop reads its artwork scheme.
-      subtitle: Builder(
-        builder: (header) => Text(
-          libraryMixSubtitle(l10n, mix),
-          style: isDesktopPlatform
-              ? desktopDetailSubtitleStyle(header)
-              : TextStyle(
-                  color: context.isMornye
-                      ? colorScheme.primary
-                      : HeaderPalette.of(header).onSurfaceVariant,
-                  fontSize: context.tokens.headerSubtitleSize,
-                  fontWeight: context.isMornye
-                      ? FontWeight.w400
-                      : FontWeight.w600,
-                ),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
+      subtitle: mix == null
+          ? null
+          : Builder(
+              builder: (header) => Text(
+                libraryMixSubtitle(l10n, mix),
+                style: isDesktopPlatform
+                    ? desktopDetailSubtitleStyle(header)
+                    : TextStyle(
+                        color: context.isMornye
+                            ? colorScheme.primary
+                            : HeaderPalette.of(header).onSurfaceVariant,
+                        fontSize: context.tokens.headerSubtitleSize,
+                        fontWeight: context.isMornye
+                            ? FontWeight.w400
+                            : FontWeight.w600,
+                      ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
       meta: HeaderMetaRow(
         items: [
-          HeaderMetaItem(l10n.tracksCount(_items.length)),
+          if (count != null) HeaderMetaItem(l10n.tracksCount(count)),
           if (minutes > 0) HeaderMetaItem('$minutes min'),
-          HeaderMetaItem(l10n.homeMixUpdatedDaily),
+          if (mix != null) HeaderMetaItem(l10n.homeMixUpdatedDaily),
         ],
       ),
       // Phones save from the toolbar; the desktop header has its own "+".
@@ -357,47 +440,53 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
         itemCount: _items.length,
         itemBuilder: (context, index) {
           final item = _items[index];
-          return Consumer(
+          // Material joins the filled rows into one connected list.
+          return TrackCardSegment.at(
             key: ValueKey(item.id),
-            builder: (context, ref, _) {
-              final playback = ref.watch(
-                mediaItemPlaybackUiProvider(_rowKey(item)),
-              );
-              return TrackCard(
-                style: context.isMornye
-                    ? TrackCardStyle.flat
-                    : TrackCardStyle.filled,
-                leadingArtwork: true,
-                leading: ClipRRect(
-                  borderRadius: BorderRadius.circular(tokens.radiusThumb),
-                  child: LibraryItemArtwork(
-                    item: item,
-                    size: tokens.coverCompact,
+            index: index,
+            count: _items.length,
+            child: Consumer(
+              builder: (context, ref, _) {
+                final playback = ref.watch(
+                  mediaItemPlaybackUiProvider(_rowKey(item)),
+                );
+                return TrackCard(
+                  style: context.isMornye
+                      ? TrackCardStyle.flat
+                      : TrackCardStyle.filled,
+                  leadingArtwork: true,
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(tokens.radiusThumb),
+                    child: LibraryItemArtwork(
+                      item: item,
+                      size: tokens.coverCompact,
+                    ),
                   ),
-                ),
-                title: item.trackName,
-                subtitle: Text(
-                  item.artistName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                isCurrent: playback.isCurrent,
-                isPlaying: playback.isPlaying,
-                isSelectionMode: isSelectionMode,
-                isSelected: selectedIds.contains(item.id),
-                // A long press selects, as on the album pages.
-                onTap: isSelectionMode
-                    ? () => toggleSelection(item.id)
-                    : playback.isCurrent
-                    ? () => ref
-                          .read(musicPlayerControllerProvider)
-                          .togglePlayPause(playback.isPlaying)
-                    : () => _play(index),
-                onLongPress: isSelectionMode
-                    ? null
-                    : () => enterSelectionMode(item.id),
-              );
-            },
+                  title: item.trackName,
+                  subtitle: Text(
+                    item.artistName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  isCurrent: playback.isCurrent,
+                  isPlaying: playback.isPlaying,
+                  isSelectionMode: isSelectionMode,
+                  isSelected: selectedIds.contains(item.id),
+                  // A long press selects, as on the album pages.
+                  onTap: isSelectionMode
+                      ? () => toggleSelection(item.id)
+                      : playback.isCurrent
+                      ? () => ref
+                            .read(musicPlayerControllerProvider)
+                            .togglePlayPause(playback.isPlaying)
+                      : () => _play(index),
+                  onLongPress: isSelectionMode
+                      ? null
+                      : () => enterSelectionMode(item.id),
+                  queueSwipe: libraryItemQueueSwipe(ref, item),
+                );
+              },
+            ),
           );
         },
       ),
@@ -517,6 +606,6 @@ class _LibraryMixScreenState extends ConsumerState<LibraryMixScreen>
         Navigator.of(context, rootNavigator: true).context,
         ref,
         [for (final item in _items) item.toTrack()],
-        playlistNamePrefill: libraryMixTitle(context.l10n, widget.view.mix),
+        playlistNamePrefill: _title(context.l10n),
       );
 }

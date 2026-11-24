@@ -287,7 +287,6 @@ fn run(replies: Vec<ScriptedReply>) -> (Result<RecognitionOutcome, RecognitionEr
         &ok,
     );
     let urls = transport.urls.borrow();
-    // Each attempt is a fresh request.
     if urls.len() == 2 {
         assert_ne!(urls[0], urls[1]);
     }

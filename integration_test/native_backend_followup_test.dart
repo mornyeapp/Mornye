@@ -67,6 +67,11 @@ void _sameTaste(AutoplayTasteModel expected, AutoplayTasteModel actual) {
   expect(maxError, lessThanOrEqualTo(1e-6));
 }
 
+/// The Dart trainer on a background isolate: what the native trainer is
+/// compared with and timed against.
+Future<AutoplayTasteModel> _trainTasteInDart(List<AutoplayTastePlay> plays) =>
+    compute(trainAutoplayTaste, plays, debugLabel: 'autoplay-taste');
+
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   Directory? desktopSupport;
@@ -144,13 +149,13 @@ void main() {
     expect(empty['tokens'], isEmpty);
     final edge = autoplayTasteEdgeFixture();
     _sameTaste(
-      await trainAutoplayTasteDartInBackground(edge),
+      await _trainTasteInDart(edge),
       await trainAutoplayTasteInBackground(edge),
     );
     for (final count in [500, 5000]) {
       final plays = autoplayTasteFixture(count);
       results['taste_$count'] = await _compare(
-        () => trainAutoplayTasteDartInBackground(plays),
+        () => _trainTasteInDart(plays),
         () => trainAutoplayTasteInBackground(plays),
         _sameTaste,
       );

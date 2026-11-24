@@ -288,6 +288,7 @@ impl Backend {
                 })
                 .map_err(|error| ResolverError::Failed(error.to_string()))?;
             let mut cancelled = None;
+            let mut heartbeat = Duration::from_millis(5);
             loop {
                 if let Err(message) = check() {
                     cancelled = Some(message);
@@ -295,11 +296,12 @@ impl Backend {
                     break;
                 }
                 if !matches!(
-                    completion.recv_timeout(Duration::from_millis(5)),
+                    completion.recv_timeout(heartbeat),
                     Err(mpsc::RecvTimeoutError::Timeout)
                 ) {
                     break;
                 }
+                heartbeat = (heartbeat * 2).min(Duration::from_millis(40));
             }
             let result = worker
                 .join()
@@ -533,9 +535,10 @@ mod tests {
     use super::*;
     use crate::RuntimeLimits;
     use std::path::Path;
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
     use std::thread;
+    use std::time::Instant;
 
     fn backend(root: &Path) -> Backend {
         Backend::new(
@@ -621,5 +624,51 @@ mod tests {
             Err(ResolverError::Cancelled("cancelled by test".into()))
         );
         assert!(joined.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn metadata_provider_work_checks_slowly_but_notices_cancel_promptly() {
+        let root = tempfile::tempdir().unwrap();
+        let backend = backend(root.path());
+        let checks = AtomicUsize::new(0);
+        let result = backend.metadata_provider_work(
+            &|| {
+                checks.fetch_add(1, Ordering::Relaxed);
+                Ok(())
+            },
+            |_| {
+                thread::sleep(Duration::from_millis(300));
+                Ok("{}".into())
+            },
+        );
+        assert!(result.is_ok());
+        // A 5 ms heartbeat would check about 60 times.
+        let checks = checks.into_inner();
+        assert!(checks <= 15, "{checks} checks in 300 ms");
+
+        let started = Instant::now();
+        let cancel_at = started + Duration::from_millis(300);
+        let result = backend.metadata_provider_work(
+            &|| {
+                if Instant::now() >= cancel_at {
+                    Err("cancelled by test".into())
+                } else {
+                    Ok(())
+                }
+            },
+            |lease| {
+                assert!(lease.wait_cancelled(60_000).is_err());
+                Ok("{}".into())
+            },
+        );
+        assert_eq!(
+            result,
+            Err(ResolverError::Cancelled("cancelled by test".into()))
+        );
+        let late = started.elapsed() - Duration::from_millis(300);
+        assert!(
+            late < Duration::from_millis(150),
+            "cancel noticed {late:?} late"
+        );
     }
 }

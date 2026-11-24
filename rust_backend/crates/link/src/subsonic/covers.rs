@@ -9,6 +9,7 @@
 use super::media::file_response;
 use super::{Failure, number, required};
 use crate::catalog::{Catalog, cover_format, hex};
+use crate::source::{self, Readable};
 use crate::types::{HttpResponse, Shared, SubsonicRequest, full};
 use http::header::{CACHE_CONTROL, ETAG, IF_NONE_MATCH};
 use http::{HeaderMap, Response};
@@ -17,13 +18,14 @@ use image::imageops::FilterType;
 use image::{ImageReader, Limits};
 use mornye_core::tags::CoverArt;
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, LazyLock, Mutex, MutexGuard, PoisonError};
 use std::time::UNIX_EPOCH;
+use tokio::sync::{OnceCell, Semaphore};
 
 /// Cache folder under the temp dir.
 pub(super) const CACHE_DIR: &str = "link-covers";
@@ -32,6 +34,11 @@ const MAX_EDGE: u32 = 2048;
 const JPEG_QUALITY: u8 = 85;
 /// Cached covers (resized or extracted) kept before the oldest are removed.
 const MAX_CACHED: usize = 4000;
+/// Covers stored beyond the limit before the cache is listed and trimmed
+/// again.
+pub(super) const TRIM_SLACK: usize = 64;
+/// Resizes decoding at once; more wait for a turn.
+const MAX_RESIZES: usize = 2;
 /// Cover files larger than this are served as they are, never decoded.
 const MAX_DECODE_BYTES: u64 = 64 * 1024 * 1024;
 /// Extensions of the cached covers.
@@ -43,6 +50,12 @@ const MAX_WITHOUT_PICTURE: usize = 50_000;
 /// version stamp, so repeated requests do not read them again. A changed
 /// file has a new key.
 static WITHOUT_PICTURE: LazyLock<Mutex<HashSet<[u8; 16]>>> = LazyLock::new(Mutex::default);
+
+/// Cached covers per cache folder: what its last listing left, plus the
+/// covers stored since.
+static CACHED: LazyLock<Mutex<HashMap<PathBuf, usize>>> = LazyLock::new(Mutex::default);
+
+static RESIZES: LazyLock<Resizes> = LazyLock::new(|| Resizes::new(MAX_RESIZES));
 
 pub(super) async fn cover_art(
     shared: &Shared,
@@ -61,11 +74,12 @@ pub(super) async fn cover_art(
     let web: Vec<PathBuf> = source.web.into_iter().map(Path::to_owned).collect();
     let dir = shared.config.temp_dir.join(CACHE_DIR);
     let cache = dir.clone();
-    let image = tokio::task::spawn_blocking(move || find_image(&cache, &files, &candidates, &web))
-        .await
-        .ok()
-        .flatten()
-        .ok_or_else(not_found)?;
+    let image = if candidates.iter().any(|(audio, _)| source::needs_app(audio)) {
+        find_image_lent(shared, dir.clone(), files, candidates, web).await
+    } else {
+        blocking(move || find_image(&cache, &files, &candidates, &web)).await
+    }
+    .ok_or_else(not_found)?;
     let size = number::<i64>(request, "size")
         .filter(|size| *size > 0)
         .map(|size| u32::try_from(size.min(i64::from(MAX_EDGE))).unwrap_or(MAX_EDGE));
@@ -84,17 +98,29 @@ pub(super) async fn cover_art(
             .body(full(bytes::Bytes::new()))
             .map_err(|error| Failure::new(super::code::GENERIC, error.to_string()));
     }
-    let mut target = image.path.clone();
+    let (mut target, mut content_type) = (image.path.clone(), image.content_type);
     if let Some(size) = size
         && image.len <= MAX_DECODE_BYTES
         && let Some(resized) = resized(dir, image.path, key, size).await
     {
-        target = resized;
+        (target, content_type) = resized;
     }
-    let content_type = sniff(&target);
-    file_response(&target, content_type, &request.headers, cache_headers)
-        .await
-        .map_err(|_| not_found())
+    file_response(
+        shared,
+        &target,
+        content_type,
+        &request.headers,
+        cache_headers,
+    )
+    .await
+    .map_err(|_| not_found())
+}
+
+/// `work` on the blocking pool.
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Option<T> + Send + 'static,
+) -> Option<T> {
+    tokio::task::spawn_blocking(work).await.ok().flatten()
 }
 
 /// The modification time in nanoseconds since the epoch, 0 when unknown.
@@ -112,6 +138,8 @@ struct Image {
     path: PathBuf,
     /// The length of `path`.
     len: u64,
+    /// The [`sniff`]ed MIME type of `path`.
+    content_type: &'static str,
     /// Identifies this version of the image: the [`version_stamp`] of the
     /// cover file, or of the audio file embedding the picture.
     stamp: String,
@@ -126,23 +154,67 @@ fn find_image(
     candidates: &[(PathBuf, &'static str)],
     web: &[PathBuf],
 ) -> Option<Image> {
-    let on_disk = |path: &PathBuf| {
-        let metadata = fs::metadata(path).ok().filter(fs::Metadata::is_file)?;
-        Some(Image {
-            path: path.clone(),
-            len: metadata.len(),
-            stamp: version_stamp(path, &metadata),
-        })
-    };
     files
         .iter()
-        .find_map(on_disk)
+        .find_map(|path| on_disk(path))
         .or_else(|| {
             candidates
                 .iter()
                 .find_map(|(audio, format)| extract_cached(dir, audio, format))
         })
-        .or_else(|| web.iter().find_map(on_disk))
+        .or_else(|| web.iter().find_map(|path| on_disk(path)))
+}
+
+/// [`find_image`] when an audio file is one the app lends: the same order,
+/// each lent file borrowed only while its picture is looked for. A lent
+/// file is borrowed even when its picture is cached, since its version
+/// stamp comes from the open file.
+async fn find_image_lent(
+    shared: &Shared,
+    dir: PathBuf,
+    files: Vec<PathBuf>,
+    candidates: Vec<(PathBuf, &'static str)>,
+    web: Vec<PathBuf>,
+) -> Option<Image> {
+    if let Some(image) = blocking(move || files.iter().find_map(|path| on_disk(path))).await {
+        return Some(image);
+    }
+    for (audio, format) in candidates {
+        let dir = dir.clone();
+        let image = if source::needs_app(&audio) {
+            let Ok(Readable {
+                file,
+                metadata,
+                lease,
+            }) = source::open(shared, &audio).await
+            else {
+                continue;
+            };
+            let file = file.into_std().await;
+            blocking(move || {
+                let _lease = lease;
+                extract_into(&dir, &audio, format, &metadata, || Some(file))
+            })
+            .await
+        } else {
+            blocking(move || extract_cached(&dir, &audio, format)).await
+        };
+        if image.is_some() {
+            return image;
+        }
+    }
+    blocking(move || web.iter().find_map(|path| on_disk(path))).await
+}
+
+/// `path` as the image to serve, when it is a file.
+fn on_disk(path: &Path) -> Option<Image> {
+    let metadata = fs::metadata(path).ok().filter(fs::Metadata::is_file)?;
+    Some(Image {
+        path: path.to_owned(),
+        len: metadata.len(),
+        content_type: sniff(path),
+        stamp: version_stamp(path, &metadata),
+    })
 }
 
 /// Identifies one version of a file: its path, mtime and length.
@@ -255,8 +327,20 @@ impl<F: Seek> Seek for Watched<F> {
 /// cache is unwritable.
 fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<Image> {
     let metadata = fs::metadata(audio).ok().filter(fs::Metadata::is_file)?;
+    extract_into(dir, audio, format, &metadata, || fs::File::open(audio).ok())
+}
+
+/// [`extract_cached`] for the audio file `audio` with `metadata`, which
+/// `open` opens only when its picture is not cached yet.
+fn extract_into(
+    dir: &Path,
+    audio: &Path,
+    format: &str,
+    metadata: &fs::Metadata,
+    open: impl FnOnce() -> Option<fs::File>,
+) -> Option<Image> {
     // The picture is a version of the audio file, whatever its cached copy.
-    let stamp = format!("embedded\0{}", version_stamp(audio, &metadata));
+    let stamp = format!("embedded\0{}", version_stamp(audio, metadata));
     let key = digest(&stamp);
     if without_picture().contains(&key) {
         return None;
@@ -273,9 +357,15 @@ fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<Image> {
             Some((path, len))
         })
     {
-        return Some(Image { path, len, stamp });
+        let content_type = sniff(&path);
+        return Some(Image {
+            path,
+            len,
+            content_type,
+            stamp,
+        });
     }
-    let cover = match read_picture(fs::File::open(audio).ok()?, format).ok()? {
+    let cover = match read_picture(open()?, format).ok()? {
         Some(cover) => cover,
         None => {
             remember_without_picture(key);
@@ -285,6 +375,7 @@ fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<Image> {
     let path = dir.join(format!("{name}.{}", image_extension(&cover.mime)));
     store(dir, &path, &cover.data)?;
     Some(Image {
+        content_type: sniff(&path),
         path,
         len: cover.data.len() as u64,
         stamp,
@@ -315,23 +406,89 @@ fn matches_etag(headers: &HeaderMap, etag: &str) -> bool {
         })
 }
 
+/// A cover file and its [`sniff`]ed MIME type.
+pub(super) type Sniffed = (PathBuf, &'static str);
+
 /// The cached resized cover, made on demand; `None` serves the original
 /// (smaller than `size`, undecodable, or the cache is unwritable).
-async fn resized(dir: PathBuf, source: PathBuf, key: String, size: u32) -> Option<PathBuf> {
+async fn resized(dir: PathBuf, source: PathBuf, key: String, size: u32) -> Option<Sniffed> {
     let target = dir.join(format!("{key}.jpg"));
-    if tokio::fs::metadata(&target)
-        .await
-        .is_ok_and(|metadata| metadata.is_file() && metadata.len() > 0)
-    {
-        return Some(target);
-    }
-    tokio::task::spawn_blocking(move || resize_into(&source, size, &dir, &target))
+    let cached = target.clone();
+    if let Some(found) = tokio::task::spawn_blocking(move || cached_cover(&cached))
         .await
         .ok()
         .flatten()
+    {
+        return Some(found);
+    }
+    let path = target.clone();
+    RESIZES
+        .run(&target, move || {
+            cached_cover(&path).or_else(|| resize_into(&source, size, &dir, &path))
+        })
+        .await
 }
 
-fn resize_into(source: &Path, size: u32, dir: &Path, target: &Path) -> Option<PathBuf> {
+/// `path` when it is a cached, non-empty file. Blocking.
+fn cached_cover(path: &Path) -> Option<Sniffed> {
+    fs::metadata(path)
+        .ok()
+        .filter(|metadata| metadata.is_file() && metadata.len() > 0)?;
+    Some((path.to_owned(), sniff(path)))
+}
+
+/// Runs blocking cover resizes, at most a set number at once; requests for
+/// a target already being made share that run.
+pub(super) struct Resizes {
+    permits: Arc<Semaphore>,
+    running: Mutex<HashMap<PathBuf, Arc<OnceCell<Option<Sniffed>>>>>,
+}
+
+impl Resizes {
+    pub(super) fn new(permits: usize) -> Self {
+        Self {
+            permits: Arc::new(Semaphore::new(permits)),
+            running: Mutex::default(),
+        }
+    }
+
+    fn running(&self) -> MutexGuard<'_, HashMap<PathBuf, Arc<OnceCell<Option<Sniffed>>>>> {
+        self.running.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// What `resize` makes of `target`, or what the run already making it
+    /// made.
+    pub(super) async fn run(
+        &self,
+        target: &Path,
+        resize: impl FnOnce() -> Option<Sniffed> + Send + 'static,
+    ) -> Option<Sniffed> {
+        let cell = Arc::clone(self.running().entry(target.to_owned()).or_default());
+        let made = cell
+            .get_or_init(|| async move {
+                let permit = Arc::clone(&self.permits).acquire_owned().await.ok()?;
+                tokio::task::spawn_blocking(move || {
+                    let _permit = permit;
+                    resize()
+                })
+                .await
+                .ok()
+                .flatten()
+            })
+            .await
+            .clone();
+        let mut running = self.running();
+        if running
+            .get(target)
+            .is_some_and(|current| Arc::ptr_eq(current, &cell))
+        {
+            running.remove(target);
+        }
+        made
+    }
+}
+
+fn resize_into(source: &Path, size: u32, dir: &Path, target: &Path) -> Option<Sniffed> {
     let bytes = fs::read(source).ok()?;
     let reader = ImageReader::new(Cursor::new(&bytes))
         .with_guessed_format()
@@ -353,13 +510,13 @@ fn resize_into(source: &Path, size: u32, dir: &Path, target: &Path) -> Option<Pa
         .encode_image(&rgb)
         .ok()?;
     store(dir, target, &encoded)?;
-    Some(target.to_owned())
+    Some((target.to_owned(), sniff(target)))
 }
 
 static STAGING: AtomicU64 = AtomicU64::new(0);
 
 /// Writes `bytes` to `target` in the cache `dir` through a staging file,
-/// then trims the cache.
+/// then counts it towards the cache limit.
 fn store(dir: &Path, target: &Path, bytes: &[u8]) -> Option<()> {
     fs::create_dir_all(dir).ok()?;
     let staging = dir.join(format!(
@@ -375,14 +532,29 @@ fn store(dir: &Path, target: &Path, bytes: &[u8]) -> Option<()> {
         let _ = fs::remove_file(&staging);
         return None;
     }
-    trim_cache(dir, MAX_CACHED);
+    count_stored(dir, MAX_CACHED);
     Some(())
 }
 
-/// Removes the oldest cached covers beyond `keep`.
-pub(super) fn trim_cache(dir: &Path, keep: usize) {
+/// Counts a cover just stored in `dir`. The first one lists the folder;
+/// after that it is listed again, and trimmed to `keep`, only once the count
+/// passes `keep` by [`TRIM_SLACK`].
+pub(super) fn count_stored(dir: &Path, keep: usize) {
+    let mut cached = CACHED.lock().unwrap_or_else(PoisonError::into_inner);
+    match cached.get_mut(dir) {
+        Some(count) if *count < keep + TRIM_SLACK => *count += 1,
+        _ => {
+            let left = trim_cache(dir, keep);
+            cached.insert(dir.to_owned(), left);
+        }
+    }
+}
+
+/// Removes the oldest cached covers beyond `keep`. Returns how many are
+/// left.
+pub(super) fn trim_cache(dir: &Path, keep: usize) -> usize {
     let Ok(entries) = fs::read_dir(dir) else {
-        return;
+        return 0;
     };
     let mut files: Vec<(std::time::SystemTime, PathBuf)> = entries
         .filter_map(Result::ok)
@@ -397,13 +569,14 @@ pub(super) fn trim_cache(dir: &Path, keep: usize) {
         })
         .collect();
     if files.len() <= keep {
-        return;
+        return files.len();
     }
     files.sort();
     let excess = files.len() - keep;
     for (_, path) in files.into_iter().take(excess) {
         let _ = fs::remove_file(path);
     }
+    keep
 }
 
 /// The image MIME type from the file's magic bytes, else its extension.

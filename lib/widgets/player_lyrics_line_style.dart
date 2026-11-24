@@ -62,11 +62,50 @@ TextAlign _lyricTextAlign(BuildContext context, LyricLine line) {
   return voice.index.isEven ? TextAlign.start : TextAlign.end;
 }
 
+/// [textAlign] of a line in [lineDirection], for a translation or
+/// pronunciation under it that reads in [supplementDirection]: it stays on
+/// the line's side, so an English translation sits under the right edge of
+/// an Arabic line.
+TextAlign _supplementTextAlign(
+  TextAlign textAlign,
+  TextDirection lineDirection,
+  TextDirection supplementDirection,
+) {
+  if (lineDirection == supplementDirection) return textAlign;
+  return switch (textAlign) {
+    TextAlign.start =>
+      lineDirection == TextDirection.rtl ? TextAlign.right : TextAlign.left,
+    TextAlign.end =>
+      lineDirection == TextDirection.rtl ? TextAlign.left : TextAlign.right,
+    _ => textAlign,
+  };
+}
+
+/// A translation or pronunciation [text] in its own direction, on the side
+/// of a line in [lineDirection].
+Widget _supplementText(
+  String text,
+  TextDirection lineDirection,
+  TextAlign textAlign,
+  TextStyle style,
+) {
+  final direction = strongTextDirection(text) ?? lineDirection;
+  return Text(
+    text,
+    textDirection: direction,
+    textAlign: _supplementTextAlign(textAlign, lineDirection, direction),
+    style: style,
+  );
+}
+
+/// [primary] with the line's pronunciation and translation under it.
+/// [direction] is the line's own, which the caller lays the row out in.
 Widget _withLyricSupplements(
   BuildContext context,
   LyricLine line,
   Widget primary,
   Color color, {
+  required TextDirection direction,
   required Offset visibility,
   required LyricPronunciationLayout? pronunciationLayout,
   required TextAlign textAlign,
@@ -94,10 +133,11 @@ Widget _withLyricSupplements(
               padding: const EdgeInsets.only(top: 6),
               child: words.isNotEmpty && timedSupplementText != null
                   ? timedSupplementText(text, words, style)
-                  : Text(
+                  : _supplementText(
                       text,
-                      textAlign: textAlign,
-                      style: style.copyWith(
+                      direction,
+                      textAlign,
+                      style.copyWith(
                         color: color.withValues(alpha: color.a * 0.8),
                       ),
                     ),

@@ -1,14 +1,18 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/screens/settings/link_desktop_settings_page.dart';
 import 'package:mornye/screens/settings/link_pairing_dialogs.dart';
+import 'package:mornye/screens/settings/link_phone_host_section.dart';
 import 'package:mornye/screens/settings/link_settings_page.dart';
 import 'package:mornye/services/link/client/link_client_controller.dart';
 import 'package:mornye/services/link/client/link_client_pairing.dart';
 import 'package:mornye/services/link/client/link_client_store.dart';
+import 'package:mornye/services/link/desktop/link_desktop_backend.dart';
 import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_transfers.dart';
@@ -19,6 +23,7 @@ import 'package:mornye/widgets/link/link_transfers_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/link_client_fakes.dart';
+import 'support/link_desktop_fakes.dart';
 
 final _l10n = lookupAppLocalizations(const Locale('en'));
 
@@ -287,6 +292,9 @@ void main() {
 
           final add = find.text(_l10n.linkAddManually);
           await tester.scrollUntilVisible(add, 300);
+          // A 300 px step can stop with the button just past the edge.
+          await tester.ensureVisible(add);
+          await tester.pump();
           await tester.tap(add);
           await _settle(tester);
           await tester.enterText(
@@ -339,12 +347,27 @@ void main() {
           // What this phone does with the computer shows once paired.
           expect(find.text(_l10n.linkPhoneSection), findsOneWidget);
           expect(find.text(_l10n.linkShareSongsTitle), findsOneWidget);
+          final computerSongs = find.text(_l10n.linkShowComputerSongsTitle);
+          await tester.ensureVisible(computerSongs);
+          await tester.pump();
+          await tester.tap(computerSongs);
+          await _settle(tester);
+          final prefs = await SharedPreferences.getInstance();
+          expect(
+            prefs.getBool(LinkPhoneOptionsNotifier.showComputerSongsKey),
+            isFalse,
+          );
+          expect(harness.bridge.librarySources.values, everyElement(isFalse));
+          expect(harness.sessions.single.disposed, isFalse);
+          await tester.tap(computerSongs);
+          await _settle(tester);
+          expect(harness.bridge.librarySources.values, everyElement(isTrue));
+
           final follow = find.text(_l10n.linkFollowDesktopTitle);
           await tester.ensureVisible(follow);
           await tester.pump();
           await tester.tap(follow);
           await _settle(tester);
-          final prefs = await SharedPreferences.getInstance();
           expect(
             prefs.getBool(LinkPhoneOptionsNotifier.followDesktopKey),
             isFalse,
@@ -392,6 +415,145 @@ void main() {
     testWidgets('says when Wi-Fi is off', (tester) async {
       await pumpPage(tester, onWifi: false);
       expect(find.text(_l10n.linkWifiOffTitle), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    });
+
+    for (final mornye in [false, true]) {
+      testWidgets(
+        '${mornye ? 'Mornye' : 'Material'}: shares this phone with other phones',
+        (tester) async {
+          tester.view.physicalSize = const Size(800, 2400);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final backend = FakeLinkBackend()
+            ..deviceList = [
+              const LinkPairedDevice(
+                deviceId: 'p2',
+                name: 'Other phone',
+                platform: 'ios',
+                connected: true,
+              ),
+            ];
+          final harness = LinkClientHarness();
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                ...harness.overrides,
+                ...linkHostOverrides(
+                  backend: backend,
+                  player: FakeLinkPlayer(),
+                ),
+                playbackPlayingProvider.overrideWithValue(false),
+              ],
+              child: _app(const LinkSettingsPage(), mornye: mornye),
+            ),
+          );
+          await _settle(tester);
+          // This phone's own announcement, found before it shares.
+          harness.browser.resolve('server-1', '10.0.0.9');
+          await _settle(tester);
+          expect(find.text('Desktop server-1'), findsOneWidget);
+
+          final toggle = find.byKey(LinkPhoneHostSection.switchKey);
+          await tester.scrollUntilVisible(toggle, 300);
+          expect(find.text(_l10n.linkPhoneHostTitle), findsOneWidget);
+          expect(find.text(_l10n.linkPhoneHostSubtitle), findsOneWidget);
+          expect(find.byKey(LinkPhoneHostSection.contentKey), findsNothing);
+          expect(backend.calls, isEmpty);
+
+          await tester.tap(toggle);
+          await _settle(tester);
+          await _settle(tester);
+          expect(backend.calls, contains('start:Test phone'));
+          expect(backend.startFeatures, isEmpty);
+          expect(find.byKey(LinkPhoneHostSection.contentKey), findsOneWidget);
+          expect(find.text(_l10n.linkDesktopStatusRunning(0)), findsOneWidget);
+          expect(find.text('Test phone'), findsOneWidget);
+          expect(
+            find.text(_l10n.linkPhoneHostSecurityCodeHint),
+            findsOneWidget,
+          );
+          expect(find.text('ab12 cd34'), findsOneWidget);
+          expect(find.text('Desktop server-1'), findsNothing);
+          // Computer-only rows stay on the computer.
+          expect(find.text(_l10n.linkDesktopFirewallHint), findsNothing);
+          expect(find.text(_l10n.linkDesktopAddSubsonicApp), findsNothing);
+
+          final pair = find.byKey(const ValueKey('link-pair'));
+          await tester.scrollUntilVisible(pair, 300);
+          await tester.tap(pair);
+          await _settle(tester);
+          expect(find.byType(LinkDesktopPairingDialog), findsOneWidget);
+          expect(
+            find.text(_l10n.linkPhoneHostPairInstructions),
+            findsOneWidget,
+          );
+          expect(find.text('123 456'), findsOneWidget);
+          await tester.tap(find.text(_l10n.dialogCancel));
+          await _settle(tester);
+          expect(backend.calls, contains('endPairing'));
+
+          final remove = find.byKey(const ValueKey('link-revoke-p2'));
+          await tester.scrollUntilVisible(remove, 300);
+          await tester.tap(remove);
+          await _settle(tester);
+          expect(find.text(_l10n.linkPhoneHostRevokeMessage), findsOneWidget);
+          await tester.tap(find.text(_l10n.linkDesktopRevoke).last);
+          await _settle(tester);
+          expect(backend.calls, contains('revoke:p2'));
+          expect(find.text(_l10n.linkDesktopNoDevices), findsOneWidget);
+
+          await tester.scrollUntilVisible(toggle, -300);
+          await tester.tap(toggle);
+          await _settle(tester);
+          await _settle(tester);
+          expect(backend.calls.last, isNot(startsWith('start')));
+          expect(backend.calls, contains('stop'));
+          expect(find.byKey(LinkPhoneHostSection.contentKey), findsNothing);
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump();
+        },
+      );
+    }
+
+    testWidgets('with reduced motion the shared phone rows open at once', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final backend = FakeLinkBackend();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ...LinkClientHarness().overrides,
+            ...linkHostOverrides(backend: backend, player: FakeLinkPlayer()),
+            playbackPlayingProvider.overrideWithValue(false),
+          ],
+          child: _app(
+            Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(disableAnimations: true),
+                child: const LinkSettingsPage(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await _settle(tester);
+      final toggle = find.byKey(LinkPhoneHostSection.switchKey);
+      await tester.scrollUntilVisible(toggle, 300);
+      await tester.tap(toggle);
+      await _settle(tester);
+      await _settle(tester);
+      expect(find.byKey(LinkPhoneHostSection.contentKey), findsOneWidget);
+      await tester.scrollUntilVisible(toggle, -300);
+      await tester.tap(toggle);
+      await _settle(tester);
+      await _settle(tester);
+      expect(find.byKey(LinkPhoneHostSection.contentKey), findsNothing);
+      expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
     });

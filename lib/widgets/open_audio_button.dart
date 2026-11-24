@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/open_audio_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -43,6 +43,7 @@ class OpenAudioButton extends ConsumerWidget {
                 showContextMenu(
                   context,
                   position: box.localToGlobal(Offset(0, box.size.height)),
+                  origin: contextMenuOriginOf(context),
                   groups: [
                     [
                       ContextMenuAction(

@@ -20,6 +20,7 @@ const List<int> losslessConversionSampleRateOptions = [
 const List<int> losslessConversionBitDepthOptions = [16, 24];
 
 const List<String> losslessDitherOptions = [
+  'auto',
   'none',
   'triangular',
   'triangular_hp',
@@ -27,16 +28,69 @@ const List<String> losslessDitherOptions = [
 
 const List<String> losslessResamplerOptions = ['swr', 'soxr'];
 
-const int soxrVhqPrecisionBits = 28;
+/// Resampler quality levels, lowest first. Each step up costs conversion
+/// time; none changes the output format.
+const List<String> losslessResamplerQualityOptions = [
+  'fast',
+  'medium',
+  'high',
+  'very_high',
+  'best',
+];
+
+/// The levels [resampler] offers. SoXR starts at Medium: FFmpeg does not
+/// reach its two quickest recipes.
+List<String> losslessResamplerQualityOptionsFor(String resampler) =>
+    resampler == 'soxr'
+    ? losslessResamplerQualityOptions.sublist(1)
+    : losslessResamplerQualityOptions;
+
+/// What a conversion used before the level could be chosen: the library's
+/// own SWR filter, and the most SoXR offers.
+String defaultLosslessResamplerQuality(String resampler) =>
+    resampler == 'soxr' ? 'best' : 'medium';
+
+// The most SoXR offers: its highest precision (33 bits, above the 28 of its
+// Very High Quality preset), a passband without ripple and exact handling of
+// rate pairs that are not a simple ratio. Slower, for a conversion that runs
+// once per file.
+const int soxrPrecisionBits = 33;
 const double soxrPassbandEndRatio = 0.95;
+
+/// SoXR precision in bits per level. 20 is SoX's High Quality recipe and 28
+/// its Very High Quality one.
+int soxrPrecisionBitsFor(String quality) => switch (quality) {
+  'medium' => 16,
+  'high' => 20,
+  'very_high' => 28,
+  _ => soxrPrecisionBits,
+};
+
+/// SWR filter length in taps per level; 32 is the library's own.
+int swrFilterSizeFor(String quality) => switch (quality) {
+  'fast' => 16,
+  'high' => 64,
+  'very_high' => 128,
+  'best' => 256,
+  _ => 32,
+};
 
 class LosslessConversionProcessing {
   final String dither;
   final String resampler;
 
+  /// One of [losslessResamplerQualityOptions]; null means the resampler's
+  /// default level.
+  final String? resamplerQuality;
+
+  /// Smart dither ('auto') applies high-pass TPDF instead of plain TPDF.
+  final bool highPass;
+
   const LosslessConversionProcessing({
-    this.dither = 'none',
+    this.dither = 'auto',
     this.resampler = 'swr',
+    this.resamplerQuality,
+    this.highPass = false,
   });
 
   String get normalizedDither {
@@ -49,19 +103,66 @@ class LosslessConversionProcessing {
     return losslessResamplerOptions.contains(normalized) ? normalized : 'swr';
   }
 
-  bool get hasDither => normalizedDither != 'none';
+  /// A level the resampler offers, its default when none or another was
+  /// given.
+  String get normalizedResamplerQuality {
+    final resampler = normalizedResampler;
+    final normalized = resamplerQuality?.trim().toLowerCase();
+    return losslessResamplerQualityOptionsFor(resampler).contains(normalized)
+        ? normalized!
+        : defaultLosslessResamplerQuality(resampler);
+  }
+
+  bool get hasDefaultResamplerQuality =>
+      normalizedResamplerQuality ==
+      defaultLosslessResamplerQuality(normalizedResampler);
+
+  bool get hasDither =>
+      normalizedDither == 'triangular' || normalizedDither == 'triangular_hp';
+
+  LosslessConversionProcessing resolveDither({
+    required int? sourceBitDepth,
+    required int? targetBitDepth,
+  }) {
+    if (normalizedDither != 'auto') return this;
+    final reducesDepth =
+        sourceBitDepth != null &&
+        targetBitDepth != null &&
+        targetBitDepth > 0 &&
+        sourceBitDepth > targetBitDepth;
+    return LosslessConversionProcessing(
+      dither: !reducesDepth
+          ? 'none'
+          : highPass
+          ? 'triangular_hp'
+          : 'triangular',
+      resampler: resampler,
+      resamplerQuality: resamplerQuality,
+    );
+  }
 }
 
 List<String> losslessResamplerFilterOptions(
   LosslessConversionProcessing processing,
 ) {
   final resampler = processing.normalizedResampler;
+  final quality = processing.normalizedResamplerQuality;
+  if (resampler == 'soxr') {
+    return [
+      'resampler=soxr',
+      'precision=${soxrPrecisionBitsFor(quality)}',
+      if (quality == 'best') ...['cutoff=$soxrPassbandEndRatio', 'cheby=1'],
+    ];
+  }
   return [
-    'resampler=$resampler',
-    if (resampler == 'soxr') ...[
-      'precision=$soxrVhqPrecisionBits',
-      'cutoff=$soxrPassbandEndRatio',
-    ],
+    'resampler=swr',
+    // Medium is the library's own filter and names no option. A longer
+    // filter narrows the band between what is kept and what is removed;
+    // the two highest levels also raise the Kaiser window's rejection (its
+    // default 9 reaches about 100 dB), which only a long filter can afford.
+    if (quality != 'medium') 'filter_size=${swrFilterSizeFor(quality)}',
+    if (quality == 'very_high') 'kaiser_beta=12',
+    if (quality == 'best') 'kaiser_beta=16',
   ];
 }
 
@@ -226,6 +327,7 @@ extension LosslessConversionLabelsL10n on AppLocalizations {
 
   String losslessDitherOptionLabel(String dither) =>
       switch (dither.trim().toLowerCase()) {
+        'auto' => trackConvertDitherSmart,
         'triangular' => trackConvertDitherTriangular,
         'triangular_hp' => trackConvertDitherTriangularHp,
         _ => trackConvertDitherNone,
@@ -236,6 +338,28 @@ extension LosslessConversionLabelsL10n on AppLocalizations {
         'soxr' => trackConvertResamplerSoxr,
         _ => trackConvertResamplerSwr,
       };
+
+  String losslessResamplerQualityLabel(String quality) => switch (quality) {
+    'fast' => trackConvertResamplerQualityFast,
+    'high' => trackConvertResamplerQualityHigh,
+    'very_high' => trackConvertResamplerQualityVeryHigh,
+    'best' => trackConvertResamplerQualityBest,
+    _ => trackConvertResamplerQualityMedium,
+  };
+
+  /// What a level means for [resampler], such as "64-tap filter" or "28-bit
+  /// precision, SoX VHQ".
+  String losslessResamplerQualityDetail(String resampler, String quality) {
+    if (resampler != 'soxr') {
+      return trackConvertResamplerSwrDetail(swrFilterSizeFor(quality));
+    }
+    final bits = soxrPrecisionBitsFor(quality);
+    return switch (quality) {
+      'high' => trackConvertResamplerSoxrPresetDetail(bits, 'HQ'),
+      'very_high' => trackConvertResamplerSoxrPresetDetail(bits, 'VHQ'),
+      _ => trackConvertResamplerSoxrDetail(bits),
+    };
+  }
 }
 
 String losslessBitDepthLabel(int? bitDepth, {required String originalLabel}) {

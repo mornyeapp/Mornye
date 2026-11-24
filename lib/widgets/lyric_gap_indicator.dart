@@ -1,10 +1,11 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/utils/synced_lyrics_scroll.dart';
+import 'package:mornye/widgets/decorative_phase.dart';
 
 /// Playback controls the fill; a gentle pulse accompanies instrumental gaps.
 class LyricGapIndicator extends ConsumerStatefulWidget {
@@ -25,12 +26,8 @@ class LyricGapIndicator extends ConsumerStatefulWidget {
   ConsumerState<LyricGapIndicator> createState() => _LyricGapIndicatorState();
 }
 
-class _LyricGapIndicatorState extends ConsumerState<LyricGapIndicator>
-    with SingleTickerProviderStateMixin {
-  late final _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 3600),
-  );
+class _LyricGapIndicatorState extends ConsumerState<LyricGapIndicator> {
+  final _pulse = DecorativePhase(const Duration(milliseconds: 3600));
 
   @override
   void dispose() {
@@ -55,8 +52,9 @@ class _LyricGapIndicatorState extends ConsumerState<LyricGapIndicator>
         widget.position == null &&
         position >= widget.start &&
         position < widget.end;
-    if (animate) {
-      if (!_pulse.isAnimating) _pulse.repeat();
+    // A hidden indicator holds its pulse, as a muted ticker did.
+    if (animate && TickerMode.valuesOf(context).enabled) {
+      _pulse.start();
     } else {
       _pulse.stop();
     }

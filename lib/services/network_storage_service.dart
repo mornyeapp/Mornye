@@ -10,6 +10,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:html/parser.dart' as html;
+import 'package:mornye/services/link/link_protocol.dart'
+    show isLinkPhoneSourceId;
 import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/services/network_certificate.dart';
 import 'package:mornye/services/network_smb_client.dart';
@@ -104,9 +106,13 @@ class NetworkConnection {
     this.trustedCertificateSha256,
     this.subsonicAuth = SubsonicAuth.saltedToken,
     this.apiKey = '',
+    this.smbEncrypt = false,
   });
   final String id, name, address, username, password, domain;
   final NetworkProtocol protocol;
+
+  /// SMB only: require SMB3 encryption for the session.
+  final bool smbEncrypt;
   final String? trustedCertificateSha256;
   final SubsonicAuth subsonicAuth;
   final String apiKey;
@@ -121,6 +127,7 @@ class NetworkConnection {
     'username': username,
     'password': password,
     'domain': domain,
+    if (protocol == NetworkProtocol.smb && smbEncrypt) 'smbEncrypt': true,
     if (protocol == NetworkProtocol.subsonic) ...{
       'subsonicAuth': subsonicAuth.name,
       'apiKey': apiKey,
@@ -142,6 +149,7 @@ class NetworkConnection {
           json['subsonicAuth'] as String? ?? 'saltedToken',
         ),
         apiKey: json['apiKey'] as String? ?? '',
+        smbEncrypt: json['smbEncrypt'] as bool? ?? false,
       );
 
   void validate() {
@@ -368,6 +376,17 @@ class NetworkStorageService {
   /// Maximum wait time for the server to commit and return response headers
   /// after all upload bytes have been flushed. Accommodates slow NAS disk I/O.
   static const uploadResponseTimeout = Duration(minutes: 30);
+
+  /// Waits between attempts to restore or clean up after a failed edit.
+  static const editRecoveryDelays = [
+    Duration(seconds: 2),
+    Duration(seconds: 5),
+    Duration(seconds: 15),
+    Duration(seconds: 30),
+  ];
+
+  @visibleForTesting
+  static List<Duration>? debugEditRecoveryDelaysOverride;
 
   @visibleForTesting
   static Duration? debugTimeoutOverride;
@@ -744,6 +763,7 @@ class NetworkStorageService {
             username: c.username,
             password: c.password,
             domain: c.domain,
+            encrypt: c.smbEncrypt,
             timeout: timeout,
           )
         : _smbSessions.connect(
@@ -751,6 +771,7 @@ class NetworkStorageService {
             username: c.username,
             password: c.password,
             domain: c.domain,
+            encrypt: c.smbEncrypt,
             timeout: timeout,
           );
     unawaited(

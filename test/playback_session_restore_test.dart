@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/models/download_history.dart';
+import 'package:mornye/models/library_database_models.dart';
+import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/playback_session_restore.dart';
 
@@ -268,4 +271,85 @@ void main() {
       expect(result.artworkRelocated, isTrue);
     },
   );
+
+  group('the session Home offers to continue', () {
+    const nas = 'network://nas/Album/Song.flac';
+    final preview = (
+      media: PlayableMedia.fromJson(_media(0, source: nas))!,
+      position: const Duration(seconds: 30),
+    );
+    final scanned = UnifiedLibraryItem.fromLocalLibrary(
+      LocalLibraryItem(
+        id: '0',
+        trackName: 'Track 0',
+        artistName: 'Fixture artist',
+        albumName: 'Album',
+        filePath: nas,
+        scannedAt: DateTime(2026, 11, 17),
+      ),
+    );
+    final downloaded = UnifiedLibraryItem.fromDownloadHistory(
+      DownloadHistoryItem(
+        id: '0',
+        trackName: 'Track 0',
+        artistName: 'Fixture artist',
+        albumName: 'Album',
+        filePath: '/music/0.flac',
+        service: 'example-provider',
+        downloadedAt: DateTime(2026, 11, 17),
+      ),
+    );
+
+    test(
+      'is hidden for a scanned song while the scanned Library is off',
+      () async {
+        expect(
+          await resumePreviewForLibrary(
+            preview,
+            localLibraryEnabled: false,
+            libraryItem: (media) async {
+              expect(media.source, nas);
+              return scanned;
+            },
+          ),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'stays for a download and for a song the Library does not know',
+      () async {
+        for (final item in [downloaded, null]) {
+          expect(
+            await resumePreviewForLibrary(
+              preview,
+              localLibraryEnabled: false,
+              libraryItem: (_) async => item,
+            ),
+            same(preview),
+          );
+        }
+      },
+    );
+
+    test('stays for a scanned song while the scanned Library is on', () async {
+      expect(
+        await resumePreviewForLibrary(
+          preview,
+          localLibraryEnabled: true,
+          libraryItem: (_) => throw StateError('No lookup is needed'),
+        ),
+        same(preview),
+      );
+      expect(
+        await resumePreviewForLibrary(
+          null,
+          localLibraryEnabled: false,
+          libraryItem: (_) => throw StateError('No lookup is needed'),
+        ),
+        isNull,
+      );
+    });
+  });
 }

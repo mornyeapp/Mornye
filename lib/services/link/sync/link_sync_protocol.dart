@@ -33,9 +33,10 @@ import 'package:mornye/utils/cover_art_utils.dart';
 ///   `key` is the track key (`loved`, `wishlist`, `playlistTrack`), the
 ///   playlist id (`playlist`) or the artist key (`favoriteArtist`).
 ///   `data`: `loved`, `wishlist`, `playlistTrack`:
-///   `{"track": Track JSON, "addedMs": int}` (no `network://` `coverUrl`,
-///   which names a connection of the author only; a receiver whose row
-///   holds one keeps it when the track comes without a cover); `playlist`:
+///   `{"track": Track JSON, "addedMs": int}` (`coverUrl` is a web URL or
+///   absent: a file path or a `network://` reference names something of
+///   the author only, so a receiver drops one an older build sends and
+///   keeps the cover its own row holds); `playlist`:
 ///   `{"name", "createdMs", "updatedMs"}` (cover images are device-local and
 ///   never sync); `favoriteArtist`: `{"artist": artist entry JSON,
 ///   "addedMs": int}`.
@@ -249,12 +250,15 @@ String? linkSyncRemoteArtwork(Object? value) {
       : null;
 }
 
-/// A collection [track] (Track JSON) as another device reads it: without a
-/// `network://` cover, which names a connection of this device only.
-Map<String, dynamic> linkSyncTrack(Map<String, dynamic> track) =>
-    _string(track['coverUrl'])?.startsWith('network://') == true
-    ? {...track, 'coverUrl': null}
-    : track;
+/// A collection [track] (Track JSON) as another device reads it: with a web
+/// cover or none. A file path, a `content://` URI and a `network://`
+/// reference all name something of this device only.
+Map<String, dynamic> linkSyncTrack(Map<String, dynamic> track) {
+  final cover = track['coverUrl'];
+  return cover == null || linkSyncRemoteArtwork(cover) != null
+      ? track
+      : {...track, 'coverUrl': null};
+}
 
 /// A page of changes or events (`GET collections`, `GET history`).
 class LinkSyncPage<T> {

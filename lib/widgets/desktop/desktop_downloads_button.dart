@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/download_item.dart';
@@ -10,15 +10,6 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/player_artwork.dart';
-
-/// Downloads that are waiting, running or finalizing, in queue order.
-List<DownloadItem> activeDesktopDownloads(List<DownloadItem> items) => [
-  for (final item in items)
-    if (item.status == DownloadStatus.queued ||
-        item.status == DownloadStatus.downloading ||
-        item.status == DownloadStatus.finalizing)
-      item,
-];
 
 /// How many of [items] are active and their overall progress: waiting items
 /// count as not started. One pass, so a progress sample allocates nothing.
@@ -58,8 +49,20 @@ class DesktopDownloadsButton extends ConsumerStatefulWidget {
 class _DesktopDownloadsButtonState
     extends ConsumerState<DesktopDownloadsButton> {
   final _menu = MenuController();
+  // The toolbar ring changes with every progress sample. Keep the open panel
+  // mounted with the same widget so those samples do not rebuild its list.
+  late final _popover = DesktopDownloadsPopover(onShowAll: _showAll);
 
   void _toggle() => _menu.isOpen ? _menu.close() : _menu.open();
+
+  void _showAll() {
+    _menu.close();
+    // Mornye lists downloads on their own sidebar page; Library would
+    // reopen whichever page it showed last, such as Songs.
+    if (!ShellNavigationService.requestLibraryLink('downloads')) {
+      ShellNavigationService.requestTab(ShellTab.library);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,18 +92,7 @@ class _DesktopDownloadsButtonState
           ),
         ),
       ),
-      menuChildren: [
-        DesktopDownloadsPopover(
-          onShowAll: () {
-            _menu.close();
-            // Mornye lists downloads on their own sidebar page; Library
-            // would reopen whichever page it showed last, such as Songs.
-            if (!ShellNavigationService.requestLibraryLink('downloads')) {
-              ShellNavigationService.requestTab(ShellTab.library);
-            }
-          },
-        ),
-      ],
+      menuChildren: [_popover],
       child: Semantics(
         value: idle ? null : '$count',
         child: AppIconButton(
@@ -160,9 +152,10 @@ class DesktopDownloadsPopover extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final active = activeDesktopDownloads(
-      ref.watch(downloadQueueProvider.select((state) => state.items)),
+    final activeIds = ref.watch(
+      downloadQueueLookupProvider.select((lookup) => lookup.activeItemIds),
     );
+    final rowCount = activeIds.length.clamp(0, _maxRows);
     return SizedBox(
       key: const ValueKey('desktop-downloads-popover'),
       width: width,
@@ -182,7 +175,7 @@ class DesktopDownloadsPopover extends ConsumerWidget {
               ),
             ),
           ),
-          if (active.isEmpty)
+          if (activeIds.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Text(
@@ -193,19 +186,19 @@ class DesktopDownloadsPopover extends ConsumerWidget {
               ),
             )
           else
-            // Menus measure their intrinsic size, which a lazy list cannot
-            // report; a long queue is better read in Library anyway.
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 360),
-              child: SingleChildScrollView(
-                // The menu panel already owns the primary controller.
+            // Explicit bounds satisfy the menu's intrinsic measurement
+            // without asking the lazy viewport to measure every queue row.
+            SizedBox(
+              height: (rowCount * _DownloadRow.height).clamp(0.0, 360.0),
+              child: ListView.builder(
+                key: const ValueKey('desktop-downloads-list'),
                 primary: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final item in active.take(_maxRows))
-                      _DownloadRow(key: ValueKey(item.id), item: item),
-                  ],
+                padding: EdgeInsets.zero,
+                itemExtent: _DownloadRow.height,
+                itemCount: rowCount,
+                itemBuilder: (context, index) => _DownloadRow(
+                  key: ValueKey(activeIds[index]),
+                  itemId: activeIds[index],
                 ),
               ),
             ),
@@ -227,14 +220,18 @@ class DesktopDownloadsPopover extends ConsumerWidget {
 }
 
 class _DownloadRow extends ConsumerWidget {
-  const _DownloadRow({super.key, required this.item});
+  const _DownloadRow({super.key, required this.itemId});
 
-  static const double _rowHeight = 64;
+  static const double height = 64;
 
-  final DownloadItem item;
+  final String itemId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final item = ref.watch(
+      downloadQueueLookupProvider.select((lookup) => lookup.byItemId[itemId]),
+    );
+    if (item == null) return const SizedBox(height: height);
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -252,7 +249,7 @@ class _DownloadRow extends ConsumerWidget {
     // A fixed height answers the menu's intrinsic measurement without
     // laying out the artwork and progress bar speculatively.
     return Container(
-      height: _rowHeight,
+      height: height,
       padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 4, 0),
       child: Row(
         children: [

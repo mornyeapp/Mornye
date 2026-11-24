@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -19,6 +19,7 @@ import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/providers/network_offline_provider.dart';
 import 'package:mornye/services/network_offline_saver.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -291,34 +292,37 @@ class NetworkOfflineButton extends ConsumerWidget {
   }
 }
 
-class NetworkOfflineTracksButton extends ConsumerWidget {
-  const NetworkOfflineTracksButton({super.key, required this.tracks});
-  final List<Track> tracks;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => HeaderCircleButton(
-    icon: Icons.download_for_offline_outlined,
-    tooltip: context.l10n.offlineSave,
-    onPressed: () async {
-      final items = await linkLibraryItemsFor(
-        tracks,
-        includeLocal: ref.read(settingsProvider).localLibraryEnabled,
-      );
-      if (context.mounted) {
-        await saveNetworkOffline(context, ref, items);
-      }
-    },
-  );
-}
+ContextMenuAction networkOfflineTracksAction(
+  BuildContext context,
+  WidgetRef ref,
+  List<Track> tracks,
+) => ContextMenuAction(
+  icon: Icons.download_for_offline_outlined,
+  label: context.l10n.offlineSave,
+  onSelected: () async {
+    final items = await linkLibraryItemsFor(
+      tracks,
+      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+    );
+    if (context.mounted) {
+      await saveNetworkOffline(context, ref, items);
+    }
+  },
+);
 
 class OfflineAvailabilityCover extends StatelessWidget {
   const OfflineAvailabilityCover({
     super.key,
     required this.item,
     required this.child,
+    this.inset = 0,
   });
   final UnifiedLibraryItem item;
   final Widget child;
+
+  /// Distance from the cover's bottom start corner, which stays free of the
+  /// source and play overlays on a grid card.
+  final double inset;
 
   @override
   Widget build(BuildContext context) {
@@ -332,19 +336,20 @@ class OfflineAvailabilityCover extends StatelessWidget {
         children: [
           child,
           PositionedDirectional(
-            bottom: 0,
-            end: 0,
+            bottom: inset,
+            start: inset,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: colors.surfaceContainerHigh,
+                color: colors.secondaryContainer,
                 shape: BoxShape.circle,
               ),
               child: Padding(
-                padding: const EdgeInsets.all(2),
+                padding: const EdgeInsets.all(3),
                 child: AppIcon.adaptive(
-                  local ? Icons.offline_pin_outlined : Icons.cloud_outlined,
+                  local ? Icons.offline_pin : Icons.cloud,
                   size: 14,
-                  color: colors.onSurface,
+                  fill: 1,
+                  color: colors.onSecondaryContainer,
                   semanticLabel: label,
                 ),
               ),

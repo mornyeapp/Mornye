@@ -25,6 +25,8 @@ class UsbBitPerfectPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Even
     private lateinit var methods: MethodChannel
     private lateinit var events: EventChannel
     private lateinit var route: MethodChannel
+    private lateinit var spatialAudio: EventChannel
+    private var spatialAudioEvents: SpatialAudioEvents? = null
     private var engine: UsbPcmPlayback? = null
     private var direct: UsbDirectPlayback? = null
     private var useDirect = false
@@ -53,6 +55,8 @@ class UsbBitPerfectPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Even
                 }
             }.start()
         }
+        spatialAudio = EventChannel(binding.binaryMessenger, "com.zarz.mornye/spatial_audio")
+        spatialAudio.setStreamHandler(SpatialAudioEvents(appContext).also { spatialAudioEvents = it })
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -112,6 +116,9 @@ class UsbBitPerfectPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Even
         methods.setMethodCallHandler(null)
         events.setStreamHandler(null)
         route.setMethodCallHandler(null)
+        spatialAudio.setStreamHandler(null)
+        spatialAudioEvents?.onCancel(null)
+        spatialAudioEvents = null
         sink = null
         direct?.dispose()
         direct = null
@@ -177,10 +184,17 @@ private class UsbPcmPlayback(context: Context, private val emit: (Map<String, An
                         try {
                             prepare(requireNotNull(call.argument<String>("path")), commandRevision)
                         } catch (error: Exception) {
+                            val info = (error as? UsbDirectException)?.info ?: source?.info
                             closeSource()
-                            android.util.Log.i("UsbPcm", "Using normal output: ${error.message}")
-                            mapOf("reason" to (error as? Unavailable)?.reason.orEmpty().ifEmpty { "format" },
-                                "detail" to (error.message ?: "USB preparation failed"))
+                            val reason = (error as? Unavailable)?.reason ?: (error as? UsbDirectException)?.reason ?: "format"
+                            val detail = listOfNotNull(info?.describe(), error.message ?: "USB preparation failed").joinToString(": ")
+                            android.util.Log.i("UsbPcm", "Using normal output ($reason): $detail")
+                            buildMap {
+                                info?.let { putAll(it.toMap()) }
+                                put("reason", reason)
+                                put("detail", detail)
+                                if (reason == UsbDirectFormats.DAC_FORMAT && sourceBits > 0) put("bitDepth", sourceBits)
+                            }
                         }
                     }
                     "resume" -> { resume(); null }
@@ -218,8 +232,9 @@ private class UsbPcmPlayback(context: Context, private val emit: (Map<String, An
         durationUs = pcm.durationUs
         val mask = if (channels == 1) AudioFormat.CHANNEL_OUT_MONO else AudioFormat.CHANNEL_OUT_STEREO
         val matching = supported.filter { it.format.sampleRate == rate && it.format.channelMask == mask }
+        // Android offers this DAC no bit-perfect mixer at the song's rate and depth.
         outputBits = BitPerfectPcm.outputBits(sourceBits, matching.map { bits(it.format.encoding) })
-            ?: throw Unavailable("format")
+            ?: throw Unavailable(UsbDirectFormats.DAC_FORMAT)
         val selected = matching.first { bits(it.format.encoding) == outputBits }
         device = usb
         mixer = selected
@@ -239,7 +254,7 @@ private class UsbPcmPlayback(context: Context, private val emit: (Map<String, An
         val deadline = android.os.SystemClock.elapsedRealtime() + 5000
         while (pending == null && !outputEnded) {
             if (revision != expectedRevision) throw Unavailable("cancelled")
-            if (android.os.SystemClock.elapsedRealtime() > deadline) throw Unavailable("format")
+            if (android.os.SystemClock.elapsedRealtime() > deadline) throw Unavailable(UsbDirectFormats.TIMEOUT)
             decode()
             if (pending == null) Thread.sleep(2)
         }

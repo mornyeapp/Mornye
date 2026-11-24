@@ -121,6 +121,13 @@ class MainActivity: FlutterFragmentActivity() {
         "safCreateCollisionAwareFromPath",
         "writeTempToSaf",
         "writeSafSidecarLrc",
+        "writeSafSidecar",
+        "readSafSidecar",
+        "findSafSibling",
+        "findSafSiblings",
+        "readSafText",
+        "safSongFolders",
+        "listSafFolder",
         "downloadCoverToFile",
         "extractCoverToFile",
         "rewriteSplitArtistTags",
@@ -384,9 +391,49 @@ class MainActivity: FlutterFragmentActivity() {
         // delegate looks it up by cached id (see getCachedEngineId above).
         AudioServicePlugin.getFlutterEngine(this)
         super.onCreate(savedInstanceState)
+        requestHighestRefreshRate()
         handleVerificationNotificationIntent(intent)
         handleExtensionOAuthIntent(intent)
         PlayerWidgetBridge.handleIntent(intent)
+    }
+
+    /**
+     * Asks Android for the display's highest refresh rate at the resolution
+     * in use. Flutter never asks, and several phone makers hold an app that
+     * has not asked at 60 Hz, whatever the panel can do. Stock Android
+     * still puts the person's own limits first (a 60 Hz display setting,
+     * battery saver). A television is left alone: a mode change there can
+     * blank the picture.
+     */
+    private fun requestHighestRefreshRate() {
+        if (isTelevisionDevice()) return
+        try {
+            val display =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    display
+                } else {
+                    @Suppress("DEPRECATION")
+                    windowManager.defaultDisplay
+                } ?: return
+            val current = display.mode
+            val modes = display.supportedModes.filter {
+                it.physicalWidth == current.physicalWidth &&
+                    it.physicalHeight == current.physicalHeight
+            }
+            val best = modes.maxByOrNull { it.refreshRate } ?: return
+            android.util.Log.i(
+                "Mornye",
+                "Display at ${current.refreshRate} Hz of " +
+                    "${modes.map { it.refreshRate.toInt() }.sorted()}, " +
+                    "asking for ${best.refreshRate} Hz",
+            )
+            val attributes = window.attributes
+            if (attributes.preferredDisplayModeId == best.modeId) return
+            attributes.preferredDisplayModeId = best.modeId
+            window.attributes = attributes
+        } catch (e: Exception) {
+            android.util.Log.w("Mornye", "Refresh rate request failed: ${e.message}")
+        }
     }
 
     private fun isTelevisionDevice(): Boolean =
@@ -558,6 +605,13 @@ class MainActivity: FlutterFragmentActivity() {
                         "writeAC4Metadata" -> handleWriteAC4Metadata(call, result)
                         "writeTempToSaf" -> handleWriteTempToSaf(call, result)
                         "writeSafSidecarLrc" -> handleWriteSafSidecarLrc(call, result)
+                        "writeSafSidecar" -> handleWriteSafSidecar(call, result)
+                        "readSafSidecar" -> handleReadSafSidecar(call, result)
+                        "findSafSibling" -> handleFindSafSibling(call, result)
+                        "findSafSiblings" -> handleFindSafSiblings(call, result)
+                        "readSafText" -> handleReadSafText(call, result)
+                        "safSongFolders" -> handleSafSongFolders(call, result)
+                        "listSafFolder" -> handleListSafFolder(call, result)
                         "downloadCoverToFile" -> handleDownloadCoverToFile(call, result)
                         "extractCoverToFile" -> handleExtractCoverToFile(call, result)
                         "reEnrichFile" -> handleReEnrichFile(call, result)

@@ -1,7 +1,8 @@
 //! Discovery (contract section 2): advertises `_mornye._tcp.local.` with the
 //! server name as the instance name and TXT `v=1`, `id=<serverId>`,
-//! `fp=<fingerprint>` on every IPv4 interface. Advertising is best effort;
-//! the server works without it when the phone knows the address.
+//! `fp=<fingerprint>` on every IPv4 interface, plus `pf=<platform>` when the
+//! app names its platform. Advertising is best effort; the server works
+//! without it when the phone knows the address.
 
 use mdns_sd::{IfKind, ServiceDaemon, ServiceInfo};
 use std::time::Duration;
@@ -18,6 +19,7 @@ pub(crate) fn advertise(
     name: &str,
     server_id: &str,
     fingerprint: &str,
+    platform: &str,
     port: u16,
 ) -> Result<Advertiser, String> {
     let fail = |error: mdns_sd::Error| format!("mDNS advertising failed: {error}");
@@ -36,7 +38,11 @@ pub(crate) fn advertise(
         .take(8)
         .collect();
     let host = format!("mornye-{short_id}.local.");
-    let properties = [("v", "1"), ("id", server_id), ("fp", fingerprint)];
+    let mut properties = vec![("v", "1"), ("id", server_id), ("fp", fingerprint)];
+    // Lets a phone tell a phone host from a computer before pairing.
+    if !platform.is_empty() {
+        properties.push(("pf", platform));
+    }
     let info = ServiceInfo::new(SERVICE_TYPE, name, &host, (), port, &properties[..])
         .map_err(fail)?
         .enable_addr_auto();

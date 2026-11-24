@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -6,6 +6,8 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
+
+import 'support/tooltip_finder.dart';
 
 Widget _app(ThemeData theme, GlobalKey<NavigatorState> navigator) {
   return ProviderScope(
@@ -119,11 +121,11 @@ void main() {
           expect(find.byType(SelectionBottomBar), findsOneWidget);
 
           if (visit == 1) {
-            await tester.tap(find.byTooltip('Close'));
+            await tester.tap(findByTooltip('Close'));
             await tester.pumpAndSettle();
             expect(find.byType(SelectionBottomBar), findsNothing);
           }
-          await tester.tap(find.byTooltip('Back'));
+          await tester.tap(findByTooltip('Back'));
           await tester.pumpAndSettle();
 
           expect(tester.takeException(), isNull);

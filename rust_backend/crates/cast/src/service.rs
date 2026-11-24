@@ -21,7 +21,7 @@
 //! Android keeps Google's sender and uses only the media methods.
 
 use crate::discovery::{Device, Discovery};
-use crate::media::MediaServer;
+use crate::media::{MediaServer, local_address_towards};
 use crate::sender::{self, Emit, Sender, Status};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -37,7 +37,7 @@ pub struct CastService {
     discovery: Mutex<Option<Discovery>>,
     sender: Arc<tokio::sync::Mutex<Option<Sender>>>,
     status: Arc<Mutex<Status>>,
-    media: Arc<Mutex<Option<(IpAddr, MediaServer)>>>,
+    media: Arc<Mutex<Option<MediaServer>>>,
 }
 
 impl CastService {
@@ -149,17 +149,20 @@ impl CastService {
                 let host: IpAddr = text("host")
                     .and_then(|host| host.parse().ok())
                     .ok_or("serve needs the TV's address")?;
+                let failed =
+                    |error: std::io::Error| format!("Could not share audio with the TV: {error}");
+                let local = local_address_towards(host).map_err(failed)?;
+                // This device's address changes with its network; a server
+                // kept on the old one would answer nobody.
                 let bound = self.media.lock().expect("cast media");
-                if bound.as_ref().is_some_and(|(address, _)| *address == host) {
+                if (bound.as_ref()).is_some_and(|server| server.address().ip() == local) {
                     return Ok(Value::Null);
                 }
                 drop(bound);
                 let media = Arc::clone(&self.media);
                 self.wait(async move {
-                    let server = MediaServer::for_receiver(host)
-                        .await
-                        .map_err(|error| format!("Could not share audio with the TV: {error}"))?;
-                    *media.lock().expect("cast media") = Some((host, server));
+                    let server = MediaServer::bind(local).await.map_err(failed)?;
+                    *media.lock().expect("cast media") = Some(server);
                     Ok(Value::Null)
                 })
             }
@@ -167,14 +170,14 @@ impl CastService {
                 let source = text("source").ok_or("register needs a source")?;
                 let mime = text("mime").ok_or("register needs a mime type")?;
                 let media = self.media.lock().expect("cast media");
-                let (_, server) = media.as_ref().ok_or("No Cast media server")?;
+                let server = media.as_ref().ok_or("No Cast media server")?;
                 let url = server
                     .register(&source, &mime)
                     .map_err(|error| error.to_string())?;
                 Ok(json!({"url": url}))
             }
             "clearMedia" => {
-                if let Some((_, server)) = self.media.lock().expect("cast media").as_ref() {
+                if let Some(server) = self.media.lock().expect("cast media").as_ref() {
                     server.clear();
                 }
                 Ok(Value::Null)

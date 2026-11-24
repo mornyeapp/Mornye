@@ -1114,13 +1114,54 @@ class AudioService {
     }
   }
 
+  /// How long Android holds back a queue whose window changed only in the
+  /// artwork or extras of some entries, so it misses the track change that
+  /// caused it and joins the next change.
+  @visibleForTesting
+  static Duration androidQueueArtworkDelay = const Duration(seconds: 3);
+
   static Future<void> _observeQueue() async {
     const queueIndexKey = 'com.ryanheise.audio_service.queueIndex';
     final window = AndroidQueueWindow<MediaItem>();
     var pendingQueue = false;
     var sendingQueue = false;
+    // The window of the last send, cleared when it failed.
+    int? sentStart;
+    List<MediaItem>? sentItems;
+    Timer? artworkSend;
+
+    bool onlyArtworkChanged() {
+      final sent = sentItems;
+      if (sent == null || sentStart != window.start) return false;
+      final items = window.items;
+      if (items.length != sent.length) return false;
+      var changed = false;
+      for (var i = 0; i < items.length; i++) {
+        final a = items[i];
+        final b = sent[i];
+        if (identical(a, b)) continue;
+        if (a.id != b.id ||
+            a.title != b.title ||
+            a.album != b.album ||
+            a.artist != b.artist ||
+            a.genre != b.genre ||
+            a.duration != b.duration ||
+            a.playable != b.playable ||
+            a.displayTitle != b.displayTitle ||
+            a.displaySubtitle != b.displaySubtitle ||
+            a.displayDescription != b.displayDescription ||
+            !identical(a.rating, b.rating) ||
+            a.isLive != b.isLive) {
+          return false;
+        }
+        changed = true;
+      }
+      return changed;
+    }
 
     Future<void> sendQueue() async {
+      artworkSend?.cancel();
+      artworkSend = null;
       pendingQueue = true;
       if (sendingQueue) return;
       sendingQueue = true;
@@ -1129,6 +1170,8 @@ class AudioService {
         final start = window.start;
         try {
           final items = window.items;
+          sentStart = start;
+          sentItems = items;
           await _platform.setQueue(SetQueueRequest(queue: [
             for (var i = 0; i < items.length; i++)
               if (start == 0 &&
@@ -1141,6 +1184,8 @@ class AudioService {
                 })._toMessage(),
           ]));
         } catch (e) {
+          sentStart = null;
+          sentItems = null;
           _asyncError.add(e);
         }
       }
@@ -1155,6 +1200,13 @@ class AudioService {
       // and the desktop sessions ignore it.
       if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
       window.updateQueue(queue, _handler.playbackState.value.queueIndex);
+      // A queued send already takes the newest window. The playing item
+      // carries its new artwork to the system at once; the queue follows.
+      if (pendingQueue) return;
+      if (onlyArtworkChanged()) {
+        artworkSend ??= Timer(androidQueueArtworkDelay, sendQueue);
+        return;
+      }
       sendQueue();
     });
     _handler.playbackState.listen((state) {

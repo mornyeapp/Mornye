@@ -10,6 +10,7 @@ class FakeMpvEngine implements MpvEngine, MpvPlaylistEngine {
   final durationEvents = StreamController<Duration>.broadcast();
   final sampleRateEvents = StreamController<int>.broadcast();
   final errorEvents = StreamController<MpvLogError>.broadcast();
+  final outputNoteEvents = StreamController<MpvOutputNote>.broadcast();
   @override
   Duration position = Duration.zero;
   double volume = 100;
@@ -46,14 +47,21 @@ class FakeMpvEngine implements MpvEngine, MpvPlaylistEngine {
     queuedStart = null;
   }
 
-  Future<void> advance() async {
+  /// Moves to the queued song. mpv reports `seeking` until the song's first
+  /// audio is ready; [started] false leaves it there for [finishStart].
+  Future<void> advance({bool started = true}) async {
     final start = queuedStart;
     queuedStart = null;
     queuedSource = null;
     position = Duration.zero;
+    properties.remove('seeking');
     await start?.call();
+    properties['seeking'] = 'yes';
     durationEvents.add(openDuration!);
+    if (started) finishStart();
   }
+
+  void finishStart() => properties['seeking'] = 'no';
 
   @override
   Stream<bool> get completed => completedEvents.stream;
@@ -63,6 +71,8 @@ class FakeMpvEngine implements MpvEngine, MpvPlaylistEngine {
   Stream<int> get sampleRate => sampleRateEvents.stream;
   @override
   Stream<MpvLogError> get errors => errorEvents.stream;
+  @override
+  Stream<MpvOutputNote> get outputNotes => outputNoteEvents.stream;
 
   @override
   Future<void> open(String source) async {
@@ -138,6 +148,7 @@ class FakeMpvEngine implements MpvEngine, MpvPlaylistEngine {
     await durationEvents.close();
     await sampleRateEvents.close();
     await errorEvents.close();
+    await outputNoteEvents.close();
   }
 
   Iterable<List<String>> get filterWrites =>

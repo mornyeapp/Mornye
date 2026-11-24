@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/playback_deck.dart';
+import 'package:mornye/utils/logger.dart';
+
+final _log = AppLogger('CastPlaybackDeck');
 
 /// Plays the queue on a Cast receiver. Songs reach it through the native
 /// media server (`serve`, `register`), which exposes only the registered
@@ -30,6 +33,10 @@ class CastPlaybackDeck implements PlaybackDeck {
   PlaybackDeckState get state => _state;
   @override
   bool get isDirect => false;
+
+  /// The receiver plays the file itself, at normal speed and pitch.
+  @override
+  PlaybackTempoSupport get tempoSupport => PlaybackTempoSupport.none;
   @override
   bool get needsSourceReload => !output.connected;
   @override
@@ -48,6 +55,8 @@ class CastPlaybackDeck implements PlaybackDeck {
   }
 
   void _receive(Map<Object?, Object?> event) {
+    final mediaError = event['mediaError'];
+    if (mediaError != null) _log.w('TV reported a media error: $mediaError');
     if (!_ready ||
         event['token'] != _token ||
         _state == PlaybackDeckState.disposed) {
@@ -126,6 +135,11 @@ class CastPlaybackDeck implements PlaybackDeck {
     }
     if (token != _token || _state == PlaybackDeckState.disposed) return;
     _duration = item?.duration ?? Duration.zero;
+    if (_network(Uri.tryParse(url)?.host) != _network(output.host)) {
+      _log.w('The TV and the media server may be on different networks');
+    }
+    // A TV that cannot reach the media server answers nothing. The platform
+    // gives up first, and its error says why; this limit is the backstop.
     await output.command('load', {
       'url': url,
       'mime': mime,
@@ -135,12 +149,16 @@ class CastPlaybackDeck implements PlaybackDeck {
       'album': item?.album ?? '',
       'duration': _duration.inMilliseconds,
       'artwork': ?artwork,
-    });
+    }, const Duration(seconds: 35));
     if (token != _token || _state == PlaybackDeckState.disposed) return;
     _position = Duration.zero;
     _ready = true;
     _setState(PlaybackDeckState.paused);
   }
+
+  /// The first three parts of an IPv4 address, for the log only.
+  static String _network(String? address) =>
+      address == null ? '' : address.substring(0, address.lastIndexOf('.') + 1);
 
   Future<String> _register(String source, String mime) async {
     final reply = await output.request<Map<Object?, Object?>>('register', {
@@ -161,6 +179,7 @@ class CastPlaybackDeck implements PlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    int usbMaxSampleRate = 0,
   }) => _load(path);
   @override
   Future<void> setNetworkSource(String url, {bool arriving = false}) =>

@@ -327,12 +327,18 @@ class AppStateDatabase {
   }) async {
     final db = databaseOverride ?? await database;
     const pageSize = 256;
-    const statuses = ['queued', 'downloading', 'finalizing', 'skipped'];
+    const statuses = [
+      'queued',
+      'downloading',
+      'finalizing',
+      'skipped',
+      'failed',
+    ];
     // Ordinary queues still need one query. Keep the channel response bounded
     // before deciding whether a transaction/keyset scan is necessary.
     final first = await db.query(
       _queueTable,
-      where: 'status IN (?, ?, ?, ?)',
+      where: 'status IN (?, ?, ?, ?, ?)',
       whereArgs: statuses,
       orderBy: 'created_at ASC, rowid ASC',
       limit: pageSize + 1,
@@ -373,7 +379,7 @@ class AppStateDatabase {
           '''
           SELECT *, rowid AS __queue_order
           FROM $_queueTable ${indexed ? 'INDEXED BY idx_${_queueTable}_created' : ''}
-          WHERE status IN (?, ?, ?, ?)
+          WHERE status IN (?, ?, ?, ?, ?)
           $cursor
           ORDER BY created_at ASC, rowid ASC
           LIMIT ?

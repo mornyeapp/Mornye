@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
@@ -15,6 +15,7 @@ import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/screens/artist_screen.dart';
+import 'package:mornye/services/artist_snapshot_store.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -118,20 +119,26 @@ class _LoadingOrErrorScaffold extends StatelessWidget {
                 background: hasCover
                     ? CachedCoverImage(imageUrl: cover, fit: BoxFit.cover)
                     : ColoredBox(color: colors.surfaceContainerHighest),
-                coverBuilder: (context, size) => hasCover
-                    ? CachedCoverImage(
-                        imageUrl: cover,
-                        width: size,
-                        height: size,
-                        fit: BoxFit.cover,
-                      )
-                    : ShimmerLoading(
-                        child: SkeletonBox(
-                          width: size,
-                          height: size,
-                          borderRadius: 0,
-                        ),
-                      ),
+                // A flat placeholder until the picture is there, like the
+                // rows below; the cover's shadow comes with the loaded page.
+                coverShadow: false,
+                coverBuilder: (context, size) {
+                  final bone = SkeletonBox(
+                    width: size,
+                    height: size,
+                    borderRadius: 0,
+                  );
+                  final skeleton = ShimmerLoading(child: bone);
+                  if (!hasCover) return skeleton;
+                  return CachedCoverImage(
+                    imageUrl: cover,
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) => skeleton,
+                    errorWidget: (_, _, _) => bone,
+                  );
+                },
                 subtitle: CollectionHeaderSkeletonRows.subtitle(context),
                 meta: CollectionHeaderSkeletonRows.meta(),
                 actions: CollectionHeaderSkeletonRows.actions(context),
@@ -766,6 +773,7 @@ class _ExtensionArtistScreenState extends ConsumerState<ExtensionArtistScreen>
   List<ArtistConcert> _concerts = const [];
   String? _albumsNext;
   int? _monthlyListeners;
+  ArtistSnapshot? _saved;
   bool _isLoading = true;
   String? _error;
 
@@ -840,9 +848,19 @@ class _ExtensionArtistScreenState extends ConsumerState<ExtensionArtistScreen>
         _isLoading = false;
       });
     } catch (e) {
+      final saved = await ArtistSnapshotStore.instance.read(widget.artistName);
       if (!mounted) return;
       setState(() {
-        _error = context.l10n.snackbarError(context.friendlyError(e));
+        if (saved != null && saved.artistId == widget.artistId) {
+          _saved = saved;
+          _albums = saved.albums;
+          _topTracks = saved.topTracks;
+          _headerImageUrl = saved.headerImageUrl;
+          _headerLogoUrl = saved.headerLogoUrl;
+          _monthlyListeners = saved.monthlyListeners;
+        } else {
+          _error = context.l10n.snackbarError(context.friendlyError(e));
+        }
         _isLoading = false;
       });
     }
@@ -906,8 +924,10 @@ class _ExtensionArtistScreenState extends ConsumerState<ExtensionArtistScreen>
         albumsNext: _albumsNext,
         monthlyListeners: _monthlyListeners,
         albums: _albums,
+        releases: _saved?.releases,
         topTracks: _topTracks,
         extensionId: widget.extensionId, // Skip Spotify/Deezer fetch
+        savedCopy: _saved != null,
       ),
     );
   }

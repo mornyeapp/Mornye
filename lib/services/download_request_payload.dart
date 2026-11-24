@@ -30,6 +30,8 @@ class DownloadRequestPayload {
   final String autoConvertBitrate;
   final int autoConvertMaxBitDepth;
   final int autoConvertMaxSampleRate;
+  final bool autoConvertSmartDither;
+  final bool autoConvertSmartDitherHighPass;
   final int trackNumber;
   final int playlistPosition;
   final int discNumber;
@@ -96,6 +98,8 @@ class DownloadRequestPayload {
     this.autoConvertBitrate = '320k',
     this.autoConvertMaxBitDepth = 16,
     this.autoConvertMaxSampleRate = 48000,
+    this.autoConvertSmartDither = true,
+    this.autoConvertSmartDitherHighPass = false,
     this.trackNumber = 0,
     this.playlistPosition = 0,
     this.discNumber = 0,
@@ -166,6 +170,8 @@ class DownloadRequestPayload {
       'auto_convert_bitrate': autoConvertBitrate,
       'auto_convert_max_bit_depth': autoConvertMaxBitDepth,
       'auto_convert_max_sample_rate': autoConvertMaxSampleRate,
+      'auto_convert_smart_dither': autoConvertSmartDither,
+      'auto_convert_smart_dither_high_pass': autoConvertSmartDitherHighPass,
       'track_number': trackNumber,
       'playlist_position': playlistPosition,
       'disc_number': discNumber,
@@ -238,6 +244,8 @@ class DownloadRequestPayload {
       autoConvertBitrate: autoConvertBitrate,
       autoConvertMaxBitDepth: autoConvertMaxBitDepth,
       autoConvertMaxSampleRate: autoConvertMaxSampleRate,
+      autoConvertSmartDither: autoConvertSmartDither,
+      autoConvertSmartDitherHighPass: autoConvertSmartDitherHighPass,
       trackNumber: trackNumber,
       playlistPosition: playlistPosition,
       discNumber: discNumber,

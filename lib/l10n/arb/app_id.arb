@@ -9,7 +9,12 @@
   "extensionsUnsecuredStorage": "Gunakan penyimpanan extension tanpa keyring",
   "extensionsUnsecuredStorageDescription": "Jalankan extension tanpa keyring Linux. Kunci disimpan secara lokal, sehingga siapa pun yang dapat mengakses file aplikasi bisa membaca kredensial extension. Nonaktifkan untuk memakai keyring sistem.",
   "extensionsStorageKeyringRequired": "Data extension yang ada memerlukan kunci aslinya. Buka keyring sistem sekali, lalu aktifkan lagi penyimpanan tanpa keyring. Data kamu tetap tersimpan.",
-  "extensionsStorageKeyConflict": "Kunci lokal dan keyring sistem berbeda. Penyimpanan tidak diubah dan kedua kunci tetap tersimpan.",
+  "extensionsStorageStartOverTitle": "Mulai ulang tanpa kunci?",
+  "extensionsStorageStartOverMessage": "Atau mulai ulang sekarang. Extension kamu tetap terpasang, tetapi pengaturan dan login yang tersimpan disisihkan dan perlu kamu atur lagi.",
+  "extensionsStorageStartOver": "Mulai ulang",
+  "extensionsStorageRecoveredTitle": "Login extension direset",
+  "extensionsStorageRecoveredMessage": "Perangkat ini kehilangan kunci yang melindungi pengaturan dan login extension, sehingga keduanya tidak bisa dibaca. Extension kamu tetap terpasang. Atur dan login lagi.",
+  "extensionsStorageKeyConflict":"Kunci lokal dan keyring sistem berbeda. Penyimpanan tidak diubah dan kedua kunci tetap tersimpan.",
   "extensionsStorageKeyringUnavailable": "Keyring sistem tidak tersedia atau terkunci. Jalankan atau buka keyring sebelum beralih ke penyimpanan aman. Kunci lokal kamu tetap tersimpan.",
   "linkFileActionOn": "{action} di {name}",
   "linkFileActionsDescription": "Perubahan diterapkan pada file musik di {name}. Pekerjaan yang diterima tetap berjalan jika HP ini terputus.",
@@ -30,6 +35,7 @@
   "linkFileSavingCover": "Menyimpan cover art...",
   "linkFileJobsUnsupported": "Perbarui Mornye di komputer agar file musiknya bisa dikelola dari HP ini.",
   "linkFileSelectionOneDevice": "Pilih lagu dari satu komputer yang terhubung (maksimal 100 lagu).",
+  "linkFileChangesUnavailable": "Lagu di {name} tidak dapat diubah dari ponsel ini.",
   "linkFileCancelHint": "Hentikan setelah lagu yang sedang diproses",
   "linkFileJobCancelled": "Dihentikan",
   "linkFileJobQueued": "Dalam antrean",
@@ -73,6 +79,22 @@
   "networkUploading": "Mengupload ke penyimpanan jaringan",
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
+  },
+  "networkUploadContinues": "Upload tetap berjalan. Progresnya ada di Penyimpanan jaringan.",
+  "@networkUploadContinues": {
+    "description": "Snackbar after the upload progress sheet is closed while songs still upload; Network storage is the settings page that lists the upload"
+  },
+  "networkUploadView": "Lihat",
+  "@networkUploadView": {
+    "description": "Snackbar action that opens the progress of the running upload to network storage again"
+  },
+  "networkUploadLast": "Upload terakhir",
+  "@networkUploadLast": {
+    "description": "Title of the Network storage row that shows how the last upload of Library songs ended"
+  },
+  "networkEditSaving": "Menyimpan ke penyimpanan jaringan",
+  "@networkEditSaving": {
+    "description": "Notification title while an edited song is saved back to network storage with the screen off"
   },
   "networkDownloadDescription": "Lagu disiapkan di perangkat, lalu diupload ke NAS. Biarkan aplikasi terbuka sampai upload selesai. Mencoba lagi akan gunakan audio yang disiapkan. File yang ada tetap disimpan; download baru dengan nama sama diberi akhiran nomor.",
   "@networkDownloadDescription": {
@@ -178,6 +200,14 @@
   "@networkDomain": {
     "description": "Optional connection form field shown only for SMB; refers to the authentication domain, not the server's internet domain name"
   },
+  "networkSmbEncrypt": "Enkripsi koneksi (SMB3)",
+  "@networkSmbEncrypt": {
+    "description": "Switch in the SMB connection form that requires SMB3 encryption; preserve the name SMB3"
+  },
+  "networkSmbEncryptDescription": "Nyalakan jika server mewajibkan enkripsi. Server harus mendukung SMB3, dan alamat harus menyertakan folder bersama, misalnya smb://server/Music/.",
+  "@networkSmbEncryptDescription": {
+    "description": "Explains the SMB3 encryption switch: when to use it, that it needs SMB3, and that shared folders cannot be listed so the address needs the share name"
+  },
   "networkConnectSave": "Hubungkan dan simpan",
   "@networkConnectSave": {
     "description": "Connection form action that checks access to the network source before saving the connection"
@@ -215,6 +245,43 @@
   "sectionPlayer": "Pemutar",
   "sectionVolumeAndTransitions": "Volume dan transisi",
   "sectionAudioOutput": "Output audio",
+  "newPlaybackEngine": "Mesin pemutar baru",
+  "newPlaybackEngineDescription": "Memutar lewat mesin pemutar milik aplikasi, bukan pemutar media bawaan ponsel. Matikan jika lagu gagal diputar atau terdengar tidak normal. Berlaku di lagu selanjutnya.",
+  "skipSilence": "Lewati hening",
+  "skipSilenceDescription": "Melompati bagian lagu yang hening. Selama aktif, lagu didekode dalam 16-bit.",
+  "skipSilenceNeedsEngine": "Aktifkan mesin pemutar baru untuk memakai ini.",
+  "skipSilenceAutoMix": "Nonaktif selama AutoMix aktif.",
+  "spatialAudio": "Audio spasial",
+  "spatialAudioDescription": "Membiarkan sistem memproses lagu menjadi audio spasial di headphone dan speaker yang mendukung. Jika mati, semua lagu diputar tanpanya.",
+  "spatialAudioNextSong": "Dengan mesin pemutar lama, perubahan berlaku di lagu selanjutnya.",
+  "spatialAudioSystemOff": "Audio spasial dimatikan di pengaturan sistem.",
+  "spatialAudioUnavailable": "Tidak tersedia di perangkat atau output ini.",
+  "spatialAudioStereo": "Musik stereo diproses menjadi audio spasial.",
+  "spatialAudioStereoHeadTracking": "Musik stereo diproses menjadi audio spasial, dengan pelacakan kepala tersedia.",
+  "spatialAudioMultichannelOnly": "Hanya lagu multikanal (seperti 5.1 atau Dolby Atmos) yang diproses menjadi audio spasial di perangkat ini.",
+  "spatialAudioDirectUsb": "Tidak dipakai dengan output USB langsung.",
+  "spatialAudioDirectAAudio": "Tidak dipakai dengan output AAudio eksklusif.",
+  "spatialAudioExclusive": "Tidak dipakai dengan output eksklusif.",
+  "spatialAudioOutputOn": "Audio spasial aktif untuk output ini.",
+  "spatialAudioOutputOff": "Tidak tersedia di output ini, atau dimatikan di Pusat Kontrol.",
+  "playbackTempoTitle": "Kecepatan dan nada",
+  "playbackTempoDescription": "Putar lagu lebih cepat atau lebih lambat, atau di nada dasar lain",
+  "playbackTempoSpeed": "Kecepatan",
+  "playbackTempoSpeedValue": "{speed}x",
+  "playbackTempoKeepPitch": "Pertahankan nada",
+  "playbackTempoKeepPitchDescription": "Jika mati, nada ikut berubah bersama kecepatan, seperti piringan hitam yang diputar lebih cepat atau lebih lambat",
+  "playbackTempoPitch": "Nada",
+  "playbackTempoSemitones": "{count, plural, other{{value} semiton}}",
+  "playbackTempoPitchFollows": "Nada mengikuti kecepatan",
+  "playbackTempoReset": "Reset",
+  "playbackTempoUnavailable": "Audio tidak melewati aplikasi di output ini, misalnya saat casting atau dengan output USB langsung, jadi kecepatan dan nada tidak bisa diubah.",
+  "playbackTempoSpeedOnly": "Di output ini hanya kecepatan yang bisa diubah; nada tetap seperti aslinya.",
+  "sectionPlaybackQueue": "Antrean",
+  "queueNoDuplicates": "Tanpa duplikat di antrean",
+  "queueNoDuplicatesDescription": "Menambahkan lagu yang sudah ada di antrean berikutnya akan memindahkannya, bukan menambah salinan kedua. Lagu yang sedang diputar dan yang sudah diputar tetap di tempatnya.",
+  "queueLock": "Kunci antrean",
+  "queueUnlock": "Buka kunci antrean",
+  "queueLockDescription": "Mencegah lagu di antrean digeser urutannya atau diusap untuk dihapus. Menambah lagu tetap bisa. Tombol yang sama ada di antrean.",
   "usbBitPerfect": "Audio Hi-Res dan Bit-Perfect",
   "usbBitPerfectDescription": "Pertahankan kualitas audio di perangkat output yang didukung. Pilih Direct USB atau AAudio Exclusive di bawah; juga, output USB Android butuh Android 14+. Berlaku di lagu selanjutnya, tanpa AutoMix & normalisasi. Mungkin Anda tidak dapat mengatur volume.",
   "usbHardwareVolume": "Volume hardware DAC",
@@ -243,11 +310,15 @@
   "exclusiveOutputDeviceFirst": "Kartu suara pertama",
   "exclusiveOutputNoDevices": "Tidak ada perangkat playback ALSA",
   "usbDirect": "Driver Direct USB",
-  "usbDirectDescription": "Gunakan audio USB eksklusif pada FLAC/WAV, DSF/DFF, dan WavPack DSD dengan izin USB Android. DSD Native butuh DAC yang didukung dan dikenali. Format PCM lain akan diputar normal. Berlaku di lagu selanjutnya.",
+  "usbDirectDescription": "Gunakan audio USB eksklusif dengan izin USB Android. FLAC, WAV, ALAC, DSF/DFF, dan WavPack DSD tetap bit-perfect; AAC, MP3, Opus, dan Vorbis di-decode oleh ponsel lalu dikirim langsung. DSD Native butuh DAC yang didukung dan dikenali. Berlaku di lagu selanjutnya.",
   "usbDsdOverPcm": "DSD melalui PCM (DoP)",
   "usbDsdOverPcmDescription": "Hidupkan bila DAC Anda mendukung DoP. Mengirim DSF/DFF & WavPack DSD dalam carrier PCM saat DSD native tidak tersedia. Bila tak didukung mungkin membuat suara desis; biarkan mati bila menggunakan headset USB biasa.",
-  "usbDsdUnsupported": "Format DSD/DAC terhubung tidak didukung. Pemutaran berhenti.",
+  "usbMaxSampleRate": "Sample rate tertinggi",
+  "usbMaxSampleRateDescription": "Lagu di atas rate ini dikonversi turun ke rate ini. Atur bila DAC diam saat memutar lagu resolusi tinggi. Berlaku di lagu selanjutnya.",
+  "usbMaxSampleRateAuto": "Otomatis",
+  "usbDsdUnsupported":"Format DSD/DAC terhubung tidak didukung. Pemutaran berhenti.",
   "usbPermissionDenied": "Izin USB tidak diberikan. Menggunakan pemutaran normal.",
+  "usbPermissionDeclined": "Akses USB ditolak. Matikan lalu nyalakan lagi Driver Direct USB, atau colok ulang DAC, agar diminta lagi. Menggunakan pemutaran normal.",
   "usbBitPerfectPending": "Menunggu lagu selanjutnya dan output USB yang didukung.",
   "usbOutputReady": "Output USB siap. Mulai pemutaran untuk mengaktifkannya.",
   "usbOutputPreparing": "Menyiapkan output audio USB...",
@@ -255,6 +326,20 @@
   "usbBitPerfectNoDevice": "Tiada DAC USB terhubung. Menggunakan pemutaran normal.",
   "usbBitPerfectFallback": "Perangkat atau format audio tidak mendukung output Bit-Perfect. Menggunakan pemutaran normal.",
   "usbBitPerfectRouteChanged": "Rute audio USB berubah. Pemutaran dijeda; pilih lagu untuk menghubungkan ulang.",
+  "usbFormatUnsupported": "Format lagu ini ({format}) belum bisa dikirim langsung ke DAC. Menggunakan pemutaran normal.",
+  "usbFormatUnsupportedGeneric": "Format lagu ini belum bisa dikirim langsung ke DAC. Menggunakan pemutaran normal.",
+  "usbDecoderUnavailable": "Ponsel ini tidak punya decoder {codec} untuk output DAC langsung. Menggunakan pemutaran normal.",
+  "usbChannelsUnsupported": "Lagu ini punya {channels} kanal. Output DAC langsung hanya memutar mono dan stereo. Menggunakan pemutaran normal.",
+  "usbDacFormatRejected": "DAC menolak {format}. Menggunakan pemutaran normal.",
+  "usbDacFormatRejectedGeneric": "DAC menolak format lagu ini. Menggunakan pemutaran normal.",
+  "usbFormatMono": "mono {format}",
+  "usbDacUnsupported": "DAC ini belum bisa dipakai dengan driver Direct USB. Menggunakan pemutaran normal.",
+  "usbDacOpenFailed": "DAC tidak bisa dibuka. Mungkin sedang dipakai aplikasi lain. Menggunakan pemutaran normal.",
+  "usbPrepareTimeout": "Lagu terlalu lama dimulai di DAC. Menggunakan pemutaran normal.",
+  "usbDecodeFailed": "Decoding lagu ini berhenti saat pemutaran langsung. Pemutaran dijeda; pilih lagu untuk melanjutkan.",
+  "usbAndroidVersion": "Output USB Bit-Perfect butuh Android 14 atau lebih baru. Coba driver Direct USB. Menggunakan pemutaran normal.",
+  "usbOutputLossySource": "{codec}, sumber lossy",
+  "usbOutputResampled": "{rate}, di-resample ke {output}",
   "upgradeIntroContinue": "Lanjut",
   "cacheMotionArtwork": "Cover bergerak offline",
   "cacheMotionArtworkDesc": "Video album yang didownload. Menghapusnya tidak akan menghapus file musik dan cover biasa.",
@@ -333,6 +418,14 @@
   "homeEmptySubtitle": "Instal ekstensi untuk melanjutkan.",
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
+  },
+  "homeNothingYetTitle": "Belum ada apa-apa",
+  "@homeNothingYetTitle": {
+    "description": "Title on the Mornye Home when the Library is empty and nothing was played"
+  },
+  "homeNothingYetMessage": "Lagu yang Anda tambahkan ke Koleksi atau putar akan muncul di sini.",
+  "@homeNothingYetMessage": {
+    "description": "Message under homeNothingYetTitle"
   },
   "homeRecent": "Terbaru",
   "@homeRecent": {
@@ -660,6 +753,24 @@
   "@optionsExtensionStoreSubtitle": {
     "description": "Subtitle for extension repo toggle"
   },
+  "optionsAutoUpdateExtensions": "Perbarui ekstensi otomatis",
+  "@optionsAutoUpdateExtensions": {
+    "description": "App settings switch that installs extension updates from the extension repository in the background"
+  },
+  "optionsAutoUpdateExtensionsSubtitle": "Memasang pembaruan untuk ekstensi yang aktif di latar belakang saat tidak ada unduhan yang berjalan.",
+  "@optionsAutoUpdateExtensionsSubtitle": {
+    "description": "Subtitle of the Update extensions automatically switch. Disabled extensions are not updated, and updates wait until downloads finish"
+  },
+  "extensionsAutoUpdatedCount": "{count, plural, =1{1 ekstensi diperbarui} other{{count} ekstensi diperbarui}}",
+  "@extensionsAutoUpdatedCount": {
+    "description": "Short notice shown after extensions were updated automatically in the background",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Number of extensions that were updated"
+      }
+    }
+  },
   "optionsCheckUpdates": "Periksa Update",
   "@optionsCheckUpdates": {
     "description": "Auto update check toggle"
@@ -757,9 +868,9 @@
   "@aboutMobileDeveloper": {
     "description": "Role description for mobile dev"
   },
-  "aboutLogoArtist": "Artist berbakat yang membuat logo indah untuk aplikasi kami!",
-  "@aboutLogoArtist": {
-    "description": "Role description for logo artist"
+  "aboutAppManager": "Manajer aplikasi dan moderator",
+  "@aboutAppManager": {
+    "description": "Role description for the contributor who manages the app's community and moderates it"
   },
   "aboutTranslators": "Penerjemah",
   "@aboutTranslators": {
@@ -1031,20 +1142,9 @@
     "description": "Skip button text"
   },
   "setupNearbyEnable": "Izinkan Perangkat di Sekitar",
-  "setupNearbyDescription": "Mornye Link memakainya untuk menemukan komputermu di jaringan yang sama, dan penyimpanan jaringan memerlukannya untuk menjangkau server di rumah.",
+  "setupNearbyDescription": "Mornye Link memakainya untuk menemukan perangkatmu yang lain di jaringan yang sama, dan penyimpanan jaringan memerlukannya untuk menjangkau server di rumah.",
   "setupNearbyGranted": "Perangkat di Sekitar Diizinkan!",
   "permissionNearbyDevices": "Perangkat di sekitar",
-  "whatsNewLinkNearbyAllow": "Izinkan perangkat di sekitar",
-  "whatsNewLinkNearbyGranted": "Perangkat di sekitar diizinkan",
-  "whatsNewNearbyTitle": "Perangkat di sekitar",
-  "whatsNewNearbyDesc": "Android kini meminta izin sebelum aplikasi bisa menjangkau perangkat lain di jaringanmu. Mornye memerlukannya untuk:",
-  "whatsNewNearbyLinkTitle": "Menemukan komputermu",
-  "whatsNewNearbyLinkBody": "Mornye Link mencari komputermu di Wi-Fi yang sama dan tetap terhubung dengannya.",
-  "whatsNewNearbyStorageTitle": "Penyimpanan jaringan",
-  "whatsNewNearbyStorageBody": "Putar musik dari NAS atau server di rumah lewat SMB atau WebDAV.",
-  "whatsNewNearbyPrivateTitle": "Hanya perangkatmu sendiri",
-  "whatsNewNearbyPrivateBody": "Mornye memakainya hanya untuk menjangkau perangkat di jaringanmu, tidak pernah untuk mengetahui lokasimu.",
-  "whatsNewNearbyRefused": "Tidak diizinkan. Mornye Link dan penyimpanan jaringan tidak aktif sampai kamu mengizinkan Perangkat di sekitar untuk Mornye di pengaturan Android.",
   "setupNext": "Lanjut",
   "@setupNext": {
     "description": "Next button text"
@@ -1861,6 +1961,14 @@
   },
   "lyricsKeepScreenOn": "Cegah layar mati saat melihat lirik",
   "lyricsKeepScreenOnSubtitle": "Mencegah layar mati saat sedang membuka layar lirik, berlaku saat pemutaran dijeda.",
+  "lyricsPlayerPreview": "Baris lirik di pemutar",
+  "lyricsPlayerPreviewSubtitle": "Tampilkan baris yang sedang dinyanyikan di bawah judul lagu. Ketuk untuk membuka lirik lengkap.",
+  "lyricsRomanize": "Romanisasi lirik",
+  "lyricsRomanizeSubtitle": "Tampilkan cara lirik bahasa Korea, Sirilik, Hindi, Punjabi, Mandarin, dan kana Jepang dinyanyikan, diolah di perangkat ini. Terjemahan AI dapat meromanisasi sisanya.",
+  "lyricsRomanizedMainLine": "Romanisasi sebagai baris utama",
+  "lyricsRomanizedMainLineSubtitle": "Tampilkan teks romanisasi menggantikan tiap baris, dengan teks aslinya di bawahnya.",
+  "lyricsAiRomanize": "Tambahkan Romanisasi",
+  "lyricsAiRomanizeSubtitle": "Juga meromanisasi baris yang tidak bisa diolah perangkat ini, seperti kanji Jepang, Thai, atau Arab",
   "lyricsMode": "Mode Lirik",
   "@lyricsMode": {
     "description": "Setting - how to save lyrics"
@@ -2474,6 +2582,7 @@
   "downloadAutoConvertAllFormatsSubtitle": "Ubah format hasil download atau batasi bit depth dan sample rate FLAC. File asli diganti hanya setelah konversi berhasil.",
   "downloadAutoConvertOutputSubtitle": "Pilih format output untuk download yang baru selesai.",
   "downloadAutoConvertFlacSubtitle": "FLAC lossless dengan batas kualitas. Bit depth dan sample rate yang lebih rendah tetap dipertahankan.",
+  "downloadAutoConvertAlacSubtitle": "Audio lossless Apple dalam file M4A, dengan batas kualitas yang sama seperti FLAC.",
   "downloadAutoConvertMaxBitDepth": "Bit depth maksimal",
   "downloadAutoConvertMaxSampleRate": "Sample rate maksimal",
   "downloadAutoConvertFlacLimitsSubtitle": "Ini adalah batas maksimal. Misalnya, sumber 44,1 kHz tetap 44,1 kHz saat 48 kHz dipilih. Sumber lossy tetap dalam format aslinya.",
@@ -2576,6 +2685,38 @@
   "appearanceForceBlurSubtitle": "Aktifkan blur bar navigasi di perangkat yang dimatikan secara default. Dapat memengaruhi performa.",
   "@appearanceForceBlurSubtitle": {
     "description": "Subtitle for the force-blur toggle"
+  },
+  "appearanceInterfaceSize": "Ukuran antarmuka",
+  "@appearanceInterfaceSize": {
+    "description": "Title of the slider that scales the whole app"
+  },
+  "appearanceInterfaceSizeDescription": "Memperkecil atau memperbesar semua yang ada di aplikasi. Ukuran lebih kecil juga membuat tombol lebih kecil untuk diketuk.",
+  "@appearanceInterfaceSizeDescription": {
+    "description": "Explanation under the Interface size slider"
+  },
+  "appearanceInterfaceSizeSmaller": "Lebih kecil",
+  "@appearanceInterfaceSizeSmaller": {
+    "description": "Label at the small end of the Interface size slider"
+  },
+  "appearanceInterfaceSizeLarger": "Lebih besar",
+  "@appearanceInterfaceSizeLarger": {
+    "description": "Label at the large end of the Interface size slider"
+  },
+  "appearanceAnimationSpeed": "Kecepatan animasi",
+  "@appearanceAnimationSpeed": {
+    "description": "Title of the slider that makes the app's animations play slower or faster"
+  },
+  "appearanceAnimationSpeedDescription": "Seberapa cepat halaman, lembar, dan kontrol bergerak. Lirik tetap mengikuti lagu.",
+  "@appearanceAnimationSpeedDescription": {
+    "description": "Explanation under the Animation speed slider"
+  },
+  "appearanceAnimationSpeedSlower": "Lebih lambat",
+  "@appearanceAnimationSpeedSlower": {
+    "description": "Label at the slow end of the Animation speed slider"
+  },
+  "appearanceAnimationSpeedFaster": "Lebih cepat",
+  "@appearanceAnimationSpeedFaster": {
+    "description": "Label at the fast end of the Animation speed slider"
   },
   "queueClearAll": "Hapus Semua",
   "@queueClearAll": {
@@ -3287,6 +3428,14 @@
   "@libraryFilterSortAlbumDesc": {
     "description": "Sort option - album descending"
   },
+  "libraryFilterSortYearAsc": "Tahun (Terlama dahulu)",
+  "@libraryFilterSortYearAsc": {
+    "description": "Library sort option - release year ascending"
+  },
+  "libraryFilterSortYearDesc": "Tahun (Terbaru dahulu)",
+  "@libraryFilterSortYearDesc": {
+    "description": "Library sort option - release year descending"
+  },
   "libraryFilterSortGenreAsc": "Genre (A-Z)",
   "@libraryFilterSortGenreAsc": {
     "description": "Sort option - genre ascending"
@@ -3417,58 +3566,6 @@
   "@tutorialReadyMessage": {
     "description": "Tutorial completion message"
   },
-  "whatsNewIntroTitle": "Mornye {version} sudah hadir",
-  "whatsNewIntroDesc": "Pembaruan terbesar kami sejauh ini. Ini sekilas yang baru.",
-  "whatsNewLinkTitle": "Mornye Link",
-  "whatsNewLinkDesc": "Hubungkan HP dan komputer di jaringan yang sama. Mornye Link masih beta.",
-  "whatsNewLinkPlayTitle": "Putar di semua perangkat",
-  "whatsNewLinkPlayBody": "Jelajahi koleksi komputer dari HP, kendalikan yang diputarnya, dan pindahkan pemutaran tanpa kehilangan posisi.",
-  "whatsNewLinkTransferTitle": "Pindahkan lagu dua arah",
-  "whatsNewLinkTransferBody": "Kirim lagu ke komputer atau simpan ke HP, langsung dari menu lagu.",
-  "whatsNewLinkSyncTitle": "Tetap sinkron",
-  "whatsNewLinkSyncBody": "Koleksi dan riwayat dengar tetap sama di perangkat yang terhubung.",
-  "whatsNewHomeTitle": "Beranda yang belajar",
-  "whatsNewHomeDesc": "Mix dan autoplay kini mengikuti caramu mendengarkan.",
-  "whatsNewHomeMixesTitle": "Mix dari Koleksi",
-  "whatsNewHomeMixesBody": "Mix baru dari lagu milikmu sendiri, termasuk mix untuk tiap genre.",
-  "whatsNewHomeAutoplayTitle": "Autoplay lebih pintar",
-  "whatsNewHomeAutoplayBody": "Autoplay mengikuti sesi mendengarmu dan belajar dari favorit, playlist, dan lagu yang kamu ulang.",
-  "whatsNewHomeAnalysisTitle": "Analisis lagu",
-  "whatsNewHomeAnalysisBody": "Mornye bisa menganalisis karakter suara lagumu untuk pilihan yang lebih pas. Fitur ini mati sampai kamu menyalakannya di Setelan.",
-  "whatsNewPlayerTitle": "Pemutar dan lirik",
-  "whatsNewPlayerDesc": "Pemutaran lebih mulus, dan lirik dalam bahasa apa pun.",
-  "whatsNewPlayerGaplessTitle": "Pemutaran tanpa jeda",
-  "whatsNewPlayerGaplessBody": "Album mengalir dari satu lagu ke lagu berikutnya tanpa jeda.",
-  "whatsNewPlayerTranslateTitle": "Terjemahkan lirik",
-  "whatsNewPlayerTranslateBody": "Terjemahkan atau romanisasi lirik dengan penyedia AI yang kamu atur.",
-  "whatsNewPlayerTimingTitle": "Waktu lirik",
-  "whatsNewPlayerTimingBody": "Majukan atau mundurkan lirik sinkron saat tidak pas dengan lagu.",
-  "whatsNewPlayerAutoTitle": "Android Auto",
-  "whatsNewPlayerAutoBody": "Jelajahi dan putar Koleksi dari layar mobil.",
-  "whatsNewPlayerExclusiveTitle": "Output eksklusif",
-  "whatsNewPlayerExclusiveBody": "Kirim audio langsung ke perangkat output tanpa mixer sistem.",
-  "whatsNewLibraryTitle": "Koleksi dan pencarian",
-  "whatsNewLibraryDesc": "Cara baru untuk menemukan dan mengatur musikmu.",
-  "whatsNewLibraryFoldersTitle": "Jelajahi per folder",
-  "whatsNewLibraryFoldersBody": "Lihat Koleksi sesuai susunan foldernya di penyimpanan.",
-  "whatsNewLibrarySuggestionsTitle": "Saran lagu",
-  "whatsNewLibrarySuggestionsBody": "Album, single, dan playlist kini menyarankan lagu yang cocok.",
-  "whatsNewLibraryRecognizeTitle": "Kenali musik",
-  "whatsNewLibraryRecognizeBody": "Ketuk mikrofon di kolom pencarian untuk tahu lagu yang sedang diputar di sekitarmu.",
-  "whatsNewLibraryPlaylistsTitle": "Playlist lebih baik",
-  "whatsNewLibraryPlaylistsBody": "Urutkan ulang lagu, buat playlist dari folder, atau impor file playlist.",
-  "whatsNewFasterTitle": "Lebih cepat di mana-mana",
-  "whatsNewFasterDesc": "Lebih cepat dan ringan, terutama untuk koleksi besar.",
-  "whatsNewFasterLibraryTitle": "Koleksi lebih cepat",
-  "whatsNewFasterLibraryBody": "Tab dan album terbuka lebih cepat, dan scroll tetap mulus.",
-  "whatsNewFasterNetworkTitle": "Musik jaringan lebih cepat",
-  "whatsNewFasterNetworkBody": "Folder jaringan dipindai jauh lebih cepat, dan server Subsonic tersinkron dengan permintaan yang jauh lebih sedikit.",
-  "whatsNewFasterQueueTitle": "Antrean panjang tetap aman",
-  "whatsNewFasterQueueBody": "Antrean besar tersimpan cepat dan kembali setelah aplikasi dibuka ulang.",
-  "whatsNewFasterBackgroundTitle": "Lebih ringan di latar belakang",
-  "whatsNewFasterBackgroundBody": "Aplikasi terbuka lebih cepat dan bekerja lebih sedikit saat musik diputar.",
-  "whatsNewDone": "Mulai mendengarkan",
-  "whatsNewAboutTitle": "Yang baru di {version}",
   "libraryForceFullScan": "Paksa Pindai Ulang",
   "@libraryForceFullScan": {
     "description": "Button to force a complete rescan of library"
@@ -3600,6 +3697,36 @@
   "playbackNormalizationPreampHint": "Nilai lebih rendah terdengar lebih pelan. Normalisasi hanya menurunkan volume, jadi tidak pernah clipping.",
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
+  },
+  "confirmLoudVolume": "Konfirmasi volume keras",
+  "@confirmLoudVolume": {
+    "description": "Switch title: the app's volume bar asks before going above a chosen level"
+  },
+  "confirmLoudVolumeDescription": "Tanya dulu sebelum bilah volume melewati batas yang Anda pilih. Tombol volume tidak terpengaruh.",
+  "@confirmLoudVolumeDescription": {
+    "description": "Subtitle of the Confirm loud volume switch; hardware volume buttons are never limited"
+  },
+  "confirmLoudVolumeLevel": "Tanya di atas",
+  "@confirmLoudVolumeLevel": {
+    "description": "Label over the choice of volume level (60, 70, 80 or 90 percent) above which the volume bar asks first"
+  },
+  "confirmLoudVolumeTitle": "Naikkan volume?",
+  "@confirmLoudVolumeTitle": {
+    "description": "Title of the dialog shown when the volume bar is moved above the chosen level"
+  },
+  "confirmLoudVolumeMessage": "Volume di atas {level} dapat membahayakan pendengaran Anda. Lanjutkan?",
+  "@confirmLoudVolumeMessage": {
+    "description": "Message of the loud volume dialog",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "80%"
+      }
+    }
+  },
+  "confirmLoudVolumeContinue": "Lanjutkan",
+  "@confirmLoudVolumeContinue": {
+    "description": "Dialog action that lets the volume go above the chosen level"
   },
   "cacheAudioAnalysis": "Cache analisis audio",
   "@cacheAudioAnalysis": {
@@ -3840,6 +3967,74 @@
   "trackReEnrichApplyChanges": "Terapkan perubahan",
   "@trackReEnrichApplyChanges": {
     "description": "Confirmation button in the batch metadata review sheet"
+  },
+  "trackReEnrichReviewSelected": "{selected} dari {total} perubahan dipilih",
+  "@trackReEnrichReviewSelected": {
+    "description": "Summary above the changes of one song in the re-enrich review, where each change has its own switch",
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trackReEnrichAlreadyMatches": "Hasil ini sama dengan metadata lagu sekarang, jadi tidak ada yang diubah.",
+  "@trackReEnrichAlreadyMatches": {
+    "description": "Shown instead of an empty review when the picked re-enrich result would change nothing"
+  },
+  "trackReEnrichSmallerCover": "Lebih kecil dari cover sekarang",
+  "@trackReEnrichSmallerCover": {
+    "description": "Note under a proposed cover in the re-enrich review; the change starts switched off"
+  },
+  "trackReEnrichHasLyrics": "Ada lirik",
+  "@trackReEnrichHasLyrics": {
+    "description": "Current value of the lyrics row in the re-enrich review when the song already has lyrics"
+  },
+  "trackReEnrichUndo": "Batalkan re-enrich",
+  "@trackReEnrichUndo": {
+    "description": "Song metadata menu action that restores the metadata the song had before its last re-enrich"
+  },
+  "trackReEnrichUndoAction": "Urungkan",
+  "@trackReEnrichUndoAction": {
+    "description": "Action in the re-enrich result for one song that restores its previous metadata"
+  },
+  "trackReEnrichUndoAll": "Urungkan semua",
+  "@trackReEnrichUndoAll": {
+    "description": "Action in the result of a re-enrich of several songs that restores the previous metadata of every song it changed"
+  },
+  "trackReEnrichUndoConfirmTitle": "Batalkan re-enrich?",
+  "@trackReEnrichUndoConfirmTitle": {
+    "description": "Title of the confirmation before restoring a song's metadata from before its last re-enrich"
+  },
+  "trackReEnrichUndoConfirmMessage": "Tag, cover, dan lirik yang diubah re-enrich terakhir kembali seperti sebelumnya. Perubahan yang dibuat setelahnya akan diganti.",
+  "@trackReEnrichUndoConfirmMessage": {
+    "description": "Message of the confirmation before undoing a re-enrich"
+  },
+  "trackReEnrichUndoProgress": "Memulihkan metadata sebelumnya...",
+  "@trackReEnrichUndoProgress": {
+    "description": "Progress title while undoing a re-enrich of several songs"
+  },
+  "trackReEnrichUndoDone": "Metadata sebelumnya dipulihkan",
+  "@trackReEnrichUndoDone": {
+    "description": "Result after undoing the re-enrich of one song"
+  },
+  "trackReEnrichUndoAllDone": "{count} dari {total} lagu dipulihkan",
+  "@trackReEnrichUndoAllDone": {
+    "description": "Result after undoing the re-enrich of several songs",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trackReEnrichUndoCoverKept": "Cover yang ditambahkan re-enrich tetap ada, karena cover tidak bisa dihapus dari lagu yang sebelumnya tidak punya cover.",
+  "@trackReEnrichUndoCoverKept": {
+    "description": "Added to the undo result when re-enrich gave a song its first cover, which undo cannot remove"
   },
   "trackReEnrichRefreshOnline": "Refresh dari internet",
   "@trackReEnrichRefreshOnline": {
@@ -4419,6 +4614,18 @@
   "lyricsProvidersTitle": "Prioritas Provider Lirik",
   "@lyricsProvidersTitle": {
     "description": "Settings item title for lyrics provider order"
+  },
+  "lyricsPreferBestTiming": "Utamakan waktu terbaik",
+  "@lyricsPreferBestTiming": {
+    "description": "Lyrics settings switch: choose lyrics by timing quality across providers instead of by provider order alone"
+  },
+  "lyricsPreferBestTimingEnabled": "Lirik per kata menang atas lirik berwaktu, dan lirik berwaktu atas lirik biasa, dari provider mana pun yang hidup. Bisa memeriksa lebih banyak provider untuk tiap lagu.",
+  "@lyricsPreferBestTimingEnabled": {
+    "description": "Subtitle of the best timing first switch when on"
+  },
+  "lyricsPreferBestTimingDisabled": "Urutan provider saja: provider pertama yang punya lirik yang dipakai.",
+  "@lyricsPreferBestTimingDisabled": {
+    "description": "Subtitle of the best timing first switch when off"
   },
   "lyricsProvidersDescription": "Hidupkan, matikan, dan atur sumber lirik. Provider akan diperiksa dari atas ke bawah hingga lirik ditemukan.",
   "@lyricsProvidersDescription": {
@@ -5390,17 +5597,9 @@
   "@hiResCheckTitle": {
     "description": "Title of the fake Hi-Res check card"
   },
-  "hiResCheckSummary": "Periksa spektrum dan bit depth aktif untuk mendeteksi tanda upsampling atau padding.",
-  "@hiResCheckSummary": {
-    "description": "Introductory text for the sampled Hi-Res analysis"
-  },
   "hiResCheckLimitedBandwidth": "Bandwidth terbatas",
   "@hiResCheckLimitedBandwidth": {
     "description": "Neutral finding: a limited spectrum alone does not prove upsampling"
-  },
-  "hiResCheckNoEvidence": "Tidak terdeteksi upsampling atau padding",
-  "@hiResCheckNoEvidence": {
-    "description": "No evidence was detected; this does not certify the master"
   },
   "hiResCheckEstimatedCutoff": "Cutoff terestimasi",
   "@hiResCheckEstimatedCutoff": {
@@ -5413,15 +5612,6 @@
   "hiResCheckBandwidthExplanation": "Cutoff rendah juga dapat berasal dari mastering. Bukan selalu hasil upsampling.",
   "@hiResCheckBandwidthExplanation": {
     "description": "Explains why the limited-bandwidth finding is neutral"
-  },
-  "hiResCheckSampledExplanation": "Hasil analisis dari {seconds} detik audio. Jangan gunakan hasil sebagai bukti keaslian.",
-  "@hiResCheckSampledExplanation": {
-    "description": "Limits of the sampled Hi-Res analysis; seconds is a formatted duration",
-    "placeholders": {
-      "seconds": {
-        "type": "String"
-      }
-    }
   },
   "hiResCheckImagingEvidence": "Ada spektrum band yang saling berbalik yang mungkin ini hasil upsampling.",
   "@hiResCheckImagingEvidence": {
@@ -5449,17 +5639,9 @@
   "@hiResCheckRun": {
     "description": "Button that starts the Hi-Res authenticity check"
   },
-  "hiResCheckChecking": "Memeriksa keaslian Hi-Res...",
-  "@hiResCheckChecking": {
-    "description": "Loading text while the Hi-Res check runs"
-  },
   "hiResCheckVerdictFake": "Sepertinya Hi-Res palsu",
   "@hiResCheckVerdictFake": {
     "description": "Verdict: the file claims Hi-Res but does not measure as it"
-  },
-  "hiResCheckVerdictStandard": "Kualitas biasa, tidak ada yang aneh",
-  "@hiResCheckVerdictStandard": {
-    "description": "Verdict: neither sample rate nor bit depth claims Hi-Res"
   },
   "hiResCheckVerdictInconclusive": "Tidak yakin: bagian teranalisis terlalu diam atau pendek",
   "@hiResCheckVerdictInconclusive": {
@@ -5486,6 +5668,367 @@
         "type": "int"
       },
       "effective": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportSummary": "Membaca seluruh file lalu memeriksa keutuhan, bit depth asli, rentang frekuensi, dan jejak kompresi lossy.",
+  "@hiResReportSummary": {
+    "description": "What the Hi-Res authenticity inspection does, shown before it runs"
+  },
+  "hiResReportChecking": "Membaca seluruh file. Lagu yang panjang butuh waktu sedikit lebih lama.",
+  "@hiResReportChecking": {
+    "description": "Loading text while the whole-file inspection runs"
+  },
+  "hiResReportGradeCorrupt": "File rusak",
+  "@hiResReportGradeCorrupt": {
+    "description": "Inspection outcome: the audio fails its checksum or cannot be decoded in full"
+  },
+  "hiResReportGradeCorruptBody": "Audio di file ini tidak sama dengan yang ditulis saat file dibuat. Ambil salinan baru.",
+  "@hiResReportGradeCorruptBody": {
+    "description": "Explains the damaged-file outcome"
+  },
+  "hiResReportGradeLossy": "Dibuat dari file lossy",
+  "@hiResReportGradeLossy": {
+    "description": "Inspection outcome: a lossless file whose audio went through a lossy codec"
+  },
+  "hiResReportGradeLossyBody": "Audio ini membawa pola frame kompresi {codec}. Audio ini pernah lossy sebelum disimpan sebagai lossless, dan detail yang hilang tidak kembali.",
+  "@hiResReportGradeLossyBody": {
+    "description": "Explains the lossy-source outcome; codec is a format name such as AAC",
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportGradeUpscaledBody": "File ini mengaku punya resolusi lebih tinggi daripada audionya.",
+  "@hiResReportGradeUpscaledBody": {
+    "description": "Explains the fake Hi-Res outcome"
+  },
+  "hiResReportGradeSuspect": "Ada tanda sumber berkualitas lebih rendah",
+  "@hiResReportGradeSuspect": {
+    "description": "Inspection outcome: evidence of a lossy or lower-resolution source that falls short of proof"
+  },
+  "hiResReportGradeSuspectBody": "Sebagian bukti mengarah ke sumber lossy atau beresolusi lebih rendah, tetapi belum cukup untuk memastikannya.",
+  "@hiResReportGradeSuspectBody": {
+    "description": "Explains the suspect outcome"
+  },
+  "hiResReportGradeClean": "Tidak ada masalah",
+  "@hiResReportGradeClean": {
+    "description": "Inspection outcome: nothing was flagged"
+  },
+  "hiResReportGradeCleanBody": "Tidak ada tanda kerusakan, upscaling, atau kompresi lossy pada audio ini.",
+  "@hiResReportGradeCleanBody": {
+    "description": "Explains the clean outcome"
+  },
+  "hiResReportIntegrity": "Keutuhan",
+  "@hiResReportIntegrity": {
+    "description": "Report section: whether the file's audio is intact"
+  },
+  "hiResReportIntegrityVerified": "Audio cocok dengan checksum yang tersimpan di file.",
+  "@hiResReportIntegrityVerified": {
+    "description": "Integrity finding: checksum verified"
+  },
+  "hiResReportIntegrityUnverified": "File ini tidak menyimpan checksum untuk dibandingkan. Seluruh audio terbaca tanpa galat.",
+  "@hiResReportIntegrityUnverified": {
+    "description": "Integrity finding: no checksum available, decoding succeeded"
+  },
+  "hiResReportIntegrityMismatch": "Audio yang terbaca tidak cocok dengan checksum yang tersimpan di file.",
+  "@hiResReportIntegrityMismatch": {
+    "description": "Integrity finding: checksum mismatch"
+  },
+  "hiResReportIntegrityLength": "File ini berisi {decoded} dari {declared} yang tertulis.",
+  "@hiResReportIntegrityLength": {
+    "description": "Integrity finding: the audio is shorter or longer than declared; both are formatted durations",
+    "placeholders": {
+      "decoded": {
+        "type": "String"
+      },
+      "declared": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportIntegrityDecodeError": "Pembacaan berhenti di {position}. File terpotong atau rusak.",
+  "@hiResReportIntegrityDecodeError": {
+    "description": "Integrity finding: a decode error; position is a formatted time",
+    "placeholders": {
+      "position": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportChecksum": "Checksum (MD5)",
+  "@hiResReportChecksum": {
+    "description": "Label of the audio checksum row"
+  },
+  "hiResReportBitDepth": "Bit depth",
+  "@hiResReportBitDepth": {
+    "description": "Report section: the real resolution of the samples"
+  },
+  "hiResReportBitDepthFull": "Seluruh {bits} bit berisi audio.",
+  "@hiResReportBitDepthFull": {
+    "description": "Bit depth finding: the declared depth is real",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportBitDepthCoarse": "Semua bit terpakai, tetapi jarak antarsampel yang pelan seperti audio {bits}-bit. Kemungkinan file ini diperbesar dari resolusi yang lebih rendah.",
+  "@hiResReportBitDepthCoarse": {
+    "description": "Bit depth finding: the samples lie further apart than the declared depth allows; bits is a formatted number",
+    "placeholders": {
+      "bits": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportBitDepthNear16": "Sampel berada di kisi 16-bit dengan noise halus di atasnya: sumber 16-bit yang disimpan sebagai {declared}-bit.",
+  "@hiResReportBitDepthNear16": {
+    "description": "Bit depth finding: 16-bit audio with dither in a wider word",
+    "placeholders": {
+      "declared": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportBitDepthFloat": "Audio floating-point tidak punya bit depth tetap untuk diperiksa.",
+  "@hiResReportBitDepthFloat": {
+    "description": "Bit depth finding for floating-point files"
+  },
+  "hiResReportBitDepthUnmeasured": "Sampel pelan terlalu sedikit untuk mengukur resolusi aslinya.",
+  "@hiResReportBitDepthUnmeasured": {
+    "description": "Bit depth finding when the resolution could not be measured"
+  },
+  "hiResReportMeasuredResolution": "Resolusi terukur",
+  "@hiResReportMeasuredResolution": {
+    "description": "Label of the measured bit resolution row"
+  },
+  "hiResReportBitsValue": "{bits} bit",
+  "@hiResReportBitsValue": {
+    "description": "A bit count; bits is a formatted number",
+    "placeholders": {
+      "bits": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportFrequency": "Rentang frekuensi",
+  "@hiResReportFrequency": {
+    "description": "Report section: how far up the audio reaches"
+  },
+  "hiResReportLowpass": "Low-pass",
+  "@hiResReportLowpass": {
+    "description": "Label of the low-pass filter row"
+  },
+  "hiResReportLowpassValue": "{frequency}, turun {drop} dB",
+  "@hiResReportLowpassValue": {
+    "description": "Where the spectrum is cut and by how much",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      },
+      "drop": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassNone": "Tidak ada potongan tajam yang menonjol di spektrum.",
+  "@hiResReportLowpassNone": {
+    "description": "Frequency finding: no low-pass filter"
+  },
+  "hiResReportLowpassFormat": "Terpotong di {frequency}, tepat di bawah batas sample rate ini: filter bawaan formatnya.",
+  "@hiResReportLowpassFormat": {
+    "description": "Frequency finding: the normal anti-alias filter",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassSourceRate": "Terpotong di {frequency}, batas rekaman 44,1 atau 48 kHz. Sample rate yang lebih tinggi ini tidak berisi musik di atasnya.",
+  "@hiResReportLowpassSourceRate": {
+    "description": "Frequency finding: a Hi-Res file with the bandwidth of a lower sample rate",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassHigh": "Terpotong di {frequency}. Filter mastering bisa menghasilkan ini, begitu juga MP3 320 kbps dan Opus.",
+  "@hiResReportLowpassHigh": {
+    "description": "Frequency finding: a cut that is not evidence by itself",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassMedium": "Terpotong di {frequency}, tempat encoder lossy sekitar 192 kbps memotong. Master berkualitas penuh jarang berhenti serendah ini.",
+  "@hiResReportLowpassMedium": {
+    "description": "Frequency finding: a cut typical of mid-bitrate lossy encoders",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLowpassLow": "Terpotong di {frequency}, tempat encoder lossy sekitar 128 kbps memotong.",
+  "@hiResReportLowpassLow": {
+    "description": "Frequency finding: a cut typical of low-bitrate lossy encoders",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportLossy": "Kompresi lossy",
+  "@hiResReportLossy": {
+    "description": "Report section: traces of a lossy codec in the audio"
+  },
+  "hiResReportLossyFound": "Ditemukan pola frame {codec}: satu blok setiap {samples} sampel, seirama di sepanjang file. Audio yang tidak pernah dikompresi tidak memilikinya.",
+  "@hiResReportLossyFound": {
+    "description": "Lossy finding: a codec frame grid was detected; codec is a format name",
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      },
+      "samples": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResReportLossySuspectedPattern": "Terlihat pola frame MP3 yang samar, terlalu lemah untuk dipastikan.",
+  "@hiResReportLossySuspectedPattern": {
+    "description": "Lossy finding: weak evidence of an MP3 frame grid"
+  },
+  "hiResReportLossySuspectedLowpass": "Pola frame tidak ditemukan, tetapi low-pass di atas berada di tempat encoder lossy biasa memotong.",
+  "@hiResReportLossySuspectedLowpass": {
+    "description": "Lossy finding: only the low-pass points to a lossy source"
+  },
+  "hiResReportLossyNotFound": "Tidak ditemukan pola frame AAC, Vorbis, atau MP3. Opus tidak meninggalkan pola, dan resampling setelah decoding menghapus pola lainnya, jadi hasil ini tidak menyingkirkan sumber lossy.",
+  "@hiResReportLossyNotFound": {
+    "description": "Lossy finding: nothing detected, with the limits of the test"
+  },
+  "hiResReportLossyHighRate": "Tidak diperiksa. Di atas 48 kHz sumber lossy pasti sudah di-resample, sehingga pola framenya tersamar.",
+  "@hiResReportLossyHighRate": {
+    "description": "Lossy finding: the test does not apply to high sample rates"
+  },
+  "hiResReportLossyTooShort": "Tidak diperiksa: audionya terlalu sedikit untuk diukur.",
+  "@hiResReportLossyTooShort": {
+    "description": "Lossy finding: the file is too short or too quiet for the test"
+  },
+  "hiResReportPatternStrength": "Kekuatan pola",
+  "@hiResReportPatternStrength": {
+    "description": "Label of the codec frame pattern score row"
+  },
+  "hiResReportPatternStrengthValue": "{score} (terdeteksi mulai {threshold})",
+  "@hiResReportPatternStrengthValue": {
+    "description": "The frame pattern score next to the score that counts as found",
+    "placeholders": {
+      "score": {
+        "type": "String"
+      },
+      "threshold": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportSpectrum": "Spektrum rata-rata",
+  "@hiResReportSpectrum": {
+    "description": "Caption of the spectrum chart"
+  },
+  "hiResReportSpectrumSemantics": "Spektrum rata-rata, berisi hingga {frequency}",
+  "@hiResReportSpectrumSemantics": {
+    "description": "Screen reader description of the spectrum chart",
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportWholeFile": "Seluruh {duration} audio dibaca. Tidak ada analisis yang bisa menjamin master aslinya.",
+  "@hiResReportWholeFile": {
+    "description": "Scope and limits of the inspection; duration is a formatted time",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResReportShare": "Bagikan laporan",
+  "@hiResReportShare": {
+    "description": "Button that shares the Hi-Res authenticity report as text"
+  },
+  "hiResBatchAction": "Cek keaslian",
+  "@hiResBatchAction": {
+    "description": "Menu action that runs the Hi-Res authenticity check on an album or on several selected songs"
+  },
+  "hiResBatchProgress": "Membaca lagu {current} dari {total}",
+  "@hiResBatchProgress": {
+    "description": "Progress of the authenticity check of several songs",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchWaiting": "Menunggu",
+  "@hiResBatchWaiting": {
+    "description": "Status of a song the authenticity check has not reached yet"
+  },
+  "hiResBatchReading": "Membaca seluruh file",
+  "@hiResBatchReading": {
+    "description": "Status of the song the authenticity check is reading now"
+  },
+  "hiResBatchSummary": "{flagged, plural, =0{Tidak ada masalah di {total} lagu.} other{{flagged} dari {total} lagu perlu dilihat.}}",
+  "@hiResBatchSummary": {
+    "description": "Result of the authenticity check of several songs: how many showed a warning or a problem",
+    "placeholders": {
+      "flagged": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchFailed": "{count, plural, other{{count} lagu tidak bisa dibaca.}}",
+  "@hiResBatchFailed": {
+    "description": "How many songs the authenticity check could not read",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchSkipped": "{count, plural, other{{count} lagu berformat lain dilewati.}} Hanya FLAC dan WAV yang bisa diperiksa.",
+  "@hiResBatchSkipped": {
+    "description": "How many songs were not checked because of their format",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hiResBatchMixedFormats": "Lagu-lagu ini tidak berformat sama: {formats}. Album dari satu master biasanya sama.",
+  "@hiResBatchMixedFormats": {
+    "description": "Note that the checked songs differ in bit depth or sample rate; formats is a list such as 24-bit/96kHz (8), 16-bit/44.1kHz (4)",
+    "placeholders": {
+      "formats": {
+        "type": "String"
+      }
+    }
+  },
+  "hiResBatchSpectrumSemantics": "Spektrum rata-rata {count} lagu, satu garis untuk tiap lagu",
+  "@hiResBatchSpectrumSemantics": {
+    "description": "Screen reader description of the chart that draws the spectra of several checked songs together",
+    "placeholders": {
+      "count": {
         "type": "int"
       }
     }
@@ -6883,6 +7426,9 @@
   "@nowPlayingSleepTimerCancelled": {
     "description": "Confirmation after cancelling the playback sleep timer"
   },
+  "nowPlayingSleepTimerEndOfSong": "Akhir lagu",
+  "nowPlayingSleepTimerEndOfSongActive": "Berhenti setelah lagu ini",
+  "nowPlayingSleepTimerEndOfSongSet": "Pemutaran dijeda saat lagu ini selesai",
   "nowPlayingOpenInExternalPlayer": "Buka di pemutar eksternal",
   "nowPlayingHideVolume": "Sembunyikan volume",
   "nowPlayingShowVolume": "Tampilkan volume",
@@ -6960,6 +7506,16 @@
   "linkConnectionDisconnected": "Tidak terhubung",
   "linkThisPhone": "Ponsel ini",
   "linkPlayingOn": "Diputar di {name}",
+  "linkPlayTogether": "Putar bersama",
+  "linkPlayTogetherSubtitle": "Ponsel ini dan {name}",
+  "linkDesktopPlayTogetherSubtitle": "Komputer ini dan {name}",
+  "linkPlayTogetherTiming": "Waktu ponsel",
+  "linkPlayTogetherTimingValue": "{value} ms",
+  "linkPlayTogetherEarlier": "Lebih awal",
+  "linkPlayTogetherLater": "Lebih lambat",
+  "linkPlayTogetherTimingHint": "Geser lebih awal jika ponsel ini terdengar terlambat, seperti dengan Bluetooth",
+  "linkPlayTogetherFailed": "Tidak dapat memutar bersama {name}",
+  "linkPlayTogetherNeedsUpdate": "Perbarui Mornye di {name} untuk memutar bersama",
   "linkDesktopDownloads": "Download di {name}",
   "linkHandoffStarted": "Diputar di {name}",
   "linkHandoffSending": "Mengirim lagu ini ke {name}...",
@@ -6979,6 +7535,9 @@
   "linkSavedToPhone": "{count, plural, other{{count} lagu disimpan ke ponsel ini}}",
   "linkSaveToPhoneFailed": "{count, plural, other{{count} lagu tidak dapat disimpan}}",
   "linkSaveToPhoneCancelled": "Penyimpanan dihentikan",
+  "linkKeepOnPhone": "Simpan otomatis di ponsel ini",
+  "linkKeepOnPhoneStop": "Hentikan simpan otomatis",
+  "linkKeptOnPhone": "Tersimpan otomatis di ponsel ini",
   "linkTransferPhoneReceiving": "{count, plural, =1{Menyimpan {title} dari {name}} other{Menyimpan {count} lagu dari {name}}}",
   "linkTransferPhoneOffered": "{count, plural, =1{{name} mengirim {title} ke ponsel ini} other{{name} mengirim {count} lagu ke ponsel ini}}",
   "linkTransferPhoneView": "Lihat",
@@ -7124,6 +7683,30 @@
   "@trackConvertResampler": {
     "description": "Section label for lossless conversion resampler options"
   },
+  "trackConvertDitherSmart": "Smart",
+  "@trackConvertDitherSmart": {
+    "description": "Automatic dither option for lossless file conversion"
+  },
+  "trackConvertDitherSmartDescription": "Otomatis memakai dither hanya saat menurunkan bit depth.",
+  "@trackConvertDitherSmartDescription": {
+    "description": "Explains when Smart Dither adds dither during file conversion"
+  },
+  "downloadAutoConvertSmartDither": "Smart Dither",
+  "@downloadAutoConvertSmartDither": {
+    "description": "Toggle for automatic dither during FLAC download conversion"
+  },
+  "trackConvertDitherSmartType": "Jenis Smart Dither",
+  "@trackConvertDitherSmartType": {
+    "description": "Label of the choice between plain TPDF and high-pass TPDF for Smart Dither"
+  },
+  "trackConvertDitherPlainDescription": "Smart Dither memakai TPDF biasa, yang menyebarkan derau tambahan merata di semua frekuensi.",
+  "@trackConvertDitherPlainDescription": {
+    "description": "Explains the plain TPDF option of Smart Dither"
+  },
+  "trackConvertDitherHighPassDescription": "Smart Dither memakai TPDF high-pass, yang memindahkan derau tambahan ke frekuensi tinggi sehingga lebih sulit terdengar.",
+  "@trackConvertDitherHighPassDescription": {
+    "description": "Explains the high-pass option of Smart Dither"
+  },
   "trackConvertDitherNone": "Tidak Ada",
   "@trackConvertDitherNone": {
     "description": "Lossless conversion dither option with no dithering applied"
@@ -7132,7 +7715,7 @@
   "@trackConvertDitherTriangular": {
     "description": "Lossless conversion triangular probability density function dither option"
   },
-  "trackConvertDitherTriangularHp": "HP Triangular",
+  "trackConvertDitherTriangularHp": "TPDF HP",
   "@trackConvertDitherTriangularHp": {
     "description": "Lossless conversion high-pass triangular dither option"
   },
@@ -7143,6 +7726,64 @@
   "trackConvertResamplerSoxr": "SoXR",
   "@trackConvertResamplerSoxr": {
     "description": "Lossless conversion SoX resampler option"
+  },
+  "trackConvertResamplerQuality": "Kualitas",
+  "@trackConvertResamplerQuality": {
+    "description": "Title of the resampler quality slider in the convert sheet"
+  },
+  "trackConvertResamplerQualityFast": "Cepat",
+  "@trackConvertResamplerQualityFast": {
+    "description": "Lowest resampler quality level"
+  },
+  "trackConvertResamplerQualityMedium": "Sedang",
+  "@trackConvertResamplerQualityMedium": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityHigh": "Tinggi",
+  "@trackConvertResamplerQualityHigh": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityVeryHigh": "Sangat tinggi",
+  "@trackConvertResamplerQualityVeryHigh": {
+    "description": "Resampler quality level"
+  },
+  "trackConvertResamplerQualityBest": "Terbaik",
+  "@trackConvertResamplerQualityBest": {
+    "description": "Highest resampler quality level"
+  },
+  "trackConvertResamplerQualityDescription": "Tingkat yang lebih tinggi lebih akurat, tetapi konversinya lebih lama.",
+  "@trackConvertResamplerQualityDescription": {
+    "description": "Explains the resampler quality slider"
+  },
+  "trackConvertResamplerSwrDetail": "Filter {taps} tap",
+  "@trackConvertResamplerSwrDetail": {
+    "description": "What the chosen SWR quality level uses: the length of its filter",
+    "placeholders": {
+      "taps": {
+        "type": "int"
+      }
+    }
+  },
+  "trackConvertResamplerSoxrDetail": "Presisi {bits} bit",
+  "@trackConvertResamplerSoxrDetail": {
+    "description": "What the chosen SoXR quality level uses: its calculation precision",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      }
+    }
+  },
+  "trackConvertResamplerSoxrPresetDetail": "Presisi {bits} bit, SoX {preset}",
+  "@trackConvertResamplerSoxrPresetDetail": {
+    "description": "What the chosen SoXR quality level uses, with the SoX name of that preset (HQ or VHQ)",
+    "placeholders": {
+      "bits": {
+        "type": "int"
+      },
+      "preset": {
+        "type": "String"
+      }
+    }
   },
   "updateSeeReleaseNotes": "Lihat catatan yang baru untuk detail.",
   "@updateSeeReleaseNotes": {
@@ -7159,6 +7800,34 @@
   "trackAddToQueue": "Tambah ke antrean",
   "@trackAddToQueue": {
     "description": "Menu action to add a track to the playback queue"
+  },
+  "swipeToQueue": "Geser lagu ke antrean",
+  "@swipeToQueue": {
+    "description": "Library setting: a horizontal swipe on a song row plays it next or adds it to the queue"
+  },
+  "swipeToQueueSubtitle": "Geser lagu ke satu arah untuk memutarnya selanjutnya dan ke arah lain untuk menambahkannya ke antrean",
+  "@swipeToQueueSubtitle": {
+    "description": "Subtitle of the swipe songs to queue setting"
+  },
+  "librarySongTap": "Mengetuk lagu",
+  "@librarySongTap": {
+    "description": "Library setting choosing whether a tap on a song row plays it or opens its details"
+  },
+  "librarySongTapOpenDetails": "Buka detail",
+  "@librarySongTapOpenDetails": {
+    "description": "Choice of the tapping a song setting: a tap on the song opens its details. Name the action of the tap, not the button on the row. Keep it short: it shares one segmented control with the other choice"
+  },
+  "librarySongTapPlaySong": "Putar lagu",
+  "@librarySongTapPlaySong": {
+    "description": "Choice of the tapping a song setting: a tap on the song plays it. Name the action of the tap, not the button on the row. Keep it short: it shares one segmented control with the other choice"
+  },
+  "librarySongTapPlayDescription": "Ketuk untuk memutar lagu. Tombol di sampingnya membuka detailnya.",
+  "@librarySongTapPlayDescription": {
+    "description": "Description of the tapping a song setting while a tap plays"
+  },
+  "librarySongTapDetailsDescription": "Ketuk untuk membuka detail lagu. Tombol putar memutarnya.",
+  "@librarySongTapDetailsDescription": {
+    "description": "Description of the tapping a song setting while a tap opens the details"
   },
   "snackbarExtensionInstalledEnable": "{extensionName} terinstal. Hidupkan di Setelan > Ekstensi",
   "@snackbarExtensionInstalledEnable": {
@@ -7444,9 +8113,13 @@
   "@autoHideLyricsControls": {
     "description": "Playback switch that lets lyrics take more screen space after five idle seconds"
   },
-  "autoHideLyricsControlsDescription": "Sembunyikan kontrol player setelah 5 detik saat lirik terbuka. Nonaktifkan untuk mempertahankan tampilan saat ini",
+  "autoHideLyricsControlsDescription": "Sembunyikan kontrol player setelah 5 detik saat lirik terbuka. Nonaktifkan agar kontrol tetap terlihat saat tidak ada interaksi",
   "@autoHideLyricsControlsDescription": {
     "description": "Subtitle explaining the five-second Now Playing lyrics timeout"
+  },
+  "autoHideLyricsControlsAccessibilityDescription": "Kontrol tetap terlihat secara default saat aksesibilitas aktif. Aktifkan untuk menyembunyikannya setelah 5 detik saat lirik terbuka. Ketuk lirik untuk menampilkannya kembali",
+  "@autoHideLyricsControlsAccessibilityDescription": {
+    "description": "Explains that the fullscreen lyrics switch explicitly allows auto-hide with accessible navigation active"
   },
   "playerCoverStyleDefault": "Default",
   "@playerCoverStyleDefault": {
@@ -7491,7 +8164,11 @@
   "autoplayFromLibrary": "Autoplay dari Koleksi Anda",
   "autoplayDescription": "Lanjutkan dengan lagu terkait dari Koleksi saat antrean berakhir.",
   "autoplayPersonalization": "Autoplay personal",
-  "autoplayPersonalizationDescription": "Pelajari lagu yang kamu dengarkan dan lewati secara privat di perangkat ini. Mematikannya menghentikan pembelajaran dan mengembalikan autoplay biasa.",
+  "autoplayPersonalizationDescription": "Pelajari lagu yang kamu dengarkan dan lewati secara privat di perangkat ini. Mematikannya menghentikan pembelajaran preferensi. Analisis lagu dan pencegahan pengulangan tetap bekerja.",
+  "autoplayRandomness": "Keacakan Autoplay",
+  "autoplayRandomnessDescription": "Nilai rendah mengutamakan lagu serupa yang sudah lama tidak diputar atau disarankan. Nilai tinggi membuat pilihan lebih beragam. Bekerja dengan atau tanpa autoplay personal.",
+  "autoplayLeastRecent": "Paling lama tidak diputar",
+  "autoplayMoreRandom": "Lebih acak",
   "autoplayResetLearning": "Reset pembelajaran rekomendasi",
   "autoplayResetLearningConfirmTitle": "Reset pembelajaran rekomendasi?",
   "autoplayResetLearningConfirmMessage": "Autoplay akan melupakan apa yang dipelajari dari lagu yang kamu dengar dan lewati. Tindakan ini tidak bisa dibatalkan.",
@@ -7505,6 +8182,7 @@
   "songAnalysisOnlyWhileCharging": "Hanya saat mengisi daya",
   "songAnalysisOnlyWhileChargingDescription": "Analisis Koleksi hanya saat ponsel ini mengisi daya. Lagu yang sedang diputar tetap dianalisis.",
   "songAnalysisProgress": "{analyzed} dari {total} lagu telah dianalisis",
+  "songAnalysisProgressWithSkipped": "{analyzed} dari {total} lagu telah dianalisis; {skipped} dilewati (file hilang, tidak terbaca, atau tanpa suara)",
   "songAnalysisClear": "Hapus analisis lagu",
   "songAnalysisClearConfirmTitle": "Hapus analisis lagu?",
   "songAnalysisClearConfirmMessage": "Autoplay akan melupakan bunyi lagu-lagumu. Selama analisis lagu aktif, Koleksi akan dianalisis ulang.",
@@ -7519,6 +8197,90 @@
   "profileRemovePhoto": "Hapus foto",
   "profilePhotoError": "Pilih foto yang di bawah 20MB.",
   "profileSaveError": "Tidak dapat menyimpan profil Anda. Coba lagi.",
+  "profileEditAction": "Edit profil",
+  "profileNowPlaying": "Sedang diputar",
+  "profileListeningSince": "Mendengarkan sejak {date}",
+  "@profileListeningSince": {
+    "description": "Line under the profile name; date is the month and year of the first recorded listening, such as November 2026",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "profileHours": "{hours} jam",
+  "@profileHours": {
+    "description": "A listening time in hours; hours is an already formatted number such as 12.5 or 240",
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "profileAllTime": "Sepanjang waktu",
+  "profileStatListening": "Waktu mendengarkan",
+  "profileStatSongs": "Lagu diputar",
+  "profileStatArtists": "Artis diputar",
+  "profileStatActiveDays": "Hari mendengarkan",
+  "profileStatStreak": "Rentetan saat ini",
+  "profileDays": "{count} hari",
+  "@profileDays": {
+    "description": "A number of days, as the value of a streak or of the days with listening",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileLast30Days": "30 hari terakhir",
+  "profileTaste": "Selera musik",
+  "profileTasteNote": "Bagian dari waktu mendengarkan Anda, untuk lagu yang genrenya diketahui Koleksi.",
+  "profileTasteEmpty": "Lagu yang Anda putar belum punya genre di Koleksi.",
+  "profileTasteMostly": "Kebanyakan {genre}",
+  "@profileTasteMostly": {
+    "description": "Line under the profile name when one genre takes at least half of the listening time",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTasteMostlyWith": "Kebanyakan {genre}, dengan {others}",
+  "@profileTasteMostlyWith": {
+    "description": "Line under the profile name when one genre takes at least half of the listening time; others is one or two more genres, such as Rock, Jazz",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      },
+      "others": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTasteMix": "Campuran {genres}",
+  "@profileTasteMix": {
+    "description": "Line under the profile name when no genre takes half of the listening time; genres is two or three genres, such as Pop, Rock, Jazz",
+    "placeholders": {
+      "genres": {
+        "type": "String"
+      }
+    }
+  },
+  "profileHabits": "Kebiasaan mendengarkan",
+  "profileAverageDay": "Pada hari mendengarkan",
+  "profileTopAlbums": "Album teratas",
+  "profileCollection": "Koleksi Anda",
+  "profileListeningOff": "Catat waktu mendengarkan sedang mati, jadi kebiasaan mendengarkan Anda tidak ditampilkan di sini.",
+  "profileWeekdayChart": "Waktu mendengarkan per hari dalam seminggu, terbanyak pada {day}",
+  "@profileWeekdayChart": {
+    "description": "Screen reader description of the chart of listening time per weekday; day is a weekday name such as Saturday",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "profileRecentChart": "Waktu mendengarkan pada tiap hari dalam 30 hari terakhir",
   "homeGreetingMorning1": "Selamat pagi",
   "homeGreetingMorning2": "Pagi yang cerah",
   "homeGreetingMorning3": "Awali harimu",
@@ -7567,9 +8329,25 @@
   "@homeOnRepeat": {
     "description": "Home section header for the most played tracks of the last four weeks"
   },
+  "homeFromYourLibrary": "Dari Koleksimu",
+  "@homeFromYourLibrary": {
+    "description": "Home section header for the day's albums from the Library, shown in On repeat's place while listening is not recorded"
+  },
   "homeShortcuts": "Pintasan",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
+  },
+  "homeShortcutChange": "Ganti pintasan",
+  "@homeShortcutChange": {
+    "description": "Menu item and sheet title for replacing one Home shortcut with another"
+  },
+  "homeShortcutChangeSubtitle": "Pintasan yang sudah ada di Beranda bertukar tempat dengan yang ini",
+  "@homeShortcutChangeSubtitle": {
+    "description": "Subtitle of the sheet that replaces a Home shortcut"
+  },
+  "homeShortcutsReset": "Atur ulang pintasan",
+  "@homeShortcutsReset": {
+    "description": "Menu item that restores the default Home shortcuts"
   },
   "artistUpcomingConcerts": "Konser Mendatang",
   "artistAllUpcomingConcerts": "Semua Konser Mendatang",
@@ -7872,8 +8650,14 @@
     "description": "Shown after mute automation pauses playback; another explicit play request can override the pause."
   },
   "playbackPauseOnMuteDescription": "Jeda saat volume media nol dan lanjutkan saat dinaikkan. Jeda manual tetap dihormati. Hanya untuk keluaran audio standar.",
-  "playbackOnHeadphonesConnected": "Putar saat earphone terhubung",
-  "playbackOnHeadphonesConnectedDescription": "Lanjutkan lagu saat earphone kabel atau Bluetooth terhubung. Pemutaran dijeda saat dilepas. Hanya untuk pemutar bawaan.",
+  "playbackOnHeadphonesConnected": "Putar saat earphone atau mobil terhubung",
+  "playbackOnHeadphonesConnectedDescription": "Lanjutkan lagu saat earphone kabel atau Bluetooth, atau mobil lewat Bluetooth, terhubung. Pemutaran dijeda saat dilepas. Hanya untuk pemutar bawaan.",
+  "playbackResumeOnReconnectDescription": "Jika earphone, mobil, atau perangkat Bluetooth lain terputus saat musik diputar, pemutaran berlanjut saat perangkat terhubung lagi dalam 30 menit. Lagu yang Anda jeda tetap dijeda. Hanya untuk pemutar bawaan.",
+  "playbackHeadphonesOff": "Mati",
+  "playbackHeadphonesAfterDisconnect": "Sambung lagi",
+  "playbackHeadphonesAlways": "Selalu",
+  "playbackHeadphonesOffDescription": "Menghubungkan earphone atau mobil tidak memulai pemutaran.",
+  "playbackHeadphonesChoices": "Mati, setelah terputus, atau setiap kali earphone atau mobil terhubung.",
   "appearanceCustomFont": "Font kustom",
   "appearanceCustomFontSubtitle": "Impor file TTF atau OTF (maksimal 10 MB). Menggantikan font tema dan sistem.",
   "appearanceCustomFontInvalid": "Font tidak dapat dimuat. Pilih file TTF atau OTF yang valid, maksimal 10 MB.",
@@ -8033,6 +8817,12 @@
   "audioInfoBitPerfect": "Bit-perfect",
   "audioInfoBitPerfectActive": "Ya, sampel tidak diubah",
   "audioInfoBitPerfectNo": "Tidak, dicampur oleh sistem",
+  "audioInfoBitPerfectNoIos": "Tidak, iOS mencampur semua audio aplikasi",
+  "@audioInfoBitPerfectNoIos": {
+    "description": "Audio info sheet, Bit-perfect row on iPhone and iPad: iOS sends every app's sound through its mixer, so no setting can make playback bit-perfect"
+  },
+  "audioInfoBitPerfectLossy": "Tidak, di-decode dari sumber lossy",
+  "audioInfoBitPerfectResampled": "Tidak, di-resample ke rate yang diterima DAC",
   "audioInfoDevice": "Perangkat",
   "audioInfoDeviceType": "{type, select, speaker{Speaker ponsel} earpiece{Speaker telepon} wired_headphones{Headphone kabel} wired_headset{Headset kabel} line{Line out} bluetooth{Bluetooth} bluetooth_le{Bluetooth LE Audio} usb{Audio USB} usb_headset{Headset USB} hdmi{HDMI} dock{Dock} cast{Cast} hearing_aid{Alat bantu dengar} airplay{AirPlay} car{Audio mobil} other{Lainnya}}",
   "@audioInfoDeviceType": {
@@ -8050,6 +8840,62 @@
   "audioInfoBluetoothUnavailableHint": "Android dapat menampilkan codec aktif di pengaturan Bluetooth tanpa menyediakan informasinya ke Mornye. Codec ini terpisah dari format file lagu.",
   "audioAnalysisFileBitrate": "Bitrate file rata-rata",
   "audioAnalysisFileBitrateHint": "Termasuk tag dan overhead container. Nilainya dapat berbeda dari bitrate stream audio dan bukan bitrate Bluetooth.",
+  "audioCompareAction": "Bandingkan dengan file lain",
+  "audioCompareActionHint": "Null test: menyejajarkan versi lain lagu ini dan menunjukkan perbedaannya.",
+  "audioCompareUnavailable": "Membandingkan dengan file lain memerlukan pemilih file, yang tidak tersedia di perangkat ini.",
+  "audioComparePickTitle": "Pilih file untuk dibandingkan",
+  "audioCompareSameFile": "Itu file yang sama. Pilih versi lain dari lagu ini.",
+  "audioCompareTitle": "Bandingkan file",
+  "audioCompareStagePreparing": "Membaca kedua file",
+  "audioCompareStageAligning": "Menyejajarkan file",
+  "audioCompareStageMeasuring": "Mengukur perbedaan",
+  "audioCompareStageSpectrogram": "Menggambar perbedaan",
+  "audioCompareStepLabel": "Langkah {step} dari {total}",
+  "audioCompareErrorUnreadable": "{file} tidak dapat dibaca sebagai audio.",
+  "audioCompareErrorTooShort": "Kedua file memerlukan audio minimal dua detik.",
+  "audioCompareErrorDecode": "Salah satu file tidak dapat didekode.",
+  "audioCompareErrorGeneric": "Perbandingan gagal: {error}",
+  "audioCompareLevelIdentical": "File identik: audionya saling meniadakan sepenuhnya.",
+  "audioCompareLevelNearlyIdentical": "File berisi audio yang sama, hanya berbeda jauh di bawah batas pendengaran.",
+  "audioCompareLevelMostlyIdentical": "File berisi audio yang sama dengan sedikit perbedaan, seperti resampling atau dither.",
+  "audioCompareLevelModerate": "File berasal dari sumber yang sama tetapi jelas berbeda, seperti akibat encoding lossy atau filter.",
+  "audioCompareLevelLarge": "File sangat berbeda, seperti remaster atau mix yang lain.",
+  "audioCompareBandHigh": "Sebagian besar perbedaan ada di frekuensi tinggi.",
+  "audioCompareBandLow": "Sebagian besar perbedaan ada di bawah 8 kHz.",
+  "audioCompareBandBroadband": "Perbedaannya tersebar di seluruh rentang.",
+  "audioComparePeak": "Perbedaan terbesar di {time}: {level}",
+  "audioCompareNoticeTitle": "Perbandingan ini mungkin kurang bermakna",
+  "audioCompareNoticeWeakAlignment": "File tidak dapat disejajarkan dengan yakin, jadi mungkin bukan rekaman yang sama.",
+  "audioCompareNoticeResidualHigh": "Perbedaannya tetap sekeras musiknya sepanjang lagu, jadi kemungkinan ini rekaman atau mix yang berbeda.",
+  "audioCompareNoticeDrift": "Waktunya bergeser {ms} ms antara awal dan bagian akhir lagu, jadi salah satu file diputar dengan kecepatan sedikit berbeda.",
+  "audioCompareNoticeDuration": "Panjangnya berbeda {seconds} dtk, jadi salah satu file memiliki audio tambahan atau yang hilang.",
+  "audioCompareNoticeFooter": "Angka di bawah ditampilkan apa adanya.",
+  "audioCompareTimelineTitle": "Perbedaan sepanjang waktu",
+  "audioCompareTimelineHint": "Ketuk atau geser pada grafik untuk membaca satu momen.",
+  "audioCompareTimelineCaption": "Level perbedaan relatif terhadap musik, dalam dB. Makin rendah makin mirip; -120 dB berarti file saling meniadakan.",
+  "audioComparePlayFromHere": "Putar dari sini",
+  "audioCompareChannelBoth": "Keduanya",
+  "audioCompareChannelLeft": "Kiri",
+  "audioCompareChannelRight": "Kanan",
+  "audioCompareSummaryTitle": "Ringkasan",
+  "audioCompareReference": "Lagu ini",
+  "audioCompareOther": "File pembanding",
+  "audioCompareOffset": "Offset",
+  "audioCompareOffsetValue": "{samples} sampel ({ms} md)",
+  "audioCompareOffsetLater": "Audio dimulai selambat ini di file pembanding.",
+  "audioCompareOffsetEarlier": "Audio dimulai secepat ini di file pembanding.",
+  "audioCompareGain": "Penyesuaian level",
+  "audioCompareGainDetail": "Diterapkan ke file pembanding sebelum dikurangkan.",
+  "audioCompareGainInverted": "Diterapkan ke file pembanding sebelum dikurangkan. Polaritasnya terbalik.",
+  "audioCompareOverall": "Perbedaan keseluruhan",
+  "audioCompareOverallDetail": "Energi perbedaan relatif terhadap musik sepanjang lagu.",
+  "audioCompareMatch": "Kecocokan penyejajaran",
+  "audioCompareNoteResampled": "File dibandingkan pada {rate}; salah satunya di-resample, yang menambah sedikit perbedaan tersendiri.",
+  "audioCompareNoteChannels": "Tata letak channel file berbeda dan dicampur menjadi sama.",
+  "audioCompareSpectrogramTitle": "Spektrogram perbedaan",
+  "audioCompareSpectrogramCaption": "Sisa setelah file saling dikurangkan. Gelap berarti saling meniadakan.",
+  "audioCompareExplainTitle": "Apa itu null test?",
+  "audioCompareExplainBody": "Null test menyejajarkan dua versi lagu, menyamakan levelnya, lalu mengurangkan satu dari yang lain. Sisanya adalah perbedaan di antara keduanya. Audio yang identik meniadakan menjadi hening. Encoding lossy menyisakan residu pelan, sebagian besar di frekuensi tinggi. Master atau mix yang berbeda menyisakan hampir seluruh musiknya. Residu kecil tidak berarti terdengar, dan file bisa terdengar sama meski hasil ukurnya berbeda.",
   "audioInfoSystemDefaultRate": "Sample rate default sistem",
   "audioInfoAndroidPcmRates": "Sample rate PCM Android",
   "audioInfoAndroidPcmFormats": "Format PCM Android",
@@ -8079,6 +8925,9 @@
   "lyricsOffsetNone": "Sinkron",
   "lyricsOffsetLater": "{seconds} dtk lebih lambat",
   "lyricsOffsetEarlier": "{seconds} dtk lebih cepat",
+  "lyricsOffsetThisSong": "Lagu ini",
+  "lyricsOffsetAllSongs": "Semua lagu",
+  "lyricsOffsetOptions": "Opsi lirik",
   "appCrashTitle": "Aplikasi sebelumnya mengalami crash",
   "appAnrTitle": "Aplikasi sebelumnya berhenti merespons",
   "@appAnrTitle": {
@@ -8248,6 +9097,8 @@
   "libraryFoldersEmptyMessage": "Unduh lagu atau tambahkan folder musik di setelan Koleksi Lokal untuk menjelajahinya per folder.",
   "libraryFolderMissing": "Folder ini tidak ada lagi di Koleksi",
   "libraryFoldersLoadFailed": "Tidak dapat membaca folder",
+  "libraryGenres": "Genre",
+  "libraryGenresEmpty": "Genre muncul di sini setelah lagu yang kamu unduh atau pindai memiliki tag genre.",
   "linkDesktopSettingsTitle": "Mornye di ponsel",
   "linkDesktopSettingsSubtitle": "Putar Library dan kendalikan pemutaran dari ponsel",
   "linkDesktopEnableTitle": "Bagikan ke Mornye di ponsel",
@@ -8312,41 +9163,48 @@
   "linkTransferDesktopView": "Lihat",
   "linkTransferDesktopNothingToSend": "Lagu-lagu ini tidak bisa dikirim sekarang",
   "linkTransferDesktopNothingToSave": "Lagu-lagu ini tidak bisa disimpan sekarang",
-  "linkSettingsTitle": "Mornye di komputer Anda",
-  "linkSettingsSubtitle": "Putar dan kendalikan pustaka komputer Anda",
-  "linkPageTitle": "Komputer",
-  "linkPageDescription": "Pasangkan dengan Mornye di komputer Anda untuk memutar pustakanya di ponsel ini dan mengendalikan yang diputarnya. Kedua perangkat harus berada di jaringan yang sama.",
-  "linkPairedSection": "Komputer terpasang",
+  "linkSettingsTitle": "Mornye di perangkat lain",
+  "linkSettingsSubtitle": "Putar dan kendalikan pustaka komputer atau ponsel lain",
+  "linkPageTitle": "Perangkat",
+  "linkPageDescription": "Pasangkan dengan Mornye di komputer atau ponsel lain untuk memutar pustakanya di ponsel ini dan mengendalikan yang diputarnya. Kedua perangkat harus berada di jaringan yang sama.",
+  "linkPairedSection": "Perangkat terpasang",
   "linkPhoneSection": "Ponsel ini",
-  "linkShareSongsTitle": "Tampilkan lagu di komputer",
-  "linkShareSongsSubtitle": "Lagu di ponsel ini muncul di Library komputer dan bisa diputar di sana selama ponsel ini terhubung",
-  "linkFollowDesktopTitle": "Ikuti pemutaran komputer",
-  "linkFollowDesktopSubtitle": "Saat komputer mulai memutar, ponsel ini menampilkan dan mengendalikannya",
+  "linkShareSongsTitle": "Tampilkan lagu di perangkat lain",
+  "linkShareSongsSubtitle": "Lagu di ponsel ini muncul di Library perangkat lain dan bisa diputar di sana selama ponsel ini terhubung",
+  "linkShowComputerSongsTitle": "Tampilkan lagu dari perangkat terpasang",
+  "linkShowComputerSongsSubtitle": "Sembunyikan lagu dari perangkat terpasang tanpa memutus Mornye Link. Lagu yang disimpan di ponsel ini tetap ada di Library.",
+  "linkFollowDesktopTitle": "Ikuti pemutaran perangkat lain",
+  "linkFollowDesktopSubtitle": "Saat perangkat lain mulai memutar, ponsel ini menampilkan dan mengendalikannya",
+  "linkHideDisconnectedTitle": "Sembunyikan lagu saat tidak terhubung",
+  "linkHideDisconnectedSubtitle": "Lagu dari perangkat terpasang hilang dari Library selama perangkat itu tidak terhubung dan kembali saat terhubung lagi",
+  "linkSyncSoundTitle": "Sinkronkan pengaturan suara",
+  "linkSyncSoundSubtitle": "Preset equalizer, tingkat normalisasi kenyaringan, dan transisi mix tetap sama di ponsel ini dan perangkat lain",
   "linkNearbySection": "Di jaringan ini",
-  "linkSearching": "Mencari komputer...",
-  "linkNoneFoundTitle": "Tidak ada komputer ditemukan",
-  "linkNoneFound": "Buka Mornye di komputer Anda dan aktifkan Bagikan dengan Mornye di ponsel Anda di pengaturannya.",
+  "linkSearching": "Mencari perangkat...",
+  "linkNoneFoundTitle": "Tidak ada perangkat ditemukan",
+  "linkNoneFound": "Buka Mornye di komputer Anda dan aktifkan Bagikan dengan Mornye di ponsel Anda di pengaturannya, atau aktifkan Bagikan ke ponsel lain di ponsel lain.",
   "linkAddManually": "Tambah lewat alamat",
-  "linkManualHost": "Alamat komputer",
+  "linkManualHost": "Alamat perangkat",
   "linkManualPort": "Port",
-  "linkManualMessage": "Mornye di komputer Anda menampilkan alamat dan port di tempat Anda mengaktifkan berbagi.",
+  "linkManualMessage": "Mornye di perangkat lain menampilkan alamat dan port di tempat Anda mengaktifkan berbagi.",
   "linkContinue": "Lanjutkan",
   "linkStateConnected": "Terhubung",
   "linkStateConnecting": "Menghubungkan...",
   "linkStateDisconnected": "Tidak terhubung",
-  "linkStateInactive": "Ketuk untuk memakai komputer ini",
+  "linkStateInactive": "Ketuk untuk memakai perangkat ini",
   "linkActive": "Dipakai",
   "linkForget": "Lupakan",
   "linkForgetTitle": "Lupakan {name}?",
   "linkForgetMessage": "Ponsel ini berhenti terhubung ke komputer tersebut. Anda dapat memasangkannya lagi nanti.",
   "linkForgetRemoveLibrary": "Hapus juga musiknya dari Pustaka",
   "linkPinTitle": "Pasangkan dengan {name}",
-  "linkPinMessage": "Masukkan PIN 6 digit yang tampil di komputer Anda.",
+  "linkPinMessage": "Masukkan PIN 6 digit yang tampil di perangkat lain.",
   "linkPinField": "PIN",
-  "linkPinCode": "Komputer Anda menampilkan kode {code} di samping PIN. Pasangkan hanya jika kodenya sama.",
-  "linkPinNotOpen": "Pemasangan belum dibuka. Mulai pemasangan di Mornye pada komputer Anda untuk menampilkan PIN.",
+  "linkPinCode": "Perangkat lain menampilkan kode {code} di samping PIN. Pasangkan hanya jika kodenya sama.",
+  "linkPinNotOpen": "Pemasangan belum dibuka. Mulai pemasangan di Mornye pada perangkat lain untuk menampilkan PIN.",
   "linkPair": "Pasangkan",
   "linkPaired": "Terpasang dengan {name}. Musiknya sedang ditambahkan ke Pustaka.",
+  "linkPairedWithoutLibrary": "Terpasang dengan {name}. Lagunya tetap disembunyikan dari Pustaka.",
   "linkPairAgain": "Pasangkan lagi",
   "linkTransfersTitle": "Transfer",
   "linkTransfersInProgress": "Sedang berjalan",
@@ -8382,24 +9240,33 @@
   "linkTransfersStop": "Hentikan transfer",
   "linkTransfersActiveCount": "{count, plural, other{{count} transfer}}",
   "linkTransfersFinishedCount": "{count, plural, other{{count} transfer selesai}}",
-  "linkErrorBadPin": "PIN tersebut salah. Periksa PIN di komputer Anda dan coba lagi.",
-  "linkErrorPairingClosed": "Pemasangan tidak dibuka di komputer Anda. Mulai pemasangan di sana, lalu coba lagi.",
+  "linkErrorBadPin": "PIN tersebut salah. Periksa PIN di perangkat lain dan coba lagi.",
+  "linkErrorPairingClosed": "Pemasangan tidak dibuka di perangkat lain. Mulai pemasangan di sana, lalu coba lagi.",
   "linkErrorTooManyAttempts": "Terlalu banyak percobaan. Tunggu sebentar, lalu coba lagi.",
-  "linkErrorCertificateTitle": "Komputer tidak terverifikasi",
-  "linkErrorCertificate": "Sertifikat keamanan komputer tidak cocok dengan yang dilaporkannya. Seseorang di jaringan ini mungkin menyadap koneksi, jadi pemasangan dihentikan.",
-  "linkErrorIncompatible": "Komputer ini menjalankan versi Mornye yang tidak dapat dipasangkan dengan ponsel ini. Perbarui Mornye di kedua perangkat.",
-  "linkErrorUnreachable": "Komputer tidak dapat dijangkau. Pastikan Mornye terbuka di komputer dan kedua perangkat berada di jaringan yang sama.",
-  "linkErrorTimeout": "Komputer tidak menjawab tepat waktu. Coba lagi.",
+  "linkErrorCertificateTitle": "Perangkat tidak terverifikasi",
+  "linkErrorCertificate": "Sertifikat keamanan perangkat tidak cocok dengan yang dilaporkannya. Seseorang di jaringan ini mungkin menyadap koneksi, jadi pemasangan dihentikan.",
+  "linkErrorIncompatible": "Perangkat itu menjalankan versi Mornye yang tidak dapat dipasangkan dengan ponsel ini. Perbarui Mornye di kedua perangkat.",
+  "linkErrorUnreachable": "Perangkat tidak dapat dijangkau. Pastikan Mornye terbuka di sana dan kedua perangkat berada di jaringan yang sama.",
+  "linkErrorTimeout": "Perangkat tidak menjawab tepat waktu. Coba lagi.",
   "linkErrorInvalidAddress": "Masukkan alamat dan port yang valid, misalnya 192.168.1.20 dan 47710.",
   "linkErrorFailed": "Pemasangan gagal. Coba lagi.",
   "linkLocalNetworkTitle": "Perlu akses jaringan lokal",
-  "linkLocalNetworkMessage": "Mornye memerlukan akses jaringan lokal untuk menemukan komputer Anda dan terhubung ke sana.",
+  "linkLocalNetworkMessage": "Mornye memerlukan akses jaringan lokal untuk menemukan perangkat Anda yang lain dan terhubung ke sana.",
   "linkLocalNetworkAllow": "Izinkan akses",
   "linkWifiOffTitle": "Tidak terhubung ke Wi-Fi",
-  "linkWifiOffMessage": "Hubungkan ponsel ini ke jaringan Wi-Fi yang sama dengan komputer Anda.",
+  "linkWifiOffMessage": "Hubungkan ponsel ini ke jaringan Wi-Fi yang sama dengan perangkat lain.",
   "linkIssueUnauthorized": "{name} tidak lagi menerima ponsel ini. Pasangkan lagi untuk terhubung kembali.",
-  "linkIssueCertificate": "{name} menampilkan sertifikat keamanan yang berbeda. Pasangkan lagi hanya jika Anda memasang ulang atau mengatur ulang Mornye di komputer tersebut.",
+  "linkIssueCertificate": "{name} menampilkan sertifikat keamanan yang berbeda. Pasangkan lagi hanya jika Anda memasang ulang atau mengatur ulang Mornye di perangkat tersebut.",
   "linkIssueIncompatible": "Perbarui Mornye di ponsel ini dan di {name} untuk terhubung.",
+  "linkPhoneHostSection": "Bagikan ponsel ini",
+  "linkPhoneHostTitle": "Bagikan ke ponsel lain",
+  "linkPhoneHostSubtitle": "Ponsel lain dapat menjelajah dan memutar lagu Anda selama Mornye terbuka atau memutar musik",
+  "linkPhoneHostNameHint": "Ponsel lain menampilkan nama ini saat menemukan ponsel ini",
+  "linkPhoneHostSecurityCodeHint": "Ponsel lain menampilkan kode yang sama saat dipasangkan",
+  "linkPhoneHostPairSubtitle": "Tampilkan kode untuk dimasukkan di ponsel lain",
+  "linkPhoneHostPairInstructions": "Buka Mornye di ponsel lain, pilih ponsel ini, lalu masukkan kode ini.",
+  "linkPhoneHostPairCheckCode": "Pastikan ponsel lain menampilkan kode keamanan {code}.",
+  "linkPhoneHostRevokeMessage": "Perangkat ini harus dipasangkan lagi sebelum dapat terhubung ke ponsel ini.",
   "playlistEditOrder": "Ubah urutan",
   "playlistEditOrderDescription": "Seret lagu lewat pegangannya, atau sentuh lama, untuk memindahkannya.",
   "playlistEditOrderSaved": "Urutan playlist disimpan",
@@ -8415,6 +9282,9 @@
   "playlistFolderPickerTitle": "Pilih folder",
   "playlistFolderPickerEmptyTitle": "Belum ada folder",
   "playlistFolderPickerEmpty": "Belum ada lagu yang dipindai. Tambahkan folder Koleksi lalu pindai terlebih dahulu.",
+  "playlistBrowseFolder": "Jelajahi folder…",
+  "playlistBrowseFolderSubtitle": "Termasuk semua subfolder di dalamnya",
+  "playlistBrowseFolderNoTracks": "Belum ada lagu dari folder itu di Koleksi Anda. Tambahkan sebagai folder Koleksi lalu pindai terlebih dahulu.",
   "playlistCreatedWithTracks": "{name} dibuat dengan {count, plural, =1{1 lagu} other{{count} lagu}}",
   "playlistImportResult": "{count, plural, =1{1 lagu} other{{count} lagu}} diimpor ke {name}, {matched} cocok dengan file di perangkat ini",
   "playlistImportNoTracks": "Tidak ada lagu di file ini",
@@ -8423,7 +9293,7 @@
   "lastfmConnect": "Hubungkan Last.fm",
   "lastfmConnecting": "Menghubungkan ke Last.fm...",
   "lastfmFinishConnection": "Selesaikan koneksi",
-  "lastfmAuthorizeHelp": "Izinkan akses di browser, lalu kembali ke sini dan pilih Selesaikan koneksi.",
+  "lastfmAuthorizeHelp": "Izinkan akses di browser, lalu kembali ke Mornye. Jika belum tersambung sendiri, pilih Selesaikan koneksi.",
   "lastfmScrobbling": "Scrobbling",
   "lastfmScrobblingDescription": "Kirim lagu yang Anda dengarkan lewat pemutar bawaan ke Last.fm.",
   "lastfmNowPlaying": "Tampilkan lagu yang diputar",
@@ -8437,6 +9307,27 @@
   "lastfmUnavailable": "Last.fm tidak tersedia pada build ini.",
   "lastfmRejected": "Last.fm menolak scrobble. Periksa tag judul dan artis lagu tersebut.",
   "lastfmPending": "{count, plural, =1{1 scrobble menunggu sinkronisasi} other{{count} scrobble menunggu sinkronisasi}}",
+  "scrobbleServiceDescription": "Catat aktivitas mendengarkan dan tampilkan lagu yang diputar di {service}.",
+  "scrobbleServiceConnect": "Hubungkan {service}",
+  "scrobbleServiceConnecting": "Menghubungkan ke {service}...",
+  "scrobbleServiceScrobblingDescription": "Kirim lagu yang Anda dengarkan lewat pemutar bawaan ke {service}.",
+  "scrobbleServiceNowPlayingDescription": "Tampilkan lagu saat ini di profil {service} Anda.",
+  "scrobbleServiceDisconnect": "Putuskan {service}",
+  "scrobbleServiceConnectionError": "{service} tidak dapat dihubungi. Scrobble yang tersimpan akan dikirim ulang secara otomatis.",
+  "scrobbleServiceStorageError": "Pengaturan {service} tidak dapat disimpan. Periksa akses penyimpanan aman perangkat ini lalu coba lagi.",
+  "scrobbleServiceReauthenticate": "Koneksi {service} Anda kedaluwarsa. Hubungkan kembali untuk melanjutkan scrobbling.",
+  "scrobbleServiceUnavailable": "{service} sedang tidak menerima scrobble dari Mornye.",
+  "scrobbleServiceRejected": "{service} menolak scrobble. Periksa tag judul dan artis lagu tersebut.",
+  "listenBrainzConnectHelp": "Tempel token pengguna dari halaman pengaturan ListenBrainz Anda.",
+  "listenBrainzToken": "Token pengguna",
+  "listenBrainzOpenSettings": "Buka pengaturan ListenBrainz",
+  "listenBrainzServer": "Alamat server (opsional)",
+  "listenBrainzServerHelp": "Kosongkan untuk memakai ListenBrainz, atau masukkan alamat server yang kompatibel.",
+  "listenBrainzServerInvalid": "Masukkan alamat yang diawali http:// atau https://.",
+  "listenBrainzServerInsecure": "Gunakan alamat https://. http:// biasa hanya bisa dipakai untuk server di perangkat ini atau jaringan lokal Anda.",
+  "listenBrainzServerSubtitle": "Server: {server}",
+  "listenBrainzInvalidToken": "Token ini tidak diterima. Periksa lalu coba lagi.",
+  "listenBrainzReauthenticate": "Token ListenBrainz Anda tidak berlaku lagi. Hubungkan kembali dengan token baru untuk melanjutkan scrobbling.",
   "audioOutputSystem": "Perangkat ini dan Bluetooth",
   "audioOutputCast": "Cast ke TV",
   "audioOutputCastDescription": "Perangkat Google Cast di jaringan Wi-Fi yang sama",

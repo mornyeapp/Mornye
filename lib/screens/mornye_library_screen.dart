@@ -1,14 +1,17 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/library_browse_provider.dart';
+import 'package:mornye/providers/library_genres_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/downloaded_album_screen.dart';
+import 'package:mornye/screens/library_artist_screen.dart';
 import 'package:mornye/screens/library_directory_screen.dart';
+import 'package:mornye/screens/library_mix_screen.dart';
 import 'package:mornye/screens/listening_rewind_screen.dart';
 import 'package:mornye/screens/local_album_screen.dart';
 import 'package:mornye/services/album_completeness.dart';
@@ -26,12 +29,13 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/hover_play_button.dart';
+import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/library_search_results.dart';
 import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
-enum MornyeLibraryPage { overview, albums, artists }
+enum MornyeLibraryPage { overview, albums, artists, genres }
 
 class MornyeLibraryScreen extends ConsumerStatefulWidget {
   const MornyeLibraryScreen({
@@ -39,11 +43,15 @@ class MornyeLibraryScreen extends ConsumerStatefulWidget {
     required this.onOpenSection,
     this.page = MornyeLibraryPage.overview,
     this.artist,
+    this.toolbar,
   });
 
   final ValueChanged<String> onOpenSection;
   final MornyeLibraryPage page;
   final String? artist;
+
+  /// Shown above the albums of [artist] in place of the Artist Page link.
+  final Widget? toolbar;
 
   @override
   ConsumerState<MornyeLibraryScreen> createState() =>
@@ -63,6 +71,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
 
   bool get _overview => widget.page == MornyeLibraryPage.overview;
   bool get _artists => widget.page == MornyeLibraryPage.artists;
+  bool get _genres => widget.page == MornyeLibraryPage.genres;
   LibraryBrowseRequest get _request => (
     artists: _artists,
     artist: widget.artist,
@@ -75,10 +84,16 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
   @override
   void initState() {
     super.initState();
-    _sort = _overview ? 'latest' : 'a-z';
+    _sort = _overview
+        ? 'latest'
+        : _artists || _genres
+        ? 'a-z'
+        : ref.read(settingsProvider).libraryAlbumSortMode;
     _scroll.addListener(() {
+      // Genres arrive in one read.
       if (_scroll.position.extentAfter < 500 &&
           !_loading &&
+          !_genres &&
           !(_overview && _query.isNotEmpty)) {
         unawaited(
           ref.read(libraryBrowseProvider(_request).notifier).loadMore(),
@@ -106,16 +121,35 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
     });
   }
 
-  void _openPage(MornyeLibraryPage page, {String? artist}) {
+  void _openPage(MornyeLibraryPage page) {
     pushPage<void>(
       context,
       (_) => Scaffold(
         body: MornyeLibraryScreen(
           page: page,
-          artist: artist,
           onOpenSection: widget.onOpenSection,
         ),
       ),
+    );
+  }
+
+  void _openArtist(String artist) =>
+      pushPage<void>(context, (_) => LibraryArtistScreen(artist: artist));
+
+  /// The Library's genres whose name holds the search text.
+  LibraryBrowseState _genreRows(List<LibraryBrowseEntry> genres) {
+    final query = LibraryDatabase.normalizeLookupText(_query);
+    return LibraryBrowseState(
+      query.isEmpty
+          ? genres
+          : [
+              for (final genre in genres)
+                if (LibraryDatabase.normalizeLookupText(
+                  genre.name,
+                ).contains(query))
+                  genre,
+            ],
+      hasMore: false,
     );
   }
 
@@ -191,6 +225,16 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
       ('latest', context.l10n.libraryRecentlyAdded, Icons.schedule),
       if (!_artists) ...[
         (
+          'year-asc',
+          context.l10n.libraryFilterSortYearAsc,
+          Icons.event_outlined,
+        ),
+        (
+          'year-desc',
+          context.l10n.libraryFilterSortYearDesc,
+          Icons.event_outlined,
+        ),
+        (
           'size-desc',
           context.l10n.libraryFilterSortSizeLargest,
           Icons.storage_outlined,
@@ -223,6 +267,9 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
               ),
             ));
     if (!mounted || selected == null || selected == _sort) return;
+    if (!_artists && !_overview) {
+      ref.read(settingsProvider.notifier).setLibraryAlbumSortMode(selected);
+    }
     setState(() {
       _sort = selected;
       _rows = const [];
@@ -313,15 +360,22 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
     final listInset = wideListInset(context);
     final result = searchingLibrary
         ? const AsyncData(LibraryBrowseState([], hasMore: false))
+        : _genres
+        ? ref.watch(libraryGenresProvider).whenData(_genreRows)
         : ref.watch(libraryBrowseProvider(_request));
     _loading = result.isLoading || (result.value?.isLoadingMore ?? false);
     if (result.hasValue) _rows = result.requireValue.entries;
+    void reload() => _genres
+        ? ref.invalidate(libraryGenresProvider)
+        : ref.invalidate(libraryBrowseProvider(_request));
     final title =
         widget.artist ??
         (_overview
             ? context.l10n.navLibrary
             : _artists
             ? context.l10n.searchArtists
+            : _genres
+            ? context.l10n.libraryGenres
             : context.l10n.searchAlbums);
     final actions = <Widget>[
       if (_overview) const OpenAudioButton(),
@@ -349,7 +403,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
             );
           },
         )
-      else if (!_artists) ...[
+      else if (!_artists && !_genres) ...[
         Builder(
           builder: (buttonContext) => IconButton(
             tooltip: context.l10n.searchSortTitle,
@@ -372,8 +426,10 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
     return AppRefreshIndicator(
       onRefresh: () async {
         if (searchingLibrary) return;
-        ref.invalidate(libraryBrowseProvider(_request));
-        await ref.read(libraryBrowseProvider(_request).future);
+        reload();
+        await (_genres
+            ? ref.read(libraryGenresProvider.future)
+            : ref.read(libraryBrowseProvider(_request).future));
       },
       child: CustomScrollView(
         controller: _scroll,
@@ -387,6 +443,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
             )
           else
             AppSliverHeader.page(title: title, actions: actions),
+          AppRefreshIndicator.sliver(enabled: !searchingLibrary),
           if (_showSearch)
             SliverToBoxAdapter(
               child: Padding(
@@ -413,8 +470,22 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
           if (searchingLibrary)
             LibrarySearchResults(
               query: _query,
-              onOpenArtist: (artist) =>
-                  _openPage(MornyeLibraryPage.albums, artist: artist),
+              // A played song continues into the Songs list in its saved
+              // sort; the Songs page's filters last only while it is open.
+              songList: (
+                filterMode: 'all',
+                sortMode: ref.watch(
+                  settingsProvider.select((s) => s.historySortMode),
+                ),
+                source: null,
+                quality: null,
+                format: null,
+                metadata: null,
+                includeLocal: ref.watch(
+                  settingsProvider.select((s) => s.localLibraryEnabled),
+                ),
+              ),
+              onOpenArtist: _openArtist,
             ),
           if (!searchingLibrary) ...[
             if (_overview && _query.isEmpty)
@@ -448,6 +519,11 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
                         Icons.music_note_outlined,
                         context.l10n.searchSongs,
                         () => widget.onOpenSection('all'),
+                      ),
+                      (
+                        Icons.category_outlined,
+                        context.l10n.libraryGenres,
+                        () => _openPage(MornyeLibraryPage.genres),
                       ),
                       (
                         Icons.folder_outlined,
@@ -523,15 +599,38 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
                   ),
                 ),
               ),
+            if (widget.toolbar case final toolbar?)
+              SliverToBoxAdapter(child: toolbar)
+            else if (widget.artist != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsetsDirectional.only(start: 16 + listInset),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: ExpressiveButton(
+                      text: true,
+                      onPressed: () =>
+                          navigateToArtist(context, artistName: widget.artist!),
+                      child: Text(context.l10n.libraryArtistPage),
+                    ),
+                  ),
+                ),
+              ),
             if (_rows.isNotEmpty)
-              if (_artists)
+              if (_artists || _genres)
                 SliverList.builder(
                   itemCount: _rows.length,
                   itemBuilder: (context, index) {
                     final entry = _rows[index];
-                    void open() => _openPage(
-                      MornyeLibraryPage.albums,
-                      artist: entry.artist,
+                    void open() => _genres
+                        ? pushPage<void>(
+                            context,
+                            (_) => LibraryMixScreen.genre(genre: entry),
+                          )
+                        : _openArtist(entry.artist);
+                    final artwork = SizedBox.square(
+                      dimension: 56,
+                      child: _LibraryBrowseArtwork(entry: entry),
                     );
                     return Column(
                       children: [
@@ -554,13 +653,13 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
                               horizontal: 24 + listInset,
                               vertical: 8,
                             ),
-                            leading: ClipOval(
-                              child: SizedBox.square(
-                                dimension: 56,
-                                child: _LibraryBrowseArtwork(entry: entry),
-                              ),
-                            ),
-                            title: Text(entry.artist),
+                            leading: _genres
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: artwork,
+                                  )
+                                : ClipOval(child: artwork),
+                            title: Text(_genres ? entry.name : entry.artist),
                             subtitle: Text(
                               context.l10n.queueTrackCount(entry.trackCount),
                             ),
@@ -617,8 +716,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
               SliverToBoxAdapter(
                 child: Center(
                   child: TextButton.icon(
-                    onPressed: () =>
-                        ref.invalidate(libraryBrowseProvider(_request)),
+                    onPressed: reload,
                     icon: const Icon(Icons.refresh),
                     label: Text(context.l10n.dialogRetry),
                   ),
@@ -741,6 +839,24 @@ class _LibraryBrowseArtwork extends StatefulWidget {
 
 class _LibraryBrowseArtworkState extends State<_LibraryBrowseArtwork> {
   @override
+  void initState() {
+    super.initState();
+    DownloadedEmbeddedCoverResolver.previewsCleared.addListener(_resolveAgain);
+  }
+
+  @override
+  void dispose() {
+    DownloadedEmbeddedCoverResolver.previewsCleared.removeListener(
+      _resolveAgain,
+    );
+    super.dispose();
+  }
+
+  void _resolveAgain() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final entry = widget.entry;
     Widget fallback(BuildContext context) => ColoredBox(
@@ -766,9 +882,7 @@ class _LibraryBrowseArtworkState extends State<_LibraryBrowseArtwork> {
         ? null
         : DownloadedEmbeddedCoverResolver.resolve(
             entry.samplePath,
-            onChanged: () {
-              if (mounted) setState(() {});
-            },
+            onChanged: _resolveAgain,
           );
     final cover = entry.cover?.isNotEmpty == true ? entry.cover! : embedded;
     return cover == null

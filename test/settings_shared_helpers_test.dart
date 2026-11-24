@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -645,6 +645,6 @@ void main() {
     expect(group.children, same(rows));
     final plain = settingsSectionSlivers(title: 'Section', children: const []);
     final plainGroup = (plain[1] as SliverToBoxAdapter).child! as SettingsGroup;
-    expect((plainGroup.connected, plainGroup.glass), (false, false));
+    expect((plainGroup.connected, plainGroup.glass), (null, false));
   });
 }

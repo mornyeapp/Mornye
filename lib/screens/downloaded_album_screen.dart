@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show mapEquals;
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/cover_palette.dart';
@@ -11,11 +12,12 @@ import 'package:mornye/services/batch_track_actions.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/models/album_track_order.dart';
+import 'package:mornye/providers/album_track_sort_provider.dart';
+import 'package:mornye/widgets/album_track_sort_button.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/audio_quality_badge_policy.dart';
 import 'package:mornye/utils/cover_art_utils.dart';
-import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/providers/deleted_library_files.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
@@ -23,6 +25,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
+import 'package:mornye/providers/song_leftovers_provider.dart';
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/confirm_and_delete_tracks.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart';
@@ -52,6 +55,7 @@ import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 
 class DownloadedAlbumScreen extends ConsumerStatefulWidget {
   final String albumName;
@@ -77,6 +81,7 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
   bool _embeddedCoverRefreshScheduled = false;
   List<DownloadHistoryItem>? _albumTracksSourceCache;
   AlbumTrackOrder<DownloadHistoryItem>? _albumTrackOrderCache;
+  Map<String, int>? _albumTrackRanksCache;
   List<DownloadHistoryItem>? _commonQualitySourceCache;
   String? _commonQualityCache;
   String? _commonQualityModeCache;
@@ -88,6 +93,22 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
       '${widget.albumName.toLowerCase()}|${widget.artistName.toLowerCase()}';
 
   @override
+  void initState() {
+    super.initState();
+    DownloadedEmbeddedCoverResolver.previewsCleared.addListener(
+      _onEmbeddedCoverChanged,
+    );
+  }
+
+  @override
+  void dispose() {
+    DownloadedEmbeddedCoverResolver.previewsCleared.removeListener(
+      _onEmbeddedCoverChanged,
+    );
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(covariant DownloadedAlbumScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.albumName != widget.albumName ||
@@ -97,11 +118,17 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
     }
   }
 
+  AlbumTrackSortKey get _sortKey =>
+      (album: widget.albumName, artist: widget.artistName);
+
   AlbumTrackOrder<DownloadHistoryItem> _getAlbumOrder(
     List<DownloadHistoryItem> allItems,
+    Map<String, int>? ranks,
   ) {
     final cached = _albumTrackOrderCache;
-    if (cached != null && identical(allItems, _albumTracksSourceCache)) {
+    if (cached != null &&
+        identical(allItems, _albumTracksSourceCache) &&
+        mapEquals(ranks, _albumTrackRanksCache)) {
       return cached;
     }
 
@@ -118,9 +145,11 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
       discNumber: (track) => track.discNumber,
       trackNumber: (track) => track.trackNumber,
       trackName: (track) => track.trackName,
+      ranks: ranks,
     );
 
     _albumTracksSourceCache = allItems;
+    _albumTrackRanksCache = ranks;
     _invalidateDerivedTrackCaches();
     _albumTrackOrderCache = order;
     return order;
@@ -146,7 +175,7 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
       deleteItem: (id) async {
         final item = tracksById[id];
         if (item == null) return false;
-        return deleteFile(item.filePath);
+        return container.read(songLeftoversProvider).delete(item.filePath);
       },
       persistDeletedItems: (ids) => removeDeletedLibraryFileEntries(
         container,
@@ -244,8 +273,9 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
         ),
       ),
     );
+    final ranks = ref.watch(albumTrackRanksProvider(_sortKey));
     final order = tracksValue.maybeWhen(
-      data: (items) => _getAlbumOrder(items),
+      data: (items) => _getAlbumOrder(items, ranks),
       orElse: () => null,
     );
 
@@ -364,11 +394,12 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
     final motion = context.isMornye && !MediaQuery.disableAnimationsOf(context)
         ? ref
               .watch(
-                playerMotionArtworkProvider((
+                songMotionArtworkProvider((
                   album: widget.albumName,
                   artist: tracks.isEmpty
                       ? widget.artistName
                       : tracks.first.artistName,
+                  source: tracks.firstOrNull?.filePath ?? '',
                 )),
               )
               .value
@@ -443,6 +474,11 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
           ? _buildDownloadedHeaderMeta(context, tracks, commonQuality)
           : null,
       appBarActions: [
+        if (tracks.isNotEmpty)
+          AlbumTrackSortButton(
+            albumKey: _sortKey,
+            songs: [for (final track in tracks) track.trackName],
+          ),
         NetworkOfflineButton(
           items: [
             for (final track in tracks)
@@ -818,6 +854,10 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
         onPlay: playback.isCurrent
             ? toggle
             : () => _openFile(track, queueItems: navigationItems),
+        queueSwipe: libraryItemQueueSwipe(
+          ref,
+          UnifiedLibraryItem.fromDownloadHistory(track),
+        ),
       ),
     );
   }

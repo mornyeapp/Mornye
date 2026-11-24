@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/app_crash_report.dart';
 import 'package:mornye/providers/app_crash_provider.dart';
 import 'package:mornye/services/app_crash_service.dart';
@@ -26,6 +26,21 @@ Map<String, dynamic> _report() => {
 };
 
 void main() {
+  test('an error line ends with the first frames of its stack', () {
+    final stack = StackTrace.fromString(
+      '#0      Player.load (package:example/player.dart:12)\n'
+      '#1      Queue.next (package:example/queue.dart:40)\n'
+      '#2      Shell.tap (package:example/shell.dart:7)\n',
+    );
+    expect(
+      firstStackFrames(stack, count: 2),
+      ' at Player.load (package:example/player.dart:12) < '
+      'Queue.next (package:example/queue.dart:40)',
+    );
+    expect(firstStackFrames(null), '');
+    expect(firstStackFrames(StackTrace.empty), '');
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
   const backend = MethodChannel('com.zarz.mornye/backend');
   final messenger =
@@ -165,7 +180,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const Scaffold(
               body: SingleChildScrollView(child: AppCrashBanner()),
@@ -200,7 +215,7 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           locale: const Locale('id'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: const Scaffold(
             body: SingleChildScrollView(
@@ -228,7 +243,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: ValueListenableBuilder<bool>(
@@ -296,7 +311,7 @@ void main() {
           child: MaterialApp(
             theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
             locale: const Locale('id'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const Scaffold(
               body: SingleChildScrollView(child: AppCrashBanner()),

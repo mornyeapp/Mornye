@@ -1,6 +1,6 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +11,8 @@ import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/view_queue_snackbar_action.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   for (final brightness in Brightness.values) {
@@ -173,7 +175,7 @@ void main() {
       showAddedToQueueSnackBar(messageContext, 'Track');
       await tester.pumpAndSettle();
       expect(find.text('View Queue'), findsOneWidget);
-      expect(find.byTooltip('Close'), findsOneWidget);
+      expect(findByTooltip('Close'), findsOneWidget);
       expect(
         find.byType(MornyeGlassPanel),
         mornye ? findsOneWidget : findsNothing,
@@ -184,7 +186,7 @@ void main() {
 
       showAddedToQueueSnackBar(messageContext, 'Another track');
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Close'));
+      await tester.tap(findByTooltip('Close'));
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
       expect(tester.takeException(), isNull);
@@ -246,6 +248,160 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  for (final reducedMotion in [false, true]) {
+    testWidgets(
+      'a new message ${reducedMotion ? 'cuts' : 'lets the current '
+                'one exit'} (reduced motion: $reducedMotion)',
+      (tester) async {
+        late BuildContext messageContext;
+        await tester.pumpWidget(
+          MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(disableAnimations: reducedMotion),
+              child: AppScaffoldMessenger(child: child!),
+            ),
+            home: Builder(
+              builder: (context) {
+                messageContext = context;
+                return const Scaffold(body: SizedBox.expand());
+              },
+            ),
+          ),
+        );
+        ScaffoldFeatureController<SnackBar, SnackBarClosedReason> show(
+          String text,
+        ) => ScaffoldMessenger.of(
+          messageContext,
+        ).showSnackBar(SnackBar(content: Text(text)));
+
+        final first = show('First');
+        await tester.pumpAndSettle();
+        show('Second');
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        if (reducedMotion) {
+          expect(find.text('First'), findsNothing);
+          expect(find.text('Second'), findsOneWidget);
+        } else {
+          // The first message is leaving; the second waits for it.
+          expect(find.text('First'), findsOneWidget);
+          expect(find.text('Second'), findsNothing);
+          await tester.pump(const Duration(milliseconds: 110));
+          expect(find.text('First'), findsNothing);
+          expect(find.text('Second'), findsOneWidget);
+        }
+        expect(await first.closed, SnackBarClosedReason.remove);
+        await tester.pumpAndSettle();
+
+        // A third message during the exit drops the waiting one.
+        show('Third');
+        await tester.pump(const Duration(milliseconds: 50));
+        final fourth = show('Fourth');
+        final fifth = show('Fifth');
+        await tester.pumpAndSettle();
+        expect(find.text('Fifth'), findsOneWidget);
+        expect(find.text('Fourth'), findsNothing);
+        expect(await fourth.closed, SnackBarClosedReason.remove);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        expect(await fifth.closed, SnackBarClosedReason.timeout);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('clearing during an exit completes the waiting message', (
+    tester,
+  ) async {
+    late BuildContext messageContext;
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => AppScaffoldMessenger(child: child!),
+        home: Builder(
+          builder: (context) {
+            messageContext = context;
+            return const Scaffold(body: SizedBox.expand());
+          },
+        ),
+      ),
+    );
+    final messenger = ScaffoldMessenger.of(messageContext);
+    ScaffoldFeatureController<SnackBar, SnackBarClosedReason> show(
+      String text,
+    ) => messenger.showSnackBar(SnackBar(content: Text(text)));
+
+    show('First');
+    await tester.pumpAndSettle();
+    final second = show('Second');
+    SnackBarClosedReason? secondReason;
+    second.closed.then((reason) => secondReason = reason);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // A caller clears the messenger and shows its own message, as batch
+    // actions do, while the second message still waits behind the exit.
+    messenger.clearSnackBars();
+    final third = show('Third');
+    await tester.pumpAndSettle();
+    expect(secondReason, SnackBarClosedReason.remove);
+    expect(find.text('Third'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(await third.closed, SnackBarClosedReason.timeout);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('closing a waiting message cancels it before it shows', (
+    tester,
+  ) async {
+    late BuildContext messageContext;
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (_, child) => AppScaffoldMessenger(child: child!),
+        home: Builder(
+          builder: (context) {
+            messageContext = context;
+            return const Scaffold(body: SizedBox.expand());
+          },
+        ),
+      ),
+    );
+    ScaffoldFeatureController<SnackBar, SnackBarClosedReason> show(
+      String text,
+    ) => ScaffoldMessenger.of(
+      messageContext,
+    ).showSnackBar(SnackBar(content: Text(text)));
+
+    final first = show('First');
+    await tester.pumpAndSettle();
+    final waiting = show('Waiting');
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('First'), findsOneWidget);
+    closeAppSnackBar(messageContext, waiting);
+    await tester.pump();
+    expect(find.text('First'), findsNothing);
+    await tester.pumpAndSettle();
+    expect(find.text('Waiting'), findsNothing);
+    expect(await first.closed, SnackBarClosedReason.remove);
+    expect(await waiting.closed, SnackBarClosedReason.hide);
+
+    // Closing it again leaves a newer message alone; closing the shown
+    // message plays its exit.
+    final next = show('Next');
+    await tester.pumpAndSettle();
+    closeAppSnackBar(messageContext, waiting);
+    await tester.pumpAndSettle();
+    expect(find.text('Next'), findsOneWidget);
+    closeAppSnackBar(messageContext, next);
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('Next'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('Next'), findsNothing);
+    expect(await next.closed, SnackBarClosedReason.hide);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('rapid messages never leave a backlog or persist an action', (
     tester,

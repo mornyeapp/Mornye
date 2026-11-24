@@ -30,21 +30,57 @@ extension _QueueTabNavigation on _QueueTabState {
     }
   }
 
+  /// The Library list [filterMode] shows, in [sortMode] and the active
+  /// filters, without the search text: the list a song played while
+  /// searching continues into.
+  LibrarySongListRequest _songListFor(String filterMode, String sortMode) => (
+    filterMode: filterMode,
+    sortMode: sortMode,
+    source: _filterSource,
+    quality: _filterQuality,
+    format: _filterFormat,
+    metadata: _filterMetadata,
+    includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+  );
+
+  /// The Songs list a song played from the Library search continues into,
+  /// in the order the Songs page shows.
+  LibrarySongListRequest _searchSongList() =>
+      _songListFor('all', ref.read(settingsProvider).historySortMode);
+
   /// Plays [item] and queues the rest of the merged library (downloaded + local
   /// in display order) so playback continues to the next track. Honors player
-  /// mode and shuffle.
+  /// mode and shuffle. While a search narrows the list, the song plays on
+  /// into the whole list around it, as the same tap without the search does.
   Future<void> _playLibraryItem(
     UnifiedLibraryItem item,
     List<UnifiedLibraryItem> libraryItems,
   ) async {
-    final playableItems = libraryItems
+    var played = item;
+    var listed = libraryItems;
+    if (_searchQuery.isNotEmpty) {
+      final mode =
+          widget.librarySection ?? ref.read(settingsProvider).historyFilterMode;
+      // A list that cannot be read leaves the matches to play.
+      final placed = await placeInLibrarySongList(
+        ref,
+        item,
+        _songListFor(mode == 'singles' ? 'singles' : 'all', _sortMode),
+      ).catchError((Object _) => null);
+      if (!mounted) return;
+      if (placed != null) {
+        played = placed.item;
+        listed = placed.songs;
+      }
+    }
+    final playableItems = listed
         .where(
           (u) => u.filePath.trim().isNotEmpty && !isCueVirtualPath(u.filePath),
         )
         .toList();
     if (playableItems.isEmpty) return;
 
-    var start = playableItems.indexWhere((u) => u.id == item.id);
+    var start = playableItems.indexWhere((u) => u.id == played.id);
     if (start < 0) start = 0;
 
     try {
@@ -54,6 +90,45 @@ extension _QueueTabNavigation on _QueueTabState {
             playableItems.map(_toPlayableMedia),
             startIndex: start,
             externalPath: item.filePath,
+          );
+    } catch (e) {
+      if (mounted) showCannotOpenFileSnackBar(context, e);
+    }
+  }
+
+  /// Plays the songs the Songs page lists, in its sort and filters, from a
+  /// random one with shuffle on, as folder and album pages do. A list the
+  /// page has not [complete]ly loaded is read whole first; an external
+  /// player opens one file and needs no list.
+  Future<void> _shuffleLibrarySongs(
+    List<UnifiedLibraryItem> loaded, {
+    required bool complete,
+  }) async {
+    var songs = loaded;
+    if (!complete &&
+        _searchQuery.isEmpty &&
+        ref.read(settingsProvider).playerMode == 'internal') {
+      // A list that cannot be read leaves the loaded songs to play.
+      songs = await ref
+          .read(librarySongListProvider(_songListFor('all', _sortMode)).future)
+          .catchError((Object _) => loaded);
+      if (!mounted) return;
+    }
+    final playable = songs
+        .where(
+          (u) => u.filePath.trim().isNotEmpty && !isCueVirtualPath(u.filePath),
+        )
+        .toList(growable: false);
+    if (playable.isEmpty) return;
+    final start = Random().nextInt(playable.length);
+    try {
+      await ref.read(musicPlayerControllerProvider).setShuffle(true);
+      await ref
+          .read(playbackProvider.notifier)
+          .playMediaQueue(
+            playable.map(_toPlayableMedia),
+            startIndex: start,
+            externalPath: playable[start].filePath,
           );
     } catch (e) {
       if (mounted) showCannotOpenFileSnackBar(context, e);
@@ -106,7 +181,7 @@ extension _QueueTabNavigation on _QueueTabState {
 
     final navigator = Navigator.of(context);
     final embeddedCoverPath = context.isMornye
-        ? DownloadedEmbeddedCoverResolver.resolve(historyItem.filePath)
+        ? await trackDetailsEmbeddedCover(historyItem.filePath)
         : await DownloadedEmbeddedCoverResolver.resolveOrExtract(
             historyItem.filePath,
             onChanged: _onEmbeddedCoverChanged,
@@ -151,7 +226,7 @@ extension _QueueTabNavigation on _QueueTabState {
   }) async {
     final navigator = Navigator.of(context);
     final embeddedCoverPath = context.isMornye
-        ? DownloadedEmbeddedCoverResolver.resolve(item.filePath)
+        ? await trackDetailsEmbeddedCover(item.filePath)
         : await DownloadedEmbeddedCoverResolver.resolveOrExtract(
             item.filePath,
             onChanged: _onEmbeddedCoverChanged,
@@ -200,9 +275,11 @@ extension _QueueTabNavigation on _QueueTabState {
     int? navigationIndex,
   }) async {
     _searchFocusNode.unfocus();
-    if (!context.isMornye) {
-      await precacheMetadataBackdrop(context, item.coverPath);
-    }
+    await prepareTrackDetailsCover(
+      context,
+      item.filePath,
+      fallback: item.coverPath,
+    );
     if (!mounted) return;
     await Navigator.push(
       context,
@@ -368,23 +445,41 @@ extension _QueueTabNavigation on _QueueTabState {
                   .firstOrNull ??
               playlist.previewCover;
 
-    if (cover != null) {
-      return LocalOrNetworkCoverImage(
-        url: cover,
-        width: size,
-        height: size,
-        borderRadius: borderRadius,
-        localCacheWidth: cacheExtent,
-        networkCacheWidth: cacheExtent,
-        fadeInDuration: Duration.zero,
-        placeholder: (_) => placeholder,
-      );
-    }
+    Widget image(String? cover) => cover == null
+        ? placeholder
+        : LocalOrNetworkCoverImage(
+            url: cover,
+            width: size,
+            height: size,
+            borderRadius: borderRadius,
+            localCacheWidth: cacheExtent,
+            networkCacheWidth: cacheExtent,
+            fadeInDuration: Duration.zero,
+            placeholder: (_) => placeholder,
+          );
 
-    return placeholder;
+    if ((customCoverPath != null && customCoverPath.isNotEmpty) ||
+        collectionCoverIsPortable(cover) ||
+        playlist.trackCount == 0) {
+      return image(cover);
+    }
+    // The first song's stored cover can name a file this device does not
+    // have, such as a playlist another device made: the Library answers.
+    return Consumer(
+      builder: (context, ref, _) => image(
+        ref
+            .watch(
+              playlistCoverProvider((
+                id: playlist.id,
+                cover: cover,
+                updatedAt: playlist.updatedAt,
+              )),
+            )
+            .maybeWhen(data: (cover) => cover, orElse: () => cover),
+      ),
+    );
   }
 
-  /// Icon fallback for playlists with no cover.
   /// When [size] is null the container expands to fill its parent (grid view)
   /// and uses a fixed icon size.
   Widget _playlistIconFallback(ColorScheme colorScheme, [double? size]) {
@@ -403,7 +498,6 @@ extension _QueueTabNavigation on _QueueTabState {
     );
   }
 
-  /// Handle a track being dropped onto a playlist.
   /// When selection mode is active and the dragged item is among the selected,
   /// all selected tracks are added to the playlist.
   Future<void> _onTrackDroppedOnPlaylist(

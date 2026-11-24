@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -6,6 +6,8 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   for (final mornye in [false, true]) {
@@ -102,6 +104,56 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    /// How far the actions close in the first frames after a collapsing
+    /// drag of the same length, made over [dragTime], is let go.
+    Future<double> closingAfterRelease(
+      WidgetTester tester,
+      Duration dragTime,
+    ) async {
+      await showPanel(tester, () {});
+      final actions = find
+          .ancestor(
+            of: find.byType(SingleChildScrollView),
+            matching: find.byType(SizeTransition),
+          )
+          .first;
+      double expansion() =>
+          tester.widget<SizeTransition>(actions).sizeFactor.value;
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(AppSheetHandle)),
+      );
+      for (var step = 1; step <= 10; step++) {
+        await gesture.moveBy(
+          const Offset(0, 12),
+          timeStamp: dragTime * step ~/ 10,
+        );
+        await tester.pump(dragTime ~/ 10);
+      }
+      final released = expansion();
+      await gesture.up(timeStamp: dragTime);
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
+      final early = expansion();
+      await tester.pumpAndSettle();
+      expect(find.text('Action').hitTestable(), findsNothing);
+      expect(expansion(), 0);
+      return released - early;
+    }
+
+    testWidgets('$name: a released collapse keeps the finger velocity', (
+      tester,
+    ) async {
+      final quick = await closingAfterRelease(
+        tester,
+        const Duration(milliseconds: 80),
+      );
+      final slow = await closingAfterRelease(
+        tester,
+        const Duration(seconds: 2),
+      );
+      expect(quick, greaterThan(slow + 0.02));
+    });
+
     testWidgets('$name: a long first swipe cannot cancel selection', (
       tester,
     ) async {
@@ -185,7 +237,7 @@ void main() {
     ) async {
       var closed = 0;
       await showPanel(tester, () => closed++);
-      await tester.tap(find.byTooltip('Close'));
+      await tester.tap(findByTooltip('Close'));
       await tester.pumpAndSettle();
       expect(closed, 1);
     });
@@ -309,7 +361,7 @@ void main() {
       await tester.tap(find.byType(AppSheetHandle));
       await tester.pumpAndSettle();
       expect(find.text('1 selected').hitTestable(), findsOneWidget);
-      expect(find.byTooltip('Close').hitTestable(), findsOneWidget);
+      expect(findByTooltip('Close').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
       expect(closed, 0);
     });

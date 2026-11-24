@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -29,7 +29,7 @@ void main() {
             playbackStateProvider.overrideWith((_) => states.stream),
           ],
           child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
             builder: (_, child) =>
@@ -81,7 +81,7 @@ void main() {
               playbackStateProvider.overrideWith((_) => states.stream),
             ],
             child: MaterialApp(
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              localizationsDelegates: appLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
               builder: (_, child) =>
@@ -142,7 +142,7 @@ void main() {
           overrides: [musicPlayerRuntimeProvider.overrideWithValue(runtime)],
           child: MaterialApp(
             locale: Locale(mornye ? 'id' : 'en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
             builder: (_, child) =>
@@ -194,7 +194,7 @@ void main() {
           playbackStateProvider.overrideWith((_) => states.stream),
         ],
         child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (_, child) =>
               AppScaffoldMessenger(child: PlaybackFeedback(child: child!)),

@@ -637,6 +637,59 @@ void main() {
     );
   });
 
+  test('a file cover stays on its device', () async {
+    final directory = await linkSyncTempDirectory();
+    final phone = await openLinkCollectionsDatabase(directory, 'phone');
+    final desk = await openLinkCollectionsDatabase(directory, 'desk');
+    final phoneStore = LinkCollectionSyncStore(() async => phone);
+    final deskStore = LinkCollectionSyncStore(() async => desk);
+    final deskCollections = LibraryCollectionsDatabase.withDatabase(desk);
+    const phoneFile = '/data/user/0/example/library_covers/cover_1.jpg';
+    const deskFile = '/Users/example/library_covers/cover_2.jpg';
+    String json(String? cover) =>
+        jsonEncode({...linkTestTrack('song').toJson(), 'coverUrl': cover});
+    final now = DateTime.now();
+    await LibraryCollectionsDatabase.withDatabase(phone).upsertLovedEntry(
+      trackKey: 'example:song',
+      trackJson: json(phoneFile),
+      addedAt: now.toIso8601String(),
+    );
+
+    // The phone sends no path of its own.
+    final sent = (await phoneStore.changesSince(0)).items.single;
+    expect((sent.data!['track'] as Map)['coverUrl'], isNull);
+    await deskStore.apply([sent]);
+    expect((await deskCollections.loadLovedTracks()).single.coverUrl, isNull);
+
+    // An older build still sends it. A device without the song stores no
+    // cover, and one whose row holds a cover of its own keeps that.
+    final older = LinkSyncChange(
+      kind: sent.kind,
+      key: sent.key,
+      updatedMs: now.millisecondsSinceEpoch + 60000,
+      origin: sent.origin,
+      data: {
+        ...sent.data!,
+        'track': {...sent.data!['track'] as Map, 'coverUrl': phoneFile},
+      },
+    );
+    final other = await openLinkCollectionsDatabase(directory, 'other');
+    await LinkCollectionSyncStore(() async => other).apply([older]);
+    expect(
+      (await LibraryCollectionsDatabase.withDatabase(
+        other,
+      ).loadLovedTracks()).single.coverUrl,
+      isNull,
+    );
+    await deskCollections.upsertLovedEntry(
+      trackKey: 'example:song',
+      trackJson: json(deskFile),
+      addedAt: now.toIso8601String(),
+    );
+    await deskStore.apply([older]);
+    expect((await deskCollections.loadLovedTracks()).single.coverUrl, deskFile);
+  });
+
   test('a desktop edit of a song keeps the phone its network cover', () async {
     final directory = await linkSyncTempDirectory();
     final phone = await openLinkCollectionsDatabase(directory, 'phone');

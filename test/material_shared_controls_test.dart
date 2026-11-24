@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
@@ -11,6 +11,8 @@ import 'package:mornye/widgets/app_checkbox.dart';
 import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/widgets/app_menu_button.dart';
 import 'package:mornye/widgets/app_text_field.dart';
+
+import 'support/tooltip_finder.dart';
 
 Widget _host(Widget child, {ThemeData? theme, bool reduceMotion = false}) =>
     ProviderScope(
@@ -60,7 +62,7 @@ void main() {
       ),
     );
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byTooltip('Provider'));
+    await tester.tap(findByTooltip('Provider'));
     await tester.pumpAndSettle();
     expect(find.text('Provider one', findRichText: true), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -86,7 +88,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byTooltip('Options'));
+    await tester.tap(findByTooltip('Options'));
     await tester.pumpAndSettle();
     final popup = find.byWidgetPredicate(
       (widget) => widget is M3EMenuPopup<Object>,
@@ -114,7 +116,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byTooltip('Provider'));
+    await tester.tap(findByTooltip('Provider'));
     await tester.pumpAndSettle();
     final popup = find.byWidgetPredicate(
       (widget) => widget is M3EMenuPopup<Object>,
@@ -142,7 +144,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byTooltip('Options'));
+    await tester.tap(findByTooltip('Options'));
     await tester.pumpAndSettle();
     visible.value = false;
     await tester.pumpAndSettle();
@@ -158,8 +160,8 @@ void main() {
   ) async {
     final selected = <String>[];
     await tester.pumpWidget(_host(_menu(onSelected: selected.add)));
-    await tester.tap(find.byTooltip('Options'));
-    await tester.tap(find.byTooltip('Options'), warnIfMissed: false);
+    await tester.tap(findByTooltip('Options'));
+    await tester.tap(findByTooltip('Options'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(
       find.byWidgetPredicate((widget) => widget is M3EMenuPopup<Object>),
@@ -168,7 +170,7 @@ void main() {
     await tester.tap(find.text('Choose item', findRichText: true));
     await tester.pumpAndSettle();
     expect(selected, ['choose']);
-    await tester.tap(find.byTooltip('Options'));
+    await tester.tap(findByTooltip('Options'));
     await tester.pumpAndSettle();
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();

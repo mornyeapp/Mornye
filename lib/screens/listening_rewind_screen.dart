@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io' show File;
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +15,7 @@ import 'package:mornye/providers/listening_rewind_provider.dart';
 import 'package:mornye/services/listening_rewind.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/widget_capture.dart';
 import 'package:mornye/widgets/app_action_button.dart';
@@ -31,6 +32,7 @@ import 'package:mornye/widgets/settled_blur.dart';
 
 export 'package:mornye/providers/listening_rewind_provider.dart';
 
+part 'listening_rewind_share_card.dart';
 part 'listening_rewind_story.dart';
 part 'listening_rewind_slides.dart';
 part 'listening_rewind_widgets.dart';
@@ -128,14 +130,21 @@ class ListeningRewindBanner extends ConsumerWidget {
       ListeningRewindSpotlight.monthly => _MonthlyRewindBanner(margin: margin),
       ListeningRewindSpotlight.yearly => _YearlyRewindBanner(margin: margin),
     };
-    // Grows in rather than shifting the list when the check completes.
+    // Grows in on the default spatial spring rather than shifting the list
+    // when the check completes. Reduced motion shows it at once: a size
+    // animation of no length would finish inside its own layout.
+    final grow = AppMotion.spatial(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+      mornye: MornyeMotion.standard,
+    );
+    final banner = child ?? const SizedBox(width: double.infinity);
+    if (grow.duration == Duration.zero) return banner;
     return AnimatedSize(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
+      duration: grow.duration,
+      curve: grow.curve,
       alignment: Alignment.topCenter,
-      child: child ?? const SizedBox(width: double.infinity),
+      child: banner,
     );
   }
 }

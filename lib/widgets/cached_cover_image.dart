@@ -3,11 +3,15 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:path/path.dart' as p;
 import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/services/cover_store.dart';
+import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
+import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/cover_palette.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 
 class CachedCoverImage extends StatelessWidget {
@@ -24,8 +28,19 @@ class CachedCoverImage extends StatelessWidget {
   final Widget Function(BuildContext, String, Object)? errorWidget;
   final Widget Function(BuildContext, String)? placeholder;
   final BorderRadius? borderRadius;
-  final Duration fadeInDuration;
+
+  /// How long a cover fades in once it decodes. Null fades it on the fast
+  /// effects spring of the app's style, except under reduced motion or
+  /// while its list flings. Zero keeps the cut (player artwork).
+  /// A cover already in the memory cache never fades: octo_image shows a
+  /// synchronous hit at once, so scrolling back does not fade it again.
+  final Duration? fadeInDuration;
   final Duration fadeOutDuration;
+
+  static const _fadeIn = AppMotionSpec(
+    Duration(milliseconds: 150),
+    Curves.easeOut,
+  );
 
   const CachedCoverImage({
     super.key,
@@ -39,9 +54,29 @@ class CachedCoverImage extends StatelessWidget {
     this.errorWidget,
     this.placeholder,
     this.borderRadius,
-    this.fadeInDuration = Duration.zero,
+    this.fadeInDuration,
     this.fadeOutDuration = Duration.zero,
   });
+
+  /// The fade a cover building in [context] gets once it decodes.
+  AppMotionSpec _fade(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return const AppMotionSpec(Duration.zero, Curves.linear);
+    }
+    final explicit = fadeInDuration;
+    if (explicit != null) return AppMotionSpec(explicit, Curves.easeIn);
+    // A fast fling builds many cells at once; their covers cut in rather
+    // than stacking opacity layers into the scroll frames. A shelf scrolls
+    // across while the page flings down, so ask the vertical list too.
+    if (Scrollable.recommendDeferredLoadingForContext(context) ||
+        Scrollable.recommendDeferredLoadingForContext(
+          context,
+          axis: Axis.vertical,
+        )) {
+      return const AppMotionSpec(Duration.zero, Curves.linear);
+    }
+    return AppMotion.effectsFast(context, _fadeIn);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +118,11 @@ class CachedCoverImage extends StatelessWidget {
         );
       }
     }
+    final fade = _fade(context);
+    // octo_image stacks the placeholder over the cover. Dissolving the
+    // placeholder off the decoded cover avoids fading the cover in over
+    // the page, which would flash the page between the two.
+    final dissolve = fadeInDuration == null && placeholder != null;
     final image = CachedNetworkImage(
       imageUrl: imageUrl,
       width: width,
@@ -92,8 +132,10 @@ class CachedCoverImage extends StatelessWidget {
       memCacheWidth: autoMemCacheWidth,
       memCacheHeight: autoMemCacheHeight,
       cacheManager: CoverCacheManager.instance,
-      fadeInDuration: fadeInDuration,
-      fadeOutDuration: fadeOutDuration,
+      fadeInDuration: dissolve ? Duration.zero : fade.duration,
+      fadeInCurve: fade.curve,
+      fadeOutDuration: dissolve ? fade.duration : fadeOutDuration,
+      fadeOutCurve: dissolve ? fade.curve : Curves.easeOut,
       useOldImageOnUrlChange: true,
       filterQuality: FilterQuality.low,
       errorWidget: errorWidget,
@@ -162,7 +204,7 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
         fit: fit,
         memCacheWidth: networkCacheWidth,
         borderRadius: borderRadius,
-        fadeInDuration: fadeInDuration ?? Duration.zero,
+        fadeInDuration: fadeInDuration,
         fadeOutDuration: fadeOutDuration,
         placeholder: (_, _) => placeholder(context),
         errorWidget: (_, _, _) => placeholder(context),
@@ -488,13 +530,60 @@ Future<void> precacheMetadataBackdrop(
     cacheHeight: isHttpCoverUrl(normalized) ? null : extent,
   );
   if (provider == null) return;
+  // The header takes its colours from the cover as well. Worked out before
+  // the page shows, it opens in them; left to the page, it opens in the
+  // app's colours and changes to the cover's a moment later, the first time
+  // a cover is seen.
+  final paletteSource = isHttpCoverUrl(normalized)
+      ? normalized
+      : coverFilePath(normalized);
+  final brightness = Theme.of(context).brightness;
+  final neutral = !context.isMornye;
   try {
-    await precacheImage(
-      provider,
-      context,
-      onError: (_, _) {},
-    ).timeout(const Duration(milliseconds: 200));
+    await Future.wait([
+      precacheImage(
+        provider,
+        context,
+        onError: (_, _) {},
+      ).timeout(const Duration(milliseconds: 200), onTimeout: () {}),
+      if (paletteSource != null)
+        CoverPalette.resolve(
+          paletteSource,
+          brightness,
+          neutralGrayscale: neutral,
+        ).timeout(const Duration(milliseconds: 300), onTimeout: () => null),
+    ]);
   } catch (_) {}
+}
+
+/// Readies the cover Track details shows for a song in a file, before the
+/// page is pushed. The page prefers the file's own picture over [fallback]
+/// (the Library's cover) as soon as it knows it; read here first, the page
+/// opens on that picture instead of changing to it a moment later, the
+/// first time a song is opened. A slow read gives up after a short wait and
+/// the page changes cover once it has it.
+Future<void> prepareTrackDetailsCover(
+  BuildContext context,
+  String filePath, {
+  String? fallback,
+}) async {
+  final embedded = await trackDetailsEmbeddedCover(filePath);
+  // Only Material's header has the blurred backdrop.
+  if (!context.mounted || context.isMornye) return;
+  await precacheMetadataBackdrop(context, embedded ?? fallback);
+}
+
+/// The picture inside the song's file, waiting a short while for a first
+/// read. Null when the file has none, or the read is not done in time.
+Future<String?> trackDetailsEmbeddedCover(String filePath) async {
+  if (filePath.startsWith('network://')) return null;
+  try {
+    return await DownloadedEmbeddedCoverResolver.resolveOrExtract(
+      filePath,
+    ).timeout(const Duration(milliseconds: 300));
+  } catch (_) {
+    return null;
+  }
 }
 
 /// Pre-warms the cover cache at the metadata-screen display size so the hero

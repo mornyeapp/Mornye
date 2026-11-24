@@ -61,17 +61,27 @@ Dart caller is `lib/services/music_playback_deck.dart` in the app.
 
 ### Mixed output
 
-On Android 9 (API 28) and later, `MediaPlayerWrapper` enables a
-`DynamicsProcessing` effect with no stage in use on the player's own session
-(player/MixedOutput.kt) before each `start()`, and disables it on `pause()`,
+On Nothing phones running Android 9 (API 28) and later, `MediaPlayerWrapper`
+enables a `DynamicsProcessing` effect with no stage in use on the player's own
+session (player/MixedOutput.kt) before each `start()`, and disables it on `pause()`,
 `stop()` and `reset()`; `release()` frees it. Without it, MediaPlayer may
 send long local tracks to a compressed offload output, where the audio DSP
 decodes them outside the platform mixer. Features that read the mixed output
 then get silence, for example the music-synced lights on Nothing phones
 (Mornye issue 802). An enabled effect without offload support makes the
 platform choose PCM through the mixer, which ExoPlayer-based players use by
-default. The effect leaves the sound unchanged. If the device refuses it,
-playback continues and the plugin logs the reason.
+default. Other manufacturers keep the platform's normal output path: even
+without processing stages, `DynamicsProcessing` participates in native volume
+handling. The forced effect is a suspect in reports of speaker volume behaving
+as mute or full volume on Realme GT6, so it is no longer attached there.
+Validation on the reported device is still needed. While a USB audio output
+is attached the effect is not created either (and an existing one is
+released at the next `start()`): with a USB DAC on a Nothing Phone (3a) every
+track change left the song at full volume until a pause and resume (Mornye
+issue 864), which fits the effect owning the volume of a track it was
+attached to before the track existed. Not yet confirmed on that phone. If a
+Nothing device refuses
+the effect, playback continues and the plugin logs the reason.
 
 ### Next player
 
@@ -82,6 +92,32 @@ starts the next player as the current one completes. `onCompletion` then
 marks the next player as playing before reporting completion, so a later
 `resume` from Dart confirms its state without restarting it. A new source
 or a release drops the link; no `nextPlayerId` unlinks it.
+
+### Spatial audio
+
+A `setSpatialAudio` method (argument `enabled`) on the per-player method
+channel stores `WrappedPlayer.spatialAudio` (true by default). On Android
+12L (API 32) and later, `AudioContextAndroid.buildAttributes` then sets the
+spatialization behavior to auto (true) or never (false). MediaPlayer reads
+its attributes as a source loads, so `MediaPlayerWrapper.setSource` sets
+them again after its reset and a change applies from the next source. The
+pub-hosted platform interface is unchanged; the app calls the method on the
+channel directly, like `setEqualizer`.
+
+### Pitch
+
+A `setPitch` method (arguments `semitones` and `followsRate`) on the
+per-player method channel stores the values on `WrappedPlayer` (0 and false
+by default), so they apply to the current source and every later one.
+`MediaPlayerWrapper.setRate` sets the playback parameters' pitch with the
+speed: `2^(semitones/12)`, times the rate when `followsRate` is true, within
+the platform's 0.25 to 4. Like the rate, a change applies at once only while
+playing, since setting playback parameters starts a paused MediaPlayer;
+`start()` applies it otherwise. The 1.0 shortcut under "Rate and start"
+skips `setPlaybackParams` only while the pitch is 1.0 as well. Below Android
+6 (API 23), any shift or following pitch fails. The Dart caller is
+`lib/services/music_playback_deck.dart` in the app, which sends only changes
+from the defaults, like `setSpatialAudio`.
 
 ### Error state
 
@@ -110,6 +146,7 @@ AGP 7.3.1 to 9.4.1, android-junit5 1.7.1.1 to 2.0.2, compileSdk 36 to 37,
 Compared against the pub.dev 5.3.0 package in the local pub cache:
 
 - `android/build.gradle`
+- `android/src/main/kotlin/xyz/luan/audioplayers/AudioContextAndroid.kt`
 - `android/src/main/kotlin/xyz/luan/audioplayers/AudioplayersPlugin.kt`
 - `android/src/main/kotlin/xyz/luan/audioplayers/player/MediaPlayerWrapper.kt`
 - `android/src/main/kotlin/xyz/luan/audioplayers/player/MixedOutput.kt` (new)
@@ -129,5 +166,6 @@ Compared against the pub.dev 5.3.0 package in the local pub cache:
    return value, or starting after `setPlaybackParams`.
 4. Keep the Gradle values in step with the app's `android/app/build.gradle.kts`.
 5. Test playback from a remote SAF provider, the equalizer, a playback error
-   in the middle of a queue, and rate changes back to 1.0.
+   in the middle of a queue, rate changes back to 1.0, and a pitch shift
+   applied while paused and while playing.
 6. Run `flutter pub get` and update this file.

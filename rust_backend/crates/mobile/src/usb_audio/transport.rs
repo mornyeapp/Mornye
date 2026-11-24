@@ -55,7 +55,7 @@ impl Output {
             return Err("Invalid USB device/configuration".into());
         }
         if candidates.is_empty() {
-            return Err("No compatible USB format".into());
+            return Err(descriptors::mismatch(&device, rate, channels, bits, dsd));
         }
         let shared = Arc::new((Mutex::new(State::default()), Condvar::new()));
         let state = shared.clone();
@@ -103,6 +103,14 @@ impl Output {
             }
         }
     }
+    /// Bytes the queue holds: 1.5 s at any rate, so a stalled source thread
+    /// does not cut a high-rate song sooner than a CD-rate one.
+    fn capacity(&self) -> usize {
+        descriptors::queue_bytes(
+            self.format.sample_rate,
+            self.format.subslot as usize * self.format.channels as usize,
+        )
+    }
     pub fn write(&self, data: Vec<u8>) -> Result<u32, String> {
         let frame = self.format.subslot as usize * self.format.channels as usize;
         if data.len() > 256 * 1024 || !data.len().is_multiple_of(frame) {
@@ -115,8 +123,11 @@ impl Output {
         if s.closed {
             return Err("USB output closed".into());
         }
-        let capacity = (self.format.sample_rate as usize * frame / 5).max(256 * 1024);
-        let n = data.len().min(capacity.saturating_sub(s.bytes.len())) / frame * frame;
+        let n = data
+            .len()
+            .min(self.capacity().saturating_sub(s.bytes.len()))
+            / frame
+            * frame;
         s.bytes.extend(&data[..n]);
         self.shared.1.notify_all();
         Ok(n as u32)
@@ -130,8 +141,7 @@ impl Output {
         if s.closed {
             return Err("USB output closed".into());
         }
-        let capacity = (self.format.sample_rate as usize * frame / 5).max(256 * 1024);
-        Ok((capacity.saturating_sub(s.bytes.len()) / frame * frame) as u32)
+        Ok((self.capacity().saturating_sub(s.bytes.len()) / frame * frame) as u32)
     }
     pub fn start(&self) -> Result<(), String> {
         let mut s = self.shared.0.lock().unwrap();
@@ -313,6 +323,7 @@ struct Session {
     alternate: Alternate,
     endpoint: Endpoint,
     feedback: Option<Endpoint>,
+    bus_speed: i32,
     high_speed: bool,
     interval: u32,
     #[allow(clippy::vec_box)] // libusb user_data must survive Vec moves/reallocation.
@@ -346,6 +357,7 @@ impl Session {
             alternate: Alternate::default(),
             endpoint: Endpoint::default(),
             feedback: None,
+            bus_speed: 0,
             high_speed: false,
             interval: 0,
             slots: vec![],
@@ -363,7 +375,7 @@ impl Session {
                 fd as _,
                 &mut s.handle,
             ))?;
-            s.high_speed = usb::libusb_get_device_speed(usb::libusb_get_device(s.handle)) >= 3;
+            s.bus_speed = usb::libusb_get_device_speed(usb::libusb_get_device(s.handle));
             check(usb::libusb_set_auto_detach_kernel_driver(s.handle, 1))?;
         }
         let mut failure = "No supported USB endpoint".to_string();
@@ -419,6 +431,26 @@ impl Session {
         }
         Ok(())
     }
+    /// The rates a UAC2 clock source lists (RANGE), or none when it does not
+    /// answer: the count first, then the whole list, as Linux asks for it.
+    fn clock_ranges(&self, index: u16) -> Vec<(u32, u32, u32)> {
+        let mut count = [0; 2];
+        if self
+            .control(true, 2, 0x100, index, &mut count, false)
+            .is_err()
+        {
+            return Vec::new();
+        }
+        let count = u16::from_le_bytes(count) as usize;
+        if count == 0 || count > 64 {
+            return Vec::new();
+        }
+        let mut reply = vec![0; 2 + 12 * count];
+        match self.control(true, 2, 0x100, index, &mut reply, false) {
+            Ok(()) => descriptors::clock_ranges(&reply),
+            Err(_) => Vec::new(),
+        }
+    }
     fn configure(&mut self, a: Alternate, f: UsbOutputFormat) -> Result<(), String> {
         let ep = a
             .endpoints
@@ -426,10 +458,11 @@ impl Session {
             .find(|e| e.address & 0x80 == 0 && e.attributes & 3 == 1 && e.attributes & 0x30 == 0)
             .ok_or("No isochronous audio output")?
             .clone();
-        if !(1..=4).contains(&ep.interval) || ep.max_packet == 0 || ep.max_packet > 3072 {
+        if ep.max_packet == 0 || ep.max_packet > 3072 {
             return Err("Unsupported USB interval/packet size".into());
         }
-        let interval = (if self.high_speed { 125 } else { 1000 }) * (1 << (ep.interval - 1));
+        let timing = descriptors::packet_timing(self.bus_speed, ep.interval)?;
+        let interval = timing.interval_us;
         let maximum_frames = (f.sample_rate as u64 * interval as u64).div_ceil(1_000_000) as usize;
         if maximum_frames * f.channels as usize * f.subslot as usize > ep.max_packet {
             return Err("USB endpoint bandwidth too small".into());
@@ -469,12 +502,25 @@ impl Session {
             ))?;
         }
         if a.uac2 {
-            let index = ((a.clock as u16) << 8) | a.control as u16;
+            // The rate belongs to the clock source; a selector in front of it
+            // answers this request with its 1-byte input pin instead.
+            let clock = descriptors::clock_source(&a, |selector| {
+                let mut pin = [0];
+                let index = ((selector as u16) << 8) | a.control as u16;
+                self.control(true, 1, 0x100, index, &mut pin, false)?;
+                Ok(pin[0])
+            })?;
+            let index = ((clock as u16) << 8) | a.control as u16;
             let mut rate = f.sample_rate.to_le_bytes();
             // A read-only clock already at the exact rate needs no SET_CUR.
             let mut current = [0; 4];
             self.control(true, 1, 0x100, index, &mut current, false)?;
             if current != rate {
+                // A rate the clock does not list is never set: some DACs
+                // take the request and then play silence.
+                if !descriptors::clock_offers(&self.clock_ranges(index), f.sample_rate) {
+                    return Err(format!("USB clock does not offer {} Hz", f.sample_rate));
+                }
                 self.control(false, 1, 0x100, index, &mut rate, false)?;
             }
             self.control(true, 1, 0x100, index, &mut current, false)?;
@@ -503,6 +549,7 @@ impl Session {
         self.alternate = a;
         self.endpoint = ep;
         self.feedback = feedback;
+        self.high_speed = timing.high_speed;
         self.interval = interval;
         self.format = f;
         Ok(())

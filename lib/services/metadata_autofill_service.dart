@@ -122,6 +122,7 @@ class MetadataAutofillService {
     required int durationMs,
     required Future<void> Function() syncLyricsSettings,
     required bool Function() isCurrent,
+    String? lyricsExtensionId,
   }) async {
     if (!isCurrent()) return null;
     final title = currentValues['title']?.trim() ?? '';
@@ -236,12 +237,22 @@ class MetadataAutofillService {
 
       if (lyricsTitle.isNotEmpty && lyricsArtist.isNotEmpty) {
         try {
-          final lyricsResult = await PlatformBridge.getLyricsLRCWithSource(
-            rawSpotifyId ?? '',
-            lyricsTitle,
-            lyricsArtist,
-            durationMs: durationMs,
-          );
+          // A chosen lyrics extension answers alone; otherwise every enabled
+          // provider is asked in the order of the lyrics settings.
+          final lyricsResult = lyricsExtensionId == null
+              ? await PlatformBridge.getLyricsLRCWithSource(
+                  rawSpotifyId ?? '',
+                  lyricsTitle,
+                  lyricsArtist,
+                  durationMs: durationMs,
+                )
+              : await PlatformBridge.getLyricsFromProvider(
+                  'extension:${lyricsExtensionId.toLowerCase()}',
+                  trackName: lyricsTitle,
+                  artistName: lyricsArtist,
+                  spotifyId: rawSpotifyId ?? '',
+                  durationMs: durationMs,
+                );
           final lyricsText = lyricsResult['lyrics']?.toString().trim() ?? '';
           final lyricsSource = lyricsResult['source']?.toString().trim() ?? '';
           if (lyricsSource.isNotEmpty) lyricsSourceName = lyricsSource;
@@ -279,10 +290,27 @@ class MetadataAutofillService {
           : null,
       sourceId: providerId?.isNotEmpty == true
           ? providerId!
-          : selectedBest?['provider_id']?.toString().trim() ?? '',
+          : selectedBest?['provider_id']?.toString().trim() ??
+                lyricsExtensionId ??
+                '',
       lyricsSource: selectedBest == null ? lyricsSourceName : null,
     );
   }
+
+  /// Whether lyrics are the only thing [fields] asks for. The source choice
+  /// then lists [lyricsProviders], since a metadata source has no say in
+  /// where lyrics come from.
+  static bool lyricsOnly(Set<String> fields) =>
+      fields.length == 1 && fields.contains('lyrics');
+
+  List<Extension> lyricsProviders(ExtensionState state) =>
+      [
+        for (final extension in state.extensions)
+          if (extension.enabled && extension.hasLyricsProvider) extension,
+      ]..sort(
+        (a, b) =>
+            a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+      );
 
   List<Extension> orderedProviders(ExtensionState state) {
     final providersById = <String, Extension>{

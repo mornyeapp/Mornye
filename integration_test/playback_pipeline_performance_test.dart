@@ -9,7 +9,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
 import 'package:ffi/ffi.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/models/settings.dart';
@@ -158,6 +158,8 @@ class _MeasuredDeck implements PlaybackDeck {
   @override
   bool get isDirect => inner.isDirect;
   @override
+  PlaybackTempoSupport get tempoSupport => inner.tempoSupport;
+  @override
   bool get needsSourceReload => inner.needsSourceReload;
   @override
   Stream<PlaybackDeckState> get onPlayerStateChanged =>
@@ -189,6 +191,7 @@ class _MeasuredDeck implements PlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    int usbMaxSampleRate = 0,
   }) {
     source = path;
     return trace.call(
@@ -201,6 +204,7 @@ class _MeasuredDeck implements PlaybackDeck {
         requiresDsd: requiresDsd,
         allowFixedVolume: allowFixedVolume,
         dapExclusive: dapExclusive,
+        usbMaxSampleRate: usbMaxSampleRate,
       ),
     );
   }

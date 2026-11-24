@@ -3,8 +3,9 @@ import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart'
+    show CupertinoButton, CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart' show pushPage;
 import 'package:mornye/controllers/player_metadata_controller.dart';
@@ -13,6 +14,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -34,7 +36,9 @@ import 'package:mornye/widgets/player_details_sheet.dart';
 import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/playback_source_label.dart';
+import 'package:mornye/widgets/playback_tempo_sheet.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
+import 'package:mornye/widgets/player_track_crossfade.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:share_plus/share_plus.dart';
@@ -64,6 +68,11 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
   /// The panel on the trailing side, kept while it animates closed.
   DesktopInspectorPanel? _lastPanel;
 
+  /// The panel motion's value on its last frame, from 0 closed to 1 open.
+  double? _panelProgress;
+
+  _PlayerColumn? _column;
+
   @override
   void initState() {
     super.initState();
@@ -91,16 +100,19 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
   }
 
   /// Centers the top buttons on the traffic lights' row.
-  static const double _controlsTop = (desktopTitleBarHeight - 36) / 2;
+  static double _controlsTop(BuildContext context) =>
+      (desktopTitleBarHeightFor(context) - 36) / 2;
 
   @override
   Widget build(BuildContext context) {
     final mediaItem = ref.watch(currentMediaItemProvider).value;
     if (context.isMornye) return _buildPlayer(context, mediaItem);
     // Material takes the track's artwork scheme. Providers are read above,
-    // so the scoped builder reads none.
+    // so the scoped builder reads none. The scheme swaps in one step and
+    // only the page background moves, as on the phone player.
     return PlayerArtworkTheme(
       artUri: mediaItem?.artUri?.toString(),
+      fadesSurfaceOnly: true,
       child: Builder(builder: (context) => _buildPlayer(context, mediaItem)),
     );
   }
@@ -127,7 +139,7 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
                 showArtwork: false,
               )
             else
-              ColoredBox(color: colorScheme.surface),
+              PlayerArtworkSurface(surface: colorScheme.surface),
             ValueListenableBuilder<DesktopInspectorPanel?>(
               valueListenable: desktopInspectorPanel,
               builder: (context, panel, _) => mediaItem == null
@@ -142,21 +154,21 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
                   : _layout(context, mediaItem, colorScheme, panel),
             ),
             // The player covers the title bar row, so it drags the window.
-            const Positioned(
+            Positioned(
               top: 0,
               left: 0,
               right: 0,
-              height: desktopTitleBarHeight,
-              child: DesktopWindowDragArea(zoomOnDoubleClick: true),
+              height: desktopTitleBarHeightFor(context),
+              child: const DesktopWindowDragArea(zoomOnDoubleClick: true),
             ),
             // The close button follows the traffic lights, which hide in
             // full screen.
             ValueListenableBuilder<bool>(
               valueListenable: desktopWindowFullScreen,
               builder: (context, fullScreen, button) => PositionedDirectional(
-                top: _controlsTop,
+                top: _controlsTop(context),
                 start: desktopTitleBarInContentFor(context) && !fullScreen
-                    ? desktopWindowControlsWidth + 12
+                    ? desktopWindowControlsWidthFor(context) + 12
                     : 20,
                 child: button!,
               ),
@@ -168,7 +180,7 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
               ),
             ),
             PositionedDirectional(
-              top: _controlsTop,
+              top: _controlsTop(context),
               end: 20,
               width: 260,
               child: _Capsule(
@@ -186,6 +198,26 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Mornye reaches Speed and pitch from its More menu;
+                      // the Material player has no More menu.
+                      if (!mornye) ...[
+                        Consumer(
+                          builder: (context, ref, _) => _RoundButton(
+                            key: const ValueKey('desktop-now-playing-tempo'),
+                            tooltip: context.l10n.playbackTempoTitle,
+                            icon: Icons.speed,
+                            selected: ref.watch(
+                              settingsProvider.select(
+                                (settings) =>
+                                    settings.playbackSpeed != 1 ||
+                                    settings.playbackPitch != 0,
+                              ),
+                            ),
+                            onPressed: () => showPlaybackTempoSheet(context),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                       _RoundButton(
                         tooltip: context.l10n.nowPlayingTabLyrics,
                         icon: mornye
@@ -231,38 +263,80 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
     final motion = panel != null
         ? desktopInspectorMotion(context)
         : const AppMotionSpec(Duration(milliseconds: 260), Curves.easeInCubic);
+    final panels = _panels(
+      context,
+      colorScheme,
+      _panelProgress ?? (panel != null ? 1 : 0),
+    );
     return LayoutBuilder(
-      builder: (context, constraints) => TweenAnimationBuilder<double>(
-        tween: Tween(end: panel != null ? 1 : 0),
-        duration: reduce ? Duration.zero : motion.duration,
-        curve: motion.curve,
-        onEnd: () {
-          if (panel == null && mounted) setState(() => _lastPanel = null);
-        },
-        builder: (context, progress, _) =>
-            _sideLayout(context, constraints, mediaItem, colorScheme, progress),
-      ),
+      builder: (context, constraints) {
+        final player = _playerColumn(
+          mediaItem,
+          colorScheme,
+          // The cover decodes once at its largest size rather than on every
+          // frame of the resize.
+          _columnWidthFor(constraints, 520),
+        );
+        return TweenAnimationBuilder<double>(
+          tween: Tween(end: panel != null ? 1 : 0),
+          duration: reduce ? Duration.zero : motion.duration,
+          curve: motion.curve,
+          onEnd: () {
+            if (panel == null && mounted) setState(() => _lastPanel = null);
+          },
+          builder: (context, progress, panels) {
+            _panelProgress = progress;
+            return _sideLayout(context, constraints, player, panels!, progress);
+          },
+          child: panels,
+        );
+      },
+    );
+  }
+
+  /// The cover column's width under [limit], leaving room for the title and
+  /// transport below.
+  static double _columnWidthFor(BoxConstraints constraints, double limit) =>
+      math.max(240.0, math.min(limit, constraints.maxHeight - 340));
+
+  /// The same column while its inputs stay the same, so the panel motion and
+  /// a window resize do not build it again.
+  _PlayerColumn _playerColumn(
+    MediaItem mediaItem,
+    ColorScheme colorScheme,
+    double decodeSize,
+  ) {
+    final column = _column;
+    if (column != null &&
+        identical(column.mediaItem, mediaItem) &&
+        column.colorScheme == colorScheme &&
+        column.decodeSize == decodeSize) {
+      return column;
+    }
+    return _column = _PlayerColumn(
+      mediaItem: mediaItem,
+      metadata: _metadata,
+      seekPreview: _seekPreview,
+      colorScheme: colorScheme,
+      decodeSize: decodeSize,
     );
   }
 
   /// The cover column moves from the middle to the leading 5/11 of the
-  /// window as [progress] goes from 0 to 1, while the last panel fades in
-  /// on the trailing 6/11.
+  /// window as [progress] goes from 0 to 1, while [panels] fade in on the
+  /// trailing 6/11. Both are built once and only placed here.
   Widget _sideLayout(
     BuildContext context,
     BoxConstraints constraints,
-    MediaItem mediaItem,
-    ColorScheme colorScheme,
+    Widget player,
+    Widget panels,
     double progress,
   ) {
     final width = constraints.maxWidth;
     final size = progress.clamp(0.0, 1.0);
-    // The cover column leaves room for the title and transport below.
-    double columnWidthFor(double limit) =>
-        math.max(240.0, math.min(limit, constraints.maxHeight - 340));
     final columnWidth = lerpDouble(
-      columnWidthFor(520),
-      columnWidthFor(math.min(440.0, width * 0.34)),
+      _columnWidthFor(constraints, 520),
+      _columnWidthFor(constraints, math.min(440.0, width * 0.34)),
       size,
     )!;
     final leading = width * 5 / 11;
@@ -272,26 +346,6 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
     // and shimmer as they slide.
     final pixelRatio = MediaQuery.devicePixelRatioOf(context);
     final slide = ((1 - size) * 48 * pixelRatio).roundToDouble() / pixelRatio;
-    final player = SizedBox(
-      width: columnWidth,
-      child: _PlayerColumn(
-        mediaItem: mediaItem,
-        metadata: _metadata,
-        seekPreview: _seekPreview,
-        colorScheme: colorScheme,
-        artworkSize: columnWidth,
-        // The cover decodes once at its largest size rather than on every
-        // frame of the resize.
-        decodeSize: columnWidthFor(520),
-      ),
-    );
-    final panel = _lastPanel;
-    final showsLyrics = panel == DesktopInspectorPanel.lyrics;
-    // Panels cross-fade only when one replaces another; a panel that opens
-    // shows at once and fades with the panel side.
-    final switchDuration = MediaQuery.disableAnimationsOf(context) || size < 0.5
-        ? Duration.zero
-        : const Duration(milliseconds: 180);
     return Stack(
       children: [
         Positioned.directional(
@@ -300,7 +354,9 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
           top: 0,
           bottom: 0,
           width: columnWidth,
-          child: Center(child: player),
+          child: Center(
+            child: SizedBox(width: columnWidth, child: player),
+          ),
         ),
         PositionedDirectional(
           start: leading,
@@ -316,71 +372,89 @@ class _DesktopNowPlayingState extends ConsumerState<DesktopNowPlaying> {
                 opacity: size,
                 child: Transform.translate(
                   offset: Offset(slide * (rtl ? -1 : 1), 0),
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.fromSTEB(
-                      0,
-                      72,
-                      48,
-                      80,
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // Hidden lyrics follow line positions so they reopen
-                        // centered, without running word animations off screen.
-                        IgnorePointer(
-                          key: const ValueKey('desktop-now-playing-lyrics'),
-                          ignoring: !showsLyrics,
-                          child: ExcludeFocus(
-                            excluding: !showsLyrics,
-                            child: AnimatedOpacity(
-                              opacity: showsLyrics ? 1 : 0,
-                              duration: switchDuration,
-                              child: NoScrollbars(
-                                child: PlayerLyricsSection(
-                                  metadata: _metadata,
-                                  seekPreview: _seekPreview,
-                                  colorScheme: colorScheme,
-                                  isActive: true,
-                                  animateWords: showsLyrics,
-                                  options: LyricsOptionsButton(
-                                    metadata: _metadata,
-                                    colorScheme: colorScheme,
-                                    translationOwner: this,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        AnimatedSwitcher(
-                          duration: switchDuration,
-                          child: panel == DesktopInspectorPanel.upNext
-                              ? KeyedSubtree(
-                                  key: const ValueKey(
-                                    'desktop-now-playing-upNext',
-                                  ),
-                                  child: NoScrollbars(
-                                    child: context.isMornye
-                                        ? MornyePlayerQueue(
-                                            colorScheme: colorScheme,
-                                          )
-                                        : DesktopMaterialQueue(
-                                            colorScheme: colorScheme,
-                                          ),
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
-                    ),
-                  ),
+                  child: panels,
                 ),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  /// Lyrics and Up Next for the last panel, built while the panel motion
+  /// stands at [progress].
+  Widget _panels(
+    BuildContext context,
+    ColorScheme colorScheme,
+    double progress,
+  ) {
+    final panel = _lastPanel;
+    final showsLyrics = panel == DesktopInspectorPanel.lyrics;
+    // Panels cross-fade on the effects spring only when one replaces
+    // another; a panel that opens shows at once and fades with the panel
+    // side.
+    final crossFade = progress < 0.5
+        ? const AppMotionSpec(Duration.zero, Curves.linear)
+        : AppMotion.effects(
+            context,
+            const AppMotionSpec(Duration.zero, Curves.linear),
+            mornye: MornyeMotion.effects,
+          );
+    final switchDuration = crossFade.duration;
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(0, 72, 48, 80),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Hidden lyrics follow line positions so they reopen centered,
+          // without running word animations off screen.
+          IgnorePointer(
+            key: const ValueKey('desktop-now-playing-lyrics'),
+            ignoring: !showsLyrics,
+            child: ExcludeFocus(
+              excluding: !showsLyrics,
+              child: AnimatedOpacity(
+                opacity: showsLyrics ? 1 : 0,
+                duration: switchDuration,
+                curve: crossFade.curve,
+                child: NoScrollbars(
+                  child: PlayerLyricsSection(
+                    metadata: _metadata,
+                    seekPreview: _seekPreview,
+                    colorScheme: colorScheme,
+                    isActive: true,
+                    animateWords: showsLyrics,
+                    options: LyricsOptionsButton(
+                      metadata: _metadata,
+                      colorScheme: colorScheme,
+                      translationOwner: this,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // A closed panel drops the queue at once rather than fading it
+          // out behind the panel side that already has.
+          if (panel != null)
+            AnimatedSwitcher(
+              duration: switchDuration,
+              switchInCurve: crossFade.curve,
+              switchOutCurve: crossFade.leaving,
+              child: panel == DesktopInspectorPanel.upNext
+                  ? KeyedSubtree(
+                      key: const ValueKey('desktop-now-playing-upNext'),
+                      child: NoScrollbars(
+                        child: context.isMornye
+                            ? MornyePlayerQueue(colorScheme: colorScheme)
+                            : DesktopMaterialQueue(colorScheme: colorScheme),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -391,7 +465,6 @@ class _PlayerColumn extends StatelessWidget {
     required this.metadata,
     required this.seekPreview,
     required this.colorScheme,
-    required this.artworkSize,
     required this.decodeSize,
   });
 
@@ -399,9 +472,8 @@ class _PlayerColumn extends StatelessWidget {
   final PlayerMetadataController metadata;
   final PlaybackSeekPreview seekPreview;
   final ColorScheme colorScheme;
-  final double artworkSize;
 
-  /// The width the cover is decoded at, at least [artworkSize].
+  /// The width the cover is decoded at, at least the column's width.
   final double decodeSize;
 
   @override
@@ -414,6 +486,7 @@ class _PlayerColumn extends StatelessWidget {
       colorScheme: colorScheme,
       iconSize: 96,
       cacheWidth: (decodeSize * MediaQuery.devicePixelRatioOf(context)).round(),
+      crossfade: playerTrackChangeMotion(context),
     );
     final subtitle = [
       mediaItem.artist,
@@ -423,8 +496,9 @@ class _PlayerColumn extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox.square(
-          dimension: artworkSize,
+        // As wide as the column, which the panel motion resizes.
+        AspectRatio(
+          aspectRatio: 1,
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: corners,
@@ -445,34 +519,42 @@ class _PlayerColumn extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  PlayerMetadataTitle(
-                    mediaItem: mediaItem,
-                    metadata: metadata,
-                    style:
-                        (mornye ? textTheme.titleMedium : textTheme.titleLarge)
-                            ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
-                    maxLines: 1,
-                  ),
-                  if (subtitle.isNotEmpty)
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              child: PlayerTrackCrossfade(
+                trackKey: mediaItem.id,
+                alignment: AlignmentDirectional.topStart,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    PlayerMetadataTitle(
+                      mediaItem: mediaItem,
+                      metadata: metadata,
                       style:
-                          (mornye ? textTheme.bodyMedium : textTheme.titleSmall)
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                          (mornye
+                                  ? textTheme.titleMedium
+                                  : textTheme.titleLarge)
+                              ?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface,
+                              ),
+                      maxLines: 1,
                     ),
-                  PlaybackSourceLabel(
-                    item: mediaItem,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ],
+                    if (subtitle.isNotEmpty)
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            (mornye
+                                    ? textTheme.bodyMedium
+                                    : textTheme.titleSmall)
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    PlaybackSourceLabel(
+                      item: mediaItem,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
               ),
             ),
             if (mornye) ...[
@@ -554,11 +636,13 @@ class _PlayerMoreButton extends ConsumerWidget {
       String value,
       String label, {
       IconData? icon,
+      String? subtitle,
       bool disclosure = false,
       bool selected = false,
     }) => MornyeMenuAction(
       icon: icon,
       label: label,
+      subtitle: subtitle,
       disclosure: disclosure,
       selected: selected,
       onPressed: () => Navigator.of(menuContext).pop(value),
@@ -589,6 +673,15 @@ class _PlayerMoreButton extends ConsumerWidget {
               selected: loved,
             ),
             row(menuContext, 'equalizer', l10n.equalizerTitle),
+            row(
+              menuContext,
+              'tempo',
+              l10n.playbackTempoTitle,
+              subtitle: playbackTempoSettingsSummary(
+                l10n,
+                ref.read(settingsProvider),
+              ),
+            ),
           ],
           [
             if ((mediaItem.album ?? '').trim().isNotEmpty)
@@ -623,6 +716,8 @@ class _PlayerMoreButton extends ConsumerWidget {
         );
       case 'equalizer':
         await pushPage<void>(context, (_) => const EqualizerScreen());
+      case 'tempo':
+        await showPlaybackTempoSheet(context);
       case 'album':
         await openPlayingAlbum(
           context,

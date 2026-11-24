@@ -1,17 +1,22 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
+import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mini_player.dart';
+import 'package:mornye/widgets/player_artwork.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/tooltip_finder.dart';
 
 class _Controller implements MusicPlayerController {
   _Controller({this.onDismiss});
@@ -50,6 +55,14 @@ class _RemotePlayback implements RemotePlayback {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _PushObserver extends NavigatorObserver {
+  final pushed = <Route<dynamic>>[];
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      pushed.add(route);
+}
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -66,6 +79,7 @@ void main() {
       bool loading = false,
       RemotePlayback? remote,
       VoidCallback? onDismiss,
+      NavigatorObserver? observer,
     }) async {
       final controller = _Controller(onDismiss: onDismiss);
       await tester.pumpWidget(
@@ -91,6 +105,7 @@ void main() {
             backdropBlurEnabledProvider.overrideWithValue(false),
           ],
           child: MaterialApp(
+            navigatorObservers: [?observer],
             theme: configuration.mornye
                 ? MornyeTheme.build(Brightness.light)
                 : AppTheme.light(),
@@ -239,10 +254,10 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    if (!configuration.mornye) {
+    {
       for (final dx in [-100.0, 100.0]) {
-        testWidgets('Material: paused swipe $dx closes the player and a new '
-            'song shows it again', (tester) async {
+        testWidgets('${configuration.name}: paused swipe $dx closes the '
+            'player and a new song shows it again', (tester) async {
           final mediaItems = StreamController<MediaItem?>();
           addTearDown(mediaItems.close);
           final controller = await pumpPlayer(
@@ -253,7 +268,7 @@ void main() {
           mediaItems.add(const MediaItem(id: 'song', title: 'Song'));
           await tester.pumpAndSettle();
 
-          expect(find.byTooltip('Dismiss'), findsNothing);
+          expect(findByTooltip('Dismiss'), findsNothing);
           await tester.timedDrag(
             find.text('Song'),
             Offset(dx, 0),
@@ -272,9 +287,8 @@ void main() {
         });
       }
 
-      testWidgets('Material: loading swipes leave the player open', (
-        tester,
-      ) async {
+      testWidgets('${configuration.name}: loading swipes leave the player '
+          'open', (tester) async {
         final controller = await pumpPlayer(tester, loading: true);
         for (final dx in [-100.0, 100.0]) {
           await tester.timedDrag(
@@ -289,9 +303,8 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
-      testWidgets('Material: paused remote swipes keep track navigation', (
-        tester,
-      ) async {
+      testWidgets('${configuration.name}: paused remote swipes keep track '
+          'navigation', (tester) async {
         final controller = await pumpPlayer(tester, remote: _RemotePlayback());
         for (final dx in [-100.0, 100.0]) {
           await tester.timedDrag(
@@ -305,25 +318,153 @@ void main() {
         expect(find.text('Song'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
-    } else {
-      testWidgets(
-        '${configuration.name}: paused swipes keep track navigation',
-        (tester) async {
-          final controller = await pumpPlayer(tester);
-          for (final dx in [-100.0, 100.0]) {
-            await tester.timedDrag(
-              find.text('Song'),
-              Offset(dx, 0),
-              const Duration(milliseconds: 600),
-            );
-            await tester.pumpAndSettle();
+    }
+
+    for (final reducedMotion in [false, true]) {
+      testWidgets('${configuration.name}: the title lines follow a sideways '
+          'drag while the cover stays (reduced motion: $reducedMotion)', (
+        tester,
+      ) async {
+        if (reducedMotion) {
+          tester.platformDispatcher.accessibilityFeaturesTestValue =
+              const FakeAccessibilityFeatures(disableAnimations: true);
+          addTearDown(
+            tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+          );
+        }
+        final controller = await pumpPlayer(tester, playing: true);
+        final title = find.text('Song');
+        final cover = find.byType(PlayerArtwork);
+        final start = tester.getTopLeft(title);
+        final coverRect = tester.getRect(cover);
+
+        final gesture = await tester.startGesture(tester.getCenter(title));
+        for (var step = 0; step < 4; step++) {
+          await gesture.moveBy(const Offset(-10, 0));
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        // The Mornye glass leans toward a held finger, carrying the cover
+        // with it; only the lines move against the cover.
+        final coverShift = tester.getCenter(cover).dx - coverRect.center.dx;
+        final moved = tester.getTopLeft(title).dx - start.dx;
+        expect(coverShift.abs(), lessThan(6));
+        if (reducedMotion) {
+          expect(moved - coverShift, closeTo(0, 0.5));
+        } else {
+          expect(moved - coverShift, lessThan(-20));
+        }
+
+        // A short, slow release keeps the song and returns the lines.
+        await tester.pump(const Duration(milliseconds: 250));
+        await gesture.up();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 140));
+        if (!reducedMotion) {
+          expect(tester.getTopLeft(title).dx, greaterThan(start.dx + moved));
+        }
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(title), start);
+        expect(controller.calls, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final reducedMotion in [false, true]) {
+      testWidgets('${configuration.name}: the full player opens from the mini '
+          'player bounds (reduced motion: $reducedMotion)', (tester) async {
+        if (reducedMotion) {
+          tester.platformDispatcher.accessibilityFeaturesTestValue =
+              const FakeAccessibilityFeatures(disableAnimations: true);
+          addTearDown(
+            tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+          );
+        }
+        final observer = _PushObserver();
+        await pumpPlayer(tester, observer: observer);
+        await tester.tap(find.text('Song'));
+        final route = observer.pushed.whereType<NowPlayingRoute>().single;
+        final geometry = route.miniPlayerGeometry!()!;
+        // The surface without the Mornye bar's bottom padding.
+        final mini = tester.getRect(find.byType(MiniPlayer));
+        expect(geometry.surface.topLeft, mini.topLeft);
+        expect(geometry.surface.width, mini.width);
+        if (configuration.mornye) {
+          expect(route.morph, isNull);
+        } else {
+          expect(
+            route.morph!.duration,
+            reducedMotion ? Duration.zero : greaterThan(Duration.zero),
+          );
+        }
+        // The test leaves the full player itself unbuilt.
+        route.navigator!.removeRoute(route);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+
+    testWidgets('${configuration.name}: a new song fades the lines through', (
+      tester,
+    ) async {
+      final mediaItems = StreamController<MediaItem?>();
+      addTearDown(mediaItems.close);
+      await pumpPlayer(tester, mediaItems: mediaItems.stream);
+      mediaItems.add(
+        const MediaItem(id: 'first', title: 'First', artist: 'Artist A'),
+      );
+      await tester.pumpAndSettle();
+      mediaItems.add(
+        const MediaItem(id: 'second', title: 'Second', artist: 'Artist B'),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.text('First'), findsOneWidget);
+      expect(find.text('Second'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.text('First'), findsNothing);
+      expect(find.text('Second'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('${configuration.name}: an upward drag ticks once where '
+        'letting go opens the player', (tester) async {
+      final haptics = <Object?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            haptics.add(call.arguments);
           }
-          expect(controller.calls, ['next', 'previous']);
-          expect(find.text('Song'), findsOneWidget);
-          expect(tester.takeException(), isNull);
+          return null;
         },
       );
-    }
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      final observer = _PushObserver();
+      final controller = await pumpPlayer(tester, observer: observer);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('Song')),
+      );
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump();
+      await gesture.moveBy(const Offset(0, -12));
+      await tester.pump();
+      expect(haptics, isEmpty);
+      await gesture.moveBy(const Offset(0, -20));
+      await tester.pump();
+      await gesture.moveBy(const Offset(0, -20));
+      await tester.pump();
+      expect(haptics, hasLength(1));
+      // Cancelling keeps the player closed.
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(observer.pushed.whereType<NowPlayingRoute>(), isEmpty);
+      expect(controller.calls, isEmpty);
+    });
 
     testWidgets('${configuration.name}: short and cancelled drags do not act', (
       tester,
@@ -355,7 +496,7 @@ void main() {
         frequency: 120,
       );
       await tester.pumpAndSettle();
-      expect(controller.calls, [configuration.mornye ? 'next' : 'dismiss']);
+      expect(controller.calls, ['dismiss']);
     });
 
     testWidgets('${configuration.name}: Home carousel and playback buttons '
@@ -368,11 +509,11 @@ void main() {
       expect(carousel.offset, greaterThan(0));
       expect(controller.calls, isEmpty);
 
-      await tester.tap(find.byTooltip('Play'));
+      await tester.tap(findByTooltip('Play'));
       await tester.pumpAndSettle();
       expect(controller.calls, ['play']);
       if (!configuration.compact) {
-        await tester.tap(find.byTooltip('Next track'));
+        await tester.tap(findByTooltip('Next track'));
         await tester.pumpAndSettle();
         expect(controller.calls, ['play', 'next']);
       }

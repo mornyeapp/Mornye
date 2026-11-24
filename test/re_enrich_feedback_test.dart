@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -87,7 +87,7 @@ void main() {
         tester.view.physicalSize = const Size(400, 900);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
-        Future<bool>? result;
+        Future<List<BatchReEnrichPreview>?>? result;
         await tester.pumpWidget(
           ProviderScope(
             child: MaterialApp(
@@ -150,7 +150,7 @@ void main() {
         expect(find.text('Apply changes').hitTestable(), findsOneWidget);
         await tester.tap(find.text('Apply changes'));
         await tester.pumpAndSettle();
-        expect(await result, isTrue);
+        expect(await result, hasLength(300));
         expect(tester.takeException(), isNull);
       },
     );

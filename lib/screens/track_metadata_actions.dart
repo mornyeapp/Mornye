@@ -188,7 +188,7 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
             .read(localLibraryProvider.notifier)
             .removeItem(cueItem.id);
       } else {
-        if (!await deleteFile(filePath)) {
+        if (!await container.read(songLeftoversProvider).delete(filePath)) {
           if (screenContext.mounted) {
             ScaffoldMessenger.of(screenContext).showSnackBar(
               SnackBar(
@@ -236,6 +236,7 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
             title: trackName,
             artist: artistName,
             album: albumName,
+            genre: genre,
             coverUrl: playbackCover,
             duration: durationSeconds != null && durationSeconds > 0
                 ? Duration(seconds: durationSeconds)
@@ -306,18 +307,5 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
     return '${date.day} ${shortMonthNames[date.month - 1]} ${date.year}, '
         '${date.hour.toString().padLeft(2, '0')}:'
         '${date.minute.toString().padLeft(2, '0')}';
-  }
-
-  IconData _getServiceIcon(String service) {
-    switch (service.toLowerCase()) {
-      case MusicServices.tidal:
-        return Icons.waves;
-      case MusicServices.qobuz:
-        return Icons.album;
-      case MusicServices.amazon:
-        return Icons.shopping_cart;
-      default:
-        return Icons.cloud_download;
-    }
   }
 }

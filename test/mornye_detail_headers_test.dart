@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -12,6 +12,8 @@ import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   testWidgets('artist logo uses a bounded aspect-preserving shared decode', (
@@ -378,7 +380,7 @@ void main() {
     expect(fade(), 1);
     expect(filter().enabled, isFalse);
     expect(TickerMode.valuesOf(artwork).enabled, isFalse);
-    expect(find.byTooltip('Back').hitTestable(), findsOneWidget);
+    expect(findByTooltip('Back').hitTestable(), findsOneWidget);
 
     controller.jumpTo(0);
     await tester.pumpAndSettle();
@@ -516,7 +518,7 @@ void main() {
           final originalArt = tester.getRect(artwork);
           final originalPlay = tester.getRect(play);
           final originalTracks = tester.getRect(tracks);
-          final originalBack = tester.getRect(find.byTooltip('Back'));
+          final originalBack = tester.getRect(findByTooltip('Back'));
           final element = tester.element(artwork);
           final gesture = await tester.startGesture(const Offset(195, 250));
           await gesture.moveBy(const Offset(0, 150));
@@ -536,7 +538,7 @@ void main() {
           expect(tester.getSize(play), originalPlay.size);
           expect(tester.getRect(play).top, greaterThan(originalPlay.top));
           expect(tester.getRect(tracks).top, greaterThan(originalTracks.top));
-          expect(tester.getRect(find.byTooltip('Back')), originalBack);
+          expect(tester.getRect(findByTooltip('Back')), originalBack);
           expect(play.hitTestable(), findsOneWidget);
           expect(tester.element(artwork), same(element));
           await gesture.up();
@@ -628,7 +630,7 @@ void main() {
               )
               .last;
           expect(tester.getTopLeft(albumTitle).dy, 370);
-          expect(find.byTooltip('Back').hitTestable(), findsOneWidget);
+          expect(findByTooltip('Back').hitTestable(), findsOneWidget);
           await tester.ensureVisible(find.text('Play'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('Play'));
@@ -637,8 +639,8 @@ void main() {
           expect(shuffles, 1);
           controller.jumpTo(1300);
           await tester.pumpAndSettle();
-          expect(find.byTooltip('Back').hitTestable(), findsOneWidget);
-          await tester.tap(find.byTooltip('Back'));
+          expect(findByTooltip('Back').hitTestable(), findsOneWidget);
+          await tester.tap(findByTooltip('Back'));
           expect(backs, 1);
           expect(tester.takeException(), isNull);
         },
@@ -695,17 +697,63 @@ void main() {
     expect(banner.top, 0);
     expect(banner.contains(action.bottomRight), isTrue);
     expect(action.center.dy, lessThan(520));
-    expect(find.byTooltip('Back').hitTestable(), findsOneWidget);
+    expect(findByTooltip('Back').hitTestable(), findsOneWidget);
     await tester.tap(find.text('Download'));
     expect(downloads, 1);
     controller.jumpTo(1000);
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Back').hitTestable(), findsOneWidget);
+    expect(findByTooltip('Back').hitTestable(), findsOneWidget);
     controller.jumpTo(0);
     await tester.pumpAndSettle();
     expect(find.text('Download').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  for (final (size, width) in [
+    // A wide phone, or a small Interface size, spans the width.
+    (const Size(480, 1120), 480.0),
+    // A portrait tablet keeps the cap.
+    (const Size(820, 1180), 440.0),
+  ]) {
+    testWidgets('square album artwork is $width wide on $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: MornyeTheme.build(Brightness.dark),
+            home: CollectionScaffold(
+              scrollController: controller,
+              isSelectionMode: false,
+              onExitSelectionMode: () {},
+              bottomInset: 0,
+              appBar: const AlbumDetailHeader(
+                title: 'Album title',
+                expandedHeight: 400,
+                showTitleInAppBar: false,
+                immersive: true,
+                background: ColoredBox(
+                  key: ValueKey('album-cover'),
+                  color: Colors.orange,
+                ),
+              ),
+              slivers: const [
+                SliverToBoxAdapter(child: SizedBox(height: 2000)),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final cover = tester.getRect(find.byKey(const ValueKey('album-cover')));
+      expect(cover.width, width);
+      expect(cover.center.dx, size.width / 2);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets(
     'artist identity grows with text and retains navigation after scroll',
@@ -754,11 +802,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.drag(find.byType(CustomScrollView), const Offset(0, -600));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Favorite'));
+      await tester.tap(findByTooltip('Favorite'));
       expect(favorites, 1);
       controller.jumpTo(1000);
       await tester.pumpAndSettle();
-      expect(find.byTooltip('Back').hitTestable(), findsOneWidget);
+      expect(findByTooltip('Back').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

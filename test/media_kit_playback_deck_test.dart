@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -97,8 +98,8 @@ void main() {
       engine.completedEvents.add(true);
       await Future<void>.delayed(Duration.zero);
       expect(events, isEmpty);
-      await engine.advance();
-      await Future<void>.delayed(Duration.zero);
+      await engine.advance(started: false);
+      await _settle();
       expect(events, ['next']);
       expect(deck.state, PlaybackDeckState.playing);
       expect(engine.volume, closeTo(100 * 0.7368063, 0.001));
@@ -106,6 +107,11 @@ void main() {
         engine.calls.where((call) => call.first == 'open'),
         hasLength(opens),
       );
+      // mpv keeps the open device only if the option still reads `weak`
+      // when the queued song's first audio is ready.
+      expect(engine.properties['gapless-audio'], 'weak');
+      engine.finishStart();
+      await _settle();
       expect(engine.properties['gapless-audio'], 'no');
       engine.completedEvents.add(true);
       await Future<void>.delayed(Duration.zero);
@@ -457,6 +463,200 @@ void main() {
     await deck.dispose();
     expect(playbackEqualizerError.value, isNull);
     expect(engine.disposed, isTrue);
+  });
+
+  group('speed and pitch', () {
+    tearDown(() {
+      playbackSpeed.value = 1;
+      playbackPitch.value = PlaybackPitch.none;
+    });
+
+    List<String> speeds() => [
+      for (final call in engine.calls)
+        if (call[0] == 'speed') call[1],
+    ];
+
+    test('the speed multiplies the rate, live and while paused', () async {
+      await deck.setFileSource('/song.flac');
+      await _settle();
+      expect(speeds(), isEmpty);
+      playbackSpeed.value = 1.5;
+      await _settle();
+      expect(speeds(), ['1.5']);
+      await deck.setPlaybackRate(1.1);
+      expect(double.parse(speeds().last), closeTo(1.65, 1e-9));
+      // Pitch kept: mpv's own correction, the default, stays on.
+      expect(engine.properties, isNot(contains('audio-pitch-correction')));
+      expect(engine.calls.where((call) => call[0] == 'play'), isEmpty);
+      expect(deck.tempoSupport, PlaybackTempoSupport.full);
+    });
+
+    test('a following pitch turns mpv pitch correction off', () async {
+      playbackPitch.value = const PlaybackPitch(followsRate: true);
+      await _settle();
+      expect(engine.properties['audio-pitch-correction'], 'no');
+      expect(engine.properties['af'], '');
+      playbackPitch.value = PlaybackPitch.none;
+      await _settle();
+      expect(engine.properties['audio-pitch-correction'], 'yes');
+    });
+
+    test('a shift joins the equalizer chain through rubberband', () async {
+      playbackEqualizer.value = const EqualizerSettings(enabled: true);
+      playbackSpeed.value = 1.25;
+      playbackPitch.value = const PlaybackPitch(semitones: 12);
+      await _settle();
+      final af = engine.properties['af']!;
+      expect(af, contains('equalizer@band9'));
+      expect(af, endsWith('rubberband@pitch=pitch=2:pitchq=quality]'));
+      expect(speeds().last, '1.25');
+      // Speed changes leave a rubberband chain as it is.
+      final writes = engine.filterWrites.length;
+      playbackSpeed.value = 1.5;
+      await _settle();
+      expect(engine.filterWrites.length, writes);
+      expect(speeds().last, '1.5');
+      // Turning the equalizer off keeps the shift.
+      playbackEqualizer.value = const EqualizerSettings();
+      await _settle();
+      expect(
+        engine.properties['af'],
+        '@mornye_format:format=format=floatp,'
+        '@mornye_dsp:lavfi=[rubberband@pitch=pitch=2:pitchq=quality]',
+      );
+      playbackPitch.value = PlaybackPitch.none;
+      await _settle();
+      expect(engine.properties['af'], '');
+    });
+
+    test('without rubberband the shift resamples through scaletempo', () async {
+      engine.missingFilters = {'rubberband'};
+      playbackSpeed.value = 1.5;
+      playbackPitch.value = const PlaybackPitch(semitones: 12);
+      await _settle();
+      expect(
+        engine.filterWrites.where(
+          (call) => call[2].startsWith('@mornye_probe'),
+        ),
+        [
+          ['set', 'af', '@mornye_probe:lavfi-rubberband'],
+        ],
+      );
+      expect(engine.properties['af'], '@mornye_tempo:scaletempo=scale=0.75');
+      expect(engine.properties['audio-pitch-correction'], 'no');
+      expect(speeds().last, '2.0');
+      expect(deck.tempoSupport, PlaybackTempoSupport.full);
+      // The chain follows each speed.
+      await deck.setPlaybackRate(0.5);
+      expect(engine.properties['af'], '@mornye_tempo:scaletempo=scale=0.375');
+    });
+
+    test(
+      'a refused shift reports speed only and keeps the equalizer',
+      () async {
+        var notices = 0;
+        void counted() => notices++;
+        playbackTempoSupportRevision.addListener(counted);
+        addTearDown(() => playbackTempoSupportRevision.removeListener(counted));
+        engine.rejectFilters = true;
+        playbackSpeed.value = 1.25;
+        playbackPitch.value = const PlaybackPitch(semitones: 3);
+        await _settle();
+        expect(deck.tempoSupport, PlaybackTempoSupport.speedOnly);
+        expect(notices, 1);
+        expect(engine.properties['af'], '');
+        expect(speeds().last, '1.25');
+        expect(playbackEqualizerError.value, isNull);
+        engine.rejectFilters = false;
+        playbackPitch.value = const PlaybackPitch(semitones: 4);
+        await _settle();
+        expect(deck.tempoSupport, PlaybackTempoSupport.full);
+        expect(engine.properties['af'], contains('rubberband@pitch'));
+      },
+    );
+
+    test('a deck created later starts at the current values', () async {
+      playbackSpeed.value = 0.75;
+      final other = FakeMpvEngine();
+      final second = MediaKitPlaybackDeck(playerId: 'mpv-late', engine: other);
+      await Future<void>.delayed(Duration.zero);
+      expect(other.calls.where((call) => call[0] == 'speed'), [
+        ['speed', '0.75'],
+      ]);
+      await second.dispose();
+    });
+  });
+
+  group('quitting', () {
+    test('stops the engine and waits until its output is closed', () async {
+      final positions = <Duration>[];
+      final states = <PlaybackDeckState>[];
+      deck.onPositionChanged.listen(positions.add);
+      deck.startPositionUpdates(const Duration(milliseconds: 10));
+      await deck.setFileSource('/song.flac');
+      await deck.resume();
+      engine.position = const Duration(seconds: 3);
+      // libmpv closes the output a moment after `stop` returns.
+      engine.properties['current-ao'] = 'wasapi';
+      Timer(
+        const Duration(milliseconds: 40),
+        () => engine.properties.remove('current-ao'),
+      );
+      deck.onPlayerStateChanged.listen(states.add);
+
+      await MediaKitPlaybackDeck.releaseOutputs();
+
+      expect(engine.calls.last, ['stop']);
+      expect(engine.properties, isNot(contains('current-ao')));
+      // The stopped engine reports zero, which is not where the song was.
+      engine.position = Duration.zero;
+      positions.clear();
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(positions, isEmpty);
+      expect(await deck.getCurrentPosition(), const Duration(seconds: 3));
+      // No state change the player would save as the end of the song.
+      expect(states, isEmpty);
+      expect(deck.state, PlaybackDeckState.playing);
+
+      // A song opened after a quit that did not happen plays as usual.
+      await deck.setFileSource('/next.flac');
+      await deck.resume();
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(positions, isNotEmpty);
+      expect(await deck.getCurrentPosition(), Duration.zero);
+    });
+
+    test('does not wait past the timeout for an output left open', () async {
+      await deck.setFileSource('/song.flac');
+      await deck.resume();
+      engine.properties['current-ao'] = 'wasapi';
+      final watch = Stopwatch()..start();
+      await MediaKitPlaybackDeck.releaseOutputs(
+        timeout: const Duration(milliseconds: 60),
+      );
+      expect(engine.calls, contains(equals(['stop'])));
+      expect(watch.elapsedMilliseconds, lessThan(1000));
+    });
+
+    testWidgets('a quit request closes the output and lets the app quit', (
+      tester,
+    ) async {
+      MediaKitPlaybackDeck.releaseOutputsOnExit();
+      final response = await tester.runAsync(
+        tester.binding.handleRequestAppExit,
+      );
+      expect(response, AppExitResponse.exit);
+      expect(engine.calls, contains(equals(['stop'])));
+    });
+
+    test('leaves a disposed deck alone', () async {
+      final other = FakeMpvEngine();
+      final disposed = MediaKitPlaybackDeck(playerId: 'gone', engine: other);
+      await disposed.dispose();
+      other.calls.clear();
+      await MediaKitPlaybackDeck.releaseOutputs();
+      expect(other.calls, isEmpty);
+    });
   });
 
   group('exclusive output', () {

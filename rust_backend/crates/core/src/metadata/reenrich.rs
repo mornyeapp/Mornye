@@ -1,11 +1,56 @@
 //! Re-enrichment input, candidate policy and preview metadata. No file access.
 
 use crate::json::lenient_deserialize;
-use crate::matching::lowercase;
-use crate::resolver::{artists_match, titles_match, track_identity_title, track_titles_match};
+use crate::lyrics::matching::{normalize_loose_artist, normalize_title};
+use crate::matching::{lowercase, uppercase};
+use crate::resolver::{
+    artists_match, same_track_title, titles_match, track_identity_title, track_titles_match,
+};
 use serde::Serialize;
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::LazyLock;
+
+/// Candidates returned to the picker; enough for every plausible release.
+pub const MAX_CANDIDATES: usize = 15;
+
+/// How closely a provider track matches the song being re-enriched.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Match {
+    Other,
+    Weak,
+    Strong,
+    Exact,
+}
+
+impl Match {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Exact => "exact",
+            Self::Strong => "strong",
+            Self::Weak => "weak",
+            Self::Other => "other",
+        }
+    }
+
+    fn parse(value: &str) -> Self {
+        match value {
+            "exact" => Self::Exact,
+            "strong" => Self::Strong,
+            "weak" => Self::Weak,
+            _ => Self::Other,
+        }
+    }
+}
+
+/// One track found for a re-enrich, before ranking.
+pub struct Candidate {
+    pub track: Value,
+    /// The built-in ISRC/ID catalog lookup, which yields to providers.
+    pub catalog: bool,
+    /// Position of the provider in the search order; lower asks first.
+    pub priority: usize,
+}
 
 #[derive(Clone, Default, Serialize)]
 pub struct Request {
@@ -36,6 +81,12 @@ pub struct Request {
     pub update_fields: Option<Vec<Option<String>>>,
     pub preview_only: bool,
     pub replace_release_metadata: bool,
+    pub include_candidates: bool,
+    /// Lists candidates without giving up the automatic early stop, for a
+    /// batch whose songs are mostly matched without a pick.
+    pub quick_candidates: bool,
+    pub selected_candidate: Option<Value>,
+    pub provider_ids: Option<Vec<Option<String>>>,
 }
 lenient_deserialize!(Request {
     "file_path" => file_path, "cover_url" => cover_url, "header_video" => header_video,
@@ -50,6 +101,8 @@ lenient_deserialize!(Request {
     "duration_ms" => duration_ms, "search_online" => search_online,
     "update_fields" => update_fields, "preview_only" => preview_only,
     "replace_release_metadata" => replace_release_metadata,
+    "include_candidates" => include_candidates, "quick_candidates" => quick_candidates,
+    "selected_candidate" => selected_candidate, "provider_ids" => provider_ids,
 });
 
 pub fn text<'a>(value: &'a Value, key: &str) -> &'a str {
@@ -152,16 +205,65 @@ impl Request {
             )
     }
 
-    pub fn query(&self) -> String {
-        let mut parts: Vec<_> = [&self.track_name, &self.artist_name]
-            .into_iter()
-            .filter(|value| !placeholder(value))
-            .map(|value| value.trim())
-            .collect();
-        if parts.is_empty() && !placeholder(&self.album_name) {
-            parts.push(self.album_name.trim());
+    /// A candidate exactly as an earlier preview returned it, chosen by the user.
+    pub fn selected_candidate(&self) -> Option<&Value> {
+        self.selected_candidate
+            .as_ref()
+            .filter(|track| track.as_object().is_some_and(|track| !track.is_empty()))
+    }
+
+    /// Metadata providers the search is limited to, in the order to ask them.
+    /// Empty means every enabled provider in the user's priority order.
+    pub fn provider_ids(&self) -> Vec<String> {
+        let mut seen = BTreeSet::new();
+        self.provider_ids
+            .iter()
+            .flatten()
+            .flatten()
+            .map(|id| id.trim())
+            .filter(|id| !id.is_empty() && seen.insert(id.to_owned()))
+            .map(Into::into)
+            .collect()
+    }
+
+    /// Candidates are only listed for a preview, which is what a picker shows.
+    pub fn wants_candidates(&self) -> bool {
+        self.include_candidates && self.preview_only
+    }
+
+    /// Whether the search may stop at the first provider with a confident
+    /// match. A picker for one song asks every provider instead; a batch
+    /// keeps the stop, since asking every provider for every song of a large
+    /// library multiplies its searches.
+    pub fn stops_when_confident(&self) -> bool {
+        !self.wants_candidates() || self.quick_candidates
+    }
+
+    /// The whole artist string or the album finds songs from other releases,
+    /// so the title goes with the primary artist first, then with the album.
+    pub fn queries(&self) -> Vec<String> {
+        let known = |value: &str| (!placeholder(value)).then(|| value.trim().to_owned());
+        let mut queries = Vec::new();
+        if let Some(title) = known(&self.track_name) {
+            let artist = known(&self.artist_name)
+                .or_else(|| known(&self.album_artist))
+                .map(|artist| primary_artist(&artist).to_owned())
+                .unwrap_or_default();
+            queries.push(format!("{title} {artist}"));
+            if let Some(album) = known(&self.album_name) {
+                queries.push(format!("{title} {album}"));
+            }
+        } else if let Some(other) = known(&self.artist_name).or_else(|| known(&self.album_name)) {
+            // Without a title only an ISRC can match, but the search may still
+            // return the song with one.
+            queries.push(other);
         }
-        parts.join(" ").trim().into()
+        let mut seen = BTreeSet::new();
+        queries
+            .into_iter()
+            .map(|query| query.trim().to_owned())
+            .filter(|query| !query.is_empty() && seen.insert(lowercase(query)))
+            .collect()
     }
 
     pub fn same_release(&self, track: &Value) -> bool {
@@ -261,6 +363,20 @@ impl Request {
         }
         if number(track, "duration_ms") > 0 {
             self.duration_ms = number(track, "duration_ms");
+        }
+    }
+
+    /// Extras from another source only fill values the winning track and the
+    /// file both lack; they never replace what the winner supplied.
+    pub fn fill_empty_extras(&mut self, genre: &str, label: &str, copyright: &str) {
+        for (target, value) in [
+            (&mut self.genre, genre),
+            (&mut self.label, label),
+            (&mut self.copyright, copyright),
+        ] {
+            if target.is_empty() && !value.is_empty() {
+                *target = value.into();
+            }
         }
     }
 
@@ -379,73 +495,194 @@ impl Request {
         true
     }
 
-    pub fn select<'a>(&self, tracks: &'a [Value]) -> Option<&'a Value> {
-        let isrc = self.isrc.trim();
-        let album = self.album_name.trim();
-        let title = if placeholder(&self.track_name) {
+    fn known_title(&self) -> &str {
+        if placeholder(&self.track_name) {
             ""
         } else {
-            &self.track_name
-        };
-        let artist = if placeholder(&self.artist_name) {
-            ""
-        } else {
-            &self.artist_name
-        };
-        let mut best = None;
-        let mut best_score = i32::MIN;
-        for track in tracks {
-            let exact = !isrc.is_empty() && isrc.eq_ignore_ascii_case(text(track, "isrc").trim());
-            let title_matches = !title.is_empty()
-                && !text(track, "name").is_empty()
-                && titles_match(title, text(track, "name"));
-            let artist_matches = !artist.is_empty()
-                && !text(track, "artists").is_empty()
-                && artists_match(artist, text(track, "artists"));
-            let album_matches = !album.is_empty()
-                && !text(track, "album_name").is_empty()
-                && titles_match(album, text(track, "album_name"));
-            let verified = self.verified(track);
-            if !exact
-                && ((!title.is_empty() && !title_matches)
-                    || (!artist.is_empty() && !artist_matches)
-                    || (title.is_empty()
-                        && artist.is_empty()
-                        && ((!album.is_empty() && !album_matches)
-                            || (album.is_empty() && !verified))))
-            {
-                continue;
-            }
-            let mut score = i32::from(verified) * 2000
-                + i32::from(exact) * 10000
-                + i32::from(title_matches) * 400
-                + i32::from(artist_matches) * 320;
-            if !album.is_empty() && !text(track, "album_name").is_empty() {
-                if album_matches {
-                    score += 120;
-                } else if lowercase(album).contains(&lowercase(text(track, "album_name")))
-                    || lowercase(text(track, "album_name")).contains(&lowercase(album))
-                {
-                    score += 50;
-                }
-            }
-            if self.duration_ms > 0
-                && number(track, "duration_ms") > 0
-                && (self.duration_ms / 1000).abs_diff(number(track, "duration_ms") / 1000) <= 10
-            {
-                score += 80;
-            }
-            score += i32::from(!text(track, "release_date").is_empty()) * 70
-                + i32::from(number(track, "track_number") > 0) * 20
-                + i32::from(number(track, "disc_number") > 0) * 10
-                + i32::from(!text(track, "isrc").is_empty()) * 40;
-            if score > best_score {
-                best_score = score;
-                best = Some(track);
-            }
+            self.track_name.trim()
         }
-        best
     }
+
+    fn known_artist(&self) -> &str {
+        [&self.artist_name, &self.album_artist]
+            .into_iter()
+            .find(|artist| !placeholder(artist))
+            .map_or("", |artist| artist.trim())
+    }
+
+    fn known_album(&self) -> &str {
+        if placeholder(&self.album_name) {
+            ""
+        } else {
+            self.album_name.trim()
+        }
+    }
+
+    /// The level shared by automatic runs and the candidate list.
+    pub fn match_level(&self, track: &Value) -> Match {
+        let isrc = self.isrc.trim();
+        // An equal ISRC still needs `verified`, which rejects previews and
+        // other recordings that a catalog filed under the same code.
+        if !isrc.is_empty()
+            && isrc.eq_ignore_ascii_case(text(track, "isrc").trim())
+            && self.verified(track)
+        {
+            return Match::Exact;
+        }
+        let (title, artist) = (self.known_title(), self.known_artist());
+        let (found_title, found_artist) = (text(track, "name"), text(track, "artists"));
+        if title.is_empty()
+            || artist.is_empty()
+            || found_title.trim().is_empty()
+            || found_artist.trim().is_empty()
+            || !same_track_title(title, found_title)
+            || !artists_match(artist, found_artist)
+        {
+            return Match::Other;
+        }
+        let (expected, duration) = (self.duration_ms / 1000, number(track, "duration_ms") / 1000);
+        let duration = (expected > 0 && duration > 0).then(|| expected.abs_diff(duration) <= 10);
+        let (album, found_album) = (self.known_album(), text(track, "album_name").trim());
+        match (duration, album.is_empty() || found_album.is_empty()) {
+            (Some(false), _) => Match::Other,
+            (_, true) => Match::Weak,
+            _ if titles_match(album, found_album) => Match::Strong,
+            // A compilation carries the same recording under another album.
+            (Some(true), _) => Match::Weak,
+            _ => Match::Other,
+        }
+    }
+
+    /// Orders tracks of one level; providers outrank the catalog, so the
+    /// user's provider priority decides between equal matches.
+    fn match_score(&self, track: &Value, catalog: bool) -> i64 {
+        let (title, artist, album) = (self.known_title(), self.known_artist(), self.known_album());
+        let (found_title, found_artist, found_album) = (
+            text(track, "name"),
+            text(track, "artists"),
+            text(track, "album_name").trim(),
+        );
+        let mut score = if catalog { 0 } else { 1000 };
+        if !title.is_empty() && !found_title.is_empty() {
+            let identity = track_identity_title(title);
+            score += if !identity.is_empty() && identity == track_identity_title(found_title) {
+                200
+            } else if same_track_title(title, found_title) {
+                150
+            } else if track_titles_match(title, found_title) {
+                100
+            } else {
+                0
+            };
+        }
+        if !artist.is_empty() && !found_artist.is_empty() {
+            score += if normalize_loose_artist(artist) == normalize_loose_artist(found_artist) {
+                150
+            } else if artists_match(artist, found_artist) {
+                80
+            } else {
+                0
+            };
+        }
+        if !album.is_empty() && !found_album.is_empty() && titles_match(album, found_album) {
+            score += 120 + i64::from(normalize_title(album) == normalize_title(found_album)) * 60;
+        }
+        let (expected, duration) = (self.duration_ms / 1000, number(track, "duration_ms") / 1000);
+        if expected > 0 && duration > 0 {
+            score += match expected.abs_diff(duration) {
+                0..=2 => 100,
+                3..=10 => 60,
+                _ => 0,
+            };
+        }
+        score
+            + i64::from(!text(track, "release_date").is_empty()) * 40
+            + i64::from(number(track, "track_number") > 0) * 20
+            + i64::from(number(track, "disc_number") > 0) * 10
+            + i64::from(!text(track, "isrc").is_empty()) * 30
+            + i64::from(!text(track, "cover_url").is_empty() || !text(track, "images").is_empty())
+                * 20
+    }
+
+    /// An exact or strong match ends an automatic search early.
+    pub fn confident(&self, track: &Value) -> bool {
+        self.match_level(track) >= Match::Strong
+    }
+
+    /// Sorts by level, then score, then provider priority, drops duplicates
+    /// and records `match` and `match_score` on every track.
+    pub fn rank(&self, found: Vec<Candidate>) -> Vec<Value> {
+        let mut ranked: Vec<_> = found
+            .into_iter()
+            .filter(|candidate| candidate.track.is_object())
+            .enumerate()
+            .map(|(arrival, candidate)| {
+                let level = self.match_level(&candidate.track);
+                let score = self.match_score(&candidate.track, candidate.catalog);
+                let mut track = candidate.track;
+                track["match"] = level.as_str().into();
+                track["match_score"] = score.into();
+                (level, score, candidate.priority, arrival, track)
+            })
+            .collect();
+        ranked.sort_by(|a, b| {
+            (b.0, b.1)
+                .cmp(&(a.0, a.1))
+                .then((a.2, a.3).cmp(&(b.2, b.3)))
+        });
+        let mut seen = BTreeSet::new();
+        ranked
+            .into_iter()
+            .map(|(.., track)| track)
+            .filter(|track| {
+                let id = text(track, "id").trim();
+                let identity = (!id.is_empty())
+                    .then(|| format!("id\0{}\0{id}", text(track, "provider_id").trim()));
+                // Providers often list the same release; rows the user could
+                // not tell apart are one candidate.
+                let content = format!(
+                    "content\0{}\0{}\0{}\0{}\0{}",
+                    normalize_title(text(track, "name")),
+                    normalize_loose_artist(text(track, "artists")),
+                    normalize_title(text(track, "album_name")),
+                    uppercase(text(track, "isrc").trim()),
+                    text(track, "release_date").trim()
+                );
+                let unseen = !seen.contains(&content)
+                    && identity.as_ref().is_none_or(|key| !seen.contains(key));
+                seen.insert(content);
+                seen.extend(identity);
+                unseen
+            })
+            .collect()
+    }
+
+    /// Whether an automatic run may apply a track of this level. A weak match
+    /// only applies when the file has no album to contradict it.
+    pub fn applies_automatically(&self, level: Match) -> bool {
+        level >= Match::Strong || (level == Match::Weak && self.known_album().is_empty())
+    }
+
+    /// The candidate an automatic run applies: the first ranked one, when its
+    /// level allows applying it without asking.
+    pub fn automatic<'a>(&self, ranked: &'a [Value]) -> Option<(&'a Value, Match)> {
+        let best = ranked.first()?;
+        let level = Match::parse(text(best, "match"));
+        self.applies_automatically(level).then_some((best, level))
+    }
+}
+
+static ARTIST_SEPARATOR: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"(?i)[,;&]|[\t\n\f\r ](?:feat\.?|ft\.?|featuring|x|and)[\t\n\f\r ]").unwrap()
+});
+
+/// The first artist of a credit such as "Lead, Guest" or "Lead feat. Guest".
+fn primary_artist(value: &str) -> &str {
+    ARTIST_SEPARATOR
+        .find(value)
+        .map(|separator| value[..separator.start()].trim())
+        .filter(|artist| !artist.is_empty())
+        .unwrap_or(value.trim())
 }
 
 fn selected(fields: &Option<Vec<Option<String>>>, group: &str, tag: &str) -> bool {
@@ -472,4 +709,210 @@ pub fn from_catalog(track: &super::TrackMetadata) -> Value {
     result["cover_url"] = json!(track.images);
     result["provider_id"] = json!("deezer");
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request(album: &str) -> Request {
+        Request::parse(
+            &json!({"track_name":"Signal","artist_name":"Lead Artist, Guest Artist",
+                "album_name":album,"duration_ms":200_000})
+            .to_string(),
+        )
+        .unwrap()
+    }
+
+    fn track(name: &str, album: &str, duration_ms: i64) -> Value {
+        json!({"provider_id":"provider-a","id":name,"name":name,"artists":"Lead Artist",
+            "album_name":album,"duration_ms":duration_ms})
+    }
+
+    fn search(track: Value, priority: usize) -> Candidate {
+        Candidate {
+            track,
+            catalog: false,
+            priority,
+        }
+    }
+
+    #[test]
+    fn new_request_fields_parse_leniently_and_keep_nested_candidates() {
+        let request = Request::parse(
+            r#"{"include_candidates":true,"preview_only":true,
+            "provider_ids":["provider-b"," provider-a ","",null,"provider-b"],
+            "selected_candidate":{"id":"one","name":"Signal","duration_ms":1}}"#,
+        )
+        .unwrap();
+        assert!(request.wants_candidates());
+        assert_eq!(request.provider_ids(), ["provider-b", "provider-a"]);
+        assert_eq!(request.selected_candidate().unwrap()["duration_ms"], 1);
+        let request =
+            Request::parse(r#"{"selected_candidate":{},"include_candidates":true}"#).unwrap();
+        assert!(request.selected_candidate().is_none());
+        assert!(!request.wants_candidates());
+        assert!(request.provider_ids().is_empty());
+    }
+
+    #[test]
+    fn queries_use_the_primary_artist_then_the_album() {
+        assert_eq!(
+            request("Album").queries(),
+            ["Signal Lead Artist", "Signal Album"]
+        );
+        let mut request = request("Unknown Album");
+        request.artist_name = "Lead Artist feat. Guest".into();
+        assert_eq!(request.queries(), ["Signal Lead Artist"]);
+        request.artist_name = String::new();
+        request.album_artist = "Band x Other Band".into();
+        assert_eq!(request.queries(), ["Signal Band"]);
+        request.album_name = "band".into();
+        assert_eq!(request.queries(), ["Signal Band"]);
+        request.album_artist = String::new();
+        request.album_name = String::new();
+        assert_eq!(request.queries(), ["Signal"]);
+    }
+
+    #[test]
+    fn a_longer_title_that_contains_the_song_is_another_song() {
+        let request = request("Album");
+        assert_eq!(
+            request.match_level(&track("Signal Night Dance", "Album", 200_000)),
+            Match::Other
+        );
+        for name in [
+            "Signal",
+            "Signal (feat. Guest Artist)",
+            "Signal (From \"Example Film\")",
+        ] {
+            assert_eq!(
+                request.match_level(&track(name, "Album", 201_000)),
+                Match::Strong,
+                "{name}"
+            );
+        }
+        let mut other_artist = track("Signal", "Album", 200_000);
+        other_artist["artists"] = "Someone Else".into();
+        assert_eq!(request.match_level(&other_artist), Match::Other);
+    }
+
+    #[test]
+    fn album_and_duration_decide_between_weak_and_other() {
+        let request = request("Album (Original Soundtrack)");
+        assert_eq!(
+            request.match_level(&track("Signal", "Album", 200_000)),
+            Match::Strong
+        );
+        let level = request.match_level(&track("Signal", "Other Album", 260_000));
+        assert_eq!(level, Match::Other);
+        assert!(!request.applies_automatically(level));
+        let level = request.match_level(&track("Signal", "Other Album", 205_000));
+        assert_eq!(level, Match::Weak);
+        assert!(!request.applies_automatically(level));
+        assert_eq!(
+            request.match_level(&track("Signal", "Album", 260_000)),
+            Match::Other
+        );
+        for album in ["", "Unknown Album"] {
+            let request = super::tests::request(album);
+            let level = request.match_level(&track("Signal", "Other Album", 260_000));
+            assert_eq!(level, Match::Other);
+            let level = request.match_level(&track("Signal", "Other Album", 0));
+            assert_eq!(level, Match::Weak);
+            assert!(request.applies_automatically(level));
+        }
+        let mut exact = track("Different Title", "Other Album", 200_000);
+        exact["isrc"] = "EXAMPLE00001".into();
+        let mut request = request.clone();
+        request.isrc = "example00001".into();
+        assert_eq!(request.match_level(&exact), Match::Exact);
+        exact["duration_ms"] = 30_000.into();
+        assert_eq!(request.match_level(&exact), Match::Other);
+    }
+
+    #[test]
+    fn ranking_orders_by_level_score_and_priority_and_drops_duplicates() {
+        let request = request("Album");
+        let mut later = track("Signal", "Album", 200_000);
+        later["provider_id"] = "provider-b".into();
+        later["id"] = "b-1".into();
+        later["release_date"] = "2001".into();
+        let mut first = track("Signal", "Album", 200_000);
+        first["release_date"] = "2002".into();
+        let mut same_as_first = first.clone();
+        same_as_first["provider_id"] = "provider-b".into();
+        same_as_first["id"] = "b-2".into();
+        let other = track("Signal Night Dance", "Album", 200_000);
+        let mut weak = track("Signal", "Different Record", 200_000);
+        weak["id"] = "compilation".into();
+        let ranked = request.rank(vec![
+            search(other, 0),
+            search(weak, 0),
+            search(later.clone(), 1),
+            search(first.clone(), 0),
+            // The same song again from the album query.
+            search(first, 0),
+            search(later, 1),
+            // Another provider listing exactly the same release.
+            search(same_as_first, 1),
+        ]);
+        let order: Vec<_> = ranked
+            .iter()
+            .map(|track| (text(track, "provider_id"), text(track, "match")))
+            .collect();
+        assert_eq!(
+            order,
+            [
+                ("provider-a", "strong"),
+                ("provider-b", "strong"),
+                ("provider-a", "weak"),
+                ("provider-a", "other"),
+            ]
+        );
+        assert!(ranked[0]["match_score"].as_i64().unwrap() > 1000);
+        let (best, level) = request.automatic(&ranked).unwrap();
+        assert_eq!(level, Match::Strong);
+        assert_eq!(best, &ranked[0]);
+        assert!(request.automatic(&ranked[2..]).is_none());
+    }
+
+    #[test]
+    fn the_winner_supplies_every_field_and_the_catalog_fills_nothing() {
+        let mut request = request("Album");
+        request.isrc = "EXAMPLE00001".into();
+        request.release_date = "2020".into();
+        request.genre = "Existing Genre".into();
+        let mut catalog = track("Signal", "Album", 200_000);
+        catalog["provider_id"] = "deezer".into();
+        catalog["isrc"] = "EXAMPLE00001".into();
+        catalog["composer"] = "Catalog Composer".into();
+        catalog["release_date"] = "2001-01-01".into();
+        catalog["genre"] = "Catalog Genre".into();
+        catalog["label"] = "Catalog Label".into();
+        let mut found = track("Signal", "Album", 200_000);
+        found["isrc"] = "EXAMPLE00001".into();
+        found["album_artist"] = "Lead Artist".into();
+        let ranked = request.rank(vec![
+            Candidate {
+                track: catalog,
+                catalog: true,
+                priority: usize::MAX,
+            },
+            search(found, 0),
+        ]);
+        let (winner, level) = request.automatic(&ranked).unwrap();
+        assert_eq!(level, Match::Exact);
+        assert_eq!(text(winner, "provider_id"), "provider-a");
+        let winner = winner.clone();
+        request.apply(&winner);
+        assert_eq!(request.composer, "");
+        assert_eq!(request.release_date, "2020");
+        assert_eq!(request.album_artist, "Lead Artist");
+        assert_eq!(request.label, "");
+        request.fill_empty_extras("Extra Genre", "Extra Label", "Extra Copyright");
+        assert_eq!(request.genre, "Existing Genre");
+        assert_eq!(request.label, "Extra Label");
+        assert_eq!(request.copyright, "Extra Copyright");
+    }
 }

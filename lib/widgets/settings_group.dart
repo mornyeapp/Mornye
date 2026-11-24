@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
@@ -147,11 +147,14 @@ class _SettingsSearchTargetState extends State<SettingsSearchTarget> {
     if (!mounted) return;
     setState(() => _highlighted = true);
 
+    // A scroll as large as the page: a spring that stops at the target
+    // rather than running the list past it. Reduced motion jumps.
+    final scroll = AppMotion.surface(context);
     await Scrollable.ensureVisible(
       context,
       alignment: 0.32,
-      duration: const Duration(milliseconds: 480),
-      curve: Curves.easeOutCubic,
+      duration: scroll.duration,
+      curve: scroll.curve,
     );
     if (!mounted) return;
 
@@ -225,6 +228,20 @@ BorderRadius connectedRowRadius(
   );
 }
 
+/// Whether a group's [children] are rows, each drawn as its own connected
+/// surface: several children are, custom ones included, unless a spacer or
+/// divider shows a hand-built form. One child alone is when it is a standard
+/// row; other single content keeps its card.
+bool settingsGroupHasRows(List<Widget> children) {
+  bool standard(Widget child) =>
+      child is SettingsItem || child is SettingsSwitchItem || child is ListTile;
+  return switch (children) {
+    [] => false,
+    [final only] => standard(only),
+    _ => !children.any((child) => child is SizedBox || child is Divider),
+  };
+}
+
 class _ConnectedRowsScope extends InheritedWidget {
   const _ConnectedRowsScope({required super.child});
 
@@ -237,17 +254,16 @@ class SettingsGroup extends StatelessWidget {
   final EdgeInsetsGeometry? margin;
   final bool glass;
 
-  /// Connects custom [children] that are each one complete row, such as
-  /// extension rows. Groups of [SettingsItem], [SettingsSwitchItem] and [ListTile]
-  /// connect without it.
-  final bool connected;
+  /// Whether each of [children] is one complete row with its own connected
+  /// surface. Null decides from the children, see [settingsGroupHasRows].
+  final bool? connected;
 
   const SettingsGroup({
     super.key,
     required this.children,
     this.margin,
     this.glass = false,
-    this.connected = false,
+    this.connected,
   });
 
   @override
@@ -295,19 +311,9 @@ class SettingsGroup extends StatelessWidget {
     }
 
     final expressive = materialExpressiveEnabled(context);
-    // Only groups of standard rows split into connected tiles. Forms and
-    // custom content keep one card, so spacers never become empty tiles.
-    final standardRows =
-        children.isNotEmpty &&
-        (connected ||
-            children.every(
-              (child) =>
-                  child is SettingsItem ||
-                  child is SettingsSwitchItem ||
-                  child is ListTile,
-            ));
+    final rows = connected ?? settingsGroupHasRows(children);
     // Connected surfaces are static layout, so reduced motion keeps the gaps.
-    if (!context.isMornye && standardRows) {
+    if (!context.isMornye && rows) {
       // Expressive connected list: every row is its own surface separated by
       // a 2dp gap. The group's ends keep the card radius, inner corners stay
       // tight, and the gaps replace row dividers.
@@ -366,7 +372,7 @@ class SettingsGroup extends StatelessWidget {
 List<Widget> settingsSectionSlivers({
   required String title,
   required List<Widget> children,
-  bool connected = false,
+  bool? connected,
   bool glass = false,
 }) => [
   SliverToBoxAdapter(child: SettingsSectionHeader(title: title)),
@@ -747,6 +753,7 @@ class SettingsChoiceChip extends StatelessWidget {
     this.icon,
     this.layout = SettingsChipLayout.row,
     this.expand = false,
+    this.enabled = true,
   });
 
   final String label;
@@ -757,6 +764,9 @@ class SettingsChoiceChip extends StatelessWidget {
 
   /// Wraps the chip in [Expanded] so a row of chips divides the width evenly.
   final bool expand;
+
+  /// False dims the chip and ignores taps, keeping the selection visible.
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -769,7 +779,9 @@ class SettingsChoiceChip extends StatelessWidget {
     final unselectedColor = context.isMornye
         ? Colors.transparent
         : colorScheme.surfaceContainerHigh;
-    final foreground = context.isMornye && isSelected
+    final foreground = !enabled
+        ? colorScheme.onSurface.withValues(alpha: 0.38)
+        : context.isMornye && isSelected
         ? colorScheme.primary
         : isSelected
         ? colorScheme.onPrimaryContainer
@@ -784,7 +796,7 @@ class SettingsChoiceChip extends StatelessWidget {
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
         // Like an iOS segment, the filled chip marks the choice; accent text
         // on Mornye's grey fill falls below readable contrast.
-        color: context.isMornye && isSelected
+        color: enabled && context.isMornye && isSelected
             ? colorScheme.onSurface
             : foreground,
       ),
@@ -814,18 +826,21 @@ class SettingsChoiceChip extends StatelessWidget {
     }
 
     final chip = Material(
-      color: isSelected
-          ? (context.isMornye
-                ? colorScheme.surfaceContainerHighest
-                : colorScheme.primaryContainer)
-          : unselectedColor,
+      color: !isSelected
+          ? unselectedColor
+          : !enabled
+          ? colorScheme.onSurface.withValues(alpha: 0.12)
+          : context.isMornye
+          ? colorScheme.surfaceContainerHighest
+          : colorScheme.primaryContainer,
       borderRadius: borderRadius,
       child: Semantics(
         button: true,
+        enabled: enabled,
         selected: isSelected,
         inMutuallyExclusiveGroup: true,
         child: InkWell(
-          onTap: onTap,
+          onTap: enabled ? onTap : null,
           borderRadius: borderRadius,
           child: ConstrainedBox(
             // Keeps every chip a comfortable tap target regardless of layout.
@@ -872,12 +887,16 @@ class SettingsSegmentedChoice<T> extends StatelessWidget {
     required this.selected,
     required this.onChanged,
     this.semanticLabel,
+    this.enabled = true,
   });
 
   final List<SettingsSegmentOption<T>> options;
   final T selected;
   final ValueChanged<T> onChanged;
   final String? semanticLabel;
+
+  /// False shows every option in its disabled style and ignores taps.
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -899,6 +918,7 @@ class SettingsSegmentedChoice<T> extends StatelessWidget {
           actions: [
             for (final option in options)
               M3EButtonGroupAction(
+                enabled: enabled,
                 icon: option.icon == null
                     ? null
                     : AppIcon.adaptive(option.icon!, size: 18, fill: 0),
@@ -919,6 +939,7 @@ class SettingsSegmentedChoice<T> extends StatelessWidget {
           for (final option in options)
             ButtonSegment(
               value: option.value,
+              enabled: enabled,
               label: Text(option.label),
               icon: option.icon == null ? null : AppIcon(option.icon!),
             ),
@@ -937,6 +958,7 @@ class SettingsSegmentedChoice<T> extends StatelessWidget {
             icon: option.icon,
             label: option.label,
             isSelected: option.value == selected,
+            enabled: enabled,
             onTap: () => onChanged(option.value),
           ),
         ],

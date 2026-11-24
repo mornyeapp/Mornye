@@ -84,7 +84,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test(
-    'verification waits survive process restart without reviving terminal failures',
+    'verification waits and failures survive a restart; a failure is not retried',
     () async {
       final store = _Store();
       var items = [
@@ -99,7 +99,7 @@ void main() {
         _item(
           'unavailable',
           status: DownloadStatus.failed,
-        ).copyWith(errorType: DownloadErrorType.notFound),
+        ).copyWith(errorType: DownloadErrorType.notFound, error: 'No match'),
         _item('done', status: DownloadStatus.completed),
         _item('cancelled', status: DownloadStatus.skipped),
       ];
@@ -116,13 +116,29 @@ void main() {
       final restarted = create();
       addTearDown(restarted.dispose);
       items = await restarted.restore();
-      expect(items.map((item) => item.id), ['waiting', 'timeout', 'cancelled']);
+      expect(items.map((item) => item.id), [
+        'waiting',
+        'timeout',
+        'unavailable',
+        'cancelled',
+      ]);
       expect(items.map((item) => item.status), [
         DownloadStatus.queued,
         DownloadStatus.queued,
+        DownloadStatus.failed,
         DownloadStatus.skipped,
       ]);
+      expect(items[2].errorType, DownloadErrorType.notFound);
+      expect(items[2].error, 'No match');
       expect(store.rows['timeout']!['status'], 'queued');
+      expect(store.rows['unavailable']!['status'], 'failed');
+      // Dismissing the failed song removes it for good.
+      items = [
+        for (final item in items)
+          if (item.id != 'unavailable') item,
+      ];
+      await restarted.flush(requireDurable: true);
+      expect(store.rows.keys, isNot(contains('unavailable')));
       expect(items.first.qualityOverride, 'HI_RES');
     },
   );
@@ -697,9 +713,11 @@ print(json.dumps([dict(row) for row in db.execute(data['sql'], data['arguments']
       'skipped',
       'downloading',
       'finalizing',
+      'failed',
     ]);
     expect(restored[1].status, DownloadStatus.skipped);
-    expect(restored.last.status, DownloadStatus.queued);
+    expect(restored[3].status, DownloadStatus.queued);
+    expect(restored.last.status, DownloadStatus.failed);
     await (await AppStateDatabase.instance.database).close();
   });
 }

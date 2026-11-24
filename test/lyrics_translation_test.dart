@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_translation.dart';
+import 'package:mornye/services/lyrics_translation_alignment.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 
 ParsedLyrics _lyrics(List<String> texts, {int offsetMs = 0}) => ParsedLyrics(
@@ -267,6 +268,247 @@ void main() {
       ]);
       expect(lyricsNeedRomanization(merged), isFalse);
       expect(lyricsNeedRomanization(_lyrics(['Hello', 'Hola'])), isFalse);
+    });
+  });
+
+  group('save to file', () {
+    String encoded(String text) => base64.encode(utf8.encode(text));
+
+    ParsedLyrics translated(ParsedLyrics lyrics, List<String?> translations) =>
+        applyLyricsTranslation(
+          lyrics,
+          LyricsTranslationSource.of(lyrics),
+          translations,
+        );
+
+    test('writes shown translations that the parser reads back', () {
+      const raw =
+          '[ti:Song]\n'
+          '[00:01.00]Hola\n'
+          '[00:02.50]<00:02.50>Mundo <00:03.00>bello\n'
+          '[00:04.00]Hola';
+      final lyrics = LyricsParser.parse(raw);
+      final shown = translated(lyrics, ['Hello', 'Beautiful world']);
+      expect(lyricsTranslationUnsaved(lyrics, shown), isTrue);
+
+      final updated = lyricsWithTranslations(raw, shown)!;
+      expect(updated, startsWith('[ti:Song]\n'));
+      expect(updated, contains('[00:02.50]<00:02.50>Mundo <00:03.00>bello'));
+      expect(updated, contains('[x-translation:1000:${encoded('Hello')}]'));
+      expect(
+        updated,
+        contains('[x-translation:2500:${encoded('Beautiful world')}]'),
+      );
+      expect(updated, contains('[x-translation:4000:${encoded('Hello')}]'));
+
+      final reread = LyricsParser.parse(updated);
+      expect(reread.lines.map((line) => line.text), [
+        'Hola',
+        'Mundo bello',
+        'Hola',
+      ]);
+      expect(reread.lines.map((line) => line.translation), [
+        'Hello',
+        'Beautiful world',
+        'Hello',
+      ]);
+      // Saved once, the same translation offers nothing more to save.
+      final shownAgain = translated(reread, ['Hello', 'Beautiful world']);
+      expect(lyricsTranslationUnsaved(reread, shownAgain), isFalse);
+      expect(lyricsWithTranslations(updated, shownAgain), isNull);
+    });
+
+    test('replaces an older translation in place and keeps the rest', () {
+      final raw =
+          '[00:01.00]Bonjour\n'
+          '[x-romaji:1000:${encoded('bonjour')}]\n'
+          '[x-translation:1000:${encoded('Old')}]\n'
+          '[00:02.00]Merci';
+      final lyrics = LyricsParser.parse(raw);
+      final updated = lyricsWithTranslations(
+        raw,
+        translated(lyrics, ['Hello', null]),
+      )!;
+      expect(
+        updated,
+        '[00:01.00]Bonjour\n'
+        '[x-romaji:1000:${encoded('bonjour')}]\n'
+        '[x-translation:1000:${encoded('Hello')}]\n'
+        '[00:02.00]Merci',
+      );
+    });
+
+    test('writes AI pronunciation with its word timing', () {
+      const raw = '[00:01.00]こんにちは\n[00:02.00]Hello';
+      final lyrics = LyricsParser.parse(raw);
+      final source = LyricsTranslationSource.of(lyrics);
+      final shown = applyLyricsTranslation(
+        lyrics,
+        source,
+        ['Hi', null],
+        romanizations: ['konnichiwa', null],
+      );
+      expect(lyricsTranslationUnsaved(lyrics, shown), isTrue);
+      final updated = lyricsWithTranslations(raw, shown)!;
+      expect(
+        updated,
+        '[00:01.00]こんにちは\n'
+        '[x-romaji:1000:${encoded('konnichiwa')}]\n'
+        '[x-translation:1000:${encoded('Hi')}]\n'
+        '[00:02.00]Hello',
+      );
+      final reread = LyricsParser.parse(updated);
+      expect(reread.lines.first.romanization, 'konnichiwa');
+      expect(reread.lines.first.translation, 'Hi');
+
+      // A new reading replaces the old one and its stale word timing.
+      final timed = LyricLine(
+        time: const Duration(seconds: 1),
+        text: 'こんにちは',
+        romanization: 'konnichi wa',
+        romanizationWords: const [
+          LyricWord(
+            time: Duration(seconds: 1),
+            end: Duration(milliseconds: 1400),
+            text: 'konnichi ',
+          ),
+          LyricWord(
+            time: Duration(milliseconds: 1400),
+            end: Duration(milliseconds: 1800),
+            text: 'wa',
+          ),
+        ],
+      );
+      final words = lyricWordsSupplement(timed.romanizationWords);
+      expect(jsonDecode(words), [
+        {'text': 'konnichi ', 'startTimeMs': 1000, 'endTimeMs': 1400},
+        {'text': 'wa', 'startTimeMs': 1400, 'endTimeMs': 1800},
+      ]);
+      final withWords = lyricsWithTranslations(
+        updated,
+        ParsedLyrics(
+          synced: true,
+          wordSynced: false,
+          lines: [timed],
+          plainText: 'こんにちは',
+        ),
+      )!;
+      expect(withWords, contains('[x-romaji-words:1000:${encoded(words)}]'));
+      expect(withWords, contains('[x-romaji:1000:${encoded('konnichi wa')}]'));
+      expect(withWords, isNot(contains(encoded('konnichiwa'))));
+      final reworded = lyricsWithTranslations(
+        withWords,
+        ParsedLyrics(
+          synced: true,
+          wordSynced: false,
+          lines: [
+            const LyricLine(
+              time: Duration(seconds: 1),
+              text: 'こんにちは',
+              romanization: 'konnichiwa',
+            ),
+          ],
+          plainText: 'こんにちは',
+        ),
+      )!;
+      expect(reworded, isNot(contains('x-romaji-words')));
+    });
+
+    test('keeps AI translation word timing through a save', () {
+      const raw =
+          '[offset:-500]\n'
+          '[00:01.00]<00:01.00>Hola <00:01.50>mundo<00:02.00>\n'
+          '[00:03.00]Otra';
+      final lyrics = LyricsParser.parse(raw);
+      final source = LyricsTranslationSource.of(lyrics);
+      ParsedLyrics display(ParsedLyrics lyrics) => applyLyricsTranslation(
+        lyrics,
+        LyricsTranslationSource.of(lyrics),
+        ['Hello world', 'Another'],
+        alignments: [
+          const [
+            LyricsTranslationChunk('Hello ', 0),
+            LyricsTranslationChunk('world', 1),
+          ],
+          const [],
+        ],
+      );
+      expect(source.words.first, ['Hola', 'mundo']);
+      final shown = display(lyrics);
+      final timing = shown.lines.first.translationWords;
+      expect(timing.map((word) => word.text), ['Hello ', 'world']);
+      // The offset moved the line and its words to 1.5s.
+      expect(timing.first.time, const Duration(milliseconds: 1500));
+      expect(lyricsTranslationUnsaved(lyrics, shown), isTrue);
+
+      final updated = lyricsWithTranslations(raw, shown)!;
+      final words = lyricWordsSupplement(timing);
+      expect(updated, contains('[x-translation-words:1500:${encoded(words)}]'));
+      final reread = LyricsParser.parse(updated);
+      expect(lyricWordsSupplement(reread.lines.first.translationWords), words);
+      expect(reread.lines.last.translationWords, isEmpty);
+      // Shown again over the saved file, nothing is left to save.
+      expect(lyricsTranslationUnsaved(reread, display(reread)), isFalse);
+      expect(lyricsWithTranslations(updated, display(reread)), isNull);
+
+      // The file without the timing still needs it saved.
+      final untimed = LyricsParser.parse(
+        updated.replaceFirst(RegExp(r'\[x-translation-words:[^\]]*\]\n'), ''),
+      );
+      expect(untimed.lines.first.translation, 'Hello world');
+      expect(lyricsTranslationUnsaved(untimed, display(untimed)), isTrue);
+
+      // A new translation drops the timing written for the old one.
+      final retranslated = lyricsWithTranslations(
+        updated,
+        ParsedLyrics(
+          synced: true,
+          wordSynced: true,
+          lines: [reread.lines.first.withTranslation('Hi world')],
+          plainText: 'Hola mundo',
+        ),
+      )!;
+      expect(retranslated, isNot(contains('x-translation-words')));
+      expect(retranslated, contains(encoded('Hi world')));
+    });
+
+    test('translates lyrics without timing line by line', () {
+      const lyrics = ParsedLyrics(
+        synced: false,
+        wordSynced: false,
+        lines: [],
+        plainText: 'Hola\n\nMundo\nHola',
+      );
+      final source = LyricsTranslationSource.of(lyrics);
+      expect(source.texts, ['Hola', 'Mundo']);
+      final shown = translated(lyrics, ['Hello', 'World']);
+      expect(shown.synced, isFalse);
+      expect(shown.plainText, lyrics.plainText);
+      expect(shown.lines.map((line) => line.text), ['Hola', 'Mundo', 'Hola']);
+      expect(shown.lines.map((line) => line.translation), [
+        'Hello',
+        'World',
+        'Hello',
+      ]);
+      expect(lyricsTranslationUnsaved(lyrics, shown), isTrue);
+      // Song files keep plain lyrics as they are; a .mlrc file takes these.
+      expect(lyricsWithTranslations(lyrics.plainText, shown), isNull);
+    });
+
+    test('leaves plain, TTML and untranslated lyrics alone', () {
+      const synced = '[00:01.00]Hola';
+      final lyrics = LyricsParser.parse(synced);
+      final shown = translated(lyrics, ['Hello']);
+      expect(lyricsWithTranslations('Hola', shown), isNull);
+      expect(
+        lyricsWithTranslations(
+          '<tt xmlns="http://www.w3.org/ns/ttml"><body/></tt>',
+          shown,
+        ),
+        isNull,
+      );
+      expect(lyricsWithTranslations(synced, lyrics), isNull);
+      expect(lyricsTranslationUnsaved(lyrics, lyrics), isFalse);
     });
   });
 

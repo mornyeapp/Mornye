@@ -27,6 +27,9 @@ abstract interface class LinkLibraryBridge {
   /// storage screen does after adding a Subsonic server.
   Future<void> addLibrarySource(NetworkConnection connection);
 
+  /// Shows or hides the indexed songs, keeping the network connection.
+  Future<void> setLibrarySourceEnabled(String connectionId, bool enabled);
+
   /// Rescans the connection's Library source incrementally, after any
   /// running scan.
   Future<void> rescan(String connectionId);
@@ -83,6 +86,7 @@ class LinkNetworkLibraryBridge implements LinkLibraryBridge {
         username: current.username,
         password: current.password,
         domain: current.domain,
+        smbEncrypt: current.smbEncrypt,
         trustedCertificateSha256: current.trustedCertificateSha256,
         subsonicAuth: current.subsonicAuth,
         apiKey: current.apiKey,
@@ -105,6 +109,26 @@ class LinkNetworkLibraryBridge implements LinkLibraryBridge {
     if (!_ref.mounted) return;
     _ref.read(settingsProvider.notifier).setLocalLibraryEnabled(true);
     _scan(source.id);
+  }
+
+  @override
+  Future<void> setLibrarySourceEnabled(
+    String connectionId,
+    bool enabled,
+  ) async {
+    if (enabled) {
+      final saved = await connection(connectionId);
+      if (saved != null && _ref.mounted) await addLibrarySource(saved);
+      return;
+    }
+    final source = await _database.getSourceByPath(_rootSource(connectionId));
+    if (!_ref.mounted || source == null) return;
+    _pendingScans.remove(source.id);
+    if (source.enabled) {
+      await _ref
+          .read(localLibraryProvider.notifier)
+          .setSourceEnabled(source.id, false);
+    }
   }
 
   @override

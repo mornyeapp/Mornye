@@ -9,10 +9,12 @@ import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_leftovers_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/notification_service.dart';
+import 'package:mornye/services/link/features/link_auto_keep.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_library_lookup.dart';
 import 'package:mornye/services/link/features/link_library_jobs_client.dart';
@@ -258,7 +260,9 @@ final linkPhoneLibraryProvider = Provider<LinkPhoneLibraryPublisher?>((ref) {
     offered: ref.watch(linkPhoneSenderProvider).fileNamed,
     deleteSharedFile: options.shareSongs
         ? (path) async {
-            if (!await deleteFile(path)) return false;
+            if (!await container.read(songLeftoversProvider).delete(path)) {
+              return false;
+            }
             await removeDeletedLibraryFileEntries(container, [path]);
             publisher.publish();
             return true;
@@ -288,6 +292,7 @@ final linkPhoneFeaturesProvider = Provider<LinkPhoneSession?>((ref) {
   ref.listen(linkPhoneLibraryProvider, (_, _) {});
   ref.listen(linkPhoneReceiverProvider, (_, _) {});
   ref.listen(linkPhoneSenderProvider, (_, _) {});
+  ref.listen(linkAutoKeepProvider, (_, _) {});
   final client = ref.watch(linkPhoneClientProvider);
   final handoff = ref.watch(linkHandoffProvider);
   if (client == null || handoff == null) return null;

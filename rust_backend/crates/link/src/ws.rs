@@ -266,12 +266,13 @@ where
     let id = state
         .clients
         .insert(info, sender, Arc::clone(&pending_bytes), closing);
-    let welcome = object!({
+    let mut welcome = object!({
         "type": "welcome",
         "serverId": state.shared.server_id,
         "name": state.name(),
         "protocol": 1,
     });
+    state.shared.config.announce(&mut welcome);
     // Keep disconnects outside the write loop so even a blocked welcome,
     // push or ping can be interrupted. Close signals bypass the text queue.
     let reason = tokio::select! {

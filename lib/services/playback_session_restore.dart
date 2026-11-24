@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart' show AudioServiceRepeatMode;
 import 'package:path_provider/path_provider.dart';
+import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/playable_media.dart';
@@ -61,6 +62,21 @@ Future<PlaybackResumePreview?> loadPlaybackResumePreview(
     _log.w('Failed to load playback resume preview: $error');
     return null;
   }
+}
+
+/// [preview], or null when its song belongs to the scanned Library while
+/// that Library is switched off: Home then offers nothing from it, such as
+/// a song on a NAS. [libraryItem] finds the song's Library record; a
+/// download and a song the Library does not know stay.
+Future<PlaybackResumePreview?> resumePreviewForLibrary(
+  PlaybackResumePreview? preview, {
+  required bool localLibraryEnabled,
+  required Future<UnifiedLibraryItem?> Function(PlayableMedia media)
+  libraryItem,
+}) async {
+  if (preview == null || localLibraryEnabled) return preview;
+  final item = await libraryItem(preview.media);
+  return item?.source == LibraryItemSource.local ? null : preview;
 }
 
 /// Resolve a saved queue in bounded groups, retaining its original order even

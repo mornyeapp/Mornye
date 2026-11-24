@@ -37,7 +37,6 @@ class LibraryQueueStore {
     this.shadowSnapshot = false,
   });
 
-  /// The Library row is not shadowed by a downloaded History file.
   String _notShadowedByHistory(String alias) =>
       sqlite.libraryNotShadowedSql(alias, snapshot: shadowSnapshot);
 
@@ -268,6 +267,8 @@ class LibraryQueueStore {
     if (sqlite.normalizeLookupText(request.searchQuery).isNotEmpty ||
         request.excludeNetwork ||
         request.albumArtist != null ||
+        request.genreTags != null ||
+        request.creditedArtist != null ||
         request.quality != null ||
         request.format != null ||
         request.metadata != null) {
@@ -356,6 +357,82 @@ class LibraryQueueStore {
     );
   }
 
+  /// Genre tags across downloaded and scanned music, one row for each
+  /// spelling of a tag with its song count and a cover, without loading
+  /// songs into Dart. Tags compare trimmed and case-folded, as the genre
+  /// sort does, and a tag listing several genres is still one tag here.
+  /// Songs without a genre and scanned paths already represented by
+  /// downloads are left out. Within a tag the most common spelling comes
+  /// first.
+  Future<List<Map<String, Object?>>> genreSpellings({
+    required bool includeLocal,
+  }) {
+    final parts = <String>[
+      '''
+        SELECT sort_genre AS genre_key, TRIM(genre) AS genre_name,
+          cover_url, NULL AS cover_path, file_path AS sample_file_path
+        FROM history_db.history
+        WHERE sort_genre != ''
+      ''',
+      if (includeLocal)
+        '''
+          SELECT l.sort_genre AS genre_key, TRIM(l.genre) AS genre_name,
+            NULL AS cover_url, l.cover_path, l.file_path AS sample_file_path
+          FROM ${LibrarySchema.visibleView} l
+          WHERE l.sort_genre != '' AND ${_notShadowedByHistory('l')}
+        ''',
+    ];
+    return _db.rawQuery('''
+      SELECT genre_key, genre_name, COUNT(*) AS track_count,
+        MAX(NULLIF(cover_url, '')) AS cover_url,
+        MAX(NULLIF(cover_path, '')) AS cover_path,
+        MAX(sample_file_path) AS sample_file_path
+      FROM (${parts.join(' UNION ALL ')})
+      GROUP BY genre_key, genre_name
+      ORDER BY genre_key, track_count DESC, genre_name
+    ''');
+  }
+
+  /// The genre tag of each Library song among [matchKeys] (title and artist
+  /// as the Library compares them) that has one, as `match_key` and
+  /// `genre_name` rows. A song in both sources, or in several files, is
+  /// listed once per file.
+  Future<List<Map<String, Object?>>> genresOfSongs(
+    List<String> matchKeys, {
+    required bool includeLocal,
+  }) async {
+    final rows = <Map<String, Object?>>[];
+    // Under SQLite's limit of 999 variables with both sources.
+    const chunk = 400;
+    for (var start = 0; start < matchKeys.length; start += chunk) {
+      final keys = matchKeys.sublist(
+        start,
+        (start + chunk).clamp(0, matchKeys.length),
+      );
+      final marks = List.filled(keys.length, '?').join(',');
+      final parts = <String>[
+        '''
+          SELECT match_key, TRIM(genre) AS genre_name
+          FROM history_db.history
+          WHERE sort_genre != '' AND match_key IN ($marks)
+        ''',
+        if (includeLocal)
+          '''
+            SELECT l.match_key, TRIM(l.genre) AS genre_name
+            FROM ${LibrarySchema.visibleView} l
+            WHERE l.sort_genre != '' AND l.match_key IN ($marks)
+          ''',
+      ];
+      rows.addAll(
+        await _db.rawQuery(parts.join(' UNION ALL '), [
+          ...keys,
+          if (includeLocal) ...keys,
+        ]),
+      );
+    }
+    return rows;
+  }
+
   String _escapeLikePattern(String value) {
     return value
         .replaceAll('\\', r'\\')
@@ -431,7 +508,7 @@ class LibraryQueueStore {
           h.sort_artist,
           h.sort_album,
           h.sort_genre,
-          h.sort_release,
+          ${_releaseSortColumn(request.sortMode, 'h')},
           h.sort_added
           ${_trackSizeColumns(request.sortMode)}
         FROM history_db.history h
@@ -511,7 +588,7 @@ class LibraryQueueStore {
           l.artist_name_norm AS sort_artist,
           l.album_name_norm AS sort_album,
           l.sort_genre,
-          l.sort_release,
+          ${_releaseSortColumn(request.sortMode, 'l')},
           l.sort_added
           ${_trackSizeColumns(request.sortMode)}
         FROM ${LibrarySchema.visibleView} l
@@ -595,6 +672,8 @@ class LibraryQueueStore {
         sqlite.normalizeLookupText(request.searchQuery).isEmpty &&
         !request.excludeNetwork &&
         request.albumArtist == null &&
+        request.genreTags == null &&
+        request.creditedArtist == null &&
         request.quality == null &&
         request.format == null &&
         request.metadata == null;
@@ -646,7 +725,7 @@ class LibraryQueueStore {
           ${unfiltered ? 'MAX(COALESCE(h.sort_added, 0))' : 'c.latest_added'} AS sort_added,
           MIN(COALESCE(h.sort_album, '')) AS sort_album,
           MIN(COALESCE(h.sort_album_artist, '')) AS sort_artist,
-          COALESCE(MAX(h.release_date), '') AS sort_release,
+          ${_releaseSortColumn(request.sortMode, 'h', album: true)},
           COALESCE(MAX(h.sort_genre), '') AS sort_genre
           ${_albumSizeColumns(request.sortMode)}
         FROM history_db.history h
@@ -711,7 +790,7 @@ class LibraryQueueStore {
           ${unfiltered ? 'MAX(COALESCE(l.sort_added, 0))' : 'c.latest_added'} AS sort_added,
           MIN(l.album_name_norm) AS sort_album,
           MIN(l.album_artist_norm) AS sort_artist,
-          COALESCE(MAX(l.release_date), '') AS sort_release,
+          ${_releaseSortColumn(request.sortMode, 'l', album: true)},
           COALESCE(MAX(l.sort_genre), '') AS sort_genre
           ${_albumSizeColumns(request.sortMode)}
         FROM ${LibrarySchema.visibleView} l
@@ -807,6 +886,21 @@ class LibraryQueueStore {
       where.add('h.sort_album_artist = ?');
       args.add(sqlite.normalizeLookupText(request.albumArtist));
     }
+    if (request.genreTags case final tags?) {
+      where.add(
+        'h.sort_genre IN (${List.filled(tags.length, '?').join(', ')})',
+      );
+      args.addAll(tags.map(sqlite.normalizeLookupText));
+    }
+    if (request.creditedArtist case final artist?) {
+      final key = sqlite.normalizeLookupText(artist);
+      where.add(
+        "(h.sort_album_artist = ? OR h.sort_artist LIKE ? ESCAPE '\\')",
+      );
+      args
+        ..add(key)
+        ..add('%${_escapeLikePattern(key)}%');
+    }
     final query = sqlite.normalizeLookupText(request.searchQuery);
     if (query.isNotEmpty) {
       final ftsQuery = sqlite.ftsPhraseSearchQuery(query);
@@ -868,6 +962,21 @@ class LibraryQueueStore {
     if (request.albumArtist != null) {
       where.add('l.album_artist_norm = ?');
       args.add(sqlite.normalizeLookupText(request.albumArtist));
+    }
+    if (request.genreTags case final tags?) {
+      where.add(
+        'l.sort_genre IN (${List.filled(tags.length, '?').join(', ')})',
+      );
+      args.addAll(tags.map(sqlite.normalizeLookupText));
+    }
+    if (request.creditedArtist case final artist?) {
+      final key = sqlite.normalizeLookupText(artist);
+      where.add(
+        "(l.album_artist_norm = ? OR l.artist_name_norm LIKE ? ESCAPE '\\')",
+      );
+      args
+        ..add(key)
+        ..add('%${_escapeLikePattern(key)}%');
     }
     final query = sqlite.normalizeLookupText(request.searchQuery);
     if (query.isNotEmpty) {
@@ -1116,6 +1225,29 @@ class LibraryQueueStore {
             'COALESCE(SUM(file_sizes.size_bytes), 0) AS sort_size'
       : '';
 
+  String _releaseSortColumn(
+    String sortMode,
+    String alias, {
+    bool album = false,
+  }) {
+    if (sortMode != 'year-asc' && sortMode != 'year-desc') {
+      return album
+          ? "COALESCE(MAX($alias.release_date), '') AS sort_release"
+          : '$alias.sort_release';
+    }
+    final date = 'TRIM($alias.release_date)';
+    final year = 'SUBSTR($date, 1, 4)';
+    final value =
+        '''CASE
+      WHEN $year GLOB '[0-9][0-9][0-9][0-9]'
+        AND CAST($year AS INTEGER) > 0
+        AND (LENGTH($date) = 4 OR SUBSTR($date, 5, 1) = '-')
+      THEN CAST($year AS INTEGER) END''';
+    // Both sentinels put undated items after every valid four-digit year.
+    final unknown = sortMode == 'year-asc' ? 10000 : 0;
+    return 'COALESCE(${album ? 'MAX($value)' : value}, $unknown) AS sort_release';
+  }
+
   /// Leading sort terms, then [nameColumn], the source and [keyColumn] as the
   /// unique tie-breakers that keyset cursors seek on.
   List<_QueueOrderTerm> _queueOrderTerms(
@@ -1144,10 +1276,10 @@ class LibraryQueueStore {
           _QueueOrderTerm('sort_album', descending: sortMode == 'album-desc'),
           name,
         ],
-        'release-oldest' || 'release-newest' => [
+        'year-asc' || 'year-desc' || 'release-oldest' || 'release-newest' => [
           _QueueOrderTerm(
             'sort_release',
-            descending: sortMode == 'release-newest',
+            descending: sortMode == 'release-newest' || sortMode == 'year-desc',
           ),
           name,
         ],

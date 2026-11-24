@@ -166,12 +166,18 @@ extension _HomeTabCsvImport on _HomeTabState {
               HistoryBatchLookupRequest(historyLookups),
             ).future,
           );
+          // Songs another app downloaded are missing from History but can
+          // already sit in a Local Library folder.
+          final existingLocalIndices = await localLibraryMatchIndices(
+            ref,
+            tracks,
+          );
           tracksToQueue = [];
           for (var i = 0; i < tracks.length; i++) {
             final track = tracks[i];
-            final isDownloaded = existingHistoryKeys.contains(
-              historyLookups[i].lookupKey,
-            );
+            final isDownloaded =
+                existingHistoryKeys.contains(historyLookups[i].lookupKey) ||
+                existingLocalIndices.contains(i);
             if (isDownloaded) {
               skippedDownloadedCount++;
               continue;

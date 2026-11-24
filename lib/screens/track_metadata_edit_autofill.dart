@@ -113,15 +113,17 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
     });
   }
 
-  Future<List<Map<String, dynamic>>> _searchAutoFillCandidates({
-    required String query,
+  /// Looks the form's values up the way re-enrich does, so both rank and
+  /// list results alike.
+  Future<Map<String, dynamic>> _searchAutoFillCandidates({
+    required Map<String, dynamic> request,
     required bool usesAutomaticProvider,
     required Extension? selectedProvider,
     required ExtensionState extensionState,
     bool allowVerificationRetry = true,
   }) async {
     try {
-      return await _autofill.search(query, provider: selectedProvider);
+      return await PlatformBridge.reEnrichFile(request);
     } catch (error) {
       if (!allowVerificationRetry || !isExtensionVerificationRequired(error)) {
         rethrow;
@@ -148,7 +150,7 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
       if (!verified || !mounted) rethrow;
 
       return _searchAutoFillCandidates(
-        query: query,
+        request: request,
         usesAutomaticProvider: usesAutomaticProvider,
         selectedProvider: selectedProvider,
         extensionState: extensionState,
@@ -162,44 +164,18 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
     required String sourceName,
     required String currentTitle,
     required String currentArtist,
-  }) {
-    return showAppBottomSheet<Map<String, dynamic>>(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
-      title: context.l10n.editMetadataAutoFillSource,
-      subtitle: [
-        currentTitle,
-        currentArtist,
-        sourceName,
-      ].where((value) => value.trim().isNotEmpty).join(' · '),
-      maxHeightFactor: 0.82,
-      builder: (sheetContext) => ListView(
-        padding: const EdgeInsets.only(bottom: 16),
-        children: [
-          MetadataEditorOptions(
-            children: [
-              for (var index = 0; index < candidates.length; index++) ...[
-                MetadataCandidateTile(
-                  candidate: candidates[index],
-                  onTap: () => Navigator.pop(sheetContext, candidates[index]),
-                ),
-                if (index != candidates.length - 1)
-                  Divider(
-                    height: 1,
-                    indent: 88,
-                    endIndent: 16,
-                    color: Theme.of(
-                      sheetContext,
-                    ).colorScheme.outlineVariant.withValues(alpha: 0.3),
-                  ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+    required ExtensionState extensionState,
+  }) => showReEnrichCandidateSheet(
+    context,
+    candidates: candidates,
+    title: context.l10n.editMetadataAutoFillSource,
+    subtitle: [
+      currentTitle,
+      currentArtist,
+      sourceName,
+    ].where((value) => value.trim().isNotEmpty).join(' · '),
+    providerName: reEnrichProviderNames(extensionState),
+  );
 
   Future<void> _fetchAutoFillPreview() async {
     if (_fetching || _saving) return;
@@ -247,6 +223,15 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
       final usesAutomaticProvider =
           selectedProviderId == null || selectedProviderId.isEmpty;
       final needsTrackLookup = fields.any((key) => key != 'lyrics');
+      final lyricsExtensionId =
+          configuredProviderId == null ||
+              !MetadataAutofillService.lyricsOnly(fields)
+          ? null
+          : _autofill
+                .lyricsProviders(extensionState)
+                .where((extension) => extension.id == configuredProviderId)
+                .firstOrNull
+                ?.id;
       Map<String, dynamic>? best;
 
       final queryParts = <String>[];
@@ -261,14 +246,22 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
         return;
       }
 
-      final normalizedTitle = _autofill.normalizeText(title);
-      final normalizedArtist = _autofill.normalizeText(searchArtist);
-      final normalizedAlbum = _autofill.normalizeText(album);
-
       if (needsTrackLookup) {
-        final query = queryParts.join(' ');
-        final results = await _searchAutoFillCandidates(
-          query: query,
+        final response = await _searchAutoFillCandidates(
+          request: {
+            'file_path': widget.filePath,
+            'spotify_id': widget.sourceTrackId ?? '',
+            'track_name': title,
+            'artist_name': artist,
+            'album_name': album,
+            'album_artist': albumArtist,
+            'isrc': currentIsrc,
+            'duration_ms': widget.durationMs,
+            'search_online': true,
+            'preview_only': true,
+            'include_candidates': true,
+            if (!usesAutomaticProvider) 'provider_ids': [selectedProviderId],
+          },
           usesAutomaticProvider: usesAutomaticProvider,
           selectedProvider: selectedProvider,
           extensionState: extensionState,
@@ -276,47 +269,27 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
 
         if (!mounted || !isCurrent()) return;
 
-        if (results.isEmpty) {
+        final candidates = reEnrichCandidates(response['candidates']);
+        if (candidates.isEmpty) {
           _showSheetSnackBar(context.l10n.editMetadataAutoFillNoResults);
           return;
         }
 
-        final rankedResults = [...results]
-          ..sort((a, b) {
-            final aScore = _autofill.matchScore(
-              a,
-              currentTitle: normalizedTitle,
-              currentArtist: normalizedArtist,
-              currentAlbum: normalizedAlbum,
-              currentIsrc: currentIsrc,
-            );
-            final bScore = _autofill.matchScore(
-              b,
-              currentTitle: normalizedTitle,
-              currentArtist: normalizedArtist,
-              currentAlbum: normalizedAlbum,
-              currentIsrc: currentIsrc,
-            );
-            return bScore.compareTo(aScore);
-          });
-
         if (usesAutomaticProvider) {
-          best = rankedResults.first;
-          if (!_autofill.matchIsConfident(
-            best,
-            currentTitle: normalizedTitle,
-            currentArtist: normalizedArtist,
-            currentAlbum: normalizedAlbum,
-            currentIsrc: currentIsrc,
-          )) {
-            best = null;
-          }
+          // The first result is the one an automatic re-enrich applies,
+          // when any fits well enough.
+          best =
+              ReEnrichMatch.fromWire(response['auto_match']) ==
+                  ReEnrichMatch.none
+              ? null
+              : candidates.first;
         } else {
           best = await _showAutoFillCandidatePicker(
-            candidates: rankedResults,
+            candidates: candidates,
             sourceName: _metadataProviderName(selectedProviderId),
             currentTitle: title,
             currentArtist: searchArtist,
+            extensionState: extensionState,
           );
           if (!mounted || !isCurrent() || best == null) return;
         }
@@ -349,6 +322,7 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
         durationMs: widget.durationMs,
         syncLyricsSettings: settingsNotifier.syncLyricsSettingsToBackend,
         isCurrent: isCurrent,
+        lyricsExtensionId: lyricsExtensionId,
       );
       if (!mounted || !isCurrent() || result == null) return;
       final availableValues = result.values;
@@ -498,7 +472,10 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
           Consumer(
             builder: (context, ref, _) {
               final extensionState = ref.watch(extensionProvider);
-              final providers = _autofill.orderedProviders(extensionState);
+              final providers =
+                  MetadataAutofillService.lyricsOnly(_form.autoFillFields)
+                  ? _autofill.lyricsProviders(extensionState)
+                  : _autofill.orderedProviders(extensionState);
               final selectedProviderIsAvailable = providers.any(
                 (extension) => extension.id == _selectedMetadataProviderId,
               );

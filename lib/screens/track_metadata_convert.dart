@@ -14,7 +14,6 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
         lower.endsWith('.ogg');
   }
 
-  /// Whether the current file is a CUE sheet (or CUE-referenced)
   bool get _isCueFile {
     if (isCueVirtualPath(rawFilePath)) return true;
     final lower = cleanFilePath.toLowerCase();
@@ -694,6 +693,9 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
           sourceId: _isLocalItem && (!isSafSource || writeBackToSaf)
               ? _localLibraryItem?.sourceId ?? LocalLibraryItem.legacySourceId
               : LocalLibraryItem.legacySourceId,
+          sourceItemId: _isLocalItem && (!isSafSource || writeBackToSaf)
+              ? _localLibraryItem?.id
+              : null,
         );
         if (mounted) {
           await ref.read(localLibraryProvider.notifier).reloadFromStorage();

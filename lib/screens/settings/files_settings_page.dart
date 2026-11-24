@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
@@ -220,6 +220,38 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
                     description:
                         context.l10n.downloadSingleFilenameFormatDescription,
                   ),
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.image_outlined,
+                  title: context.l10n.downloadSaveFolderCover,
+                  subtitle: context.l10n.downloadSaveFolderCoverSubtitle,
+                  value: settings.saveFolderCover,
+                  onChanged: ref
+                      .read(settingsProvider.notifier)
+                      .setSaveFolderCover,
+                ),
+                if (settings.saveFolderCover)
+                  SettingsItem(
+                    icon: Icons.photo_size_select_large_outlined,
+                    title: context.l10n.downloadFolderCoverSize,
+                    subtitle: _folderCoverSizeLabel(
+                      context,
+                      settings.folderCoverMaxDimension,
+                    ),
+                    onTap: () => _showFolderCoverSizePicker(
+                      context,
+                      ref,
+                      settings.folderCoverMaxDimension,
+                    ),
+                  ),
+                SettingsSwitchItem(
+                  icon: Icons.motion_photos_on_outlined,
+                  title: context.l10n.downloadSaveMotionArtwork,
+                  subtitle: context.l10n.downloadSaveMotionArtworkSubtitle,
+                  value: settings.saveMotionArtworkFile,
+                  onChanged: ref
+                      .read(settingsProvider.notifier)
+                      .setSaveMotionArtworkFile,
                   showDivider: false,
                 ),
               ],
@@ -357,6 +389,16 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
                   title: context.l10n.reorganizeLibraryTitle,
                   subtitle: context.l10n.reorganizeLibrarySubtitle,
                   onTap: () => _reorganizeExistingDownloads(context, ref),
+                ),
+                SettingsSwitchItem(
+                  key: const ValueKey('remove-empty-folders'),
+                  icon: Icons.folder_delete_outlined,
+                  title: context.l10n.removeEmptyFoldersTitle,
+                  subtitle: context.l10n.removeEmptyFoldersSubtitle,
+                  value: settings.removeEmptyFolders,
+                  onChanged: ref
+                      .read(settingsProvider.notifier)
+                      .setRemoveEmptyFolders,
                   showDivider: false,
                 ),
               ],
@@ -747,6 +789,31 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
       ),
     );
   }
+
+  String _folderCoverSizeLabel(BuildContext context, int maxDimension) =>
+      maxDimension <= 0
+      ? context.l10n.optionsEmbeddedCoverSizeOriginal
+      : '$maxDimension × $maxDimension px';
+
+  void _showFolderCoverSizePicker(
+    BuildContext context,
+    WidgetRef ref,
+    int current,
+  ) => showAppChoiceSheet(
+    context: context,
+    title: context.l10n.downloadFolderCoverSize,
+    subtitle: context.l10n.downloadFolderCoverSizeDescription,
+    selected: current,
+    choices: [
+      for (final maxDimension in const [0, 500, 1000, 1500, 2000])
+        AppChoice(
+          maxDimension,
+          maxDimension == 0 ? Icons.image_outlined : Icons.compress_outlined,
+          _folderCoverSizeLabel(context, maxDimension),
+        ),
+    ],
+    onSelected: ref.read(settingsProvider.notifier).setFolderCoverMaxDimension,
+  );
 
   void _showAlbumFolderStructurePicker(
     BuildContext context,

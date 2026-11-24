@@ -21,6 +21,7 @@ void main() {
       late Directory temporary;
       late NetworkFileEditor editor;
       late List<String> changes;
+      late List<String> awake;
       const original = {
         'title': 'Old title',
         'artist': 'Artist',
@@ -38,6 +39,10 @@ void main() {
           'network-editor-test-',
         );
         changes = [];
+        awake = [];
+        NetworkStorageService.debugEditRecoveryDelaysOverride = const [
+          Duration(milliseconds: 1),
+        ];
         editor = NetworkFileEditor(
           storage: nas.storage,
           input: NetworkAudioAnalysisInput(
@@ -45,9 +50,14 @@ void main() {
             temporaryDirectory: () async => temporary,
           ),
           changed: (source) async => changes.add(source),
+          keepAwake: () async {
+            awake.add('acquire');
+            return () async => awake.add('release');
+          },
         );
       });
       tearDown(() async {
+        NetworkStorageService.debugEditRecoveryDelaysOverride = null;
         await nas.close();
         expect(nas.openHandles, 0);
         expect(nas.openSessions, 0);
@@ -115,7 +125,120 @@ void main() {
         });
         expect(nas.files.keys, ['song.flac']);
         expect(changes, [NetworkEditFixture.source]);
+        // Samba keeps the hidden attribute of a dot name through a rename,
+        // so no file on the way to the song may start with a dot.
+        final written = [
+          for (final method in nas.methods)
+            if (method.startsWith('PUT ') || method.startsWith('MOVE '))
+              ...method.split(' ').skip(1),
+        ];
+        expect(written, isNotEmpty);
+        expect(
+          written.where((path) => path.split('/').last.startsWith('.')),
+          isEmpty,
+        );
       });
+
+      if (protocol == NetworkProtocol.webdav) {
+        for (final listing in ['stale', 'missing', 'hidden']) {
+          test(
+            'verifies WebDAV content when upload listing is $listing',
+            () async {
+              nas.temporaryListedSize = listing == 'stale' ? 0 : null;
+              nas.omitTemporarySize = listing == 'missing';
+              nas.hideTemporaryFiles = listing == 'hidden';
+              final result = await save();
+              expect(result.failure, isNull, reason: '${result.error}');
+              expect(jsonDecode(utf8.decode(nas.files['song.flac']!)), {
+                ...original,
+                'title': 'New title',
+                'lyrics': '[00:01.00]New lyrics',
+              });
+              expect(nas.files.keys, ['song.flac']);
+              expect(changes, [NetworkEditFixture.source]);
+            },
+          );
+        }
+      }
+
+      if (protocol == NetworkProtocol.smb) {
+        for (final reportedSize in [0, 1]) {
+          test(
+            'verifies SMB handle and content when stat reports $reportedSize',
+            () async {
+              nas.smbUploadStatSize = reportedSize;
+              final result = await save();
+              expect(result.failure, isNull, reason: '${result.error}');
+              expect(nas.smbUploadVerifications, 1);
+              expect(jsonDecode(utf8.decode(nas.files['song.flac']!)), {
+                ...original,
+                'title': 'New title',
+                'lyrics': '[00:01.00]New lyrics',
+              });
+              expect(nas.files.keys, ['song.flac']);
+              expect(changes, [NetworkEditFixture.source]);
+            },
+          );
+        }
+      }
+
+      for (final truncated in [false, true]) {
+        test('rejects altered $protocol upload before replacing the original '
+            '(truncated=$truncated)', () async {
+          nas.temporaryListedSize = 0;
+          nas.smbUploadStatSize = 0;
+          nas.transformUpload = (bytes) => truncated
+              ? bytes.sublist(0, bytes.length - 1)
+              : [bytes.first ^ 0xff, ...bytes.skip(1)];
+          final result = await save();
+          expect(result.failure, isNotNull);
+          expect(result.error, isStateError);
+          if (protocol == NetworkProtocol.smb) {
+            expect(nas.smbUploadVerifications, 1);
+          }
+          expect(nas.files, {'song.flac': originalBytes()});
+          expect(nas.methods.where((m) => m.startsWith('MOVE ')), isEmpty);
+          expect(changes, isEmpty);
+        });
+      }
+
+      test(
+        'a saved sidecar goes beside the song and replaces an older one',
+        () async {
+          final local = await Directory.systemTemp.createTemp(
+            'network-sidecar-test-',
+          );
+          addTearDown(() => local.delete(recursive: true));
+          final sidecar = File('${local.path}/Artist - Song.lrc');
+          final target = NetworkStorageService.source(
+            'edit-nas',
+            'Artist - Song.lrc',
+          );
+          await sidecar.writeAsString('[00:01.00]First');
+          await editor.saveSidecar(target, sidecar);
+          expect(
+            utf8.decode(nas.files['Artist - Song.lrc']!),
+            '[00:01.00]First',
+          );
+          await sidecar.writeAsString('[00:01.00]Second');
+          await editor.saveSidecar(target, sidecar);
+          expect(
+            utf8.decode(nas.files['Artist - Song.lrc']!),
+            '[00:01.00]Second',
+          );
+          expect(nas.files.keys.toSet(), {'song.flac', 'Artist - Song.lrc'});
+          expect(nas.files['song.flac'], originalBytes());
+          // Each save keeps the device awake only while it runs.
+          expect(awake, ['acquire', 'release', 'acquire', 'release']);
+          // The song itself did not change, so nothing reloads it.
+          expect(changes, isEmpty);
+
+          await expectLater(
+            editor.saveSidecar('network://gone/cover.jpg', sidecar),
+            throwsFormatException,
+          );
+        },
+      );
 
       test('a failed tag writer never uploads or publishes a change', () async {
         expect(
@@ -156,6 +279,23 @@ void main() {
         expect((await save()).failure, isNotNull);
         expect(nas.files, {'song.flac': originalBytes()});
         expect(changes, isEmpty);
+        // The save held its screen-off lease until the restore was done.
+        expect(awake, ['acquire', 'release']);
+      });
+
+      test('a restore that fails once is tried again', () async {
+        // The phone slept: the final rename and the first restore both fail.
+        nas.rejectPublish = true;
+        var restores = 0;
+        nas.beforeMove = (from, to) {
+          if (from.startsWith('mornye-original-') && restores++ == 0) {
+            throw const SocketException('offline');
+          }
+        };
+        expect((await save()).failure, isNotNull);
+        expect(restores, 2);
+        expect(nas.files, {'song.flac': originalBytes()});
+        expect(changes, isEmpty);
       });
 
       test('a remote change during the original rename is restored', () async {
@@ -163,7 +303,7 @@ void main() {
           jsonEncode({...original, 'title': 'Other editor'}),
         );
         nas.beforeMove = (from, to) {
-          if (from == 'song.flac' && to.startsWith('.mornye-original-')) {
+          if (from == 'song.flac' && to.startsWith('mornye-original-')) {
             nas.files[from] = external;
           }
         };

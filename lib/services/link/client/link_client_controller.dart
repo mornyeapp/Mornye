@@ -14,6 +14,7 @@ import 'package:mornye/services/link/client/link_client_library.dart';
 import 'package:mornye/services/link/client/link_client_pairing.dart';
 import 'package:mornye/services/link/client/link_client_session.dart';
 import 'package:mornye/services/link/client/link_client_store.dart';
+import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/local_network_access.dart';
@@ -261,6 +262,8 @@ class LinkClientController extends Notifier<LinkClientState> {
       ref.read(linkClientEnvironmentProvider);
   LinkClientStore get _store => ref.read(linkClientStoreProvider);
   LinkLibraryBridge get _library => ref.read(linkLibraryBridgeProvider);
+  bool get _showComputerSongs =>
+      ref.read(linkPhoneOptionsProvider).showComputerSongs;
 
   /// Completes once paired desktops are loaded and the session started.
   Future<void> ensureLoaded() => _loading ?? Future.value();
@@ -287,6 +290,20 @@ class LinkClientController extends Notifier<LinkClientState> {
       (_, keep) => _updateConnected(() => _keepConnected = keep),
       fireImmediately: true,
     );
+    ref.listen(linkPhoneOptionsProvider, (previous, next) {
+      if (!next.loaded ||
+          previous?.loaded != true ||
+          previous?.showComputerSongs == next.showComputerSongs) {
+        return;
+      }
+      _rescan?.cancel();
+      unawaited(
+        _serial(_syncLibrarySources).catchError(
+          (Object error) =>
+              _log.w('Updating computer songs in Library failed: $error'),
+        ),
+      );
+    });
     ref.onDispose(_dispose);
     _loading = Future<void>.microtask(
       () => _serial(_load).catchError(
@@ -304,6 +321,8 @@ class LinkClientController extends Notifier<LinkClientState> {
   }
 
   Future<void> _load() async {
+    await ref.read(linkPhoneOptionsProvider.notifier).ensureLoaded();
+    if (_disposed) return;
     final store = _store;
     final servers = await store.servers();
     var active = await store.activeServerId();
@@ -317,7 +336,21 @@ class LinkClientController extends Notifier<LinkClientState> {
       activeServerId: active,
       clearActiveServer: active == null,
     );
-    await _restartSession();
+    if (!_showComputerSongs) await _syncLibrarySources();
+    if (!_disposed) await _restartSession();
+  }
+
+  Future<void> _syncLibrarySources() async {
+    if (_disposed) return;
+    final enabled = _showComputerSongs;
+    for (final server in state.servers) {
+      if (_disposed) return;
+      try {
+        await _library.setLibrarySourceEnabled(server.connectionId, enabled);
+      } on Object catch (error) {
+        _log.w('Updating ${server.name} songs in Library failed: $error');
+      }
+    }
   }
 
   Future<LinkDeviceIdentity> _identity() async {
@@ -415,8 +448,28 @@ class LinkClientController extends Notifier<LinkClientState> {
       // A catalog notification can be lost while the phone is offline or
       // suspended, even when the desktop believes it was delivered.
       _scheduleRescan(session);
+      unawaited(_rememberAnnounced(session.server));
     }
   }
+
+  /// Stores what the host announced in its welcome (its platform and
+  /// abilities) for labels and for the next start.
+  Future<void> _rememberAnnounced(LinkServerRecord announced) =>
+      _serial(() async {
+        final stored = state.servers
+            .where((s) => s.serverId == announced.serverId)
+            .firstOrNull;
+        if (_disposed || stored == null) return;
+        final updated = stored.announced(
+          platform: announced.platform,
+          features: announced.features,
+        );
+        if (identical(updated, stored)) return;
+        final servers = await _store.upsert(updated);
+        if (!_disposed) state = state.copyWith(servers: servers);
+      }).catchError(
+        (Object error) => _log.w('Saving the host details failed: $error'),
+      );
 
   void _onMessage(LinkSession session, Map<String, dynamic> message) {
     if (_disposed || !identical(session, _session)) return;
@@ -427,9 +480,11 @@ class LinkClientController extends Notifier<LinkClientState> {
   void _scheduleRescan(LinkSession session) {
     final connectionId = session.server.connectionId;
     _rescan?.cancel();
+    if (!_showComputerSongs) return;
     _rescan = Timer(rescanDelay, () {
       _rescan = null;
       if (_disposed ||
+          !_showComputerSongs ||
           !identical(session, _session) ||
           session.connectionState != LinkConnectionState.connected) {
         return;
@@ -770,8 +825,8 @@ class LinkClientController extends Notifier<LinkClientState> {
   });
 
   /// Pairs with [target] using [pin]. On success the desktop is saved as a
-  /// Subsonic network connection, added to Library and scanned; re-pairing
-  /// replaces the stored key. Throws [LinkPairingException].
+  /// Subsonic network connection and, when enabled, added to Library and
+  /// scanned. Re-pairing replaces the stored key. Throws [LinkPairingException].
   Future<LinkServerRecord> pair(LinkPairingTarget target, String pin) async {
     final result = await ref
         .read(linkPairingApiProvider)
@@ -799,6 +854,8 @@ class LinkClientController extends Notifier<LinkClientState> {
         connectionId: connection.id,
         address: target.address,
         fingerprint: result.fingerprint,
+        platform: target.info.platform,
+        features: target.info.features,
       );
       final servers = await _store.upsert(record);
       var active = state.activeServerId;
@@ -813,12 +870,17 @@ class LinkClientController extends Notifier<LinkClientState> {
       return (record, connection);
     });
     unawaited(
-      _library
-          .addLibrarySource(connection)
-          .catchError(
-            (Object error) =>
-                _log.w('Adding the computer to Library failed: $error'),
-          ),
+      _serial(() async {
+        if (_disposed) return;
+        if (_showComputerSongs) {
+          await _library.addLibrarySource(connection);
+        } else {
+          await _library.setLibrarySourceEnabled(connection.id, false);
+        }
+      }).catchError(
+        (Object error) =>
+            _log.w('Adding the computer to Library failed: $error'),
+      ),
     );
     return record;
   }

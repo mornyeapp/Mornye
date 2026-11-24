@@ -1,9 +1,10 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
+import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 
 void main() {
@@ -70,6 +71,8 @@ void main() {
               Theme.of(bodyContext).colorScheme.onSurface,
             );
           }
+          // Let the fast spring settle, so the dialog closes from fully open.
+          await tester.pump(const Duration(milliseconds: 150));
           final panel = find.byType(MornyeGlassPanel);
           final openWidth = tester.getRect(panel).width;
           await tester.tap(find.text('Cancel'));
@@ -176,6 +179,96 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  Future<void> pumpOpener(
+    WidgetTester tester, {
+    required ThemeData theme,
+    required void Function(BuildContext context) open,
+  }) => tester.pumpWidget(
+    ProviderScope(
+      child: MaterialApp(
+        theme: theme,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              child: const Text('Open'),
+              onPressed: () => open(context),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  double opacityAbove(WidgetTester tester, Finder target) => tester
+      .widgetList<FadeTransition>(
+        find.ancestor(of: target, matching: find.byType(FadeTransition)),
+      )
+      .fold(1.0, (opacity, fade) => opacity * fade.opacity.value);
+
+  double scaleAbove(WidgetTester tester, Finder target) => tester
+      .widgetList<ScaleTransition>(
+        find.ancestor(of: target, matching: find.byType(ScaleTransition)),
+      )
+      .fold(1.0, (scale, transition) => scale * transition.scale.value);
+
+  testWidgets('Mornye sheet dialogs keep their glass frosted while entering', (
+    tester,
+  ) async {
+    await pumpOpener(
+      tester,
+      theme: MornyeTheme.build(Brightness.light),
+      open: (context) => showAppSheetDialog<void>(
+        context: context,
+        builder: (context) => const SizedBox(height: 200, child: Text('Sheet')),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    final blur = find.descendant(
+      of: find.byType(AppSheetDialog),
+      matching: find.byType(BackdropFilter),
+    );
+    expect(blur, findsWidgets);
+    expect(opacityAbove(tester, blur.first), 1);
+    expect(scaleAbove(tester, blur.first), lessThan(1));
+    await tester.pumpAndSettle();
+    expect(scaleAbove(tester, blur.first), 1);
+  });
+
+  for (final sheet in [false, true]) {
+    testWidgets('Material ${sheet ? 'sheet ' : ''}dialog exits with a short '
+        'fade and no scale', (tester) async {
+      Widget content(BuildContext context) => TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Close'),
+      );
+      await pumpOpener(
+        tester,
+        theme: ThemeData(),
+        open: (context) => sheet
+            ? showAppSheetDialog<void>(context: context, builder: content)
+            : showAppDialog<void>(context: context, builder: content),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      final close = find.text('Close');
+      expect(opacityAbove(tester, close), lessThan(1));
+      expect(scaleAbove(tester, close), lessThan(1));
+      await tester.pumpAndSettle();
+
+      await tester.tap(close);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(opacityAbove(tester, close), lessThan(1));
+      expect(scaleAbove(tester, close), 1);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(close, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('glass confirmation keeps actions reachable with long text', (

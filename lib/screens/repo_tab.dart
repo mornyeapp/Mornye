@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons, CupertinoTextField;
-import 'package:mornye/widgets/app_alert_dialog.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:mornye/widgets/app_text_field.dart';
 import 'package:mornye/widgets/app_refresh_indicator.dart';
 import 'package:mornye/widgets/extension_row.dart';
@@ -16,6 +15,7 @@ import 'package:mornye/providers/repo_provider.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/screens/repo/extension_details_screen.dart';
+import 'package:mornye/screens/repo/repositories_screen.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
@@ -41,6 +41,9 @@ class _RepoTabState extends ConsumerState<RepoTab> {
   final _repoUrlController = TextEditingController();
   bool _isInitialized = false;
 
+  /// Why the first repository could not be added.
+  String? _setupError;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +58,12 @@ class _RepoTabState extends ConsumerState<RepoTab> {
 
     if (!mounted) return;
 
+    final repo = ref.read(repoProvider);
+    // A background check may have initialized the store while offline.
+    if (repo.isInitialized && repo.hasRegistryUrls && repo.error != null) {
+      await ref.read(repoProvider.notifier).refresh();
+      return;
+    }
     await ref.read(repoProvider.notifier).initialize(cacheDir.path);
   }
 
@@ -81,9 +90,11 @@ class _RepoTabState extends ConsumerState<RepoTab> {
       repoProvider.select((s) => s.downloadingId),
     );
     final hasRegistryUrl = ref.watch(
-      repoProvider.select((s) => s.hasRegistryUrl),
+      repoProvider.select((s) => s.hasRegistryUrls),
     );
-    final registryUrl = ref.watch(repoProvider.select((s) => s.registryUrl));
+    final showRepository = ref.watch(
+      repoProvider.select((s) => s.hasMultipleRepositories),
+    );
     final filteredExtensions = RepoState(
       extensions: extensions,
       selectedCategory: selectedCategory,
@@ -120,18 +131,25 @@ class _RepoTabState extends ConsumerState<RepoTab> {
                     icon: Icon(
                       context.isMornye ? CupertinoIcons.link : Icons.link,
                     ),
-                    tooltip: context.l10n.storeChangeRepoTooltip,
-                    onPressed: () => _showChangeRepoDialog(registryUrl),
+                    tooltip: context.l10n.storeRepositoriesTitle,
+                    onPressed: () => pushPage<void>(
+                      context,
+                      (context) => const RepositoriesScreen(),
+                    ),
                   ),
               ],
             ),
+            AppRefreshIndicator.sliver(),
 
             if (!hasRegistryUrl)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Builder(
-                  builder: (context) =>
-                      _buildSetupRepoState(context, colorScheme, error),
+                  builder: (context) => _buildSetupRepoState(
+                    context,
+                    colorScheme,
+                    _setupError ?? error,
+                  ),
                 ),
               )
             else ...[
@@ -211,6 +229,7 @@ class _RepoTabState extends ConsumerState<RepoTab> {
                     columns: desktopColumns,
                     edge: edge,
                     downloadingId: downloadingId,
+                    showRepository: showRepository,
                   )
                 else if (context.isMornye)
                   SliverToBoxAdapter(
@@ -229,6 +248,7 @@ class _RepoTabState extends ConsumerState<RepoTab> {
                           return _ExtensionItem(
                             extension: ext,
                             showDivider: index < filteredExtensions.length - 1,
+                            showRepository: showRepository,
                             isDownloading: downloadingId == ext.id,
                             onInstall: () => _installExtension(ext),
                             onUpdate: () => _updateExtension(ext),
@@ -248,6 +268,7 @@ class _RepoTabState extends ConsumerState<RepoTab> {
                         return _ExtensionItem(
                           extension: ext,
                           showDivider: index < filteredExtensions.length - 1,
+                          showRepository: showRepository,
                           isDownloading: downloadingId == ext.id,
                           onInstall: () => _installExtension(ext),
                           onUpdate: () => _updateExtension(ext),
@@ -274,17 +295,18 @@ class _RepoTabState extends ConsumerState<RepoTab> {
 
   static const double _desktopGridGap = 12;
 
-  /// Desktop extensions as a grid of tiles that fills the pane.
   Widget _desktopExtensionGrid(
     List<RepoExtension> extensions, {
     required int columns,
     required double edge,
     required String? downloadingId,
+    required bool showRepository,
   }) {
     Widget tile(RepoExtension ext) {
       final item = _ExtensionItem(
         extension: ext,
         showDivider: false,
+        showRepository: showRepository,
         isDownloading: downloadingId == ext.id,
         onInstall: () => _installExtension(ext),
         onUpdate: () => _updateExtension(ext),
@@ -423,10 +445,19 @@ class _RepoTabState extends ConsumerState<RepoTab> {
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
-                child: ExpressiveButton(
-                  onPressed: _submitRepoUrl,
-                  icon: const Icon(Icons.add),
-                  child: Text(context.l10n.storeAddRepoButton),
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final adding = ref.watch(
+                      repoProvider.select((s) => s.isAddingRepository),
+                    );
+                    return ExpressiveButton(
+                      onPressed: adding ? null : _submitRepoUrl,
+                      icon: adding
+                          ? const AppLoadingIndicator(size: 18)
+                          : const Icon(Icons.add),
+                      child: Text(context.l10n.storeAddRepoButton),
+                    );
+                  },
                 ),
               ),
             ],
@@ -436,122 +467,19 @@ class _RepoTabState extends ConsumerState<RepoTab> {
     );
   }
 
-  void _submitRepoUrl() {
+  Future<void> _submitRepoUrl() async {
     final url = _repoUrlController.text.trim();
-    if (url.isEmpty) return;
-    ref.read(repoProvider.notifier).setRegistryUrl(url);
-  }
-
-  void _showChangeRepoDialog(String currentUrl) {
-    final changeUrlController = TextEditingController(text: currentUrl);
-    showAppDialog<void>(
-      context: context,
-      builder: (context) => AppAlertDialog(
-        title: Text(context.l10n.storeRepoDialogTitle),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.l10n.storeRepoDialogCurrent,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              currentUrl,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontFamily: 'monospace',
-                fontSize: 11,
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 16),
-            if (context.isMornye)
-              CupertinoTextField(
-                controller: changeUrlController,
-                placeholder: context.l10n.storeNewRepoUrlLabel,
-                keyboardType: TextInputType.url,
-                autocorrect: false,
-                padding: const EdgeInsets.all(12),
-              )
-            else
-              AppTextField(
-                controller: changeUrlController,
-                outlined: true,
-                label: context.l10n.storeNewRepoUrlLabel,
-                hint: context.l10n.storeRepoUrlHint,
-                leading: const Icon(Icons.link),
-                decoration: InputDecoration(
-                  hintText: context.l10n.storeRepoUrlHint,
-                  labelText: context.l10n.storeNewRepoUrlLabel,
-                  prefixIcon: const Icon(Icons.link),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
-                      width: 2,
-                    ),
-                  ),
-                  filled: true,
-                  fillColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
-                  ),
-                ),
-                keyboardType: TextInputType.url,
-                autocorrect: false,
-              ),
-          ],
-        ),
-        actions: [
-          AppDialogAction(
-            isDestructive: true,
-            onPressed: () {
-              Navigator.of(context).pop();
-              ref.read(repoProvider.notifier).removeRegistryUrl();
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: Text(context.l10n.dialogRemove),
-          ),
-          AppDialogAction(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            filled: true,
-            isDefault: true,
-            onPressed: () {
-              final newUrl = changeUrlController.text.trim();
-              Navigator.of(context).pop();
-              if (newUrl.isNotEmpty) {
-                ref.read(repoProvider.notifier).setRegistryUrl(newUrl);
-              }
-            },
-            child: Text(context.l10n.dialogSave),
-          ),
-        ],
-      ),
-    ).then((_) => changeUrlController.dispose());
+    if (url.isEmpty || ref.read(repoProvider).isAddingRepository) return;
+    setState(() => _setupError = null);
+    final result = await ref.read(repoProvider.notifier).addRegistryUrl(url);
+    if (!mounted) return;
+    setState(() {
+      _setupError = switch (result.status) {
+        RepoAddStatus.added => null,
+        RepoAddStatus.duplicate => context.l10n.storeRepoAlreadyAdded,
+        RepoAddStatus.failed => result.error,
+      };
+    });
   }
 
   Widget _buildErrorState(String error, ColorScheme colorScheme) {
@@ -924,6 +852,9 @@ IconData _getCategoryIcon(String category) {
 class _ExtensionItem extends StatelessWidget {
   final RepoExtension extension;
   final bool showDivider;
+
+  /// Names the row's repository, when more than one is configured.
+  final bool showRepository;
   final bool isDownloading;
   final VoidCallback onInstall;
   final VoidCallback onUpdate;
@@ -932,11 +863,39 @@ class _ExtensionItem extends StatelessWidget {
   const _ExtensionItem({
     required this.extension,
     required this.showDivider,
+    this.showRepository = false,
     required this.isDownloading,
     required this.onInstall,
     required this.onUpdate,
     this.onTap,
   });
+
+  /// [details] with the repository's name under it when rows name their
+  /// repository; a pin to a repository that dropped the extension says so.
+  Widget _withRepository(BuildContext context, Widget details) {
+    if (!showRepository && !extension.sourceMissing) return details;
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        details,
+        SizedBox(height: context.tokens.gapXs),
+        Text(
+          extension.sourceMissing
+              ? context.l10n.storeSourceMissingShort
+              : extension.registryName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: extension.sourceMissing
+                ? colorScheme.error
+                : colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -976,42 +935,45 @@ class _ExtensionItem extends StatelessWidget {
           ),
         ],
       ),
-      subtitle: extension.requiresNewerApp
-          ? Container(
-              padding: tokens.badgePadding,
-              decoration: BoxDecoration(
-                color: colorScheme.errorContainer,
-                borderRadius: tokens.borderRadiusBadge,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    size: 12,
-                    color: colorScheme.onErrorContainer,
-                  ),
-                  SizedBox(width: tokens.gapXs),
-                  Text(
-                    context.l10n.storeRequiresVersion(
-                      extension.minAppVersion ?? '',
-                    ),
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+      subtitle: _withRepository(
+        context,
+        extension.requiresNewerApp
+            ? Container(
+                padding: tokens.badgePadding,
+                decoration: BoxDecoration(
+                  color: colorScheme.errorContainer,
+                  borderRadius: tokens.borderRadiusBadge,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 12,
                       color: colorScheme.onErrorContainer,
-                      fontWeight: FontWeight.w500,
                     ),
-                  ),
-                ],
+                    SizedBox(width: tokens.gapXs),
+                    Text(
+                      context.l10n.storeRequiresVersion(
+                        extension.minAppVersion ?? '',
+                      ),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onErrorContainer,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Text(
+                extension.description,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            )
-          : Text(
-              extension.description,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+      ),
       trailingWidth: _storeButtonWidth(context),
       trailing: isDownloading
           ? const AppLoadingIndicator(size: 24)

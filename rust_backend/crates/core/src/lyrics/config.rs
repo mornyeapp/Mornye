@@ -34,6 +34,10 @@ pub struct FetchOptions {
     pub apple_elrc_word_sync: bool,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub musixmatch_language: String,
+    /// Choose the provider result with the best timing (word, then line,
+    /// then plain) instead of the first provider that has lyrics. Provider
+    /// order still breaks ties.
+    pub prefer_best_timing: bool,
 }
 
 crate::json::lenient_deserialize!(FetchOptions {
@@ -42,6 +46,7 @@ crate::json::lenient_deserialize!(FetchOptions {
     "multi_person_word_by_word" => multi_person_word_by_word,
     "apple_elrc_word_sync" => apple_elrc_word_sync,
     "musixmatch_language" => musixmatch_language,
+    "prefer_best_timing" => prefer_best_timing,
 });
 
 impl Default for FetchOptions {
@@ -52,6 +57,7 @@ impl Default for FetchOptions {
             multi_person_word_by_word: true,
             apple_elrc_word_sync: false,
             musixmatch_language: String::new(),
+            prefer_best_timing: true,
         }
     }
 }
@@ -227,7 +233,7 @@ pub fn cache_key(
     let mut extensions: Vec<_> = extensions.iter().map(|id| lowercase(id.trim())).collect();
     extensions.sort();
     format!(
-        "{}|{}|{}|{:.0}|{}|{}|{}|{}|{}|{}|{}",
+        "{}|{}|{}|{:.0}|{}|{}|{}|{}|{}|{}|{}|{}",
         spotify_id.trim(),
         lowercase(artist.trim()),
         lowercase(track.trim()),
@@ -238,7 +244,10 @@ pub fn cache_key(
         options.include_romanization_netease,
         options.multi_person_word_by_word,
         options.apple_elrc_word_sync,
-        options.musixmatch_language
+        options.musixmatch_language,
+        // The timing choice can pick another provider's result. The extra
+        // field also retires results cached before the choice existed.
+        options.prefer_best_timing
     )
 }
 
@@ -266,5 +275,24 @@ mod tests {
                 .iter()
                 .any(|p| p.id == "mornye_lyrics")
         );
+    }
+
+    #[test]
+    fn best_timing_is_the_default_and_changes_the_cache_key() {
+        let mut options = FetchOptions::default();
+        assert!(options.prefer_best_timing);
+        let key =
+            |options: &FetchOptions| cache_key("", "Song", "Artist", 180.0, &[], &[], options);
+        let best = key(&options);
+        options
+            .update_json(r#"{"prefer_best_timing":false}"#)
+            .unwrap();
+        assert!(!options.prefer_best_timing);
+        assert_ne!(key(&options), best);
+        // A partial update of another option keeps the choice.
+        options
+            .update_json(r#"{"musixmatch_language":"id"}"#)
+            .unwrap();
+        assert!(!options.prefer_best_timing);
     }
 }

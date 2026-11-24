@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
+
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -61,6 +63,48 @@ class LyricsSettingsPage extends ConsumerWidget {
                       .read(settingsProvider.notifier)
                       .setKeepScreenOnLyrics(value),
                 ),
+                if (Platform.isAndroid || Platform.isIOS)
+                  SettingsSwitchItem(
+                    icon: Icons.screen_lock_portrait_outlined,
+                    title: context.l10n.lyricsLockScreen,
+                    subtitle: Platform.isIOS
+                        ? context.l10n.lyricsLockScreenSubtitleIos
+                        : context.l10n.lyricsLockScreenSubtitle,
+                    value: settings.lockScreenLyrics,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setLockScreenLyrics(value),
+                  ),
+                SettingsSwitchItem(
+                  key: const ValueKey('lyric-snippet-preview'),
+                  icon: Icons.lyrics_outlined,
+                  title: context.l10n.lyricsPlayerPreview,
+                  subtitle: context.l10n.lyricsPlayerPreviewSubtitle,
+                  value: settings.playerShowLyricSnippet,
+                  onChanged: (value) => ref
+                      .read(settingsProvider.notifier)
+                      .setPlayerShowLyricSnippet(value),
+                ),
+                SettingsSwitchItem(
+                  key: const ValueKey('lyrics-romanize'),
+                  icon: Icons.record_voice_over_outlined,
+                  title: context.l10n.lyricsRomanize,
+                  subtitle: context.l10n.lyricsRomanizeSubtitle,
+                  value: settings.lyricsRomanize,
+                  onChanged: (value) => ref
+                      .read(settingsProvider.notifier)
+                      .setLyricsRomanize(value),
+                ),
+                SettingsSwitchItem(
+                  key: const ValueKey('lyrics-romanized-main-line'),
+                  icon: Icons.swap_vert_rounded,
+                  title: context.l10n.lyricsRomanizedMainLine,
+                  subtitle: context.l10n.lyricsRomanizedMainLineSubtitle,
+                  value: settings.lyricsRomanizedMainLine,
+                  onChanged: (value) => ref
+                      .read(settingsProvider.notifier)
+                      .setLyricsRomanizedMainLine(value),
+                ),
                 SettingsItem(
                   key: const ValueKey('lyrics-ai-translation'),
                   icon: Icons.auto_awesome_outlined,
@@ -108,6 +152,18 @@ class LyricsSettingsPage extends ConsumerWidget {
                       context,
                       (_) => const LyricsProviderPriorityPage(),
                     ),
+                  ),
+                  SettingsSwitchItem(
+                    key: const ValueKey('lyrics-prefer-best-timing'),
+                    icon: Icons.timer_outlined,
+                    title: context.l10n.lyricsPreferBestTiming,
+                    subtitle: settings.lyricsPreferBestTiming
+                        ? context.l10n.lyricsPreferBestTimingEnabled
+                        : context.l10n.lyricsPreferBestTimingDisabled,
+                    value: settings.lyricsPreferBestTiming,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setLyricsPreferBestTiming(value),
                     showDivider: false,
                   ),
                 ],

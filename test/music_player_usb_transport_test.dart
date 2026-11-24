@@ -31,12 +31,13 @@ void main() {
     Completer<Map<String, dynamic>>? prepareReply;
     var position = 0;
 
-    Future<void> event(String name, {int? withToken}) =>
+    Future<void> event(String name, {int? withToken, String? reason}) =>
         native.messenger.handlePlatformMessage(
           events.name,
           const StandardMethodCodec().encodeSuccessEnvelope({
             'event': name,
             'token': withToken ?? token,
+            'reason': ?reason,
           }),
           (_) {},
         );
@@ -164,6 +165,17 @@ void main() {
       );
       expect(prepareArguments['direct'], isTrue);
       expect(prepareArguments['allowDop'], isTrue);
+      expect(prepareArguments['maxSampleRate'], 0);
+    });
+
+    test('the highest sample rate reaches the direct driver', () async {
+      await deck.setFileSource(
+        '/one.flac',
+        preferBitPerfect: true,
+        directUsb: true,
+        usbMaxSampleRate: 48000,
+      );
+      expect(prepareArguments['maxSampleRate'], 48000);
     });
 
     test('hardware volume changes the DAC, never PCM gain', () async {
@@ -382,6 +394,73 @@ void main() {
       expect(deck.isDirect, isFalse);
       expect(native.playing, {'usb-test'});
       expect(usbAudioStatus.value.reason, 'no_usb');
+    });
+
+    test('a specific native failure keeps its reason and format', () async {
+      prepareReply = Completer()
+        ..complete({
+          'reason': 'format_unsupported',
+          'detail': 'ALAC 32-bit 96000 Hz 2ch: cannot be decoded exactly',
+          'codec': 'ALAC',
+          'lossy': false,
+          'sampleRate': 96000,
+          'sourceBitDepth': 32,
+          'channels': 2,
+        });
+      await deck.setFileSource(
+        '/one.m4a',
+        preferBitPerfect: true,
+        directUsb: true,
+      );
+      await deck.resume();
+      expect(deck.isDirect, isFalse);
+      expect(native.playing, {'usb-test'});
+      final status = usbAudioStatus.value;
+      expect(status.reason, 'format_unsupported');
+      expect(status.codec, 'ALAC');
+      expect(status.sourceBitDepth, 32);
+      expect(status.sampleRate, 96000);
+      expect(status.channels, 2);
+      expect(status.lossy, isFalse);
+    });
+
+    test('a decoded lossy source stays marked lossy while active', () async {
+      prepareReply = Completer()
+        ..complete({
+          'ready': true,
+          'duration': 60000,
+          'device': 'Test DAC',
+          'sampleRate': 44100,
+          'bitDepth': 24,
+          'sourceBitDepth': 0,
+          'codec': 'AAC',
+          'lossy': true,
+          'transport': 'pcm',
+          'driver': 'usb_direct',
+          'volumeBlocked': false,
+        });
+      await deck.setFileSource(
+        '/one.m4a',
+        preferBitPerfect: true,
+        directUsb: true,
+      );
+      await deck.resume();
+      expect(usbAudioStatus.value.reason, 'active');
+      expect(usbAudioStatus.value.codec, 'AAC');
+      expect(usbAudioStatus.value.lossy, isTrue);
+    });
+
+    test('a decode failure pauses with its own reason', () async {
+      await deck.setFileSource(
+        '/one.m4a',
+        preferBitPerfect: true,
+        directUsb: true,
+      );
+      await deck.resume();
+      await event('paused', reason: 'decode_failed');
+      await _until(() => deck.state == PlaybackDeckState.paused);
+      expect(native.playing, isEmpty);
+      expect(usbAudioStatus.value.reason, 'decode_failed');
     });
 
     test('unverified route falls back before starting USB audio', () async {

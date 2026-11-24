@@ -102,6 +102,48 @@ List<String> missingReEnrichFields(LocalLibraryItem item) {
   return fields;
 }
 
+/// How well an online result fits a song, as the re-enrich backend rates it.
+/// Automatic runs apply only [exact] and [strong] results, and [weak] ones
+/// for songs without an album.
+enum ReEnrichMatch {
+  /// The same ISRC.
+  exact,
+
+  /// Title, artist and album agree, and the length when both are known.
+  strong,
+
+  /// Title and artist agree, but the album is unknown or another release.
+  weak,
+
+  /// Anything else a provider returned for the search.
+  other,
+
+  /// Nothing was found.
+  none;
+
+  static ReEnrichMatch fromWire(Object? value) => switch (value) {
+    'exact' => exact,
+    'strong' => strong,
+    'weak' => weak,
+    'other' => other,
+    _ => none,
+  };
+
+  /// Worth listing under Best matches.
+  bool get likely => this == exact || this == strong || this == weak;
+}
+
+/// The online results a preview listed for a song, best first.
+List<Map<String, dynamic>> reEnrichCandidates(Object? raw) => [
+  if (raw is List)
+    for (final candidate in raw)
+      if (candidate is Map)
+        candidate.map((key, value) => MapEntry(key.toString(), value)),
+];
+
+ReEnrichMatch reEnrichCandidateMatch(Map<String, dynamic> candidate) =>
+    ReEnrichMatch.fromWire(candidate['match']);
+
 Map<String, dynamic> buildBatchReEnrichRequest({
   required LocalLibraryItem item,
   required AppSettings settings,
@@ -109,6 +151,13 @@ Map<String, dynamic> buildBatchReEnrichRequest({
   bool previewOnly = false,
   Map<String, dynamic>? resolvedMetadata,
   String? sourceTrackId,
+
+  /// Asks the preview for the results it chose from, so a song can be
+  /// matched by hand.
+  bool includeCandidates = false,
+
+  /// A result a person picked; it is applied instead of searching.
+  Map<String, dynamic>? selectedCandidate,
 }) {
   final request = <String, dynamic>{
     'file_path': item.filePath,
@@ -136,12 +185,21 @@ Map<String, dynamic> buildBatchReEnrichRequest({
     // Lyrics-only previews do not need a second metadata-provider search.
     // Preserve the file's title/artist and fetch lyrics during apply.
     'search_online':
-        resolvedMetadata == null &&
-        !(updateFields.length == 1 &&
-            updateFields.single == ReEnrichFields.lyrics),
+        selectedCandidate != null ||
+        (resolvedMetadata == null &&
+            !(updateFields.length == 1 &&
+                updateFields.single == ReEnrichFields.lyrics)),
     'replace_release_metadata': false,
     'update_fields': updateFields,
     if (previewOnly) 'preview_only': true,
+    // A batch keeps the search's stop at the first confident provider: a
+    // song that matched lists what was searched, one that did not lists
+    // every provider's results.
+    if (previewOnly && includeCandidates) ...{
+      'include_candidates': true,
+      'quick_candidates': true,
+    },
+    'selected_candidate': ?selectedCandidate,
   };
   if (resolvedMetadata != null) {
     request.addAll(resolvedMetadata);
@@ -165,18 +223,132 @@ class ReEnrichMetadataChange {
   });
 }
 
+/// The current value of a lyrics change when the song already has lyrics.
+const reEnrichHasLyricsValue = '__has_lyrics__';
+
+/// The change fields a review can list. Other keys of a preview's metadata,
+/// such as `spotify_id`, go with every write.
+const reEnrichReviewFields = {
+  'track_name',
+  'artist_name',
+  'album_name',
+  'album_artist',
+  'track_number',
+  'total_tracks',
+  'disc_number',
+  'total_discs',
+  'release_date',
+  'isrc',
+  'genre',
+  'composer',
+  'label',
+  'copyright',
+  'cover_url',
+  'header_video',
+  'lyrics',
+};
+
+/// The backend update field that writes the change to [field], or null for
+/// motion artwork, which is saved in app storage instead of the file.
+String? reEnrichUpdateField(String field) => switch (field) {
+  'cover_url' => ReEnrichFields.cover,
+  'header_video' => null,
+  _ => field,
+};
+
+/// A cover's size in pixels.
+typedef ReEnrichCoverSize = ({int width, int height});
+
+/// Whether [change] likely makes the song's metadata worse, so a review
+/// starts with it switched off: a new cover with fewer pixels than the
+/// current one ([currentCover] and [newCover], when both were measured), or
+/// an empty value replacing one the song has.
+bool reEnrichChangeIsDowngrade(
+  ReEnrichMetadataChange change, {
+  ReEnrichCoverSize? currentCover,
+  ReEnrichCoverSize? newCover,
+}) {
+  if (change.field == 'cover_url') {
+    return currentCover != null &&
+        newCover != null &&
+        newCover.width * newCover.height <
+            currentCover.width * currentCover.height;
+  }
+  return change.newValue.trim().isEmpty && change.oldValue.trim().isNotEmpty;
+}
+
 class BatchReEnrichPreview {
   final LocalLibraryItem item;
   final List<String> updateFields;
   final Map<String, dynamic> enrichedMetadata;
   final List<ReEnrichMetadataChange> changes;
 
+  /// How well the automatically chosen result fits, or the picked one.
+  final ReEnrichMatch match;
+
+  /// The results the song can be matched to by hand, best first.
+  final List<Map<String, dynamic>> candidates;
+
+  /// The result picked by hand, if any.
+  final Map<String, dynamic>? chosen;
+
   const BatchReEnrichPreview({
     required this.item,
     required this.updateFields,
     required this.enrichedMetadata,
     required this.changes,
+    this.match = ReEnrichMatch.exact,
+    this.candidates = const [],
+    this.chosen,
   });
+
+  /// No result fitted well enough to apply on its own, but one could be
+  /// picked by hand.
+  bool get needsChoice =>
+      chosen == null && match == ReEnrichMatch.none && candidates.isNotEmpty;
+
+  /// [candidate] picked by hand, with what its preview would change.
+  BatchReEnrichPreview withChoice(
+    Map<String, dynamic> candidate,
+    Map<String, dynamic> metadata,
+  ) => BatchReEnrichPreview(
+    item: item,
+    updateFields: updateFields,
+    enrichedMetadata: metadata,
+    changes: buildReEnrichMetadataChanges(item, metadata, updateFields),
+    match: reEnrichCandidateMatch(candidate),
+    candidates: candidates,
+    chosen: candidate,
+  );
+
+  /// This preview with only the changes to [fields]. Its write touches only
+  /// those: every other value stays as the song has it, never the result's.
+  /// Choosing nothing the file holds leaves [updateFields] empty, and such a
+  /// preview must not be written, since the backend reads an empty list as
+  /// every field.
+  BatchReEnrichPreview selecting(Set<String> fields) {
+    final kept = [
+      for (final change in changes)
+        if (fields.contains(change.field)) change,
+    ];
+    final keptFields = {for (final change in kept) change.field};
+    return BatchReEnrichPreview(
+      item: item,
+      updateFields: {
+        for (final change in kept) ?reEnrichUpdateField(change.field),
+      }.toList(growable: false),
+      enrichedMetadata: {
+        for (final entry in enrichedMetadata.entries)
+          if (!reEnrichReviewFields.contains(entry.key) ||
+              keptFields.contains(entry.key))
+            entry.key: entry.value,
+      },
+      changes: kept,
+      match: match,
+      candidates: candidates,
+      chosen: chosen,
+    );
+  }
 }
 
 BatchReEnrichPreview? buildManualBatchReEnrichPreview(
@@ -265,9 +437,9 @@ List<ReEnrichMetadataChange> buildReEnrichMetadataChanges(
   if (updateFields.contains(ReEnrichFields.lyrics) ||
       updateFields.contains('lyrics')) {
     changes.add(
-      const ReEnrichMetadataChange(
+      ReEnrichMetadataChange(
         field: 'lyrics',
-        oldValue: '',
+        oldValue: item.hasLyrics ? reEnrichHasLyricsValue : '',
         newValue: '__refresh_online__',
       ),
     );

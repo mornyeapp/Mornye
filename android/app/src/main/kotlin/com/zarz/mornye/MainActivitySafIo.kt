@@ -9,6 +9,7 @@ import android.system.Os
 import android.system.OsConstants
 import androidx.documentfile.provider.DocumentFile
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -36,9 +37,6 @@ internal fun isMediaStoreUri(uri: Uri): Boolean {
                authority.contains("media")
     }
 
-    /**
-     * Resolve extension from a MediaStore URI by querying DISPLAY_NAME or MIME_TYPE.
-     */
 internal fun Context.resolveMediaStoreExt(uri: Uri, fallbackExt: String?): String {
         try {
             contentResolver.query(uri, arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
@@ -459,41 +457,255 @@ internal fun Context.writeSafSidecarFromPath(
      * mode requests an external/both sidecar. Callers must handle false so a
      * failed lyrics write cannot be reported as a successful refresh.
      */
-internal fun Context.writeSafSidecarLrc(audioUri: Uri, lrcContent: String): Boolean {
-        if (lrcContent.isBlank()) return false
-        try {
-            val parent = safParentDir(audioUri) ?: run {
-                android.util.Log.w("Mornye", "LRC sidecar: no SAF parent dir")
-                return false
-            }
-            val audioName = try {
+internal fun Context.writeSafSidecarLrc(audioUri: Uri, lrcContent: String): Boolean =
+    writeSafSidecar(audioUri, lrcContent, "lrc")
+
+private fun Context.safSidecarName(audioUri: Uri, extension: String): String? {
+    val audioName = try {
+        DocumentFile.fromSingleUri(this, audioUri)?.name
+    } catch (_: Exception) {
+        null
+    } ?: return null
+    return "${audioName.substringBeforeLast('.', audioName)}.$extension"
+}
+
+/**
+ * Write a text sidecar next to a SAF audio document, such as "Song.lrc" or
+ * "Song.mlrc" for "Song.flac", in the same parent directory. Callers must
+ * handle false so a failed write cannot be reported as saved.
+ */
+internal fun Context.writeSafSidecar(audioUri: Uri, content: String, extension: String): Boolean {
+    if (content.isBlank()) return false
+    try {
+        val parent = safParentDir(audioUri) ?: run {
+            android.util.Log.w("Mornye", "Sidecar: no SAF parent dir")
+            return false
+        }
+        val name = safSidecarName(audioUri, extension) ?: return false
+        val target = SafDownloadHandler.createOrReuseDocumentFile(
+            this,
+            parent,
+            "application/octet-stream",
+            name
+        ) ?: run {
+            android.util.Log.w("Mornye", "Sidecar: failed to create $name")
+            return false
+        }
+
+        contentResolver.openOutputStream(target.uri, "wt")?.use { output ->
+            output.write(content.toByteArray(Charsets.UTF_8))
+        } ?: return false
+        android.util.Log.d("Mornye", "Sidecar written: $name")
+        return true
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Sidecar write failed: ${e.message}")
+        return false
+    }
+}
+
+/**
+ * Read the text sidecar with [extension] next to a SAF audio document, or
+ * null when there is none or it exceeds [maxBytes].
+ */
+internal fun Context.readSafSidecar(
+    audioUri: Uri,
+    extension: String,
+    maxBytes: Int = 8 * 1024 * 1024,
+): String? {
+    return try {
+        val parent = safParentDir(audioUri) ?: return null
+        val name = safSidecarName(audioUri, extension) ?: return null
+        val sidecar = findSafChild(this, parent, name)?.takeIf { it.isFile } ?: return null
+        if (sidecar.length() > maxBytes) return null
+        contentResolver.openInputStream(sidecar.uri)?.use { input ->
+            input.readBytes().toString(Charsets.UTF_8)
+        }
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Sidecar read failed: ${e.message}")
+        null
+    }
+}
+
+/**
+ * The file named [name] in the folder of a SAF audio document, such as an
+ * album's "cover.mp4", as its uri, size and modification time, or null when
+ * the folder has none.
+ */
+internal fun Context.findSafSibling(audioUri: Uri, name: String): Map<String, Any>? {
+    return try {
+        val parent = safParentDir(audioUri) ?: return null
+        val sibling = findSafChild(this, parent, name)?.takeIf { it.isFile } ?: return null
+        mapOf(
+            "uri" to sibling.uri.toString(),
+            "size" to sibling.length(),
+            "modified" to sibling.lastModified(),
+        )
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Sibling lookup failed: ${e.message}")
+        null
+    }
+}
+
+/**
+ * The sidecars with [extensions] and the files named [names] in the folder
+ * of a SAF audio document, found in one listing of that folder, each as its
+ * uri, size and modification time: "sidecars" by extension and "files" by
+ * name, leaving out those the folder does not have. Null when the folder
+ * cannot be read.
+ */
+internal fun Context.findSafSiblings(
+    audioUri: Uri,
+    extensions: List<String>,
+    names: List<String>,
+): Map<String, Any>? {
+    return try {
+        val parent = safParentDir(audioUri) ?: return null
+        val audioName = if (extensions.isEmpty()) {
+            null
+        } else {
+            try {
                 DocumentFile.fromSingleUri(this, audioUri)?.name
             } catch (_: Exception) {
                 null
-            } ?: return false
-            val baseName = audioName.substringBeforeLast('.', audioName)
-            val lrcName = "$baseName.lrc"
-
-            val target = SafDownloadHandler.createOrReuseDocumentFile(
-                this,
-                parent,
-                "application/octet-stream",
-                lrcName
-            ) ?: run {
-                android.util.Log.w("Mornye", "LRC sidecar: failed to create $lrcName")
-                return false
             }
-
-            contentResolver.openOutputStream(target.uri, "wt")?.use { output ->
-                output.write(lrcContent.toByteArray(Charsets.UTF_8))
-            } ?: return false
-            android.util.Log.d("Mornye", "LRC sidecar written: $lrcName")
-            return true
-        } catch (e: Exception) {
-            android.util.Log.w("Mornye", "LRC sidecar write failed: ${e.message}")
-            return false
         }
+        val wanted = safSiblingWanted(audioName, extensions, names)
+        val children = findSafChildren(this, parent, wanted.names)
+        val entries = mutableMapOf<String, Map<String, Any>?>()
+        fun entry(name: String): Map<String, Any>? = entries.getOrPut(name) {
+            children[name]?.takeIf { it.isFile }?.let {
+                mapOf(
+                    "uri" to it.uri.toString(),
+                    "size" to it.length(),
+                    "modified" to it.lastModified(),
+                )
+            }
+        }
+        mapOf(
+            "sidecars" to buildMap {
+                for ((extension, name) in wanted.sidecars) entry(name)?.let { put(extension, it) }
+            },
+            "files" to buildMap {
+                for (name in wanted.files) entry(name)?.let { put(name, it) }
+            },
+        )
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Sibling lookup failed: ${e.message}")
+        null
     }
+}
+
+/**
+ * The text of a sidecar document found by [findSafSiblings], or null when it
+ * cannot be read or exceeds [maxBytes].
+ */
+internal fun Context.readSafText(uri: Uri, maxBytes: Int = 8 * 1024 * 1024): String? {
+    return try {
+        contentResolver.openInputStream(uri)?.use { input ->
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                if (output.size() + read > maxBytes) return null
+                output.write(buffer, 0, read)
+            }
+            output.toByteArray().toString(Charsets.UTF_8)
+        }
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Sidecar read failed: ${e.message}")
+        null
+    }
+}
+
+/**
+ * A SAF song document's file name and the folders holding it, nearest first,
+ * each as its uri and whether it is the granted tree's own folder, or null
+ * when the provider cannot tell. Without the provider's ancestry only the
+ * song's verified parent is known. Asked before the song is deleted: a
+ * deleted document has no name or ancestry left.
+ */
+internal fun Context.safSongFolders(audioUri: Uri): Map<String, Any>? {
+    return try {
+        val docId = DocumentsContract.getDocumentId(audioUri)
+        val treeDocId = DocumentsContract.getTreeDocumentId(audioUri)
+        if (docId.isNullOrEmpty() || treeDocId.isNullOrEmpty() || docId == treeDocId) {
+            return null
+        }
+        val name = DocumentFile.fromSingleUri(this, audioUri)?.name
+            ?.takeIf(String::isNotEmpty) ?: return null
+        val path = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                DocumentsContract.findDocumentPath(contentResolver, audioUri)?.path
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+        val folderIds = if (path != null) {
+            if (path.size < 2 || path.first() != treeDocId || path.last() != docId) {
+                return null
+            }
+            path.subList(0, path.lastIndex).asReversed()
+        } else {
+            val parent = safParentDir(audioUri) ?: return null
+            listOf(DocumentsContract.getDocumentId(parent.uri))
+        }
+        mapOf(
+            "name" to name,
+            "folders" to folderIds.map { id ->
+                mapOf(
+                    "uri" to DocumentsContract.buildDocumentUriUsingTree(audioUri, id).toString(),
+                    "root" to (id == treeDocId),
+                )
+            },
+        )
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Song folder lookup failed: ${e.message}")
+        null
+    }
+}
+
+/**
+ * The entries of a SAF folder document, each as its name, uri and whether it
+ * is a folder, or null when the folder cannot be listed. An entry whose kind
+ * the provider does not tell counts as a folder.
+ */
+internal fun Context.listSafFolder(folderUri: Uri): List<Map<String, Any>>? {
+    return try {
+        if (!DocumentsContract.isTreeUri(folderUri)) return null
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+            folderUri,
+            DocumentsContract.getDocumentId(folderUri),
+        )
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+        )
+        contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+            val idColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+            val nameColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+            val mimeColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+            if (idColumn < 0 || nameColumn < 0) return null
+            val entries = mutableListOf<Map<String, Any>>()
+            while (cursor.moveToNext()) {
+                val id = cursor.getString(idColumn)?.takeIf(String::isNotEmpty) ?: return null
+                val mime = if (mimeColumn < 0) null else cursor.getString(mimeColumn)
+                entries.add(
+                    mapOf(
+                        "name" to (cursor.getString(nameColumn) ?: ""),
+                        "uri" to DocumentsContract.buildDocumentUriUsingTree(folderUri, id).toString(),
+                        "folder" to (mime == null || mime == DocumentsContract.Document.MIME_TYPE_DIR),
+                    )
+                )
+            }
+            entries
+        }
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "SAF folder listing failed: ${e.message}")
+        null
+    }
+}
 
 internal fun Context.runPostProcessingSafV2(
     coreBackend: CoreBackend,

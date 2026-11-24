@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -135,7 +135,10 @@ void main() {
           }
         });
         expect(cache.statusForKey(key).live, isTrue);
-        expect(cache.pendingImageCount, 0);
+        // The backdrop prewarm also starts the header's palette, which
+        // reads its own small sample of the cover; only the display
+        // picture must not be decoded again.
+        expect(cache.statusForKey(key).pending, isFalse);
         expect(cache.currentSize, 1);
         await tester.pumpWidget(
           MaterialApp(

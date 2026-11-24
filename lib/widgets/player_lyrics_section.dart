@@ -1,20 +1,27 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
+import 'package:mornye/utils/text_direction.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/lyrics_editor_sheet.dart';
+import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/lyrics_text_scale.dart';
+
+/// The directions of plain lyrics' lines, worked out once for each lyrics.
+final _plainLyricDirections =
+    Expando<({List<TextDirection?> text, List<TextDirection?> lines})>();
 
 class PlayerLyricsSection extends ConsumerWidget {
   const PlayerLyricsSection({
@@ -57,6 +64,8 @@ class PlayerLyricsSection extends ConsumerWidget {
           settings.locale,
           settings.lyricsAutoTranslate,
           settings.lyricsAiWordSync,
+          settings.lyricsRomanize,
+          settings.lyricsRomanizedMainLine,
         ),
       ),
     );
@@ -64,10 +73,12 @@ class PlayerLyricsSection extends ConsumerWidget {
     final translation = ref.read(lyricsTranslationProvider.notifier);
     return ListenableBuilder(
       listenable: metadata,
-      builder: (context, _) => _buildLyricsSection(
-        context,
-        visibility,
-        translation.display(metadata.lyrics),
+      builder: (context, _) => LyricsOptionsActivity(
+        child: _buildLyricsSection(
+          context,
+          visibility,
+          translation.shown(metadata.lyrics),
+        ),
       ),
     );
   }
@@ -183,10 +194,11 @@ class PlayerLyricsSection extends ConsumerWidget {
             showPronunciation: visibility.$1,
             showTranslation: visibility.$2,
             onLongPressLine: onShareLyrics,
+            songKey: songLyricsOffsetKeyOf(metadata.item),
           ),
           if (options != null)
             PositionedDirectional(
-              start: context.isMornye ? mornyeLyricsContentInset : 24,
+              end: context.isMornye ? mornyeLyricsContentInset : 24,
               bottom: 8,
               child: options!,
             ),
@@ -207,14 +219,7 @@ class PlayerLyricsSection extends ConsumerWidget {
                     onShareLyrics!(null);
                   },
             child: LyricsTextScale(
-              child: Text(
-                metadata.lyrics.plainText,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  height: 1.6,
-                  color: colorScheme.onSurface,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              child: _plainLyrics(context, visibility, lyrics),
             ),
           ),
           ?_lyricsCredits(),
@@ -227,10 +232,98 @@ class PlayerLyricsSection extends ConsumerWidget {
       children: [
         plain,
         PositionedDirectional(
-          start: context.isMornye ? mornyeLyricsContentInset : 24,
+          end: context.isMornye ? mornyeLyricsContentInset : 24,
           bottom: 8,
           child: options!,
         ),
+      ],
+    );
+  }
+
+  /// Lyrics without timing, with each line's pronunciation and translation
+  /// under it while they are shown.
+  Widget _plainLyrics(
+    BuildContext context,
+    (bool, bool) visibility,
+    ParsedLyrics lyrics,
+  ) {
+    final style = Theme.of(context).textTheme.titleMedium?.copyWith(
+      height: 1.6,
+      color: colorScheme.onSurface,
+    );
+    String? shown(String? value, bool visible) =>
+        visible && value?.trim().isNotEmpty == true ? value!.trim() : null;
+    final hasSupplements = lyrics.lines.any(
+      (line) =>
+          shown(line.romanization, visibility.$1) != null ||
+          shown(line.translation, visibility.$2) != null,
+    );
+    final ambientDirection = Directionality.of(context);
+    final directions = _plainLyricDirections[lyrics] ??= (
+      text: lyricLineDirections(lyrics.plainText.split('\n')),
+      lines: lyricLineDirections(lyrics.lines.map((line) => line.text)),
+    );
+    if (!hasSupplements) {
+      // Each line reads in its own direction. One text has one, so lyrics
+      // mixing both directions get a text a line, laid out the same.
+      final first = directions.text.firstOrNull;
+      if (directions.text.every((direction) => direction == first)) {
+        return Text(
+          lyrics.plainText,
+          textDirection: first ?? ambientDirection,
+          style: style,
+          textAlign: TextAlign.center,
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (index, line) in lyrics.plainText.split('\n').indexed)
+            Text(
+              line,
+              textDirection: directions.text[index] ?? ambientDirection,
+              style: style,
+              textAlign: TextAlign.center,
+            ),
+        ],
+      );
+    }
+    final supplementStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(
+      height: 1.4,
+      color: colorScheme.onSurfaceVariant,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (index, line) in lyrics.lines.indexed)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  line.text,
+                  textDirection: directions.lines[index] ?? ambientDirection,
+                  style: style,
+                  textAlign: TextAlign.center,
+                ),
+                for (final supplement in [
+                  shown(line.romanization, visibility.$1),
+                  shown(line.translation, visibility.$2),
+                ])
+                  if (supplement != null)
+                    Text(
+                      supplement,
+                      textDirection:
+                          strongTextDirection(supplement) ??
+                          directions.lines[index] ??
+                          ambientDirection,
+                      style: supplementStyle,
+                      textAlign: TextAlign.center,
+                    ),
+              ],
+            ),
+          ),
       ],
     );
   }

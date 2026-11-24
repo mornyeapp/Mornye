@@ -82,11 +82,13 @@ void main() {
           .read(repoProvider.notifier)
           .initialize('${root.path}/cache');
       expect(container.read(repoProvider).isInitialized, isTrue);
-      await PlatformBridge.setRepoRegistryUrl(
+      await PlatformBridge.setRepoRegistryUrls([
         'https://example.com/registry.json',
-      );
+      ]);
       expect(
-        await PlatformBridge.getRepoRegistryUrl(),
+        await PlatformBridge.resolveRepoRegistryUrl(
+          'https://example.com/registry.json',
+        ),
         'https://example.com/registry.json',
       );
       for (final id in ids) {

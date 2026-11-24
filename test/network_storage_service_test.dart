@@ -260,6 +260,41 @@ void main() {
     expect(stored, isNull);
   });
 
+  test('songs of a removed connection are orphaned', () async {
+    String? stored;
+    final service = NetworkStorageService(
+      read: () async => stored,
+      write: (value) async => stored = value,
+    );
+    await service.save(connection('https://music.example.com', id: 'nas'));
+    service.virtualSources = _VirtualSources();
+
+    expect(await service.isOrphanedSource('network://nas/a.flac'), isFalse);
+    expect(await service.isOrphanedSource('network://phone/a.flac'), isFalse);
+    expect(await service.isOrphanedSource('network://gone/a.flac'), isTrue);
+    expect(await service.isOrphanedSource('/music/a.flac'), isFalse);
+
+    // A paired phone's songs stay while Link is off.
+    service.virtualSources = null;
+    expect(
+      await service.isOrphanedSource(
+        'network://link-phone-0123456789abcdef/a.flac',
+      ),
+      isFalse,
+    );
+
+    await service.remove('nas');
+    expect(await service.isOrphanedSource('network://nas/a.flac'), isTrue);
+  });
+
+  test('an unreadable connection list orphans no song', () async {
+    final service = NetworkStorageService(
+      read: () async => throw const FileSystemException('locked'),
+      write: (_) async {},
+    );
+    expect(await service.isOrphanedSource('network://nas/a.flac'), isFalse);
+  });
+
   test('virtual hosts answer covers with their local files only', () async {
     final service = NetworkStorageService(
       read: () async => null,

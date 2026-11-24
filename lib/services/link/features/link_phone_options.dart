@@ -13,6 +13,7 @@ class LinkPhoneOptions {
   const LinkPhoneOptions({
     this.loaded = false,
     this.shareSongs = true,
+    this.showComputerSongs = true,
     this.followDesktop = true,
   });
 
@@ -22,15 +23,22 @@ class LinkPhoneOptions {
   /// This phone's songs show in the computer's Library and play there.
   final bool shareSongs;
 
+  /// Paired computers' songs show in this phone's Library.
+  final bool showComputerSongs;
+
   /// The player screens follow the computer when it starts playing.
   final bool followDesktop;
 
-  LinkPhoneOptions copyWith({bool? shareSongs, bool? followDesktop}) =>
-      LinkPhoneOptions(
-        loaded: true,
-        shareSongs: shareSongs ?? this.shareSongs,
-        followDesktop: followDesktop ?? this.followDesktop,
-      );
+  LinkPhoneOptions copyWith({
+    bool? shareSongs,
+    bool? showComputerSongs,
+    bool? followDesktop,
+  }) => LinkPhoneOptions(
+    loaded: true,
+    shareSongs: shareSongs ?? this.shareSongs,
+    showComputerSongs: showComputerSongs ?? this.showComputerSongs,
+    followDesktop: followDesktop ?? this.followDesktop,
+  );
 }
 
 /// Keeps [LinkPhoneOptions] in shared preferences. Tests pass [initial],
@@ -39,14 +47,18 @@ class LinkPhoneOptionsNotifier extends Notifier<LinkPhoneOptions> {
   LinkPhoneOptionsNotifier({this.initial});
 
   static const shareSongsKey = 'link_phone_share_songs';
+  static const showComputerSongsKey = 'link_phone_show_computer_songs';
   static const followDesktopKey = 'link_phone_follow_desktop';
 
   final LinkPhoneOptions? initial;
+  Future<void>? _loading;
+
+  Future<void> ensureLoaded() => _loading ?? Future.value();
 
   @override
   LinkPhoneOptions build() {
     if (initial case final options?) return options;
-    unawaited(_restore());
+    _loading = _restore();
     return const LinkPhoneOptions();
   }
 
@@ -57,6 +69,7 @@ class LinkPhoneOptionsNotifier extends Notifier<LinkPhoneOptions> {
       options = LinkPhoneOptions(
         loaded: true,
         shareSongs: prefs.getBool(shareSongsKey) ?? true,
+        showComputerSongs: prefs.getBool(showComputerSongsKey) ?? true,
         followDesktop: prefs.getBool(followDesktopKey) ?? true,
       );
     } on Object catch (error) {
@@ -69,6 +82,11 @@ class LinkPhoneOptionsNotifier extends Notifier<LinkPhoneOptions> {
   void setShareSongs(bool share) {
     state = state.copyWith(shareSongs: share);
     unawaited(_persist((prefs) => prefs.setBool(shareSongsKey, share)));
+  }
+
+  void setShowComputerSongs(bool show) {
+    state = state.copyWith(showComputerSongs: show);
+    unawaited(_persist((prefs) => prefs.setBool(showComputerSongsKey, show)));
   }
 
   void setFollowDesktop(bool follow) {

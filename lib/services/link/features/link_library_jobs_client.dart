@@ -65,6 +65,11 @@ class LinkLibraryJobsClient extends Notifier<LinkLibraryJobsState> {
         client.connectionState != LinkConnectionState.connected) {
       return;
     }
+    // A phone host runs no file changes; it says so in `features`.
+    if (!client.server.supports(LinkHostFeatures.libraryJobs)) {
+      if (!state.loaded) state = const LinkLibraryJobsState(loaded: true);
+      return;
+    }
     _refreshing = true;
     final revision = _revision;
     try {

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audio_service_platform_interface/audio_service_platform_interface.dart';
 import 'package:audio_service_platform_interface/no_op_audio_service.dart';
+import 'package:mornye/services/windows_taskbar_controls.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:smtc_windows/smtc_windows.dart' as smtc;
 
@@ -75,8 +76,10 @@ class _WindowsSmtcControls implements SmtcControls {
 /// lock screen). The controls offer no seek request, so seeking stays in
 /// the app.
 class SmtcAudioService extends NoOpAudioService {
-  SmtcAudioService({Future<SmtcControls> Function()? create})
+  SmtcAudioService({Future<SmtcControls> Function()? create, this.taskbar})
     : _create = create ?? _WindowsSmtcControls.create;
+
+  final WindowsTaskbarControls? taskbar;
 
   /// How often a playing timeline is refreshed when nothing else changes,
   /// as Microsoft suggests for the timeline properties.
@@ -102,6 +105,7 @@ class SmtcAudioService extends NoOpAudioService {
   @override
   Future<void> configure(ConfigureRequest request) async {
     if (_controls != null) return;
+    taskbar?.initialize();
     try {
       final controls = await _create();
       _controls = controls;
@@ -112,8 +116,10 @@ class SmtcAudioService extends NoOpAudioService {
   }
 
   @override
-  void setHandlerCallbacks(AudioHandlerCallbacks callbacks) =>
-      _callbacks = callbacks;
+  void setHandlerCallbacks(AudioHandlerCallbacks callbacks) {
+    _callbacks = callbacks;
+    taskbar?.callbacks = callbacks;
+  }
 
   void _pressed(smtc.PressedButton button) {
     final callbacks = _callbacks;
@@ -147,6 +153,7 @@ class SmtcAudioService extends NoOpAudioService {
   @override
   Future<void> setState(SetStateRequest request) async {
     _state = request.state;
+    await taskbar?.update(request.state);
     final controls = _controls;
     if (controls == null) return;
     final state = request.state;
@@ -220,6 +227,7 @@ class SmtcAudioService extends NoOpAudioService {
 
   @override
   Future<void> stopService(StopServiceRequest request) async {
+    await taskbar?.stop();
     final controls = _controls;
     if (controls == null) return;
     await _guard(() => _setStatus(controls, smtc.PlaybackStatus.stopped));
@@ -270,6 +278,7 @@ class SmtcAudioService extends NoOpAudioService {
 
   /// Stops listening, for tests and shutdown.
   Future<void> close() async {
+    await taskbar?.close();
     await _buttons?.cancel();
     _buttons = null;
   }

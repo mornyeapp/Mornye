@@ -1,5 +1,5 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -117,7 +117,7 @@ void main() {
           themeMode: themeMode,
           themeAnimationDuration: const Duration(milliseconds: 300),
           locale: locale,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) =>
               buildAppContent(context, child, heroAnimationsEnabled: true),
@@ -269,31 +269,53 @@ void main() {
     variant: _macOS,
   );
 
-  testWidgets('resizes reuse the app fade and still fade at the rail', (
+  Finder appFade() => find.ancestor(
+    of: find.byType(AppScaffoldMessenger),
+    matching: find.byType(FadeTransition),
+  );
+
+  testWidgets('phone resizes reuse the app fade and fade on rotation', (
     tester,
   ) async {
-    await pumpApp(tester);
-    Animation<double> fade() => tester
-        .widget<FadeTransition>(
-          find
-              .ancestor(
-                of: find.byType(AppScaffoldMessenger),
-                matching: find.byType(FadeTransition),
-              )
-              .first,
-        )
-        .opacity;
+    debugDesktopPlatformOverride = false;
+    tester.view.physicalSize = const Size(800, 400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+    Animation<double> fade() =>
+        tester.widget<FadeTransition>(appFade().first).opacity;
     final opacity = fade();
 
-    await resize(tester);
+    for (var step = 1; step <= 5; step++) {
+      tester.view.physicalSize = Size(800 - step * 10, 400);
+      await tester.pump();
+    }
     expect(fade(), same(opacity));
+    expect(opacity.value, 1);
 
-    tester.view.physicalSize = const Size(1500, 800);
+    tester.view.physicalSize = const Size(400, 800);
     await tester.pump();
     expect(fade(), same(opacity));
     expect(opacity.value, lessThan(1));
     await tester.pumpAndSettle();
     expect(opacity.value, 1);
+  });
+
+  testWidgets('desktop maximize, Snap and portrait windows never fade', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    expect(appFade(), findsNothing);
+
+    // Maximize across the rail breakpoint, then a portrait Snap.
+    for (final size in const [Size(1920, 1080), Size(800, 900)]) {
+      tester.view.physicalSize = size;
+      await tester.pump();
+      expect(appFade(), findsNothing);
+      expect(find.text('content'), findsOneWidget);
+    }
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(

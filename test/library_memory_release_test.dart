@@ -40,7 +40,7 @@ Future<void> _browseAndClose(ProviderContainer container, String search) async {
     subscription.close();
   }
   await container.pump();
-  expect(container.exists(provider), isFalse);
+  expect(container.read(provider.exists), isFalse);
 }
 
 Future<void> main() async {

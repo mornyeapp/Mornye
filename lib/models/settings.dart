@@ -20,8 +20,70 @@ double playbackNormalizationPreampFromJson(Object? value) =>
 String playbackNormalizationModeFromJson(Object? value) =>
     value == 'album' ? 'album' : 'track';
 
+/// Volume levels, in percent, above which the volume bar can ask first.
+const loudVolumeLevels = [60, 70, 80, 90];
+
+int loudVolumeLevelFromJson(Object? value) =>
+    value is int && loudVolumeLevels.contains(value) ? value : 80;
+
+/// When connecting headphones resumes playback: never, only a recent pause
+/// caused by headphones or Bluetooth going away, or on every connection
+/// (which also pauses on disconnect).
+const headphoneResumeModes = ['off', 'after_disconnect', 'always'];
+
+/// Older builds stored two switches. The broad one wins, then the narrow
+/// one; an unknown value reads as off.
+Object? readHeadphoneResume(Map<dynamic, dynamic> json, String key) {
+  final value = json[key];
+  if (headphoneResumeModes.contains(value)) return value;
+  if (json['playOnHeadphonesConnected'] == true) return 'always';
+  if (json['resumeOnOutputReconnect'] == true) return 'after_disconnect';
+  return 'off';
+}
+
+String headphoneResumeFromJson(Object? value) =>
+    headphoneResumeModes.contains(value) ? value! as String : 'off';
+
 double musicHapticsLevelFromJson(Object? value) =>
     value is num && value.isFinite ? value.toDouble().clamp(0, 1) : 0.5;
+
+double autoplayRandomnessFromJson(Object? value) =>
+    value is num && value.isFinite ? value.toDouble().clamp(0, 1) : 0;
+
+/// Slowest and fastest playback speed, as a factor of the normal speed.
+const double minPlaybackSpeed = 0.5;
+const double maxPlaybackSpeed = 2;
+
+double playbackSpeedFromJson(Object? value) => value is num && value.isFinite
+    ? value.toDouble().clamp(minPlaybackSpeed, maxPlaybackSpeed)
+    : 1;
+
+/// Largest pitch shift either way, in semitones.
+const double maxPlaybackPitch = 12;
+
+/// The pitch shift in whole semitones, the steps a key changes by.
+double playbackPitchFromJson(Object? value) => value is num && value.isFinite
+    ? value.toDouble().roundToDouble().clamp(
+        -maxPlaybackPitch,
+        maxPlaybackPitch,
+      )
+    : 0;
+
+/// Smallest and largest Interface size, as a factor of the normal size.
+const double minInterfaceScale = 0.8;
+const double maxInterfaceScale = 1.3;
+
+double interfaceScaleFromJson(Object? value) => value is num && value.isFinite
+    ? value.toDouble().clamp(minInterfaceScale, maxInterfaceScale)
+    : 1;
+
+/// Slowest and fastest Animation speed, as a factor of the designed speed.
+const double minAnimationSpeed = 0.5;
+const double maxAnimationSpeed = 2;
+
+double animationSpeedFromJson(Object? value) => value is num && value.isFinite
+    ? value.toDouble().clamp(minAnimationSpeed, maxAnimationSpeed)
+    : 1;
 
 /// Sort choices offered by the Library, in display order.
 const librarySortModes = [
@@ -35,6 +97,8 @@ const librarySortModes = [
   'artist-desc',
   'album-asc',
   'album-desc',
+  'year-asc',
+  'year-desc',
   'release-newest',
   'release-oldest',
   'genre-asc',
@@ -44,6 +108,31 @@ const librarySortModes = [
 String librarySortModeFromJson(Object? value) =>
     value is String && librarySortModes.contains(value) ? value : 'latest';
 
+String libraryAlbumSortModeFromJson(Object? value) =>
+    const [
+      'a-z',
+      'latest',
+      'size-desc',
+      'size-asc',
+      'year-asc',
+      'year-desc',
+    ].contains(value)
+    ? value as String
+    : 'a-z';
+
+const lyricsTranslationSaveToSongFile = 'songFile';
+const lyricsTranslationSaveToMlrc = 'mlrc';
+
+String lyricsTranslationSaveToFromJson(Object? value) =>
+    value == lyricsTranslationSaveToMlrc
+    ? lyricsTranslationSaveToMlrc
+    : lyricsTranslationSaveToSongFile;
+
+/// Offline romanization starts as the AI romanization switch was, so a
+/// user who turned that off is not shown romanization they did not want.
+Object? readLyricsRomanize(Map<dynamic, dynamic> json, String key) =>
+    json[key] ?? json['lyricsAiRomanize'];
+
 @JsonSerializable(explicitToJson: true)
 class AppSettings {
   static const String homeFeedProviderOff = '__off__';
@@ -52,6 +141,8 @@ class AppSettings {
   static const String libraryQualityLabelBitDepthOnly = 'bit_depth_only';
   static const String libraryQualityLabelBitDepth = 'bit_depth';
   static const String libraryQualityLabelBitDepthBitrate = 'bit_depth_bitrate';
+  static const String librarySongTapPlay = 'play';
+  static const String librarySongTapDetails = 'details';
 
   final String defaultService;
   final String audioQuality;
@@ -79,8 +170,14 @@ class AppSettings {
   final double playbackNormalizationPreamp;
   @JsonKey(fromJson: playbackNormalizationModeFromJson)
   final String playbackNormalizationMode; // 'track' or 'album'
+  // Ask before the app's volume bar goes above [loudVolumeLevel] percent.
+  final bool confirmLoudVolume;
+  @JsonKey(fromJson: loudVolumeLevelFromJson)
+  final int loudVolumeLevel; // One of [loudVolumeLevels].
   final bool pauseOnMute;
-  final bool playOnHeadphonesConnected;
+  // One of [headphoneResumeModes].
+  @JsonKey(readValue: readHeadphoneResume, fromJson: headphoneResumeFromJson)
+  final String headphoneResume;
   // Start the next song the moment one ends; AutoMix replaces it while on.
   final bool gaplessPlayback;
   final bool autoMix;
@@ -94,6 +191,20 @@ class AppSettings {
   final double autoMixPitch;
   final bool autoMixEcho;
   final bool autoMixLowPass;
+
+  /// Playback speed for every song, from [minPlaybackSpeed] to
+  /// [maxPlaybackSpeed]; 1 is normal.
+  @JsonKey(fromJson: playbackSpeedFromJson)
+  final double playbackSpeed;
+
+  /// True keeps the pitch while the speed changes; false lets the pitch
+  /// follow the speed, as a record played faster or slower.
+  final bool playbackKeepPitch;
+
+  /// Pitch shift in whole semitones on top of [playbackKeepPitch], from
+  /// -[maxPlaybackPitch] to [maxPlaybackPitch]; 0 is the original key.
+  @JsonKey(fromJson: playbackPitchFromJson)
+  final double playbackPitch;
   AutoMixOptions get autoMixOptions => AutoMixOptions(
     durationSeconds: autoMixDuration,
     effect: autoMixEffect,
@@ -107,7 +218,36 @@ class AppSettings {
   final bool usbDirect;
   final bool usbDsdOverPcm;
   final bool usbAllowFixedVolume;
+
+  /// The highest sample rate the direct USB driver sets on the DAC, in Hz;
+  /// a song above it is converted. 0 leaves the choice to the DAC.
+  final int usbMaxSampleRate;
   final bool dapExclusive;
+
+  /// Android beta, off by default: play the music player and AutoMix through
+  /// the app's own media3 engine instead of the platform MediaPlayer, which
+  /// turning it off restores. Songs for the USB and AAudio outputs
+  /// ([usbBitPerfect]) stay on the platform player. Applies from the next
+  /// song.
+  final bool media3Engine;
+
+  /// Android, through [media3Engine] only: jump over silent passages. Off
+  /// while AutoMix is on, whose fades follow the clock. While on, media3
+  /// decodes to 16-bit, which its silence detection needs.
+  final bool skipSilence;
+
+  /// Android, iOS and macOS: let the system spatialize songs (Android
+  /// spatialization behavior auto, Apple mono, stereo and multichannel).
+  /// Off asks the system never to spatialize them. The app renders nothing.
+  final bool spatialAudio;
+
+  /// Adding a song already coming up in the queue moves that entry instead
+  /// of queueing a second copy. The current and played entries stay.
+  final bool queueNoDuplicates;
+
+  /// The queue UIs stop reordering and swiping songs away; adding songs
+  /// from elsewhere still works. Toggled from the queue header too.
+  final bool queueLocked;
 
   /// Desktop: take the output device for the music player alone, bypassing
   /// the system mixer (WASAPI exclusive on Windows, hog mode on macOS, an
@@ -120,6 +260,8 @@ class AppSettings {
   final String exclusiveOutputDevice;
   final bool autoplay;
   final bool autoplayPersonalization;
+  @JsonKey(fromJson: autoplayRandomnessFromJson)
+  final double autoplayRandomness;
 
   /// Analyze how each Library song sounds, on this device, so Autoplay picks
   /// songs that sound like the session. Off until turned on: decoding songs
@@ -138,6 +280,10 @@ class AppSettings {
   final String playerCoverStyle; // 'default' (card), 'fullscreen' or ''
   final bool landscapeLyricsArtwork;
   final bool autoHideLyricsControls;
+
+  /// An explicit auto-hide choice also applies if accessibility changes later.
+  /// The default keeps playback controls available to assistive navigation.
+  final bool autoHideLyricsControlsWithAccessibility;
   // Material: idle lyrics shrink the player to a slim bar, not hide it.
   final bool compactPlayer;
   final bool isFirstLaunch;
@@ -154,6 +300,12 @@ class AppSettings {
   final String historyFilterMode;
   @JsonKey(fromJson: librarySortModeFromJson)
   final String historySortMode;
+  @JsonKey(fromJson: libraryAlbumSortModeFromJson)
+  final String libraryAlbumSortMode;
+
+  /// A Library artist opens on all their songs instead of their albums:
+  /// the view chosen last on an artist.
+  final bool libraryArtistShowsSongs;
 
   /// Library view opened when switching to the Library tab:
   /// 'last' (keep last used), 'all', 'albums', 'singles', or 'playlists'.
@@ -162,6 +314,15 @@ class AppSettings {
   /// Library badge text: measured bitrate, file format, bit depth,
   /// bit depth/sample rate, or the combined bit depth/bitrate label.
   final String libraryQualityLabelMode;
+
+  /// Phones and tablets: a horizontal swipe on a song row plays it next or
+  /// adds it to the queue.
+  final bool swipeToQueue;
+
+  /// What a tap on a Library song row with a play button does:
+  /// [librarySongTapDetails], the default, opens its details and the button
+  /// plays; [librarySongTapPlay] plays it and the button opens its details.
+  final String librarySongTap;
   final bool askQualityBeforeDownload;
   final bool enableLogging;
   final bool useExtensionProviders;
@@ -173,10 +334,21 @@ class AppSettings {
   /// shows cover grids and shelves.
   final String searchViewMode;
   final String? homeFeedProvider;
+
+  /// The Material Home's shortcuts, in order, by `HomeShortcut` name. Read
+  /// them through `HomeShortcut.resolve`, which fills in unknown names.
+  final List<String> homeShortcuts;
+
+  /// Whether Home offers the last song again ("Continue listening").
+  final bool homeContinueListening;
   final bool separateSingles;
   final String singleFilenameFormat;
   final String albumFolderStructure;
   final bool showExtensionStore;
+
+  /// Installs store updates for enabled extensions after each background
+  /// store check, but only while no download is queued or running.
+  final bool autoUpdateExtensions;
 
   /// Shared-element (Hero) flights, e.g. the mini player artwork expanding
   /// into the full player. Off skips the flights entirely.
@@ -186,20 +358,50 @@ class AppSettings {
   /// profile disabled it for this device tier. Off means "follow the
   /// device default".
   final bool forceBackdropBlur;
+
+  /// Interface size: scales the whole app, on top of the automatic tablet
+  /// and TV scale. 1 is the normal size.
+  @JsonKey(fromJson: interfaceScaleFromJson)
+  final double interfaceScale;
+
+  /// Animation speed: how fast the app's own motion plays. 1 is the
+  /// designed speed, 2 twice as fast.
+  @JsonKey(fromJson: animationSpeedFromJson)
+  final double animationSpeed;
   final String
   extensionVerificationBrowserMode; // 'external_first' or 'in_app_first'
   final String locale;
   final String lyricsMode;
   final bool keepScreenOnLyrics;
+
+  /// Show the line being sung in place of the song title on the lock screen.
+  final bool lockScreenLyrics;
   final bool motionArtworkEnabled;
+
+  /// Copy a download's animated cover into its album folder as `cover.mp4`.
+  final bool saveMotionArtworkFile;
+
+  /// Save a download's cover into its album folder as `folder.jpg`, for
+  /// players that do not read the cover inside a song.
+  final bool saveFolderCover;
+
+  /// The longest side of that cover in pixels; 0 keeps the original.
+  final int folderCoverMaxDimension;
+
+  /// Delete the album and artist folders a deleted song leaves empty, inside
+  /// the download and Local Library folders.
+  final bool removeEmptyFolders;
   final bool listeningStatisticsEnabled;
   final bool autoConvertDownloads;
   // Re-download a Hi-Res request at LOSSLESS when the file measures as fake.
   final bool redownloadFakeHiRes;
-  final String autoConvertFormat; // 'mp3', 'aac' (M4A), 'opus', or 'flac'
+  final String autoConvertFormat; // 'mp3', 'aac'/'alac' (M4A), 'opus', 'flac'
   final String autoConvertBitrate; // '128k', '160k', '192k', '256k', or '320k'
   final int autoConvertMaxBitDepth; // 0 retains the source bit depth.
   final int autoConvertMaxSampleRate; // 0 retains the source sample rate.
+  final bool autoConvertSmartDither;
+  // Smart Dither uses high-pass TPDF instead of plain TPDF.
+  final bool autoConvertSmartDitherHighPass;
   final bool
   useAllFilesAccess; // Android 13+ only: enable MANAGE_EXTERNAL_STORAGE
   final bool autoExportFailedDownloads;
@@ -223,13 +425,18 @@ class AppSettings {
   final String
   localLibraryAutoScan; // Auto-scan mode: 'off', 'on_open', 'daily', 'weekly'
 
+  /// Hide a Mornye Link device's songs from the Library while it is not
+  /// connected: a phone's on the desktop, a computer's on a phone.
+  final bool linkHideDisconnectedSongs;
+
   final bool hasCompletedTutorial;
 
-  /// The last `AppInfo.whatsNewRelease` tour shown or skipped. New installs
-  /// mark the current one at setup, so only updates show the tour.
-  final String whatsNewSeen;
-
   final List<String> lyricsProviders;
+
+  /// Take the best-timed lyrics any enabled provider has (word-synced, then
+  /// line-synced, then plain) instead of the first provider's lyrics.
+  /// [lyricsProviders] order still decides between equals.
+  final bool lyricsPreferBestTiming;
   final bool
   lyricsIncludeTranslationNetease; // Append translated lyrics (Netease)
   final bool
@@ -253,18 +460,45 @@ class AppSettings {
   /// BCP-47 target language; empty follows the app language.
   final String lyricsTranslationLanguage;
 
+  /// BCP-47 language for songs already in the target; empty leaves them
+  /// untranslated.
+  final String lyricsTranslationSecondLanguage;
+
   /// Optional guidance added to the translation prompt.
   final String lyricsAiInstruction;
 
   /// Translate lyrics without a translation as they open.
   final bool lyricsAutoTranslate;
 
-  /// Ask the translation for a romanization of lines written outside the
-  /// Latin alphabet.
+  /// Ask the translation for a romanization of the lines written outside
+  /// the Latin alphabet that offline romanization cannot give, while
+  /// [lyricsRomanize] is on.
   final bool lyricsAiRomanize;
+
+  /// Romanize lyrics written outside the Latin alphabet on the device,
+  /// where their script allows it.
+  @JsonKey(readValue: readLyricsRomanize)
+  final bool lyricsRomanize;
+
+  /// Show a line's romanization as the line, with the original under it.
+  final bool lyricsRomanizedMainLine;
 
   /// Align AI translations and readings to sung words instead of whole lines.
   final bool lyricsAiWordSync;
+
+  /// Where saved lyrics translations go: [lyricsTranslationSaveToSongFile],
+  /// the song's own lyrics where they can carry them, or
+  /// [lyricsTranslationSaveToMlrc], a `.mlrc` file next to the song.
+  @JsonKey(fromJson: lyricsTranslationSaveToFromJson)
+  final String lyricsTranslationSaveTo;
+
+  /// Save each lyrics translation once the player shows it.
+  final bool lyricsTranslationAutoSave;
+
+  /// Translate the lyrics of each finished download and save them with the
+  /// song, so they show offline. Off by default: every download is a
+  /// request on the user's API key.
+  final bool lyricsTranslateDownloads;
 
   final String
   lastSeenVersion; // Last app version the user has acknowledged (e.g. '3.7.0')
@@ -279,6 +513,10 @@ class AppSettings {
 
   /// Whether the phone Now Playing screen shows its volume slider.
   final bool playerShowVolume;
+
+  /// Whether the Now Playing screen shows the synced line being sung under
+  /// the track title. Off by default; Lyrics settings turns it on.
+  final bool playerShowLyricSnippet;
 
   const AppSettings({
     this.defaultService = '',
@@ -300,8 +538,10 @@ class AppSettings {
     this.playbackNormalization = false,
     this.playbackNormalizationPreamp = 0,
     this.playbackNormalizationMode = 'track',
+    this.confirmLoudVolume = true,
+    this.loudVolumeLevel = 80,
     this.pauseOnMute = true,
-    this.playOnHeadphonesConnected = false,
+    this.headphoneResume = 'off',
     this.gaplessPlayback = true,
     this.autoMix = false,
     this.autoMixDuration = 0,
@@ -310,16 +550,26 @@ class AppSettings {
     this.autoMixPitch = 0,
     this.autoMixEcho = false,
     this.autoMixLowPass = false,
+    this.playbackSpeed = 1,
+    this.playbackKeepPitch = true,
+    this.playbackPitch = 0,
     this.discordRichPresenceEnabled = false,
     this.usbBitPerfect = false,
     this.usbDirect = false,
     this.usbDsdOverPcm = false,
     this.usbAllowFixedVolume = false,
+    this.usbMaxSampleRate = 0,
     this.dapExclusive = false,
+    this.media3Engine = false,
+    this.skipSilence = false,
+    this.spatialAudio = true,
+    this.queueNoDuplicates = false,
+    this.queueLocked = false,
     this.exclusiveOutput = false,
     this.exclusiveOutputDevice = '',
     this.autoplay = false,
     this.autoplayPersonalization = true,
+    this.autoplayRandomness = 0,
     this.songAnalysis = false,
     this.songAnalysisOnlyWhileCharging = true,
     this.musicHaptics = false,
@@ -328,6 +578,7 @@ class AppSettings {
     this.playerCoverStyle = '',
     this.landscapeLyricsArtwork = false,
     this.autoHideLyricsControls = true,
+    this.autoHideLyricsControlsWithAccessibility = false,
     this.compactPlayer = false,
     this.isFirstLaunch = true,
     this.checkForUpdates = true,
@@ -342,8 +593,12 @@ class AppSettings {
     this.historyViewMode = 'grid',
     this.historyFilterMode = 'all',
     this.historySortMode = 'latest',
+    this.libraryAlbumSortMode = 'a-z',
+    this.libraryArtistShowsSongs = false,
     this.defaultLibraryView = 'last',
     this.libraryQualityLabelMode = AppSettings.libraryQualityLabelBitDepthOnly,
+    this.swipeToQueue = true,
+    this.librarySongTap = AppSettings.librarySongTapDetails,
     this.askQualityBeforeDownload = true,
     this.enableLogging = false,
     this.useExtensionProviders = true,
@@ -352,17 +607,32 @@ class AppSettings {
     this.defaultSearchTab = 'all',
     this.searchViewMode = 'list',
     this.homeFeedProvider,
+    this.homeShortcuts = const [
+      'shuffle',
+      'equalizer',
+      'listeningStats',
+      'networkStorage',
+    ],
+    this.homeContinueListening = true,
     this.separateSingles = false,
     this.singleFilenameFormat = '{title} - {artist}',
     this.albumFolderStructure = 'artist_album',
     this.showExtensionStore = true,
+    this.autoUpdateExtensions = true,
     this.heroAnimationsEnabled = true,
     this.forceBackdropBlur = false,
+    this.interfaceScale = 1,
+    this.animationSpeed = 1,
     this.extensionVerificationBrowserMode = 'in_app_first',
     this.locale = 'system',
     this.lyricsMode = 'embed',
     this.keepScreenOnLyrics = true,
+    this.lockScreenLyrics = false,
     this.motionArtworkEnabled = true,
+    this.saveMotionArtworkFile = false,
+    this.saveFolderCover = false,
+    this.folderCoverMaxDimension = 0,
+    this.removeEmptyFolders = true,
     this.listeningStatisticsEnabled = true,
     this.autoConvertDownloads = false,
     this.redownloadFakeHiRes = false,
@@ -370,6 +640,8 @@ class AppSettings {
     this.autoConvertBitrate = '320k',
     this.autoConvertMaxBitDepth = 16,
     this.autoConvertMaxSampleRate = 48000,
+    this.autoConvertSmartDither = true,
+    this.autoConvertSmartDitherHighPass = false,
     this.useAllFilesAccess = false,
     this.autoExportFailedDownloads = false,
     this.downloadNetworkMode = 'any',
@@ -383,8 +655,8 @@ class AppSettings {
     this.localLibraryBookmark = '',
     this.localLibraryShowDuplicates = true,
     this.localLibraryAutoScan = 'off',
+    this.linkHideDisconnectedSongs = true,
     this.hasCompletedTutorial = false,
-    this.whatsNewSeen = '',
     this.lyricsProviders = const [
       'apple_music',
       'lrcred',
@@ -392,6 +664,7 @@ class AppSettings {
       'lyricsplus',
       'lrclib',
     ],
+    this.lyricsPreferBestTiming = true,
     this.lyricsIncludeTranslationNetease = false,
     this.lyricsIncludeRomanizationNetease = false,
     this.lyricsMultiPersonWordByWord = true,
@@ -401,10 +674,16 @@ class AppSettings {
     this.lyricsAiBaseUrl = '',
     this.lyricsAiModel = '',
     this.lyricsTranslationLanguage = '',
+    this.lyricsTranslationSecondLanguage = '',
     this.lyricsAiInstruction = '',
     this.lyricsAutoTranslate = false,
     this.lyricsAiRomanize = true,
+    this.lyricsRomanize = true,
+    this.lyricsRomanizedMainLine = false,
     this.lyricsAiWordSync = false,
+    this.lyricsTranslationSaveTo = lyricsTranslationSaveToSongFile,
+    this.lyricsTranslationAutoSave = false,
+    this.lyricsTranslateDownloads = false,
     this.lastSeenVersion = '',
     this.deduplicateDownloads = true,
     this.allowQualityVariants = false,
@@ -413,6 +692,7 @@ class AppSettings {
     this.playerShowPronunciation = true,
     this.playerShowTranslation = true,
     this.playerShowVolume = true,
+    this.playerShowLyricSnippet = false,
   });
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -422,6 +702,7 @@ class AppSettings {
     'multi_person_word_by_word': lyricsMultiPersonWordByWord,
     'apple_elrc_word_sync': lyricsAppleElrcWordSync,
     'musixmatch_language': musixmatchLanguage,
+    'prefer_best_timing': lyricsPreferBestTiming,
   };
 
   /// The cover art style the player shows: the one chosen, else the app
@@ -432,6 +713,10 @@ class AppSettings {
       : mornye
       ? 'default'
       : 'fullscreen';
+
+  bool shouldAutoHideLyricsControls({required bool accessibleNavigation}) =>
+      autoHideLyricsControls &&
+      (!accessibleNavigation || autoHideLyricsControlsWithAccessibility);
 
   AppSettings copyWith({
     String? defaultService,
@@ -453,8 +738,10 @@ class AppSettings {
     bool? playbackNormalization,
     double? playbackNormalizationPreamp,
     String? playbackNormalizationMode,
+    bool? confirmLoudVolume,
+    int? loudVolumeLevel,
     bool? pauseOnMute,
-    bool? playOnHeadphonesConnected,
+    String? headphoneResume,
     bool? gaplessPlayback,
     bool? autoMix,
     int? autoMixDuration,
@@ -463,16 +750,26 @@ class AppSettings {
     double? autoMixPitch,
     bool? autoMixEcho,
     bool? autoMixLowPass,
+    double? playbackSpeed,
+    bool? playbackKeepPitch,
+    double? playbackPitch,
     bool? discordRichPresenceEnabled,
     bool? usbBitPerfect,
     bool? usbDirect,
     bool? usbDsdOverPcm,
     bool? usbAllowFixedVolume,
+    int? usbMaxSampleRate,
     bool? dapExclusive,
+    bool? media3Engine,
+    bool? skipSilence,
+    bool? spatialAudio,
+    bool? queueNoDuplicates,
+    bool? queueLocked,
     bool? exclusiveOutput,
     String? exclusiveOutputDevice,
     bool? autoplay,
     bool? autoplayPersonalization,
+    double? autoplayRandomness,
     bool? songAnalysis,
     bool? songAnalysisOnlyWhileCharging,
     bool? musicHaptics,
@@ -481,6 +778,7 @@ class AppSettings {
     String? playerCoverStyle,
     bool? landscapeLyricsArtwork,
     bool? autoHideLyricsControls,
+    bool? autoHideLyricsControlsWithAccessibility,
     bool? compactPlayer,
     bool? isFirstLaunch,
     bool? checkForUpdates,
@@ -495,8 +793,12 @@ class AppSettings {
     String? historyViewMode,
     String? historyFilterMode,
     String? historySortMode,
+    String? libraryAlbumSortMode,
+    bool? libraryArtistShowsSongs,
     String? defaultLibraryView,
     String? libraryQualityLabelMode,
+    bool? swipeToQueue,
+    String? librarySongTap,
     bool? askQualityBeforeDownload,
     bool? enableLogging,
     bool? useExtensionProviders,
@@ -508,17 +810,27 @@ class AppSettings {
     String? searchViewMode,
     String? homeFeedProvider,
     bool clearHomeFeedProvider = false,
+    List<String>? homeShortcuts,
+    bool? homeContinueListening,
     bool? separateSingles,
     String? singleFilenameFormat,
     String? albumFolderStructure,
     bool? showExtensionStore,
+    bool? autoUpdateExtensions,
     bool? heroAnimationsEnabled,
     bool? forceBackdropBlur,
+    double? interfaceScale,
+    double? animationSpeed,
     String? extensionVerificationBrowserMode,
     String? locale,
     String? lyricsMode,
     bool? keepScreenOnLyrics,
+    bool? lockScreenLyrics,
     bool? motionArtworkEnabled,
+    bool? saveMotionArtworkFile,
+    bool? saveFolderCover,
+    int? folderCoverMaxDimension,
+    bool? removeEmptyFolders,
     bool? listeningStatisticsEnabled,
     bool? autoConvertDownloads,
     bool? redownloadFakeHiRes,
@@ -526,6 +838,8 @@ class AppSettings {
     String? autoConvertBitrate,
     int? autoConvertMaxBitDepth,
     int? autoConvertMaxSampleRate,
+    bool? autoConvertSmartDither,
+    bool? autoConvertSmartDitherHighPass,
     bool? useAllFilesAccess,
     bool? autoExportFailedDownloads,
     String? downloadNetworkMode,
@@ -539,9 +853,10 @@ class AppSettings {
     String? localLibraryBookmark,
     bool? localLibraryShowDuplicates,
     String? localLibraryAutoScan,
+    bool? linkHideDisconnectedSongs,
     bool? hasCompletedTutorial,
-    String? whatsNewSeen,
     List<String>? lyricsProviders,
+    bool? lyricsPreferBestTiming,
     bool? lyricsIncludeTranslationNetease,
     bool? lyricsIncludeRomanizationNetease,
     bool? lyricsMultiPersonWordByWord,
@@ -551,10 +866,16 @@ class AppSettings {
     String? lyricsAiBaseUrl,
     String? lyricsAiModel,
     String? lyricsTranslationLanguage,
+    String? lyricsTranslationSecondLanguage,
     String? lyricsAiInstruction,
     bool? lyricsAutoTranslate,
     bool? lyricsAiRomanize,
+    bool? lyricsRomanize,
+    bool? lyricsRomanizedMainLine,
     bool? lyricsAiWordSync,
+    String? lyricsTranslationSaveTo,
+    bool? lyricsTranslationAutoSave,
+    bool? lyricsTranslateDownloads,
     String? lastSeenVersion,
     bool? deduplicateDownloads,
     bool? allowQualityVariants,
@@ -563,6 +884,7 @@ class AppSettings {
     bool? playerShowPronunciation,
     bool? playerShowTranslation,
     bool? playerShowVolume,
+    bool? playerShowLyricSnippet,
   }) {
     return AppSettings(
       defaultService: defaultService ?? this.defaultService,
@@ -590,9 +912,10 @@ class AppSettings {
           playbackNormalizationPreamp ?? this.playbackNormalizationPreamp,
       playbackNormalizationMode:
           playbackNormalizationMode ?? this.playbackNormalizationMode,
+      confirmLoudVolume: confirmLoudVolume ?? this.confirmLoudVolume,
+      loudVolumeLevel: loudVolumeLevel ?? this.loudVolumeLevel,
       pauseOnMute: pauseOnMute ?? this.pauseOnMute,
-      playOnHeadphonesConnected:
-          playOnHeadphonesConnected ?? this.playOnHeadphonesConnected,
+      headphoneResume: headphoneResume ?? this.headphoneResume,
       gaplessPlayback: gaplessPlayback ?? this.gaplessPlayback,
       autoMix: autoMix ?? this.autoMix,
       autoMixDuration: autoMixDuration ?? this.autoMixDuration,
@@ -601,19 +924,29 @@ class AppSettings {
       autoMixPitch: autoMixPitch ?? this.autoMixPitch,
       autoMixEcho: autoMixEcho ?? this.autoMixEcho,
       autoMixLowPass: autoMixLowPass ?? this.autoMixLowPass,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+      playbackKeepPitch: playbackKeepPitch ?? this.playbackKeepPitch,
+      playbackPitch: playbackPitch ?? this.playbackPitch,
       discordRichPresenceEnabled:
           discordRichPresenceEnabled ?? this.discordRichPresenceEnabled,
       usbBitPerfect: usbBitPerfect ?? this.usbBitPerfect,
       usbDirect: usbDirect ?? this.usbDirect,
       usbDsdOverPcm: usbDsdOverPcm ?? this.usbDsdOverPcm,
       usbAllowFixedVolume: usbAllowFixedVolume ?? this.usbAllowFixedVolume,
+      usbMaxSampleRate: usbMaxSampleRate ?? this.usbMaxSampleRate,
       dapExclusive: dapExclusive ?? this.dapExclusive,
+      media3Engine: media3Engine ?? this.media3Engine,
+      skipSilence: skipSilence ?? this.skipSilence,
+      spatialAudio: spatialAudio ?? this.spatialAudio,
+      queueNoDuplicates: queueNoDuplicates ?? this.queueNoDuplicates,
+      queueLocked: queueLocked ?? this.queueLocked,
       exclusiveOutput: exclusiveOutput ?? this.exclusiveOutput,
       exclusiveOutputDevice:
           exclusiveOutputDevice ?? this.exclusiveOutputDevice,
       autoplay: autoplay ?? this.autoplay,
       autoplayPersonalization:
           autoplayPersonalization ?? this.autoplayPersonalization,
+      autoplayRandomness: autoplayRandomness ?? this.autoplayRandomness,
       songAnalysis: songAnalysis ?? this.songAnalysis,
       songAnalysisOnlyWhileCharging:
           songAnalysisOnlyWhileCharging ?? this.songAnalysisOnlyWhileCharging,
@@ -626,6 +959,9 @@ class AppSettings {
           landscapeLyricsArtwork ?? this.landscapeLyricsArtwork,
       autoHideLyricsControls:
           autoHideLyricsControls ?? this.autoHideLyricsControls,
+      autoHideLyricsControlsWithAccessibility:
+          autoHideLyricsControlsWithAccessibility ??
+          this.autoHideLyricsControlsWithAccessibility,
       compactPlayer: compactPlayer ?? this.compactPlayer,
       isFirstLaunch: isFirstLaunch ?? this.isFirstLaunch,
       checkForUpdates: checkForUpdates ?? this.checkForUpdates,
@@ -643,9 +979,14 @@ class AppSettings {
       historyViewMode: historyViewMode ?? this.historyViewMode,
       historyFilterMode: historyFilterMode ?? this.historyFilterMode,
       historySortMode: historySortMode ?? this.historySortMode,
+      libraryAlbumSortMode: libraryAlbumSortMode ?? this.libraryAlbumSortMode,
+      libraryArtistShowsSongs:
+          libraryArtistShowsSongs ?? this.libraryArtistShowsSongs,
       defaultLibraryView: defaultLibraryView ?? this.defaultLibraryView,
       libraryQualityLabelMode:
           libraryQualityLabelMode ?? this.libraryQualityLabelMode,
+      swipeToQueue: swipeToQueue ?? this.swipeToQueue,
+      librarySongTap: librarySongTap ?? this.librarySongTap,
       askQualityBeforeDownload:
           askQualityBeforeDownload ?? this.askQualityBeforeDownload,
       enableLogging: enableLogging ?? this.enableLogging,
@@ -662,20 +1003,33 @@ class AppSettings {
       homeFeedProvider: clearHomeFeedProvider
           ? null
           : (homeFeedProvider ?? this.homeFeedProvider),
+      homeShortcuts: homeShortcuts ?? this.homeShortcuts,
+      homeContinueListening:
+          homeContinueListening ?? this.homeContinueListening,
       separateSingles: separateSingles ?? this.separateSingles,
       singleFilenameFormat: singleFilenameFormat ?? this.singleFilenameFormat,
       albumFolderStructure: albumFolderStructure ?? this.albumFolderStructure,
       showExtensionStore: showExtensionStore ?? this.showExtensionStore,
+      autoUpdateExtensions: autoUpdateExtensions ?? this.autoUpdateExtensions,
       heroAnimationsEnabled:
           heroAnimationsEnabled ?? this.heroAnimationsEnabled,
       forceBackdropBlur: forceBackdropBlur ?? this.forceBackdropBlur,
+      interfaceScale: interfaceScale ?? this.interfaceScale,
+      animationSpeed: animationSpeed ?? this.animationSpeed,
       extensionVerificationBrowserMode:
           extensionVerificationBrowserMode ??
           this.extensionVerificationBrowserMode,
       locale: locale ?? this.locale,
       lyricsMode: lyricsMode ?? this.lyricsMode,
       keepScreenOnLyrics: keepScreenOnLyrics ?? this.keepScreenOnLyrics,
+      lockScreenLyrics: lockScreenLyrics ?? this.lockScreenLyrics,
       motionArtworkEnabled: motionArtworkEnabled ?? this.motionArtworkEnabled,
+      saveMotionArtworkFile:
+          saveMotionArtworkFile ?? this.saveMotionArtworkFile,
+      saveFolderCover: saveFolderCover ?? this.saveFolderCover,
+      folderCoverMaxDimension:
+          folderCoverMaxDimension ?? this.folderCoverMaxDimension,
+      removeEmptyFolders: removeEmptyFolders ?? this.removeEmptyFolders,
       listeningStatisticsEnabled:
           listeningStatisticsEnabled ?? this.listeningStatisticsEnabled,
       autoConvertDownloads: autoConvertDownloads ?? this.autoConvertDownloads,
@@ -686,6 +1040,10 @@ class AppSettings {
           autoConvertMaxBitDepth ?? this.autoConvertMaxBitDepth,
       autoConvertMaxSampleRate:
           autoConvertMaxSampleRate ?? this.autoConvertMaxSampleRate,
+      autoConvertSmartDither:
+          autoConvertSmartDither ?? this.autoConvertSmartDither,
+      autoConvertSmartDitherHighPass:
+          autoConvertSmartDitherHighPass ?? this.autoConvertSmartDitherHighPass,
       useAllFilesAccess: useAllFilesAccess ?? this.useAllFilesAccess,
       autoExportFailedDownloads:
           autoExportFailedDownloads ?? this.autoExportFailedDownloads,
@@ -703,9 +1061,12 @@ class AppSettings {
       localLibraryShowDuplicates:
           localLibraryShowDuplicates ?? this.localLibraryShowDuplicates,
       localLibraryAutoScan: localLibraryAutoScan ?? this.localLibraryAutoScan,
+      linkHideDisconnectedSongs:
+          linkHideDisconnectedSongs ?? this.linkHideDisconnectedSongs,
       hasCompletedTutorial: hasCompletedTutorial ?? this.hasCompletedTutorial,
-      whatsNewSeen: whatsNewSeen ?? this.whatsNewSeen,
       lyricsProviders: lyricsProviders ?? this.lyricsProviders,
+      lyricsPreferBestTiming:
+          lyricsPreferBestTiming ?? this.lyricsPreferBestTiming,
       lyricsIncludeTranslationNetease:
           lyricsIncludeTranslationNetease ??
           this.lyricsIncludeTranslationNetease,
@@ -722,10 +1083,22 @@ class AppSettings {
       lyricsAiModel: lyricsAiModel ?? this.lyricsAiModel,
       lyricsTranslationLanguage:
           lyricsTranslationLanguage ?? this.lyricsTranslationLanguage,
+      lyricsTranslationSecondLanguage:
+          lyricsTranslationSecondLanguage ??
+          this.lyricsTranslationSecondLanguage,
       lyricsAiInstruction: lyricsAiInstruction ?? this.lyricsAiInstruction,
       lyricsAutoTranslate: lyricsAutoTranslate ?? this.lyricsAutoTranslate,
       lyricsAiRomanize: lyricsAiRomanize ?? this.lyricsAiRomanize,
+      lyricsRomanize: lyricsRomanize ?? this.lyricsRomanize,
+      lyricsRomanizedMainLine:
+          lyricsRomanizedMainLine ?? this.lyricsRomanizedMainLine,
       lyricsAiWordSync: lyricsAiWordSync ?? this.lyricsAiWordSync,
+      lyricsTranslationSaveTo:
+          lyricsTranslationSaveTo ?? this.lyricsTranslationSaveTo,
+      lyricsTranslationAutoSave:
+          lyricsTranslationAutoSave ?? this.lyricsTranslationAutoSave,
+      lyricsTranslateDownloads:
+          lyricsTranslateDownloads ?? this.lyricsTranslateDownloads,
       lastSeenVersion: lastSeenVersion ?? this.lastSeenVersion,
       deduplicateDownloads: deduplicateDownloads ?? this.deduplicateDownloads,
       allowQualityVariants: allowQualityVariants ?? this.allowQualityVariants,
@@ -736,6 +1109,8 @@ class AppSettings {
       playerShowTranslation:
           playerShowTranslation ?? this.playerShowTranslation,
       playerShowVolume: playerShowVolume ?? this.playerShowVolume,
+      playerShowLyricSnippet:
+          playerShowLyricSnippet ?? this.playerShowLyricSnippet,
     );
   }
 
@@ -751,5 +1126,10 @@ class AppSettings {
       }.toList(),
     );
   }
-  Map<String, dynamic> toJson() => _$AppSettingsToJson(this);
+  Map<String, dynamic> toJson() => {
+    ..._$AppSettingsToJson(this),
+    // Builds before [headphoneResume] read this switch, so a downgrade or
+    // a backup opened by one keeps Always.
+    'playOnHeadphonesConnected': headphoneResume == 'always',
+  };
 }

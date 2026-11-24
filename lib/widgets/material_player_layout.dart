@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
@@ -13,10 +13,12 @@ import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_compact_bar.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
+import 'package:mornye/widgets/player_lyric_preview.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/playback_source_label.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
+import 'package:mornye/widgets/player_track_crossfade.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 
 class MaterialPlayerLayout extends StatelessWidget {
@@ -29,13 +31,17 @@ class MaterialPlayerLayout extends StatelessWidget {
     required this.showLyrics,
     required this.lyricsBuilder,
     required this.onOpenQueue,
+    this.onOpenLyrics,
     this.fullScreenArtwork = false,
     this.landscapeLyricsArtwork = false,
     this.immersive = false,
     this.compactPlayer = false,
     this.onCompactPlayerTouch,
+    this.showSourceLabel = true,
   });
 
+  /// False where the Playing on row names the song's source instead.
+  final bool showSourceLabel;
   final MediaItem mediaItem;
   final PlayerMetadataController metadata;
   final PlaybackSeekPreview seekPreview;
@@ -43,6 +49,7 @@ class MaterialPlayerLayout extends StatelessWidget {
   final bool showLyrics;
   final WidgetBuilder lyricsBuilder;
   final VoidCallback onOpenQueue;
+  final VoidCallback? onOpenLyrics;
 
   /// The page backdrop paints the cover; this area only keeps its gestures.
   final bool fullScreenArtwork;
@@ -82,14 +89,12 @@ class MaterialPlayerLayout extends StatelessWidget {
                         final resting =
                             !ref.watch(playbackPlayingProvider) &&
                             !ref.watch(playbackLoadingProvider);
+                        // The cover is as large as a panel, so it settles
+                        // on the slow spatial spring, which stops at its
+                        // size; reduced motion changes it at once.
                         final motion = AppMotion.spatialSlow(
                           context,
-                          AppMotionSpec(
-                            MediaQuery.disableAnimationsOf(context)
-                                ? Duration.zero
-                                : const Duration(milliseconds: 500),
-                            Curves.easeOutBack,
-                          ),
+                          const AppMotionSpec(Duration.zero, Curves.linear),
                         );
                         return AnimatedScale(
                           scale: resting ? 0.9 : 1,
@@ -110,33 +115,21 @@ class MaterialPlayerLayout extends StatelessWidget {
                       child: SizedBox(
                         width: artSize,
                         height: artSize,
-                        child: AnimatedSwitcher(
-                          duration: MediaQuery.disableAnimationsOf(context)
-                              ? Duration.zero
-                              : const Duration(milliseconds: 450),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          transitionBuilder: (child, animation) =>
-                              FadeTransition(
-                                opacity: animation,
-                                child: ScaleTransition(
-                                  scale: Tween(
-                                    begin: 0.94,
-                                    end: 1.0,
-                                  ).animate(animation),
-                                  child: child,
-                                ),
-                              ),
-                          child: PlayerArtwork(
-                            key: ValueKey(
-                              mediaItem.artUri?.toString() ?? mediaItem.id,
-                            ),
-                            artUri: mediaItem.artUri?.toString(),
-                            colorScheme: colorScheme,
-                            cacheWidth:
-                                (artSize *
-                                        MediaQuery.devicePixelRatioOf(context))
-                                    .round(),
+                        // A track change keeps the old cover until the new
+                        // one has a frame. It then fades in on the effects
+                        // spring and grows from 0.94 on the slow spatial
+                        // spring, which does not overshoot because the app
+                        // started this motion.
+                        child: PlayerArtwork(
+                          artUri: mediaItem.artUri?.toString(),
+                          colorScheme: colorScheme,
+                          cacheWidth:
+                              (artSize * MediaQuery.devicePixelRatioOf(context))
+                                  .round(),
+                          crossfade: playerTrackChangeMotion(context),
+                          crossfadeScale: AppMotion.spatialSlow(
+                            context,
+                            playerTrackChangeMotion(context),
                           ),
                         ),
                       ),
@@ -158,12 +151,15 @@ class MaterialPlayerLayout extends StatelessWidget {
           ),
         );
 
+        // The cover and the lyrics crossfade on the effects spring.
+        final crossfade = AppMotion.effects(
+          context,
+          const AppMotionSpec(Duration.zero, Curves.linear),
+        );
         Widget visual() => AnimatedSwitcher(
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 300),
-          switchInCurve: Curves.easeInOutCubic,
-          switchOutCurve: Curves.easeInOutCubic,
+          duration: crossfade.duration,
+          switchInCurve: crossfade.curve,
+          switchOutCurve: crossfade.leaving,
           child: showLyrics
               ? KeyedSubtree(
                   key: const ValueKey('material-player-lyrics'),
@@ -199,9 +195,9 @@ class MaterialPlayerLayout extends StatelessWidget {
                         ),
                         Expanded(
                           child: AnimatedSwitcher(
-                            duration: MediaQuery.disableAnimationsOf(context)
-                                ? Duration.zero
-                                : const Duration(milliseconds: 300),
+                            duration: crossfade.duration,
+                            switchInCurve: crossfade.curve,
+                            switchOutCurve: crossfade.leaving,
                             child: showLyrics
                                 ? KeyedSubtree(
                                     key: const ValueKey('landscape-lyrics'),
@@ -309,6 +305,18 @@ class MaterialPlayerLayout extends StatelessWidget {
     );
   }
 
+  /// [child] changing size on [motion]. Reduced motion takes no time, which
+  /// `AnimatedSize` cannot lay out, so the child then resizes by itself.
+  static Widget _resized(AppMotionSpec motion, Widget child) =>
+      motion.duration == Duration.zero
+      ? child
+      : AnimatedSize(
+          duration: motion.duration,
+          curve: motion.curve,
+          alignment: AlignmentDirectional.topStart,
+          child: child,
+        );
+
   /// Title/artist, seek slider, transport buttons and volume, shared by the
   /// portrait column and the landscape right pane.
   List<Widget> _metadataAndControls(
@@ -318,88 +326,99 @@ class MaterialPlayerLayout extends StatelessWidget {
     bool showMetadata = true,
     bool showControls = true,
   }) {
-    final fallback = AppMotionSpec(
-      MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 350),
-      Curves.linear,
+    final titleResize = AppMotion.spatialSlow(
+      context,
+      AppMotionSpec(
+        MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        Curves.easeInOutCubic,
+      ),
     );
-    final slide = AppMotion.spatial(context, fallback);
-    final fade = AppMotion.effects(context, fallback);
     return [
       if (showMetadata) ...[
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: ClipRect(
-            child: AnimatedSwitcher(
-              duration: slide.duration,
-              // Finish fading the old title before revealing the next one. This
-              // also keeps rapid skips from stacking several readable titles.
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation.drive(
-                  CurveTween(curve: Interval(0.5, 1, curve: fade.curve)),
-                ),
-                child: SlideTransition(
-                  position: Tween(begin: const Offset(0, 0.4), end: Offset.zero)
-                      .chain(
-                        CurveTween(curve: Interval(0.5, 1, curve: slide.curve)),
-                      )
-                      .animate(animation),
-                  child: child,
-                ),
-              ),
-              child: Row(
-                key: ValueKey(mediaItem.id),
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        PlayerMetadataTitle(
-                          mediaItem: mediaItem,
-                          metadata: metadata,
-                          style:
-                              (compact
-                                      ? Theme.of(context).textTheme.titleLarge
-                                      : Theme.of(
-                                          context,
-                                        ).textTheme.headlineSmall)
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.onSurface,
-                                  ),
-                          textAlign: TextAlign.start,
-                          maxLines: compact ? 1 : 2,
-                        ),
-                        SizedBox(height: compact ? 4 : 6),
-                        PlaybackSourceLabel(
-                          item: mediaItem,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        Consumer(
-                          builder: (context, ref, _) {
-                            final track = ref
-                                .watch(playerCollectionTrackProvider(mediaItem))
-                                .value;
-                            // No extensionId: a downloaded track's source is
-                            // its download service, not a metadata catalog.
-                            return ClickableArtistName(
-                              artistName: mediaItem.artist ?? '',
-                              artistId: track?.artistId,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // A skip the app started crossfades in place. When the next
+              // title takes another number of lines, the block resizes
+              // once on the slow spatial spring, which stops at its size,
+              // instead of jumping when the old title leaves.
+              _resized(
+                titleResize,
+                PlayerTrackCrossfade(
+                  trackKey: mediaItem.id,
+                  alignment: AlignmentDirectional.topStart,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            PlayerMetadataTitle(
+                              mediaItem: mediaItem,
+                              metadata: metadata,
+                              style:
+                                  (compact
+                                          ? Theme.of(
+                                              context,
+                                            ).textTheme.titleLarge
+                                          : Theme.of(
+                                              context,
+                                            ).textTheme.headlineSmall)
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onSurface,
+                                      ),
                               textAlign: TextAlign.start,
-                            );
-                          },
+                              maxLines: compact ? 1 : 2,
+                            ),
+                            SizedBox(height: compact ? 4 : 6),
+                            if (showSourceLabel)
+                              PlaybackSourceLabel(
+                                item: mediaItem,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            Consumer(
+                              builder: (context, ref, _) {
+                                final track = ref
+                                    .watch(
+                                      playerCollectionTrackProvider(mediaItem),
+                                    )
+                                    .value;
+                                // No extensionId: a downloaded track's
+                                // source is its download service, not a
+                                // metadata catalog.
+                                return ClickableArtistName(
+                                  artistName: mediaItem.artist ?? '',
+                                  artistId: track?.artistId,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                  textAlign: TextAlign.start,
+                                );
+                              },
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+              // Outside the crossfade: the line keeps its row from one
+              // song to the next, so a skip moves nothing around it.
+              if (!showLyrics && !compact)
+                PlayerLyricPreview(
+                  metadata: metadata,
+                  seekPreview: seekPreview,
+                  colorScheme: colorScheme,
+                  onTap: onOpenLyrics,
+                ),
+            ],
           ),
         ),
         SizedBox(height: compact ? 12 : 24),

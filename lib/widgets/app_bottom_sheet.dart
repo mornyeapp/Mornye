@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart'
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart'
     show CupertinoButton, CupertinoDynamicColor, kCupertinoModalBarrierColor;
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
@@ -469,20 +470,21 @@ Future<T?> showAppSheetDialog<T>({
   Color? backgroundColor,
   AppDialogSize dialogSize = AppDialogSize.medium,
 }) {
-  final mornye = context.isMornye;
-  return showDialog<T>(
+  // Presented like [showAppDialog], so Mornye glass is frosted from the
+  // first frame (no opacity layer over its backdrop) and Material shares
+  // the expressive dialog motion.
+  return showAppDialog<T>(
     context: context,
     barrierDismissible: isDismissible,
-    barrierColor: mornye
-        ? CupertinoDynamicColor.resolve(kCupertinoModalBarrierColor, context)
-        : null,
-    builder: (dialogContext) => AppSheetDialog(
-      isScrollControlled: isScrollControlled,
-      topInset: topInset,
-      mornyeGlass: mornyeGlass,
-      backgroundColor: backgroundColor,
-      dialogSize: dialogSize,
-      child: Builder(builder: builder),
+    builder: (dialogContext) => SafeArea(
+      child: AppSheetDialog(
+        isScrollControlled: isScrollControlled,
+        topInset: topInset,
+        mornyeGlass: mornyeGlass,
+        backgroundColor: backgroundColor,
+        dialogSize: dialogSize,
+        child: Builder(builder: builder),
+      ),
     ),
   );
 }

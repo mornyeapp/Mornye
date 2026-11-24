@@ -5,6 +5,7 @@ mod browse;
 mod compat;
 mod covers;
 mod forward;
+mod lent;
 mod lyrics;
 mod media;
 mod web_covers;
@@ -26,11 +27,12 @@ pub(super) const DEVICE_ID: &str = "device-1";
 pub(super) const APP_VERSION: &str = "9.9.9-test";
 
 /// Records forwarded requests and answers with canned replies (`{}` when
-/// none is set for an op).
+/// none is set for an op); a held op never answers.
 #[derive(Default)]
 pub(super) struct FakeHost {
     requests: Mutex<Vec<(String, String, Value)>>,
     replies: Mutex<HashMap<String, Result<Value, HostError>>>,
+    held: Mutex<Vec<String>>,
 }
 
 impl FakeHost {
@@ -39,6 +41,11 @@ impl FakeHost {
             .lock()
             .expect("replies")
             .insert(op.to_owned(), reply);
+    }
+
+    /// Leaves every request for `op` unanswered.
+    pub(super) fn hold(&self, op: &str) {
+        self.held.lock().expect("held").push(op.to_owned());
     }
 
     pub(super) fn requests(&self) -> Vec<(String, String, Value)> {
@@ -66,6 +73,15 @@ impl Host for FakeHost {
             .lock()
             .expect("requests")
             .push((op.to_owned(), device_id.to_owned(), args));
+        if self
+            .held
+            .lock()
+            .expect("held")
+            .iter()
+            .any(|held| held == op)
+        {
+            return Box::pin(std::future::pending());
+        }
         let reply = self
             .replies
             .lock()
@@ -123,10 +139,13 @@ impl Fixture {
                 port: 0,
                 ffmpeg_path,
                 app_version: APP_VERSION.to_owned(),
+                platform: String::new(),
+                features: None,
             },
             server_id: "server-1".to_owned(),
             host: Arc::clone(&host) as Arc<dyn Host>,
             catalog: RwLock::new(Arc::new(catalog)),
+            leases: Default::default(),
         };
         Self {
             _dir: dir,

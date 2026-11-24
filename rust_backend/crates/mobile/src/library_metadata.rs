@@ -80,6 +80,35 @@ pub fn extract_cover_from_descriptor(
     Ok(tags::extract_cover(&mut file, format, &check)?.data)
 }
 
+/// The folder image (cover.jpg and the like) among a document folder's file
+/// `names`, for its songs without embedded artwork. Matches the Rust scan.
+#[uniffi::export]
+pub fn library_folder_image(names: Vec<String>) -> Option<String> {
+    cover::folder_image(names.iter().map(String::as_str)).map(str::to_owned)
+}
+
+/// Whether a document folder named `name` is one disc of an album, whose
+/// songs may use the parent folder's image.
+#[uniffi::export]
+pub fn is_library_disc_folder(name: String) -> bool {
+    cover::is_disc_folder(&name)
+}
+
+/// The Library thumbnail of a folder image the document provider scan
+/// opened. The caller stores it as it stores descriptor artwork.
+#[uniffi::export]
+pub fn library_thumbnail_from_descriptor(
+    descriptor: i32,
+    lease: Option<Arc<RequestLease>>,
+) -> Result<Vec<u8>, AudioTagsError> {
+    let check = || check_lease(lease.as_deref());
+    let mut file = open_audio_file(&descriptor_path(descriptor)?)?;
+    let image = cover::read_folder_image(&mut file, &check)?;
+    let thumbnail = cover::library_thumbnail(&image, &check)?;
+    check()?;
+    Ok(thumbnail.to_vec())
+}
+
 /// The caller keeps the descriptor open until this synchronous read returns.
 /// Duplicating its descriptor preserves SAF access, including single-open
 /// AppFuse proxies, without resolving a protected path or copying the audio.
@@ -219,6 +248,34 @@ mod tests {
         std::fs::write(&png, b"newer").unwrap();
         let cached = library_cover_slot(root, key.into()).cached;
         assert_eq!(cached.as_deref(), png.to_str());
+    }
+
+    #[test]
+    fn document_scan_folder_images_match_the_rust_scan() {
+        let names = ["01.flac", "._cover.jpg", "Folder.PNG", "front.jpg"].map(String::from);
+        assert_eq!(
+            library_folder_image(names.into()).as_deref(),
+            Some("Folder.PNG")
+        );
+        assert_eq!(library_folder_image(vec!["back.jpg".into()]), None);
+        assert!(is_library_disc_folder("Disc 1 - Title".into()));
+        assert!(!is_library_disc_folder("Discography".into()));
+
+        // A 1x1 PNG is already small enough to keep its bytes.
+        let png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89\0\0\0\nIDATx\x9cc\0\x01\0\0\x05\0\x01\r\n-\xb4\0\0\0\0IEND\xaeB`\x82";
+        let mut source = tempfile::tempfile().unwrap();
+        source.write_all(png).unwrap();
+        use std::io::{Seek, SeekFrom};
+        source.seek(SeekFrom::Start(0)).unwrap();
+        let thumbnail = library_thumbnail_from_descriptor(source.as_raw_fd(), None).unwrap();
+        assert_eq!(thumbnail, png);
+        assert_eq!(cover::dimensions(&thumbnail), (1, 1));
+
+        let mut text = tempfile::tempfile().unwrap();
+        text.write_all(b"not an image").unwrap();
+        text.seek(SeekFrom::Start(0)).unwrap();
+        assert!(library_thumbnail_from_descriptor(text.as_raw_fd(), None).is_err());
+        assert!(library_thumbnail_from_descriptor(-1, None).is_err());
     }
 
     #[test]

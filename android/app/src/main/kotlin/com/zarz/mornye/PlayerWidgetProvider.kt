@@ -89,6 +89,7 @@ class PlayerWidgetProvider : AppWidgetProvider() {
     companion object {
         const val ACTION = "com.zarz.mornye.PLAYER_WIDGET_ACTION"
         const val COMMAND = "player_widget_command"
+        private const val DISABLED_ALPHA = 0.38f
         fun preferences(context: Context) = context.getSharedPreferences("player_widget", Context.MODE_PRIVATE)
 
         fun installedCount(context: Context): Int = AppWidgetManager.getInstance(context)
@@ -174,7 +175,16 @@ class PlayerWidgetProvider : AppWidgetProvider() {
                 views.setInt(shape, "setColorFilter", fill)
                 views.setImageViewResource(icon, iconRes)
                 views.setInt(icon, "setColorFilter", tint)
-                views.setFloat(root, "setAlpha", if (enabled) 1f else 0.38f)
+                // A widget may set a view's alpha only from Android 12; before
+                // it the call fails the whole widget, so the two images of
+                // the button dim instead.
+                if (Build.VERSION.SDK_INT >= 31) {
+                    views.setFloat(root, "setAlpha", if (enabled) 1f else DISABLED_ALPHA)
+                } else {
+                    val alpha = if (enabled) 255 else (DISABLED_ALPHA * 255).toInt()
+                    views.setInt(shape, "setImageAlpha", alpha)
+                    views.setInt(icon, "setImageAlpha", alpha)
+                }
                 views.setBoolean(root, "setEnabled", enabled)
                 views.setOnClickPendingIntent(root, PendingIntent.getBroadcast(
                     context, 8200 + command.hashCode(),
@@ -182,7 +192,6 @@ class PlayerWidgetProvider : AppWidgetProvider() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 ))
             }
-            // Expressive shape morph: a pill while paused, a rounder square while playing.
             views.setImageViewResource(R.id.player_widget_play_shape, if (playing) R.drawable.widget_shape_squircle else R.drawable.widget_shape_pill)
             bind(R.id.player_widget_play, R.id.player_widget_play_shape, R.id.player_widget_play_icon,
                 if (playing) R.drawable.ic_widget_pause else R.drawable.ic_widget_play, colors.primary, colors.onPrimary, "toggle")
@@ -199,7 +208,6 @@ class PlayerWidgetProvider : AppWidgetProvider() {
 
         fun seed(state: JSONObject) = state.optLong("background", 0xff292433).toInt()
 
-        /** Material 3 colour roles for one widget instance. */
         class Palette(
             val container: Int,
             val onContainer: Int,

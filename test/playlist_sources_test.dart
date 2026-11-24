@@ -113,6 +113,87 @@ void main() {
     );
   });
 
+  test('tree grouping adds parent folders holding every nested track', () {
+    final folders = groupLibraryFolderTree(
+      [
+        (id: '1', sourceId: 'music', filePath: _document('b/one.flac')),
+        (id: '2', sourceId: 'music', filePath: _document('A/x/two.flac')),
+        (id: '3', sourceId: 'music', filePath: _document('A/three.flac')),
+        (id: '4', sourceId: 'music', filePath: _document('root.flac')),
+      ],
+      sourceNames: {'music': 'Music'},
+    );
+    expect(
+      [
+        for (final folder in folders)
+          (folder.name, folder.path, folder.ids.join(',')),
+      ],
+      [
+        ('A', 'A', '2,3'),
+        ('b', 'b', '1'),
+        ('Music', '', '1,2,3,4'),
+        ('x', 'A/x', '2'),
+      ],
+    );
+  });
+
+  test('tree grouping stops at the folder common to a plain source', () {
+    final folders = groupLibraryFolderTree([
+      (id: '1', sourceId: 'fs', filePath: '/music/A/x/one.flac'),
+      (id: '2', sourceId: 'fs', filePath: '/music/A/two.flac'),
+      (id: '3', sourceId: 'fs', filePath: '/music/B/three.flac'),
+    ]);
+    expect(
+      [
+        for (final folder in folders)
+          (folder.name, folder.path, folder.ids.join(',')),
+      ],
+      [
+        ('A', '/music/A', '1,2'),
+        ('B', '/music/B', '3'),
+        ('music', '/music', '1,2,3'),
+        ('x', '/music/A/x', '1'),
+      ],
+    );
+  });
+
+  test('tree grouping adds no parents above a single plain folder', () {
+    final folders = groupLibraryFolderTree([
+      (id: '1', sourceId: 'fs', filePath: '/sd/solo/a.flac'),
+      (id: '2', sourceId: 'fs', filePath: '/sd/solo/b.flac'),
+    ]);
+    expect(
+      [
+        for (final folder in folders)
+          (folder.name, folder.path, folder.ids.join(',')),
+      ],
+      [('solo', '/sd/solo', '1,2')],
+    );
+  });
+
+  test('a browsed folder takes every Library track nested inside it', () async {
+    final library = _Library([
+      _row('deep', '/music/A/x/b.flac'),
+      _row('top-b', '/music/A/b.flac'),
+      _row('top-a', '/music/A/a.flac'),
+      _row('sibling', '/music/AB/c.flac'),
+      _row('parent', '/music/d.flac'),
+      _row('share', 'network://nas/music/A/e.flac'),
+    ]);
+
+    final folder = await libraryFolderTree('/music/A/', library);
+    expect((folder.name, folder.path), ('A', '/music/A'));
+    expect(folder.ids, ['deep', 'top-b', 'top-a']);
+    expect(
+      [
+        for (final track in await libraryFolderTreeTracks(folder, library))
+          track.id,
+      ],
+      ['top-a', 'top-b', 'deep'],
+    );
+    expect((await libraryFolderTree('/elsewhere', library)).ids, isEmpty);
+  });
+
   test('one numbered album plays by disc and track, others by file', () {
     LocalLibraryItem item(
       String id,
@@ -175,6 +256,20 @@ void main() {
     expect(index.match('Live/disc.flac'), isNull);
   });
 
+  test('percent-encoded playlist paths match after decoding', () {
+    final index = PlaylistPathIndex([
+      (id: 'spaced', sourceId: 's', filePath: '/m/My Album/01 My Song.flac'),
+      (id: 'percent', sourceId: 's', filePath: '/m/Hits/100% Pure.flac'),
+      (id: 'accent', sourceId: 's', filePath: _document('Café/Été.flac')),
+    ]);
+
+    expect(index.match('Music/My%20Album/01%20My%20Song.flac'), 'spaced');
+    expect(index.match('../Caf%C3%A9/%C3%89t%C3%A9.flac'), 'accent');
+    expect(index.match('/sdcard/Hits/100% Pure.flac'), 'percent');
+    expect(index.match('/sdcard/Hits/100%zz%20.flac'), isNull);
+    expect(index.match('/sdcard/Hits/Bad%C3.flac'), isNull);
+  });
+
   test(
     'M3U imports keep their path lines and skip a byte order mark',
     () async {
@@ -231,6 +326,48 @@ void main() {
       expect(
         [for (final lookup in library.lookups) lookup.trackName],
         ['Second', 'Missing'],
+      );
+    },
+  );
+
+  test(
+    'a title numbered for the playlist order is matched without its number',
+    () async {
+      final library = _Library([
+        _row('song', '/music/Album/Song.flac', title: 'Song'),
+        _row('year', '/music/Album/1979.flac', title: '1979'),
+      ]);
+      Track track(String name) => Track(
+        id: 'm3u_$name',
+        name: name,
+        artistName: 'Artist',
+        albumName: 'Unknown Album',
+        duration: 0,
+      );
+
+      final result = await matchPlaylistImport([
+        PlaylistImportEntry(track('001 - Song'), 'elsewhere/001 - Song.mp3'),
+        PlaylistImportEntry(track('02. Song')),
+        PlaylistImportEntry(track('1979')),
+        PlaylistImportEntry(track('003 - Missing')),
+      ], library);
+
+      expect(result.matched, 3);
+      expect(
+        [for (final track in result.tracks) track.id],
+        ['song', 'song', 'year', 'm3u_003 - Missing'],
+      );
+      expect(
+        [for (final lookup in library.lookups) lookup.trackName],
+        [
+          '001 - Song',
+          '02. Song',
+          '1979',
+          '003 - Missing',
+          'Song',
+          'Song',
+          'Missing',
+        ],
       );
     },
   );

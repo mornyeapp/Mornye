@@ -1,17 +1,21 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:audio_service/audio_service.dart' show MediaItem;
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show mapEquals;
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/album_track_sort_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/widgets/album_track_sort_button.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/audio_quality_badge_policy.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
+import 'package:mornye/services/library_album_artwork.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/batch_track_actions.dart';
 import 'package:mornye/models/album_track_order.dart';
@@ -19,10 +23,12 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/providers/deleted_library_files.dart';
+import 'package:mornye/providers/library_album_artwork_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
+import 'package:mornye/providers/song_leftovers_provider.dart';
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/confirm_and_delete_tracks.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart';
@@ -43,6 +49,7 @@ import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/album_track_tile.dart';
 import 'package:mornye/widgets/animation_utils.dart';
+import 'package:mornye/widgets/loaded_sliver_fade_in.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
@@ -54,6 +61,7 @@ import 'package:mornye/widgets/disc_separator_chip.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 
 class LocalAlbumScreen extends ConsumerStatefulWidget {
   final String albumName;
@@ -80,6 +88,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
         SelectionModeMixin<LocalAlbumScreen>,
         CollapsingHeaderScrollMixin<LocalAlbumScreen> {
   late AlbumTrackOrder<LocalLibraryItem> _trackOrder;
+  Map<String, int>? _trackRanks;
   List<LocalLibraryItem> get _sortedTracksCache => _trackOrder.tracks;
   Map<int, List<LocalLibraryItem>> get _discGroupsCache =>
       _trackOrder.discGroups;
@@ -145,6 +154,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
       discNumber: (track) => track.discNumber,
       trackNumber: (track) => track.trackNumber,
       trackName: (track) => track.trackName,
+      ranks: _trackRanks,
     );
     _commonQualityCache = null;
     _commonQualityModeCache = null;
@@ -175,7 +185,9 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
         final item = tracksById[id];
         if (item == null) return false;
         if (!isCueVirtualPath(item.filePath)) {
-          final deleted = await deleteFile(item.filePath);
+          final deleted = await ref
+              .read(songLeftoversProvider)
+              .delete(item.filePath);
           if (!deleted) return false;
         }
         return true;
@@ -218,6 +230,12 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
 
   Future<void> _openMetadata(LocalLibraryItem track) async {
     final tracks = _sortedTracksCache;
+    await prepareTrackDetailsCover(
+      context,
+      track.filePath,
+      fallback: track.coverPath,
+    );
+    if (!mounted) return;
     await Navigator.of(context).push(
       slidePageRoute<void>(
         page: TrackMetadataScreen(
@@ -249,10 +267,13 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
             )
             .firstOrNull ??
         _sortedTracksCache.firstOrNull;
+    // Songs handed to the page keep the covers they had when it opened, so
+    // a cover found from here shows from its record.
+    final foundCover = _albumArtwork()?.record?.coverFile;
     return LocalLibraryArtworkBuilder(
       coverPath: albumCover?.isNotEmpty == true
           ? albumCover
-          : artworkTrack?.coverPath,
+          : artworkTrack?.coverPath ?? foundCover,
       filePath: artworkTrack?.filePath,
       builder: (context, coverPath) => context.isMornye
           ? MornyeArtistSurface(
@@ -274,6 +295,11 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
     final bottomPadding = isSelectionMode
         ? MediaQuery.paddingOf(context).bottom
         : 0.0;
+    final ranks = ref.watch(albumTrackRanksProvider(_sortKey));
+    if (!mapEquals(ranks, _trackRanks)) {
+      _trackRanks = ranks;
+      _rebuildTrackCaches();
+    }
     final tracks = _sortedTracksCache;
 
     if (tracks.isEmpty && !_loadingTracks && _loadError == null) {
@@ -304,15 +330,26 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
               ),
             ),
           )
-        else if (_loadingTracks)
-          const SliverToBoxAdapter(
-            child: RepaintBoundary(
-              child: AlbumTrackListSkeleton(itemCount: 8, showQuality: true),
-            ),
-          )
         else ...[
-          _buildTrackList(context, colorScheme, tracks),
-          if (!showsSelectionBar)
+          // Loaded songs fade in once over the skeleton's place where their
+          // rows do not stagger in: the desktop table, and phone rows that
+          // load after the page opens.
+          LoadedSliverFadeIn(
+            key: const ValueKey('local-album-tracks'),
+            loading: _loadingTracks,
+            enabled: isDesktopPlatform || widget.loadTracks != null,
+            sliver: _loadingTracks
+                ? const SliverToBoxAdapter(
+                    child: RepaintBoundary(
+                      child: AlbumTrackListSkeleton(
+                        itemCount: 8,
+                        showQuality: true,
+                      ),
+                    ),
+                  )
+                : _buildTrackList(context, colorScheme, tracks),
+          ),
+          if (!_loadingTracks && !showsSelectionBar)
             CollectionSuggestionsSliver(
               collectionKey:
                   'local-album:${widget.artistName}:${widget.albumName}',
@@ -358,11 +395,12 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
     final motion = context.isMornye && !MediaQuery.disableAnimationsOf(context)
         ? ref
               .watch(
-                playerMotionArtworkProvider((
+                songMotionArtworkProvider((
                   album: widget.albumName,
                   artist:
                       _sortedTracksCache.firstOrNull?.artistName ??
                       widget.artistName,
+                  source: _sortedTracksCache.firstOrNull?.filePath ?? '',
                 )),
               )
               .value
@@ -443,6 +481,10 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
       ),
       meta: _buildLocalHeaderMeta(context, qualityLabelMode),
       appBarActions: [
+        AlbumTrackSortButton(
+          albumKey: _sortKey,
+          songs: [for (final track in _sortedTracksCache) track.trackName],
+        ),
         NetworkOfflineButton(items: _albumItems()),
         NetworkUploadButton(items: _albumItems()),
         if (ref.watch(linkPhoneClientProvider) != null)
@@ -478,14 +520,119 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
           );
         },
       ),
-      moreMenu: () => libraryTrackMenuGroups(
-        context,
-        ref,
-        items: _albumItems(),
-        onPlay: _playAll,
+      moreMenu: () => _withArtworkActions(
+        libraryTrackMenuGroups(
+          context,
+          ref,
+          items: _albumItems(),
+          onPlay: _playAll,
+        ),
+        hasCover: coverPath != null,
+        hasMotion:
+            motion != null ||
+            !context.isMornye ||
+            MediaQuery.disableAnimationsOf(context),
       ),
     );
   }
+
+  /// The album's key and what Find Missing Artwork found for it. Null for
+  /// songs from a network connection, which keep their server's covers.
+  ({String albumKey, AlbumArtworkRecord? record})? _albumArtwork() {
+    final path = _sortedTracksCache.firstOrNull?.filePath;
+    if (path == null || path.startsWith('network://')) return null;
+    return ref.watch(libraryAlbumArtworkForSongProvider(path)).value;
+  }
+
+  /// [groups] with Find Artwork, while the album lacks a cover or an
+  /// animated cover it could show, and Remove Found Artwork, once something
+  /// was found. They go before a last group of destructive actions.
+  List<List<ContextMenuAction>> _withArtworkActions(
+    List<List<ContextMenuAction>> groups, {
+    required bool hasCover,
+    required bool hasMotion,
+  }) {
+    final artwork = _albumArtwork();
+    if (artwork == null) return groups;
+    final record = artwork.record;
+    final busy = ref.read(libraryAlbumArtworkProvider).running;
+    final wantsMotion =
+        !hasMotion && ref.read(settingsProvider).motionArtworkEnabled;
+    final actions = [
+      if (!hasCover || wantsMotion)
+        ContextMenuAction(
+          icon: Icons.image_search_outlined,
+          label: context.l10n.albumFindArtwork,
+          onSelected: busy
+              ? null
+              : () => _findArtwork(artwork.albumKey, motion: wantsMotion),
+        ),
+      if (record?.coverFile != null || record?.motionSaved == true)
+        ContextMenuAction(
+          icon: Icons.hide_image_outlined,
+          label: context.l10n.albumRemoveFoundArtwork,
+          onSelected: busy ? null : () => _removeFoundArtwork(artwork.albumKey),
+        ),
+    ];
+    if (actions.isEmpty) return groups;
+    final destructiveLast =
+        groups.isNotEmpty && groups.last.every((action) => action.destructive);
+    return [
+      ...destructiveLast ? groups.take(groups.length - 1) : groups,
+      actions,
+      if (destructiveLast) groups.last,
+    ];
+  }
+
+  Future<void> _findArtwork(String albumKey, {required bool motion}) async {
+    final artwork = ref.read(libraryAlbumArtworkProvider.notifier);
+    final l10n = context.l10n;
+    if (!artwork.canLookUp()) {
+      showAppSnackBar(
+        context,
+        content: Text(l10n.libraryFindArtworkNoProvider),
+      );
+      return;
+    }
+    try {
+      final summary = await artwork.findForAlbum(albumKey, motion: motion);
+      if (summary == null || !mounted) return;
+      final found =
+          summary.covers > 0 || summary.motion > 0 || summary.failed > 0;
+      showAppSnackBar(
+        context,
+        content: Text(
+          found
+              ? l10n.libraryFindArtworkResult(
+                  summary.covers,
+                  summary.motion,
+                  summary.failed,
+                )
+              : l10n.albumFindArtworkNotFound,
+        ),
+      );
+      if (summary.songs > 0) _loadTracks();
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        content: Text(l10n.snackbarError(context.friendlyError(error))),
+      );
+    }
+  }
+
+  Future<void> _removeFoundArtwork(String albumKey) async {
+    final l10n = context.l10n;
+    await ref
+        .read(libraryAlbumArtworkProvider.notifier)
+        .removeForAlbum(albumKey);
+    if (!mounted) return;
+    showAppSnackBar(context, content: Text(l10n.albumRemoveFoundArtworkDone));
+    _loadTracks();
+  }
+
+  AlbumTrackSortKey get _sortKey =>
+      (album: widget.albumName, artist: widget.artistName);
 
   /// Every song of the album, for the header's album-wide actions.
   List<UnifiedLibraryItem> _albumItems() => [
@@ -718,6 +865,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
         );
         final isPlaying = isCurrent && ref.watch(playbackPlayingProvider);
         return AlbumTrackTile(
+          filePath: track.filePath,
           isCurrent: isCurrent,
           isPlaying: isPlaying,
           trackNumber: track.trackNumber,
@@ -750,6 +898,10 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
                     .read(musicPlayerControllerProvider)
                     .togglePlayPause(isPlaying)
               : () => _openFile(track),
+          queueSwipe: libraryItemQueueSwipe(
+            ref,
+            UnifiedLibraryItem.fromLocalLibrary(track),
+          ),
         );
       },
     );

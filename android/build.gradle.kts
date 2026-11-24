@@ -5,6 +5,20 @@ allprojects {
     }
 }
 
+// Media3 modules must all be one version. The app's playback engine and
+// video_player_android (exoplayer plus its HLS, DASH, RTSP and
+// SmoothStreaming modules) each ask for their own, so pin the whole group.
+extra["media3Version"] = "1.11.1"
+subprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "androidx.media3") {
+                useVersion(rootProject.extra["media3Version"] as String)
+            }
+        }
+    }
+}
+
 subprojects {
     afterEvaluate {
         if (project.hasProperty("android")) {

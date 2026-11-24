@@ -20,7 +20,9 @@ void main() {
         await createNativeLibraryFixture(db);
         await db.execute('''CREATE TABLE history_db.history (
           id TEXT PRIMARY KEY, file_path TEXT, track_name TEXT,
-          artist_name TEXT, cover_url TEXT, downloaded_at TEXT, has_lyrics INTEGER
+          artist_name TEXT, cover_url TEXT, downloaded_at TEXT, has_lyrics INTEGER,
+          lyrics_metadata_scan_version INTEGER NOT NULL DEFAULT 0,
+          origin_file_path TEXT
         )''');
         await db.insert('history_db.history', {
           'id': 'download',
@@ -233,6 +235,160 @@ void main() {
           );
           expect(reads.toSet().length, 42);
           expect((await search('shared', limit: 100)).length, 40);
+        },
+      );
+
+      test(
+        'songs a scan read without lyrics are skipped until an edit',
+        () async {
+          Future<void> addLocal(String id, {int version = 4}) async {
+            await addNativeLibraryTrack(
+              db,
+              nativeLibraryTrack(id, version: version)..['hasLyrics'] = false,
+            );
+            lyrics['/music/$id.flac'] = 'Words of $id';
+          }
+
+          Future<void> addDownload(String id, int scanVersion) async {
+            await db.insert('history_db.history', {
+              'id': id,
+              'file_path': '/downloads/$id.flac',
+              'track_name': id,
+              'downloaded_at': '2026-11-02',
+              'has_lyrics': 0,
+              'lyrics_metadata_scan_version': scanVersion,
+            });
+            await addNativeLibraryDownload(db, '/downloads/$id.flac');
+            await db.update(
+              'history_db.history_path_keys',
+              {'item_id': id},
+              where: 'item_id = ?',
+              whereArgs: ['download-/downloads/$id.flac'],
+            );
+            lyrics['/downloads/$id.flac'] = 'Words of $id';
+          }
+
+          await addLocal('bare');
+          await addLocal('unscanned', version: 2);
+          await addDownload('bare-download', 1);
+          await addDownload('unprobed-download', 0);
+          final progress = await index();
+          expect(progress.checked, 6);
+          expect(reads.toSet(), {
+            '/music/download.flac',
+            '/music/local.flac',
+            '/music/unscanned.flac',
+            '/downloads/unprobed-download.flac',
+          });
+          expect(
+            await search('words'),
+            unorderedEquals(['unprobed-download', 'unscanned']),
+          );
+
+          reads.clear();
+          await LibraryLyricsSearchStore.invalidateStored(
+            db,
+            '/music/bare.flac',
+          );
+          await store.invalidate('/downloads/bare-download.flac');
+          expect((await index()).checked, 2);
+          expect(reads.toSet(), {
+            '/music/bare.flac',
+            '/downloads/bare-download.flac',
+          });
+          expect(
+            await search('words'),
+            unorderedEquals([
+              'bare',
+              'bare-download',
+              'unprobed-download',
+              'unscanned',
+            ]),
+          );
+          reads.clear();
+          expect((await index()).checked, 0);
+          expect(reads, isEmpty);
+        },
+      );
+
+      test(
+        'Refresh reads songs flagged without lyrics until its pass ends',
+        () async {
+          Future<void> addFlagged(String id) async {
+            await addNativeLibraryTrack(
+              db,
+              nativeLibraryTrack(id)..['hasLyrics'] = false,
+            );
+            lyrics['/music/$id.flac'] = 'Hidden verse of $id';
+          }
+
+          await addFlagged('wrong-flag');
+          await index();
+          expect(await search('hidden verse'), isEmpty);
+
+          await store.clear();
+          final cancelled = store.index(
+            includeLocal: true,
+            cancelled: () => true,
+          );
+          expect((await cancelled.toList()).last.complete, isFalse);
+          reads.clear();
+          expect((await index()).checked, 3);
+          expect(reads, contains('/music/wrong-flag.flac'));
+          expect(await search('hidden verse'), ['wrong-flag']);
+
+          await addFlagged('after-refresh');
+          reads.clear();
+          expect((await index()).checked, 1);
+          expect(reads, isEmpty);
+          expect(await search('hidden verse'), ['wrong-flag']);
+        },
+      );
+
+      test(
+        'open searches refresh at a calm rate and once when a pass ends',
+        () async {
+          for (var i = 0; i < 40; i++) {
+            final id = 'extra-$i';
+            await addNativeLibraryTrack(db, nativeLibraryTrack(id));
+            lyrics['/music/$id.flac'] = 'Shared chorus $i';
+          }
+          Future<List<LibraryLyricsIndexProgress>> pass() =>
+              store.index(includeLocal: true, cancelled: () => false).toList();
+          var events = await pass();
+          final start = events.first.revision;
+          expect(events.length, greaterThan(4));
+          expect(
+            events.where((event) => !event.complete),
+            everyElement(
+              isA<LibraryLyricsIndexProgress>().having(
+                (event) => event.revision,
+                'revision',
+                start,
+              ),
+            ),
+          );
+          expect(events.last.complete, isTrue);
+          expect(events.last.revision, isNot(start));
+
+          events = await pass();
+          expect(events.map((event) => event.revision).toSet(), {
+            events.first.revision,
+          });
+
+          await store.clear();
+          store = LibraryLyricsSearchStore(
+            db,
+            useFts: fts,
+            refreshInterval: Duration.zero,
+            readLyrics: (path) async => lyrics[path]!,
+          );
+          events = await pass();
+          final during = events
+              .where((event) => !event.complete)
+              .map((event) => event.revision)
+              .toSet();
+          expect(during.length, greaterThan(2));
         },
       );
     });

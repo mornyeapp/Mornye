@@ -5,6 +5,7 @@ import 'package:mornye/models/download_result.dart';
 import 'package:mornye/services/download_file_finalizer.dart';
 import 'package:mornye/services/download_saf_file_replacer.dart';
 import 'package:mornye/services/ffmpeg_probe.dart';
+import 'package:mornye/utils/audio_conversion_utils.dart';
 
 void main() {
   late Directory directory;
@@ -40,6 +41,7 @@ void main() {
           required bitrate,
           required deleteOriginal,
           required losslessQuality,
+          required losslessProcessing,
         }) async => throw StateError('Unexpected conversion'),
     replaceSafFile:
         replaceSaf ??
@@ -280,6 +282,7 @@ void main() {
               required bitrate,
               required deleteOriginal,
               required losslessQuality,
+              required losslessProcessing,
             }) async => null,
       );
       final outcome = await convert(stage, result, name: 'Song.flac');
@@ -323,10 +326,12 @@ void main() {
               required bitrate,
               required deleteOriginal,
               required losslessQuality,
+              required losslessProcessing,
             }) async {
               expect(targetFormat, 'flac');
               expect(losslessQuality.maxBitDepth, 16);
               expect(losslessQuality.maxSampleRate, 48000);
+              expect(losslessProcessing.normalizedDither, 'auto');
               return '/converted.flac';
             },
       );
@@ -347,6 +352,43 @@ void main() {
     });
   }
 
+  test(
+    'automatic FLAC conversion forwards the disabled Smart setting',
+    () async {
+      final stage = finalizer(
+        properties: (_) async => const PrimaryAudioProperties(
+          codec: 'flac',
+          bitDepth: 24,
+          sampleRate: 48000,
+        ),
+        convert:
+            ({
+              required inputPath,
+              required targetFormat,
+              required bitrate,
+              required deleteOriginal,
+              required losslessQuality,
+              required losslessProcessing,
+            }) async {
+              expect(losslessProcessing.normalizedDither, 'none');
+              return '/converted.flac';
+            },
+      );
+      final outcome = await stage.autoConvert(
+        result: DownloadResult.fromMap({}),
+        filePath: '/source.flac',
+        fileName: 'source.flac',
+        quality: '24-bit/48kHz',
+        enabled: true,
+        targetFormat: 'flac',
+        targetBitrate: '',
+        useSaf: false,
+        losslessProcessing: const LosslessConversionProcessing(dither: 'none'),
+      );
+      expect(outcome.converted, isTrue);
+    },
+  );
+
   test('FLAC auto conversion preserves compliant and lossy sources', () async {
     for (final codec in ['flac', 'aac']) {
       final result = DownloadResult.fromMap({});
@@ -365,6 +407,128 @@ void main() {
       expect(outcome.filePath, '/source.flac');
       expect(warnings, isEmpty);
     }
+  });
+
+  test('ALAC auto conversion writes a capped ALAC M4A', () async {
+    final result = DownloadResult.fromMap({
+      'actual_bit_depth': 24,
+      'actual_sample_rate': 96000,
+      'bitrate': 4000,
+    });
+    final embedded = <String>[];
+    final stage = finalizer(
+      properties: (path) async => path == '/source.flac'
+          ? const PrimaryAudioProperties(
+              codec: 'flac',
+              bitDepth: 24,
+              sampleRate: 96000,
+            )
+          : const PrimaryAudioProperties(
+              codec: 'alac',
+              bitDepth: 16,
+              sampleRate: 48000,
+            ),
+      convert:
+          ({
+            required inputPath,
+            required targetFormat,
+            required bitrate,
+            required deleteOriginal,
+            required losslessQuality,
+            required losslessProcessing,
+          }) async {
+            expect(inputPath, '/source.flac');
+            expect(targetFormat, 'alac');
+            expect(losslessQuality.maxBitDepth, 16);
+            expect(losslessQuality.maxSampleRate, 48000);
+            expect(losslessProcessing.normalizedDither, 'auto');
+            return '/source.m4a';
+          },
+    );
+    final outcome = await convert(
+      stage,
+      result,
+      name: 'Song.flac',
+      format: 'ALAC',
+      embed: (_, format) async => embedded.add(format),
+    );
+    expect(outcome.converted, isTrue);
+    expect(outcome.filePath, '/source.m4a');
+    expect(outcome.fileName, 'source.m4a');
+    expect(outcome.quality, '16-bit/48kHz');
+    expect(embedded, ['m4a']);
+    expect(result.audioCodec, 'alac');
+    expect(result['format'], 'alac');
+    expect(result.actualBitDepth, 16);
+    expect(result.actualSampleRate, 48000);
+    expect(result.bitrateKbps, isNull);
+    expect(warnings, isEmpty);
+  });
+
+  test('ALAC auto conversion keeps lossy, DSD and compliant ALAC', () async {
+    for (final (path, properties) in [
+      // AAC and ALAC share the .m4a name; only the codec tells them apart.
+      (
+        '/source.m4a',
+        const PrimaryAudioProperties(codec: 'aac', sampleRate: 44100),
+      ),
+      ('/source.mp3', const PrimaryAudioProperties(codec: 'mp3')),
+      ('/source.opus', const PrimaryAudioProperties(codec: 'opus')),
+      ('/source.dsf', const PrimaryAudioProperties(codec: 'dsd_lsbf')),
+      (
+        '/source.m4a',
+        const PrimaryAudioProperties(
+          codec: 'alac',
+          bitDepth: 16,
+          sampleRate: 44100,
+        ),
+      ),
+    ]) {
+      final result = DownloadResult.fromMap({});
+      final outcome = await convert(
+        finalizer(properties: (_) async => properties),
+        result,
+        path: path,
+        format: 'alac',
+        embed: (_, _) async => fail('Unexpected metadata embed'),
+      );
+      expect(outcome.converted, isFalse, reason: properties.codec);
+      expect(outcome.filePath, path);
+      expect(result.audioCodec, isNull);
+    }
+    expect(warnings, isEmpty);
+  });
+
+  test('ALAC above the caps is re-encoded in place', () async {
+    var converted = false;
+    final outcome = await convert(
+      finalizer(
+        properties: (path) async => PrimaryAudioProperties(
+          codec: 'alac',
+          bitDepth: converted ? 16 : 24,
+          sampleRate: converted ? 48000 : 96000,
+        ),
+        convert:
+            ({
+              required inputPath,
+              required targetFormat,
+              required bitrate,
+              required deleteOriginal,
+              required losslessQuality,
+              required losslessProcessing,
+            }) async {
+              converted = true;
+              return inputPath;
+            },
+      ),
+      DownloadResult.fromMap({}),
+      path: '/Song.m4a',
+      name: 'Song.m4a',
+      format: 'alac',
+    );
+    expect(outcome.converted, isTrue);
+    expect(outcome.filePath, '/Song.m4a');
+    expect(outcome.fileName, 'Song.m4a');
   });
 
   test('unknown FLAC quality preserves the original with a warning', () async {
@@ -396,6 +560,7 @@ void main() {
               required bitrate,
               required deleteOriginal,
               required losslessQuality,
+              required losslessProcessing,
             }) async {
               expect(deleteOriginal, isTrue);
               expect(targetFormat, 'opus');
@@ -490,6 +655,7 @@ void main() {
               required bitrate,
               required deleteOriginal,
               required losslessQuality,
+              required losslessProcessing,
             }) async => (await output.writeAsString('converted')).path,
       );
       final result = await convert(
@@ -566,6 +732,7 @@ void main() {
                 required bitrate,
                 required deleteOriginal,
                 required losslessQuality,
+                required losslessProcessing,
               }) async {
                 expect(deleteOriginal, isFalse);
                 return (await output.writeAsString('converted')).path;

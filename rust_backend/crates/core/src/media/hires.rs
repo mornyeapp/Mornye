@@ -17,12 +17,19 @@
 //! confidence levels describe the sampled evidence, not permission to discard
 //! audio. Replacement additionally requires a full, exact PCM comparison.
 //!
+//! [`check_file`] reads a sample from the middle of the track, which is
+//! what a download can afford. [`inspect_file`] reads all of it and adds
+//! what a sample cannot show: integrity, the real spacing of the samples
+//! and the trace of a lossy codec.
+//!
 //! Only FLAC and PCM WAV are decoded. Anything else is
 //! [`HiResCheckError::Unsupported`], which callers treat as "check skipped".
 
 mod evidence;
 pub(crate) mod fft;
+mod inspect;
 mod replacement;
+pub use inspect::{Inspection, inspect_file};
 pub use replacement::replacement_preserves_audio;
 #[cfg(test)]
 mod reference;
@@ -168,6 +175,8 @@ struct ChannelAnalysis {
     integers: IntegerEvidence,
     count: usize,
     non_silent: bool,
+    /// Whole-file evidence; only a full inspection gathers it.
+    detail: Option<Box<inspect::ChannelDetail>>,
 }
 
 impl ChannelAnalysis {
@@ -183,12 +192,19 @@ impl ChannelAnalysis {
         if let Some(integer) = integer {
             self.integers.push(integer);
         }
+        if let Some(detail) = &mut self.detail {
+            detail.push(sample, integer);
+        }
         self.stft.push(sample, plan, check)
     }
 }
 
 struct WindowAnalysis {
     channels: Vec<ChannelAnalysis>,
+    /// Whole-stream evidence; only a full inspection gathers it.
+    stream: Option<inspect::StreamDetail>,
+    /// Why decoding stopped before the window was full, if it did.
+    decode_error: Option<String>,
     #[cfg(test)]
     decoded_blocks: usize,
 }
@@ -201,6 +217,23 @@ pub fn check_file(
     options: &HiResCheckOptions,
     check: &dyn Fn() -> Result<(), String>,
 ) -> Result<HiResCheckResult, HiResCheckError> {
+    validate(&file, file_path, options)?;
+    check()?;
+    let mut source = Source::open(&mut file)?;
+    let (mut result, window) = prepare(&source, file_path, options, false)?;
+    let mut plan = StftPlan::new(window.n_fft, result.declared_sample_rate);
+    let analysis = source
+        .analyze_window(window.start_frame, window.frames, &mut plan, check)
+        .map_err(|e| HiResCheckError::Failed(format!("could not decode audio: {e}")))?;
+    conclude(&mut result, analysis.channels, &plan, options, check)?;
+    Ok(result)
+}
+
+fn validate(
+    file: &File,
+    file_path: &str,
+    options: &HiResCheckOptions,
+) -> Result<(), HiResCheckError> {
     if options.sample_seconds <= 0 {
         return Err("sample_seconds must be positive".to_string().into());
     }
@@ -213,9 +246,24 @@ pub fn check_file(
     if size == 0 {
         return Err(format!("file is empty: {file_path}").into());
     }
-    check()?;
+    Ok(())
+}
 
-    let mut source = Source::open(&mut file)?;
+/// The frames a check reads and the STFT size that fits them.
+struct Window {
+    start_frame: u64,
+    frames: u64,
+    n_fft: usize,
+}
+
+/// The result with what the header declares, and the window to analyse:
+/// `sample_seconds` from the middle of the track, or with `whole` all of it.
+fn prepare(
+    source: &Source,
+    file_path: &str,
+    options: &HiResCheckOptions,
+    whole: bool,
+) -> Result<(HiResCheckResult, Window), HiResCheckError> {
     let sr = source.sample_rate();
     if sr == 0 {
         return Err("invalid declared sample rate 0".to_string().into());
@@ -227,14 +275,22 @@ pub fn check_file(
             .into());
     }
 
-    let analyzed_duration = (options.sample_seconds as f64).min(total_duration);
+    let analyzed_duration = if whole {
+        total_duration
+    } else {
+        (options.sample_seconds as f64).min(total_duration)
+    };
     let offset = ((total_duration - analyzed_duration) / 2.0).max(0.0);
     let start_frame = (offset * f64::from(sr)) as u64;
-    let window_frames = (analyzed_duration * f64::from(sr)) as u64;
+    let window_frames = if whole {
+        source.total_frames()
+    } else {
+        (analyzed_duration * f64::from(sr)) as u64
+    };
 
     let declared_bits = source.declared_bits();
 
-    let mut result = HiResCheckResult {
+    let result = HiResCheckResult {
         file_path: file_path.to_string(),
         declared_sample_rate: sr,
         total_duration_s: total_duration,
@@ -252,16 +308,35 @@ pub fn check_file(
     while n_fft > 256 && n_fft as u64 > window_frames {
         n_fft /= 2;
     }
+    Ok((
+        result,
+        Window {
+            start_frame,
+            frames: window_frames,
+            n_fft,
+        },
+    ))
+}
+
+/// Judges the Hi-Res claims from what the channels gathered and fills
+/// `result`. Returns the spectrum of all channels together, or `None` when
+/// there was no signal to measure and the verdict stays inconclusive.
+fn conclude(
+    result: &mut HiResCheckResult,
+    channels: Vec<ChannelAnalysis>,
+    plan: &StftPlan,
+    options: &HiResCheckOptions,
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<Option<StftStats>, HiResCheckError> {
+    let sr = result.declared_sample_rate;
+    let declared_bits = result.declared_bit_depth;
+    let n_fft = plan.size();
     let claims_by_rate = i64::from(sr) > options.hires_sample_rate_threshold;
     let mut combined: Option<StftStats> = None;
     let mut or_bits = 0;
     let mut common_artifact: Option<&str> = None;
     let mut all_floors_at_16bit = true;
-    let mut plan = StftPlan::new(n_fft, sr);
-    let analysis = source
-        .analyze_window(start_frame, window_frames, &mut plan, check)
-        .map_err(|e| HiResCheckError::Failed(format!("could not decode audio: {e}")))?;
-    for channel in analysis.channels {
+    for channel in channels {
         check()?;
         if channel.count == 0 {
             return Err("decoded audio segment is empty".to_string().into());
@@ -273,7 +348,7 @@ pub fn check_file(
         if !channel.non_silent {
             continue;
         }
-        let stats = channel.stft.finish(&plan);
+        let stats = channel.stft.finish(plan);
         all_floors_at_16bit &= classify_noise_floor(stats.quiet_floor_var, 1).0 == FLOOR_AT_16BIT;
         if claims_by_rate {
             let artifact = channel.integers.artifact();
@@ -302,10 +377,10 @@ pub fn check_file(
         }
     }
     let Some(stats) = combined else {
-        return Ok(result);
+        return Ok(None);
     };
     if !stats.avg_magnitude.iter().any(|&v| v > 0.0) {
-        return Ok(result);
+        return Ok(None);
     }
 
     // Deliberately unclamped: flooring at the noise floor itself would make
@@ -426,7 +501,7 @@ pub fn check_file(
         findings.push("bandwidth alone does not establish upsampling or master provenance".into());
     }
     result.reason = findings.join("; ");
-    Ok(result)
+    Ok(Some(stats))
 }
 
 /// The containers the checker decodes, sniffed from their magic bytes rather
@@ -496,16 +571,40 @@ impl<'a> Source<'a> {
         plan: &mut StftPlan,
         check: &dyn Fn() -> Result<(), String>,
     ) -> Result<WindowAnalysis, String> {
+        self.analyze(start_frame, frames, plan, check, false)
+    }
+
+    /// With `detail`, the channels and the stream also gather their
+    /// whole-file evidence; the window is then the whole file.
+    fn analyze(
+        &mut self,
+        start_frame: u64,
+        frames: u64,
+        plan: &mut StftPlan,
+        check: &dyn Fn() -> Result<(), String>,
+        detail: bool,
+    ) -> Result<WindowAnalysis, String> {
         let sample_rate = self.sample_rate();
+        let declared_bits = self.declared_bits();
         let mut analysis = WindowAnalysis {
             channels: (0..self.channel_count())
-                .map(|_| ChannelAnalysis {
+                .map(|index| ChannelAnalysis {
                     stft: StftAccumulator::new(plan),
                     integers: IntegerEvidence::new(sample_rate),
                     count: 0,
                     non_silent: false,
+                    // A codec's grid is looked for in the first two channels.
+                    detail: detail.then(|| {
+                        Box::new(inspect::ChannelDetail::new(
+                            declared_bits,
+                            frames,
+                            index < 2,
+                        ))
+                    }),
                 })
                 .collect(),
+            stream: detail.then(|| inspect::StreamDetail::new(self)),
+            decode_error: None,
             #[cfg(test)]
             decoded_blocks: 0,
         };
@@ -516,10 +615,13 @@ impl<'a> Source<'a> {
                 let mut blocks = reader.blocks();
                 let mut buffer = Vec::new();
                 let mut decoded = 0_u64;
-                while analysis
-                    .channels
-                    .first()
-                    .is_some_and(|channel| (channel.count as u64) < frames)
+                // A full inspection reads to the end of the stream, past the
+                // length the header declares, so its digest covers all of it.
+                while detail
+                    || analysis
+                        .channels
+                        .first()
+                        .is_some_and(|channel| (channel.count as u64) < frames)
                 {
                     if decoded.is_multiple_of(64) {
                         check()?;
@@ -528,9 +630,15 @@ impl<'a> Source<'a> {
                     let block = match blocks.read_next_or_eof(buffer) {
                         Ok(Some(block)) => block,
                         Ok(None) => break,
-                        Err(_) if analysis.channels[0].count > 0 => break,
+                        Err(error) if analysis.channels[0].count > 0 => {
+                            analysis.decode_error = Some(error.to_string());
+                            break;
+                        }
                         Err(error) => return Err(error.to_string()),
                     };
+                    if let Some(stream) = &mut analysis.stream {
+                        stream.block(&block);
+                    }
                     #[cfg(test)]
                     {
                         analysis.decoded_blocks += 1;

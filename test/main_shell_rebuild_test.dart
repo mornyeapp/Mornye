@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -186,6 +186,31 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
+      testWidgets('switching tabs rebuilds no page of a tab ($platform, '
+          '$style)', (tester) async {
+        await pumpShell(tester, desktop: desktop, mornye: mornye);
+        final probeBuilds = await pushProbeInLibrary(tester);
+        final builds = probeBuilds.single;
+        List<Widget> pages() => [
+          ...tester.widgetList(find.byType(HomeTab, skipOffstage: false)),
+          tester.widget(find.byType(_ProbePage, skipOffstage: false)),
+        ];
+        final before = pages();
+
+        for (final tab in [
+          ShellTab.library,
+          ShellTab.settings,
+          ShellTab.home,
+        ]) {
+          ShellNavigationService.requestTab(tab);
+          await settle(tester);
+        }
+
+        expect(probeBuilds.single, builds);
+        expectSameInstances(before, pages());
+        expect(tester.takeException(), isNull);
+      });
+
       for (final (badge, setCount) in <(String, void Function(int))>[
         ('download', (count) => queue.setQueued(count)),
         ('Store update', (count) => repo.setUpdates(count)),
@@ -223,7 +248,8 @@ void main() {
         await pumpShell(tester, desktop: desktop, mornye: mornye);
         bool libraryActive() => tester
             .widget<QueueTab>(find.byType(QueueTab, skipOffstage: false))
-            .isTabActive;
+            .tabActive!
+            .value;
 
         for (var round = 0; round < 2; round++) {
           ShellNavigationService.requestTab(ShellTab.library);
@@ -237,6 +263,229 @@ void main() {
       });
     }
   }
+
+  /// The tab view's fade and the page it shows. The shell's PageView is the
+  /// first in the tree; Library holds its own.
+  Finder tabView() => find.byType(PageView).first;
+  double tabOpacity(WidgetTester tester) => tester
+      .widget<FadeTransition>(
+        find
+            .ancestor(of: tabView(), matching: find.byType(FadeTransition))
+            .first,
+      )
+      .opacity
+      .value;
+  double? tabPage(WidgetTester tester) =>
+      tester.widget<PageView>(tabView()).controller!.page;
+
+  for (final desktop in [true, false]) {
+    final platform = desktop ? 'desktop' : 'phone';
+    testWidgets('Material destinations fade through instead of sliding '
+        '($platform)', (tester) async {
+      await pumpShell(tester, desktop: desktop, mornye: false);
+      expect(tabOpacity(tester), 1);
+
+      ShellNavigationService.requestTab(ShellTab.library);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 32));
+      // The page shown fades out first.
+      expect(tabPage(tester), 0.0);
+      final leaving = tabOpacity(tester);
+      expect(leaving, inExclusiveRange(0, 1));
+      await tester.pump(const Duration(milliseconds: 32));
+      expect(tabPage(tester), 0.0);
+      expect(tabOpacity(tester), lessThan(leaving));
+      // Then the new page fades in.
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(tabPage(tester), 1.0);
+      final entering = tabOpacity(tester);
+      expect(entering, lessThan(1));
+      await tester.pump(const Duration(milliseconds: 32));
+      expect(tabPage(tester), 1.0);
+      expect(tabOpacity(tester), greaterThan(entering));
+      await settle(tester);
+      expect(tabPage(tester), 1.0);
+      expect(tabOpacity(tester), 1);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a destination change during the fade in fades out from '
+        'where it is ($platform)', (tester) async {
+      await pumpShell(tester, desktop: desktop, mornye: false);
+      ShellNavigationService.requestTab(ShellTab.library);
+      await tester.pump();
+      // Past the fade out and partly into the fade in.
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 48));
+      expect(tabPage(tester), 1.0);
+      final shown = tabOpacity(tester);
+      expect(shown, inExclusiveRange(0.05, 1));
+
+      ShellNavigationService.requestTab(ShellTab.home);
+      await tester.pump();
+      // The page does not start again from nothing, nor jump yet.
+      expect(tabPage(tester), 1.0);
+      expect(tabOpacity(tester), closeTo(shown, 0.001));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tabOpacity(tester), lessThan(shown));
+      await settle(tester);
+      expect(tabPage(tester), 0.0);
+      expect(tabOpacity(tester), 1);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('reduced motion switches Material destinations at once '
+        '($platform)', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await pumpShell(tester, desktop: desktop, mornye: false);
+
+      ShellNavigationService.requestTab(ShellTab.library);
+      await tester.pump();
+      expect(tabPage(tester), 1.0);
+      expect(tabOpacity(tester), 1);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('rapid Material destination changes settle on the last one '
+        '($platform)', (tester) async {
+      await pumpShell(tester, desktop: desktop, mornye: false);
+      ShellNavigationService.requestTab(ShellTab.library);
+      await settle(tester);
+      final home = tester.state(find.byType(HomeTab, skipOffstage: false));
+      final library = tester.state(find.byType(QueueTab, skipOffstage: false));
+
+      // Two requests in one frame, then one per frame mid-fade.
+      ShellNavigationService.requestTab(ShellTab.settings);
+      ShellNavigationService.requestTab(ShellTab.home);
+      await tester.pump();
+      for (final tab in [ShellTab.library, ShellTab.settings, ShellTab.home]) {
+        ShellNavigationService.requestTab(tab);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await settle(tester);
+
+      expect(tabPage(tester), 0.0);
+      expect(tabOpacity(tester), 1);
+      // One page paints at rest; the others keep their state offstage.
+      expect(find.byType(HomeTab), findsOneWidget);
+      expect(find.byType(QueueTab), findsNothing);
+      expect(
+        tester.state(find.byType(HomeTab, skipOffstage: false)),
+        same(home),
+      );
+      expect(
+        tester.state(find.byType(QueueTab, skipOffstage: false)),
+        same(library),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  /// The widget [type]'s state built last; a new instance means its state
+  /// built again.
+  Widget builtBy(WidgetTester tester, Type type) {
+    late Widget child;
+    tester
+        .element(find.byType(type, skipOffstage: false).first)
+        .visitChildElements((element) => child = element.widget);
+    return child;
+  }
+
+  for (final desktop in [true, false]) {
+    for (final mornye in [false, true]) {
+      testWidgets('a switch of tab builds neither Home nor Library again '
+          '(${desktop ? 'desktop' : 'phone'}, '
+          '${mornye ? 'Mornye' : 'Material'})', (tester) async {
+        await pumpShell(tester, desktop: desktop, mornye: mornye);
+        ShellNavigationService.requestTab(ShellTab.library);
+        await settle(tester);
+        ShellNavigationService.requestTab(ShellTab.home);
+        await settle(tester);
+        final home = builtBy(tester, HomeTab);
+        final library = builtBy(tester, QueueTab);
+
+        for (final tab in [
+          ShellTab.library,
+          ShellTab.settings,
+          ShellTab.home,
+        ]) {
+          ShellNavigationService.requestTab(tab);
+          await settle(tester);
+        }
+
+        expect(builtBy(tester, HomeTab), same(home));
+        expect(builtBy(tester, QueueTab), same(library));
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('desktop Material width changes rebuild neither Home nor a '
+      'hidden Library', (tester) async {
+    await pumpShell(tester, desktop: true, mornye: false);
+    ShellNavigationService.requestTab(ShellTab.library);
+    await settle(tester);
+    ShellNavigationService.requestTab(ShellTab.home);
+    await settle(tester);
+    final home = builtBy(tester, HomeTab);
+    final library = builtBy(tester, QueueTab);
+    Size librarySize() => MediaQuery.sizeOf(
+      tester.element(find.byType(QueueTab, skipOffstage: false).first),
+    );
+    final hiddenSize = librarySize();
+
+    // Width-only frames, as in a live edge drag or the rail expanding.
+    for (var frame = 1; frame <= 10; frame++) {
+      tester.view.physicalSize = Size(1280.0 + frame * 12, 800);
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await settle(tester);
+    expect(builtBy(tester, HomeTab), same(home));
+    expect(builtBy(tester, QueueTab), same(library));
+
+    // Home follows a height change; the hidden Library keeps its size.
+    tester.view.physicalSize = const Size(1400, 760);
+    await settle(tester);
+    expect(builtBy(tester, HomeTab), isNot(same(home)));
+    expect(builtBy(tester, QueueTab), same(library));
+    expect(librarySize(), hiddenSize);
+
+    // Library takes the new size when it shows again.
+    ShellNavigationService.requestTab(ShellTab.library);
+    await settle(tester);
+    expect(librarySize(), isNot(hiddenSize));
+    expect(
+      librarySize().height,
+      MediaQuery.sizeOf(
+        tester.element(find.byType(HomeTab, skipOffstage: false).first),
+      ).height,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a Material rail playlist link fades in like a destination', (
+    tester,
+  ) async {
+    await pumpShell(tester, desktop: true, mornye: false);
+    ShellNavigationService.requestTab(ShellTab.library);
+    await settle(tester);
+    expect(tabOpacity(tester), 1);
+
+    tester
+        .widget<DesktopShellLayout>(find.byType(DesktopShellLayout))
+        .onOpenLibraryLink!(DesktopSidebarLink.allPlaylistsId);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(desktopSidebarLink.value, DesktopSidebarLink.allPlaylistsId);
+    expect(tabOpacity(tester), inExclusiveRange(0, 1));
+    await settle(tester);
+    expect(tabOpacity(tester), 1);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final mornye in [false, true]) {
     testWidgets('a phone turned into a tablet still swaps the bar for the '

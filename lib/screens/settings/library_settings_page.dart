@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_switch.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,8 +10,11 @@ import 'package:mornye/controllers/library_re_enrich_all.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_scan_failure.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/download_history_provider.dart';
+import 'package:mornye/providers/library_album_artwork_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/link/link_source_names.dart';
@@ -27,6 +30,8 @@ import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/ios_library_folder_sheet.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/queue_swipe.dart';
 
 part 'library_settings_page_widgets.dart';
 
@@ -295,6 +300,74 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
     }
   }
 
+  Future<void> _findArtwork() async {
+    if (ref.read(libraryAlbumArtworkProvider).running) return;
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    if (!ref.read(libraryAlbumArtworkProvider.notifier).canLookUp()) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.libraryFindArtworkNoProvider)),
+      );
+      return;
+    }
+    var motion = false;
+    // Animated covers mean a lookup for every album, so they are a choice,
+    // offered only where the players and album pages show them.
+    if (context.isMornye && ref.read(settingsProvider).motionArtworkEnabled) {
+      final choice = await showAppBottomSheet<bool>(
+        context: context,
+        useRootNavigator: true,
+        title: l10n.libraryFindArtwork,
+        builder: (context) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppSheetOption(
+              leading: const AppIcon(Icons.image_outlined),
+              title: Text(context.l10n.libraryFindArtworkCovers),
+              subtitle: Text(context.l10n.libraryFindArtworkCoversSubtitle),
+              onTap: () => Navigator.pop(context, false),
+            ),
+            AppSheetOption(
+              leading: const AppIcon(Icons.motion_photos_on_outlined),
+              title: Text(context.l10n.libraryFindArtworkMotion),
+              subtitle: Text(context.l10n.libraryFindArtworkMotionSubtitle),
+              onTap: () => Navigator.pop(context, true),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      );
+      if (choice == null || !mounted) return;
+      motion = choice;
+    }
+    try {
+      final summary = await ref
+          .read(libraryAlbumArtworkProvider.notifier)
+          .findMissing(covers: true, motion: motion);
+      if (summary == null) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            summary.albums == 0
+                ? l10n.libraryFindArtworkNothing
+                : l10n.libraryFindArtworkResult(
+                    summary.covers,
+                    summary.motion,
+                    summary.failed,
+                  ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.snackbarError(context.friendlyError(error))),
+        ),
+      );
+    }
+  }
+
   Future<void> _findMovedDownloads() async {
     if (_isFindingMovedDownloads || _isCleaningMissingFiles) return;
     setState(() => _isFindingMovedDownloads = true);
@@ -394,6 +467,8 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
         return context.l10n.historyFilterSingles;
       case 'artists':
         return context.l10n.searchArtists;
+      case 'genres':
+        return context.l10n.libraryGenres;
       case 'playlists':
         return context.l10n.searchPlaylists;
       case 'folders':
@@ -415,6 +490,7 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
             ('albums', Icons.album),
             ('singles', Icons.audiotrack),
             ('artists', Icons.person),
+            ('genres', Icons.category_outlined),
             ('playlists', Icons.queue_music),
             ('folders', Icons.folder_outlined),
           ])
@@ -504,6 +580,7 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
 
           SliverToBoxAdapter(
             child: SettingsGroup(
+              connected: true,
               children: [
                 SettingsItem(
                   icon: Icons.grid_view_rounded,
@@ -528,7 +605,22 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                     context,
                     settings.libraryQualityLabelMode,
                   ),
-                  showDivider: false,
+                ),
+                if (queueSwipeOffered)
+                  SettingsSwitchItem(
+                    icon: Icons.queue_music,
+                    title: context.l10n.swipeToQueue,
+                    subtitle: context.l10n.swipeToQueueSubtitle,
+                    value: settings.swipeToQueue,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setSwipeToQueue(value),
+                  ),
+                _LibrarySongTapChoice(
+                  mode: settings.librarySongTap,
+                  onChanged: (mode) => ref
+                      .read(settingsProvider.notifier)
+                      .setLibrarySongTap(mode),
                 ),
               ],
             ),
@@ -774,6 +866,9 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                   final canReEnrich =
                       !_isLoadingReEnrich &&
                       (libraryState.totalCount > 0 || hasDownloads);
+                  final artwork = ref.watch(libraryAlbumArtworkProvider);
+                  final canFindArtwork =
+                      !artwork.running && libraryState.totalCount > 0;
                   return SettingsGroup(
                     connected: true,
                     children: [
@@ -831,6 +926,31 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                             onTap: canReEnrich ? _reEnrichAll : null,
                           ),
                         ),
+                        if (artwork.running && artwork.albumKey == null)
+                          _ArtworkProgressTile(
+                            done: artwork.done,
+                            total: artwork.total,
+                            stopping: artwork.cancelling,
+                            onStop: ref
+                                .read(libraryAlbumArtworkProvider.notifier)
+                                .cancel,
+                          )
+                        else
+                          Opacity(
+                            opacity: canFindArtwork ? 1.0 : 0.5,
+                            child: SettingsItem(
+                              icon: Icons.image_search_outlined,
+                              title: context.l10n.libraryFindArtwork,
+                              subtitle: context.l10n.libraryFindArtworkSubtitle,
+                              trailing: artwork.running
+                                  ? const AppLoadingIndicator(
+                                      size: 20,
+                                      strokeWidth: 2,
+                                    )
+                                  : null,
+                              onTap: canFindArtwork ? _findArtwork : null,
+                            ),
+                          ),
                       ],
                       Opacity(
                         opacity: canFindMoved || _isFindingMovedDownloads
@@ -902,5 +1022,92 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
         ],
       ),
     );
+  }
+}
+
+/// What a tap on a Library song row does ([AppSettings.librarySongTap]): a
+/// two-way choice under its title and the current choice's description.
+class _LibrarySongTapChoice extends StatelessWidget {
+  const _LibrarySongTapChoice({required this.mode, required this.onChanged});
+
+  final String mode;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final title = l10n.librarySongTap;
+    final details = mode != AppSettings.librarySongTapPlay;
+    final selected = details
+        ? AppSettings.librarySongTapDetails
+        : AppSettings.librarySongTapPlay;
+    // The default comes first. Each names what the tap does: a bare
+    // "Details" or "Play" read as the button on the row, which holds the
+    // other action.
+    final labels = {
+      AppSettings.librarySongTapDetails: l10n.librarySongTapOpenDetails,
+      AppSettings.librarySongTapPlay: l10n.librarySongTapPlaySong,
+    };
+    final choice = context.isMornye
+        ? MornyeSegmentedControl(
+            labels: labels.values.toList(),
+            selectedIndex: labels.keys.toList().indexOf(selected),
+            onChanged: (index) => onChanged(labels.keys.elementAt(index)),
+            samplesBackdrop: false,
+          )
+        : SettingsSegmentedChoice<String>(
+            selected: selected,
+            onChanged: onChanged,
+            semanticLabel: title,
+            options: [
+              for (final MapEntry(:key, :value) in labels.entries)
+                SettingsSegmentOption(value: key, label: value),
+            ],
+          );
+    final content = Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: context.tokens.rowPaddingH,
+        vertical: context.tokens.rowPaddingVCompact,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (!context.isMornye) ...[
+                AppIcon(
+                  Icons.play_circle_outline,
+                  color: colorScheme.onSurfaceVariant,
+                  size: 24,
+                ),
+                SizedBox(width: context.tokens.rowIconGap),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: textTheme.bodyLarge),
+                    const SizedBox(height: 2),
+                    Text(
+                      details
+                          ? l10n.librarySongTapDetailsDescription
+                          : l10n.librarySongTapPlayDescription,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          choice,
+        ],
+      ),
+    );
+    return SettingsSearchTarget(label: title, child: content);
   }
 }

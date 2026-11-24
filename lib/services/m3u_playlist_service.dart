@@ -108,7 +108,6 @@ class M3uPlaylistService {
     return tracks;
   }
 
-  /// Builds `#EXTM3U` content with one EXTINF line per entry.
   static String buildM3u8Content(List<M3uExportEntry> entries) {
     final buffer = StringBuffer('#EXTM3U\n');
     for (final entry in entries) {

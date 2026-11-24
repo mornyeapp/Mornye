@@ -12,9 +12,11 @@ import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
+import 'package:mornye/services/lyrics_romanization.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_alignment.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
+import 'package:mornye/services/lyrics_translation_song_languages.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -166,10 +168,12 @@ void main() {
     AppSettings settings = _settings,
     Map<String, String>? keys,
     LyricsTranslationCache? cache,
+    PinyinDataLoader? pinyin,
   }) async {
     final container = ProviderContainer(
       overrides: [
         initialSettingsProvider.overrideWithValue(settings),
+        if (pinyin != null) pinyinDataLoaderProvider.overrideWithValue(pinyin),
         lyricsAiKeyStoreProvider.overrideWithValue(
           MemoryLyricsAiKeyStore(keys ?? {'openai': 'sk-test'}),
         ),
@@ -224,7 +228,7 @@ void main() {
   }
 
   test(
-    'Fast reuses saved translations and toggles timing without AI',
+    'Fast reuses saved translations and keeps their timing without AI',
     () async {
       final cache = LyricsTranslationCache(directory: () async => directory);
       final key = lyricsTranslationCacheKey(
@@ -246,21 +250,22 @@ void main() {
       final container = await containerFor(cache: cache, keys: {});
       final controller = container.read(lyricsTranslationProvider.notifier);
       expect((await controller.translate(_timedLyrics)).error, isNull);
-      final fast = controller.display(_timedLyrics);
-      expect(fast.lines.single.translation, 'You');
-      expect(fast.lines.single.translationWords, isEmpty);
-      expect(fast.lines.single.romanizationWords, isEmpty);
+      // The mode only decides what a new translation asks for. Timing a
+      // saved or shared translation already has shows in either mode.
+      void expectTimed() {
+        final line = controller.display(_timedLyrics).lines.single;
+        expect(line.translation, 'You');
+        expect(line.translationWords.single.time.inSeconds, 10);
+        expect(line.romanizationWords.last.time.inSeconds, 12);
+      }
+
+      expectTimed();
       final settings = container.read(settingsProvider.notifier);
       settings.setLyricsAiWordSync(true);
-      final synced = controller.display(_timedLyrics);
-      expect(synced.lines.single.translationWords.single.time.inSeconds, 10);
-      expect(synced.lines.single.romanizationWords.last.time.inSeconds, 12);
+      expectTimed();
       expect((await controller.translate(_timedLyrics)).error, isNull);
       settings.setLyricsAiWordSync(false);
-      expect(
-        controller.display(_timedLyrics).lines.single.translationWords,
-        isEmpty,
-      );
+      expectTimed();
       expect((await cache.read(key))!.wordSynced, isTrue);
       expect(requests, isEmpty);
     },
@@ -837,6 +842,97 @@ void main() {
     expect(requests, isEmpty);
   });
 
+  String systemPrompt(http.Request request) {
+    final body = jsonDecode(request.body) as Map<String, dynamic>;
+    return ((body['messages'] as List).first as Map)['content'] as String;
+  }
+
+  ParsedLyrics lyricsOf(List<String> texts) => ParsedLyrics(
+    synced: true,
+    wordSynced: false,
+    lines: [
+      for (var i = 0; i < texts.length; i++)
+        LyricLine(
+          time: Duration(seconds: i),
+          text: texts[i],
+        ),
+    ],
+    plainText: texts.join('\n'),
+  );
+
+  const englishSong = [
+    'I walk the empty streets when the night is falling down',
+    "You told me that you'd stay but now I'm all alone",
+    "And I don't know what to do with all this love I've got",
+    "It's the only thing I want, the only thing I need",
+  ];
+
+  test('songs in the first language go to the second, others stay', () async {
+    final container = await containerFor(
+      settings: _settings.copyWith(
+        lyricsAutoTranslate: true,
+        lyricsTranslationLanguage: 'en',
+        lyricsTranslationSecondLanguage: 'es',
+      ),
+    );
+    final controller = container.read(lyricsTranslationProvider.notifier);
+    final english = lyricsOf(englishSong);
+    expect(controller.targetFor(english).code, 'es');
+    expect(controller.targetFor(_lyrics).code, 'en');
+    controller.display(english);
+    for (var i = 0; i < 30 && requests.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(requests, hasLength(1));
+    expect(systemPrompt(requests.single), contains('Spanish'));
+  });
+
+  test('a language picked for a song leaves the settings alone', () async {
+    final container = await containerFor();
+    final controller = container.read(lyricsTranslationProvider.notifier);
+    final other = lyricsOf(['Another line']);
+
+    controller.chooseSongLanguage(_lyrics, 'ja');
+    expect(controller.targetFor(_lyrics).code, 'ja');
+    expect(controller.songLanguage(_lyrics), 'ja');
+    expect(controller.targetFor(other).code, 'es');
+    expect(container.read(settingsProvider).lyricsTranslationLanguage, 'es');
+
+    expect((await controller.translate(_lyrics)).error, isNull);
+    expect(systemPrompt(requests.single), contains('Japanese'));
+    expect(
+      controller.display(_lyrics).lines.first.translation,
+      'es:Hello',
+      reason: 'The reply mock prefixes every language alike',
+    );
+
+    controller.chooseSongLanguage(_lyrics, '');
+    expect(controller.songLanguage(_lyrics), isNull);
+    expect(controller.targetFor(_lyrics).code, 'es');
+  });
+
+  test('a picked language survives a restart', () async {
+    final first = LyricsTranslationSongLanguages();
+    await first.set('song-a', 'ja');
+    final restarted = LyricsTranslationSongLanguages();
+    expect(await restarted.load(), isTrue);
+    expect(restarted['song-a'], 'ja');
+    await restarted.set('song-a', null);
+    final cleared = LyricsTranslationSongLanguages();
+    await cleared.load();
+    expect(cleared['song-a'], isNull);
+  });
+
+  test('the oldest picked languages leave first', () async {
+    final languages = LyricsTranslationSongLanguages(maxEntries: 2);
+    await languages.set('a', 'ja');
+    await languages.set('b', 'ko');
+    await languages.set('c', 'de');
+    expect(languages['a'], isNull);
+    expect(languages['b'], 'ko');
+    expect(languages['c'], 'de');
+  });
+
   test('the target follows the app language by default', () {
     expect(
       lyricsTranslationTargetFor(const AppSettings(locale: 'pt_PT')).code,
@@ -868,5 +964,99 @@ void main() {
       ),
       isTrue,
     );
+  });
+
+  group('offline romanization', () {
+    ParsedLyrics song(List<String> texts) => ParsedLyrics(
+      synced: true,
+      wordSynced: false,
+      lines: [
+        for (var i = 0; i < texts.length; i++)
+          LyricLine(
+            time: Duration(seconds: i),
+            text: texts[i],
+          ),
+      ],
+      plainText: texts.join('\n'),
+    );
+
+    bool asksRomanization() {
+      final body = jsonDecode(requests.single.body) as Map<String, dynamic>;
+      final system = (body['messages'] as List).first as Map;
+      return (system['content'] as String).contains('"romanization"');
+    }
+
+    test('asks the AI only for what the device cannot romanize', () async {
+      final container = await containerFor();
+      final controller = container.read(lyricsTranslationProvider.notifier);
+      await controller.translate(song(['사랑해', '좋아']));
+      expect(asksRomanization(), isFalse);
+      requests.clear();
+      await controller.translate(song(['きみの', '君の名前']));
+      expect(asksRomanization(), isTrue);
+    });
+
+    test('the app language keeps its script unromanized', () async {
+      final container = await containerFor(
+        settings: _settings.copyWith(locale: 'ja'),
+      );
+      final controller = container.read(lyricsTranslationProvider.notifier);
+      await controller.translate(song(['きみの', '君の名前']));
+      expect(asksRomanization(), isFalse);
+      final lyrics = song(['사랑해', 'きみの']);
+      expect(controller.shown(lyrics).lines.map((line) => line.romanization), [
+        'saranghae',
+        null,
+      ]);
+      container.read(settingsProvider.notifier).setLocale('ko');
+      expect(controller.shown(lyrics).lines.map((line) => line.romanization), [
+        null,
+        'kimino',
+      ]);
+    });
+
+    test('romanization off asks the AI for none', () async {
+      final container = await containerFor(
+        settings: _settings.copyWith(lyricsRomanize: false),
+      );
+      final controller = container.read(lyricsTranslationProvider.notifier);
+      await controller.translate(song(['きみの', '君の名前']));
+      expect(asksRomanization(), isFalse);
+      expect(controller.shown(song(['사랑해'])).lines.single.romanization, isNull);
+    });
+
+    test('shows Chinese once its data loads, and never saves it', () async {
+      final loader = PinyinDataLoader(
+        read: () async => File(pinyinDataAsset).readAsBytes(),
+      );
+      final container = await containerFor(pinyin: loader);
+      final controller = container.read(lyricsTranslationProvider.notifier);
+      final lyrics = song(['我爱你', '사랑해']);
+      expect(controller.shown(lyrics).lines.map((line) => line.romanization), [
+        null,
+        'saranghae',
+      ]);
+      await loader.load();
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.shown(lyrics).lines.first.romanization, 'wǒ ài nǐ');
+      expect(controller.display(lyrics), same(lyrics));
+      expect(
+        lyricsTranslationUnsaved(lyrics, controller.display(lyrics)),
+        isFalse,
+      );
+    });
+
+    test('puts the romanization in the main line when asked', () async {
+      final container = await containerFor(
+        settings: _settings.copyWith(lyricsRomanizedMainLine: true),
+      );
+      final line = container
+          .read(lyricsTranslationProvider.notifier)
+          .shown(song(['사랑해']))
+          .lines
+          .single;
+      expect(line.text, 'saranghae');
+      expect(line.romanization, '사랑해');
+    });
   });
 }

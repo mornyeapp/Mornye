@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/android_tv.dart';
+import 'package:mornye/utils/view_display.dart';
 
 const fullPlayerRouteName = '/full-player';
 final _log = AppLogger('Orientation');
@@ -22,8 +23,8 @@ bool get isTabletDevice {
   final dispatcher = WidgetsBinding.instance.platformDispatcher;
   final view = dispatcher.implicitView ?? dispatcher.views.firstOrNull;
   if (view == null) return false;
-  final display = view.display;
-  var size = display.devicePixelRatio > 0
+  final display = displayOf(view);
+  var size = display != null && display.devicePixelRatio > 0
       ? display.size / display.devicePixelRatio
       : Size.zero;
   if (size.isEmpty && view.devicePixelRatio > 0) {

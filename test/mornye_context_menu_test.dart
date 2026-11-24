@@ -1,7 +1,7 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +11,7 @@ import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 
 class _Settings extends SettingsNotifier {
@@ -241,6 +242,54 @@ void main() {
       expect(result, 'Share');
       expect(find.byType(MornyeContextMenu), findsNothing);
       expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final (origin, expected) in [
+    (null, const Offset(100, 200)),
+    (const Offset(118, 178), const Offset(118, 178)),
+  ]) {
+    testWidgets('a context menu opens out of ${expected.dx}', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [backdropBlurEnabledProvider.overrideWithValue(false)],
+          child: MaterialApp(
+            theme: MornyeTheme.build(Brightness.light),
+            home: Builder(
+              builder: (context) => Center(
+                child: TextButton(
+                  onPressed: () => showContextMenu(
+                    context,
+                    position: const Offset(100, 200),
+                    origin: origin,
+                    groups: [
+                      [
+                        ContextMenuAction(
+                          icon: Icons.folder_open_outlined,
+                          label: 'Open folder',
+                          onSelected: () {},
+                        ),
+                      ],
+                    ],
+                  ),
+                  child: const Text('Open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      final Object flight = tester.widget(
+        find.byWidgetPredicate(
+          (widget) => '${widget.runtimeType}' == '_MenuFlight',
+        ),
+      );
+      expect((flight as dynamic).anchor, expected);
     });
   }
 

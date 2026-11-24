@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart' show CupertinoButton;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoButton;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -648,9 +648,16 @@ class _AudioFacts {
       if (_resampling case final value?) _Fact(l10n.audioInfoResampling, value),
       _Fact(l10n.audioInfoBitPerfect, switch (_bitPerfect) {
         AudioBitPerfectStatus.verified => l10n.audioInfoBitPerfectActive,
-        AudioBitPerfectStatus.systemMixed => l10n.audioInfoBitPerfectNo,
+        // iOS offers apps no direct or exclusive output, so no setting
+        // changes this there.
+        AudioBitPerfectStatus.systemMixed =>
+          route?.platform == 'ios'
+              ? l10n.audioInfoBitPerfectNoIos
+              : l10n.audioInfoBitPerfectNo,
         AudioBitPerfectStatus.processed => l10n.audioInfoBitPerfectProcessed,
         AudioBitPerfectStatus.unverified => l10n.audioInfoBitPerfectUnverified,
+        AudioBitPerfectStatus.lossySource => l10n.audioInfoBitPerfectLossy,
+        AudioBitPerfectStatus.resampled => l10n.audioInfoBitPerfectResampled,
       }, emphasis: _bitPerfect == AudioBitPerfectStatus.verified),
     ];
   }
@@ -662,6 +669,8 @@ class _AudioFacts {
     normalizationGain: processing?.normalizationGain ?? 1,
     tempo: processing?.autoMixRate ?? 1,
     softwareVolume: softwareVolume,
+    lossySource: usb.lossy,
+    resampled: usb.outputSampleRate != null,
   );
 
   bool get _bluetoothFormatUnreported =>
@@ -670,7 +679,7 @@ class _AudioFacts {
   bool get _androidOutputUnreported => !direct && route?.platform == 'android';
 
   int? get _outputRate {
-    if (direct) return usb.sampleRate;
+    if (direct) return usb.outputSampleRate ?? usb.sampleRate;
     // Shared mixer properties cannot describe an exclusive engine's output.
     if (exclusive || _androidOutputUnreported) return null;
     return route?.device?.mixerSampleRate ?? route?.mixerSampleRate;

@@ -1,8 +1,9 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/lyric_supplement_transition.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
+import 'package:mornye/utils/text_direction.dart';
 
 /// Keeps each pronunciation phrase under the lyric with the same start time.
 /// Only shared word boundaries are used; line-only timing cannot identify
@@ -39,10 +40,14 @@ class LyricPronunciationLayout {
   }) {
     final original = line.words;
     final pronunciation = line.romanizationWords;
+    // Phrase columns run left to right. A right-to-left line keeps its
+    // pronunciation as a row of its own under it.
     if (original.isEmpty ||
         pronunciation.isEmpty ||
         !maxWidth.isFinite ||
-        maxWidth <= 0) {
+        maxWidth <= 0 ||
+        strongTextDirection(line.text) == TextDirection.rtl ||
+        strongTextDirection(line.romanization ?? '') == TextDirection.rtl) {
       return null;
     }
     String normalize(String text) => text.replaceAll(_whitespaceRun, '');

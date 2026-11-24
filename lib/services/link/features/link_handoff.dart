@@ -134,7 +134,7 @@ List<int> _indexes(Object? reply, String key) {
 /// Whether the desktop's [track] is the queue entry [ref] the phone sent.
 /// The desktop names a song it plays from the phone's file by the title and
 /// artist the phone sent, and a Library song by the Library's tags.
-bool _sameTrack(TrackRef ref, TrackRef track) =>
+bool linkSameTrack(TrackRef ref, TrackRef track) =>
     (ref.songId != null && ref.songId == track.songId) ||
     (ref.isrc != null && ref.isrc == track.isrc) ||
     (ref.matchKey != null && ref.matchKey == track.matchKey) ||
@@ -176,10 +176,10 @@ class _DesktopProgress {
   /// The queued entry nearest [at] that is [track], looking ahead first.
   int? _find(TrackRef track) {
     for (var i = at; i < queued; i++) {
-      if (_sameTrack(queue[i], track)) return i;
+      if (linkSameTrack(queue[i], track)) return i;
     }
     for (var i = min(at, queued) - 1; i >= 0; i--) {
-      if (_sameTrack(queue[i], track)) return i;
+      if (linkSameTrack(queue[i], track)) return i;
     }
     return null;
   }
@@ -242,9 +242,15 @@ const linkHandoffAheadSongs = 3;
 /// [linkHandoffAheadSongs] while the phone charges.
 const linkHandoffAheadSongsCharging = 5;
 
+/// How long the phone keeps showing the song it just sent while the desktop
+/// still reports what it played before.
+const linkHandoffArrivalWait = Duration(seconds: 5);
+
+int _wallClockMs() => DateTime.now().millisecondsSinceEpoch;
+
 /// Moves playback between the phone and the paired desktop.
 class LinkHandoff {
-  const LinkHandoff({
+  LinkHandoff({
     required this.client,
     required this.player,
     required this.refs,
@@ -254,6 +260,7 @@ class LinkHandoff {
     this.aheadSongs = linkHandoffAheadSongs,
     this.aheadSongsCharging = linkHandoffAheadSongsCharging,
     this.isCharging,
+    this.nowMs = _wallClockMs,
   });
 
   final LinkClientApi client;
@@ -274,6 +281,25 @@ class LinkHandoff {
   /// Whether the phone is on external power, asked before each song sent
   /// ahead; null counts as on battery.
   final Future<bool> Function()? isCharging;
+
+  final int Function() nowMs;
+
+  /// The song [playOnDesktop] moved to the desktop, and when.
+  ({TrackRef track, int sentMs})? _arriving;
+
+  /// The song just moved to the desktop, for the player screens that show
+  /// the desktop next. It stays out of the desktop's state until the state
+  /// is pushed, so they keep it instead of the desktop's previous song. Null
+  /// once taken, once too old, or when the song was not moved at all.
+  TrackRef? takeArriving() {
+    final arriving = _arriving;
+    _arriving = null;
+    if (arriving == null ||
+        nowMs() - arriving.sentMs >= linkHandoffArrivalWait.inMilliseconds) {
+      return null;
+    }
+    return arriving.track;
+  }
 
   Future<int> _aheadSongs() async {
     final charging = isCharging;
@@ -305,6 +331,26 @@ class LinkHandoff {
       snapshot.queue.sublist(window.start, window.end),
       current: snapshot.index - window.start,
       positionMs: () => player.snapshot.positionMs,
+      movesPlayback: true,
+      onSending: onSending,
+    );
+  }
+
+  /// Gives the desktop the phone's queue as [playOnDesktop] does, uploads
+  /// included, but loaded paused at the phone's position and with the phone
+  /// still playing: Play together then starts the desktop at an agreed
+  /// instant. Null when the phone plays nothing.
+  Future<LinkHandoffResult?> shareQueueWithDesktop({
+    void Function(int sent, int total)? onSending,
+  }) async {
+    final snapshot = player.snapshot;
+    if (snapshot.current == null) return null;
+    final window = linkQueueWindow(snapshot.queue.length, snapshot.index);
+    return _sendQueue(
+      snapshot.queue.sublist(window.start, window.end),
+      current: snapshot.index - window.start,
+      positionMs: () => player.snapshot.positionMs,
+      desktopPlays: false,
       onSending: onSending,
     );
   }
@@ -395,13 +441,14 @@ class LinkHandoff {
     required int current,
     required int Function() positionMs,
     LinkPlayerState? modes,
+    bool movesPlayback = false,
+    bool desktopPlays = true,
     void Function(int sent, int total)? onSending,
   }) async {
     final files = this.files;
     final run = files?.begin();
     final (:queue, :phoneFiles) = await _refs(items);
 
-    // Songs the desktop lacks that the phone can send.
     final pending = await _missing(queue, phoneFiles, current: current);
     ({LinkUploadStart? start, Future<void> whole})? upload;
     if (pending.remove(current)) {
@@ -437,11 +484,12 @@ class LinkHandoff {
         queue: played,
         index: current - first,
         positionMs: positionMs(),
-        playing: true,
+        playing: desktopPlays,
         shuffle: modes?.shuffle ?? localModes.shuffle,
         repeat: modes?.repeat ?? localModes.repeat,
-        autoplay: modes?.autoplay ?? localModes.autoplay,
-        autoMix: modes?.autoMix ?? localModes.autoMix,
+        // A shared queue leaves the desktop's saved choices alone.
+        autoplay: desktopPlays ? modes?.autoplay ?? localModes.autoplay : null,
+        autoMix: desktopPlays ? modes?.autoMix ?? localModes.autoMix : null,
       ).toJson(),
       if (arriving != null)
         'arriving': [
@@ -455,7 +503,14 @@ class LinkHandoff {
       resolved: resolved is num ? resolved.toInt() : 0,
       missing: _indexes(reply, 'missing'),
     );
-    if (result.started) await player.pause();
+    if (result.started && desktopPlays) {
+      // Set before the pause, which can already bring up the desktop's
+      // player. When the desktop lacks this song it starts a later one.
+      if (movesPlayback && !result.missing.contains(current - first)) {
+        _arriving = (track: queue[current], sentMs: nowMs());
+      }
+      await player.pause();
+    }
     final later = [...pending.where((i) => i > last)]..sort();
     if (files != null && handoffId is String && later.isNotEmpty) {
       unawaited(

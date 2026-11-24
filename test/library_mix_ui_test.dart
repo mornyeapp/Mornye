@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
@@ -24,6 +24,7 @@ import 'package:mornye/widgets/mornye_mix_banner.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 final _items = [
   for (var i = 0; i < 24; i++)
@@ -98,7 +99,7 @@ void main() {
           expect(find.byType(SliverTrackTable), findsOneWidget);
         } else {
           expect(find.byType(TrackCard), findsWidgets);
-          expect(find.byTooltip('Save as playlist'), findsOneWidget);
+          expect(findByTooltip('Save as playlist'), findsOneWidget);
         }
         expect(tester.takeException(), isNull);
       });
@@ -123,6 +124,16 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pump(const Duration(seconds: 1));
+      // The rows are one run, which Material draws as a connected list.
+      TrackCardSegment segment(String title) => tester.widget(
+        find.ancestor(
+          of: find.text(title),
+          matching: find.byType(TrackCardSegment),
+        ),
+      );
+      expect(segment('Song 0').first, isTrue);
+      expect(segment('Song 0').last, isFalse);
+      expect(segment('Song 1').first, isFalse);
       await tester.longPress(first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));

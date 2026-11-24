@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart' as material_ui;
 import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/providers/custom_font_provider.dart';
 import 'package:mornye/theme/app_theme.dart';
@@ -105,7 +104,7 @@ class DynamicColorWrapper extends ConsumerWidget {
     );
   }
 
-  ColorScheme _toFlutterColorScheme(material_ui.ColorScheme scheme) {
+  ColorScheme _toFlutterColorScheme(ColorScheme scheme) {
     return ColorScheme.fromSeed(
       seedColor: scheme.primary,
       brightness: scheme.brightness,
@@ -171,10 +170,7 @@ class _DynamicColorBuilder extends StatefulWidget {
   const _DynamicColorBuilder({required this.colors, required this.builder});
 
   final DynamicColors? colors;
-  final Widget Function(
-    material_ui.ColorScheme? lightDynamic,
-    material_ui.ColorScheme? darkDynamic,
-  )
+  final Widget Function(ColorScheme? lightDynamic, ColorScheme? darkDynamic)
   builder;
 
   @override

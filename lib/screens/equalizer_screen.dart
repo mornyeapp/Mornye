@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:share_plus/share_plus.dart';
@@ -11,6 +11,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/providers/equalizer_provider.dart';
 import 'package:mornye/services/playback_equalizer.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -484,7 +485,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   }
 }
 
-/// The preset whose curve and tone match the current settings.
 EqualizerPreset? _matchingPreset(EqualizerState state) {
   bool same(double left, double right) =>
       left == right && (left != 0 || left.isNegative == right.isNegative);

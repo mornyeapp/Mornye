@@ -3,9 +3,11 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
@@ -25,7 +27,6 @@ import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:mornye/widgets/player_queue_sheet.dart';
 import 'package:mornye/widgets/no_scrollbars.dart';
 
-/// A panel of the desktop trailing inspector.
 enum DesktopInspectorPanel { lyrics, upNext }
 
 /// Width of the trailing inspector.
@@ -306,12 +307,18 @@ class DesktopInspector extends ConsumerWidget {
   }
 }
 
-/// Motion for opening the inspector: the Material spatial spring, or an
-/// iOS-like ease for Mornye.
+/// Motion for opening the inspector: the default spatial spring of the
+/// style, Material's expressive one or Mornye's standard one.
 AppMotionSpec desktopInspectorMotion(BuildContext context) => AppMotion.spatial(
   context,
   const AppMotionSpec(Duration(milliseconds: 300), Curves.easeOutCubic),
 );
+
+/// [desktopInspectorMotion]'s spring, for an opening that goes on from the
+/// pane's own velocity.
+SpringDescription _inspectorSpring(BuildContext context) => context.isMornye
+    ? MornyeMotion.standardSpring
+    : MotionPace.spring(M3EMotion.expressiveSpatialDefault.toDescription());
 
 /// Opens and closes [panel] with motion, keeping the last panel on screen
 /// while it leaves. Beside the content the pane grows from the trailing
@@ -337,12 +344,21 @@ class DesktopInspectorTransition extends StatefulWidget {
 
 class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    value: widget.panel == null ? 0 : 1,
-  );
+  // Created up front: a lazy controller first read when the panel opens
+  // would start at the open value and skip the first opening. Its value is
+  // the pane's openness on screen, which the open spring may carry past 1,
+  // so a reversal always goes on from where the pane is.
+  late final AnimationController _controller;
   late DesktopInspectorPanel? _shown = widget.panel;
-  Curve _curve = Curves.linear;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController.unbounded(
+      vsync: this,
+      value: widget.panel == null ? 0 : 1,
+    );
+  }
 
   @override
   void didUpdateWidget(DesktopInspectorTransition oldWidget) {
@@ -354,23 +370,31 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
     }
     final reduce = MediaQuery.disableAnimationsOf(context);
     if (panel != null) {
-      final motion = desktopInspectorMotion(context);
       _shown = panel;
-      _curve = motion.curve;
-      _controller.animateTo(
-        1,
-        duration: reduce ? Duration.zero : motion.duration,
-      );
+      if (reduce) {
+        _controller.value = 1;
+      } else {
+        // A pane closing when it opens again turns on its own velocity.
+        _controller.animateWith(
+          SpringSimulation(
+            _inspectorSpring(context),
+            _controller.value,
+            1,
+            _controller.velocity,
+            snapToEnd: true,
+          ),
+        );
+      }
     } else {
       // Leaving uses a short ease without overshoot, so the pane never
       // grows again on its way out.
-      _curve = Curves.easeInCubic;
       _controller
           .animateBack(
             0,
             duration: reduce
                 ? Duration.zero
                 : const Duration(milliseconds: 220),
+            curve: Curves.easeInCubic,
           )
           .whenCompleteOrCancel(() {
             if (mounted && widget.panel == null && _controller.value == 0) {
@@ -390,10 +414,16 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
   Widget build(BuildContext context) {
     final shown = _shown;
     if (shown == null) return const SizedBox.shrink();
+    // Switching panels cross-fades on the effects spring of the style.
+    final crossFade = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+      mornye: MornyeMotion.effects,
+    );
     final content = AnimatedSwitcher(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 180),
+      duration: crossFade.duration,
+      switchInCurve: crossFade.curve,
+      switchOutCurve: crossFade.leaving,
       // Panels keep their fixed width while they cross-fade.
       layoutBuilder: (current, previous) => Stack(
         alignment: AlignmentDirectional.topStart,
@@ -409,9 +439,14 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
       animation: _controller,
       child: content,
       builder: (context, child) {
-        // The open spring may overshoot; the pane can briefly grow past its
-        // width, but never below nothing.
-        final value = math.max(0.0, _curve.transform(_controller.value));
+        // The open spring may overshoot. A floating panel can slide a little
+        // past its place, but the pane beside the content stops at its
+        // width: growing past it would narrow the content below its final
+        // size, flip its layout breakpoints and flip them back.
+        final spring = _controller.value;
+        final value = widget.overlay
+            ? math.max(0.0, spring)
+            : spring.clamp(0.0, 1.0);
         if (widget.overlay) {
           final translation = Offset((1 - value) * (rtl ? -1 : 1), 0);
           // An opacity layer would hide the backdrop from Mornye's glass.
@@ -490,7 +525,6 @@ class _InspectorLyricsState extends ConsumerState<_InspectorLyrics> {
   );
 }
 
-/// The Material Up Next list in a desktop panel.
 class DesktopMaterialQueue extends StatefulWidget {
   const DesktopMaterialQueue({super.key, required this.colorScheme});
 

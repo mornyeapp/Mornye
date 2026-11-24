@@ -52,7 +52,7 @@ abstract interface class LinkServiceBrowser {
   Future<void> stop();
 }
 
-/// A desktop found on the local network.
+/// A Link host, a computer or a shared phone, found on the local network.
 @immutable
 class LinkDiscoveredServer {
   const LinkDiscoveredServer({
@@ -62,6 +62,7 @@ class LinkDiscoveredServer {
     required this.host,
     required this.port,
     required this.fingerprint,
+    this.platform = '',
   });
 
   /// The mDNS instance name, which identifies the service in lost events.
@@ -75,6 +76,12 @@ class LinkDiscoveredServer {
   /// still checks it against the certificate it actually sees.
   final String fingerprint;
 
+  /// The host's operating system (TXT `pf`), empty from older hosts.
+  final String platform;
+
+  /// Whether the host is a phone shared with other phones.
+  bool get isPhone => platform == 'android' || platform == 'ios';
+
   /// `https://host:port`, the form of [LinkServerRecord.address].
   String get address => Uri(scheme: 'https', host: host, port: port).toString();
 
@@ -86,11 +93,19 @@ class LinkDiscoveredServer {
       other.name == name &&
       other.host == host &&
       other.port == port &&
-      other.fingerprint == fingerprint;
+      other.fingerprint == fingerprint &&
+      other.platform == platform;
 
   @override
-  int get hashCode =>
-      Object.hash(serviceName, serverId, name, host, port, fingerprint);
+  int get hashCode => Object.hash(
+    serviceName,
+    serverId,
+    name,
+    host,
+    port,
+    fingerprint,
+    platform,
+  );
 
   @override
   String toString() => 'LinkDiscoveredServer($name, $serverId, $address)';
@@ -119,6 +134,7 @@ LinkDiscoveredServer? linkDiscoveredServerFrom(LinkServiceResolved service) {
     host: host,
     port: service.port,
     fingerprint: fingerprint,
+    platform: attributes['pf']?.trim().toLowerCase() ?? '',
   );
 }
 

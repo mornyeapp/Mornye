@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/theme/app_theme.dart';
@@ -43,6 +43,8 @@ Widget _collection(
 );
 
 void _phone(WidgetTester tester) {
+  // The header settles its blur only in a resumed app.
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.view.physicalSize = const Size(1079, 2339);
   tester.view.devicePixelRatio = 2.625;
   addTearDown(tester.view.reset);
@@ -116,6 +118,46 @@ void main() {
     expect(liveFrames, 2);
     expect(images, hasLength(1));
     expect(images.single!.debugDisposed, isFalse);
+  });
+
+  testWidgets('a loading header can leave the shadow off its cover', (
+    tester,
+  ) async {
+    _phone(tester);
+    const cover = ValueKey('cover');
+    for (final loading in [false, true]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: CustomScrollView(
+              slivers: [
+                AlbumDetailHeader(
+                  title: 'Album',
+                  expandedHeight: 534,
+                  showTitleInAppBar: false,
+                  blurAndScrimBackground: false,
+                  background: const SizedBox.expand(),
+                  coverShadow: !loading,
+                  coverBuilder: (context, size) =>
+                      SizedBox.square(key: cover, dimension: size),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final frame = tester.widget<Container>(
+        find
+            .ancestor(of: find.byKey(cover), matching: find.byType(Container))
+            .first,
+      );
+      expect(
+        (frame.decoration! as BoxDecoration).boxShadow,
+        loading ? isEmpty : isNotEmpty,
+      );
+    }
   });
 
   testWidgets('a new window size or theme blurs the header cover again', (

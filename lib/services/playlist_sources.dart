@@ -9,6 +9,9 @@ import 'package:mornye/services/csv_import_service.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/m3u_playlist_service.dart';
 import 'package:mornye/utils/file_access.dart';
+import 'package:mornye/utils/logger.dart';
+
+final _log = AppLogger('PlaylistImport');
 
 /// One Library folder offered as a playlist source.
 class LibraryFolder {
@@ -91,6 +94,118 @@ List<LibraryFolder> groupLibraryFolders(
   return folders;
 }
 
+p.Context _folderContext(String path, bool tree) =>
+    tree || path.startsWith('network://') ? p.posix : p.context;
+
+/// [path] and the folders above it, up to [root]. [root] is the topmost
+/// folder to offer; for a SAF [tree] the chain ends at the tree root, `''`.
+Iterable<String> _folderChain(String path, bool tree, String? root) sync* {
+  if (!tree && root == null) {
+    yield path;
+    return;
+  }
+  final context = _folderContext(path, tree);
+  var current = path;
+  while (true) {
+    yield current;
+    if (current.isEmpty || current == root) return;
+    final parent = context.dirname(current);
+    if (parent == current) return;
+    if (parent == '.') {
+      if (tree) yield '';
+      return;
+    }
+    current = parent;
+  }
+}
+
+/// The deepest folder that holds, or is above, every one of [folders].
+String? _commonFolder(List<String> folders) {
+  if (folders.isEmpty) return null;
+  final context = _folderContext(folders.first, false);
+  var candidate = folders.first;
+  while (true) {
+    final current = candidate;
+    if (folders.every(
+      (folder) => folder == current || context.isWithin(current, folder),
+    )) {
+      return current;
+    }
+    final parent = context.dirname(current);
+    if (parent == current || parent == '.') return null;
+    candidate = parent;
+  }
+}
+
+/// Like [groupLibraryFolders], but every folder also holds the tracks of all
+/// its subfolders, and the folders above the ones with tracks are offered
+/// too, up to the top of their Library source. Picking a folder therefore
+/// takes everything nested inside it, on plain paths and SAF trees alike.
+List<LibraryFolder> groupLibraryFolderTree(
+  List<LibraryFilePathRow> rows, {
+  Map<String, String> sourceNames = const {},
+}) {
+  final direct =
+      <String, ({String sourceId, String path, bool tree, List<String> ids})>{};
+  for (final row in rows) {
+    final folder = libraryFolderPath(row.filePath);
+    if (folder == null) continue;
+    direct
+        .putIfAbsent(
+          '${row.sourceId}\n$folder',
+          () => (
+            sourceId: row.sourceId,
+            path: folder,
+            tree: isContentUri(row.filePath.trim()),
+            ids: <String>[],
+          ),
+        )
+        .ids
+        .add(row.id);
+  }
+
+  final plainFolders = <String, List<String>>{};
+  for (final group in direct.values) {
+    if (!group.tree) {
+      plainFolders.putIfAbsent(group.sourceId, () => []).add(group.path);
+    }
+  }
+  final roots = {
+    for (final entry in plainFolders.entries)
+      entry.key: _commonFolder(entry.value),
+  };
+
+  final totals = <String, ({String sourceId, String path, Set<String> ids})>{};
+  for (final group in direct.values) {
+    final root = group.tree ? '' : roots[group.sourceId];
+    for (final folder in _folderChain(group.path, group.tree, root)) {
+      totals
+          .putIfAbsent(
+            '${group.sourceId}\n$folder',
+            () => (sourceId: group.sourceId, path: folder, ids: <String>{}),
+          )
+          .ids
+          .addAll(group.ids);
+    }
+  }
+
+  final folders = [
+    for (final group in totals.values)
+      LibraryFolder(
+        name: group.path.isEmpty
+            ? sourceNames[group.sourceId] ?? group.sourceId
+            : p.basename(group.path),
+        path: group.path,
+        ids: group.ids.toList(growable: false),
+      ),
+  ];
+  folders.sort((a, b) {
+    final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    return byName != 0 ? byName : a.path.compareTo(b.path);
+  });
+  return folders;
+}
+
 /// A folder in playback order: by disc and track number when it holds one
 /// album that numbers every track, otherwise by file name, as a file browser
 /// lists it.
@@ -132,18 +247,54 @@ Future<List<LibraryFolder>> loadLibraryFolders(LibraryDatabase library) async {
 
 List<LibraryFolder> _groupFolders(
   ({List<LibraryFilePathRow> rows, Map<String, String> sourceNames}) request,
-) => groupLibraryFolders(request.rows, sourceNames: request.sourceNames);
+) => groupLibraryFolderTree(request.rows, sourceNames: request.sourceNames);
 
-/// The tracks of [folder] in [sortFolderItems] order.
-Future<List<Track>> libraryFolderTracks(
+/// Every Library track inside [root] and all of its subfolders, however
+/// deep. Only files already in the Library are found.
+Future<LibraryFolder> libraryFolderTree(
+  String root,
+  LibraryDatabase library,
+) async {
+  final rows = await library.getFilePathRows();
+  return compute(_folderTree, (root: root, rows: rows));
+}
+
+LibraryFolder _folderTree(
+  ({String root, List<LibraryFilePathRow> rows}) request,
+) => folderTreeOfRows(request.root, request.rows);
+
+/// The [rows] inside [root] and all of its subfolders, as one folder.
+LibraryFolder folderTreeOfRows(String root, List<LibraryFilePathRow> rows) {
+  final base = p.normalize(_visiblePath(root) ?? root);
+  final ids = <String>[];
+  for (final row in rows) {
+    final folder = libraryFolderPath(row.filePath);
+    if (folder == null) continue;
+    final dir = p.normalize(folder);
+    if (dir == base || p.isWithin(base, dir)) ids.add(row.id);
+  }
+  return LibraryFolder(name: p.basename(base), path: base, ids: ids);
+}
+
+/// The tracks of [folder] and its subfolders: subfolders in path order, each
+/// one in [sortFolderItems] order.
+Future<List<Track>> libraryFolderTreeTracks(
   LibraryFolder folder,
   LibraryDatabase library,
 ) async {
-  final rows = await library.getByIds(folder.ids);
-  final items = sortFolderItems([
-    for (final row in rows) LocalLibraryItem.fromJson(row),
-  ]);
-  return [for (final item in items) _localTrack(item)];
+  final byDir = <String, List<LocalLibraryItem>>{};
+  for (final row in await library.getByIds(folder.ids)) {
+    final item = LocalLibraryItem.fromJson(row);
+    byDir
+        .putIfAbsent(libraryFolderPath(item.filePath) ?? '', () => [])
+        .add(item);
+  }
+  final dirs = byDir.keys.toList()
+    ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  return [
+    for (final dir in dirs)
+      for (final item in sortFolderItems(byDir[dir]!)) _localTrack(item),
+  ];
 }
 
 /// Parses an M3U, M3U8 or CSV playlist file named [fileName].
@@ -194,6 +345,26 @@ List<String> _pathSegments(String raw) {
       .toList(growable: false);
 }
 
+final _percentEscape = RegExp('%[0-9A-Fa-f]{2}');
+
+/// [_pathSegments] of a plain path line written percent-encoded, as some
+/// players do ("My%20Song.flac"); empty for any other line.
+List<String> _decodedPathSegments(String raw) {
+  final path = raw.trim();
+  if (!_percentEscape.hasMatch(path) ||
+      isContentUri(path) ||
+      path.toLowerCase().startsWith('file:')) {
+    return const [];
+  }
+  try {
+    return _pathSegments(Uri.decodeComponent(path));
+  } on ArgumentError {
+    return const [];
+  } on FormatException {
+    return const [];
+  }
+}
+
 /// Matches playlist paths to Library files by their last one to three
 /// segments, so an export from another device or player still resolves.
 class PlaylistPathIndex {
@@ -217,8 +388,12 @@ class PlaylistPathIndex {
 
   /// The Library id at [path], or null when no single file matches. The
   /// longest tail present decides; a shared one is not narrowed further.
-  String? match(String path) {
-    final segments = _pathSegments(path);
+  /// A percent-encoded line is tried again decoded.
+  String? match(String path) =>
+      _matchSegments(_pathSegments(path)) ??
+      _matchSegments(_decodedPathSegments(path));
+
+  String? _matchSegments(List<String> segments) {
     for (var count = math.min(_depth, segments.length); count > 0; count--) {
       final id = _ids[segments.sublist(segments.length - count).join('/')];
       if (id != null) return id.isEmpty ? null : id;
@@ -258,6 +433,7 @@ Future<({List<Track> tracks, int matched})> matchPlaylistImport(
     for (var i = 0; i < entries.length; i++)
       if (rows[i] == null) i,
   ];
+  final byPath = entries.length - pending.length;
   final found = await library.findExistingBatch([
     for (final i in pending)
       LocalLibraryBatchLookupRequest(
@@ -268,6 +444,26 @@ Future<({List<Track> tracks, int matched})> matchPlaylistImport(
   ]);
   for (var j = 0; j < pending.length; j++) {
     rows[pending[j]] = found[j];
+  }
+  // A title numbered to keep the playlist's order ("001 - Song") is looked
+  // up again without its number.
+  final numbered = [
+    for (final i in pending)
+      if (rows[i] == null &&
+          _withoutPosition(entries[i].track.name) != entries[i].track.name)
+        i,
+  ];
+  if (numbered.isNotEmpty) {
+    final retried = await library.findExistingBatch([
+      for (final i in numbered)
+        LocalLibraryBatchLookupRequest(
+          trackName: _withoutPosition(entries[i].track.name),
+          artistName: entries[i].track.artistName,
+        ),
+    ]);
+    for (var j = 0; j < numbered.length; j++) {
+      rows[numbered[j]] = retried[j];
+    }
   }
   var matched = 0;
   final tracks = <Track>[];
@@ -280,5 +476,29 @@ Future<({List<Track> tracks, int matched})> matchPlaylistImport(
       tracks.add(_localTrack(LocalLibraryItem.fromJson(row)));
     }
   }
+  _log.i(
+    'Matched $matched of ${entries.length} playlist entries '
+    '($byPath by path, ${matched - byPath} by title and artist)',
+  );
+  final unmatchedPaths = [
+    for (var i = 0; i < entries.length; i++)
+      if (rows[i] == null && entries[i].path != null) entries[i].path!,
+  ];
+  if (unmatchedPaths.isNotEmpty) {
+    _log.i(
+      'Unmatched path lines, first: ${unmatchedPaths.take(3).join(' | ')}',
+    );
+  }
   return (tracks: tracks, matched: matched);
+}
+
+final _positionPrefix = RegExp(r'^\d{1,4}\s*[-.)]\s+');
+
+/// [title] without a leading playlist position such as "001 - " or "01. ",
+/// which some exports write into the display text to keep their order.
+String _withoutPosition(String title) {
+  final match = _positionPrefix.firstMatch(title);
+  return match == null || match.end >= title.length
+      ? title
+      : title.substring(match.end);
 }

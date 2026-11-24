@@ -1,5 +1,5 @@
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
@@ -7,6 +7,7 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/artist_screen.dart';
+import 'package:mornye/services/artist_snapshot_store.dart';
 import 'package:mornye/screens/album_screen.dart';
 import 'package:mornye/screens/extension_collection_screens.dart'
     show ExtensionArtistScreen, ExtensionAlbumScreen;
@@ -205,7 +206,7 @@ Future<void> navigateToArtist(
 
     final artistList = searchResult?.items ?? const <Map<String, dynamic>>[];
     if (artistList.isEmpty) {
-      _showUnavailable(context, context.l10n.trackArtist);
+      await _openSavedArtistOrReport(context, artistName);
       return;
     }
 
@@ -240,8 +241,37 @@ Future<void> navigateToArtist(
     _log.e('Failed to look up artist "$artistName": $e', e);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    _showUnavailable(context, context.l10n.trackArtist);
+    await _openSavedArtistOrReport(context, artistName);
   }
+}
+
+/// Offline, a lookup finds nothing: the page saved earlier still opens.
+Future<void> _openSavedArtistOrReport(
+  BuildContext context,
+  String artistName,
+) async {
+  final saved = await ArtistSnapshotStore.instance.read(artistName);
+  if (!context.mounted) return;
+  if (saved == null) {
+    _showUnavailable(context, context.l10n.trackArtist);
+    return;
+  }
+  pushViaPreferredNavigator(
+    context,
+    (context) => ArtistScreen(
+      artistId: saved.artistId,
+      artistName: saved.artistName,
+      coverUrl: saved.coverUrl,
+      albums: saved.albums,
+      releases: saved.releases,
+      topTracks: saved.topTracks,
+      headerImageUrl: saved.headerImageUrl,
+      headerLogoUrl: saved.headerLogoUrl,
+      monthlyListeners: saved.monthlyListeners,
+      extensionId: saved.extensionId,
+      savedCopy: true,
+    ),
+  );
 }
 
 Future<void> navigateToAlbum(
@@ -489,7 +519,6 @@ class DetailPage {
 
   static final _routes = Expando<DetailPage>('detail page');
 
-  /// Records that the route around [context] shows [page].
   static void mark(BuildContext context, DetailPage page) {
     final route = ModalRoute.of(context);
     if (route != null) _routes[route] = page;
@@ -549,7 +578,6 @@ void pushViaPreferredNavigator(
   push(activeTabNavigator);
 }
 
-/// Pushes a [MaterialPageRoute] built by [builder] onto the nearest navigator.
 Future<T?> pushPage<T>(BuildContext context, WidgetBuilder builder) =>
     Navigator.push(context, MaterialPageRoute<T>(builder: builder));
 

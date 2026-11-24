@@ -17,6 +17,7 @@ unicode-normalization.workspace = true
 unicode-general-category.workspace = true
 chrono.workspace = true
 claxon.workspace = true
+md-5.workspace = true
 roxmltree.workspace = true
 tempfile.workspace = true
 

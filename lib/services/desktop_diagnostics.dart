@@ -51,6 +51,10 @@ class DesktopDiagnostics {
   static const _reportFileName = 'crash-report.json';
   static const _runtimeErrorFileName = 'last-runtime-error.json';
   static const _recentLogLines = 80;
+
+  /// How soon after a runtime error the session must have ended for the
+  /// error to explain an unclean exit.
+  static const runtimeErrorExitWindow = Duration(seconds: 10);
   static const _panicTailBytes = 16 * 1024;
 
   final Directory directory;
@@ -185,7 +189,16 @@ class DesktopDiagnostics {
         : '';
     var runtime = _readJson(_runtimeError);
     final runtimeAt = (runtime?['timestamp'] as num?)?.toInt();
-    if (runtimeAt == null || runtimeAt < startedAt) runtime = null;
+    final lastLogAt = _modified(logFile)?.millisecondsSinceEpoch;
+    if (runtimeAt == null ||
+        runtimeAt < startedAt ||
+        // The app survives many runtime errors. A session that kept
+        // logging long after its last one ended another way, such as a
+        // force quit, so that error is not blamed for the exit.
+        (lastLogAt != null &&
+            lastLogAt - runtimeAt > runtimeErrorExitWindow.inMilliseconds)) {
+      runtime = null;
+    }
     final osCrash = _osCrashReportSince(startedAt);
     if (panic.isEmpty && runtime == null && osCrash == null) return null;
 

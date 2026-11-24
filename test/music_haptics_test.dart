@@ -139,6 +139,42 @@ void main() {
 
   // Pulse timing runs on the widget binding's fake clock: the scheduler uses
   // timers and PlaybackState extrapolates its position from clock.now().
+  testWidgets('music pulses keep the media usage on the native channel', (
+    tester,
+  ) async {
+    const channel = MethodChannel('com.zarz.mornye/haptics');
+    final calls = <Map<Object?, Object?>>[];
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call.arguments as Map<Object?, Object?>);
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    final state = PlaybackState(
+      playing: true,
+      processingState: AudioProcessingState.ready,
+      updatePosition: Duration.zero,
+    );
+    final haptics = MusicHaptics(
+      state: () => state,
+      analyzer: _Analyzer(
+        HapticTrack(
+          Int32List.fromList([80]),
+          Uint8List.fromList([255]),
+          Uint8List.fromList([0]),
+        ),
+      ),
+    );
+    addTearDown(haptics.dispose);
+    haptics.update('/music/song.flac');
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(calls, hasLength(1));
+    // No usage means media vibration on Android, as before.
+    expect(calls.single.containsKey('usage'), isFalse);
+  });
+
   testWidgets('pulses follow the playing position and stop on pause', (
     tester,
   ) async {

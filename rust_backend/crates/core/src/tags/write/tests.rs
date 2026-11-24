@@ -147,6 +147,151 @@ fn changed_flac_tags_match_full_rewrite_and_preserve_audio() {
     }
 }
 
+fn flac_with_comments(items: &[&str]) -> Vec<u8> {
+    let mut comments = Vec::new();
+    put_string(&mut comments, b"Mornye");
+    comments.extend((items.len() as u32).to_le_bytes());
+    for item in items {
+        put_string(&mut comments, item.as_bytes());
+    }
+    let mut input = b"fLaC".to_vec();
+    for (index, (kind, data)) in [(0, vec![0; 34]), (4, comments)].iter().enumerate() {
+        input.push(kind | if index == 1 { 0x80 } else { 0 });
+        input.extend(&(data.len() as u32).to_be_bytes()[1..]);
+        input.extend(data);
+    }
+    input.extend([0xff, 0xf8, 0, 0]);
+    input
+}
+
+/// The Vorbis comments of a FLAC file, sorted.
+fn flac_comment_list(data: &[u8]) -> Vec<String> {
+    let mut offset = 4;
+    loop {
+        let header = &data[offset..offset + 4];
+        let length = u32::from_be_bytes([0, header[1], header[2], header[3]]) as usize;
+        let body = &data[offset + 4..offset + 4 + length];
+        if header[0] & 0x7f == 4 {
+            let mut comments: Vec<_> = parse_comments(body)
+                .unwrap()
+                .1
+                .iter()
+                .map(|comment| String::from_utf8_lossy(comment).into_owned())
+                .collect();
+            comments.sort();
+            return comments;
+        }
+        assert_eq!(header[0] & 0x80, 0, "no comment block");
+        offset += 4 + length;
+    }
+}
+
+fn read_flac(data: &[u8]) -> crate::tags::AudioMetadata {
+    crate::tags::read_audio_tags(&mut Cursor::new(data), "flac", &|| Ok(())).unwrap()
+}
+
+#[test]
+fn flac_downloads_write_totals_in_their_own_comments() {
+    let input = flac_with_comments(&["TITLE=Example", "TRACKTOTAL=99"]);
+    let fields = Fields::from([
+        ("TRACKNUMBER".into(), "6/12".into()),
+        ("DISCNUMBER".into(), "1/2".into()),
+    ]);
+    let mut output = Vec::new();
+    embed_flac_metadata(
+        &mut Cursor::new(&input),
+        &mut output,
+        &fields,
+        "",
+        None,
+        &|| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(
+        flac_comment_list(&output),
+        [
+            "DISCNUMBER=1",
+            "DISCTOTAL=2",
+            "TITLE=Example",
+            "TOTALDISCS=2",
+            "TOTALTRACKS=12",
+            "TRACKNUMBER=6",
+            "TRACKTOTAL=12",
+        ]
+    );
+    let metadata = read_flac(&output);
+    assert_eq!((metadata.track_number, metadata.total_tracks), (6, 12));
+    assert_eq!((metadata.disc_number, metadata.total_discs), (1, 2));
+
+    // Without a total from the fields, the file's own total stays.
+    let fields = Fields::from([("TRACKNUMBER".into(), "3".into())]);
+    let mut output = Vec::new();
+    embed_flac_metadata(
+        &mut Cursor::new(&input),
+        &mut output,
+        &fields,
+        "",
+        None,
+        &|| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(
+        flac_comment_list(&output),
+        ["TITLE=Example", "TRACKNUMBER=3", "TRACKTOTAL=99"]
+    );
+}
+
+#[test]
+fn flac_tag_edits_split_combined_numbers_and_keep_totals() {
+    let edit = |input: &[u8], fields: &[(&str, &str)]| {
+        let fields = fields
+            .iter()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect::<Fields>();
+        let mut output = Vec::new();
+        rewrite_audio_tags(
+            &mut Cursor::new(input),
+            &mut output,
+            "flac",
+            &fields,
+            None,
+            &|| Ok(()),
+        )
+        .unwrap();
+        output
+    };
+
+    // An older `6/12` file becomes separate fields on any number edit.
+    let old = flac_with_comments(&["TRACKNUMBER=6/12", "DISCNUMBER=1/2"]);
+    let output = edit(&old, &[("track_number", "7")]);
+    assert_eq!(
+        flac_comment_list(&output),
+        [
+            "DISCNUMBER=1/2",
+            "TOTALTRACKS=12",
+            "TRACKNUMBER=7",
+            "TRACKTOTAL=12"
+        ]
+    );
+    assert_eq!(read_flac(&output).total_discs, 2);
+
+    // A total written by another tag editor is read and kept.
+    let separate = flac_with_comments(&["TRACKNUMBER=2", "TOTALTRACKS=9"]);
+    let metadata = read_flac(&separate);
+    assert_eq!((metadata.track_number, metadata.total_tracks), (2, 9));
+    let output = edit(&separate, &[("track_number", "4")]);
+    assert_eq!(
+        flac_comment_list(&output),
+        ["TOTALTRACKS=9", "TRACKNUMBER=4", "TRACKTOTAL=9"]
+    );
+
+    let output = edit(&separate, &[("track_total", "")]);
+    assert_eq!(flac_comment_list(&output), ["TRACKNUMBER=2"]);
+
+    let output = edit(&separate, &[("disc_number", "3"), ("track_number", "")]);
+    assert_eq!(flac_comment_list(&output), ["DISCNUMBER=3"]);
+}
+
 fn flac_id3_prefix(version: u8, footer: bool, padding: usize) -> Vec<u8> {
     let mut header = b"ID3".to_vec();
     header.extend([version, 0, if footer { 0x10 } else { 0 }]);

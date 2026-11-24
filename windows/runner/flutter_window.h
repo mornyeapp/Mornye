@@ -11,12 +11,12 @@
 #include <string>
 #include <vector>
 
+#include "taskbar_controls.h"
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
  public:
-  // Creates a new FlutterWindow hosting a Flutter view running |project|.
   explicit FlutterWindow(const flutter::DartProject& project);
   virtual ~FlutterWindow();
   static constexpr ULONG_PTR kOpenAudioMessage = 0x4D415544;
@@ -58,8 +58,13 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       window_channel_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> audio_channel_;
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> taskbar_channel_;
+  std::unique_ptr<TaskbarControls> taskbar_controls_;
   flutter::EncodableList pending_audio_;
   bool audio_ready_ = false;
+
+  // Frames still to ask for after the window first showed.
+  int startup_redraws_left_ = 0;
 
   // Whether the window shows the mini player, and what it restores.
   bool mini_player_ = false;

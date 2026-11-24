@@ -333,8 +333,15 @@ class PlatformBridge {
   static Future<Map<String, dynamic>> linkStart({
     required String name,
     int? port,
+    String platform = '',
+    List<String>? features,
   }) async => _linkMap(
-    await _channel.invokeMethod('linkStart', {'name': name, 'port': ?port}),
+    await _channel.invokeMethod('linkStart', {
+      'name': name,
+      'port': ?port,
+      if (platform.isNotEmpty) 'platform': platform,
+      'features': ?features,
+    }),
   );
 
   static Future<void> linkStop() => _invokeVoid('linkStop');
@@ -1680,6 +1687,138 @@ class PlatformBridge {
     return map['success'] == true;
   }
 
+  /// Writes [content] as the sidecar with [extension] next to the Android
+  /// document [safUri], in its folder. Returns whether it was written.
+  static Future<bool> writeSafSidecar(
+    String safUri,
+    String content,
+    String extension,
+  ) async =>
+      await _invokeAs<bool?>('writeSafSidecar', {
+        'saf_uri': safUri,
+        'content': content,
+        'extension': extension,
+      }) ??
+      false;
+
+  /// The sidecar with [extension] next to the Android document [safUri], or
+  /// null when it has none.
+  static Future<String?> readSafSidecar(String safUri, String extension) =>
+      _invokeAs<String?>('readSafSidecar', {
+        'saf_uri': safUri,
+        'extension': extension,
+      });
+
+  /// The file named [name] in the folder of the SAF document [safUri], or
+  /// null when the folder has none.
+  static Future<({String uri, int size, int modified})?> findSafSibling(
+    String safUri,
+    String name,
+  ) async {
+    final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'findSafSibling',
+      {'saf_uri': safUri, 'name': name},
+    );
+    final uri = result?['uri'];
+    final size = result?['size'];
+    final modified = result?['modified'];
+    if (uri is! String || size is! int || modified is! int) return null;
+    return (uri: uri, size: size, modified: modified);
+  }
+
+  /// The sidecars with [extensions] and the files named [names] in the
+  /// folder of the SAF document [safUri], found in one listing of that
+  /// folder: sidecars by extension and files by name, leaving out those the
+  /// folder does not have. Null when the folder cannot be read.
+  static Future<
+    ({
+      Map<String, ({String uri, int size, int modified})> sidecars,
+      Map<String, ({String uri, int size, int modified})> files,
+    })?
+  >
+  findSafSiblings(
+    String safUri, {
+    required List<String> extensions,
+    required List<String> names,
+  }) async {
+    final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'findSafSiblings',
+      {'saf_uri': safUri, 'extensions': extensions, 'names': names},
+    );
+    if (result == null) return null;
+    Map<String, ({String uri, int size, int modified})> entries(Object? map) =>
+        {
+          if (map is Map)
+            for (final MapEntry(:key, :value) in map.entries)
+              if (key is String && value is Map)
+                if (value case {
+                  'uri': final String uri,
+                  'size': final int size,
+                  'modified': final int modified,
+                })
+                  key: (uri: uri, size: size, modified: modified),
+        };
+    return (
+      sidecars: entries(result['sidecars']),
+      files: entries(result['files']),
+    );
+  }
+
+  /// The text of the SAF document [uri], or null when it cannot be read or
+  /// is larger than [maxBytes].
+  static Future<String?> readSafText(String uri, int maxBytes) =>
+      _invokeAs<String?>('readSafText', {'uri': uri, 'max_bytes': maxBytes});
+
+  /// The file name of the SAF document [safUri] and the folders holding it,
+  /// nearest first, each with whether it is the granted tree's own folder,
+  /// or null when the provider cannot tell. Ask before deleting the
+  /// document.
+  static Future<({String name, List<({String uri, bool root})> folders})?>
+  safSongFolders(String safUri) async {
+    final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'safSongFolders',
+      {'saf_uri': safUri},
+    );
+    if (result case {
+      'name': final String name,
+      'folders': final List<Object?> folders,
+    }) {
+      return (
+        name: name,
+        folders: [
+          for (final folder in folders)
+            if (folder case {'uri': final String uri, 'root': final bool root})
+              (uri: uri, root: root),
+        ],
+      );
+    }
+    return null;
+  }
+
+  /// The entries of the SAF folder [folderUri], or null when it cannot be
+  /// listed.
+  static Future<List<({String name, String uri, bool folder})>?> listSafFolder(
+    String folderUri,
+  ) async {
+    final result = await _channel.invokeMethod<List<Object?>>('listSafFolder', {
+      'folder_uri': folderUri,
+    });
+    if (result == null) return null;
+    final entries = <({String name, String uri, bool folder})>[];
+    for (final entry in result) {
+      if (entry case {
+        'name': final String name,
+        'uri': final String uri,
+        'folder': final bool folder,
+      }) {
+        entries.add((name: name, uri: uri, folder: folder));
+      } else {
+        return null;
+      }
+    }
+    return entries;
+  }
+
   static Future<void> startDownloadService({
     String trackName = '',
     String artistName = '',
@@ -2973,38 +3112,45 @@ class PlatformBridge {
     await _invokeVoid('initExtensionRepo', {'cache_dir': cacheDir});
   }
 
-  static Future<void> setRepoRegistryUrl(String registryUrl) async {
-    _log.d('setRepoRegistryUrl: $registryUrl');
-    await _invokeVoid('setRepoRegistryUrl', {'registry_url': registryUrl});
+  /// Replaces the ordered list of store repositories.
+  static Future<void> setRepoRegistryUrls(List<String> registryUrls) async {
+    _log.d('setRepoRegistryUrls: ${registryUrls.length} repositories');
+    await _invokeVoid('setRepoRegistryUrls', {'registry_urls': registryUrls});
   }
 
-  static Future<String> getRepoRegistryUrl() async {
-    _log.d('getRepoRegistryUrl');
-    return await _invokeAs<String?>('getRepoRegistryUrl') ?? '';
+  /// Resolves a repository page or registry link to its registry URL,
+  /// without changing the configured repositories.
+  static Future<String> resolveRepoRegistryUrl(String registryUrl) async {
+    _log.d('resolveRepoRegistryUrl: $registryUrl');
+    return await _invokeAs<String?>('resolveRepoRegistryUrl', {
+          'registry_url': registryUrl,
+        }) ??
+        '';
   }
 
-  static Future<void> clearRepoRegistryUrl() async {
-    _log.d('clearRepoRegistryUrl');
-    await _invokeVoid('clearRepoRegistryUrl');
-  }
-
-  static Future<List<Map<String, dynamic>>> getRepoExtensions({
+  /// Every configured repository with its entries: `sources` and
+  /// `extensions`, in repository order.
+  static Future<Map<String, dynamic>> getRepoCatalog({
     bool forceRefresh = false,
   }) async {
-    _log.d('getRepoExtensions (forceRefresh: $forceRefresh)');
-    return _invokeDecoded(_decodeMapListResultAsync, 'getRepoExtensions', {
+    _log.d('getRepoCatalog (forceRefresh: $forceRefresh)');
+    return _invokeDecoded(_decodeRequiredMapResultAsync, 'getRepoCatalog', {
       'force_refresh': forceRefresh,
     });
   }
 
+  /// Downloads [extensionId] from [registryUrl], or from the first
+  /// repository that lists it when [registryUrl] is empty.
   static Future<String> downloadRepoExtension(
     String extensionId,
-    String destDir,
-  ) async {
+    String destDir, {
+    String registryUrl = '',
+  }) async {
     _log.i('downloadRepoExtension: $extensionId to $destDir');
     return _invokeAs('downloadRepoExtension', {
       'extension_id': extensionId,
       'dest_dir': destDir,
+      'registry_url': registryUrl,
     });
   }
 

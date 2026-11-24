@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/lastfm/lastfm_api.dart';
 import 'package:mornye/services/lastfm/lastfm_service.dart';
+import 'package:mornye/services/scrobbling/scrobbler.dart';
 
 import 'support/lastfm_fakes.dart';
 
@@ -38,6 +40,22 @@ void main() {
   );
   PlaybackState playing({bool play = true}) =>
       PlaybackState(playing: play, processingState: AudioProcessingState.ready);
+
+  // The engine reports each step between foreground and background.
+  void lifecycle(WidgetTester tester, List<AppLifecycleState> states) {
+    for (final state in states) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+  }
+
+  void leaveAndReturn(WidgetTester tester) => lifecycle(tester, const [
+    AppLifecycleState.inactive,
+    AppLifecycleState.hidden,
+    AppLifecycleState.paused,
+    AppLifecycleState.hidden,
+    AppLifecycleState.inactive,
+    AppLifecycleState.resumed,
+  ]);
 
   LastfmService create(
     WidgetTester tester,
@@ -199,7 +217,7 @@ void main() {
     expect(service.awaitingAuthorization, isTrue);
     await service.finishConnection();
     expect(service.connected, isFalse);
-    expect(service.problem, LastfmProblem.pending);
+    expect(service.problem, ScrobbleProblem.pending);
     api.sessionError = null;
     await service.finishConnection();
     expect(service.connected, isTrue);
@@ -222,19 +240,144 @@ void main() {
         openBrowser: (_) async => opened,
       );
       await service.beginConnection();
-      expect(service.problem, LastfmProblem.connection);
+      expect(service.problem, ScrobbleProblem.connection);
       expect(service.awaitingAuthorization, isFalse);
       opened = true;
       await service.beginConnection();
       await tester.pump(const Duration(hours: 1));
       await service.finishConnection();
-      expect(service.problem, LastfmProblem.expired);
+      expect(service.problem, ScrobbleProblem.expired);
       expect(service.connected, isFalse);
       await service.beginConnection();
       await service.finishConnection();
       expect(service.connected, isTrue);
     },
   );
+
+  serviceTest('coming back from the browser finishes connecting', (
+    tester,
+  ) async {
+    final store = MemoryLastfmStore()..session = null;
+    final service = create(tester, FakeLastfmApi(), store);
+    await service.beginConnection();
+    expect(store.authorization?.token, 'request-token');
+    // The notification shade or a dialog over the app is not a return.
+    lifecycle(tester, const [
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]);
+    await tester.pump();
+    expect(service.connected, isFalse);
+    expect(service.awaitingAuthorization, isTrue);
+    leaveAndReturn(tester);
+    await tester.pump();
+    expect(service.connected, isTrue);
+    expect(store.session?.key, lastfmTestSession.key);
+    expect(store.authorization, isNull);
+  });
+
+  serviceTest('an unapproved return keeps waiting for the next one', (
+    tester,
+  ) async {
+    final store = MemoryLastfmStore()..session = null;
+    final api = FakeLastfmApi()..sessionError = const LastfmException(14);
+    final service = create(tester, api, store);
+    await service.beginConnection();
+    leaveAndReturn(tester);
+    await tester.pump();
+    expect(service.problem, ScrobbleProblem.pending);
+    expect(service.awaitingAuthorization, isTrue);
+    api.sessionError = null;
+    leaveAndReturn(tester);
+    await tester.pump();
+    expect(service.connected, isTrue);
+    expect(api.tokenRequests, 1);
+  });
+
+  serviceTest('connecting finishes after the app ended in the browser', (
+    tester,
+  ) async {
+    final store = MemoryLastfmStore()..session = null;
+    final api = FakeLastfmApi();
+    final first = create(tester, api, store);
+    await first.beginConnection();
+    await first.close();
+    expect(store.authorization?.token, 'request-token');
+
+    final restarted = create(tester, api, store);
+    await restarted.initialize();
+    await tester.pump();
+    expect(restarted.connected, isTrue);
+    expect(store.authorization, isNull);
+    expect(api.tokenRequests, 1);
+  });
+
+  serviceTest('an expired or superseded request is dropped on start', (
+    tester,
+  ) async {
+    final store = MemoryLastfmStore()
+      ..session = null
+      ..authorization = (
+        token: 'old-token',
+        created: tester.binding.clock.now().subtract(const Duration(hours: 2)),
+      );
+    final api = FakeLastfmApi()..sessionError = StateError('not asked');
+    final service = create(tester, api, store);
+    await service.initialize();
+    await tester.pump();
+    expect(service.awaitingAuthorization, isFalse);
+    expect(service.problem, isNull);
+    expect(store.authorization, isNull);
+
+    final connected = MemoryLastfmStore()
+      ..authorization = (
+        token: 'old-token',
+        created: tester.binding.clock.now(),
+      );
+    final other = create(tester, api, connected);
+    await other.initialize();
+    await tester.pump();
+    expect(other.connected, isTrue);
+    expect(other.awaitingAuthorization, isFalse);
+    expect(connected.authorization, isNull);
+  });
+
+  serviceTest('cancelling forgets the saved request', (tester) async {
+    final store = MemoryLastfmStore()..session = null;
+    final service = create(tester, FakeLastfmApi(), store);
+    await service.beginConnection();
+    service.cancelConnection();
+    await tester.pump();
+    expect(store.authorization, isNull);
+    leaveAndReturn(tester);
+    await tester.pump();
+    expect(service.connected, isFalse);
+  });
+
+  serviceTest('paused playback stops counting until it plays again', (
+    tester,
+  ) async {
+    final api = FakeLastfmApi(), store = MemoryLastfmStore();
+    final service = create(tester, api, store);
+    await service.initialize();
+    final handler = BaseAudioHandler();
+    service.bind(handler);
+    handler.mediaItem.add(song);
+    handler.playbackState.add(playing());
+    await tester.pump(const Duration(seconds: 100));
+    handler.playbackState.add(playing(play: false));
+    await tester.pump(const Duration(minutes: 10));
+    await service.flush();
+    expect(api.batches, isEmpty);
+    handler.playbackState.add(playing());
+    await tester.pump(const Duration(seconds: 19));
+    await service.flush();
+    expect(api.batches, isEmpty);
+    // Two minutes of a four minute song, counted without new events.
+    await tester.pump(const Duration(seconds: 2));
+    await service.flush();
+    expect(api.batches, hasLength(1));
+  });
 
   serviceTest('cancelled login cannot publish a late session', (tester) async {
     final store = MemoryLastfmStore()..session = null;
@@ -258,7 +401,7 @@ void main() {
       final service = create(tester, api, MemoryLastfmStore()..session = null);
       await service.beginConnection();
       await service.finishConnection();
-      expect(service.problem, LastfmProblem.connection);
+      expect(service.problem, ScrobbleProblem.connection);
       expect(service.awaitingAuthorization, isTrue);
       api.sessionError = null;
       await service.finishConnection();
@@ -311,7 +454,7 @@ void main() {
       final service = create(tester, api, store);
       await service.initialize();
       await service.flush();
-      expect(service.problem, LastfmProblem.reauthenticate);
+      expect(service.problem, ScrobbleProblem.reauthenticate);
       expect(service.connected, isFalse);
       expect(store.queue, hasLength(1));
       expect(store.session, isNull);
@@ -343,13 +486,67 @@ void main() {
   );
 
   serviceTest(
+    'a refused batch is resent one listen at a time and drops only the bad one',
+    (tester) async {
+      final store = MemoryLastfmStore()
+        ..queue = [
+          lastfmQueued(1),
+          lastfmQueued(2, title: 'Bad'),
+          lastfmQueued(3),
+        ];
+      final api = FakeLastfmApi()
+        ..refuses = ((track) => track['track'] == 'Bad');
+      final service = create(tester, api, store);
+      await service.initialize();
+      await service.flush();
+      expect(api.batches.map((batch) => batch.length), [3, 1, 1, 1]);
+      expect(api.accepted.map((track) => track['timestamp']), [
+        lastfmQueued(1).parameters['timestamp'],
+        lastfmQueued(3).parameters['timestamp'],
+      ]);
+      expect(store.queue, isEmpty);
+      expect(service.problem, ScrobbleProblem.rejected);
+    },
+  );
+
+  serviceTest(
+    'listens that keep failing are not looped on and wait for the timer',
+    (tester) async {
+      final store = MemoryLastfmStore()
+        ..queue = [lastfmQueued(1), lastfmQueued(2), lastfmQueued(3)];
+      final api = FakeLastfmApi()..refuses = ((_) => true);
+      // The first single listen hits an outage: the run stops there.
+      api.onBatch = () {
+        if (api.batches.length == 2) api.batchError = const LastfmException(16);
+      };
+      final service = create(tester, api, store);
+      await service.initialize();
+      await service.flush();
+      expect(api.batches.map((batch) => batch.length), [3, 1]);
+      expect(store.queue, hasLength(3));
+      expect(service.problem, ScrobbleProblem.connection);
+
+      api.batchError = null;
+      api.onBatch = null;
+      await tester.pump(const Duration(seconds: 29));
+      expect(api.batches, hasLength(2));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      // Each refused listen is tried once on its own, then dropped.
+      expect(api.batches.map((batch) => batch.length), [3, 1, 1, 1, 1]);
+      expect(store.queue, isEmpty);
+      expect(api.accepted, isEmpty);
+    },
+  );
+
+  serviceTest(
     'failed storage prevents submission and recovers without losing the queue',
     (tester) async {
       final store = MemoryLastfmStore()..failRead = true;
       final api = FakeLastfmApi();
       final service = create(tester, api, store);
       await service.initialize();
-      expect(service.problem, LastfmProblem.storage);
+      expect(service.problem, ScrobbleProblem.storage);
       expect(store.writes, 0);
       store.failRead = false;
       await service.retry();
@@ -390,7 +587,7 @@ void main() {
         MemoryLastfmStore()..session = null,
       );
       await unavailable.beginConnection();
-      expect(unavailable.problem, LastfmProblem.unavailable);
+      expect(unavailable.problem, ScrobbleProblem.unavailable);
       expect(unavailableApi.tokenRequests, 0);
     },
   );

@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart' show RenderProxySliver;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -49,6 +49,7 @@ class AlbumDetailHeader extends StatelessWidget {
     this.paletteSource,
     this.blurAndScrimBackground = true,
     this.coverBuilder,
+    this.coverShadow = true,
     this.subtitle,
     this.meta,
     this.actions,
@@ -85,6 +86,11 @@ class AlbumDetailHeader extends StatelessWidget {
   /// Builds the centered square cover for the given side length; null hides
   /// the cover block (the header wraps it in the shared shadow + rounding).
   final Widget Function(BuildContext context, double coverSize)? coverBuilder;
+
+  /// Whether the Material phone cover casts its shadow. A loading screen
+  /// turns it off: its cover is a flat placeholder, and a picture that has
+  /// not arrived would leave the shadow alone on the page as a grey blur.
+  final bool coverShadow;
 
   /// Artist line under the title (plain text or a clickable artist widget).
   final Widget? subtitle;
@@ -148,10 +154,14 @@ class AlbumDetailHeader extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final edgeInset = detailHeaderEdgeInset(context);
     final screenSize = MediaQuery.sizeOf(context);
-    // Landscape tablets are short: the artwork also yields to the height so
-    // the title and actions stay on the first screen.
+    // On a phone the artwork spans the width, however wide the phone or
+    // small its Interface size; only tablets cap it. Landscape screens are
+    // short: the artwork also yields to the height so the title and actions
+    // stay on the first screen.
     final artworkSize = math.min(
-      screenSize.width.clamp(0.0, 440.0),
+      screenSize.shortestSide >= 600
+          ? screenSize.width.clamp(0.0, 440.0)
+          : screenSize.width,
       math.max(240.0, screenSize.height * 0.55),
     );
     final details = _buildMornyeDetails(context);
@@ -166,6 +176,12 @@ class AlbumDetailHeader extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
           ),
     );
+    // The title dissolves in on the effects spring, and with reduced motion
+    // as well.
+    final titleFade = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 180), Curves.linear),
+    );
     Widget toolbar({bool collapsed = true}) => SliverAppBar(
       pinned: true,
       backgroundColor: collapsed ? scheme.surface : Colors.transparent,
@@ -178,7 +194,8 @@ class AlbumDetailHeader extends StatelessWidget {
           opacity: showTitle || appBarTitle != null || (immersive && collapsed)
               ? 1
               : 0,
-          duration: const Duration(milliseconds: 180),
+          duration: titleFade.duration,
+          curve: titleFade.curve,
           child: Text(
             appBarTitle ?? title,
             maxLines: 1,
@@ -434,11 +451,14 @@ class AlbumDetailHeader extends StatelessWidget {
                           plainArtworkHeader ? tokens.radiusCover : coverRadius,
                         ),
                         boxShadow: [
-                          BoxShadow(
-                            color: headerScheme.shadow.withValues(alpha: 0.45),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
-                          ),
+                          if (coverShadow)
+                            BoxShadow(
+                              color: headerScheme.shadow.withValues(
+                                alpha: 0.45,
+                              ),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
                         ],
                       ),
                       child: ClipRRect(
@@ -517,7 +537,8 @@ class AlbumDetailHeader extends StatelessWidget {
                           ),
                         )
                       : AnimatedOpacity(
-                          duration: tokens.motionFast,
+                          duration: titleFade.duration,
+                          curve: titleFade.curve,
                           opacity: showContent ? 1.0 : 0.0,
                           child: content,
                         ),
@@ -899,6 +920,7 @@ class HeaderCircleButton extends ConsumerWidget {
     this.glassTintOpacity,
     this.buttonSize,
     this.iconSize = 22,
+    this.selected,
   });
 
   final IconData icon;
@@ -907,6 +929,11 @@ class HeaderCircleButton extends ConsumerWidget {
 
   /// Overrides the palette foreground, e.g. to mark an active "loved" state.
   final Color? iconColor;
+
+  /// Makes the Material button a toggle: it morphs its shape on the
+  /// expressive toggle springs and crossfades a changed [icon]. Null keeps
+  /// a plain action. Mornye ignores it.
+  final bool? selected;
 
   /// Uses the same translucent fill as the local album's Play/Shuffle pills.
   final bool tonal;
@@ -1009,13 +1036,35 @@ class HeaderCircleButton extends ConsumerWidget {
         ),
       );
     }
+    final foreground = iconColor ?? scheme.onSurfaceVariant;
+    // A toggle's glyph carries its own colour, so the outgoing one keeps
+    // the old colour while it fades instead of taking the new one.
+    final glyph = AppIcon(
+      icon,
+      key: ValueKey(icon),
+      size: iconSize,
+      color: selected == null
+          ? null
+          : onPressed == null
+          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38)
+          : foreground,
+    );
     return ExpressiveIconButton(
       onPressed: onPressed,
-      icon: AppIcon(icon, size: iconSize),
+      icon: selected == null
+          ? glyph
+          : AnimatedSwitcher(
+              duration: AppMotion.effectsFast(
+                context,
+                const AppMotionSpec(Duration.zero, Curves.linear),
+              ).duration,
+              child: glyph,
+            ),
+      selected: selected,
       tooltip: tooltip,
       size: buttonSize ?? tokens.minTouchTarget,
       backgroundColor: scheme.surfaceContainerHighest.withValues(alpha: 0.7),
-      foregroundColor: iconColor ?? scheme.onSurfaceVariant,
+      foregroundColor: foreground,
     );
   }
 }
@@ -1036,6 +1085,7 @@ class HeaderMoreButton extends StatelessWidget {
           contextMenuPositionBelow(context) ??
           contextMenuOriginOf(context) ??
           Offset.zero,
+      origin: contextMenuOriginOf(context),
       groups: groups(),
     ),
   );

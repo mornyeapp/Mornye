@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
@@ -9,6 +9,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/download_service_picker.dart';
 
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 class _Extensions extends ExtensionNotifier {
   _Extensions(
@@ -218,7 +219,7 @@ void main() {
         );
         extensions.publishHealth('example', 'offline');
         await tester.pumpAndSettle();
-        expect(find.byTooltip('Service offline'), findsOneWidget);
+        expect(findByTooltip('Service offline'), findsOneWidget);
         expect(
           identical(tester.widget(find.text('Quality 0')), qualityBefore),
           isTrue,

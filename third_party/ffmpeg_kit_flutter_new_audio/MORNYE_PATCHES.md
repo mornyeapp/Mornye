@@ -1,13 +1,13 @@
 # Local FFmpegKit patch
 
-Based on ffmpeg_kit_flutter_new_audio 2.5.7 (license retained in LICENSE).
-The upstream `example` app is not copied.
+Based on ffmpeg_kit_flutter_new_audio 2.5.8 (license retained in LICENSE).
+The upstream `example` app and `test` folder are not copied.
 
 The root `pubspec.yaml` overrides the package with this copy
 (`dependency_overrides: ffmpeg_kit_flutter_new_audio: path:
 third_party/ffmpeg_kit_flutter_new_audio`), next to the pinned
-`ffmpeg_kit_flutter_new_audio: 2.5.7`. The version is the one in this
-folder's `pubspec.yaml` (2.5.7, unchanged).
+`ffmpeg_kit_flutter_new_audio: 2.5.8`. The version is the one in this
+folder's `pubspec.yaml` (2.5.8, unchanged).
 
 ## Patches
 

@@ -4,14 +4,16 @@ import 'dart:ui' show ImageFilter;
 import 'package:mornye/controllers/open_audio_controller.dart';
 import 'package:mornye/services/audio_file_open_service.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show listEquals;
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/saf_migration_prompt_store.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
+import 'package:mornye/providers/extension_auto_update_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/network_upload_provider.dart';
@@ -30,7 +32,6 @@ import 'package:mornye/screens/repo_tab.dart';
 import 'package:mornye/screens/queue_tab.dart';
 import 'package:mornye/screens/settings/profile_settings_page.dart';
 import 'package:mornye/screens/settings/settings_tab.dart';
-import 'package:mornye/screens/whats_new_screen.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/services/share_intent_service.dart';
@@ -56,6 +57,8 @@ import 'package:mornye/widgets/mornye_bottom_bar.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
@@ -127,7 +130,7 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   int _currentIndex = 0;
   final _mornyeChrome = MornyeChromeController();
   // Preserves the tab view element (and its kept-alive tabs) when the body
@@ -135,16 +138,31 @@ class _MainShellState extends ConsumerState<MainShell>
   final GlobalKey _pageViewKey = GlobalKey();
   late final PageController _pageController;
   late final AnimationController _tabJumpTransitionController;
+  // Material fade through between destinations: [_fadeThroughToCurrentTab]
+  // fades the page shown out on [_tabExitController], then
+  // [_playTabFadeThrough] fades the new one in and sets the curves.
   // Transitions update their layers directly; no shell subtree rebuilds per
   // animation frame.
+  late final AnimationController _tabExitController;
+  bool _tabLeaving = false;
+  static const _tabExitDuration = Duration(milliseconds: 90);
   late final CurvedAnimation _tabJumpOpacity = CurvedAnimation(
     parent: _tabJumpTransitionController,
-    curve: Curves.easeOutCubic,
+    curve: Easing.standardDecelerate,
+  );
+  late final CurvedAnimation _tabJumpScaleCurve = CurvedAnimation(
+    parent: _tabJumpTransitionController,
+    curve: Easing.standardDecelerate,
+  );
+  // One opacity layer for both halves: the lower of the two.
+  late final Animation<double> _tabOpacity = AnimationMin<double>(
+    _tabJumpOpacity,
+    _tabExitController,
   );
   late final Animation<double> _tabJumpScale = Tween<double>(
-    begin: 0.985,
+    begin: 0.92,
     end: 1,
-  ).animate(_tabJumpOpacity);
+  ).animate(_tabJumpScaleCurve);
   bool _hasCheckedUpdate = false;
   bool _hasCheckedAppAnnouncement = false;
   bool _initialSafRepairComplete = false;
@@ -268,6 +286,11 @@ class _MainShellState extends ConsumerState<MainShell>
       duration: const Duration(milliseconds: 180),
       value: 1,
     );
+    _tabExitController = AnimationController(
+      vsync: this,
+      duration: _tabExitDuration,
+      value: 1,
+    );
     ShellNavigationService.registerTabSelectionHandler(
       owner: this,
       handler: _onShellTabRequested,
@@ -284,13 +307,16 @@ class _MainShellState extends ConsumerState<MainShell>
       _initialSafRepairComplete = true;
       if (!mounted) return;
       unawaited(_restorePlayback());
+      // Off the startup path: waits for extensions, then fills the Store
+      // badge and installs updates without the Store tab being opened.
+      unawaited(
+        ref.read(extensionAutoUpdateProvider.notifier).checkAfterStartup(),
+      );
       // Library menus are built synchronously and offer an upload only once
       // the writable connections are known.
       ref.read(networkUploadConnectionsProvider);
       _setupShareListener();
       await _checkSafMigration();
-      if (!mounted) return;
-      await maybeShowWhatsNewDialog(context, ref);
       if (!mounted) return;
       final updateDialogShown = await _checkForUpdates();
       if (!updateDialogShown) {
@@ -339,6 +365,7 @@ class _MainShellState extends ConsumerState<MainShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _initialSafRepairComplete) {
       unawaited(_repairSafAccessIfNeeded());
+      unawaited(ref.read(extensionAutoUpdateProvider.notifier).checkOnResume());
     } else if (state == AppLifecycleState.paused) {
       unawaited(
         ref.read(musicPlayerRuntimeProvider).handler?.persistCurrentSession(),
@@ -395,7 +422,7 @@ class _MainShellState extends ConsumerState<MainShell>
         SnackBar(
           content: Text(context.l10n.loadingSharedLink),
           // A paired desktop can take the link instead.
-          action: linkClient == null
+          action: linkClient == null || !linkTakesSharedUrls(linkClient)
               ? null
               : SnackBarAction(
                   label: context.l10n.linkSendToDesktop(
@@ -444,7 +471,9 @@ class _MainShellState extends ConsumerState<MainShell>
     _audioOpenSubscription?.cancel();
     _pageController.dispose();
     _tabJumpOpacity.dispose();
+    _tabJumpScaleCurve.dispose();
     _tabJumpTransitionController.dispose();
+    _tabExitController.dispose();
     _mornyeChrome.dispose();
     _libraryDepthObserver.dispose();
     super.dispose();
@@ -522,8 +551,6 @@ class _MainShellState extends ConsumerState<MainShell>
     }
 
     if (_currentIndex != index) {
-      final previousIndex = _currentIndex;
-      final isNonAdjacentJump = (previousIndex - index).abs() > 1;
       HapticFeedback.selectionClick();
       // Stop any preview snippet when leaving the current tab. (_onPageChanged
       // cannot do this because _currentIndex is already updated below.)
@@ -535,24 +562,89 @@ class _MainShellState extends ConsumerState<MainShell>
         showSearchTab: context.isMornye,
       );
       if (!isAndroidTv) FocusManager.instance.primaryFocus?.unfocus();
-      // Jump directly when skipping intermediate tabs to avoid
-      // sliding through them. For those jumps, keep a short fade-in
-      // so the transition still feels intentional.
       if (context.isMornye || isAndroidTv) {
         // The glass pill owns the tab transition. Sliding/fading the whole
         // page at the same time continuously invalidates its live backdrop.
         _tabJumpTransitionController.value = 1;
-      } else if (isNonAdjacentJump) {
-        _pageController.jumpToPage(index);
-        _tabJumpTransitionController.forward(from: 0);
       } else {
-        _pageController.animateToPage(
-          index,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-        );
+        // Top-level destinations have no spatial order, so Material fades
+        // through to the page (M3 fade through) instead of sliding through
+        // its neighbours.
+        _fadeThroughToCurrentTab();
       }
     }
+  }
+
+  /// Material fade through to the page of [_currentIndex]: the page shown
+  /// fades out, then the new one fades in ([_playTabFadeThrough]). A change
+  /// made while a page is still fading in starts from the opacity it has,
+  /// and one made during the fade out only renames where it ends, so quick
+  /// taps never flash a page in from nothing. Reduced motion jumps.
+  void _fadeThroughToCurrentTab() {
+    if (!materialExpressiveEnabled(context)) {
+      _showCurrentTabPage();
+      return;
+    }
+    if (_tabLeaving) return;
+    final shown = _tabOpacity.value;
+    _tabJumpTransitionController.stop();
+    if (shown <= 0.01) {
+      _showCurrentTabPage();
+      return;
+    }
+    _tabLeaving = true;
+    _tabExitController.value = shown;
+    _tabExitController
+        .animateTo(
+          0,
+          duration: MotionPace.duration(_tabExitDuration) * shown,
+          curve: Easing.standardAccelerate,
+        )
+        .whenCompleteOrCancel(() {
+          if (mounted && _tabLeaving) _showCurrentTabPage();
+        });
+  }
+
+  /// Jumps to the page of [_currentIndex] and fades it in.
+  void _showCurrentTabPage() {
+    _tabLeaving = false;
+    if (_pageController.hasClients) _pageController.jumpToPage(_currentIndex);
+    _playTabFadeThrough();
+    _tabExitController.value = 1;
+  }
+
+  /// Fades the Material tab view in after a destination change: opacity on
+  /// the effects spring, a scale up from 92 percent on the standard spatial
+  /// spring, whose overshoot stays far below a pixel, so the page never
+  /// spills over the rail. Reduced motion shows the page at once.
+  void _playTabFadeThrough() {
+    if (!materialExpressiveEnabled(context)) {
+      _tabJumpTransitionController.value = 1;
+      return;
+    }
+    const fallback = AppMotionSpec(
+      Duration(milliseconds: 180),
+      Easing.standardDecelerate,
+    );
+    final opacity = AppMotion.effects(context, fallback);
+    final scale = AppMotion.materialPage;
+    final total = opacity.duration > scale.duration
+        ? opacity.duration
+        : scale.duration;
+    final micros = total.inMicroseconds;
+    _tabJumpOpacity.curve = Interval(
+      0,
+      opacity.duration.inMicroseconds / micros,
+      curve: opacity.curve,
+    );
+    _tabJumpScaleCurve.curve = Interval(
+      0,
+      scale.duration.inMicroseconds / micros,
+      curve: scale.curve,
+    );
+    _tabJumpTransitionController
+      ..duration = total
+      ..forward(from: 0);
   }
 
   void _onPageChanged(int index) {
@@ -780,6 +872,11 @@ class _MainShellState extends ConsumerState<MainShell>
         label: l10n.searchSongs,
       ),
       DesktopSidebarLink(
+        id: 'genres',
+        icon: CupertinoIcons.guitars,
+        label: l10n.libraryGenres,
+      ),
+      DesktopSidebarLink(
         id: 'folders',
         icon: CupertinoIcons.folder,
         label: l10n.libraryFolders,
@@ -818,6 +915,12 @@ class _MainShellState extends ConsumerState<MainShell>
         ),
       ),
       'songs' => const Scaffold(body: QueueTab(librarySection: 'all')),
+      'genres' => Scaffold(
+        body: MornyeLibraryScreen(
+          page: MornyeLibraryPage.genres,
+          onOpenSection: (_) {},
+        ),
+      ),
       'folders' => const LibraryDirectoryScreen(),
       'downloads' => const Scaffold(
         body: QueueTab(librarySection: 'downloads'),
@@ -835,7 +938,8 @@ class _MainShellState extends ConsumerState<MainShell>
   void _openDesktopLibraryLink(String id) {
     final page = _desktopLibraryPage(id);
     // A link replaces the Library page at once, as in a source list, so the
-    // Library root never shows on the way from another tab.
+    // Library root never shows on the way from another tab. Material fades
+    // the new page in like a destination change; Mornye cuts.
     void show(NavigatorState navigator) {
       navigator.popUntil((route) => route.isFirst);
       if (page != null) {
@@ -850,6 +954,7 @@ class _MainShellState extends ConsumerState<MainShell>
         );
       }
       desktopSidebarLink.value = page == null ? null : id;
+      if (!context.isMornye) _playTabFadeThrough();
     }
 
     final navigator = _libraryTabNavigatorKey.currentState;
@@ -923,6 +1028,9 @@ class _MainShellState extends ConsumerState<MainShell>
     ref.listen(activeRemotePlaybackProvider, (_, remote) {
       unawaited(ref.read(musicPlayerRuntimeProvider).showRemote(remote));
     });
+    ref.listen(soundsBesideRemoteProvider, (_, beside) {
+      ref.read(musicPlayerRuntimeProvider).soundsBesideRemote = beside;
+    });
     ref.listen(settingsProvider.select((s) => s.discordRichPresenceEnabled), (
       _,
       enabled,
@@ -933,6 +1041,13 @@ class _MainShellState extends ConsumerState<MainShell>
       settingsProvider.select((s) => s.listeningStatisticsEnabled),
       (_, enabled) => listeningRecorder.setEnabled(enabled),
     );
+    ref.listen(extensionAutoUpdateProvider, (_, notice) {
+      if (notice == null) return;
+      showAppSnackBar(
+        context,
+        content: Text(context.l10n.extensionsAutoUpdatedCount(notice.count)),
+      );
+    });
     final showStore = ref.watch(
       settingsProvider.select((s) => s.showExtensionStore),
     );
@@ -951,21 +1066,20 @@ class _MainShellState extends ConsumerState<MainShell>
         navigatorKey: _homeTabNavigatorKey,
         observers: [_homePreviewStopObserver],
         heroAnimationsEnabled: heroAnimationsEnabled,
-        child: Builder(
-          builder: (context) => HomeTab(
-            mode: context.isMornye ? HomeTabMode.browse : HomeTabMode.combined,
-          ),
-        ),
+        child: const _HomeTabRoot(),
       ),
-      _TabNavigator(
+      _TabShown(
         key: const ValueKey('tab-library'),
-        navigatorKey: _libraryTabNavigatorKey,
-        observers: [
-          _libraryPreviewStopObserver,
-          if (isDesktopPlatform) _libraryDepthObserver,
-        ],
-        heroAnimationsEnabled: heroAnimationsEnabled,
-        child: _LibraryTabRoot(isTabActive: _currentIndex == 1),
+        shown: _currentIndex == 1,
+        child: _TabNavigator(
+          navigatorKey: _libraryTabNavigatorKey,
+          observers: [
+            _libraryPreviewStopObserver,
+            if (isDesktopPlatform) _libraryDepthObserver,
+          ],
+          heroAnimationsEnabled: heroAnimationsEnabled,
+          child: const _LibraryTabRoot(),
+        ),
       ),
       if (showStore)
         _TabNavigator(
@@ -1031,7 +1145,7 @@ class _MainShellState extends ConsumerState<MainShell>
               ],
             )
           : FadeTransition(
-              opacity: _tabJumpOpacity,
+              opacity: _tabOpacity,
               child: ScaleTransition(
                 scale: _tabJumpScale,
                 child: PageView.builder(
@@ -1046,7 +1160,12 @@ class _MainShellState extends ConsumerState<MainShell>
                     key: ValueKey('page-$index'),
                     child: TickerMode(
                       enabled: index == _currentIndex,
-                      child: observeScroll(tabs[index], index),
+                      // Kept-alive hidden pages keep their last size, so
+                      // resizes and rail motion rebuild only the page shown.
+                      child: HiddenTabMediaQuery(
+                        hidden: index != _currentIndex,
+                        child: observeScroll(tabs[index], index),
+                      ),
                     ),
                   ),
                 ),
@@ -1444,6 +1563,29 @@ class _TabNavigatorState extends State<_TabNavigator> {
       MaterialApp.createMaterialHeroController();
   final _nowPlayingCloser = DesktopNowPlayingCloser();
 
+  /// The navigator as last built. A [Navigator] that is built again builds
+  /// the page of every route on it again, so every tab's pages would follow
+  /// each switch of tab; the same one is handed back until what it is made
+  /// from changes.
+  Navigator? _navigator;
+
+  @override
+  void didUpdateWidget(_TabNavigator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(widget.child, oldWidget.child) ||
+        widget.navigatorKey != oldWidget.navigatorKey ||
+        widget.heroAnimationsEnabled != oldWidget.heroAnimationsEnabled ||
+        !listEquals(widget.observers, oldWidget.observers)) {
+      _navigator = null;
+    }
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _navigator = null;
+  }
+
   @override
   void dispose() {
     _chromeObserver.detach();
@@ -1453,7 +1595,7 @@ class _TabNavigatorState extends State<_TabNavigator> {
 
   @override
   Widget build(BuildContext context) {
-    return Navigator(
+    return _navigator ??= Navigator(
       key: widget.navigatorKey,
       routeDirectionalTraversalEdgeBehavior: isAndroidTv
           ? TraversalEdgeBehavior.parentScope
@@ -1544,15 +1686,57 @@ class _PageDepthObserver extends NavigatorObserver {
   }
 }
 
-class _LibraryTabRoot extends ConsumerWidget {
-  final bool isTabActive;
+/// Whether a tab is the one on screen, for the tab's root page. It reaches
+/// the page from above the tab's navigator: handed down as a parameter it
+/// would build the navigator again, and every page on it.
+class _TabShown extends InheritedWidget {
+  const _TabShown({super.key, required this.shown, required super.child});
 
-  const _LibraryTabRoot({required this.isTabActive});
+  final bool shown;
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_TabShown>()?.shown ?? true;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return QueueTab(isTabActive: isTabActive);
+  bool updateShouldNotify(_TabShown oldWidget) => shown != oldWidget.shown;
+}
+
+class _HomeTabRoot extends StatelessWidget {
+  const _HomeTabRoot();
+
+  @override
+  Widget build(BuildContext context) => HomeTab(
+    mode: context.isMornye ? HomeTabMode.browse : HomeTabMode.combined,
+  );
+}
+
+/// Library's root page: one [QueueTab] for the life of the tab. A switch of
+/// tab changes what it listens to and builds nothing of the Library again.
+class _LibraryTabRoot extends StatefulWidget {
+  const _LibraryTabRoot();
+
+  @override
+  State<_LibraryTabRoot> createState() => _LibraryTabRootState();
+}
+
+class _LibraryTabRootState extends State<_LibraryTabRoot> {
+  final _shown = ValueNotifier(false);
+  late final _tab = QueueTab(tabActive: _shown);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _shown.value = _TabShown.of(context);
   }
+
+  @override
+  void dispose() {
+    _shown.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _tab;
 }
 
 class _KeepAliveTabPage extends StatefulWidget {

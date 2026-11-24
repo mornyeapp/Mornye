@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
@@ -11,6 +11,7 @@ import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_link_library_jobs_view.dart';
+import 'package:mornye/widgets/link/link_play_together.dart';
 import 'package:mornye/widgets/link/link_transfers_view.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
@@ -24,6 +25,9 @@ Future<void> showDesktopLinkDevicesSheet(BuildContext context) =>
 
 /// Desktop counterpart of the phone's Devices sheet. The main player drives
 /// the selected device, so this sheet needs no separate transport controls.
+/// While this computer plays together with a phone, a checked Play together
+/// row says so and no device is checked; choosing this computer or that
+/// phone ends it there.
 class DesktopLinkDevicesSheet extends ConsumerWidget {
   const DesktopLinkDevicesSheet({super.key, this.scrollController});
 
@@ -69,6 +73,8 @@ class DesktopLinkDevicesSheet extends ConsumerWidget {
               entry.job.action != LinkLibraryAction.reEnrichPreview,
         )
         .length;
+    final together = state.togetherPhone;
+    final onComputer = state.followedPhone == null && together == null;
     return SingleChildScrollView(
       key: const ValueKey('desktop-link-devices-sheet'),
       controller: scrollController,
@@ -84,9 +90,11 @@ class DesktopLinkDevicesSheet extends ConsumerWidget {
                 icon: Icons.computer,
                 title: l10n.linkDesktopSectionComputer,
                 subtitle: state.name,
-                selected: state.followedPhone == null,
-                trailing: state.followedPhone == null ? check : null,
-                onTap: state.followedPhone == null
+                selected: onComputer,
+                trailing: onComputer ? check : null,
+                onTap: together != null
+                    ? () => choose(() => host.endTogether(keepHere: true))
+                    : onComputer
                     ? null
                     : () => choose(host.continueOnComputer),
                 showDivider: state.clients.isNotEmpty,
@@ -101,7 +109,15 @@ class DesktopLinkDevicesSheet extends ConsumerWidget {
                   trailing: state.followedPhone == client.deviceId
                       ? check
                       : null,
-                  onTap: state.followedPhone == client.deviceId
+                  // Both hold the queue while they play together: the
+                  // computer just stops. Another phone waits for that.
+                  onTap: together != null
+                      ? together == client.deviceId
+                            ? () => choose(
+                                () => host.endTogether(keepHere: false),
+                              )
+                            : null
+                      : state.followedPhone == client.deviceId
                       ? null
                       : () => choose(() async {
                           if (state.followedPhone == null &&
@@ -113,6 +129,9 @@ class DesktopLinkDevicesSheet extends ConsumerWidget {
                   showDivider: i < state.clients.length - 1,
                 ),
             ],
+          ),
+          LinkDesktopPlayTogether(
+            name: together == null ? null : host.deviceName(together),
           ),
           SettingsGroup(
             children: [

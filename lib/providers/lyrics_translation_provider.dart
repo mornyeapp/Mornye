@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -9,9 +10,13 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_language_guess.dart';
+import 'package:mornye/services/lyrics_romanization.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_languages.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
+import 'package:mornye/services/lyrics_translation_song_languages.dart';
+import 'package:mornye/services/romanization/pinyin.dart';
+import 'package:mornye/services/romanization/text_romanizer.dart';
 import 'package:mornye/services/secure_storage_options.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
@@ -61,6 +66,33 @@ final lyricsTranslationCacheProvider = Provider<LyricsTranslationCache>(
   (ref) => LyricsTranslationCache(),
 );
 
+final lyricsTranslationSongLanguagesProvider =
+    Provider<LyricsTranslationSongLanguages>(
+      (ref) => LyricsTranslationSongLanguages(),
+    );
+
+final pinyinDataLoaderProvider = Provider<PinyinDataLoader>(
+  (ref) => PinyinDataLoader(),
+);
+
+/// The scripts of the app's language, or of the system's when the app
+/// follows it: the user reads them, so they are never romanized.
+Set<LyricsScript> lyricsReaderScriptsFor(AppSettings settings) =>
+    lyricsReaderScripts(
+      localeFromAppSetting(settings.locale) ??
+          PlatformDispatcher.instance.locale,
+    );
+
+/// Whether a translation of [lyrics] also asks for romanization: for the
+/// lines offline romanization cannot give, when the settings want both.
+bool lyricsAiRomanizes(AppSettings settings, ParsedLyrics lyrics) =>
+    settings.lyricsRomanize &&
+    settings.lyricsAiRomanize &&
+    linesNeedingAiRomanization(
+      lyrics,
+      readerScripts: lyricsReaderScriptsFor(settings),
+    ).isNotEmpty;
+
 /// Creates the HTTP client of one job; tests substitute a mock.
 final lyricsAiHttpClientProvider = Provider<http.Client Function()>(
   (ref) => http.Client.new,
@@ -79,7 +111,6 @@ String lyricsAiModelFor(AppSettings settings) {
   return LyricsAiProvider.fromId(settings.lyricsAiProvider).defaultModel ?? '';
 }
 
-/// The provider settings with [apiKey] filled in.
 LyricsAiConfig lyricsAiConfigFor(AppSettings settings, {String apiKey = ''}) =>
     LyricsAiConfig(
       provider: LyricsAiProvider.fromId(settings.lyricsAiProvider),
@@ -106,7 +137,6 @@ LyricsTranslationLanguage lyricsTranslationTargetFor(AppSettings settings) =>
           PlatformDispatcher.instance.locale,
     );
 
-/// A running translation.
 class LyricsTranslationJob {
   const LyricsTranslationJob({
     required this.id,
@@ -131,7 +161,6 @@ class LyricsTranslationState {
   final LyricsTranslationJob? job;
 }
 
-/// How a translation request ended.
 class LyricsTranslationOutcome {
   const LyricsTranslationOutcome.success({
     this.missing = 0,
@@ -159,7 +188,6 @@ class LyricsTranslationOutcome {
 
   final LyricsAiErrorKind? error;
 
-  /// Lines the model left untranslated.
   final int missing;
 
   /// The model returned every line as it was: the lyrics are already in
@@ -167,7 +195,6 @@ class LyricsTranslationOutcome {
   final bool unchanged;
   final bool cancelled;
 
-  /// Another translation was already running.
   final bool busy;
 }
 
@@ -182,15 +209,29 @@ final lyricsTranslationProvider =
 class LyricsTranslationController extends Notifier<LyricsTranslationState> {
   final _lookedUp = <String>{};
   final _autoAttempted = <String>{};
-  final _merged = Expando<(LyricsTranslationResult, bool, ParsedLyrics)>();
+  final _merged =
+      Expando<(LyricsTranslationResult, ParsedLyrics, Set<LyricsScript>)>();
+  final _alreadyInTarget = <String, bool>{};
   LyricsTranslationCancelToken? _cancel;
   Object? _owner;
   int _jobIds = 0;
   late LyricsTranslationSharing _sharing;
+  late LyricsTranslationSongLanguages _songLanguages;
+  late PinyinDataLoader _pinyin;
+  final _shown =
+      Expando<(bool, bool, PinyinData?, Set<LyricsScript>, ParsedLyrics)>();
+  bool _pinyinRequested = false;
 
   @override
   LyricsTranslationState build() {
+    _pinyin = ref.watch(pinyinDataLoaderProvider);
     _sharing = ref.watch(lyricsTranslationSharingProvider);
+    _songLanguages = ref.watch(lyricsTranslationSongLanguagesProvider);
+    unawaited(
+      _songLanguages.load().then((loaded) {
+        if (loaded && ref.mounted) _refreshLanguage();
+      }),
+    );
     final incoming = _sharing.incoming.listen((update) {
       if (!ref.mounted) return;
       state = LyricsTranslationState(
@@ -205,6 +246,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       settingsProvider.select(
         (settings) => (
           settings.lyricsTranslationLanguage,
+          settings.lyricsTranslationSecondLanguage,
           settings.locale,
           settings.lyricsAiProvider,
           settings.lyricsAiModel,
@@ -229,16 +271,96 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     if (source.isEmpty || config.model.isEmpty) return null;
     return lyricsTranslationCacheKey(
       sourceHash: source.hash,
-      language: language ?? lyricsTranslationTargetFor(settings).code,
+      language: language ?? _targetOf(source, settings).code,
       config: config,
     );
+  }
+
+  /// The second language when the song is already in the first, else the
+  /// first.
+  LyricsTranslationLanguage _settingsTargetOf(
+    LyricsTranslationSource source,
+    AppSettings settings,
+  ) {
+    final first = lyricsTranslationTargetFor(settings);
+    final second = lyricsTranslationLanguageFor(
+      settings.lyricsTranslationSecondLanguage,
+    );
+    if (second == null || second.code == first.code) return first;
+    return _alreadyIn(source, first.code) ? second : first;
+  }
+
+  bool _alreadyIn(LyricsTranslationSource source, String code) {
+    if (_alreadyInTarget.length > 64) _alreadyInTarget.clear();
+    return _alreadyInTarget.putIfAbsent(
+      '${source.hash}:$code',
+      () => lyricsAlreadyIn(source.texts, code),
+    );
+  }
+
+  LyricsTranslationLanguage _targetOf(
+    LyricsTranslationSource source,
+    AppSettings settings,
+  ) =>
+      lyricsTranslationLanguageFor(_songLanguages[source.hash] ?? '') ??
+      _settingsTargetOf(source, settings);
+
+  /// The language [lyrics] translate into: the song's own choice, else what
+  /// the settings give for this song.
+  LyricsTranslationLanguage targetFor(ParsedLyrics lyrics) => _targetOf(
+    LyricsTranslationSource.cached(lyrics),
+    ref.read(settingsProvider),
+  );
+
+  /// Whether [lyrics] already read in the language [targetFor] gives: they
+  /// are written in it, or its AI translation is shown.
+  bool inTargetLanguage(ParsedLyrics lyrics) {
+    final source = LyricsTranslationSource.cached(lyrics);
+    if (source.isEmpty) return false;
+    final settings = ref.read(settingsProvider);
+    final target = _targetOf(source, settings).code;
+    // A linked device's translation is the one [display] shows, if any.
+    final shared = _sharing.receivedFor(source.hash);
+    final key = _cacheKey(source, settings, language: target);
+    final shown = shared != null
+        ? shared.language == target
+        : key != null && state.results.containsKey(key);
+    return shown || _alreadyIn(source, target);
+  }
+
+  LyricsTranslationLanguage settingsTargetFor(ParsedLyrics lyrics) =>
+      _settingsTargetOf(
+        LyricsTranslationSource.cached(lyrics),
+        ref.read(settingsProvider),
+      );
+
+  /// The language picked for this song alone, if any.
+  String? songLanguage(ParsedLyrics lyrics) =>
+      _songLanguages[LyricsTranslationSource.cached(lyrics).hash];
+
+  /// Keeps [code] for the song of [lyrics] alone, leaving the settings
+  /// as they are. An empty code follows the settings again.
+  void chooseSongLanguage(ParsedLyrics lyrics, String code) {
+    unawaited(
+      _songLanguages.set(
+        LyricsTranslationSource.cached(lyrics).hash,
+        code.isEmpty ? null : code,
+      ),
+    );
+    _refreshLanguage();
+  }
+
+  void _refreshLanguage() {
+    _sharing.clearReceived();
+    _lookedUp.clear();
+    state = LyricsTranslationState(results: state.results, job: state.job);
   }
 
   /// [lyrics] with the AI translation for the current settings, when one
   /// was made. Looks the cache up once per song and may start an automatic
   /// translation; both report back through the state.
   ParsedLyrics display(ParsedLyrics lyrics) {
-    if (!lyrics.synced || lyrics.lines.isEmpty) return lyrics;
+    if (lyrics.isEmpty) return lyrics;
     final settings = ref.read(settingsProvider);
     final source = LyricsTranslationSource.cached(lyrics);
     if (source.isEmpty) return lyrics;
@@ -257,27 +379,86 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     return _apply(lyrics, source, result);
   }
 
+  /// [lyrics] as the player shows them: [display], with the offline
+  /// romanization and the main line the settings choose. Saving uses
+  /// [display]: offline romanization is worked out again, never saved.
+  ParsedLyrics shown(ParsedLyrics lyrics) {
+    final translated = display(lyrics);
+    final settings = ref.read(settingsProvider);
+    final romanize = settings.lyricsRomanize;
+    final mainLine = settings.lyricsRomanizedMainLine;
+    if (!romanize && !mainLine) return translated;
+    final pinyin = _pinyin.data;
+    final readers = lyricsReaderScriptsFor(settings);
+    final memo = _shown[translated];
+    if (memo != null &&
+        memo.$1 == romanize &&
+        memo.$2 == mainLine &&
+        identical(memo.$3, pinyin) &&
+        setEquals(memo.$4, readers)) {
+      return memo.$5;
+    }
+    var result = translated;
+    if (romanize) {
+      if (pinyin == null &&
+          lyricsNeedPinyin(translated, readerScripts: readers)) {
+        _loadPinyin();
+      }
+      result = lyricsWithOfflineRomanization(
+        result,
+        pinyin: pinyin,
+        readerScripts: readers,
+      );
+    }
+    if (mainLine) result = lyricsWithRomanizedMainLines(result);
+    _shown[translated] = (romanize, mainLine, pinyin, readers, result);
+    return result;
+  }
+
+  /// Loads the Chinese readings, then has the views show them.
+  void _loadPinyin() {
+    if (_pinyinRequested) return;
+    _pinyinRequested = true;
+    unawaited(
+      _pinyin.load().then((data) {
+        if (data == null || !ref.mounted) return;
+        state = LyricsTranslationState(
+          results: {...state.results},
+          job: state.job,
+        );
+      }),
+    );
+  }
+
+  /// [lyrics] with [result], timed word by word wherever [result] has the
+  /// timing, whatever the mode: the mode only decides whether a new
+  /// translation asks for it. A translation from a linked device, or one
+  /// saved in Synced mode, keeps its timing.
   ParsedLyrics _apply(
     ParsedLyrics lyrics,
     LyricsTranslationSource source,
     LyricsTranslationResult result,
   ) {
-    final wordSync = ref.read(settingsProvider).lyricsAiWordSync;
+    final readers = lyricsReaderScriptsFor(ref.read(settingsProvider));
     final memo = _merged[lyrics];
-    if (memo != null && identical(memo.$1, result) && memo.$2 == wordSync) {
-      return memo.$3;
+    if (memo != null &&
+        identical(memo.$1, result) &&
+        setEquals(memo.$3, readers)) {
+      return memo.$2;
     }
-    final merged = applyLyricsTranslation(
+    final merged = lyricsWithoutReaderRomanization(
       lyrics,
-      source,
-      result.translations,
-      romanizations: result.romanizations,
-      alignments: wordSync ? result.alignments : const [],
-      romanizationAlignments: wordSync
-          ? result.romanizationAlignments
-          : const [],
+      applyLyricsTranslation(
+        lyrics,
+        source,
+        result.translations,
+        romanizations: result.romanizations,
+        alignments: result.alignments,
+        romanizationAlignments: result.romanizationAlignments,
+      ),
+      readers,
     );
-    _merged[lyrics] = (result, wordSync, merged);
+    _merged[lyrics] = (result, merged, readers);
     return merged;
   }
 
@@ -313,25 +494,21 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
         job: state.job,
       );
       if (_cacheKey(source, ref.read(settingsProvider)) == key) {
-        _publish(
-          source.hash,
-          lyricsTranslationTargetFor(settings).code,
-          cached,
-        );
+        _publish(source.hash, _targetOf(source, settings).code, cached);
       }
       return;
     }
+    // Automatic translation is for synced lyrics, as its setting says;
+    // plain lyrics translate when asked.
     if (!settings.lyricsAutoTranslate ||
+        !lyrics.synced ||
         state.job != null ||
         lyricsHaveTranslation(lyrics) ||
         !_autoAttempted.add(key)) {
       return;
     }
     // A song already in the target language has nothing to translate.
-    if (lyricsAlreadyIn(
-      LyricsTranslationSource.cached(lyrics).texts,
-      lyricsTranslationTargetFor(settings).code,
-    )) {
+    if (_alreadyIn(source, _targetOf(source, settings).code)) {
       return;
     }
     final apiKey = await ref.read(
@@ -359,13 +536,13 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
   }) async {
     if (state.job != null) return const LyricsTranslationOutcome.busy();
     final source = LyricsTranslationSource.cached(lyrics);
-    if (!lyrics.synced || source.isEmpty) {
+    if (source.isEmpty) {
       return const LyricsTranslationOutcome.failed(LyricsAiErrorKind.noLyrics);
     }
     final settings = ref.read(settingsProvider);
     final target =
         lyricsTranslationLanguageFor(language ?? '') ??
-        lyricsTranslationTargetFor(settings);
+        _targetOf(source, settings);
     final key = _cacheKey(source, settings, language: target.code);
     if (key == null) {
       return const LyricsTranslationOutcome.failed(
@@ -404,18 +581,15 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       final cached = await cache.read(key);
       cancel.throwIfCancelled();
       // An explicit translation can upgrade older line-only cache entries.
-      final romanize =
-          settings.lyricsAiRomanize && lyricsNeedRomanization(lyrics);
+      final romanize = lyricsAiRomanizes(settings, lyrics);
       final wordSync = settings.lyricsAiWordSync && source.wordSynced;
       final timedRomanize =
           wordSync &&
           romanize &&
-          lyrics.lines.any(
-            (line) =>
-                line.hasWordTiming &&
-                line.romanization?.trim().isNotEmpty != true &&
-                lyricNeedsRomanization(line.text),
-          );
+          linesNeedingAiRomanization(
+            lyrics,
+            readerScripts: lyricsReaderScriptsFor(settings),
+          ).any((line) => line.hasWordTiming);
       final reusable =
           cached != null &&
           (!romanize || cached.romanized) &&
@@ -541,7 +715,6 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     }
   }
 
-  /// The provider's model ids.
   Future<List<String>> listModels(LyricsAiConfig config) async {
     final client = ref.read(lyricsAiHttpClientProvider)();
     try {

@@ -232,6 +232,65 @@ ${_tag('translation', 2000, 'Second translation')}
     },
   );
 
+  test('word timing preserves spaces after closing timestamps', () {
+    final lyrics = LyricsParser.parse(
+      '[00:01.00]<00:01.00>First<00:01.50> '
+      '<00:02.00>second<00:02.50> '
+      '<00:03.00>line<00:04.00>',
+    );
+    final line = lyrics.lines.single;
+    expect(line.text, 'First second line');
+    expect(line.words.map((word) => word.text).join(), line.text);
+    expect(line.words.map((word) => word.text), ['First ', 'second ', 'line']);
+    expect(line.words.map((word) => word.time.inMilliseconds), [
+      1000,
+      2000,
+      3000,
+    ]);
+    expect(line.words.map((word) => word.end?.inMilliseconds), [
+      1500,
+      2500,
+      4000,
+    ]);
+  });
+
+  test(
+    'word separators preserve whitespace and the first closing timestamp',
+    () {
+      for (final separator in ['  ', '\t', '\u00a0']) {
+        final line = LyricsParser.parse(
+          '[00:01.00]<00:01.00>First<00:01.50>$separator'
+          '<00:01.75> <00:02.00>second<00:04.00>',
+        ).lines.single;
+        expect(line.text, 'First$separator second');
+        expect(line.words.map((word) => word.text).join(), line.text);
+        expect(line.words, hasLength(2));
+        expect(line.words.first.end, const Duration(milliseconds: 1500));
+        expect(line.words.last.time, const Duration(seconds: 2));
+        expect(line.words.last.end, const Duration(seconds: 4));
+      }
+    },
+  );
+
+  test(
+    'adjacent Latin and CJK syllables keep their original word boundaries',
+    () {
+      final line = LyricsParser.parse(
+        '[00:01.00]<00:01.00>To<00:01.50>gether<00:02.00> '
+        '<00:03.00>日<00:04.00>本<00:05.00>語<00:06.00>',
+      ).lines.single;
+      expect(line.text, 'Together 日本語');
+      expect(line.words.map((word) => word.text), [
+        'To',
+        'gether ',
+        '日',
+        '本',
+        '語',
+      ]);
+      expect(line.words.map((word) => word.text).join(), line.text);
+    },
+  );
+
   test('retains all three texts, word ends and millisecond timing', () {
     final lyrics = LyricsParser.parse('''
 ${_tag('romaji', 1009, 'Romanized')}

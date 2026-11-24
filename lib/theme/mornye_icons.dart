@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 
 /// [CupertinoIcons.arrow_right] that points the other way in right-to-left
@@ -89,6 +89,7 @@ IconData _cupertinoFor(IconData icon) {
     Icons.download_for_offline_outlined => CupertinoIcons.arrow_down_circle,
     Icons.call_split => CupertinoIcons.arrow_branch,
     Icons.download_rounded => CupertinoIcons.arrow_down,
+    Icons.save_alt => CupertinoIcons.square_arrow_down,
     Icons.info_outline => CupertinoIcons.info,
     Icons.settings || Icons.settings_outlined => CupertinoIcons.gear_alt,
     Icons.tune ||
@@ -141,6 +142,7 @@ IconData _cupertinoFor(IconData icon) {
     Icons.cloud || Icons.cloud_outlined => CupertinoIcons.cloud,
     Icons.cloud_upload_outlined => CupertinoIcons.cloud_upload,
     Icons.high_quality => CupertinoIcons.hifispeaker,
+    Icons.spatial_audio_outlined => CupertinoIcons.headphones,
     Icons.four_k => CupertinoIcons.waveform,
     Icons.dynamic_feed_outlined ||
     Icons.tab_outlined => CupertinoIcons.square_on_square,
@@ -153,6 +155,7 @@ IconData _cupertinoFor(IconData icon) {
     Icons.refresh_rounded ||
     Icons.update ||
     Icons.system_update => CupertinoIcons.arrow_clockwise,
+    Icons.undo => CupertinoIcons.arrow_uturn_left,
     Icons.content_copy_outlined ||
     Icons.content_copy_rounded ||
     Icons.copy_all_rounded ||
@@ -188,7 +191,8 @@ IconData _cupertinoFor(IconData icon) {
     Icons.mic => CupertinoIcons.mic_fill,
     Icons.bedtime_outlined => CupertinoIcons.moon_zzz,
     Icons.explore_outlined => CupertinoIcons.compass,
-    Icons.vpn_key_outlined => CupertinoIcons.lock,
+    Icons.vpn_key_outlined ||
+    Icons.screen_lock_portrait_outlined => CupertinoIcons.lock,
     Icons.bookmark_outline => CupertinoIcons.bookmark,
     Icons.low_priority => CupertinoIcons.sort_down,
     Icons.search || Icons.manage_search => CupertinoIcons.search,
@@ -197,6 +201,7 @@ IconData _cupertinoFor(IconData icon) {
     Icons.lightbulb_outline => CupertinoIcons.lightbulb,
     Icons.telegram => CupertinoIcons.paperplane,
     Icons.album || Icons.album_outlined => CupertinoIcons.square_stack,
+    Icons.category_outlined => CupertinoIcons.guitars,
     Icons.playlist_play => CupertinoIcons.music_note_list,
     Icons.video_library ||
     Icons.video_library_outlined ||
@@ -211,7 +216,8 @@ IconData _cupertinoFor(IconData icon) {
     Icons.check_circle_outline => CupertinoIcons.checkmark_circle,
     Icons.help_outline => CupertinoIcons.question_circle,
     Icons.phone_android => CupertinoIcons.device_phone_portrait,
-    Icons.computer => CupertinoIcons.desktopcomputer,
+    // Cupertino has no glyph of several devices.
+    Icons.computer || Icons.devices => CupertinoIcons.desktopcomputer,
     Icons.hub_outlined => CupertinoIcons.link,
     Icons.campaign_outlined => CupertinoIcons.speaker_2,
     Icons.drag_handle => CupertinoIcons.line_horizontal_3,

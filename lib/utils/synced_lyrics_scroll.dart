@@ -39,6 +39,29 @@ int syncedLyricsDueLineIndex({
   return dueIndex;
 }
 
+/// The line to show at [position] while playback advances, given the line
+/// [shown] already, which starts at [shownStart]. A [position] only a little
+/// behind [shownStart], as a late position report is, keeps [shown] instead
+/// of stepping back to the line before for a moment. A seek back of
+/// [seekThreshold] or more moves to [index] at once.
+int steadySyncedLyricsIndex({
+  required int index,
+  required int shown,
+  required Duration shownStart,
+  required Duration position,
+  Duration seekThreshold = const Duration(milliseconds: 750),
+}) => index < shown && shownStart - position < seekThreshold ? shown : index;
+
+/// How far ahead of the audio clock playing lyrics are drawn. A frame reaches
+/// the screen about two refresh intervals after it is drawn, so lyrics drawn
+/// for the position at that moment always showed that much behind the sound.
+Duration lyricsDisplayLead(double? refreshRate) {
+  final rate = refreshRate != null && refreshRate.isFinite && refreshRate >= 30
+      ? refreshRate
+      : 60.0;
+  return Duration(microseconds: (2e6 / rate).round().clamp(8000, 40000));
+}
+
 /// Extrapolates the latest player position for the lyrics animation only.
 ///
 /// The global playback state intentionally updates at a lower frequency to
@@ -53,22 +76,24 @@ Duration interpolatedSyncedLyricsPosition({
   return anchorPosition + elapsedSinceAnchor;
 }
 
-/// Keeps small timing corrections from making the lyric highlight jump while
-/// still applying a seek or another large position change immediately.
-Duration reconcileSyncedLyricsPosition({
+/// How long the lyric clock takes to close the gap to a reported position.
+const syncedLyricsCatchUpWindow = Duration(seconds: 2);
+
+/// How fast the lyric clock runs, relative to playback, to close the gap to
+/// a reported position over [window]: a little slow when the report is
+/// behind, a little fast when it is ahead. The highlight keeps moving
+/// forward from where it is, where stepping to the report moved it back a
+/// few letters whenever one was behind. Null for a seek or another large
+/// change, which is applied at once.
+double? syncedLyricsCatchUpRate({
   required Duration predictedPosition,
   required Duration reportedPosition,
   Duration seekThreshold = const Duration(milliseconds: 750),
+  Duration window = syncedLyricsCatchUpWindow,
 }) {
-  final drift = (reportedPosition - predictedPosition).abs();
-  if (drift >= seekThreshold) return reportedPosition;
-
-  const correctionFraction = 0.25;
-  final correction =
-      ((reportedPosition - predictedPosition).inMicroseconds *
-              correctionFraction)
-          .round();
-  return predictedPosition + Duration(microseconds: correction);
+  final drift = reportedPosition - predictedPosition;
+  if (drift.abs() >= seekThreshold) return null;
+  return (1 + drift.inMicroseconds / window.inMicroseconds).clamp(0.5, 1.5);
 }
 
 /// Continuous progress for one timed TTML or enhanced LRC segment.

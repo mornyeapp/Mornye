@@ -1,7 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +19,8 @@ import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/mornye_bottom_bar.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   late MornyeChromeController chrome;
@@ -570,8 +572,8 @@ void main() {
         find.byKey(const ValueKey('mornye-compact-leading')),
       );
       expect((homeCenter.dy - firstHomeCenter!.dy).abs(), lessThan(20));
-      expect(find.byTooltip('Home').hitTestable(), findsOneWidget);
-      expect(find.byTooltip('Search').hitTestable(), findsOneWidget);
+      expect(findByTooltip('Home').hitTestable(), findsOneWidget);
+      expect(findByTooltip('Search').hitTestable(), findsOneWidget);
       if (withPlayer) {
         expect(tester.state(find.byType(MiniPlayer)), same(playerState));
       }
@@ -687,8 +689,8 @@ void main() {
       tester.getSize(find.byType(MornyeBottomBar)).height,
       lessThan(expandedHeight - 60),
     );
-    expect(find.byTooltip('Next track'), findsNothing);
-    await tester.tap(find.byTooltip('Home'));
+    expect(findByTooltip('Next track'), findsNothing);
+    await tester.tap(findByTooltip('Home'));
     await tester.pumpAndSettle();
     expect(chrome.value, isFalse);
     expect(tester.getSize(find.byType(MornyeBottomBar)).height, expandedHeight);
@@ -907,9 +909,9 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -240));
     await tester.pumpAndSettle();
     expect(chrome.value, isTrue);
-    await tester.tap(find.byTooltip('Search'));
+    await tester.tap(findByTooltip('Search'));
     expect(searches, 1);
-    await tester.tap(find.byTooltip('Home'));
+    await tester.tap(findByTooltip('Home'));
     await tester.pumpAndSettle();
     expect(chrome.value, isFalse);
     expect(tester.takeException(), isNull);

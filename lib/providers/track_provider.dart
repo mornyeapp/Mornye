@@ -151,6 +151,28 @@ class ArtistAlbum {
     required this.artists,
     this.providerId,
   });
+
+  factory ArtistAlbum.fromJson(Map<String, dynamic> json) => ArtistAlbum(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    releaseDate: json['releaseDate'] as String,
+    totalTracks: json['totalTracks'] as int,
+    coverUrl: json['coverUrl'] as String?,
+    albumType: json['albumType'] as String,
+    artists: json['artists'] as String,
+    providerId: json['providerId'] as String?,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'releaseDate': releaseDate,
+    'totalTracks': totalTracks,
+    'coverUrl': coverUrl,
+    'albumType': albumType,
+    'artists': artists,
+    'providerId': providerId,
+  };
 }
 
 class TrackNotifier extends Notifier<TrackState> {

@@ -162,6 +162,31 @@ class LinkDownloadUpdates {
   }
 }
 
+/// The service this computer downloads a phone's request with. A phone sends
+/// the album or playlist's metadata provider as a hint, which may have no
+/// download provider here; like the phone's own download picker, the hint
+/// is used only when it is an enabled download provider (or one replacing
+/// that built-in provider), else the default download service.
+String linkDownloadServiceFor(
+  String? requested, {
+  required String defaultService,
+  required ExtensionState extensions,
+}) {
+  final hint = requested?.trim().toLowerCase() ?? '';
+  if (hint.isNotEmpty) {
+    final downloaders = extensions.extensions.where(
+      (ext) => ext.enabled && ext.hasDownloadProvider,
+    );
+    final match =
+        downloaders.where((ext) => ext.id.toLowerCase() == hint).firstOrNull ??
+        downloaders
+            .where((ext) => ext.replacesBuiltInProviders.contains(hint))
+            .firstOrNull;
+    if (match != null) return match.id;
+  }
+  return resolveEffectiveDownloadService(defaultService, extensions);
+}
+
 class _DownloadPeer {
   _DownloadPeer(this.connectedMs);
 
@@ -233,12 +258,11 @@ class AppLinkDownloadsPort implements LinkDownloadsPort {
     String? playlistName,
   }) {
     if (tracks.isEmpty) return 0;
-    final resolved = service?.trim().isNotEmpty == true
-        ? service!.trim()
-        : resolveEffectiveDownloadService(
-            _ref.read(settingsProvider).defaultService,
-            _ref.read(extensionProvider),
-          );
+    final resolved = linkDownloadServiceFor(
+      service,
+      defaultService: _ref.read(settingsProvider).defaultService,
+      extensions: _ref.read(extensionProvider),
+    );
     if (resolved.isEmpty) {
       throw const LinkException('unavailable', 'No download provider');
     }

@@ -102,7 +102,6 @@ internal fun Service.startDataSyncForeground(notificationId: Int, notification: 
     }
 }
 
-/** Content intent that opens [MainActivity] from a service notification. */
 internal fun Context.mainActivityContentIntent(): PendingIntent =
     PendingIntent.getActivity(
         this,

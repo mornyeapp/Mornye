@@ -105,7 +105,7 @@ pub async fn handle(shared: &Shared, request: SubsonicRequest) -> HttpResponse {
     let catalog = shared.catalog();
     let binary = match request.method.as_str() {
         "stream" => media::stream(shared, &catalog, &request).await,
-        "download" => media::download(&catalog, &request).await,
+        "download" => media::download(shared, &catalog, &request).await,
         "getCoverArt" => covers::cover_art(shared, &catalog, &request).await,
         method => {
             let outcome = if forward::handles(method) {
@@ -161,7 +161,7 @@ async fn dispatch(
         "getArtist" => browse::artist(catalog, request),
         "getAlbum" => browse::album(catalog, request),
         "getSong" => browse::song(catalog, request),
-        "getLyricsBySongId" => lyrics::by_song_id(catalog, request).await,
+        "getLyricsBySongId" => lyrics::by_song_id(shared, catalog, request).await,
         "getMusicDirectory" => browse::directory(catalog, request),
         "getAlbumList" => browse::album_list(shared, catalog, request, false).await,
         "getAlbumList2" => browse::album_list(shared, catalog, request, true).await,

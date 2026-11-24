@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/app_motion.dart';
@@ -702,11 +702,21 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
       await _saveProgress(step: step);
       if (!mounted) return;
       setState(() => _currentStep = step);
-      await _pageController?.animateToPage(
-        step,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+      // A step moves on the slow spatial spring, which stops at the page
+      // without overshoot; reduced motion shows the step at once.
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _pageController?.jumpToPage(step);
+      } else {
+        final motion = AppMotion.spatialSlow(
+          context,
+          const AppMotionSpec(Duration(milliseconds: 300), Curves.easeInOut),
+        );
+        await _pageController?.animateToPage(
+          step,
+          duration: motion.duration,
+          curve: motion.curve,
+        );
+      }
     } catch (e, stack) {
       _log.e('Failed to save setup step', e, stack);
     } finally {
@@ -780,13 +790,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
         : FloatingActionButton.extended(
             onPressed: _isLoading ? null : _completeSetup,
             label: _isLoading
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: colorScheme.onPrimary,
-                    ),
-                  )
+                ? AppLoadingIndicator(size: 20, color: colorScheme.onPrimary)
                 : Text(context.l10n.setupGetStarted),
             icon: const Icon(Icons.check),
             backgroundColor: colorScheme.primary,

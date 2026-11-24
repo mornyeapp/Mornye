@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -9,6 +9,8 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/screens/settings/download_fallback_extensions_page.dart';
 import 'package:mornye/services/local_network_access.dart';
+import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -137,8 +139,9 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
                       settings.autoConvertFormat,
                     ),
                   ),
-                  if (normalizeAutoConvertFormat(settings.autoConvertFormat) ==
-                      'flac') ...[
+                  if (isLosslessAutoConvertFormat(
+                    settings.autoConvertFormat,
+                  )) ...[
                     SettingsItem(
                       icon: Icons.high_quality_outlined,
                       title: context.l10n.downloadAutoConvertMaxBitDepth,
@@ -168,7 +171,22 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
                         ref,
                         settings.autoConvertMaxSampleRate,
                       ),
-                      showDivider: false,
+                    ),
+                    SettingsSwitchItem(
+                      icon: Icons.auto_fix_high_outlined,
+                      title: context.l10n.downloadAutoConvertSmartDither,
+                      subtitle: context.l10n.trackConvertDitherSmartDescription,
+                      value: settings.autoConvertSmartDither,
+                      onChanged: (value) => ref
+                          .read(settingsProvider.notifier)
+                          .setAutoConvertSmartDither(value),
+                    ),
+                    _SmartDitherTypeChoice(
+                      highPass: settings.autoConvertSmartDitherHighPass,
+                      enabled: settings.autoConvertSmartDither,
+                      onChanged: (value) => ref
+                          .read(settingsProvider.notifier)
+                          .setAutoConvertSmartDitherHighPass(value),
                     ),
                   ] else
                     SettingsItem(
@@ -393,6 +411,7 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
             'aac' => context.l10n.downloadAutoConvertM4aSubtitle,
             'opus' => context.l10n.downloadAutoConvertOpusSubtitle,
             'flac' => context.l10n.downloadAutoConvertFlacSubtitle,
+            'alac' => context.l10n.downloadAutoConvertAlacSubtitle,
             _ => context.l10n.downloadAutoConvertMp3Subtitle,
           },
         ),

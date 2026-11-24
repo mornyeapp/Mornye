@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -6,8 +6,12 @@ import 'package:mornye/widgets/app_content_card.dart';
 import 'package:mornye/widgets/app_crash_banner.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus;
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/runtime_profile_provider.dart'
+    show mornyeGlassLevelProvider;
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -94,6 +98,8 @@ class _LogScreenState extends State<LogScreen> {
   }
 
   Future<void> _scrollToLatest(int generation) async {
+    // A short follow of the newest row; reduced motion jumps to it.
+    final jump = MediaQuery.disableAnimationsOf(context);
     await WidgetsBinding.instance.endOfFrame;
     while (mounted &&
         generation == _scrollGeneration &&
@@ -102,11 +108,15 @@ class _LogScreenState extends State<LogScreen> {
         _scrollController.hasClients) {
       final position = _scrollController.position;
       if (position.extentAfter <= 0.5) return;
-      await position.animateTo(
-        position.maxScrollExtent,
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOut,
-      );
+      if (jump) {
+        position.jumpTo(position.maxScrollExtent);
+      } else {
+        await position.animateTo(
+          position.maxScrollExtent,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+      }
       // A lazy list refines its extent as new multiline rows are laid out.
       // Follow that estimate until the final row is actually visible.
       await WidgetsBinding.instance.endOfFrame;
@@ -120,8 +130,15 @@ class _LogScreenState extends State<LogScreen> {
     );
   }
 
+  Future<String> _exportLogs() => LogBuffer().exportWithDeviceInfo(
+    glassLevel: ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(mornyeGlassLevelProvider).name,
+  );
+
   void _copyLogs() async {
-    final logs = await LogBuffer().exportWithDeviceInfo();
+    final logs = await _exportLogs();
     Clipboard.setData(ClipboardData(text: logs));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -217,7 +234,7 @@ class _LogScreenState extends State<LogScreen> {
 
   void _shareLogs() async {
     final subject = '${context.l10n.appName} Logs';
-    final logs = await LogBuffer().exportWithDeviceInfo();
+    final logs = await _exportLogs();
     SharePlus.instance.share(ShareParams(text: logs, subject: subject));
   }
 
@@ -452,12 +469,13 @@ class _LogScreenState extends State<LogScreen> {
                     ],
                   ),
                 ),
-                Divider(
-                  height: 1,
-                  indent: 56,
-                  endIndent: 20,
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-                ),
+                if (context.isMornye)
+                  Divider(
+                    height: 1,
+                    indent: 56,
+                    endIndent: 20,
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                  ),
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,

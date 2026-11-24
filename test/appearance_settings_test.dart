@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +10,8 @@ import 'package:mornye/screens/settings/appearance_settings_page.dart';
 import 'package:mornye/theme/dynamic_color_wrapper.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+
+import 'support/tooltip_finder.dart';
 
 void main() {
   test(
@@ -376,7 +378,7 @@ void main() {
         MornyeTheme.accentColor(MornyeAccent.red, initial.brightness),
       );
 
-      final blue = find.byTooltip('Blue');
+      final blue = findByTooltip('Blue');
       await tester.ensureVisible(blue);
       await tester.tap(blue);
       await tester.pumpAndSettle();
@@ -403,8 +405,8 @@ void main() {
         Theme.of(tester.element(page)).colorScheme.primary,
         theme.colorScheme.primary,
       );
-      await tester.ensureVisible(find.byTooltip('Red (default)'));
-      await tester.tap(find.byTooltip('Red (default)'));
+      await tester.ensureVisible(findByTooltip('Red (default)'));
+      await tester.tap(findByTooltip('Red (default)'));
       await tester.pumpAndSettle();
       expect(
         Theme.of(tester.element(page)).colorScheme.primary,

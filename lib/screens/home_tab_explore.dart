@@ -8,7 +8,7 @@ extension _HomeTabExploreUI on _HomeTabState {
   ) {
     final hasGreeting =
         !context.isMornye && greeting != null && greeting.isNotEmpty;
-    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final isTablet = _usesTabletSizes(context);
     final sectionOffset = hasGreeting ? 1 : 0;
     final totalCount = sections.length + sectionOffset + 1;
 
@@ -57,7 +57,7 @@ extension _HomeTabExploreUI on _HomeTabState {
       );
     }
     final sectionHeight = _exploreSectionHeight(context);
-    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final isTablet = _usesTabletSizes(context);
     if (section.isQuickPicks) {
       return _buildQuickPicksSection(section, colorScheme);
     }
@@ -189,10 +189,11 @@ extension _HomeTabExploreUI on _HomeTabState {
     ColorScheme colorScheme,
   ) {
     final isArtist = item.type == 'artist';
-    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final isTablet = _usesTabletSizes(context);
     final cardSize = _exploreCardSize(context);
     final coverSize = _exploreCoverSize(context);
     final iconSize = cardSize * 0.3;
+    final coverRadius = BorderRadius.circular(isArtist ? coverSize / 2 : 10);
 
     return Semantics(
       button: true,
@@ -213,44 +214,48 @@ extension _HomeTabExploreUI on _HomeTabState {
                   baseName: item.artists.isEmpty
                       ? item.name
                       : '${item.artists} - ${item.name}',
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(
-                      isArtist ? coverSize / 2 : 10,
-                    ),
-                    child: item.coverUrl != null && item.coverUrl!.isNotEmpty
-                        ? CachedCoverImage(
-                            imageUrl: item.coverUrl!,
-                            width: coverSize,
-                            height: coverSize,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => ShimmerLoading(
-                              child: Container(
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: coverRadius,
+                        child:
+                            item.coverUrl != null && item.coverUrl!.isNotEmpty
+                            ? CachedCoverImage(
+                                imageUrl: item.coverUrl!,
+                                width: coverSize,
+                                height: coverSize,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => ShimmerLoading(
+                                  child: Container(
+                                    width: coverSize,
+                                    height: coverSize,
+                                    color: colorScheme.surfaceContainerHighest,
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  width: coverSize,
+                                  height: coverSize,
+                                  color: colorScheme.surfaceContainerHighest,
+                                  child: Icon(
+                                    _getIconForType(item.type),
+                                    color: colorScheme.onSurfaceVariant,
+                                    size: iconSize,
+                                  ),
+                                ),
+                              )
+                            : Container(
                                 width: coverSize,
                                 height: coverSize,
                                 color: colorScheme.surfaceContainerHighest,
+                                child: Icon(
+                                  _getIconForType(item.type),
+                                  color: colorScheme.onSurfaceVariant,
+                                  size: iconSize,
+                                ),
                               ),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              width: coverSize,
-                              height: coverSize,
-                              color: colorScheme.surfaceContainerHighest,
-                              child: Icon(
-                                _getIconForType(item.type),
-                                color: colorScheme.onSurfaceVariant,
-                                size: iconSize,
-                              ),
-                            ),
-                          )
-                        : Container(
-                            width: coverSize,
-                            height: coverSize,
-                            color: colorScheme.surfaceContainerHighest,
-                            child: Icon(
-                              _getIconForType(item.type),
-                              color: colorScheme.onSurfaceVariant,
-                              size: iconSize,
-                            ),
-                          ),
+                      ),
+                      DesktopCoverHover(borderRadius: coverRadius),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -778,7 +783,6 @@ class _ExploreSectionPage extends StatelessWidget {
   static bool _isFeatured(ExploreItem item) =>
       item.featuredCoverUrl?.isNotEmpty == true;
 
-  /// Columns of at least [minWidth], at most [maxCount].
   static int _columns(double width, double minWidth, int maxCount) =>
       ((width + _gap) / (minWidth + _gap)).floor().clamp(1, maxCount);
 

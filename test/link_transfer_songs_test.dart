@@ -16,6 +16,8 @@ import 'package:mornye/services/link/link_protocol.dart';
 import 'support/link_desktop_fakes.dart';
 
 const _phone = 'phone-1';
+const _document =
+    'content://com.example.documents/tree/a%3AMusic/document/a%3AMusic%2FSong.flac';
 
 String _fileId(int i) => i.toRadixString(16).padLeft(32, '0');
 
@@ -99,6 +101,26 @@ void main() {
       ),
       isNull,
     );
+    expect(
+      linkDesktopSongIdOf(
+        UnifiedLibraryItem.fromLocalLibrary(_scanned('c1', _document)),
+      ),
+      'l:c1',
+      reason: 'a phone host shares its storage access songs',
+    );
+  });
+
+  test('offers a storage access song without opening it', () async {
+    final index = DesktopLinkCatalogIndex(
+      serverId: 'server-1',
+      songs: [catalogSong('l:c1')],
+    );
+    final songs = await linkOutgoingSongs([
+      UnifiedLibraryItem.fromLocalLibrary(_scanned('c1', _document)),
+    ], index);
+    expect(songs.single.song.songId, 'l:c1');
+    expect(songs.single.song.suffix, 'flac');
+    expect(songs.single.song.size, 0, reason: 'learnt when downloaded');
   });
 
   test('offers the catalog songs once each, with tags and sizes', () async {

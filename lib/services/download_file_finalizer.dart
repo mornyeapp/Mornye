@@ -24,6 +24,7 @@ typedef ConvertDownloadAudio =
       required String bitrate,
       required bool deleteOriginal,
       required LosslessConversionQuality losslessQuality,
+      required LosslessConversionProcessing losslessProcessing,
     });
 
 enum DownloadDecryptionFailure { safAccess, decrypt, safWrite }
@@ -204,6 +205,8 @@ class DownloadFileFinalizer {
       maxBitDepth: 16,
       maxSampleRate: 48000,
     ),
+    LosslessConversionProcessing losslessProcessing =
+        const LosslessConversionProcessing(),
     String? treeUri,
     String relativeDir = '',
     Future<void> Function(String path, String format)? embedMetadata,
@@ -217,7 +220,7 @@ class DownloadFileFinalizer {
     if (!enabled) return original;
     targetFormat = normalizeAutoConvertFormat(targetFormat);
     targetBitrate = normalizeAutoConvertBitrate(targetBitrate);
-    final lossless = targetFormat == 'flac';
+    final lossless = isLosslessAutoConvertFormat(targetFormat);
     final bitrateKbps = lossless ? null : autoConvertBitrateKbps(targetBitrate);
     if (!lossless &&
         autoConversionAlreadySatisfied(
@@ -251,10 +254,11 @@ class DownloadFileFinalizer {
     );
     Future<void> embed(String path) async {
       try {
-        await embedMetadata?.call(
-          path,
-          lossless ? 'flac' : metadataFormatForLossyFormat(targetFormat),
-        );
+        await embedMetadata?.call(path, switch (targetFormat) {
+          'flac' => 'flac',
+          'alac' => 'm4a',
+          _ => metadataFormatForLossyFormat(targetFormat),
+        });
       } catch (e) {
         warn('Automatic conversion metadata embed failed: $e');
         result['auto_conversion_metadata_warning'] = e.toString();
@@ -271,7 +275,7 @@ class DownloadFileFinalizer {
       if (lossless) {
         source = await probeProperties(input);
         if (!isLosslessAudioCodec(source.codec) ||
-            (source.codec?.toLowerCase() == 'flac' &&
+            (source.codec?.toLowerCase() == targetFormat &&
                 autoConversionAlreadySatisfied(
                   filePath: input,
                   targetFormat: targetFormat,
@@ -280,6 +284,7 @@ class DownloadFileFinalizer {
                   sampleRate: source.sampleRate,
                   maxBitDepth: losslessQuality.maxBitDepth,
                   maxSampleRate: losslessQuality.maxSampleRate,
+                  codec: source.codec,
                 ))) {
           skipped = true;
           return null;
@@ -287,7 +292,10 @@ class DownloadFileFinalizer {
         if ((losslessQuality.maxBitDepth != null && source.bitDepth == null) ||
             (losslessQuality.maxSampleRate != null &&
                 source.sampleRate == null)) {
-          throw StateError('Cannot inspect source quality for FLAC conversion');
+          throw StateError(
+            'Cannot inspect source quality for '
+            '${targetFormat.toUpperCase()} conversion',
+          );
         }
       }
       final output = await convertAudio(
@@ -296,6 +304,7 @@ class DownloadFileFinalizer {
         bitrate: targetBitrate,
         deleteOriginal: deleteOriginal,
         losslessQuality: losslessQuality,
+        losslessProcessing: losslessProcessing,
       );
       if (lossless && output != null) {
         PrimaryAudioProperties measured;
@@ -305,7 +314,7 @@ class DownloadFileFinalizer {
           measured = const PrimaryAudioProperties();
         }
         convertedProperties = PrimaryAudioProperties(
-          codec: 'flac',
+          codec: targetFormat,
           bitDepth:
               measured.bitDepth ??
               losslessQuality.effectiveBitDepth(source?.bitDepth),
@@ -365,11 +374,11 @@ class DownloadFileFinalizer {
           ? resolveDisplayQuality(
                   filePath: convertedPath,
                   fileName: publishedName,
-                  detectedFormat: 'flac',
+                  detectedFormat: targetFormat,
                   bitDepth: convertedProperties?.bitDepth,
                   sampleRate: convertedProperties?.sampleRate,
                 ) ??
-                'FLAC'
+                targetFormat.toUpperCase()
           : '${displayFormatForLossyFormat(targetFormat)} ${bitrateKbps}kbps';
       info('Automatic conversion completed: $convertedQuality');
       return DownloadConversionOutcome(

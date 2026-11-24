@@ -7,5 +7,6 @@ Build recipes: https://github.com/zhongfly/mpv-winbuild
 mpv source: https://github.com/mpv-player/mpv/tree/488fec0789
 The bundles also provide video decoders; Mornye uses their audio API.
 The x64 build targets the baseline architecture, without the x86-64-v3 requirement.
-Both include wasapi-exclusive-buffer for devices that glitch after stream resets.
+Both include wasapi-exclusive-buffer. Mornye uses the driver's default period;
+forcing the minimum period can leave too little scheduling headroom for music.
 LGPL license: https://www.gnu.org/licenses/lgpl-2.1.html

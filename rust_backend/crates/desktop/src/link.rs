@@ -3,83 +3,17 @@
 //! A request the server forwards becomes the inbound call `linkRequest`
 //! (kind 12), and Dart answers it with `linkReply`; the server's other
 //! events become the inbound calls `linkMessage`, `linkClients`,
-//! `linkPaired` and `linkPairingEnded`.
+//! `linkPaired` and `linkPairingEnded`. The glue itself is
+//! [`mornye_link::bridge`], shared with the phone backend.
 
 use crate::call::{Args, CallError, CallResult, Reply};
 use crate::runtime::Config;
-use mornye_link::{Host, HostError, LinkConfig, LinkServer};
-use serde_json::{Value, json};
-use std::collections::HashMap;
-use std::future::Future;
-use std::path::{Path, PathBuf};
-use std::pin::Pin;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
-use tokio::sync::oneshot;
-
-/// The most files one `linkEmbeddedPictures` call reads.
-const MAX_PICTURE_PROBES: usize = 1000;
-
-type Emitter = Arc<dyn Fn(&str, Value) + Send + Sync>;
-type Waiting = Arc<Mutex<HashMap<String, oneshot::Sender<Result<Value, HostError>>>>>;
-type ReplyFuture = Pin<Box<dyn Future<Output = Result<Value, HostError>> + Send>>;
-
-/// The app side of the server: inbound calls out, `linkReply` back.
-struct DesktopHost {
-    emit: Emitter,
-    waiting: Waiting,
-    next_id: AtomicU64,
-}
-
-impl Host for DesktopHost {
-    fn request(&self, op: &str, device_id: &str, args: Value) -> ReplyFuture {
-        let request_id = (self.next_id.fetch_add(1, Ordering::Relaxed) + 1).to_string();
-        let (sender, receiver) = oneshot::channel();
-        self.waiting
-            .lock()
-            .expect("link requests")
-            .insert(request_id.clone(), sender);
-        // The server drops the future on its timeout; forget the request then.
-        let forget = Forget {
-            waiting: Arc::clone(&self.waiting),
-            request_id: request_id.clone(),
-        };
-        (self.emit)(
-            "linkRequest",
-            json!({"requestId": request_id, "op": op, "deviceId": device_id, "args": args}),
-        );
-        Box::pin(async move {
-            let _forget = forget;
-            receiver
-                .await
-                .unwrap_or_else(|_| Err(HostError::new("unavailable", "The app did not answer")))
-        })
-    }
-
-    fn event(&self, method: &str, args: Value) {
-        (self.emit)(method, args);
-    }
-}
-
-struct Forget {
-    waiting: Waiting,
-    request_id: String,
-}
-
-impl Drop for Forget {
-    fn drop(&mut self) {
-        self.waiting
-            .lock()
-            .expect("link requests")
-            .remove(&self.request_id);
-    }
-}
+use mornye_link::bridge::{AppBridge, BridgeError, BridgePaths, Emitter};
+use serde_json::Value;
+use std::sync::Arc;
 
 pub(crate) struct Link {
-    host: Arc<DesktopHost>,
-    /// Shared so a slow call (catalog loading) does not hold the lock; the
-    /// server stops when the last holder lets go.
-    server: Mutex<Option<Arc<LinkServer>>>,
+    bridge: AppBridge,
 }
 
 impl Default for Link {
@@ -93,319 +27,116 @@ impl Default for Link {
 impl Link {
     pub(crate) fn new(emit: Emitter) -> Self {
         Self {
-            host: Arc::new(DesktopHost {
-                emit,
-                waiting: Arc::default(),
-                next_id: AtomicU64::new(0),
-            }),
-            server: Mutex::new(None),
+            bridge: AppBridge::new(emit),
         }
     }
 
-    fn current(&self) -> Option<Arc<LinkServer>> {
-        self.server.lock().expect("link server").clone()
-    }
-
-    fn running(&self) -> Result<Arc<LinkServer>, CallError> {
-        self.current()
-            .ok_or_else(|| CallError::failure("Mornye Link is not running"))
-    }
-
-    /// `linkStart {"name", "port"?}`. Restarts a running server.
+    /// `linkStart {"name", "port"?, "platform"?, "features"?}`. Restarts a
+    /// running server.
     pub(crate) fn start(&self, config: &Config, args: &Args) -> CallResult {
-        let port = match args.i64("port") {
-            None => 0,
-            Some(port) => u16::try_from(port)
-                .map_err(|_| CallError::invalid_arguments("port must be between 0 and 65535"))?,
-        };
-        let link_config = LinkConfig {
-            state_dir: state_dir(config)?,
-            temp_dir: config.temp_dir.clone(),
-            name: args.string("name", ""),
-            port,
-            ffmpeg_path: config.ffmpeg_path.clone(),
-            app_version: config.app_version.clone(),
-        };
-        let mut slot = self.server.lock().expect("link server");
-        if let Some(previous) = slot.take() {
-            stop(previous);
+        let started = self
+            .bridge
+            .start(&paths(config), args.value())
+            .map_err(error)?;
+        if let Some(error) = started.discovery_error {
+            crate::runtime::log("warn", &error);
         }
-        let host: Arc<dyn Host> = self.host.clone();
-        let server = LinkServer::start(link_config, host).map_err(CallError::failure)?;
-        if let Some(error) = server.discovery_error() {
-            crate::runtime::log("warn", error);
-        }
-        let summary = server.summary();
-        *slot = Some(Arc::new(server));
-        Ok(summary.into())
+        Ok(started.summary.into())
     }
 
     /// `linkStop`. Safe when stopped.
     pub(crate) fn stop(&self) {
-        let server = self.server.lock().expect("link server").take();
-        if let Some(server) = server {
-            stop(server);
-        }
+        self.bridge.stop();
     }
 
     /// `linkStatus`: `{"running": false, "receivedDir"}` while stopped
     /// (`receivedDir` only once `app_support_dir` is configured).
     pub(crate) fn status(&self, config: &Config) -> Value {
-        if let Some(server) = self.current() {
-            return server.status();
-        }
-        let mut status = json!({"running": false});
-        if let Ok(dir) = state_dir(config) {
-            status["receivedDir"] = Value::from(mornye_link::received_dir(&dir).to_string_lossy());
-        }
-        status
+        self.bridge.status(&paths(config))
     }
 
     /// `linkSetCatalog {"path"}`.
     pub(crate) fn set_catalog(&self, args: &Args) -> CallResult {
-        let path = args
-            .opt_string("path")
-            .filter(|path| !path.is_empty())
-            .ok_or_else(|| CallError::invalid_arguments("path is required"))?;
-        let server = self.running()?;
-        server
-            .set_catalog(Path::new(path))
-            .map(Reply::from)
-            .map_err(CallError::failure)
+        reply(self.bridge.set_catalog(args.value()))
     }
 
     /// `linkBeginPairing`.
     pub(crate) fn begin_pairing(&self) -> CallResult {
-        self.running()?
-            .begin_pairing()
-            .map(Reply::from)
-            .map_err(CallError::failure)
+        reply(self.bridge.begin_pairing())
     }
 
     /// `linkEndPairing`. Safe when stopped.
     pub(crate) fn end_pairing(&self) {
-        if let Some(server) = self.current() {
-            server.end_pairing();
-        }
+        self.bridge.end_pairing();
     }
 
     /// `linkDevices`; while stopped, the stored devices.
     pub(crate) fn devices(&self, config: &Config) -> CallResult {
-        match self.current() {
-            Some(server) => Ok(server.devices().into()),
-            None => mornye_link::stored_devices(&state_dir(config)?)
-                .map(Reply::from)
-                .map_err(CallError::failure),
-        }
+        reply(self.bridge.devices(&paths(config)))
     }
 
     /// `linkRevoke {"deviceId"}`; works while stopped too.
     pub(crate) fn revoke(&self, config: &Config, args: &Args) -> CallResult {
-        let device_id = required(args, "deviceId")?;
-        let revoked = match self.current() {
-            Some(server) => server.revoke(device_id),
-            None => mornye_link::revoke_stored(&state_dir(config)?, device_id),
-        };
-        revoked.map(Reply::from).map_err(CallError::failure)
+        reply(self.bridge.revoke(&paths(config), args.value()))
     }
 
     /// `linkCreateKey {"name"}`.
     pub(crate) fn create_key(&self, args: &Args) -> CallResult {
-        self.running()?
-            .create_key(&args.string("name", ""))
-            .map(Reply::from)
-            .map_err(CallError::failure)
+        reply(self.bridge.create_key(args.value()))
     }
 
     /// `linkReply {"requestId", "result"?, "error"?: {"code", "message"}}`.
-    /// A reply to a request that already timed out is ignored.
     pub(crate) fn reply(&self, args: &Args) -> CallResult {
-        let request_id = required(args, "requestId")?;
-        let value = args.value();
-        let reply = match value.get("error").filter(|error| !error.is_null()) {
-            Some(error) => {
-                let text = |key: &str| error.get(key).and_then(Value::as_str).unwrap_or("");
-                let code = Some(text("code"))
-                    .filter(|code| !code.is_empty())
-                    .unwrap_or("error");
-                Err(HostError::new(code, text("message")))
-            }
-            None => Ok(value.get("result").cloned().unwrap_or(Value::Null)),
-        };
-        let sender = self
-            .host
-            .waiting
-            .lock()
-            .expect("link requests")
-            .remove(request_id);
-        if let Some(sender) = sender {
-            let _ = sender.send(reply);
-        }
-        Ok(Reply::null())
+        reply(self.bridge.reply(args.value()))
     }
 
-    /// `linkEmbeddedPictures {"paths": [String]}`: `{"pictures": [bool|null]}`,
-    /// whether each audio file embeds a picture the server would serve, null
-    /// when it is not a readable file. Works while stopped.
+    /// `linkEmbeddedPictures {"paths": [String]}`: `{"pictures": [bool|null]}`.
     pub(crate) fn embedded_pictures(&self, args: &Args) -> CallResult {
-        let paths = args
-            .value()
-            .get("paths")
-            .and_then(Value::as_array)
-            .filter(|paths| paths.len() <= MAX_PICTURE_PROBES)
-            .ok_or_else(|| {
-                CallError::invalid_arguments(format!(
-                    "paths must be a list of at most {MAX_PICTURE_PROBES} paths"
-                ))
-            })?;
-        let pictures: Vec<Value> = paths
-            .iter()
-            .map(|path| {
-                path.as_str()
-                    .filter(|path| !path.is_empty())
-                    .and_then(|path| mornye_link::embeds_picture(Path::new(path)))
-                    .map_or(Value::Null, Value::Bool)
-            })
-            .collect();
-        Ok(json!({"pictures": pictures}).into())
+        reply(self.bridge.embedded_pictures(args.value()))
     }
 
     /// `linkSend {"deviceId"?, "message"}`: `{"delivered": <int>}`.
     pub(crate) fn send(&self, args: &Args) -> CallResult {
-        let message = args
-            .value()
-            .get("message")
-            .filter(|message| !message.is_null())
-            .cloned()
-            .ok_or_else(|| CallError::invalid_arguments("message is required"))?;
-        let device_id = args.opt_string("deviceId").filter(|id| !id.is_empty());
-        let delivered = self
-            .current()
-            .map_or(0, |server| server.send(device_id, message));
-        Ok(json!({"delivered": delivered}).into())
+        reply(self.bridge.send(args.value()))
     }
 }
 
-/// Stops now when nothing else holds the server, else when the last call
-/// using it returns.
-fn stop(server: Arc<LinkServer>) {
-    if let Ok(server) = Arc::try_unwrap(server) {
-        server.stop();
+fn paths(config: &Config) -> BridgePaths {
+    BridgePaths {
+        app_support_dir: config.app_support_dir.clone(),
+        temp_dir: config.temp_dir.clone(),
+        ffmpeg_path: config.ffmpeg_path.clone(),
+        app_version: config.app_version.clone(),
     }
 }
 
-/// `<app_support_dir>/link`.
-fn state_dir(config: &Config) -> Result<PathBuf, CallError> {
-    if config.app_support_dir.as_os_str().is_empty() {
-        return Err(CallError::failure("app_support_dir is not configured"));
+fn error(error: BridgeError) -> CallError {
+    match error {
+        BridgeError::Invalid(message) => CallError::invalid_arguments(message),
+        BridgeError::Failure(message) => CallError::failure(message),
     }
-    Ok(config.app_support_dir.join("link"))
 }
 
-fn required<'a>(args: &'a Args, key: &str) -> Result<&'a str, CallError> {
-    args.opt_string(key)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| CallError::invalid_arguments(format!("{key} is required")))
+fn reply(result: Result<Value, BridgeError>) -> CallResult {
+    result.map(Reply::from).map_err(error)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
-    type Calls = Arc<Mutex<Vec<(String, Value)>>>;
-
-    fn link() -> (Link, Calls) {
-        let calls: Calls = Arc::default();
-        let recorded = Arc::clone(&calls);
-        let link = Link::new(Arc::new(move |method, args| {
-            recorded.lock().unwrap().push((method.to_owned(), args));
-        }));
-        (link, calls)
+    fn link() -> Link {
+        Link::new(Arc::new(|_, _| {}))
     }
 
     fn args(value: Value) -> Args {
         Args::decode(value.to_string().as_bytes(), None).unwrap()
     }
 
-    fn block_on<T>(future: impl Future<Output = T>) -> T {
-        tokio::runtime::Builder::new_current_thread()
-            .build()
-            .unwrap()
-            .block_on(future)
-    }
-
-    #[test]
-    fn link_reply_completes_the_pending_request() {
-        let (link, calls) = link();
-        let pending = link
-            .host
-            .request("state", "phone", json!({"_method": "GET"}));
-        let (method, arguments) = calls.lock().unwrap()[0].clone();
-        assert_eq!(method, "linkRequest");
-        assert_eq!(arguments["op"], "state");
-        assert_eq!(arguments["deviceId"], "phone");
-        assert_eq!(arguments["args"], json!({"_method": "GET"}));
-        let request_id = arguments["requestId"].as_str().unwrap().to_owned();
-
-        let replied = link
-            .reply(&args(
-                json!({"requestId": request_id, "result": {"playing": true}}),
-            ))
-            .unwrap();
-        assert_eq!(replied, Reply::null());
-        assert_eq!(block_on(pending), Ok(json!({"playing": true})));
-        assert!(link.host.waiting.lock().unwrap().is_empty());
-    }
-
-    #[test]
-    fn link_reply_errors_reach_the_server() {
-        let (link, calls) = link();
-        let pending = link.host.request("resolve", "phone", json!({}));
-        let request_id = calls.lock().unwrap()[0].1["requestId"].clone();
-        link.reply(&args(json!({
-            "requestId": request_id,
-            "error": {"code": "not_found", "message": "No such track"},
-        })))
-        .unwrap();
-        assert_eq!(
-            block_on(pending),
-            Err(HostError::new("not_found", "No such track"))
-        );
-    }
-
-    #[test]
-    fn abandoned_requests_are_forgotten() {
-        let (link, calls) = link();
-        let pending = link.host.request("state", "phone", json!({}));
-        let request_id = calls.lock().unwrap()[0].1["requestId"].clone();
-        drop(pending);
-        assert!(link.host.waiting.lock().unwrap().is_empty());
-        // A late reply is ignored.
-        assert_eq!(
-            link.reply(&args(json!({"requestId": request_id, "result": {}})))
-                .unwrap(),
-            Reply::null()
-        );
-        assert_eq!(
-            link.reply(&args(json!({}))).unwrap_err().code,
-            "invalid_arguments"
-        );
-    }
-
-    #[test]
-    fn events_become_inbound_calls() {
-        let (link, calls) = link();
-        link.host
-            .event("linkPairingEnded", json!({"reason": "expired"}));
-        assert_eq!(
-            calls.lock().unwrap()[0],
-            ("linkPairingEnded".to_owned(), json!({"reason": "expired"}))
-        );
-    }
-
     #[test]
     fn answers_while_stopped() {
-        let (link, _) = link();
+        let link = link();
         let dir = tempfile::tempdir().unwrap();
         let config = Config {
             app_support_dir: dir.path().to_owned(),
@@ -431,6 +162,15 @@ mod tests {
             Reply::Json(json!({"delivered": 0}))
         );
         assert!(link.send(&args(json!({}))).is_err());
+        assert_eq!(
+            link.reply(&args(json!({"requestId": "gone", "result": {}})))
+                .unwrap(),
+            Reply::null()
+        );
+        assert_eq!(
+            link.reply(&args(json!({}))).unwrap_err().code,
+            "invalid_arguments"
+        );
         let notes = dir.path().join("notes.txt");
         std::fs::write(&notes, b"no audio").unwrap();
         assert_eq!(
@@ -440,7 +180,7 @@ mod tests {
             .unwrap(),
             Reply::Json(json!({"pictures": [false, null, null, null]}))
         );
-        let many = vec![""; MAX_PICTURE_PROBES + 1];
+        let many = vec![""; mornye_link::bridge::MAX_PICTURE_PROBES + 1];
         for bad in [json!({}), json!({"paths": "x"}), json!({"paths": many})] {
             assert_eq!(
                 link.embedded_pictures(&args(bad)).unwrap_err().code,

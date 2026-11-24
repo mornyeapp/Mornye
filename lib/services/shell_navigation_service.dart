@@ -236,7 +236,6 @@ class ShellNavigationService {
     return ShellTab.settings;
   }
 
-  /// Records a destination visit into navigation history.
   static void recordTabVisit(ShellTab tab) {
     if (_isNavigatingHistory) return;
     if (_currentTab == null) {
@@ -256,7 +255,6 @@ class ShellNavigationService {
   /// Whether destination history has a later destination.
   static bool get canNavigateForward => _forwardHistory.any(_canRevisit);
 
-  /// Returns to the previously visited destination.
   static bool navigateBack() => _travel(_backHistory, _forwardHistory);
 
   /// Returns to the destination left by [navigateBack].

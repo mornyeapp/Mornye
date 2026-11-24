@@ -1,8 +1,10 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/page_transitions.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 
 /// Flutter counterpart of Mornye's iPhone visual system. Reference values come
 /// from AccentColor.colorset, Components.swift, PlayerViews.swift and Motion.md
@@ -121,10 +123,11 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
   // Theme construction includes seeded color generation and typography. Reuse
   // identical themes across routes; bound artwork-derived variants so browsing
   // many artists cannot grow the cache indefinitely. Platform is part of the
-  // key because it controls fonts and route transitions.
+  // key because it controls fonts and route transitions; desktop because it
+  // sets the tooltip delay.
   static final _themeCache =
       <
-        (TargetPlatform, Brightness, Color?, MornyeAccent, bool, String?),
+        (TargetPlatform, bool, Brightness, Color?, MornyeAccent, bool, String?),
         ThemeData
       >{};
   static final _glassVariants = Expando<ThemeData>();
@@ -140,6 +143,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
   }) {
     final key = (
       defaultTargetPlatform,
+      isDesktopPlatform,
       brightness,
       chromeSurface,
       accent,
@@ -369,13 +373,12 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
         bodyColor: scheme.onPrimary,
         displayColor: scheme.onPrimary,
       ),
-      pageTransitionsTheme: const PageTransitionsTheme(
-        builders: {
-          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
-          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-        },
-      ),
+      pageTransitionsTheme: mornyePageTransitionsTheme,
+      // Desktop help tags wait for a deliberate hover, as the sidebar rows
+      // already do, instead of flashing while the pointer passes.
+      tooltipTheme: isDesktopPlatform
+          ? const TooltipThemeData(waitDuration: Duration(milliseconds: 800))
+          : null,
       appBarTheme: AppBarTheme(
         backgroundColor: surface,
         foregroundColor: accent,

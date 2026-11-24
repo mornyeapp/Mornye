@@ -1,20 +1,22 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart' show MediaItem;
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_draft.dart';
 import 'package:mornye/utils/string_utils.dart';
+import 'package:mornye/utils/text_direction.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -46,11 +48,10 @@ Future<void> openLyricsEditor(
   BuildContext context,
   PlayerMetadataController metadata,
 ) async {
-  final item = metadata.item;
-  final source = metadata.source;
-  if (item == null || source == null || !canEditPlayerLyrics(metadata)) {
-    return;
-  }
+  if (!canEditPlayerLyrics(metadata)) return;
+  final edit = metadata.beginLyricsEdit();
+  if (edit == null) return;
+  final source = edit.source;
   final l10n = context.l10n;
   // Only SMB and WebDAV network songs can be rewritten in place.
   if (source.startsWith('network://') &&
@@ -69,7 +70,7 @@ Future<void> openLyricsEditor(
     // button ask first.
     enableDrag: false,
     dialogSize: AppDialogSize.wide,
-    builder: (_) => LyricsEditorSheet(metadata: metadata, item: item),
+    builder: (_) => LyricsEditorSheet(metadata: metadata, edit: edit),
   );
   if (saved == true && context.mounted) {
     showAppSnackBar(context, content: Text(l10n.lyricsEditSaved));
@@ -83,11 +84,12 @@ class LyricsEditorSheet extends ConsumerStatefulWidget {
   const LyricsEditorSheet({
     super.key,
     required this.metadata,
-    required this.item,
+    required this.edit,
   });
 
   final PlayerMetadataController metadata;
-  final MediaItem item;
+  final PlayerLyricsEdit edit;
+  MediaItem get item => edit.item;
 
   @override
   ConsumerState<LyricsEditorSheet> createState() => _LyricsEditorSheetState();
@@ -96,6 +98,8 @@ class LyricsEditorSheet extends ConsumerStatefulWidget {
 class _EditorLine {
   _EditorLine(this.base) : time = base.time {
     text.text = base.text;
+    direction.value = strongTextDirection(base.text);
+    text.addListener(_updateDirection);
   }
 
   final LyricsDraftLine base;
@@ -104,11 +108,19 @@ class _EditorLine {
   final key = GlobalKey();
   Duration? time;
 
+  /// The line's own direction, by its first letter; null follows the
+  /// editor's. It changes only when that letter's script does, so typing
+  /// does not rebuild the field.
+  final direction = ValueNotifier<TextDirection?>(null);
+
+  void _updateDirection() => direction.value = strongTextDirection(text.text);
+
   LyricsDraftLine get draft =>
       base.copyWith(time: time, clearTime: time == null, text: text.text);
 
   void dispose() {
     text.dispose();
+    direction.dispose();
     focus.dispose();
   }
 }
@@ -116,9 +128,7 @@ class _EditorLine {
 class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
   static const _nudgeStep = Duration(milliseconds: 100);
 
-  late final LyricsDraft _original = LyricsDraft.parse(
-    widget.metadata.rawLyrics,
-  );
+  late final LyricsDraft _original = LyricsDraft.parse(widget.edit.rawLyrics);
   late final String _originalLrc = _original.toLrc();
   late final List<_EditorLine> _lines = [
     for (final line in _original.lines) _track(_EditorLine(line)),
@@ -133,6 +143,7 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
   @override
   void initState() {
     super.initState();
+    widget.metadata.addListener(_onMetadataChanged);
     // Start where syncing would: the first line without a time.
     final untimed = _lines.indexWhere((line) => line.time == null);
     _selected = untimed < 0 ? 0 : untimed;
@@ -140,10 +151,18 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
 
   @override
   void dispose() {
+    widget.metadata.removeListener(_onMetadataChanged);
     for (final line in _lines) {
       line.dispose();
     }
     super.dispose();
+  }
+
+  bool get _editingCurrentTrack =>
+      widget.metadata.isCurrentLyricsEdit(widget.edit);
+
+  void _onMetadataChanged() {
+    if (mounted) setState(() {});
   }
 
   _EditorLine _track(_EditorLine line) {
@@ -179,22 +198,30 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = _lines[index].key.currentContext;
       if (context == null || !context.mounted) return;
+      // The list moves as content, on a spring that stops at its place
+      // instead of scrolling past it: Material's slow spatial spring is
+      // critically damped, and Mornye's standard one has no bounce.
+      final motion = AppMotion.spatialSlow(
+        context,
+        const AppMotionSpec(Duration.zero, Curves.linear),
+        mornye: MornyeMotion.standard,
+      );
       Scrollable.ensureVisible(
         context,
         alignment: 0.4,
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
+        duration: motion.duration,
+        curve: motion.curve,
       );
     });
   }
 
   /// Where playback is now, extrapolated between position updates.
-  Duration get _position =>
-      ref.read(playbackStateProvider).value?.position ?? Duration.zero;
+  Duration get _position => _editingCurrentTrack
+      ? ref.read(playbackStateProvider).value?.position ?? Duration.zero
+      : Duration.zero;
 
   void _setTime() {
+    if (!_editingCurrentTrack) return;
     final ms = (_position.inMilliseconds / 10).round() * 10;
     setState(() {
       _lines[_selected].time = Duration(milliseconds: ms);
@@ -218,7 +245,7 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
   void _seekTo(int index) {
     final time = _lines[index].time;
     _select(index);
-    if (time != null) {
+    if (time != null && _editingCurrentTrack) {
       unawaited(ref.read(musicPlayerControllerProvider).seek(time));
     }
   }
@@ -265,7 +292,7 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
     if (_saving || !_dirty) return;
     setState(() => _saving = true);
     try {
-      await widget.metadata.saveEditedLyrics(_draft.toLrc());
+      await widget.metadata.saveEditedLyrics(_draft.toLrc(), edit: widget.edit);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -397,7 +424,7 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
     Duration? latest;
     for (var i = 0; i < _lines.length; i++) {
       final time = _lines[i].time;
-      if (time == null || time > position) continue;
+      if (!_editingCurrentTrack || time == null || time > position) continue;
       if (latest == null || time >= latest) {
         latest = time;
         playing = i;
@@ -438,7 +465,7 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
             playing: index == playing,
             outOfOrder: time != null && previous != null && time < previous,
             onSelect: () => _select(index),
-            onSeek: () => _seekTo(index),
+            onSeek: _editingCurrentTrack ? () => _seekTo(index) : null,
             onMenu: (position) => _showLineMenu(index, position),
           ),
         );
@@ -452,7 +479,9 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
     final scheme = theme.colorScheme;
     final mornye = context.isMornye;
     final controller = ref.read(musicPlayerControllerProvider);
-    final playing = ref.watch(playbackPlayingProvider);
+    final active = _editingCurrentTrack;
+    final playing = ref.watch(playbackPlayingProvider) && active;
+    final position = ref.watch(playbackPositionProvider);
     final duration = widget.item.duration ?? Duration.zero;
     final timeStyle = theme.textTheme.labelMedium?.copyWith(
       color: scheme.onSurfaceVariant,
@@ -470,7 +499,7 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
     final playButton = AppIconButton.filledTonal(
       tooltip: playing ? l10n.actionPause : l10n.tooltipPlay,
       isSelected: playing,
-      onPressed: () => controller.togglePlayPause(playing),
+      onPressed: active ? () => controller.togglePlayPause(playing) : null,
       icon: AppIcon.adaptive(
         mornye ? CupertinoIcons.play_fill : Icons.play_arrow,
       ),
@@ -484,7 +513,7 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
         key: const ValueKey('lyrics-editor-set-time'),
         tonal: true,
         outlined: mornye,
-        onPressed: _saving ? null : _setTime,
+        onPressed: _saving || !active ? null : _setTime,
         icon: const AppIcon(Icons.timer_outlined),
         label: Text(l10n.lyricsEditSetTime),
       ),
@@ -506,15 +535,17 @@ class _LyricsEditorSheetState extends ConsumerState<LyricsEditorSheet> {
             Row(
               children: [
                 Text(
-                  formatClock(ref.watch(playbackPositionProvider).inSeconds),
+                  formatClock(active ? position.inSeconds : 0),
                   style: timeStyle,
                 ),
                 Expanded(
                   child: PlaybackSeekSlider(
                     key: ValueKey(widget.item.id),
-                    position: ref.watch(playbackPositionProvider),
-                    duration: duration,
-                    onSeek: controller.seek,
+                    position: active ? position : Duration.zero,
+                    duration: active ? duration : Duration.zero,
+                    onSeek: (position) async {
+                      if (_editingCurrentTrack) await controller.seek(position);
+                    },
                     playing: playing,
                   ),
                 ),
@@ -623,7 +654,7 @@ class _LyricsEditorRow extends StatelessWidget {
   final bool playing;
   final bool outOfOrder;
   final VoidCallback onSelect;
-  final VoidCallback onSeek;
+  final VoidCallback? onSeek;
   final ValueChanged<Offset> onMenu;
 
   @override
@@ -655,6 +686,8 @@ class _LyricsEditorRow extends StatelessWidget {
           ? l10n.lyricsEditNoTime
           : outOfOrder
           ? l10n.lyricsEditOutOfOrder
+          : onSeek == null
+          ? timeLabel
           : l10n.lyricsEditPlayFrom(timeLabel),
       child: Semantics(
         button: time != null,
@@ -664,7 +697,7 @@ class _LyricsEditorRow extends StatelessWidget {
           shape: const StadiumBorder(),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: time == null ? onSelect : onSeek,
+            onTap: time == null || onSeek == null ? onSelect : onSeek,
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 minHeight: tokens.minTouchTarget,
@@ -712,28 +745,34 @@ class _LyricsEditorRow extends StatelessWidget {
                 timeChip,
                 const SizedBox(width: 4),
                 Expanded(
-                  child: TextField(
-                    controller: line.text,
-                    focusNode: line.focus,
-                    minLines: 1,
-                    maxLines: null,
-                    // The field grows with its text, so it never needs to
-                    // scroll; a wheel or trackpad over a line then scrolls
-                    // the list instead of nudging the text inside its row.
-                    scrollPhysics: const NeverScrollableScrollPhysics(),
-                    textInputAction: TextInputAction.done,
-                    style: theme.textTheme.bodyLarge?.copyWith(color: onFill),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      hintText: l10n.lyricsEditLineHint,
-                      hintStyle: theme.textTheme.bodyLarge?.copyWith(
-                        color: onFill.withValues(alpha: 0.5),
+                  child: ValueListenableBuilder<TextDirection?>(
+                    valueListenable: line.direction,
+                    builder: (context, direction, _) => TextField(
+                      controller: line.text,
+                      focusNode: line.focus,
+                      textDirection: direction,
+                      minLines: 1,
+                      maxLines: null,
+                      // The field grows with its text, so it never needs to
+                      // scroll; a wheel or trackpad over a line then scrolls
+                      // the list instead of nudging the text inside its row.
+                      scrollPhysics: const NeverScrollableScrollPhysics(),
+                      textInputAction: TextInputAction.done,
+                      style: theme.textTheme.bodyLarge?.copyWith(color: onFill),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                        hintText: l10n.lyricsEditLineHint,
+                        hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                          color: onFill.withValues(alpha: 0.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),

@@ -19,16 +19,22 @@ internal fun NativeDownloadFinalizer.finalizeAutoConversion(
         bitrate = input.request.optString("auto_convert_bitrate", ""),
         maxBitDepth = input.request.optInt("auto_convert_max_bit_depth", 16),
         maxSampleRate = input.request.optInt("auto_convert_max_sample_rate", 48000),
+        smartDither = input.request.optBoolean("auto_convert_smart_dither", true),
+        smartDitherHighPass = input.request.optBoolean(
+            "auto_convert_smart_dither_high_pass",
+            false,
+        ),
     ) ?: return
-    if (target.codec == "flac") {
+    val label = target.codec.uppercase(Locale.ROOT)
+    if (target.isLossless) {
         refreshFinalAudioQualityMetadata(context, input.result, state)
         val codec = normalizeAudioCodec(state.audioCodec).orEmpty()
         if (!NativeFinalizationPolicy.isLosslessAudioCodec(codec)) return
         check(target.maxBitDepth == null || state.bitDepth != null) {
-            "Cannot inspect source bit depth for FLAC conversion"
+            "Cannot inspect source bit depth for $label conversion"
         }
         check(target.maxSampleRate == null || state.sampleRate != null) {
-            "Cannot inspect source sample rate for FLAC conversion"
+            "Cannot inspect source sample rate for $label conversion"
         }
     }
     if (
@@ -59,9 +65,9 @@ internal fun NativeDownloadFinalizer.finalizeAutoConversion(
             "aac" -> "-v error -hide_banner -i ${q(localInput)} -codec:a aac -b:a $bitrate -map 0:a -f mp4 ${q(stagedOutput)} -y"
             else -> "-v error -hide_banner -i ${q(localInput)} -codec:a libmp3lame -b:a $bitrate -map 0:a -id3v2_version 3 ${q(stagedOutput)} -y"
         }
-        val conversion = if (target.codec == "flac") {
+        val conversion = if (target.isLossless) {
             runFFmpegArguments(
-                NativeFinalizationPolicy.flacAutoConversionArguments(
+                NativeFinalizationPolicy.losslessAutoConversionArguments(
                     target, localInput, stagedOutput, state.bitDepth, state.sampleRate,
                 ).toTypedArray(),
                 shouldCancel,
@@ -72,7 +78,7 @@ internal fun NativeDownloadFinalizer.finalizeAutoConversion(
         if (!conversion.first || !File(stagedOutput).exists()) {
             throw IllegalStateException("automatic conversion failed: ${conversion.second}")
         }
-        val metadataFormat = if (target.codec == "aac") "m4a" else target.codec
+        val metadataFormat = if (target.extension == ".m4a") "m4a" else target.codec
         embedBasicMetadata(context, stagedOutput, input, metadataFormat)
         if (!promoteStagedConversion(stagedOutput, output)) {
             throw IllegalStateException("failed to promote automatic conversion output")
@@ -94,20 +100,20 @@ internal fun NativeDownloadFinalizer.finalizeAutoConversion(
     }
 
     state.audioCodec = target.codec
-    if (target.codec == "flac") {
+    if (target.isLossless) {
         state.bitDepth = state.bitDepth?.let { depth -> target.maxBitDepth?.let { minOf(depth, it) } ?: depth }
         state.sampleRate = state.sampleRate?.let { rate -> target.maxSampleRate?.let { minOf(rate, it) } ?: rate }
         state.bitrateKbps = null
         state.quality = NativeFinalizationPolicy.displayAudioQuality(
-            state.filePath, state.fileName, state.bitDepth, state.sampleRate, null, "flac", null,
-        ) ?: "FLAC"
+            state.filePath, state.fileName, state.bitDepth, state.sampleRate, null, target.codec, null,
+        ) ?: label
         input.result.remove("actual_bitrate")
         input.result.remove("bitrate")
         input.result.put("actual_bit_depth", state.bitDepth)
         input.result.put("actual_sample_rate", state.sampleRate)
-        input.result.put("actual_container", "flac")
-        input.result.put("actual_extension", ".flac")
-        input.result.put("output_extension", ".flac")
+        input.result.put("actual_container", target.extension.removePrefix("."))
+        input.result.put("actual_extension", target.extension)
+        input.result.put("output_extension", target.extension)
     } else {
         state.quality = "${if (target.codec == "aac") "AAC" else target.codec.uppercase(Locale.ROOT)} ${target.bitrateKbps}kbps"
         state.bitDepth = null

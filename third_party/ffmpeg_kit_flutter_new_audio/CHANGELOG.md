@@ -1,3 +1,8 @@
+## 2.5.8
+
+* **Fixed: Windows apps raised an uncaught `FileSystemException` when no log callback was set.** By default, when no log callback is set, the plugin prints FFmpeg's logs to stdout. A Windows app started from Explorer, or from a console without redirected output, has no stdout handle, so the write failed and Dart reported it afterwards as an uncaught `FileSystemException: writeFrom failed ... (OS Error: The handle is invalid, errno = 6)`. Error reporters such as Sentry recorded it once per run, and apps that treat uncaught errors as fatal exited. The plugin now handles the failure and stops printing logs for the rest of the run. Where stdout works, the printed output is unchanged. No changes to the native libraries.
+* Tests: `test/ffmpeg_kit_flutter_initializer_test.dart` sends log events to a stdout that fails the same way and checks that no uncaught error is raised.
+
 ## 2.5.7
 
 * **Fixed: macOS release builds and App Store archives failed at code signing (#170).** The prebuilt 8.1.1 and 8.1.2 iOS and macOS framework zips on the GitHub releases, which versions 2.3.0 to 2.5.6 download, contained macOS metadata files (`._*` AppleDouble files) inside every framework. `codesign` refuses to sign a macOS framework with extra files in its root, so macOS builds through CocoaPods failed at the app's CodeSign step with `code object is not signed at all` and `In subcomponent: .../<one of the frameworks>.framework`. iOS builds through CocoaPods still worked, but the files were copied into the app and sealed into its signature. macOS builds that use Swift Package Manager were not affected.

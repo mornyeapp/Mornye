@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +12,7 @@ import 'package:mornye/services/update_checker.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/material_symbols.dart';
 import 'package:mornye/theme/mornye_icons.dart';
+import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_announcement_dialog.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -19,6 +20,8 @@ import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/update_dialog.dart';
+
+import 'support/tooltip_finder.dart';
 
 Widget _app(ThemeData theme, Widget home) => ProviderScope(
   child: MaterialApp(
@@ -161,6 +164,8 @@ void main() {
             ('Output format', 'MP3', 'Opus'),
             ('Output quality', '320 kbps', '160 kbps'),
             ('Output format', 'Opus', 'FLAC'),
+            // ALAC keeps the lossless limits and Smart Dither below.
+            ('Output format', 'FLAC', 'M4A (ALAC)'),
             ('Maximum bit depth', '16-bit', '24-bit'),
             ('Maximum sample rate', '48 kHz', '96 kHz'),
             (
@@ -202,7 +207,10 @@ void main() {
             final settings = container.read(settingsProvider);
             switch (picker) {
               case 'Output format':
-                expect(settings.autoConvertFormat, next.toLowerCase());
+                expect(
+                  autoConvertFormatLabel(settings.autoConvertFormat),
+                  next,
+                );
               case 'Output quality':
                 expect(settings.autoConvertBitrate, '160k');
               case 'Maximum bit depth':
@@ -222,6 +230,49 @@ void main() {
             await tester.pumpAndSettle();
             expect(find.byType(AppBottomSheet), findsNothing);
           }
+          expect(
+            container.read(settingsProvider).autoConvertSmartDither,
+            isTrue,
+          );
+          // The M3E button group builds each label twice.
+          Future<void> tapSmartType(String label) async {
+            final finder = find.text(label).first;
+            await tester.ensureVisible(finder);
+            await tester.pumpAndSettle();
+            await tester.tap(finder, warnIfMissed: false);
+            await tester.pumpAndSettle();
+          }
+
+          expect(find.text('Smart Dither type'), findsOneWidget);
+          expect(
+            container.read(settingsProvider).autoConvertSmartDitherHighPass,
+            isFalse,
+          );
+          await tapSmartType('TPDF HP');
+          expect(
+            container.read(settingsProvider).autoConvertSmartDitherHighPass,
+            isTrue,
+          );
+          await tapSmartType('TPDF');
+          expect(
+            container.read(settingsProvider).autoConvertSmartDitherHighPass,
+            isFalse,
+          );
+          final smartDither = find.text('Smart Dither');
+          await tester.ensureVisible(smartDither);
+          await tester.pumpAndSettle();
+          await tester.tap(smartDither);
+          await tester.pumpAndSettle();
+          expect(
+            container.read(settingsProvider).autoConvertSmartDither,
+            isFalse,
+          );
+          // Without Smart Dither the type choice is disabled.
+          await tapSmartType('TPDF HP');
+          expect(
+            container.read(settingsProvider).autoConvertSmartDitherHighPass,
+            isFalse,
+          );
           expect(tester.takeException(), isNull);
         } finally {
           semantics.dispose();
@@ -598,7 +649,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Service notice'), findsOneWidget);
       expect(dismissals, 0);
-      await tester.tap(find.byTooltip('Close'));
+      await tester.tap(findByTooltip('Close'));
       await tester.pumpAndSettle();
       expect(find.text('Service notice'), findsNothing);
       expect(dismissals, 1);

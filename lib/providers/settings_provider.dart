@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/models/home_shortcut.dart';
 import 'package:mornye/models/metadata_separators.dart';
 import 'package:mornye/models/automix_options.dart';
 import 'package:mornye/constants/app_info.dart';
@@ -120,6 +121,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
     'albums',
     'singles',
     'artists',
+    'genres',
     'playlists',
     'folders',
   };
@@ -643,11 +645,21 @@ class SettingsNotifier extends Notifier<AppSettings> {
     ),
   );
 
+  void setConfirmLoudVolume(bool enabled) =>
+      _commit(state.copyWith(confirmLoudVolume: enabled));
+
+  void setLoudVolumeLevel(int percent) {
+    if (!loudVolumeLevels.contains(percent)) return;
+    _commit(state.copyWith(loudVolumeLevel: percent));
+  }
+
   void setPauseOnMute(bool enabled) =>
       _commit(state.copyWith(pauseOnMute: enabled));
 
-  void setPlayOnHeadphonesConnected(bool enabled) =>
-      _commit(state.copyWith(playOnHeadphonesConnected: enabled));
+  void setHeadphoneResume(String mode) {
+    if (!headphoneResumeModes.contains(mode)) return;
+    _commit(state.copyWith(headphoneResume: mode));
+  }
 
   void setGaplessPlayback(bool enabled) =>
       _commit(state.copyWith(gaplessPlayback: enabled));
@@ -679,6 +691,19 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setAutoMixLowPass(bool enabled) =>
       _commit(state.copyWith(autoMixLowPass: enabled));
 
+  void setPlaybackSpeed(double speed) =>
+      _commit(state.copyWith(playbackSpeed: playbackSpeedFromJson(speed)));
+
+  void setPlaybackKeepPitch(bool keep) =>
+      _commit(state.copyWith(playbackKeepPitch: keep));
+
+  void setPlaybackPitch(double semitones) =>
+      _commit(state.copyWith(playbackPitch: playbackPitchFromJson(semitones)));
+
+  void resetPlaybackTempo() => _commit(
+    state.copyWith(playbackSpeed: 1, playbackKeepPitch: true, playbackPitch: 0),
+  );
+
   void setDiscordRichPresenceEnabled(bool enabled) =>
       _commit(state.copyWith(discordRichPresenceEnabled: enabled));
 
@@ -686,6 +711,10 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setAutoplayPersonalization(bool enabled) =>
       _commit(state.copyWith(autoplayPersonalization: enabled));
+
+  void setAutoplayRandomness(double value) => _commit(
+    state.copyWith(autoplayRandomness: autoplayRandomnessFromJson(value)),
+  );
 
   void setSongAnalysis(bool enabled) =>
       _commit(state.copyWith(songAnalysis: enabled));
@@ -711,8 +740,12 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLandscapeLyricsArtwork(bool enabled) =>
       _commit(state.copyWith(landscapeLyricsArtwork: enabled));
 
-  void setAutoHideLyricsControls(bool enabled) =>
-      _commit(state.copyWith(autoHideLyricsControls: enabled));
+  void setAutoHideLyricsControls(bool enabled) => _commit(
+    state.copyWith(
+      autoHideLyricsControls: enabled,
+      autoHideLyricsControlsWithAccessibility: enabled,
+    ),
+  );
 
   void setCompactPlayer(bool enabled) =>
       _commit(state.copyWith(compactPlayer: enabled));
@@ -730,9 +763,27 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setUsbAllowFixedVolume(bool enabled) =>
       _commit(state.copyWith(usbAllowFixedVolume: enabled));
 
+  void setUsbMaxSampleRate(int rate) =>
+      _commit(state.copyWith(usbMaxSampleRate: rate));
+
   void setDapExclusive(bool enabled) => _commit(
     state.copyWith(dapExclusive: enabled, usbDirect: enabled ? false : null),
   );
+
+  void setMedia3Engine(bool enabled) =>
+      _commit(state.copyWith(media3Engine: enabled));
+
+  void setSkipSilence(bool enabled) =>
+      _commit(state.copyWith(skipSilence: enabled));
+
+  void setSpatialAudio(bool enabled) =>
+      _commit(state.copyWith(spatialAudio: enabled));
+
+  void setQueueNoDuplicates(bool enabled) =>
+      _commit(state.copyWith(queueNoDuplicates: enabled));
+
+  void setQueueLocked(bool locked) =>
+      _commit(state.copyWith(queueLocked: locked));
 
   void setExclusiveOutput(bool enabled) =>
       _commit(state.copyWith(exclusiveOutput: enabled));
@@ -775,8 +826,28 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setKeepScreenOnLyrics(bool enabled) =>
       _commit(state.copyWith(keepScreenOnLyrics: enabled));
 
+  void setLockScreenLyrics(bool enabled) =>
+      _commit(state.copyWith(lockScreenLyrics: enabled));
+
   void setMotionArtworkEnabled(bool enabled) =>
       _commit(state.copyWith(motionArtworkEnabled: enabled));
+
+  void setSaveMotionArtworkFile(bool enabled) =>
+      _commit(state.copyWith(saveMotionArtworkFile: enabled));
+
+  void setSaveFolderCover(bool enabled) =>
+      _commit(state.copyWith(saveFolderCover: enabled));
+
+  void setFolderCoverMaxDimension(int maxDimension) => _commit(
+    state.copyWith(
+      folderCoverMaxDimension: _normalizeEmbeddedCoverMaxDimension(
+        maxDimension,
+      ),
+    ),
+  );
+
+  void setRemoveEmptyFolders(bool enabled) =>
+      _commit(state.copyWith(removeEmptyFolders: enabled));
 
   void setListeningStatisticsEnabled(bool enabled) =>
       _commit(state.copyWith(listeningStatisticsEnabled: enabled));
@@ -789,6 +860,11 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setLyricsProviders(List<String> providers) {
     _commit(state.copyWith(lyricsProviders: providers));
+    _syncLyricsSettingsToBackend();
+  }
+
+  void setLyricsPreferBestTiming(bool enabled) {
+    _commit(state.copyWith(lyricsPreferBestTiming: enabled));
     _syncLyricsSettingsToBackend();
   }
 
@@ -834,6 +910,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLyricsTranslationLanguage(String code) =>
       _commit(state.copyWith(lyricsTranslationLanguage: code.trim()));
 
+  void setLyricsTranslationSecondLanguage(String code) =>
+      _commit(state.copyWith(lyricsTranslationSecondLanguage: code.trim()));
+
   void setLyricsAiInstruction(String instruction) =>
       _commit(state.copyWith(lyricsAiInstruction: instruction.trim()));
 
@@ -843,8 +922,26 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLyricsAiRomanize(bool enabled) =>
       _commit(state.copyWith(lyricsAiRomanize: enabled));
 
+  void setLyricsRomanize(bool enabled) =>
+      _commit(state.copyWith(lyricsRomanize: enabled));
+
+  void setLyricsRomanizedMainLine(bool enabled) =>
+      _commit(state.copyWith(lyricsRomanizedMainLine: enabled));
+
   void setLyricsAiWordSync(bool enabled) =>
       _commit(state.copyWith(lyricsAiWordSync: enabled));
+
+  void setLyricsTranslationSaveTo(String target) => _commit(
+    state.copyWith(
+      lyricsTranslationSaveTo: lyricsTranslationSaveToFromJson(target),
+    ),
+  );
+
+  void setLyricsTranslationAutoSave(bool enabled) =>
+      _commit(state.copyWith(lyricsTranslationAutoSave: enabled));
+
+  void setLyricsTranslateDownloads(bool enabled) =>
+      _commit(state.copyWith(lyricsTranslateDownloads: enabled));
 
   Future<void> setFirstLaunchComplete() async {
     // The router leaves setup as soon as this flag changes. Persist the final
@@ -859,11 +956,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
     try {
       do {
         _saveQueued = false;
-        // A new install already has this release, so it skips its tour.
-        final completed = state.copyWith(
-          isFirstLaunch: false,
-          whatsNewSeen: AppInfo.whatsNewRelease,
-        );
+        final completed = state.copyWith(isFirstLaunch: false);
         if (!await prefs.setString(
           _settingsKey,
           jsonEncode(completed.toJson()),
@@ -926,6 +1019,13 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setHistorySortMode(String mode) =>
       _commit(state.copyWith(historySortMode: librarySortModeFromJson(mode)));
 
+  void setLibraryAlbumSortMode(String mode) => _commit(
+    state.copyWith(libraryAlbumSortMode: libraryAlbumSortModeFromJson(mode)),
+  );
+
+  void setLibraryArtistShowsSongs(bool songs) =>
+      _commit(state.copyWith(libraryArtistShowsSongs: songs));
+
   void setAskQualityBeforeDownload(bool enabled) =>
       _commit(state.copyWith(askQualityBeforeDownload: enabled));
 
@@ -945,6 +1045,13 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setSearchViewMode(String mode) =>
       _commit(state.copyWith(searchViewMode: mode));
 
+  void setHomeShortcuts(List<HomeShortcut> shortcuts) => _commit(
+    state.copyWith(homeShortcuts: [for (final s in shortcuts) s.name]),
+  );
+
+  void setHomeContinueListening(bool enabled) =>
+      _commit(state.copyWith(homeContinueListening: enabled));
+
   void setDefaultLibraryView(String view) => _commit(
     state.copyWith(defaultLibraryView: _normalizeDefaultLibraryView(view)),
   );
@@ -952,6 +1059,17 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLibraryQualityLabelMode(String mode) => _commit(
     state.copyWith(
       libraryQualityLabelMode: normalizeLibraryQualityLabelMode(mode),
+    ),
+  );
+
+  void setSwipeToQueue(bool enabled) =>
+      _commit(state.copyWith(swipeToQueue: enabled));
+
+  void setLibrarySongTap(String mode) => _commit(
+    state.copyWith(
+      librarySongTap: mode == AppSettings.librarySongTapPlay
+          ? AppSettings.librarySongTapPlay
+          : AppSettings.librarySongTapDetails,
     ),
   );
 
@@ -988,11 +1106,20 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setShowExtensionStore(bool enabled) =>
       _commit(state.copyWith(showExtensionStore: enabled));
 
+  void setAutoUpdateExtensions(bool enabled) =>
+      _commit(state.copyWith(autoUpdateExtensions: enabled));
+
   void setHeroAnimationsEnabled(bool enabled) =>
       _commit(state.copyWith(heroAnimationsEnabled: enabled));
 
   void setForceBackdropBlur(bool enabled) =>
       _commit(state.copyWith(forceBackdropBlur: enabled));
+
+  void setInterfaceScale(double scale) =>
+      _commit(state.copyWith(interfaceScale: interfaceScaleFromJson(scale)));
+
+  void setAnimationSpeed(double speed) =>
+      _commit(state.copyWith(animationSpeed: animationSpeedFromJson(speed)));
 
   void setExtensionVerificationBrowserMode(String mode) => _commit(
     state.copyWith(
@@ -1026,6 +1153,12 @@ class SettingsNotifier extends Notifier<AppSettings> {
       autoConvertMaxSampleRate: normalizeAutoConvertSampleRate(rate),
     ),
   );
+
+  void setAutoConvertSmartDither(bool enabled) =>
+      _commit(state.copyWith(autoConvertSmartDither: enabled));
+
+  void setAutoConvertSmartDitherHighPass(bool enabled) =>
+      _commit(state.copyWith(autoConvertSmartDitherHighPass: enabled));
 
   void setUseAllFilesAccess(bool enabled) =>
       _commit(state.copyWith(useAllFilesAccess: enabled));
@@ -1065,14 +1198,14 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLocalLibraryShowDuplicates(bool show) =>
       _commit(state.copyWith(localLibraryShowDuplicates: show));
 
+  void setLinkHideDisconnectedSongs(bool hide) =>
+      _commit(state.copyWith(linkHideDisconnectedSongs: hide));
+
   void setLocalLibraryAutoScan(String mode) =>
       _commit(state.copyWith(localLibraryAutoScan: mode));
 
   void setTutorialComplete() =>
       _commit(state.copyWith(hasCompletedTutorial: true));
-
-  void setWhatsNewSeen() =>
-      _commit(state.copyWith(whatsNewSeen: AppInfo.whatsNewRelease));
 
   void setDeduplicateDownloads(bool enabled) =>
       _commit(state.copyWith(deduplicateDownloads: enabled));
@@ -1095,6 +1228,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setPlayerShowVolume(bool visible) =>
       _commit(state.copyWith(playerShowVolume: visible));
+
+  void setPlayerShowLyricSnippet(bool visible) =>
+      _commit(state.copyWith(playerShowLyricSnippet: visible));
 }
 
 final settingsProvider = NotifierProvider<SettingsNotifier, AppSettings>(

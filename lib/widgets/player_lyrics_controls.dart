@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_motion.dart';
 
 /// Material's immersive lyrics: fades the controls and folds their height
@@ -50,6 +50,9 @@ class PlayerLyricsControlsCollapse extends StatelessWidget {
 }
 
 /// Fades controls without changing the lyric viewport or active scroll gesture.
+///
+/// Hidden controls stay mounted but stop animating: the time labels would
+/// otherwise roll their digits every second, a frame at a time, unseen.
 class PlayerLyricsControlsVisibility extends StatelessWidget {
   const PlayerLyricsControlsVisibility({
     super.key,
@@ -60,19 +63,27 @@ class PlayerLyricsControlsVisibility extends StatelessWidget {
   final bool hidden;
   final Widget child;
 
-  @override
-  Widget build(BuildContext context) => IgnorePointer(
-    ignoring: hidden,
-    child: ExcludeSemantics(
-      excluding: hidden,
-      child: AnimatedOpacity(
-        opacity: hidden ? 0 : 1,
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        child: child,
-      ),
-    ),
+  /// The fade, on the style's effects spring; reduced motion cuts.
+  static AppMotionSpec motion(BuildContext context) => AppMotion.effects(
+    context,
+    const AppMotionSpec(Duration.zero, Curves.linear),
+    mornye: MornyeMotion.effects,
   );
+
+  @override
+  Widget build(BuildContext context) {
+    final fade = motion(context);
+    return IgnorePointer(
+      ignoring: hidden,
+      child: ExcludeSemantics(
+        excluding: hidden,
+        child: AnimatedOpacity(
+          opacity: hidden ? 0 : 1,
+          duration: fade.duration,
+          curve: fade.curve,
+          child: TickerMode(enabled: !hidden, child: child),
+        ),
+      ),
+    );
+  }
 }

@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/track.dart';
@@ -61,6 +62,28 @@ StartupOrphanDecision reconcileStartupOrphanSuspects({
     confirmedIds: currentMissing.intersection(previousSuspectIds),
     pendingIds: currentMissing.difference(previousSuspectIds),
   );
+}
+
+/// Android hides other apps' audio from an app without media access, so a
+/// file missing from shared storage then proves nothing. The app's own
+/// folder under `Android/data` stays readable either way.
+bool _inAndroidSharedStorage(String path) =>
+    (path.startsWith('/storage/') || path.startsWith('/sdcard/')) &&
+    !path.contains('/Android/data/');
+
+Future<bool> _canReadAndroidSharedStorage() async {
+  for (final permission in [
+    Permission.audio,
+    Permission.storage,
+    Permission.manageExternalStorage,
+  ]) {
+    try {
+      if (await permission.isGranted) return true;
+    } catch (_) {
+      // An unanswered check is no grant.
+    }
+  }
+  return false;
 }
 
 bool historyItemsReferToSameStoredFile(
@@ -889,6 +912,10 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
     }
 
     const checkChunkSize = 16;
+    final sharedStorageReadable =
+        !Platform.isAndroid ||
+        regularEntries.isEmpty ||
+        await _canReadAndroidSharedStorage();
 
     for (var i = 0; i < regularEntries.length; i += checkChunkSize) {
       final end = (i + checkChunkSize < regularEntries.length)
@@ -901,7 +928,13 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
           final id = entry['id'] as String;
           final filePath = entry['file_path'] as String;
           try {
-            if (await fileExists(filePath)) return MapEntry(id, true);
+            // Only a confirmed absence removes a row: an unplugged drive, an
+            // unmounted share or a lost permission keeps the download.
+            var stored = await storedFileState(filePath);
+            if (stored == true) return MapEntry(id, true);
+            if (!sharedStorageReadable && _inAndroidSharedStorage(filePath)) {
+              stored = null;
+            }
 
             final moved = Platform.isAndroid || recoverMovedFiles
                 ? await DownloadFileRecovery(
@@ -922,7 +955,7 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
               return MapEntry(id, true);
             }
 
-            return MapEntry(id, false);
+            return MapEntry(id, stored);
           } catch (e) {
             _historyLog.w('Error checking file existence for $id: $e');
             return MapEntry(id, null);
@@ -931,6 +964,12 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       );
 
       for (final check in checks) {
+        if (check != null && check.value == null) {
+          _historyLog.d(
+            'Keeping download whose storage cannot be checked: ${check.key} '
+            '(${pathById[check.key] ?? ''})',
+          );
+        }
         if (check == null || check.value != false) continue;
         orphanedIds.add(check.key);
         _historyLog.d(

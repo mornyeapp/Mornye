@@ -1,5 +1,5 @@
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +25,7 @@ import 'package:mornye/widgets/track_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 class _Playback extends PlaybackController {
   final queues = <List<String>>[];
@@ -87,8 +88,11 @@ Future<_Playback> _pump(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        // These tests play songs with a tap on the row.
         settingsProvider.overrideWith(
-          () => FixedSettingsNotifier(const AppSettings()),
+          () => FixedSettingsNotifier(
+            const AppSettings(librarySongTap: AppSettings.librarySongTapPlay),
+          ),
         ),
         libraryDirectoryIndexProvider.overrideWith(
           (ref) async => index ?? _index(),
@@ -133,14 +137,15 @@ void main() {
     expect(find.text('$_root/Artist A/Album A'), findsOneWidget);
     expect(find.text('3 tracks'), findsOneWidget);
 
-    // A song's play button queues the folder's songs from it; the CUE
-    // track needs splitting first, so it stays out of the queue.
-    await tester.tap(
-      find.descendant(
-        of: find.widgetWithText(TrackCard, 'Song a2'),
-        matching: find.byTooltip('Play'),
-      ),
+    // A tap on a song queues the folder's songs from it, and its button
+    // opens the details instead; the CUE track needs splitting first, so it
+    // stays out of the queue.
+    final song = find.widgetWithText(TrackCard, 'Song a2');
+    expect(
+      find.descendant(of: song, matching: findByTooltip('Show details')),
+      findsOneWidget,
     );
+    await tester.tap(song);
     await tester.pumpAndSettle();
     expect(playback.queues.single, [_paths['a1'], _paths['a2']]);
     expect(playback.starts.single, 1);
@@ -348,7 +353,7 @@ void main() {
     // An opened folder takes the album pages' header.
     expect(find.text('$_root/Artist A/Album A'), findsOneWidget);
     expect(find.text('3 tracks'), findsOneWidget);
-    expect(find.byTooltip('Add to playlist'), findsOneWidget);
+    expect(findByTooltip('Add to playlist'), findsOneWidget);
     expect(find.text('Songs'), findsNothing);
     await tester.tap(find.text('Play'));
     await tester.pumpAndSettle();
@@ -359,8 +364,11 @@ void main() {
   test('Folders is a default Library view', () {
     final container = ProviderContainer(
       overrides: [
+        // These tests play songs with a tap on the row.
         settingsProvider.overrideWith(
-          () => FixedSettingsNotifier(const AppSettings()),
+          () => FixedSettingsNotifier(
+            const AppSettings(librarySongTap: AppSettings.librarySongTapPlay),
+          ),
         ),
       ],
     );

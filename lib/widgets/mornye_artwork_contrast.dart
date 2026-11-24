@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
+import 'package:mornye/widgets/mornye_player_background.dart'
+    show mornyeControlsDimAlpha;
 
 // Readback uses 8-bit sRGB. Cache each channel's exact Flutter luminance
 // contribution (6 KiB total), avoiding three powers and a Color per pixel.
@@ -30,24 +33,47 @@ final _blueLuminance = Float64List.fromList(
 double artworkPixelLuminance(int red, int green, int blue) =>
     _redLuminance[red] + _greenLuminance[green] + _blueLuminance[blue];
 
-/// Samples the rendered artwork and its fade, rather than an album palette.
-/// Static artwork is read again only after its scene or target geometry changes.
+/// The lightest background the player's white labels sit on undimmed: white
+/// keeps 3.5:1 on it, enough for the title and the controls. Mid-tone covers
+/// stay as bright as they are.
+const mornyeLabelBackgroundLuminance = 0.25;
+
+/// How much of the dark layer (0 none, 1 all of it) brings a label
+/// background of [luminance] down to [mornyeLabelBackgroundLuminance]. Black
+/// at an opacity scales the encoded pixel values, so the luminance falls by
+/// about that scale to the power 2.2. Steps of a twentieth keep a reading's
+/// noise from moving the layer.
+double mornyeDimStrength(double luminance) {
+  if (luminance <= mornyeLabelBackgroundLuminance) return 0;
+  final alpha =
+      1 - math.pow(mornyeLabelBackgroundLuminance / luminance, 1 / 2.2);
+  final strength = (alpha / mornyeControlsDimAlpha).clamp(0.0, 1.0);
+  return (strength * 20).round() / 20;
+}
+
+/// Samples the rendered still artwork and its fade, rather than an album
+/// palette, and reads it again only after its scene or target geometry
+/// changes. The player's labels stay white over every cover; this reports
+/// how much darker the lightest target must be for white text, so the player
+/// darkens behind the labels only as far as needed instead of turning them
+/// black. Moving artwork stays out: its frames would keep moving the layer,
+/// so it is always dimmed.
 class MornyeArtworkContrast extends StatefulWidget {
   const MornyeArtworkContrast({
     super.key,
     required this.enabled,
-    this.continuous = false,
     required this.targets,
-    required this.onChanged,
+    required this.onDim,
     required this.child,
   });
 
   final bool enabled;
-
-  /// Video textures can change without a new Flutter scene being submitted.
-  final bool continuous;
   final Map<String, GlobalKey> targets;
-  final ValueChanged<Map<String, Color>> onChanged;
+
+  /// Called after every reading with the strength of the dark layer white
+  /// labels need (see [mornyeDimStrength]). Keep that layer outside [child],
+  /// so it does not change what the sample reads.
+  final ValueChanged<double> onDim;
   final Widget child;
 
   @visibleForTesting
@@ -72,7 +98,6 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
   int _readbacks = 0;
   int? _sampledRevision;
   Map<String, Rect> _sampledTargets = {};
-  Map<String, Color> _colors = {};
 
   @override
   void initState() {
@@ -94,10 +119,7 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
   @override
   void didUpdateWidget(MornyeArtworkContrast oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.enabled != widget.enabled ||
-        oldWidget.continuous != widget.continuous) {
-      _schedule();
-    }
+    if (oldWidget.enabled != widget.enabled) _schedule();
   }
 
   void _schedule() {
@@ -105,15 +127,11 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
     _timer = null;
     _sampledRevision = null;
     _resamplePending = false;
-    if (!widget.enabled || !_tickersEnabled) {
-      _colors = {};
-      return;
-    }
+    if (!widget.enabled || !_tickersEnabled) return;
     // Playback can keep the Dart isolate alive after the UI is backgrounded.
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
     WidgetsBinding.instance.addPostFrameCallback((_) => _sample());
-    if (widget.continuous) _queueSample();
   }
 
   void _queueSample() {
@@ -124,10 +142,9 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
     // Composition also reports changes inside nested repaint boundaries, such
     // as a late image decode. Coalesce animation frames within one readback.
-    _timer = Timer(const Duration(milliseconds: 333), () async {
+    _timer = Timer(const Duration(milliseconds: 333), () {
       _timer = null;
-      await _sample();
-      if (mounted && widget.continuous) _queueSample();
+      _sample();
     });
   }
 
@@ -165,9 +182,7 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
     }
     final revision = boundary.revision;
     if (revision == null) return;
-    if (!widget.continuous &&
-        revision == _sampledRevision &&
-        mapEquals(targets, _sampledTargets)) {
+    if (revision == _sampledRevision && mapEquals(targets, _sampledTargets)) {
       return;
     }
     _sampling = true;
@@ -195,9 +210,8 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
       }
       _sampledRevision = revision;
       _sampledTargets = targets;
-      final next = <String, Color>{};
-      for (final entry in targets.entries) {
-        final rect = entry.value;
+      double? lightest;
+      for (final rect in targets.values) {
         final left = (rect.left * scale).floor().clamp(0, image.width);
         final right = (rect.right * scale).ceil().clamp(0, image.width);
         final top = (rect.top * scale).floor().clamp(0, image.height);
@@ -216,20 +230,12 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
           }
         }
         if (count == 0) continue;
-        // Prefer the player's white labels/icons while they retain 3:1
-        // contrast. Pastel frames need not switch to black merely because
-        // black has a higher contrast ratio. Hysteresis prevents flicker.
-        final threshold = _colors[entry.key] == Colors.black ? 0.28 : 0.30;
-        next[entry.key] = luminance / count > threshold
-            ? Colors.black
-            : Colors.white;
+        lightest = math.max(lightest ?? 0, luminance / count);
       }
-      if (next.entries.any((entry) => _colors[entry.key] != entry.value)) {
-        _colors = next;
-        widget.onChanged(next);
-      }
+      // One layer covers every label, so the lightest target sets it.
+      if (lightest != null) widget.onDim(mornyeDimStrength(lightest));
     } catch (_) {
-      // Unreadable surfaces keep the light controls over the dark fade.
+      // An unreadable surface keeps the current layer.
     } finally {
       image?.dispose();
       _sampling = false;

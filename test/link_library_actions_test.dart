@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -29,6 +29,7 @@ import 'package:mornye/utils/audio_conversion_utils.dart';
 
 import 'support/link_fakes.dart';
 import 'support/fixed_settings.dart';
+import 'support/tooltip_finder.dart';
 
 class _Extensions extends ExtensionNotifier {
   @override
@@ -127,6 +128,7 @@ void main() {
               const LosslessConversionProcessing(
                 dither: 'triangular',
                 resampler: 'soxr',
+                resamplerQuality: 'very_high',
               ),
               true,
             );
@@ -144,6 +146,8 @@ void main() {
           'maxSampleRate': 44100,
           'dither': 'triangular',
           'resampler': 'soxr',
+          'resamplerQuality': 'very_high',
+          'ditherHighPass': false,
         });
         expect(accepted, 1);
         // Ends like a conversion on this phone: progress, then the result.
@@ -179,7 +183,7 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(find.byTooltip('Show menu'));
+      await tester.tap(findByTooltip('Show menu'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       for (final label in [
@@ -292,6 +296,66 @@ void main() {
     );
   }
 
+  testWidgets('a host that changes no files says so and is asked nothing', (
+    tester,
+  ) async {
+    final client = FakeLinkClient(
+      server: linkTestServer.copyWith(
+        platform: 'android',
+        features: const <String>[],
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [linkPhoneClientProvider.overrideWithValue(client)],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await client.close();
+    });
+    // Its songs still count as the linked device's, so this phone's own
+    // file actions never run on them.
+    expect(hasLinkLibrarySongs(container, [item]), isTrue);
+
+    var selectionEnded = 0;
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => unawaited(
+                  runLinkLibraryAction(
+                    context,
+                    container,
+                    [item],
+                    LinkLibraryAction.delete,
+                    onAccepted: () => selectionEnded++,
+                  ),
+                ),
+                child: const Text('Remote delete'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Remote delete'));
+    await tester.pump();
+
+    expect(
+      find.text('Songs on Studio PC cannot be changed from this phone.'),
+      findsOneWidget,
+    );
+    // The selection sheet would cover the message.
+    expect(selectionEnded, 1);
+    expect(client.posts, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('mixed-device batch never sends an operation', (tester) async {
     final client = FakeLinkClient();
     final container = ProviderContainer(
@@ -402,7 +466,7 @@ void main() {
     expect(find.text('2 of 2 songs · 1 failed'), findsOneWidget);
     expect(find.text('Broken: Conversion failed'), findsOneWidget);
     expect(find.text('Next Song · 1 of 3 songs'), findsOneWidget);
-    expect(find.byTooltip('Stop after the current song'), findsOneWidget);
+    expect(findByTooltip('Stop after the current song'), findsOneWidget);
     // Reading tags is a step of an edit, not a change of its own.
     expect(find.text('Show details'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());

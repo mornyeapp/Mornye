@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/screens/settings/donate_page.dart';
 import 'package:mornye/services/app_remote_config_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -121,7 +121,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: MornyeTheme.build(brightness),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           locale: const Locale('id'),
           home: DonatePage(remoteConfigService: service),

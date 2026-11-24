@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/services/network_audio_analysis_input.dart';
+import 'package:mornye/services/network_file_editor.dart';
 import 'package:mornye/services/network_smb_client.dart';
 import 'package:mornye/services/network_storage_service.dart';
 
@@ -8,7 +10,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = null;
   test(
-    'SMB uploads, reconciles retries and deletes only the selected file',
+    'SMB uploads, edits, reconciles retries and deletes only the selected file',
     () async {
       final storage = NetworkStorageService(
         read: () async => null,
@@ -133,6 +135,37 @@ void main() {
         Uri.parse(collision).pathSegments.last,
         name.replaceFirst('.flac', ' (2).flac'),
       );
+
+      final input = NetworkAudioAnalysisInput(
+        storage: storage,
+        temporaryDirectory: () async => temp,
+      );
+      final changes = <String>[];
+      final editor = NetworkFileEditor(
+        storage: storage,
+        input: input,
+        changed: (source) async => changes.add(source),
+      );
+      final originalBytes = await audio.readAsBytes();
+      final editedBytes = [...originalBytes, ...'Updated metadata'.codeUnits];
+      expect(
+        await editor.edit(target, (path) async {
+          final working = File(path);
+          expect(await working.readAsBytes(), originalBytes);
+          await working.writeAsBytes(editedBytes);
+          return true;
+        }, succeeded: (saved) => saved),
+        isTrue,
+      );
+      expect(changes, [target]);
+      await input.withFile(target, (path) async {
+        expect(await File(path).readAsBytes(), editedBytes);
+      });
+      expect(await audio.readAsBytes(), originalBytes);
+      final editedEntries = await storage.list(c, '$parent/');
+      expect(editedEntries.map((entry) => entry.name), [name]);
+      expect(editedEntries.single.size, editedBytes.length);
+
       // A path without a trailing slash still must not delete a directory.
       expect(await storage.deleteFile('network://nas/$parent'), isFalse);
       expect(await storage.deleteFile(target), isTrue);

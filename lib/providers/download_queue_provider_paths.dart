@@ -453,6 +453,89 @@ extension _DownloadQueuePaths on DownloadQueueNotifier {
     };
   }
 
+  /// The folder, as relative parts, when downloads of [track] go to a folder
+  /// of their album alone, so files that belong to the whole album can sit
+  /// beside them. Planned again with a marker for the album name: a folder
+  /// that holds an album names it in its last part and nowhere else differs.
+  Future<List<String>?> _albumFolderParts(
+    Track track,
+    DownloadItem item,
+    AppSettings settings,
+    String quality,
+  ) async {
+    if (track.albumName.trim().isEmpty) return null;
+    const marker = 'mornyealbumfolder';
+    Future<List<String>> folder(Track value) async => _buildRelativeOutputDir(
+      value,
+      settings,
+      customFolderPath: await _resolveCustomFolderPath(
+        value,
+        item,
+        settings,
+        quality,
+      ),
+      playlistName: item.playlistName,
+    ).split('/').where((part) => part.isNotEmpty).toList();
+    final markedTrack = track.copyWith(albumName: marker);
+    // An album named like "Singles" counts as a single: renaming it must
+    // not move it out of the shared Singles folder.
+    if (settings.separateSingles &&
+        _shouldTreatAsSingleRelease(track) !=
+            _shouldTreatAsSingleRelease(markedTrack)) {
+      return null;
+    }
+    final planned = await folder(track);
+    final marked = await folder(markedTrack);
+    bool named(String part) => part.toLowerCase().contains(marker);
+    // A playlist folder or a shared Singles folder names no album.
+    if (marked.isEmpty || planned.length != marked.length) return null;
+    if (!named(marked.last)) return null;
+    for (var i = 0; i < marked.length; i++) {
+      if (!named(marked[i]) && marked[i] != planned[i]) return null;
+    }
+    return planned;
+  }
+
+  /// Whether the song of [track] saved at [filePath], or as a document in
+  /// [relativeDir], sits in a folder of its album alone, and not in one an
+  /// earlier copy of it was kept in.
+  Future<bool> _holdsAlbumFiles(
+    Track track,
+    DownloadItem item,
+    AppSettings settings,
+    String quality, {
+    required String filePath,
+    String? relativeDir,
+  }) async {
+    final parts = await _albumFolderParts(track, item, settings, quality);
+    return parts != null && _isInAlbumFolder(filePath, relativeDir, parts);
+  }
+
+  bool _isInAlbumFolder(
+    String filePath,
+    String? relativeDir,
+    List<String> parts,
+  ) {
+    final List<String> folder;
+    if (isContentUri(filePath)) {
+      folder = (relativeDir ?? '').split('/');
+    } else if (filePath.startsWith('network://')) {
+      final segments = Uri.tryParse(filePath)?.pathSegments ?? const [];
+      folder = segments.isEmpty
+          ? const []
+          : segments.sublist(0, segments.length - 1);
+    } else {
+      folder = p.split(p.dirname(filePath));
+    }
+    final named = folder.where((part) => part.isNotEmpty).toList();
+    if (named.length < parts.length) return false;
+    final tail = named.sublist(named.length - parts.length);
+    for (var i = 0; i < parts.length; i++) {
+      if (tail[i] != parts[i]) return false;
+    }
+    return true;
+  }
+
   String _joinRelativePath(String prefix, String suffix) {
     if (prefix.isEmpty) return suffix;
     if (suffix.isEmpty) return prefix;

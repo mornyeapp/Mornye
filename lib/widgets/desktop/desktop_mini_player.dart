@@ -296,7 +296,8 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
   int _shiftedOffsetMs = 0;
   List<LyricLine> _shifted = const [];
 
-  /// [lines] with the lyrics timing setting applied, kept while neither
+  /// [lines] with the lyrics timing (app-wide plus the song's) applied, kept
+  /// while neither
   /// changes so word-timed lines keep their sweep across rebuilds.
   List<LyricLine> _withOffset(List<LyricLine> lines, int offsetMs) {
     if (!identical(lines, _shiftedSource) || offsetMs != _shiftedOffsetMs) {
@@ -399,17 +400,27 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
         builder: (context, ref, _) {
           final lines = _withOffset(
             lyrics.lines,
-            ref.watch(themeProvider.select((theme) => theme.lyricsOffsetMs)),
+            ref.watch(
+              lyricsOffsetMsForSongProvider(
+                songLyricsOffsetKeyOf(metadata.item),
+              ),
+            ),
           );
           final current = _followPlayback(ref, lines);
           final next = _leadLineAfter(lines, current);
+          final lineFade = AppMotion.effects(
+            context,
+            const AppMotionSpec(Duration.zero, Curves.linear),
+            mornye: MornyeMotion.effects,
+          );
           return Padding(
             padding: const EdgeInsets.only(top: 10),
             child: SingleChildScrollView(
+              // The lines cross-fade on the effects spring of the style.
               child: AnimatedSwitcher(
-                duration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 220),
+                duration: lineFade.duration,
+                switchInCurve: lineFade.curve,
+                switchOutCurve: lineFade.leaving,
                 layoutBuilder: (current, previous) => Stack(
                   alignment: AlignmentDirectional.topStart,
                   children: [...previous, ?current],
@@ -417,7 +428,7 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
                 child: Column(
                   key: ValueKey(current),
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (current >= 0)
                       if (lines[current].hasWordTiming)
@@ -435,6 +446,11 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
                       else
                         Text(
                           lines[current].text,
+                          // Each line reads, and aligns, in its own
+                          // direction.
+                          textDirection: strongTextDirection(
+                            lines[current].text,
+                          ),
                           style: textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: colorScheme.onSurface,
@@ -445,6 +461,7 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
                     if (next >= 0)
                       Text(
                         lines[next].text,
+                        textDirection: strongTextDirection(lines[next].text),
                         style: textTheme.bodyLarge?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),

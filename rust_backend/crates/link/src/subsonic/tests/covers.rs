@@ -1,6 +1,10 @@
 use super::*;
-use crate::subsonic::covers::{CACHE_DIR, embeds_picture, read_picture, trim_cache};
+use crate::subsonic::covers::{
+    CACHE_DIR, Resizes, TRIM_SLACK, count_stored, embeds_picture, read_picture, trim_cache,
+};
 use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 
 fn cached_files(fixture: &Fixture) -> Vec<PathBuf> {
     std::fs::read_dir(fixture.shared.config.temp_dir.join(CACHE_DIR))
@@ -174,7 +178,7 @@ async fn undecodable_covers_are_served_as_they_are() {
 
 /// A minimal FLAC file: STREAMINFO, then `block` as the last metadata block
 /// of type `kind`, then a frame sync code.
-fn flac(kind: u8, block: &[u8]) -> Vec<u8> {
+pub(super) fn flac(kind: u8, block: &[u8]) -> Vec<u8> {
     let mut bytes = b"fLaC".to_vec();
     bytes.extend_from_slice(&[0, 0, 0, 34]);
     bytes.extend_from_slice(&[0; 34]);
@@ -278,7 +282,6 @@ async fn cover_art_without_any_picture_is_404_and_remembered() {
     set_mtime(modified);
     assert_eq!(json_cover(&fixture, "s").await.status, 404, "remembered");
 
-    // A changed file is read again.
     set_mtime(modified + std::time::Duration::from_secs(5));
     let found = json_cover(&fixture, "s").await;
     assert_eq!(found.status, 200);
@@ -469,4 +472,103 @@ fn trim_cache_removes_the_oldest_covers() {
         .collect();
     left.sort();
     assert_eq!(left, ["3.jpg", "4.jpg", "note.txt"]);
+}
+
+#[test]
+fn the_cover_cache_is_listed_again_only_past_the_slack() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let covers = || {
+        std::fs::read_dir(dir.path())
+            .expect("list")
+            .filter_map(Result::ok)
+            .count()
+    };
+    let store = |index: usize| {
+        std::fs::write(dir.path().join(format!("{index}.jpg")), [0]).expect("write");
+        count_stored(dir.path(), 2);
+    };
+    std::fs::write(dir.path().join("old.jpg"), [0]).expect("write");
+    std::fs::write(dir.path().join("older.jpg"), [0]).expect("write");
+    store(0);
+    assert_eq!(covers(), 2, "the first cover lists and trims");
+    for index in 1..=TRIM_SLACK {
+        store(index);
+    }
+    assert_eq!(covers(), 2 + TRIM_SLACK, "not listed again");
+    store(TRIM_SLACK + 1);
+    assert_eq!(covers(), 2, "trimmed once past the slack");
+    for index in 0..10 * TRIM_SLACK {
+        store(TRIM_SLACK + 2 + index);
+        assert!(covers() <= 2 + TRIM_SLACK, "stays bounded");
+    }
+}
+
+#[tokio::test]
+async fn identical_resizes_share_one_run() {
+    static RUNS: AtomicUsize = AtomicUsize::new(0);
+    let resizes = Resizes::new(2);
+    let target = PathBuf::from("/cache/same.jpg");
+    let made = futures_util::future::join_all((0..8).map(|_| {
+        let resizes = &resizes;
+        let target = target.clone();
+        async move {
+            let made = target.clone();
+            resizes
+                .run(&target, move || {
+                    RUNS.fetch_add(1, Ordering::SeqCst);
+                    std::thread::sleep(Duration::from_millis(100));
+                    Some((made, "image/jpeg"))
+                })
+                .await
+        }
+    }))
+    .await;
+    assert_eq!(RUNS.load(Ordering::SeqCst), 1);
+    assert!(
+        made.iter()
+            .all(|made| made == &Some((target.clone(), "image/jpeg")))
+    );
+}
+
+#[tokio::test]
+async fn resizes_run_at_most_two_at_once() {
+    static RUNNING: AtomicUsize = AtomicUsize::new(0);
+    static PEAK: AtomicUsize = AtomicUsize::new(0);
+    let resizes = Resizes::new(2);
+    futures_util::future::join_all((0..8).map(|index| {
+        let target = PathBuf::from(format!("/cache/{index}.jpg"));
+        let resizes = &resizes;
+        async move {
+            resizes
+                .run(&target, || {
+                    let running = RUNNING.fetch_add(1, Ordering::SeqCst) + 1;
+                    PEAK.fetch_max(running, Ordering::SeqCst);
+                    std::thread::sleep(Duration::from_millis(50));
+                    RUNNING.fetch_sub(1, Ordering::SeqCst);
+                    None
+                })
+                .await
+        }
+    }))
+    .await;
+    assert_eq!(PEAK.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn concurrent_requests_for_one_size_serve_one_resized_copy() {
+    let fixture = library();
+    let id = fixture.album_id("l:1");
+    let params = [("id", id.as_str()), ("size", "16")];
+    let replies = futures_util::future::join_all(
+        (0..6).map(|_| fixture.raw("getCoverArt", &params, HeaderMap::new())),
+    )
+    .await;
+    let cached = cached_files(&fixture);
+    assert_eq!(cached.len(), 1);
+    let stored = std::fs::read(&cached[0]).expect("cache file");
+    for reply in &replies {
+        assert_eq!(reply.status, 200);
+        assert_eq!(reply.header("content-type"), Some("image/jpeg"));
+        assert_eq!(reply.body.as_ref(), stored.as_slice());
+    }
 }

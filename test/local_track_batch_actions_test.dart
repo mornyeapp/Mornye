@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart';
@@ -13,6 +14,8 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/services/batch_metadata_re_enrich.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
+import 'package:mornye/services/re_enrich_undo.dart';
+import 'package:mornye/services/re_enrich_undo_store.dart';
 
 LocalLibraryItem item(String id) => LocalLibraryItem(
   id: id,
@@ -443,6 +446,13 @@ void main() {
                         },
                         onSelectionRestore: () => events.add('restore'),
                         onComplete: () => events.add('complete'),
+                        // App storage never answers under fake time.
+                        undo: ReEnrichUndo(
+                          store: ReEnrichUndoStore(
+                            directory: () async =>
+                                throw const FileSystemException('No storage'),
+                          ),
+                        ),
                       );
                     },
                     child: const Text('Start'),

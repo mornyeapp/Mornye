@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/services/media_kit_audio_filters.dart';
+import 'package:mornye/services/playback_deck.dart';
 
 void main() {
   test('a disabled equalizer clears the chain', () {
@@ -145,5 +146,73 @@ void main() {
     expect(compressor.options, containsPair('attack', '1'));
     expect(compressor.options, containsPair('release', '1000'));
     expect(compressor.options, containsPair('ratio', '20'));
+  });
+
+  group('tempo', () {
+    test('without a shift only speed and pitch correction change', () {
+      final kept = MpvTempo.of(1.5, PlaybackPitch.none);
+      expect(kept.speed, 1.5);
+      expect(kept.pitchCorrection, isTrue);
+      expect(kept.filters, isEmpty);
+      expect(kept.tempoScale, isNull);
+      final following = MpvTempo.of(
+        0.8,
+        const PlaybackPitch(followsRate: true),
+      );
+      expect(following.speed, 0.8);
+      expect(following.pitchCorrection, isFalse);
+      expect(MpvAudioFilterChain.empty.withTempo(following).spec, '');
+    });
+
+    test('a shift is a rubberband filter after the equalizer', () {
+      final tempo = MpvTempo.of(1.25, const PlaybackPitch(semitones: 12));
+      expect(tempo.speed, 1.25);
+      expect(tempo.pitchCorrection, isTrue);
+      final chain = MpvAudioFilterChain.fromEqualizer(
+        const EqualizerSettings(enabled: true, limiter: false),
+      ).withTempo(tempo);
+      expect(
+        chain.spec,
+        endsWith(
+          'equalizer@band9=f=16000:t=q:w=1.4142:g=0,'
+          'rubberband@pitch=pitch=2:pitchq=quality]',
+        ),
+      );
+      // Without the equalizer the shift still has its graph.
+      expect(
+        MpvAudioFilterChain.empty.withTempo(tempo).spec,
+        '@mornye_format:format=format=floatp,'
+        '@mornye_dsp:lavfi=[rubberband@pitch=pitch=2:pitchq=quality]',
+      );
+    });
+
+    test('without rubberband mpv resamples and scaletempo restores', () {
+      final kept = MpvTempo.of(
+        1.5,
+        const PlaybackPitch(semitones: 12),
+        unavailable: {'rubberband'},
+      );
+      // Resampled by the frequency factor, stretched back to 1.5x.
+      expect(kept.speed, 2);
+      expect(kept.pitchCorrection, isFalse);
+      expect(kept.filters, isEmpty);
+      expect(kept.tempoScale, 0.75);
+      final following = MpvTempo.of(
+        1.5,
+        const PlaybackPitch(semitones: -12, followsRate: true),
+        unavailable: {'rubberband'},
+      );
+      expect(following.speed, 0.75);
+      expect(following.tempoScale, 2);
+      final chain = MpvAudioFilterChain.fromEqualizer(
+        const EqualizerSettings(enabled: true),
+      ).withTempo(kept);
+      expect(chain.spec, endsWith('],@mornye_tempo:scaletempo=scale=0.75'));
+      expect(
+        MpvAudioFilterChain.empty.withTempo(kept).spec,
+        '@mornye_tempo:scaletempo=scale=0.75',
+      );
+      expect(MpvAudioFilterChain.empty.withTempo(kept).isEmpty, isFalse);
+    });
   });
 }

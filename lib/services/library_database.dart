@@ -524,7 +524,6 @@ class LibraryDatabase {
     includeLocal: includeLocal,
   );
 
-  /// Paths and durations of every downloaded and scanned song.
   Future<List<Map<String, Object?>>> getSongFiles() =>
       _queueRead((store) => store.songFiles(), includeLocal: true);
 
@@ -560,6 +559,25 @@ class LibraryDatabase {
   ) => _queueRead(
     (store) => store.artistPage(request),
     includeLocal: request.includeLocal,
+  );
+
+  /// Each spelling of each genre across downloaded and scanned music, with
+  /// its song count and a cover; see [LibraryQueueStore.genreSpellings].
+  Future<List<Map<String, Object?>>> getGenreSpellings({
+    required bool includeLocal,
+  }) => _queueRead(
+    (store) => store.genreSpellings(includeLocal: includeLocal),
+    includeLocal: includeLocal,
+  );
+
+  /// The genre tags of the Library songs with [matchKeys]; see
+  /// [LibraryQueueStore.genresOfSongs].
+  Future<List<Map<String, Object?>>> getGenresOfSongs(
+    List<String> matchKeys, {
+    required bool includeLocal,
+  }) => _queueRead(
+    (store) => store.genresOfSongs(matchKeys, includeLocal: includeLocal),
+    includeLocal: includeLocal,
   );
 
   Future<List<Map<String, dynamic>>> getQueueLocalAlbumTracks(
@@ -698,7 +716,10 @@ class LibraryDatabase {
   }
 
   /// Resolves a track list with a bounded number of indexed queries instead
-  /// of issuing up to three SQLite calls for every track.
+  /// of issuing up to three SQLite calls for every track. When several rows
+  /// answer one track, a file on this device comes before the same song on
+  /// network storage or a Link device, so it plays without the network and
+  /// is not taken for a song this device still lacks.
   Future<List<Map<String, dynamic>?>> findExistingBatch(
     List<LocalLibraryBatchLookupRequest> requests,
   ) async {
@@ -720,6 +741,7 @@ class LibraryDatabase {
         rawValues: rawValues,
         destination: destination,
         mapRow: LibraryRowMapper.decode,
+        orderBy: "file_path LIKE 'network://%', id",
       );
     }
 
@@ -927,6 +949,19 @@ class LibraryDatabase {
     }
 
     await sqlite.transactionWithBusyRetry(db, (txn) async {
+      // A song opened from a list does not carry its folder. Filed under
+      // the default one, the converted file would stay hidden wherever that
+      // folder is gone, so it joins the folder its original is stored in.
+      final stored = await txn.query(
+        'library',
+        columns: ['source_id'],
+        where: 'id = ? OR file_path = ?',
+        whereArgs: [item.id, item.filePath],
+        limit: 1,
+      );
+      if (stored.isNotEmpty) {
+        updated['sourceId'] = stored.first['source_id'];
+      }
       if (!keepOriginal) {
         await txn.delete(
           'library_path_keys',

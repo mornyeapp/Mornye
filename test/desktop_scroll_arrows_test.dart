@@ -1,17 +1,22 @@
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 
+import 'support/tooltip_finder.dart';
+
 void main() {
   late ScrollController controller;
+  var shelfBuilds = 0;
 
   Future<void> pumpShelf(WidgetTester tester) async {
+    shelfBuilds = 0;
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -23,6 +28,7 @@ void main() {
             child: DesktopScrollArrows(
               builder: (context, scrollController) {
                 controller = scrollController;
+                shelfBuilds++;
                 return ListView.builder(
                   controller: scrollController,
                   scrollDirection: Axis.horizontal,
@@ -82,15 +88,15 @@ void main() {
     await mouse.moveTo(tester.getCenter(find.byType(ListView)));
     await tester.pump();
 
-    final arrow = find.byTooltip('Scroll forward');
+    final arrow = findByTooltip('Scroll forward');
     final fade = find.ancestor(of: arrow, matching: find.byType(Opacity));
     await tester.pump(const Duration(milliseconds: 125));
     expect(
       tester.widget<Opacity>(fade).opacity,
-      closeTo(0.5, 0.01),
-      reason: 'a linear 250ms fade is halfway',
+      inExclusiveRange(0.5, 1),
+      reason: 'the effects spring is most of the way in by half its length',
     );
-    await tester.pump(const Duration(milliseconds: 125));
+    await tester.pump(MornyeMotion.effects.duration);
     expect(tester.widget<Opacity>(fade).opacity, 1);
     expect(
       tester.getSize(
@@ -107,26 +113,83 @@ void main() {
     expect(arrow, findsNothing);
   });
 
+  for (final reduced in [false, true]) {
+    testWidgets('Material fades its arrows in and out faster'
+        '${reduced ? ' (reduced motion)' : ''}', (tester) async {
+      if (reduced) {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+      }
+      debugDesktopPlatformOverride = true;
+      await pumpShelf(tester);
+      final arrow = findByTooltip('Scroll forward');
+      double opacity() => tester
+          .widget<Opacity>(
+            find.ancestor(of: arrow, matching: find.byType(Opacity)).first,
+          )
+          .opacity;
+      // At rest the shelf holds a zero-size child and no arrows.
+      expect(arrow, findsNothing);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(find.byType(ListView)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      if (reduced) {
+        expect(arrow, findsOneWidget);
+        expect(
+          find.ancestor(of: arrow, matching: find.byType(Opacity)),
+          findsNothing,
+        );
+      } else {
+        expect(opacity(), inExclusiveRange(0, 1));
+        await tester.pumpAndSettle();
+        expect(opacity(), 1);
+      }
+
+      await mouse.moveTo(Offset.zero);
+      await tester.pump();
+      if (reduced) {
+        await tester.pump();
+        expect(arrow, findsNothing);
+      } else {
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(opacity(), inExclusiveRange(0, 1));
+        // The exit is shorter than the entrance.
+        await tester.pump(const Duration(milliseconds: 60));
+        await tester.pump();
+        expect(arrow, findsNothing);
+      }
+      // Hovering never rebuilt the list.
+      expect(shelfBuilds, 1);
+    });
+  }
+
   testWidgets('desktop shows arrows on hover in the open directions', (
     tester,
   ) async {
     debugDesktopPlatformOverride = true;
     await pumpShelf(tester);
-    expect(find.byTooltip('Scroll forward'), findsNothing);
+    expect(findByTooltip('Scroll forward'), findsNothing);
 
     await hover(tester);
-    expect(find.byTooltip('Scroll forward'), findsOneWidget);
-    expect(find.byTooltip('Scroll back'), findsNothing);
+    expect(findByTooltip('Scroll forward'), findsOneWidget);
+    expect(findByTooltip('Scroll back'), findsNothing);
 
-    await tester.tap(find.byTooltip('Scroll forward'));
+    await tester.tap(findByTooltip('Scroll forward'));
     await tester.pumpAndSettle();
     expect(controller.offset, closeTo(240, 0.1));
-    expect(find.byTooltip('Scroll back'), findsOneWidget);
+    expect(findByTooltip('Scroll back'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Scroll back'));
+    await tester.tap(findByTooltip('Scroll back'));
     await tester.pumpAndSettle();
     expect(controller.offset, 0);
-    expect(find.byTooltip('Scroll back'), findsNothing);
+    expect(findByTooltip('Scroll back'), findsNothing);
   });
 
   testWidgets('hovering a card rebuilds only that card', (tester) async {
@@ -166,7 +229,7 @@ void main() {
     await mouse.addPointer(location: Offset.zero);
     await mouse.moveTo(tester.getCenter(find.text('Card 1')));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Scroll forward'), findsOneWidget);
+    expect(findByTooltip('Scroll forward'), findsOneWidget);
     expect(cardBuilds, {for (final i in visible) i: i == 1 ? 2 : 1});
 
     await mouse.moveTo(tester.getCenter(find.text('Card 2')));
@@ -177,7 +240,7 @@ void main() {
 
     await mouse.moveTo(Offset.zero);
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Scroll forward'), findsNothing);
+    expect(findByTooltip('Scroll forward'), findsNothing);
     expect(cardBuilds, {
       for (final i in visible) i: i == 1 ? 3 : (i == 2 ? 3 : 1),
     });
@@ -188,7 +251,7 @@ void main() {
     debugDesktopPlatformOverride = false;
     await pumpShelf(tester);
     await hover(tester);
-    expect(find.byTooltip('Scroll forward'), findsNothing);
+    expect(findByTooltip('Scroll forward'), findsNothing);
     expect(
       find.ancestor(of: find.byType(ListView), matching: find.byType(Stack)),
       findsNothing,

@@ -1,11 +1,18 @@
-import 'package:flutter/material.dart';
+import 'dart:math' as math;
+
+import 'package:flutter/physics.dart';
+import 'package:material_3_expressive/material_3_expressive.dart'
+    show M3EMotion;
+import 'package:material_ui/material_ui.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
+import 'package:mornye/widgets/loaded_sliver_fade_in.dart';
 
 /// Wraps a child in a staggered fade-in + slide-up animation.
 ///
@@ -32,13 +39,20 @@ class StaggeredListItem extends StatelessWidget {
     this.animate = true,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final position = Scrollable.maybeOf(context)?.position;
-    final scrolled =
-        position != null &&
+  static bool _hasScrolled(ScrollableState? scrollable) {
+    final position = scrollable?.position;
+    return position != null &&
         position.hasContentDimensions &&
         position.pixels > position.minScrollExtent;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // A shelf scrolls sideways inside a page that builds its shelves lazily
+    // while it scrolls down, so a moved page skips the reveal as well.
+    final scrolled =
+        _hasScrolled(Scrollable.maybeOf(context)) ||
+        _hasScrolled(Scrollable.maybeOf(context, axis: Axis.vertical));
     if (!animate ||
         scrolled ||
         index >= _maxAnimatedItems ||
@@ -47,58 +61,40 @@ class StaggeredListItem extends StatelessWidget {
     }
     final cappedIndex = index.clamp(0, _maxAnimatedItems - 1);
     final delay = staggerDelay * cappedIndex;
-    if (materialExpressiveEnabled(context)) {
-      // Expressive: each item springs up after its own delay and may
-      // overshoot slightly; opacity stays within range.
-      final motion = AppMotion.spatial(
-        context,
-        AppMotionSpec(duration, Curves.easeOutCubic),
-      );
-      final total = motion.duration + delay;
-      final delayFraction = total.inMicroseconds > 0
-          ? delay.inMicroseconds / total.inMicroseconds
-          : 0.0;
-      return TweenAnimationBuilder<double>(
-        key: ValueKey('stagger_$index'),
-        tween: Tween(begin: 0.0, end: 1.0),
-        duration: total,
-        builder: (context, value, child) {
-          final elapsed = value <= delayFraction
-              ? 0.0
-              : ((value - delayFraction) / (1.0 - delayFraction)).clamp(
-                  0.0,
-                  1.0,
-                );
-          final progress = motion.curve.transform(elapsed);
-          return Opacity(
-            opacity: progress.clamp(0.0, 1.0),
-            child: Transform.translate(
-              offset: Offset(0, 16 * (1 - progress)),
-              child: child,
-            ),
-          );
-        },
-        child: child,
-      );
-    }
-    final totalDuration = duration + delay;
+    // Expressive: each item springs up after its own delay and may
+    // overshoot slightly, while its opacity follows the effects spring.
+    final rise = AppMotion.spatial(
+      context,
+      AppMotionSpec(duration, Curves.easeOutCubic),
+    );
+    final fade = AppMotion.effectsFast(
+      context,
+      AppMotionSpec(duration, Curves.easeOutCubic),
+    );
+    final distance = materialExpressiveEnabled(context) ? 16.0 : 12.0;
+    final span = rise.duration > fade.duration ? rise.duration : fade.duration;
+    final total = (span + delay).inMicroseconds.toDouble();
+    // The skeleton leaves in the frame these rows arrive, so the reveal
+    // starts one frame in and the first row already shows.
+    final start = math.min(
+      loadedFadeFirstFrame.inMicroseconds.toDouble(),
+      total,
+    );
+    double progress(double elapsed, Duration length) =>
+        (elapsed / length.inMicroseconds).clamp(0.0, 1.0);
 
     return TweenAnimationBuilder<double>(
       key: ValueKey('stagger_$index'),
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: totalDuration,
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        final delayFraction = totalDuration.inMilliseconds > 0
-            ? delay.inMilliseconds / totalDuration.inMilliseconds
-            : 0.0;
-        final progress = value <= delayFraction
-            ? 0.0
-            : ((value - delayFraction) / (1.0 - delayFraction)).clamp(0.0, 1.0);
+      tween: Tween(begin: start, end: total),
+      duration: Duration(microseconds: (total - start).round()),
+      builder: (context, time, child) {
+        final elapsed = time - delay.inMicroseconds;
+        final moved = rise.curve.transform(progress(elapsed, rise.duration));
+        final opacity = fade.curve.transform(progress(elapsed, fade.duration));
         return Opacity(
-          opacity: progress,
+          opacity: opacity.clamp(0.0, 1.0),
           child: Transform.translate(
-            offset: Offset(0, 12 * (1 - progress)),
+            offset: Offset(0, distance * (1 - moved)),
             child: child,
           ),
         );
@@ -117,7 +113,9 @@ Route<T> slidePageRoute<T>({required Widget page}) {
   return MaterialPageRoute<T>(builder: (context) => page);
 }
 
-/// A shimmer effect widget that can wrap skeleton placeholders.
+/// A shimmer effect widget that can wrap skeleton placeholders. Its sweep
+/// advances on a [DecorativePhase], at most 30 times a second, like the
+/// other continuous decorations.
 class ShimmerLoading extends StatefulWidget {
   final Widget child;
 
@@ -131,33 +129,23 @@ class ShimmerLoading extends StatefulWidget {
   State<ShimmerLoading> createState() => _ShimmerLoadingState();
 }
 
-class _ShimmerLoadingState extends State<ShimmerLoading>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-  }
+class _ShimmerLoadingState extends State<ShimmerLoading> {
+  final _phase = DecorativePhase(const Duration(milliseconds: 1200));
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (MediaQuery.disableAnimationsOf(context) ||
         !TickerMode.valuesOf(context).enabled) {
-      _controller.stop();
-    } else if (!_controller.isAnimating) {
-      _controller.repeat();
+      _phase.stop();
+    } else {
+      _phase.start();
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _phase.dispose();
     super.dispose();
   }
 
@@ -178,8 +166,9 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
         : Color.alphaBlend(Colors.black.withValues(alpha: 0.01), surface);
 
     return AnimatedBuilder(
-      animation: _controller,
+      animation: _phase,
       builder: (context, child) {
+        final phase = _phase.value;
         return ShaderMask(
           shaderCallback: (bounds) {
             return LinearGradient(
@@ -187,9 +176,9 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
               end: Alignment.centerRight,
               colors: [baseColor, highlightColor, baseColor],
               stops: [
-                (_controller.value - 0.3).clamp(0.0, 1.0),
-                _controller.value,
-                (_controller.value + 0.3).clamp(0.0, 1.0),
+                (phase - 0.3).clamp(0.0, 1.0),
+                phase,
+                (phase + 0.3).clamp(0.0, 1.0),
               ],
               tileMode: TileMode.clamp,
             ).createShader(bounds);
@@ -1506,7 +1495,7 @@ class _TopResultsSkeleton extends StatelessWidget {
   }
 }
 
-/// Crossfades when the child's runtime type changes — used to swap a loading
+/// Crossfades when the child's runtime type changes: used to swap a loading
 /// skeleton for the loaded screen without a single-frame hard cut.
 class SkeletonCrossfade extends StatelessWidget {
   final Widget child;
@@ -1515,8 +1504,15 @@ class SkeletonCrossfade extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A dissolve, so it stays with reduced motion as well.
+    final fade = AppMotion.effects(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 250), Curves.linear),
+    );
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 250),
+      duration: fade.duration,
+      switchInCurve: fade.curve,
+      switchOutCurve: fade.leaving,
       // Loading and loaded screens may carry the same Hero tag (both render
       // the header cover); mute the outgoing child's heroes so a pop during
       // the fade doesn't find duplicate tags.
@@ -1562,6 +1558,10 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
       context,
       const AppMotionSpec(Duration(milliseconds: 200), Curves.linear),
     );
+    final tick = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 150), Curves.linear),
+    );
     return AnimatedContainer(
       duration: fill.duration,
       curve: fill.curve,
@@ -1578,7 +1578,9 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
         ),
       ),
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 150),
+        duration: tick.duration,
+        switchInCurve: tick.curve,
+        switchOutCurve: tick.leaving,
         child: selected
             ? Icon(
                 Icons.check,
@@ -1596,81 +1598,22 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
   }
 }
 
-/// A widget that briefly flashes a success color behind its child and shows
-/// an animated checkmark when [showSuccess] transitions to true.
-class DownloadSuccessOverlay extends StatefulWidget {
-  final bool showSuccess;
-  final Widget child;
-
-  const DownloadSuccessOverlay({
-    super.key,
-    required this.showSuccess,
-    required this.child,
-  });
-
-  @override
-  State<DownloadSuccessOverlay> createState() => _DownloadSuccessOverlayState();
-}
-
-class _DownloadSuccessOverlayState extends State<DownloadSuccessOverlay>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _flashAnimation;
-  late bool _wasSuccess;
-
-  @override
-  void initState() {
-    super.initState();
-    _wasSuccess = widget.showSuccess;
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _flashAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.15), weight: 30),
-      TweenSequenceItem(tween: Tween(begin: 0.15, end: 0.0), weight: 70),
-    ]).animate(_controller);
-  }
-
-  @override
-  void didUpdateWidget(DownloadSuccessOverlay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.showSuccess && !_wasSuccess) {
-      _controller.forward(from: 0);
-    }
-    _wasSuccess = widget.showSuccess;
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.green.withValues(alpha: _flashAnimation.value),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: child,
-        );
-      },
-      child: widget.child,
-    );
-  }
-}
-
-/// Wraps a [Badge] child and plays a brief scale-bump whenever [count] changes.
+/// Wraps a [Badge] child and plays a brief scale-bump whenever [count] grows.
+///
+/// The bump is a push on a spring at rest at scale 1: it rises to about
+/// 1.15 and settles back, on Material's fast spatial spring (which dips
+/// slightly below 1 on the way) or on Mornye's fast spring (which does
+/// not). A count that grows again mid-bump pushes from the scale and speed
+/// on screen instead of starting over. Reduced motion shows the new count
+/// without one.
 class AnimatedBadge extends StatefulWidget {
   final int count;
   final Widget child;
 
   const AnimatedBadge({super.key, required this.count, required this.child});
+
+  /// How far above 1 a bump from rest reaches.
+  static const bumpHeight = 0.15;
 
   @override
   State<AnimatedBadge> createState() => _AnimatedBadgeState();
@@ -1678,29 +1621,58 @@ class AnimatedBadge extends StatefulWidget {
 
 class _AnimatedBadgeState extends State<AnimatedBadge>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
+  static final _materialSpring = M3EMotion.expressiveSpatialFast
+      .toDescription();
+
+  /// The push of each style's spring, by Animation speed: a slower spring
+  /// reaches the same height on a gentler push.
+  static final _pushes = <(bool mornye, double timeScale), double>{};
+
+  /// The speed, in scale units a second, at which a push from rest on
+  /// [spring] peaks at [AnimatedBadge.bumpHeight].
+  static double _pushFor(SpringDescription spring) {
+    final probe = SpringSimulation(spring, 0, 0, 1);
+    var peak = 0.0;
+    for (var t = 0.0; t < 1; t += 1 / 1000) {
+      peak = math.max(peak, probe.x(t));
+    }
+    return AnimatedBadge.bumpHeight / peak;
+  }
+
+  // The controller holds the scale itself; at rest it is 1.
+  late final AnimationController _controller = AnimationController.unbounded(
+    vsync: this,
+    value: 1,
+  );
   int _previousCount = 0;
 
   @override
   void initState() {
     super.initState();
     _previousCount = widget.count;
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _scaleAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.3), weight: 40),
-      TweenSequenceItem(tween: Tween(begin: 1.3, end: 1.0), weight: 60),
-    ]).animate(_controller);
   }
 
   @override
   void didUpdateWidget(AnimatedBadge oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.count != _previousCount && widget.count > _previousCount) {
-      _controller.forward(from: 0);
+    if (widget.count > _previousCount &&
+        !MediaQuery.disableAnimationsOf(context)) {
+      final mornye = context.isMornye;
+      final spring = mornye
+          ? MornyeMotion.fastSpring
+          : MotionPace.spring(_materialSpring);
+      final push = _pushes[(mornye, MotionPace.timeScale)] ??= _pushFor(spring);
+      // A badge already rising faster than a push keeps its speed.
+      _controller.animateWith(
+        SpringSimulation(
+          spring,
+          _controller.value,
+          1,
+          math.max(_controller.velocity, push),
+          // Rests at exactly 1, so the badge is not left a hair off scale.
+          snapToEnd: true,
+        ),
+      );
     }
     _previousCount = widget.count;
   }
@@ -1713,6 +1685,6 @@ class _AnimatedBadgeState extends State<AnimatedBadge>
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(scale: _scaleAnimation, child: widget.child);
+    return ScaleTransition(scale: _controller, child: widget.child);
   }
 }

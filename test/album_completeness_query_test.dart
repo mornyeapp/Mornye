@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,6 +21,8 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
+
+import 'support/tooltip_finder.dart';
 
 String _definition(String file, String table) => RegExp(
   'CREATE TABLE $table\\s*\\([\\s\\S]*?\\n\\s*\\)',
@@ -325,7 +327,7 @@ void main() {
                     builder: (_, active, _) => Scaffold(
                       body: TickerMode(
                         enabled: active,
-                        child: QueueTab(isTabActive: active),
+                        child: QueueTab(tabActive: tabActive),
                       ),
                     ),
                   ),
@@ -460,7 +462,7 @@ void main() {
       expect(find.text('2/4'), findsOneWidget);
       expect(find.text('2/3'), findsOneWidget);
       expect(find.text('complete'), findsNothing);
-      expect(find.byTooltip('2/4 tracks · 2 missing'), findsOneWidget);
+      expect(findByTooltip('2/4 tracks · 2 missing'), findsOneWidget);
       final container = ProviderScope.containerOf(
         tester.element(find.byType(QueueTab)),
       );

@@ -2,21 +2,23 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
-import 'package:mornye/providers/theme_provider.dart';
+import 'package:mornye/providers/song_lyrics_offset_provider.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/material_expressive.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/string_utils.dart';
+import 'package:mornye/utils/text_direction.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
@@ -27,6 +29,7 @@ import 'package:mornye/widgets/desktop/desktop_cast_button.dart';
 import 'package:mornye/widgets/desktop/desktop_downloads_button.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_link_devices_button.dart';
+import 'package:mornye/widgets/desktop/desktop_row_ink.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/desktop/desktop_volume_scroll.dart';
 import 'package:mornye/widgets/expressive_playback_transport.dart';
@@ -37,6 +40,7 @@ import 'package:mornye/widgets/mornye_player_background.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
+import 'package:mornye/widgets/player_track_crossfade.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
 
@@ -328,9 +332,12 @@ class _TrackSummary extends StatelessWidget {
       ],
     );
     if (item == null) return content;
+    final press = desktopRowInk(context);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: _toggleNowPlaying,
+      splashFactory: press.splashFactory,
+      highlightColor: press.highlightColor,
       child: Padding(padding: const EdgeInsets.all(4), child: content),
     );
   }
@@ -345,32 +352,36 @@ class _TitleAndArtist extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ExplicitTrackTitle(
-          title: mediaItem.title,
-          explicit: parseExplicitFlag(mediaItem.extras?['explicit']) == true,
-          style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        Text(
-          mediaItem.artist ?? '',
-          style: textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
+    return PlayerTrackCrossfade(
+      trackKey: mediaItem.id,
+      alignment: AlignmentDirectional.topStart,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ExplicitTrackTitle(
+            title: mediaItem.title,
+            explicit: parseExplicitFlag(mediaItem.extras?['explicit']) == true,
+            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        // While the desktop follows a phone, the bar shows and drives it.
-        LinkPlayingOnText(
-          color: colorScheme.primary,
-          style: textTheme.labelSmall,
-          glyphSize: 14,
-        ),
-      ],
+          Text(
+            mediaItem.artist ?? '',
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          // While the desktop follows a phone, the bar shows and drives it.
+          LinkPlayingOnText(
+            color: colorScheme.primary,
+            style: textTheme.labelSmall,
+            glyphSize: 14,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -399,6 +410,7 @@ class _Artwork extends StatelessWidget {
           colorScheme: Theme.of(context).colorScheme,
           cacheWidth: (size * 2).round(),
           iconSize: size * 0.4,
+          crossfade: playerTrackChangeMotion(context),
         ),
       ),
     );
@@ -702,16 +714,19 @@ class _MornyeLcdArtworkState extends State<_MornyeLcdArtwork> {
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    final motion = reduceMotion
-        ? Duration.zero
-        : const Duration(milliseconds: 150);
+    // A hover: the fast spring for the lift, the fast effects spring for
+    // the overlay.
+    final lift = MornyeMotion.fast;
+    final fade = reduceMotion
+        ? const AppMotionSpec(Duration.zero, Curves.linear)
+        : MornyeMotion.effectsFast;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedScale(
         scale: _hovered && !reduceMotion ? 1.1 : 1,
-        duration: motion,
-        curve: Curves.easeOut,
+        duration: reduceMotion ? Duration.zero : lift.duration,
+        curve: lift.curve,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -720,8 +735,8 @@ class _MornyeLcdArtworkState extends State<_MornyeLcdArtwork> {
               child: AnimatedOpacity(
                 key: const ValueKey('desktop-player-artwork-overlay'),
                 opacity: _hovered ? 1 : 0,
-                duration: motion,
-                curve: Curves.easeOut,
+                duration: fade.duration,
+                curve: fade.curve,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.45),
@@ -760,49 +775,53 @@ class _MornyeLcdLines extends ConsumerWidget {
       mediaItem.album,
     ].where((part) => part != null && part.trim().isNotEmpty).join(' · ');
     final style = textTheme.bodyMedium?.copyWith(fontSize: 13, height: 1.25);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        OverflowMarquee(
-          resetKey: (mediaItem.id, mediaItem.title),
-          maxCycles: 2,
-          child: ExplicitTrackTitle(
-            title: mediaItem.title,
-            explicit: parseExplicitFlag(mediaItem.extras?['explicit']) == true,
-            style: style?.copyWith(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        // The capsule has two lines: while the desktop follows a phone,
-        // the second names it instead.
-        if (ref.watch(
-          activeRemotePlaybackProvider.select((remote) => remote != null),
-        ))
-          LinkPlayingOnText(
-            color: colorScheme.primary,
-            style: style?.copyWith(fontWeight: FontWeight.w600),
-            glyphSize: 12,
-          )
-        else if (subtitle.isNotEmpty)
+    return PlayerTrackCrossfade(
+      trackKey: mediaItem.id,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           OverflowMarquee(
-            resetKey: (mediaItem.id, subtitle),
+            resetKey: (mediaItem.id, mediaItem.title),
             maxCycles: 2,
-            child: Text(
-              subtitle,
-              // Keep the subtitle legible over the capsule's glass.
+            child: ExplicitTrackTitle(
+              title: mediaItem.title,
+              explicit:
+                  parseExplicitFlag(mediaItem.extras?['explicit']) == true,
               style: style?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.78),
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
-      ],
+          // The capsule has two lines: while the desktop follows a phone,
+          // the second names it instead.
+          if (ref.watch(
+            activeRemotePlaybackProvider.select((remote) => remote != null),
+          ))
+            LinkPlayingOnText(
+              color: colorScheme.primary,
+              style: style?.copyWith(fontWeight: FontWeight.w600),
+              glyphSize: 12,
+            )
+          else if (subtitle.isNotEmpty)
+            OverflowMarquee(
+              resetKey: (mediaItem.id, subtitle),
+              maxCycles: 2,
+              child: Text(
+                subtitle,
+                // Keep the subtitle legible over the capsule's glass.
+                style: style?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.78),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1063,7 +1082,8 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
   }
 }
 
-/// The popover entrance: 250ms of fade with a short rise.
+/// The popover entrance: a fade with a short rise on the effects spring,
+/// which never overshoots, so the rise lands without a bounce.
 class _MornyePopoverEntrance extends StatelessWidget {
   const _MornyePopoverEntrance({required this.child});
 
@@ -1074,10 +1094,8 @@ class _MornyePopoverEntrance extends StatelessWidget {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: reduceMotion
-          ? Duration.zero
-          : const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
+      duration: reduceMotion ? Duration.zero : MornyeMotion.effects.duration,
+      curve: MornyeMotion.effects.curve,
       builder: (context, progress, child) => Opacity(
         opacity: progress,
         child: Transform.translate(

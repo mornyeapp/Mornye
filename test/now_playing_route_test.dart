@@ -1,18 +1,22 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
+import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 
 const _sheet = Key('player-sheet');
 
 class _TestPlayerRoute extends NowPlayingRoute {
-  _TestPlayerRoute({super.miniPlayerGeometry}) : super(child: const SizedBox());
+  _TestPlayerRoute({super.miniPlayerGeometry, super.morph})
+    : super(child: const SizedBox());
 
   @override
   Widget buildPage(
@@ -287,6 +291,276 @@ void main() {
     );
   }
 
+  for (final reducedMotion in [false, true]) {
+    testWidgets('Mornye player opens and closes at once only under reduced '
+        'motion ($reducedMotion)', (tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      if (reducedMotion) {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+      }
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          theme: MornyeTheme.build(Brightness.dark),
+          home: const SizedBox(),
+        ),
+      );
+      navigator.currentState!.push(_TestPlayerRoute());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      final top = tester.getTopLeft(find.byKey(_sheet)).dy;
+      if (reducedMotion) {
+        expect(top, 0);
+      } else {
+        expect(top, greaterThan(0));
+      }
+      await tester.pumpAndSettle();
+
+      navigator.currentState!.pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.byKey(_sheet), reducedMotion ? findsNothing : findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.byKey(_sheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  group('Material morph', () {
+    const mini = Rect.fromLTWH(0, 700, 400, 72);
+    const morph = AppMotionSpec(Duration(milliseconds: 500), Curves.linear);
+    const surface = ValueKey('player-expand-surface');
+    const minimize = ValueKey('player-minimize-surface');
+
+    Future<GlobalKey<NavigatorState>> pumpApp(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          theme: AppTheme.light(),
+          home: const SizedBox(),
+        ),
+      );
+      return navigator;
+    }
+
+    _TestPlayerRoute route({AppMotionSpec spec = morph}) => _TestPlayerRoute(
+      miniPlayerGeometry: () =>
+          (surface: mini, artwork: const Rect.fromLTWH(12, 714, 44, 44)),
+      morph: spec,
+    );
+
+    Future<void> backGesture(
+      WidgetTester tester,
+      String method, [
+      double? progress,
+    ]) => tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      'flutter/backgesture',
+      const StandardMethodCodec().encodeMethodCall(
+        MethodCall(
+          method,
+          progress == null
+              ? null
+              : {
+                  'touchOffset': [5.0, 400.0],
+                  'progress': progress,
+                  'swipeEdge': 0,
+                },
+        ),
+      ),
+      (_) {},
+    );
+
+    testWidgets('the player grows out of the mini player and shrinks back', (
+      tester,
+    ) async {
+      final navigator = await pumpApp(tester);
+      final player = route();
+      navigator.currentState!.push(player);
+      // The first frame lays the route out offstage to measure Heroes.
+      await tester.pump();
+      await tester.pump();
+      expect(tester.getRect(find.byKey(surface)), mini);
+      // The player's own content comes in behind the growing surface.
+      final content = player.contentOpacity(
+        CurveTween(curve: const Interval(0.4, 1)),
+      );
+      expect(content.value, 0);
+      await tester.pump(const Duration(milliseconds: 150));
+      final growing = tester.getRect(find.byKey(surface));
+      expect(growing.top, inExclusiveRange(0, mini.top));
+      expect(growing.bottom, inInclusiveRange(mini.bottom, 800));
+      expect(growing.height, greaterThan(mini.height));
+      await tester.pumpAndSettle();
+      expect(find.byKey(surface), findsNothing);
+      expect(
+        tester.getRect(find.byKey(_sheet)),
+        const Rect.fromLTWH(0, 0, 400, 800),
+      );
+
+      navigator.currentState!.pop();
+      await tester.pump();
+      // The shrink only moves toward the mini player, never past it, at
+      // the pace of the entrance: still well short of the bar after a
+      // tenth of a second, and done in about half a second.
+      var previousTop = 0.0;
+      var elapsed = Duration.zero;
+      while (find.byKey(minimize).evaluate().isNotEmpty) {
+        final top = tester.getRect(find.byKey(minimize)).top;
+        expect(top, greaterThanOrEqualTo(previousTop));
+        expect(top, lessThanOrEqualTo(mini.top + 0.01));
+        if (elapsed == const Duration(milliseconds: 96)) {
+          expect(top, lessThan(mini.top * 0.6));
+        }
+        // The content stays with the page instead of fading on the spring.
+        expect(content.value, 1);
+        // The player is still on screen most of the way down.
+        if (elapsed == const Duration(milliseconds: 144)) {
+          final opacity = tester
+              .widget<Opacity>(
+                find
+                    .descendant(
+                      of: find.byKey(minimize),
+                      matching: find.byType(Opacity),
+                    )
+                    .first,
+              )
+              .opacity;
+          expect(opacity, greaterThan(0.25));
+        }
+        previousTop = top;
+        await tester.pump(const Duration(milliseconds: 16));
+        elapsed += const Duration(milliseconds: 16);
+      }
+      expect(previousTop, greaterThan(mini.top - 20));
+      expect(elapsed, greaterThan(const Duration(milliseconds: 450)));
+      expect(elapsed, lessThan(const Duration(milliseconds: 650)));
+      expect(find.byKey(_sheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the grow fades in on the effects spring', (tester) async {
+      final navigator = await pumpApp(tester);
+      navigator.currentState!.push(route());
+      await tester.pump();
+      await tester.pump();
+      double opacity() => tester
+          .widget<Opacity>(
+            find.descendant(
+              of: find.byKey(surface),
+              matching: find.byType(Opacity),
+            ),
+          )
+          .opacity;
+      await tester.pump(const Duration(milliseconds: 100));
+      final early = opacity();
+      // The surface is fully opaque well before it stops growing.
+      await tester.pump(const Duration(milliseconds: 220));
+      expect(early, inExclusiveRange(0, 1));
+      expect(opacity(), 1);
+      expect(find.byKey(surface), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('reduced motion opens and closes at once', (tester) async {
+      final navigator = await pumpApp(tester);
+      navigator.currentState!.push(
+        route(spec: const AppMotionSpec(Duration.zero, Curves.linear)),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(surface), findsNothing);
+      expect(
+        tester.getRect(find.byKey(_sheet)),
+        const Rect.fromLTWH(0, 0, 400, 800),
+      );
+      navigator.currentState!.pop();
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(_sheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('predictive back previews the shrink, cancels and commits', (
+      tester,
+    ) async {
+      final navigator = await pumpApp(tester);
+      navigator.currentState!.push(route());
+      await tester.pumpAndSettle();
+
+      await backGesture(tester, 'startBackGesture', 0);
+      await backGesture(tester, 'updateBackGestureProgress', 0.5);
+      await tester.pump();
+      final half = tester.getRect(find.byKey(minimize));
+      await backGesture(tester, 'updateBackGestureProgress', 1);
+      await tester.pump();
+      final full = tester.getRect(find.byKey(minimize));
+      expect(half.top, greaterThan(0));
+      expect(full.top, greaterThan(half.top));
+      expect(full.top, lessThan(mini.top / 2));
+
+      await backGesture(tester, 'cancelBackGesture');
+      await tester.pumpAndSettle();
+      expect(find.byKey(minimize), findsNothing);
+      expect(
+        tester.getRect(find.byKey(_sheet)),
+        const Rect.fromLTWH(0, 0, 400, 800),
+      );
+
+      await backGesture(tester, 'startBackGesture', 0);
+      await backGesture(tester, 'updateBackGestureProgress', 0.6);
+      await tester.pump();
+      final released = tester.getRect(find.byKey(minimize));
+      await backGesture(tester, 'commitBackGesture');
+      await tester.pump();
+      expect(
+        tester.getRect(find.byKey(minimize)).top,
+        closeTo(released.top, 1),
+      );
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(
+        tester.getRect(find.byKey(minimize)).top,
+        greaterThan(released.top),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(_sheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('predictive back leaves a route above the player alone', (
+      tester,
+    ) async {
+      final navigator = await pumpApp(tester);
+      navigator.currentState!.push(route());
+      await tester.pumpAndSettle();
+      navigator.currentState!.push(
+        MaterialPageRoute<void>(builder: (_) => const Text('Sheet')),
+      );
+      await tester.pumpAndSettle();
+      await backGesture(tester, 'startBackGesture', 0);
+      await backGesture(tester, 'updateBackGestureProgress', 0.5);
+      await tester.pump();
+      expect(find.byKey(minimize), findsNothing);
+      await backGesture(tester, 'commitBackGesture');
+      await tester.pumpAndSettle();
+      // The system back closes the route on top, not the player.
+      expect(find.text('Sheet'), findsNothing);
+      expect(find.byKey(_sheet), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   for (final dismiss in [false, true]) {
     testWidgets('Player drag settles without a position jump (pop: $dismiss)', (
       tester,
@@ -338,4 +612,243 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  group('a released drag keeps the finger\'s velocity', () {
+    const mini = Rect.fromLTWH(20, 700, 360, 64);
+
+    /// How far [surface] moved in the first frame after a drag of [drag]
+    /// (a fraction of the page) is let go at [velocity] pixels a second.
+    Future<double> firstFrameTravel(
+      WidgetTester tester, {
+      required ThemeData theme,
+      required double drag,
+      required double velocity,
+      required Key surface,
+      bool geometry = false,
+    }) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          theme: theme,
+          home: const SizedBox(),
+        ),
+      );
+      final route = _TestPlayerRoute(
+        miniPlayerGeometry: geometry
+            ? () =>
+                  (surface: mini, artwork: const Rect.fromLTWH(28, 710, 44, 44))
+            : null,
+      );
+      navigator.currentState!.push(route);
+      await tester.pumpAndSettle();
+      route.startDrag();
+      route.updateDrag(
+        DragUpdateDetails(
+          globalPosition: Offset(0, 800 * drag),
+          primaryDelta: 800 * drag,
+          delta: Offset(0, 800 * drag),
+        ),
+        800,
+      );
+      await tester.pump();
+      route.endDrag(
+        DragEndDetails(
+          velocity: Velocity(pixelsPerSecond: Offset(0, velocity)),
+          primaryVelocity: velocity,
+        ),
+        800,
+      );
+      await tester.pump();
+      final released = tester.getTopLeft(find.byKey(surface)).dy;
+      await tester.pump(const Duration(milliseconds: 16));
+      final travel = tester.getTopLeft(find.byKey(surface)).dy - released;
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      return travel;
+    }
+
+    testWidgets('a Material page flung down closes faster than one let go', (
+      tester,
+    ) async {
+      final still = await firstFrameTravel(
+        tester,
+        theme: AppTheme.light(),
+        drag: 0.4,
+        velocity: 0,
+        surface: _sheet,
+      );
+      final flung = await firstFrameTravel(
+        tester,
+        theme: AppTheme.light(),
+        drag: 0.4,
+        velocity: 1500,
+        surface: _sheet,
+      );
+      expect(still, greaterThan(0));
+      // At 1500 px/s the finger covers 24 px in a 16 ms frame.
+      expect(flung - still, greaterThan(12));
+    });
+
+    testWidgets('a page flung up settles open faster than one let go', (
+      tester,
+    ) async {
+      for (final theme in [
+        AppTheme.light(),
+        MornyeTheme.build(Brightness.dark),
+      ]) {
+        final still = await firstFrameTravel(
+          tester,
+          theme: theme,
+          drag: 0.2,
+          velocity: 0,
+          surface: _sheet,
+        );
+        final flung = await firstFrameTravel(
+          tester,
+          theme: theme,
+          drag: 0.2,
+          velocity: -1500,
+          surface: _sheet,
+        );
+        expect(still, lessThan(0));
+        expect(still - flung, greaterThan(12));
+      }
+    });
+
+    testWidgets('the Mornye shrink starts from the finger\'s velocity', (
+      tester,
+    ) async {
+      const minimize = ValueKey('player-minimize-surface');
+      final still = await firstFrameTravel(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        drag: 0.4,
+        velocity: 0,
+        surface: minimize,
+        geometry: true,
+      );
+      final flung = await firstFrameTravel(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        drag: 0.4,
+        velocity: 1500,
+        surface: minimize,
+        geometry: true,
+      );
+      expect(still, greaterThan(0));
+      expect(flung - still, greaterThan(8));
+    });
+
+    testWidgets('reduced motion settles a let-go drag at once', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(navigatorKey: navigator, home: const SizedBox()),
+      );
+      final route = _TestPlayerRoute();
+      navigator.currentState!.push(route);
+      await tester.pumpAndSettle();
+      route.startDrag();
+      route.updateDrag(
+        DragUpdateDetails(
+          globalPosition: const Offset(0, 120),
+          primaryDelta: 120,
+          delta: const Offset(0, 120),
+        ),
+        600,
+      );
+      await tester.pump();
+      route.endDrag(
+        DragEndDetails(
+          velocity: const Velocity(pixelsPerSecond: Offset(0, -900)),
+          primaryVelocity: -900,
+        ),
+        600,
+      );
+      await tester.pump();
+      expect(tester.getTopLeft(find.byKey(_sheet)).dy, 0);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  // Issue 918: back closed the player while a finger was still on it. The
+  // finger's release then drove the popped route back on screen, and the
+  // next drag down popped the page below, leaving nothing.
+  for (final late in ['cancel', 'drag', 'release']) {
+    testWidgets('a touch that ends after the player closed changes nothing '
+        '($late)', (tester) async {
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(navigatorKey: navigator, home: const Text('Home')),
+      );
+      final route = _TestPlayerRoute();
+      navigator.currentState!.push(route);
+      await tester.pumpAndSettle();
+      const height = 600.0;
+      final down = DragUpdateDetails(
+        globalPosition: const Offset(0, 300),
+        primaryDelta: 300,
+        delta: const Offset(0, 300),
+      );
+      if (late == 'release') {
+        route.startDrag();
+        route.updateDrag(down, height);
+      }
+
+      navigator.currentState!.pop();
+      await tester.pump();
+      switch (late) {
+        case 'cancel':
+          route.cancelDrag();
+        case 'drag':
+          route.startDrag();
+          route.updateDrag(down, height);
+          route.endDrag(DragEndDetails(primaryVelocity: 0), height);
+        default:
+          route.endDrag(DragEndDetails(primaryVelocity: 0), height);
+      }
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(_sheet), findsNothing);
+      expect(find.text('Home'), findsOneWidget);
+      expect(navigator.currentState!.canPop(), isFalse);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('a drag let go under another route does not pop that route', (
+    tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(navigatorKey: navigator, home: const Text('Home')),
+    );
+    final route = _TestPlayerRoute();
+    navigator.currentState!.push(route);
+    await tester.pumpAndSettle();
+    route.startDrag();
+    navigator.currentState!.push(
+      MaterialPageRoute<void>(builder: (_) => const Text('Above')),
+    );
+    await tester.pumpAndSettle();
+    route.endDrag(
+      DragEndDetails(
+        velocity: const Velocity(pixelsPerSecond: Offset(0, 2000)),
+        primaryVelocity: 2000,
+      ),
+      600,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Above'), findsOneWidget);
+    expect(route.isActive, isTrue);
+    expect(tester.takeException(), isNull);
+  });
 }

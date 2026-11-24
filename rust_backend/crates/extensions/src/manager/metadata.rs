@@ -227,39 +227,20 @@ impl ExtensionManager {
             if !providers.contains(&id) {
                 continue;
             }
-            let response = self.provider_operation_value(
+            let found = self.provider_search_tracks(
                 &id,
-                "searchTracks",
-                &json!([query, limit]).to_string(),
+                query,
+                limit,
                 lease.clone(),
                 timeout_ms,
                 item_id,
-            );
-            if let Some(lease) = &lease {
-                lease.check_active().map_err(|e| error(e.to_string()))?;
-            }
-            let mut response = match response {
-                Ok(response) => response,
-                Err(failure) if failure.0 == "download cancelled" => return Err(failure),
-                Err(failure) => {
-                    let _ = self.environment.log_buffer().backend(&format!(
-                        "[MetadataSearch] Search error from {id}: {failure}"
-                    ));
-                    if verification.is_none() && requires_verification(&failure.0) {
-                        verification = Some(error(format!(
-                            "verification_required: extension '{id}' needs verification: {failure}"
-                        )));
-                    }
-                    continue;
-                }
-            };
-            if let Value::Array(found) = response["tracks"].take() {
-                for track in found {
-                    if seen.insert(dedup_key(&track)) {
-                        tracks.push(track);
-                        if tracks.len() >= limit {
-                            return Ok(tracks.into());
-                        }
+                &mut verification,
+            )?;
+            for track in found {
+                if seen.insert(dedup_key(&track)) {
+                    tracks.push(track);
+                    if tracks.len() >= limit {
+                        return Ok(tracks.into());
                     }
                 }
             }
@@ -270,6 +251,133 @@ impl ExtensionManager {
             return Err(failure);
         }
         Ok(tracks.into())
+    }
+
+    /// Enabled metadata providers in the order a search asks them: `only`
+    /// in its own order when given, otherwise the user's priority order.
+    pub(crate) fn metadata_search_order(
+        &self,
+        only: &[String],
+    ) -> Result<Vec<String>, ManagerError> {
+        let providers: BTreeSet<_> = self
+            .provider_ids("metadata_provider")?
+            .into_iter()
+            .collect();
+        let mut ordered = if only.is_empty() {
+            let mut ordered = self
+                .priorities
+                .lock()
+                .expect("provider priority lock")
+                .metadata
+                .clone();
+            let prioritized: BTreeSet<_> = ordered.iter().cloned().collect();
+            ordered.extend(providers.difference(&prioritized).cloned());
+            ordered
+        } else {
+            only.to_vec()
+        };
+        let mut seen = BTreeSet::new();
+        ordered.retain(|id| providers.contains(id) && seen.insert(id.clone()));
+        Ok(ordered)
+    }
+
+    /// Unlike `search_metadata_providers_value_with_lease`, every provider
+    /// gets its own `limit`, so the first one cannot fill every slot and hide
+    /// the others. `done` sees each provider's tracks and returns true to
+    /// skip the remaining providers.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn search_each_metadata_provider_with_lease(
+        &self,
+        query: &str,
+        limit: isize,
+        order: &[String],
+        item_id: &str,
+        timeout_ms: u64,
+        request_lease: Option<Arc<RequestLease>>,
+        mut done: impl FnMut(&[Value]) -> bool,
+    ) -> Result<Vec<Value>, ManagerError> {
+        self.check()?;
+        let limit = search_limit(limit);
+        let mut tracks = Vec::new();
+        let mut verification = None;
+        let lease = if request_lease.is_some() {
+            request_lease
+        } else if order.is_empty() {
+            None
+        } else {
+            self.item_lease(item_id)?
+        };
+        for id in order {
+            if let Some(lease) = &lease {
+                lease.check_active().map_err(|e| error(e.to_string()))?;
+            }
+            let mut found = self.provider_search_tracks(
+                id,
+                query,
+                limit,
+                lease.clone(),
+                timeout_ms,
+                item_id,
+                &mut verification,
+            )?;
+            found.truncate(limit);
+            let stop = done(&found);
+            tracks.extend(found);
+            if stop {
+                break;
+            }
+        }
+        if tracks.is_empty()
+            && let Some(failure) = verification
+        {
+            return Err(failure);
+        }
+        Ok(tracks)
+    }
+
+    /// One provider's `searchTracks`. Failures other than cancellation are
+    /// logged and skipped; the first one asking for verification is kept so
+    /// an empty search can report it.
+    #[allow(clippy::too_many_arguments)]
+    fn provider_search_tracks(
+        &self,
+        id: &str,
+        query: &str,
+        limit: usize,
+        lease: Option<Arc<RequestLease>>,
+        timeout_ms: u64,
+        item_id: &str,
+        verification: &mut Option<ManagerError>,
+    ) -> Result<Vec<Value>, ManagerError> {
+        let response = self.provider_operation_value(
+            id,
+            "searchTracks",
+            &json!([query, limit]).to_string(),
+            lease.clone(),
+            timeout_ms,
+            item_id,
+        );
+        if let Some(lease) = &lease {
+            lease.check_active().map_err(|e| error(e.to_string()))?;
+        }
+        match response {
+            Ok(mut response) => Ok(match response["tracks"].take() {
+                Value::Array(found) => found,
+                _ => Vec::new(),
+            }),
+            Err(failure) if failure.0 == "download cancelled" => Err(failure),
+            Err(failure) => {
+                let _ = self.environment.log_buffer().backend(&format!(
+                    "[MetadataSearch] Search error from {id}: {failure}"
+                ));
+                if verification.is_none() && requires_verification(&failure.0) {
+                    *verification = Some(error(format!(
+                        "verification_required: extension '{id}' needs verification: {failure}"
+                    )));
+                }
+                Ok(Vec::new())
+            }
+        }
     }
 }
 

@@ -12,6 +12,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart'
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/history_schema.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/library_lyrics_search.dart';
 import 'package:mornye/services/library_queue_store.dart';
 import 'package:mornye/services/library_row_mapper.dart';
 import 'package:mornye/services/library_search.dart';
@@ -500,6 +501,36 @@ void main() {
           );
         }
       }
+    },
+  );
+
+  test(
+    'each lyrics index batch seeks past the last song instead of rescanning',
+    () async {
+      await _seed();
+      final db = await LibraryDatabase.instance.openLyricsSearchDatabase();
+      final store = LibraryLyricsSearchStore(db, readLyrics: (_) async => '');
+      recording = true;
+      await store.index(includeLocal: true, cancelled: () => false).last;
+      recording = false;
+      final batches = statements[db]!.entries.where(
+        (entry) => entry.key.contains('LIMIT 32'),
+      );
+      final seeks = <String>{};
+      for (final MapEntry(key: sql, value: args) in batches) {
+        final plan = (await db.rawQuery(
+          'EXPLAIN QUERY PLAN $sql',
+          args,
+        )).map((row) => row['detail'] as String).toList();
+        expect(plan, isNot(contains(contains('TEMP B-TREE'))), reason: '$plan');
+        if (args.isEmpty) continue;
+        final song = plan.firstWhere(
+          (detail) => RegExp(r'^(SCAN|SEARCH) (h|l)\b').hasMatch(detail),
+        );
+        expect(song, matches(r'^SEARCH (h|l) .*\(id>\?\)'), reason: '$plan');
+        seeks.add(song.split(' ')[1]);
+      }
+      expect(seeks, {'h', 'l'});
     },
   );
 

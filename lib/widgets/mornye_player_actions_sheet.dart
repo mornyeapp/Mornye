@@ -1,6 +1,6 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
@@ -52,19 +52,27 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
     super.key,
     required this.mediaItem,
     this.sleepTimerSubtitle,
+    this.tempoSubtitle,
     this.volumeShown = true,
     this.sendToDesktop,
+    this.sendToPhoneHost = false,
     this.saveToPhone = false,
   });
 
   final MediaItem mediaItem;
   final String? sleepTimerSubtitle;
 
+  /// The speed and pitch while either differs from normal.
+  final String? tempoSubtitle;
+
   /// Whether the player shows its volume slider, which the menu toggles.
   final bool volumeShown;
 
   /// The paired desktop's name while this phone's song can go there.
   final String? sendToDesktop;
+
+  /// Whether that paired device is another phone rather than a computer.
+  final bool sendToPhoneHost;
 
   /// Whether the song is the paired desktop's, which can be saved here.
   final bool saveToPhone;
@@ -140,7 +148,9 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
                 context,
                 'linkSend',
                 context.l10n.linkSendToDesktop(name),
-                CupertinoIcons.desktopcomputer,
+                sendToPhoneHost
+                    ? CupertinoIcons.device_phone_portrait
+                    : CupertinoIcons.desktopcomputer,
               ),
             if (saveToPhone)
               _action(
@@ -166,6 +176,13 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
               'equalizer',
               context.l10n.equalizerTitle,
               CupertinoIcons.slider_horizontal_3,
+            ),
+            _action(
+              context,
+              'tempo',
+              context.l10n.playbackTempoTitle,
+              CupertinoIcons.gauge,
+              subtitle: tempoSubtitle,
             ),
             _action(
               context,
