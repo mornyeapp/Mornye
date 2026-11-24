@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 enum EqualizerFilterType {
   peak('peak'),
@@ -33,30 +34,43 @@ class EqualizerFilter {
   final double frequency, gain, q;
   final bool enabled;
 
+  static const _tenOverLn10 = 10 / math.ln10;
+
   /// Gain in dB at [hz], from the analog prototype. The digital filter
   /// differs only close to half the sample rate.
   double responseAt(double hz) {
     if (!enabled || gain == 0) return 0;
     final a = math.pow(10, gain / 40).toDouble();
-    final w = hz / frequency, w2 = w * w;
+    return _responseAtPrepared(hz, a, a * a, 1 / (q * q), 1 / frequency);
+  }
+
+  double _responseAtPrepared(
+    double hz,
+    double a,
+    double a2,
+    double invQ2,
+    double invFrequency,
+  ) {
+    final w = hz * invFrequency;
+    final w2 = w * w;
     switch (type) {
       case EqualizerFilterType.peak:
-        final pass = (1 - w2) * (1 - w2);
-        return 10 *
-            math.log(
-              (pass + math.pow(a * w / q, 2)) /
-                  (pass + math.pow(w / (a * q), 2)),
-            ) /
-            math.ln10;
+        final diff = 1 - w2;
+        final pass = diff * diff;
+        final w2InvQ2 = w2 * invQ2;
+        return _tenOverLn10 *
+            math.log((pass + a2 * w2InvQ2) / (pass + w2InvQ2 / a2));
       case EqualizerFilterType.lowShelf:
       case EqualizerFilterType.highShelf:
-        final damping = a * w2 / (q * q);
-        final low = math.pow(a - w2, 2) + damping;
-        final high = math.pow(1 - a * w2, 2) + damping;
+        final damping = a * w2 * invQ2;
+        final dLow = a - w2;
+        final dHigh = 1 - a * w2;
+        final low = dLow * dLow + damping;
+        final high = dHigh * dHigh + damping;
         final ratio = type == EqualizerFilterType.lowShelf
             ? low / high
             : high / low;
-        return 10 * math.log(a * a * ratio) / math.ln10;
+        return _tenOverLn10 * math.log(a2 * ratio);
     }
   }
 
@@ -222,16 +236,83 @@ class EqualizerSettings {
       ? filters.fold(0.0, (sum, filter) => sum + filter.responseAt(hz))
       : gainAt(hz, includeTone: true);
 
+  static final Float64List _peakGridHz = Float64List.fromList([
+    for (var step = 0; step <= 240; step++)
+      20.0 * math.pow(2, step / 24).toDouble(),
+  ]);
+
+  static List<EqualizerFilter>? _lastPeakFilters;
+  static double _lastPeakValue = 0;
+
+  /// Evaluates the combined parametric response across [frequenciesHz] while
+  /// preparing each active filter's constants once instead of per sample point.
+  Float64List sampleParametricResponse(List<double> frequenciesHz) {
+    final total = Float64List(frequenciesHz.length);
+    for (final filter in filters) {
+      if (!filter.enabled || filter.gain == 0) continue;
+      final a = math.pow(10, filter.gain / 40).toDouble();
+      final a2 = a * a;
+      final invQ2 = 1 / (filter.q * filter.q);
+      final invFreq = 1 / filter.frequency;
+      for (var i = 0; i < frequenciesHz.length; i++) {
+        total[i] += filter._responseAtPrepared(
+          frequenciesHz[i],
+          a,
+          a2,
+          invQ2,
+          invFreq,
+        );
+      }
+    }
+    return total;
+  }
+
   /// The highest point of the parametric curve, looked for on a grid of 24
   /// points an octave and at every filter's own frequency.
   double get _filterPeak {
-    var peak = 0.0;
-    for (var step = 0; step <= 240; step++) {
-      peak = math.max(peak, responseAt(20 * math.pow(2, step / 24).toDouble()));
-    }
+    if (identical(filters, _lastPeakFilters)) return _lastPeakValue;
+    var activeCount = 0;
     for (final filter in filters) {
-      peak = math.max(peak, responseAt(filter.frequency));
+      if (filter.enabled && filter.gain != 0) activeCount++;
     }
+    if (activeCount == 0) {
+      _lastPeakFilters = filters;
+      _lastPeakValue = 0;
+      return 0;
+    }
+    final gridLen = _peakGridHz.length;
+    final totals = Float64List(gridLen + filters.length);
+    for (final filter in filters) {
+      if (!filter.enabled || filter.gain == 0) continue;
+      final a = math.pow(10, filter.gain / 40).toDouble();
+      final a2 = a * a;
+      final invQ2 = 1 / (filter.q * filter.q);
+      final invFreq = 1 / filter.frequency;
+      for (var i = 0; i < gridLen; i++) {
+        totals[i] += filter._responseAtPrepared(
+          _peakGridHz[i],
+          a,
+          a2,
+          invQ2,
+          invFreq,
+        );
+      }
+      for (var j = 0; j < filters.length; j++) {
+        totals[gridLen + j] += filter._responseAtPrepared(
+          filters[j].frequency,
+          a,
+          a2,
+          invQ2,
+          invFreq,
+        );
+      }
+    }
+    var peak = 0.0;
+    for (var i = 0; i < totals.length; i++) {
+      if (totals[i] > peak) peak = totals[i];
+    }
+    _lastPeakFilters = filters;
+    _lastPeakValue = peak;
     return peak;
   }
 

@@ -161,51 +161,122 @@ class _EqualizerCurve extends CustomPainter {
 
   static const _range = 18.0;
   static const _minHz = 20.0, _maxHz = 20000.0;
+  static const _parametricSteps = 120;
+  static final double _logSpan = math.log(_maxHz / _minHz);
+  static final List<double> _parametricGridHz = List<double>.unmodifiable([
+    for (var i = 0; i <= _parametricSteps; i++)
+      _minHz * math.pow(_maxHz / _minHz, i / _parametricSteps).toDouble(),
+  ]);
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final (gutter, bottomInset) = _equalizerPlotInsets(labelStyle, textScaler);
-    final bottom = size.height - bottomInset;
-    final plot = Rect.fromLTRB(gutter, 4, size.width, bottom);
+  static _EqualizerCurveGeometry? _cachedGeometry;
+
+  _EqualizerCurveGeometry _geometryFor(Rect plot) {
+    final cached = _cachedGeometry;
+    if (cached != null &&
+        cached.plot == plot &&
+        _sameCurve(cached.settings, settings)) {
+      return cached;
+    }
     double x(double hz) =>
-        plot.left +
-        math.log(hz / _minHz) / math.log(_maxHz / _minHz) * plot.width;
+        plot.left + math.log(hz / _minHz) / _logSpan * plot.width;
     double y(double gain) =>
         plot.center.dy - gain.clamp(-_range, _range) / _range * plot.height / 2;
 
-    final curve = settings.copyWith(gains: settings.effectiveGains);
     final points = <Offset>[];
+    final dots = <Offset>[];
+    double dotRadius = 4;
     if (settings.parametric) {
       // The filters' own response, which has no bands to pass through.
-      const steps = 120;
-      for (var i = 0; i <= steps; i++) {
-        final hz = _minHz * math.pow(_maxHz / _minHz, i / steps);
+      final activeFilters = [
+        for (final filter in settings.filters)
+          if (filter.enabled) filter,
+      ];
+      final sampleHz = <double>[
+        ..._parametricGridHz,
+        for (final filter in activeFilters) filter.frequency,
+      ];
+      final responses = settings.sampleParametricResponse(sampleHz);
+      for (var i = 0; i <= _parametricSteps; i++) {
         points.add(
           Offset(
-            plot.left + plot.width * i / steps,
-            y(settings.responseAt(hz.toDouble())),
+            plot.left + plot.width * i / _parametricSteps,
+            y(responses[i]),
+          ),
+        );
+      }
+      for (var i = 0; i < activeFilters.length; i++) {
+        dots.add(
+          Offset(
+            x(activeFilters[i].frequency),
+            y(responses[_parametricSteps + 1 + i]),
           ),
         );
       }
     } else {
-      points.add(Offset(plot.left, y(curve.gains.first)));
-      for (var i = 0; i < curve.gains.length; i++) {
-        final point = Offset(x(settings.frequencies[i]), y(curve.gains[i]));
+      final effective = settings.effectiveGains;
+      final freqs = settings.frequencies;
+      points.add(Offset(plot.left, y(effective.first)));
+      for (var i = 0; i < effective.length; i++) {
+        final point = Offset(x(freqs[i]), y(effective[i]));
         if (point.dx > points.last.dx + 0.5 && point.dx < plot.right - 0.5) {
           points.add(point);
         }
       }
-      points.add(Offset(plot.right, y(curve.gains.last)));
+      points.add(Offset(plot.right, y(effective.last)));
+      dotRadius = effective.length > 15 ? 2.5 : 4;
+      for (var i = 0; i < effective.length; i++) {
+        final hz = freqs[i];
+        if (hz < _minHz || hz > _maxHz) continue;
+        dots.add(Offset(x(hz), y(effective[i])));
+      }
     }
     final line = _monotoneSpline(points);
     final area = Path.from(line)
       ..lineTo(plot.right, plot.center.dy)
       ..lineTo(plot.left, plot.center.dy)
       ..close();
+    final built = _EqualizerCurveGeometry(
+      settings: settings,
+      plot: plot,
+      line: line,
+      area: area,
+      dots: dots,
+      dotRadius: dotRadius,
+    );
+    _cachedGeometry = built;
+    return built;
+  }
+
+  static bool _sameCurve(EqualizerSettings a, EqualizerSettings b) {
+    if (identical(a, b)) return true;
+    if (a.parametric != b.parametric) return false;
+    if (a.parametric) {
+      if (identical(a.filters, b.filters)) return true;
+      if (a.filters.length != b.filters.length) return false;
+      for (var i = 0; i < a.filters.length; i++) {
+        if (a.filters[i] != b.filters[i]) return false;
+      }
+      return true;
+    }
+    if (a.bass != b.bass || a.treble != b.treble) return false;
+    if (identical(a.gains, b.gains)) return true;
+    if (a.gains.length != b.gains.length) return false;
+    for (var i = 0; i < a.gains.length; i++) {
+      if (a.gains[i] != b.gains[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final (gutter, bottomInset) = _equalizerPlotInsets(labelStyle, textScaler);
+    final bottom = size.height - bottomInset;
+    final plot = Rect.fromLTRB(gutter, 4, size.width, bottom);
+    final geometry = _geometryFor(plot);
     canvas.save();
     canvas.clipRect(plot);
     canvas.drawPath(
-      area,
+      geometry.area,
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
@@ -219,7 +290,7 @@ class _EqualizerCurve extends CustomPainter {
     );
     canvas.restore();
     canvas.drawPath(
-      line,
+      geometry.line,
       Paint()
         ..color = color
         ..style = PaintingStyle.stroke
@@ -228,27 +299,8 @@ class _EqualizerCurve extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
     final dot = Paint()..color = color;
-    if (settings.parametric) {
-      // One dot a filter, on the curve at the filter's frequency.
-      for (final filter in settings.filters) {
-        if (!filter.enabled) continue;
-        canvas.drawCircle(
-          Offset(x(filter.frequency), y(settings.responseAt(filter.frequency))),
-          4,
-          dot,
-        );
-      }
-      return;
-    }
-    final effective = curve.gains;
-    for (var i = 0; i < effective.length; i++) {
-      final hz = settings.frequencies[i];
-      if (hz < _minHz || hz > _maxHz) continue;
-      canvas.drawCircle(
-        Offset(x(hz), y(effective[i])),
-        effective.length > 15 ? 2.5 : 4,
-        dot,
-      );
+    for (final center in geometry.dots) {
+      canvas.drawCircle(center, geometry.dotRadius, dot);
     }
   }
 
@@ -303,8 +355,26 @@ class _EqualizerCurve extends CustomPainter {
 
   @override
   bool shouldRepaint(_EqualizerCurve oldDelegate) =>
-      oldDelegate.settings != settings ||
+      !_sameCurve(oldDelegate.settings, settings) ||
       oldDelegate.color != color ||
       oldDelegate.labelStyle != labelStyle ||
       oldDelegate.textScaler != textScaler;
+}
+
+class _EqualizerCurveGeometry {
+  const _EqualizerCurveGeometry({
+    required this.settings,
+    required this.plot,
+    required this.line,
+    required this.area,
+    required this.dots,
+    required this.dotRadius,
+  });
+
+  final EqualizerSettings settings;
+  final Rect plot;
+  final Path line;
+  final Path area;
+  final List<Offset> dots;
+  final double dotRadius;
 }
