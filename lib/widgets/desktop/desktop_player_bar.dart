@@ -1099,15 +1099,18 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final volume = ref.watch(systemVolumeProvider).value;
+    final icon = ref.watch(
+      systemVolumeProvider.select(
+        (state) => switch (state.value) {
+          null => CupertinoIcons.speaker_2_fill,
+          <= 0 => CupertinoIcons.speaker_slash_fill,
+          < 0.34 => CupertinoIcons.speaker_1_fill,
+          < 0.67 => CupertinoIcons.speaker_2_fill,
+          _ => CupertinoIcons.speaker_3_fill,
+        },
+      ),
+    );
     final cast = _cast;
-    final icon = switch (volume) {
-      null => CupertinoIcons.speaker_2_fill,
-      <= 0 => CupertinoIcons.speaker_slash_fill,
-      < 0.34 => CupertinoIcons.speaker_1_fill,
-      < 0.67 => CupertinoIcons.speaker_2_fill,
-      _ => CupertinoIcons.speaker_3_fill,
-    };
     return MenuAnchor(
       controller: _menu,
       consumeOutsideTap: true,

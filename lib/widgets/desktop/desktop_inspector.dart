@@ -481,7 +481,7 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
     final rtl = Directionality.of(context) == TextDirection.rtl;
     return AnimatedBuilder(
       animation: _controller,
-      child: content,
+      child: RepaintBoundary(child: content),
       builder: (context, child) {
         // The open spring may overshoot. A floating panel can slide a little
         // past its place, but the pane beside the content stops at its

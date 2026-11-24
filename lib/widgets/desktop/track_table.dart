@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show listEquals, setEquals;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
@@ -253,6 +254,11 @@ class _SliverTrackTableState extends State<SliverTrackTable> {
           pinned: true,
           delegate: _HeaderDelegate(
             height: TrackTableLayout.headerHeightFor(context),
+            columns: widget.columns,
+            sortColumn: sort?.column,
+            ascending: sort?.ascending ?? true,
+            sortableColumns: widget.sortableColumns,
+            hasTrailing: hasTrailing,
             child: _TrackTableHeader(
               columns: widget.columns,
               sortColumn: sort?.column,
@@ -341,7 +347,7 @@ Comparable<Object?>? _sortKey(TrackTableRow row, TrackTableColumn column) {
     TrackTableColumn.duration => row.duration?.inMilliseconds,
     TrackTableColumn.quality => switch (row.quality) {
       null || '' => null,
-      final label => _QualityKey(label),
+      final label => _QualityKey.forLabel(label),
     },
   };
 }
@@ -355,13 +361,21 @@ int _compareKeys(Comparable<Object?>? a, Comparable<Object?>? b) {
 /// Compares quality labels by their numbers (bit depth, then sample rate or
 /// bitrate), so "24-bit/96kHz" sorts above "16-bit/44.1kHz".
 class _QualityKey implements Comparable<_QualityKey> {
-  _QualityKey(String label)
+  _QualityKey._(String label)
     : numbers = [
         for (final m in _number.allMatches(label)) double.parse(m[0]!),
       ],
       text = label.toLowerCase();
 
   static final _number = RegExp(r'\d+(?:\.\d+)?');
+  static final Map<String, _QualityKey> _cache = {};
+
+  static _QualityKey forLabel(String label) {
+    final cached = _cache[label];
+    if (cached != null) return cached;
+    if (_cache.length >= 256) _cache.clear();
+    return _cache[label] = _QualityKey._(label);
+  }
 
   final List<double> numbers;
   final String text;
@@ -452,9 +466,22 @@ class TrackTableLayout {
 }
 
 class _HeaderDelegate extends SliverPersistentHeaderDelegate {
-  const _HeaderDelegate({required this.height, required this.child});
+  const _HeaderDelegate({
+    required this.height,
+    required this.columns,
+    required this.sortColumn,
+    required this.ascending,
+    required this.sortableColumns,
+    required this.hasTrailing,
+    required this.child,
+  });
 
   final double height;
+  final List<TrackTableColumn> columns;
+  final TrackTableColumn? sortColumn;
+  final bool ascending;
+  final Set<TrackTableColumn>? sortableColumns;
+  final bool hasTrailing;
   final Widget child;
 
   @override
@@ -472,7 +499,12 @@ class _HeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_HeaderDelegate oldDelegate) =>
-      height != oldDelegate.height || child != oldDelegate.child;
+      height != oldDelegate.height ||
+      sortColumn != oldDelegate.sortColumn ||
+      ascending != oldDelegate.ascending ||
+      hasTrailing != oldDelegate.hasTrailing ||
+      !listEquals(columns, oldDelegate.columns) ||
+      !setEquals(sortableColumns, oldDelegate.sortableColumns);
 }
 
 class _TrackTableHeader extends StatelessWidget {
@@ -854,8 +886,16 @@ class _AlbumRowView extends StatefulWidget {
 }
 
 class _AlbumRowViewState extends State<_AlbumRowView> {
-  bool _hovered = false;
-  bool _focused = false;
+  final _hovered = ValueNotifier<bool>(false);
+  final _focused = ValueNotifier<bool>(false);
+  late final _activeChanges = Listenable.merge([_hovered, _focused]);
+
+  @override
+  void dispose() {
+    _hovered.dispose();
+    _focused.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -867,42 +907,44 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
       color: scheme.onSurfaceVariant,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
-    final active = _hovered || widget.selected || _focused;
     final l10n = MaterialLocalizations.of(context);
     final onContextMenu = widget.onContextMenu;
+    final numberText = Text(
+      row.number?.toString() ?? '',
+      textAlign: TextAlign.end,
+      style: secondary,
+    );
     final number = SizedBox(
       width: TrackTableLayout.albumNumber,
-      child: _hovered
-          ? IconButton(
-              tooltip: context.l10n.tooltipPlay,
-              onPressed: widget.onPlay,
-              padding: EdgeInsets.zero,
-              style: IconButton.styleFrom(
-                minimumSize: const Size.square(28),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              icon: AppIcon.adaptive(
-                Icons.play_arrow_rounded,
-                size: 16,
-                color: scheme.primary,
-              ),
-            )
-          : Text(
-              row.number?.toString() ?? '',
-              textAlign: TextAlign.end,
-              style: secondary,
-            ),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: _hovered,
+        child: numberText,
+        builder: (context, hovered, text) => hovered
+            ? IconButton(
+                tooltip: context.l10n.tooltipPlay,
+                onPressed: widget.onPlay,
+                padding: EdgeInsets.zero,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(28),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                icon: AppIcon.adaptive(
+                  Icons.play_arrow_rounded,
+                  size: 16,
+                  color: scheme.primary,
+                ),
+              )
+            : text!,
+      ),
     );
     final more = onContextMenu == null
         ? const SizedBox(width: 32)
         : Focus(
             canRequestFocus: false,
             skipTraversal: true,
-            onFocusChange: (focused) => setState(() => _focused = focused),
-            child: AnimatedOpacity(
-              opacity: active ? 1 : 0,
-              duration: _rowActionFade(context).duration,
-              curve: _rowActionFade(context).curve,
+            onFocusChange: (focused) => _focused.value = focused,
+            child: ListenableBuilder(
+              listenable: _activeChanges,
               child: Builder(
                 builder: (buttonContext) => IconButton(
                   tooltip: l10n.showMenuTooltip,
@@ -920,6 +962,14 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
                     contextMenuPositionBelow(buttonContext) ?? Offset.zero,
                   ),
                 ),
+              ),
+              builder: (context, button) => AnimatedOpacity(
+                opacity: _hovered.value || widget.selected || _focused.value
+                    ? 1
+                    : 0,
+                duration: _rowActionFade(context).duration,
+                curve: _rowActionFade(context).curve,
+                child: button,
               ),
             ),
           );
@@ -959,6 +1009,7 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
     final selectedFill = context.isMornye
         ? scheme.primary.withValues(alpha: 0.16)
         : scheme.secondaryContainer;
+    final hoverFill = scheme.onSurface.withValues(alpha: 0.05);
     final press = desktopRowInk(
       context,
       content: widget.selected ? scheme.onSecondaryContainer : null,
@@ -968,17 +1019,21 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
       label: [row.title, ?widget.artist].join(', '),
       child: DesktopContextMenuRegion(
         onContextMenu: onContextMenu,
-        child: Material(
-          color: widget.selected || _hovered
-              ? (widget.selected
-                    ? selectedFill
-                    : scheme.onSurface.withValues(alpha: 0.05))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-          clipBehavior: Clip.antiAlias,
+        child: ValueListenableBuilder<bool>(
+          valueListenable: _hovered,
+          builder: (context, hovered, child) => Material(
+            color: widget.selected
+                ? selectedFill
+                : hovered
+                ? hoverFill
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            clipBehavior: Clip.antiAlias,
+            child: child,
+          ),
           child: InkWell(
             onTap: widget.onTap,
-            onHover: (hovered) => setState(() => _hovered = hovered),
+            onHover: (hovered) => _hovered.value = hovered,
             hoverColor: Colors.transparent,
             splashFactory: press.splashFactory,
             highlightColor: press.highlightColor,
