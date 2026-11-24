@@ -482,14 +482,44 @@ class SubsonicClient {
       if (offset > 0) await checkpoint();
       final page = offset == 0 ? _albumPage(first) : await _albums(offset);
       await checkpoint();
-      var newAlbums = 0;
+      final pendingIds = <String>[];
       for (final album in page) {
-        await checkpoint();
         final id = _subsonicText(album, 'id');
         if (id.isEmpty) throw const HttpException('Invalid Subsonic album');
         if (!albums.add(id)) continue;
-        newAlbums++;
-        for (final song in await _songs(id)) {
+        pendingIds.add(id);
+      }
+      const concurrency = 4;
+      final inFlight =
+          <
+            Future<
+              ({List<SubsonicSong>? songs, Object? error, StackTrace? stack})
+            >
+          >[];
+      Future<({List<SubsonicSong>? songs, Object? error, StackTrace? stack})>
+      fetchAlbum(String id) async {
+        try {
+          return (songs: await _songs(id), error: null, stack: null);
+        } catch (error, stack) {
+          return (songs: null, error: error, stack: stack);
+        }
+      }
+
+      var nextIndex = 0;
+      while (nextIndex < pendingIds.length && inFlight.length < concurrency) {
+        inFlight.add(fetchAlbum(pendingIds[nextIndex++]));
+      }
+      while (inFlight.isNotEmpty) {
+        await checkpoint();
+        final next = inFlight.removeAt(0);
+        if (nextIndex < pendingIds.length) {
+          inFlight.add(fetchAlbum(pendingIds[nextIndex++]));
+        }
+        final result = await next;
+        if (result.error != null) {
+          Error.throwWithStackTrace(result.error!, result.stack!);
+        }
+        for (final song in result.songs!) {
           await checkpoint();
           if (songs.add(song.id)) yield song;
           if (songs.length > 500000) {
@@ -498,7 +528,7 @@ class SubsonicClient {
         }
       }
       if (page.length < 200) return;
-      if (newAlbums == 0) {
+      if (pendingIds.isEmpty) {
         throw const HttpException('Subsonic pagination did not advance');
       }
     }
@@ -772,7 +802,6 @@ class SubsonicClient {
           throw const HttpException('Subsonic artwork is too large');
         }
         writer.add(chunk);
-        await writer.flush();
       }
       if (size == 0) throw const HttpException('Subsonic artwork is empty');
     } finally {
