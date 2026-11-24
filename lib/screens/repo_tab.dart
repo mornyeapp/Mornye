@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
@@ -38,6 +40,7 @@ class RepoTab extends ConsumerStatefulWidget {
 class _RepoTabState extends ConsumerState<RepoTab> {
   final _searchController = TextEditingController();
   final _repoUrlController = TextEditingController();
+  Timer? _searchDebounce;
   bool _isInitialized = false;
   List<RepoExtension>? _cachedRawExtensions;
   String? _cachedCategory;
@@ -72,9 +75,23 @@ class _RepoTabState extends ConsumerState<RepoTab> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     _repoUrlController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      ref.read(repoProvider.notifier).setSearchQuery(value);
+    });
+  }
+
+  void _onSearchCleared() {
+    _searchDebounce?.cancel();
+    ref.read(repoProvider.notifier).setSearchQuery('');
   }
 
   @override
@@ -115,7 +132,8 @@ class _RepoTabState extends ConsumerState<RepoTab> {
       _cachedSearchQuery = searchQuery;
       _cachedFilteredExtensions = filteredExtensions;
     }
-    if (_searchController.text != searchQuery) {
+    if (_searchDebounce?.isActive != true &&
+        _searchController.text != searchQuery) {
       _searchController.value = TextEditingValue(
         text: searchQuery,
         selection: TextSelection.collapsed(offset: searchQuery.length),
@@ -177,10 +195,8 @@ class _RepoTabState extends ConsumerState<RepoTab> {
                     hintText: context.l10n.storeSearch,
                     clearTooltip: context.l10n.dialogClear,
                     samplesBackdrop: false,
-                    onChanged: (value) =>
-                        ref.read(repoProvider.notifier).setSearchQuery(value),
-                    onClear: () =>
-                        ref.read(repoProvider.notifier).setSearchQuery(''),
+                    onChanged: _onSearchChanged,
+                    onClear: _onSearchCleared,
                   ),
                 ),
               ),
@@ -247,50 +263,66 @@ class _RepoTabState extends ConsumerState<RepoTab> {
                     showRepository: showRepository,
                   )
                 else if (context.isMornye)
-                  SliverToBoxAdapter(
-                    child: ExtensionRepoCard(
-                      margin: EdgeInsets.symmetric(
-                        horizontal: edge,
-                        vertical: 4,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: filteredExtensions.asMap().entries.map((
-                          entry,
-                        ) {
-                          final index = entry.key;
-                          final ext = entry.value;
-                          return _ExtensionItem(
-                            extension: ext,
-                            showDivider: index < filteredExtensions.length - 1,
-                            showRepository: showRepository,
-                            isDownloading: downloadingId == ext.id,
-                            onInstall: () => _installExtension(ext),
-                            onUpdate: () => _updateExtension(ext),
-                            onTap: () => _showExtensionDetails(ext),
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final buttonWidth = _storeButtonWidth(context);
+                      return SliverToBoxAdapter(
+                        child: ExtensionRepoCard(
+                          margin: EdgeInsets.symmetric(
+                            horizontal: edge,
+                            vertical: 4,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: filteredExtensions.asMap().entries.map((
+                              entry,
+                            ) {
+                              final index = entry.key;
+                              final ext = entry.value;
+                              return _ExtensionItem(
+                                extension: ext,
+                                showDivider:
+                                    index < filteredExtensions.length - 1,
+                                showRepository: showRepository,
+                                isDownloading: downloadingId == ext.id,
+                                trailingWidth: buttonWidth,
+                                onInstall: () => _installExtension(ext),
+                                onUpdate: () => _updateExtension(ext),
+                                onTap: () => _showExtensionDetails(ext),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      );
+                    },
                   )
                 else
-                  SliverToBoxAdapter(
-                    child: SettingsGroup(
-                      connected: true,
-                      children: filteredExtensions.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final ext = entry.value;
-                        return _ExtensionItem(
-                          extension: ext,
-                          showDivider: index < filteredExtensions.length - 1,
-                          showRepository: showRepository,
-                          isDownloading: downloadingId == ext.id,
-                          onInstall: () => _installExtension(ext),
-                          onUpdate: () => _updateExtension(ext),
-                          onTap: () => _showExtensionDetails(ext),
-                        );
-                      }).toList(),
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final buttonWidth = _storeButtonWidth(context);
+                      return SliverToBoxAdapter(
+                        child: SettingsGroup(
+                          connected: true,
+                          children: filteredExtensions.asMap().entries.map((
+                            entry,
+                          ) {
+                            final index = entry.key;
+                            final ext = entry.value;
+                            return _ExtensionItem(
+                              extension: ext,
+                              showDivider:
+                                  index < filteredExtensions.length - 1,
+                              showRepository: showRepository,
+                              isDownloading: downloadingId == ext.id,
+                              trailingWidth: buttonWidth,
+                              onInstall: () => _installExtension(ext),
+                              onUpdate: () => _updateExtension(ext),
+                              onTap: () => _showExtensionDetails(ext),
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    },
                   ),
 
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
@@ -822,6 +854,7 @@ class _ExtensionItem extends StatelessWidget {
   /// Names the row's repository, when more than one is configured.
   final bool showRepository;
   final bool isDownloading;
+  final double? trailingWidth;
   final VoidCallback onInstall;
   final VoidCallback onUpdate;
   final VoidCallback? onTap;
@@ -831,6 +864,7 @@ class _ExtensionItem extends StatelessWidget {
     required this.showDivider,
     this.showRepository = false,
     required this.isDownloading,
+    this.trailingWidth,
     required this.onInstall,
     required this.onUpdate,
     this.onTap,
@@ -940,7 +974,7 @@ class _ExtensionItem extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
       ),
-      trailingWidth: _storeButtonWidth(context),
+      trailingWidth: trailingWidth ?? _storeButtonWidth(context),
       trailing: isDownloading
           ? const AppLoadingIndicator(size: 24)
           : !context.isMornye
