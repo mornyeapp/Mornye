@@ -517,10 +517,13 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   /// device at every song change. `seeking` reads `yes` until that decision
   /// is made, and nothing while the file still loads.
   Future<void> _drainOnceStarted(int token, int revision) async {
-    for (var attempt = 0; attempt < _startPolls; attempt++) {
+    final watch = Stopwatch()..start();
+    var delayMs = _startPoll.inMilliseconds;
+    while (watch.elapsed < _startPollTimeout) {
       if (_disposed || token != _token || revision != _nextRevision) return;
       if (await _engine.getProperty('seeking') == 'no') break;
-      await Future<void>.delayed(_startPoll);
+      await Future<void>.delayed(Duration(milliseconds: delayMs));
+      if (delayMs < 40) delayMs = math.min(40, delayMs * 2);
     }
     // A newer queued song or source owns the setting by now.
     if (_disposed || token != _token || revision != _nextRevision) return;
@@ -531,7 +534,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
 
   /// Ten seconds: a song that has not started by then loses only the
   /// retained device, not its ending.
-  static const _startPolls = 500;
+  static const _startPollTimeout = Duration(seconds: 10);
 
   @override
   Future<void> clearNextSource() async {
