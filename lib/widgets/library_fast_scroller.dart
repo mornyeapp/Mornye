@@ -278,54 +278,58 @@ class _LibraryFastScrollerState extends State<LibraryFastScroller> {
                                   clipBehavior: Clip.hardEdge,
                                   children: [
                                     PositionedDirectional(
-                                      top: top,
+                                      top: 0,
                                       end: 0,
                                       width: _hitWidth,
                                       height: _thumbHeight,
-                                      child: Semantics(
-                                        // Screen readers scroll the list itself.
-                                        excludeSemantics: true,
-                                        child: IgnorePointer(
-                                          // A hidden thumb must not catch edge swipes.
-                                          ignoring: !_visible && !_dragging,
-                                          child: GestureDetector(
-                                            behavior: HitTestBehavior.opaque,
-                                            onVerticalDragStart: _startDrag,
-                                            onVerticalDragUpdate: (details) =>
-                                                _updateDrag(details, track),
-                                            onVerticalDragEnd: (_) =>
-                                                _endDrag(),
-                                            onVerticalDragCancel: _endDrag,
-                                            child: AnimatedOpacity(
-                                              opacity: _visible || _dragging
-                                                  ? 1
-                                                  : 0,
-                                              duration: fade.duration,
-                                              curve: fade.curve,
-                                              child: Align(
-                                                alignment: AlignmentDirectional
-                                                    .centerEnd,
-                                                child: AnimatedContainer(
-                                                  duration: motion.duration,
-                                                  curve: motion.curve,
-                                                  margin:
-                                                      const EdgeInsetsDirectional.only(
-                                                        end: 4,
-                                                      ),
-                                                  width: _dragging ? 10 : 6,
-                                                  height: _thumbHeight,
-                                                  decoration: ShapeDecoration(
-                                                    color: _dragging
-                                                        ? colors.primary
-                                                        : colors
-                                                              .onSurfaceVariant
-                                                              .withValues(
-                                                                alpha: mornye
-                                                                    ? 0.45
-                                                                    : 0.6,
-                                                              ),
-                                                    shape:
-                                                        const StadiumBorder(),
+                                      child: Transform.translate(
+                                        offset: Offset(0, top),
+                                        child: Semantics(
+                                          // Screen readers scroll the list itself.
+                                          excludeSemantics: true,
+                                          child: IgnorePointer(
+                                            // A hidden thumb must not catch edge swipes.
+                                            ignoring: !_visible && !_dragging,
+                                            child: GestureDetector(
+                                              behavior: HitTestBehavior.opaque,
+                                              onVerticalDragStart: _startDrag,
+                                              onVerticalDragUpdate: (details) =>
+                                                  _updateDrag(details, track),
+                                              onVerticalDragEnd: (_) =>
+                                                  _endDrag(),
+                                              onVerticalDragCancel: _endDrag,
+                                              child: AnimatedOpacity(
+                                                opacity: _visible || _dragging
+                                                    ? 1
+                                                    : 0,
+                                                duration: fade.duration,
+                                                curve: fade.curve,
+                                                child: Align(
+                                                  alignment:
+                                                      AlignmentDirectional
+                                                          .centerEnd,
+                                                  child: AnimatedContainer(
+                                                    duration: motion.duration,
+                                                    curve: motion.curve,
+                                                    margin:
+                                                        const EdgeInsetsDirectional.only(
+                                                          end: 4,
+                                                        ),
+                                                    width: _dragging ? 10 : 6,
+                                                    height: _thumbHeight,
+                                                    decoration: ShapeDecoration(
+                                                      color: _dragging
+                                                          ? colors.primary
+                                                          : colors
+                                                                .onSurfaceVariant
+                                                                .withValues(
+                                                                  alpha: mornye
+                                                                      ? 0.45
+                                                                      : 0.6,
+                                                                ),
+                                                      shape:
+                                                          const StadiumBorder(),
+                                                    ),
                                                   ),
                                                 ),
                                               ),

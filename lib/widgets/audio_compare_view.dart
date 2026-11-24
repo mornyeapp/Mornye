@@ -936,9 +936,37 @@ class _ResidualTimeline extends StatefulWidget {
 class _ResidualTimelineState extends State<_ResidualTimeline> {
   AudioCompareChannel _channel = AudioCompareChannel.combined;
   int? _selected;
+  late List<double> _values;
+  late (double, double) _range;
+  AudioComparePeak? _peak;
 
-  List<double> get _values =>
-      audioCompareSeries(widget.result.windows, _channel);
+  @override
+  void initState() {
+    super.initState();
+    _recomputeSeries();
+  }
+
+  @override
+  void didUpdateWidget(_ResidualTimeline oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.result, widget.result)) {
+      _recomputeSeries();
+    }
+  }
+
+  void _recomputeSeries() {
+    _values = audioCompareSeries(widget.result.windows, _channel);
+    _range = _audioCompareRange(_values);
+    _peak = audioComparePeakFor(widget.result.windows, _channel);
+  }
+
+  void _setChannel(AudioCompareChannel channel) {
+    if (_channel == channel) return;
+    setState(() {
+      _channel = channel;
+      _recomputeSeries();
+    });
+  }
 
   void _select(Offset position, double width) {
     final windows = widget.result.windows;
@@ -959,9 +987,9 @@ class _ResidualTimelineState extends State<_ResidualTimeline> {
     final tokens = context.tokens;
     final result = widget.result;
     final values = _values;
-    final range = _audioCompareRange(values);
+    final range = _range;
     final selected = _selected;
-    final peak = audioComparePeakFor(result.windows, _channel);
+    final peak = _peak;
     final stereo = result.channels > 1;
     final labels = [
       l10n.audioCompareChannelBoth,
@@ -978,7 +1006,7 @@ class _ResidualTimelineState extends State<_ResidualTimeline> {
               selectedIndex: _channel.index,
               samplesBackdrop: false,
               onChanged: (index) =>
-                  setState(() => _channel = AudioCompareChannel.values[index]),
+                  _setChannel(AudioCompareChannel.values[index]),
             )
           else
             SettingsSegmentedChoice<AudioCompareChannel>(
@@ -990,7 +1018,7 @@ class _ResidualTimelineState extends State<_ResidualTimeline> {
                   ),
               ],
               selected: _channel,
-              onChanged: (channel) => setState(() => _channel = channel),
+              onChanged: _setChannel,
             ),
           SizedBox(height: tokens.gapMd),
         ],

@@ -230,7 +230,7 @@ class _HiResBatchCheckState extends State<HiResBatchCheck> {
     );
     return CustomScrollView(
       controller: widget.controller,
-      shrinkWrap: true,
+      shrinkWrap: _entries.length <= 8,
       slivers: [
         SliverToBoxAdapter(
           child: Padding(

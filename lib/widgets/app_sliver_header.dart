@@ -235,6 +235,12 @@ class AppSliverHeader extends StatelessWidget {
               ),
             ),
           );
+          final expandedTitleStyle = TextStyle(
+            fontSize: tokens.headerExpandedTitleSize,
+            fontWeight: FontWeight.bold,
+            letterSpacing: context.isMornye ? -0.7 : null,
+            color: colorScheme.onSurface,
+          );
           final bar = titleTrailing == null
               ? flexibleBar
               : Stack(
@@ -245,7 +251,13 @@ class AppSliverHeader extends StatelessWidget {
                       end: trailingInset,
                       bottom:
                           tokens.gapLg +
-                          (_titleLineHeight(context, title, titleStyle) -
+                          (_titleLineHeight(
+                                        context,
+                                        title,
+                                        expandedTitleStyle,
+                                      ) *
+                                      (fontSize /
+                                          tokens.headerExpandedTitleSize) -
                                   _titleTrailingExtent) /
                               2,
                       child: SizedBox.square(

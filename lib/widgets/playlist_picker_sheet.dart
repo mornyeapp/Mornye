@@ -279,8 +279,8 @@ class _PlaylistPickerSheetContentState
                     );
                   }
                   return ListView.builder(
-                    // The sheet is as tall as its playlists, up to the cap.
-                    shrinkWrap: true,
+                    // Small lists hug their content; long lists scroll lazily.
+                    shrinkWrap: playlists.length <= 8,
                     padding: EdgeInsets.only(top: context.isMornye ? 0 : 8),
                     itemCount: playlists.length,
                     itemBuilder: (context, index) {

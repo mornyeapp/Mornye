@@ -121,6 +121,7 @@ class HiddenTabMediaQuery extends StatefulWidget {
 class _HiddenTabMediaQueryState extends State<HiddenTabMediaQuery> {
   Size? _visibleSize;
   EdgeInsets? _visiblePadding;
+  EdgeInsets? _visibleViewPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -128,10 +129,15 @@ class _HiddenTabMediaQueryState extends State<HiddenTabMediaQuery> {
     if (!widget.hidden || _visibleSize == null) {
       _visibleSize = data.size;
       _visiblePadding = data.padding;
+      _visibleViewPadding = data.viewPadding;
     }
     return MediaQuery(
       data: data
-          .copyWith(size: _visibleSize, padding: _visiblePadding)
+          .copyWith(
+            size: _visibleSize,
+            padding: _visiblePadding,
+            viewPadding: _visibleViewPadding,
+          )
           .removeViewInsets(removeBottom: widget.hidden),
       child: widget.child,
     );
