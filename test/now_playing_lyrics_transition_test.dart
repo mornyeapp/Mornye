@@ -1167,6 +1167,39 @@ void main() {
     });
   }
 
+  for (final page in ['lyrics', 'queue']) {
+    testWidgets('the Mornye $page header is centred on its cover', (
+      tester,
+    ) async {
+      await pumpNowPlaying(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        size: const Size(393, 852),
+      );
+      mediaItems.add(item('first'));
+      await settlePlayer(tester);
+      await tester.tap(
+        findAppIcon(
+          page == 'lyrics'
+              ? CupertinoIcons.quote_bubble
+              : CupertinoIcons.list_bullet,
+        ),
+      );
+      await settlePlayer(tester);
+      final cover = tester.getRect(
+        find.byKey(const ValueKey('compact-player-artwork')).hitTestable(),
+      );
+      final title = tester.getRect(find.text('First').hitTestable());
+      final artist = tester.getRect(find.text('Artist').hitTestable());
+      final more = tester.getRect(
+        find.byIcon(CupertinoIcons.ellipsis).hitTestable(),
+      );
+      expect((title.top + artist.bottom) / 2, closeTo(cover.center.dy, 2));
+      expect(more.center.dy, closeTo(cover.center.dy, 2));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'portrait motion cover keeps the raised square-cover control positions',
     (tester) async {

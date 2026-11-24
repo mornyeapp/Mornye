@@ -516,6 +516,8 @@ class MornyePlayerLayout extends ConsumerWidget {
         : 24 + (_mornyeCompactIconSize - 24) * progress;
     return Builder(
       builder: (context) => Column(
+        // Centred on the compact cover, which is taller than the titles.
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
