@@ -383,8 +383,8 @@ Future<void> _genreCacheWrites = Future.value();
 
 /// Songs outside the Library like the Library's songs of the genre family
 /// [genre] (a genre mix's key), for the Recommended page. Asked once a day
-/// per genre and kept for that day; a failed request falls back on the last
-/// day's songs of that genre, else none.
+/// per genre and kept for that day; a failed or empty answer falls back on
+/// the last day's songs of that genre, else none, and is not kept.
 final homeGenreRecommendationsProvider = FutureProvider.autoDispose
     .family<List<Track>, String>((ref, genre) async {
       if (!ref.watch(settingsProvider.select((s) => s.homeRecommendations)) ||
@@ -437,7 +437,8 @@ final homeGenreRecommendationsProvider = FutureProvider.autoDispose
         round: round,
         limit: homeRecommendationCount,
       );
-      if (tracks == null) {
+      // No answer, or none found, is asked again when the page next opens.
+      if (tracks == null || tracks.isEmpty) {
         return last == null ? const [] : outsideLibrary(last);
       }
       await (_genreCacheWrites = _genreCacheWrites

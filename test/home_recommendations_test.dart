@@ -582,6 +582,17 @@ void main() {
       expect(await read(genres(), 'jazz'), isEmpty);
     });
 
+    test('an empty answer is asked again on the next read', () async {
+      answer = [];
+      expect(await read(genres(), 'rock'), isEmpty);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey(genreCacheKey), isFalse);
+
+      answer = [_result('Later one')];
+      expect(await read(genres(), 'rock'), ['Later one']);
+      expect(requests, hasLength(2));
+    });
+
     test(
       'a genre without a mix, or with the switch off, asks nothing',
       () async {
