@@ -110,6 +110,27 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
   bool _interactiveTransition = false;
   int _dragGeneration = 0;
 
+  static final _slideCurveTween = CurveTween(
+    curve: Easing.emphasizedDecelerate,
+  );
+  static final _slidePositionTween = Tween<Offset>(
+    begin: const Offset(0, 1),
+    end: Offset.zero,
+  );
+  Animation<double>? _cachedSlideSource;
+  Animation<double>? _cachedCurvedSlide;
+  Animation<Offset>? _cachedDirectSlidePosition;
+  Animation<Offset>? _cachedCurvedSlidePosition;
+
+  void _ensureSlideAnimations(Animation<double> animation) {
+    if (identical(_cachedSlideSource, animation)) return;
+    _cachedSlideSource = animation;
+    final curved = animation.drive(_slideCurveTween);
+    _cachedCurvedSlide = curved;
+    _cachedDirectSlidePosition = animation.drive(_slidePositionTween);
+    _cachedCurvedSlidePosition = curved.drive(_slidePositionTween);
+  }
+
   /// The finger's speed when the last drag was let go, in controller units
   /// a second (positive opens). The spring that finishes the move starts
   /// from it, once.
@@ -583,13 +604,13 @@ class NowPlayingRoute extends PageRoute<void> with SteadyStartRoute<void> {
       // pop.
       final inPlacePop =
           reversing && !_interactiveTransition && !context.isMornye;
-      final slide = _interactiveTransition || _usesSpringSlide
-          ? animation
-          : animation.drive(CurveTween(curve: Easing.emphasizedDecelerate));
+      _ensureSlideAnimations(animation);
+      final directSlide = _interactiveTransition || _usesSpringSlide;
+      final slide = directSlide ? animation : _cachedCurvedSlide!;
       if (!inPlacePop) {
-        position = slide.drive(
-          Tween(begin: const Offset(0, 1), end: Offset.zero),
-        );
+        position = directSlide
+            ? _cachedDirectSlidePosition!
+            : _cachedCurvedSlidePosition!;
       }
       if (inPlacePop) fade = animation;
       cornerRadius = _pageRadius(context, size.height * (1 - slide.value));
