@@ -31,7 +31,10 @@ $targetDir = Join-Path $rustBackendDir 'target'
 Push-Location $rustBackendDir
 try {
     $env:CARGO_TARGET_DIR = $targetDir
-    $env:CFLAGS = (($env:CFLAGS, '/Gy', '/Gw') | Where-Object { $_ }) -join ' '
+    # ring builds its ARM64 C with GNU-style clang, which reads /Gy as a file.
+    if ($Target -eq 'x86_64-pc-windows-msvc') {
+        $env:CFLAGS = (($env:CFLAGS, '/Gy', '/Gw') | Where-Object { $_ }) -join ' '
+    }
     $env:LIBSQLITE3_FLAGS = (($env:LIBSQLITE3_FLAGS,
         '-USQLITE_ENABLE_FTS3',
         '-USQLITE_ENABLE_FTS3_PARENTHESIS',
