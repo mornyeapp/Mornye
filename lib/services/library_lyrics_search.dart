@@ -101,13 +101,22 @@ class LibraryLyricsSearchStore {
     FROM library_visible l WHERE ${libraryNotShadowedSql('l')}
   ''';
 
-  String _songs(bool includeLocal) =>
-      '$_downloadedSongs${includeLocal ? 'UNION ALL $_localSongs' : ''}';
-
   /// One reader lane also bounds overlapping passes when a source changes or
   /// the user leaves and reopens the Lyrics filter during a native read.
-  Future<void> _index(
+  Future<
+    ({
+      Object? source,
+      Object? id,
+      Object? filePath,
+      Object? version,
+      String text,
+      bool exists,
+      int generation,
+    })?
+  >
+  _prepareIndexEntry(
     Map<String, Object?> song,
+    Map<String, Object?>? stored,
     bool Function() cancelled, {
     required bool readAll,
   }) async {
@@ -116,18 +125,10 @@ class LibraryLyricsSearchStore {
     _readTail = done.future;
     await previous;
     try {
-      if (cancelled()) return;
-      final cached = await db.query(
-        _table,
-        columns: ['file_path', 'version'],
-        where: 'source = ? AND id = ?',
-        whereArgs: [song['source'], song['id']],
-        limit: 1,
-      );
-      final stored = cached.firstOrNull;
+      if (cancelled()) return null;
       if (stored?['file_path'] == song['file_path'] &&
           stored?['version'] == song['version']) {
-        return;
+        return null;
       }
       final generation = _generation;
       // An edit can add lyrics before a scan updates the flag.
@@ -136,30 +137,80 @@ class LibraryLyricsSearchStore {
           ? ''
           : await readLyrics(song['file_path'] as String);
       final text = cleanLyricsForDisplay(raw).toLowerCase();
-      if (generation != _generation) return;
-      // UPDATE preserves the rowid used by the external-content FTS index.
-      final values = {
-        'file_path': song['file_path'],
-        'version': song['version'],
-        'search_text': text,
-      };
-      final changed = await db.update(
-        _table,
-        values,
-        where: 'source = ? AND id = ?',
-        whereArgs: [song['source'], song['id']],
+      if (generation != _generation) return null;
+      return (
+        source: song['source'],
+        id: song['id'],
+        filePath: song['file_path'],
+        version: song['version'],
+        text: text,
+        exists: stored != null,
+        generation: generation,
       );
-      if (changed == 0 && generation == _generation) {
-        await db.insert(_table, {
-          'source': song['source'],
-          'id': song['id'],
-          ...values,
-        });
-      }
-      // A new row without lyrics cannot change any search result.
-      if (changed > 0 || text.isNotEmpty) _revision++;
     } finally {
       done.complete();
+    }
+  }
+
+  /// Writes [entries] in one transaction and returns how many could not be
+  /// written; like a failed read, they are tried again on the next pass.
+  Future<int> _commitPreparedEntries(
+    List<
+      ({
+        Object? source,
+        Object? id,
+        Object? filePath,
+        Object? version,
+        String text,
+        bool exists,
+        int generation,
+      })
+    >
+    entries,
+  ) async {
+    if (entries.isEmpty) return 0;
+    Future<void> apply(DatabaseExecutor executor) async {
+      final batch = executor.batch();
+      var touched = false;
+      for (final entry in entries) {
+        if (entry.generation != _generation) continue;
+        final values = {
+          'file_path': entry.filePath,
+          'version': entry.version,
+          'search_text': entry.text,
+        };
+        if (entry.exists) {
+          // UPDATE preserves the rowid used by the external-content FTS index.
+          batch.update(
+            _table,
+            values,
+            where: 'source = ? AND id = ?',
+            whereArgs: [entry.source, entry.id],
+          );
+          touched = true;
+        } else {
+          batch.insert(_table, {
+            'source': entry.source,
+            'id': entry.id,
+            ...values,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+          if (entry.text.isNotEmpty) touched = true;
+        }
+      }
+      await batch.commit(noResult: true);
+      if (touched) _revision++;
+    }
+
+    final executor = db;
+    try {
+      if (executor is Database) {
+        await executor.transaction(apply);
+      } else {
+        await apply(executor);
+      }
+      return 0;
+    } catch (_) {
+      return entries.length;
     }
   }
 
@@ -203,18 +254,59 @@ class LibraryLyricsSearchStore {
           [?afterId],
         );
         if (rows.isEmpty) break;
+        final source = rows.first['source'];
+        final ids = [for (final row in rows) row['id']];
+        final placeholders = List.filled(ids.length, '?').join(',');
+        final existingRows = await db.query(
+          _table,
+          columns: ['id', 'file_path', 'version'],
+          where: 'source = ? AND id IN ($placeholders)',
+          whereArgs: [source, ...ids],
+        );
+        final existingById = {
+          for (final row in existingRows) row['id'] as String: row,
+        };
+        final prepared =
+            <
+              ({
+                Object? source,
+                Object? id,
+                Object? filePath,
+                Object? version,
+                String text,
+                bool exists,
+                int generation,
+              })
+            >[];
         for (final song in rows) {
-          if (cancelled()) return;
+          if (cancelled()) {
+            await _commitPreparedEntries(prepared);
+            return;
+          }
           try {
-            await _index(song, cancelled, readAll: _readAll);
+            final entry = await _prepareIndexEntry(
+              song,
+              existingById[song['id'] as String],
+              cancelled,
+              readAll: _readAll,
+            );
+            if (entry != null) prepared.add(entry);
           } catch (_) {
             // A failed probe is retryable, never cached as "no lyrics".
             failed++;
           }
-          if (cancelled()) return;
+          if (cancelled()) {
+            await _commitPreparedEntries(prepared);
+            return;
+          }
           checked++;
-          if (checked % 8 == 0) yield progress();
+          if (checked % 8 == 0) {
+            failed += await _commitPreparedEntries(prepared);
+            prepared.clear();
+            yield progress();
+          }
         }
+        failed += await _commitPreparedEntries(prepared);
         afterId = rows.last['id'] as String;
         yield progress();
       }
@@ -247,14 +339,38 @@ class LibraryLyricsSearchStore {
       ftsTable: _hasFts ? _fts : null,
     );
     final order = search.orderBy('LOWER(song.title)', args);
+    final localUnion = includeLocal
+        ? '''
+      UNION ALL
+      SELECT 'local' AS source, l.id, l.track_name AS title,
+        l.artist_name AS artist, l.cover_path AS cover, l.file_path
+      FROM matched m
+      JOIN library_visible l ON m.source = 'local' AND l.id = m.id
+        AND l.file_path = m.file_path
+        AND (COALESCE(l.file_mod_time, 0) || '|' || l.scanned_at || '|' ||
+          COALESCE(l.network_file_version, '') || '|' || l.has_lyrics) = m.version
+      WHERE ${libraryNotShadowedSql('l')}
+      '''
+        : '';
     final rows = await db.rawQuery(
       '''
+      WITH matched AS (
+        SELECT c.source, c.id, c.file_path, c.version
+        FROM $_table c
+        WHERE $predicate
+      )
       SELECT song.source, song.id, song.title, song.artist, song.cover,
         song.file_path AS sample_path, 1 AS track_count
-      FROM (${_songs(includeLocal)}) song JOIN $_table c
-        ON c.source = song.source AND c.id = song.id
-          AND c.file_path = song.file_path AND c.version = song.version
-      WHERE $predicate
+      FROM (
+        SELECT 'downloaded' AS source, h.id, h.track_name AS title,
+          h.artist_name AS artist, h.cover_url AS cover, h.file_path
+        FROM matched m
+        JOIN history_db.history h ON m.source = 'downloaded' AND h.id = m.id
+          AND h.file_path = m.file_path
+          AND (COALESCE(h.downloaded_at, '') || '|' || COALESCE(h.has_lyrics, 0)) = m.version
+        WHERE COALESCE(h.file_path, '') != ''
+        $localUnion
+      ) song
       ORDER BY $order, LOWER(song.title), song.source, song.id LIMIT ? OFFSET ?
     ''',
       [...args, limit.clamp(1, 100), offset < 0 ? 0 : offset],
