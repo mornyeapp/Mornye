@@ -213,6 +213,8 @@ class _Arrival {
   final _done = Completer<void>();
   late final Timer _timer;
   String? _part;
+  int _partScanMisses = 0;
+  DateTime? _nextPartScan;
   int _written = 0;
   bool _sawPart = false;
   bool _failed = false;
@@ -288,7 +290,15 @@ class _Arrival {
 
   /// The part file the Link server writes this upload into.
   Future<String?> _findPart() async {
-    if (_part case final part? when await File(part).exists()) return part;
+    if (_part case final part? when await File(part).exists()) {
+      _partScanMisses = 0;
+      _nextPartScan = null;
+      return part;
+    }
+    final now = DateTime.now();
+    if (!_sawPart && _nextPartScan != null && now.isBefore(_nextPartScan!)) {
+      return null;
+    }
     final prefix = '.$name.';
     String? found;
     try {
@@ -302,6 +312,14 @@ class _Arrival {
       }
     } on FileSystemException {
       return null;
+    }
+    if (found == null) {
+      _partScanMisses++;
+      final backoffMs = min(1000, poll.inMilliseconds * _partScanMisses);
+      _nextPartScan = now.add(Duration(milliseconds: backoffMs));
+    } else {
+      _partScanMisses = 0;
+      _nextPartScan = null;
     }
     return _part = found;
   }
