@@ -83,7 +83,7 @@ impl Drop for Browse {
     fn drop(&mut self) {
         let _ = self.daemon.stop_browse(self.ty);
         if let Ok(done) = self.daemon.shutdown() {
-            let _ = done.recv_timeout(Duration::from_secs(1));
+            let _ = done.recv_timeout(Duration::from_millis(250));
         }
     }
 }
