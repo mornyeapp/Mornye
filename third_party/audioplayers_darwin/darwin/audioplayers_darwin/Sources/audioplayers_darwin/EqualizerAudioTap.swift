@@ -69,18 +69,16 @@ final class EqualizerAudioTap {
   }
 
   private func process(_ list: UnsafeMutablePointer<AudioBufferList>, frames: Int) {
-    // A busy editor skips the equalizer for one block; the shift never skips,
-    // or its stream would lose continuity.
-    let locked = dsp.lock.try()
-    defer { if locked { dsp.lock.unlock() } }
-    let equalize = locked && dsp.enabled
+    // Adopts a new EQ plan without waiting; while one is being written the
+    // active filters keep running instead of passing dry audio.
+    let equalize = dsp.beginRenderBlock()
     let shift = pitch.begin()
     let channels = Int(format.mChannelsPerFrame)
     guard equalize || shift, channels > 0, channels <= 8,
       format.mFormatID == kAudioFormatLinearPCM else { return }
     let floating = format.mFormatFlags & kAudioFormatFlagIsFloat != 0
     let bits = Int(format.mBitsPerChannel)
-    guard (floating && [32, 64].contains(bits)) || (!floating && [16, 32].contains(bits)) else { return }
+    guard (floating && (bits == 32 || bits == 64)) || (!floating && (bits == 16 || bits == 32)) else { return }
     let buffers = UnsafeMutableAudioBufferListPointer(list)
     for buffer in buffers where buffer.mData == nil { return }
     var start = 0
