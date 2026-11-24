@@ -126,16 +126,23 @@ void TaskbarControls::ReleaseTaskbar() {
   added_ = false;
 }
 
-void TaskbarControls::ResetIcons() {
+bool TaskbarControls::ResetIcons() {
   const UINT dpi = GetDpiForWindow(window_);
   const int size =
       std::max(16, GetSystemMetricsForDpi(
                        SM_CXSMICON, dpi == 0 ? USER_DEFAULT_SCREEN_DPI : dpi));
   const COLORREF color = IconColor();
+  if (icons_[0] != nullptr && size == last_icon_size_ &&
+      color == last_icon_color_) {
+    return false;
+  }
   for (size_t i = 0; i < icons_.size(); ++i) {
     if (icons_[i] != nullptr) DestroyIcon(icons_[i]);
     icons_[i] = MakeIcon(static_cast<Glyph>(i), size, color);
   }
+  last_icon_size_ = size;
+  last_icon_color_ = color;
+  return true;
 }
 
 void TaskbarControls::Update(TaskbarPlaybackState state) {
@@ -178,8 +185,9 @@ bool TaskbarControls::HandleMessage(UINT message, WPARAM wparam) {
   }
   if (message == WM_THEMECHANGED || message == WM_SETTINGCHANGE ||
       message == WM_SYSCOLORCHANGE || message == WM_DPICHANGED) {
-    ResetIcons();
-    Publish();
+    if (ResetIcons()) {
+      Publish();
+    }
   }
   if (message != WM_COMMAND || HIWORD(wparam) != THBN_CLICKED) return false;
   switch (LOWORD(wparam)) {

@@ -67,14 +67,20 @@ class AppDelegate: FlutterAppDelegate {
   /// the one holding Bring All to Front, whatever its localized title.
   private func adoptWindowsMenu() {
     guard let mainMenu = NSApp.mainMenu else { return }
-    let menus = mainMenu.items.compactMap(\.submenu)
-    if let current = NSApp.windowsMenu, menus.contains(where: { $0 === current }) {
-      return
+    if let current = NSApp.windowsMenu {
+      if current.supermenu === mainMenu { return }
+      for item in mainMenu.items where item.submenu === current {
+        return
+      }
     }
     let arrange = #selector(NSApplication.arrangeInFront(_:))
-    guard let menu = menus.first(where: { $0.items.contains { $0.action == arrange } })
-    else { return }
-    NSApp.windowsMenu = menu
+    for item in mainMenu.items {
+      guard let menu = item.submenu else { continue }
+      if menu.items.contains(where: { $0.action == arrange }) {
+        NSApp.windowsMenu = menu
+        return
+      }
+    }
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

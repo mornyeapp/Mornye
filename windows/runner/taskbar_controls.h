@@ -32,7 +32,7 @@ class TaskbarControls {
 
  private:
   void Publish();
-  void ResetIcons();
+  bool ResetIcons();
   void ReleaseTaskbar();
 
   HWND window_;
@@ -43,6 +43,8 @@ class TaskbarControls {
   bool added_ = false;
   TaskbarPlaybackState state_;
   std::array<HICON, 4> icons_ = {};
+  int last_icon_size_ = 0;
+  COLORREF last_icon_color_ = CLR_INVALID;
 };
 
 #endif  // RUNNER_TASKBAR_CONTROLS_H_

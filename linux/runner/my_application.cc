@@ -84,6 +84,9 @@ static void notify_window_mode(MyApplication* self) {
 
 static gboolean window_state_cb(GtkWidget* widget, GdkEventWindowState* event,
                                 gpointer user_data) {
+  if ((event->changed_mask & GDK_WINDOW_STATE_FULLSCREEN) == 0) {
+    return FALSE;
+  }
   MyApplication* self = MY_APPLICATION(user_data);
   notify_window_mode(self);
   return FALSE;
@@ -364,6 +367,11 @@ static void register_url_scheme() {
   }
 }
 
+static gboolean register_url_scheme_idle_cb(gpointer /*user_data*/) {
+  register_url_scheme();
+  return G_SOURCE_REMOVE;
+}
+
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
@@ -378,7 +386,7 @@ static void my_application_activate(GApplication* application) {
     return;
   }
 
-  register_url_scheme();
+  g_idle_add(register_url_scheme_idle_cb, nullptr);
 
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));

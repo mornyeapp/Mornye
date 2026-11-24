@@ -19,6 +19,8 @@ class MainFlutterWindow: NSWindow {
   private var requestedFullScreen = false
   private var fullScreenRestoreFrame: NSRect?
   private var resizeMonitor: Any?
+  private var pendingResizeFrame: NSRect?
+  private var resizeFrameScheduled = false
 
   override var canBecomeKey: Bool { true }
   override var canBecomeMain: Bool { true }
@@ -215,16 +217,21 @@ class MainFlutterWindow: NSWindow {
     var containerFrame = container.frame
     containerFrame.size.height = height
     containerFrame.origin.y = frame.height - height
-    container.frame = containerFrame
-    titleBar.frame = container.bounds
+    if container.frame != containerFrame {
+      container.frame = containerFrame
+    }
+    if titleBar.frame != container.bounds {
+      titleBar.frame = container.bounds
+    }
     let spacing = miniaturize.frame.minX - close.frame.minX
     for (index, button) in [close, miniaturize, zoom].enumerated() {
-      button.setFrameOrigin(
-        NSPoint(
-          x: Self.windowControlsInset + CGFloat(index) * spacing,
-          y: ((height - button.frame.height) / 2).rounded()
-        )
+      let origin = NSPoint(
+        x: Self.windowControlsInset + CGFloat(index) * spacing,
+        y: ((height - button.frame.height) / 2).rounded()
       )
+      if button.frame.origin != origin {
+        button.setFrameOrigin(origin)
+      }
     }
   }
 
@@ -295,6 +302,22 @@ class MainFlutterWindow: NSWindow {
   private func stopWindowResize() {
     if let monitor = resizeMonitor { NSEvent.removeMonitor(monitor) }
     resizeMonitor = nil
+    if let finalFrame = pendingResizeFrame {
+      pendingResizeFrame = nil
+      if frame != finalFrame {
+        setFrame(finalFrame, display: true)
+      }
+    }
+    resizeFrameScheduled = false
+  }
+
+  private func flushPendingResizeFrame() {
+    resizeFrameScheduled = false
+    guard resizeMonitor != nil, let nextFrame = pendingResizeFrame else { return }
+    pendingResizeFrame = nil
+    if frame != nextFrame {
+      setFrame(nextFrame, display: true)
+    }
   }
 
   private func startWindowResize(fromLeft: Bool) {
@@ -314,8 +337,14 @@ class MainFlutterWindow: NSWindow {
         let width = max(minimum.width, bounds.width + (fromLeft ? -delta.x : delta.x))
         let height = max(minimum.height, bounds.height - delta.y)
         let x = fromLeft ? bounds.maxX - width : bounds.minX
-        self.setFrame(
-          NSRect(x: x, y: bounds.maxY - height, width: width, height: height), display: true)
+        self.pendingResizeFrame = NSRect(
+          x: x, y: bounds.maxY - height, width: width, height: height)
+        if !self.resizeFrameScheduled {
+          self.resizeFrameScheduled = true
+          DispatchQueue.main.async { [weak self] in
+            self?.flushPendingResizeFrame()
+          }
+        }
       }
       return event
     }
