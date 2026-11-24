@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:cupertino_ui/cupertino_ui.dart'
     show CupertinoSliverRefreshControl;
-import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/material_expressive.dart';
@@ -128,12 +127,25 @@ class _AppRefreshIndicatorState extends State<AppRefreshIndicator> {
       return _RefreshScope(onRefresh: widget.onRefresh, child: widget.child);
     }
     if (!_usesExpressive) {
-      return RefreshIndicator(
+      Widget indicator = RefreshIndicator(
         key: _materialKey,
         onRefresh: widget.onRefresh,
         notificationPredicate: widget.notificationPredicate,
         child: widget.child,
       );
+      if (_bounces(context)) {
+        final behavior = ScrollConfiguration.of(context);
+        indicator = ScrollConfiguration(
+          behavior: behavior.copyWith(
+            physics: _PullEdgeScrollPhysics(
+              holdsPull: () => false,
+              parent: behavior.getScrollPhysics(context),
+            ),
+          ),
+          child: indicator,
+        );
+      }
+      return indicator;
     }
     Widget indicator = M3ERefreshIndicator.contained(
       controller: _expressive,
@@ -145,10 +157,9 @@ class _AppRefreshIndicatorState extends State<AppRefreshIndicator> {
         child: widget.child,
       ),
     );
-    // macOS lists bounce past their top edge. Under a pinned header that
-    // bounce opens a gap below the title, and the indicator ignores a pull
-    // that starts while it is still closing, so the top edge stays put.
-    if (defaultTargetPlatform == TargetPlatform.macOS) {
+    // A bounce past the top opens a gap under a pinned header and skips the
+    // overscroll the indicator follows, so bouncing lists hold their top edge.
+    if (_bounces(context)) {
       final behavior = ScrollConfiguration.of(context);
       indicator = ScrollConfiguration(
         behavior: behavior.copyWith(
