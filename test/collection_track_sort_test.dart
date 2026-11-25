@@ -30,6 +30,7 @@ CollectionTrackEntry _entry(
   String album,
   int day, {
   int? number,
+  String? releaseDate,
 }) => CollectionTrackEntry(
   key: key,
   addedAt: DateTime(2026, 1, day),
@@ -40,6 +41,7 @@ CollectionTrackEntry _entry(
     albumName: album,
     trackNumber: number,
     duration: 180,
+    releaseDate: releaseDate,
   ),
 );
 
@@ -49,6 +51,27 @@ final _entries = [
   _entry('a', 'Zebra', 'Cara', 'Blue', 2, number: 2),
   _entry('b', 'apple 10', 'Ana', 'Blue', 1, number: 1),
   _entry('c', 'Apple 2', 'Ben', 'Red', 3),
+];
+
+/// Same shape, with release dates: the May album's second track is named
+/// Zebra, so only the track number keeps it in order; Amber shares the May
+/// date; one song has no release date.
+final _dated = [
+  _entry('a', 'Zebra', 'Cara', 'Blue', 2, number: 2, releaseDate: '2026-05-20'),
+  _entry(
+    'b',
+    'apple 10',
+    'Ana',
+    'Blue',
+    1,
+    number: 1,
+    releaseDate: '2026-05-20',
+  ),
+  _entry('c', 'Apple 2', 'Ben', 'Red', 3, releaseDate: '2026-03-10'),
+  _entry('d', 'Song', 'Dan', 'Green', 4, number: 1, releaseDate: '2026-07-01'),
+  _entry('e', 'Song', 'Eve', 'Green', 5, number: 2, releaseDate: '2026-07-01'),
+  _entry('f', 'Song', 'Fay', 'Yellow', 6),
+  _entry('g', 'Song', 'Gus', 'Amber', 7, number: 1, releaseDate: '2026-05-20'),
 ];
 
 List<String> _keys(Iterable<CollectionTrackEntry> entries) => [
@@ -186,6 +209,34 @@ void main() {
     expect(_keys(_entries), ['a', 'b', 'c']);
   });
 
+  test('release-album sorts keep albums whole on a release timeline, '
+      'undated last', () {
+    List<String> sorted(CollectionTrackSort sort) =>
+        _keys(sortCollectionEntries(_dated, sort));
+
+    // The May album's second track is named Zebra, so only the track
+    // number can keep the album in order; Amber shares the May date and
+    // sorts before Blue by album name.
+    expect(sorted(CollectionTrackSort.releaseAlbumOldest), [
+      'c',
+      'g',
+      'b',
+      'a',
+      'd',
+      'e',
+      'f',
+    ]);
+    expect(sorted(CollectionTrackSort.releaseAlbumNewest), [
+      'd',
+      'e',
+      'g',
+      'b',
+      'a',
+      'c',
+      'f',
+    ]);
+  });
+
   for (final desktop in [false, true]) {
     for (final mornye in [false, true]) {
       testWidgets('a playlist lists its songs by the chosen sort and keeps '
@@ -219,6 +270,24 @@ void main() {
       });
     }
   }
+
+  testWidgets('a release-album choice is offered in the sort menu and saved', (
+    tester,
+  ) async {
+    await _open(tester);
+    await tester.tap(findByTooltip('Sort Songs').hitTestable().first);
+    await tester.pumpAndSettle();
+    final option = find.text('Release date, then album (Oldest first)');
+    await tester.ensureVisible(option);
+    await tester.pumpAndSettle();
+    await tester.tap(option);
+    await tester.pumpAndSettle();
+    final prefs = await SharedPreferences.getInstance();
+    expect(jsonDecode(prefs.getString('collection_track_sorts')!), {
+      'playlist:mix': 'releaseAlbumOldest',
+    });
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('a saved choice applies when the playlist opens, and to that '
       'playlist only', (tester) async {

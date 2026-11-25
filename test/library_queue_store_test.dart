@@ -314,6 +314,8 @@ void main() {
         'album-desc',
         'release-oldest',
         'release-newest',
+        'release-album-oldest',
+        'release-album-newest',
         'year-asc',
         'year-desc',
         'genre-asc',

@@ -57,6 +57,24 @@ enum HomeSearchSortOption {
   durationDesc,
   dateAsc,
   dateDesc,
+  releaseAlbumNewest,
+  releaseAlbumOldest,
+}
+
+/// Release dates for the release-album sorts, in the chosen direction. A
+/// song without a release date always sorts last, in both directions.
+int _compareSearchReleaseDates(
+  String? first,
+  String? second, {
+  required bool newest,
+}) {
+  final firstDate = (first ?? '').trim();
+  final secondDate = (second ?? '').trim();
+  if (firstDate.isEmpty && secondDate.isEmpty) return 0;
+  if (firstDate.isEmpty) return 1;
+  if (secondDate.isEmpty) return -1;
+  final order = firstDate.compareTo(secondDate);
+  return newest ? -order : order;
 }
 
 List<T> sortHomeSearchItems<T>({
@@ -66,6 +84,9 @@ List<T> sortHomeSearchItems<T>({
   required String Function(T) artistOf,
   required int Function(T) durationOf,
   required String? Function(T) dateOf,
+  String Function(T)? albumOf,
+  int? Function(T)? discOf,
+  int? Function(T)? trackOf,
 }) {
   if (option == HomeSearchSortOption.defaultOrder) return items;
 
@@ -99,6 +120,28 @@ List<T> sortHomeSearchItems<T>({
       sorted.sort((a, b) => (dateOf(a) ?? '').compareTo(dateOf(b) ?? ''));
     case HomeSearchSortOption.dateDesc:
       sorted.sort((a, b) => (dateOf(b) ?? '').compareTo(dateOf(a) ?? ''));
+    case HomeSearchSortOption.releaseAlbumNewest:
+    case HomeSearchSortOption.releaseAlbumOldest:
+      final newest = option == HomeSearchSortOption.releaseAlbumNewest;
+      sorted.sort((a, b) {
+        final date = _compareSearchReleaseDates(
+          dateOf(a),
+          dateOf(b),
+          newest: newest,
+        );
+        if (date != 0) return date;
+        final album = (albumOf?.call(a) ?? '').toLowerCase().compareTo(
+          (albumOf?.call(b) ?? '').toLowerCase(),
+        );
+        if (album != 0) return album;
+        final disc = (discOf?.call(a) ?? 1).compareTo(discOf?.call(b) ?? 1);
+        if (disc != 0) return disc;
+        final number = (trackOf?.call(a) ?? 999).compareTo(
+          trackOf?.call(b) ?? 999,
+        );
+        if (number != 0) return number;
+        return nameOf(a).toLowerCase().compareTo(nameOf(b).toLowerCase());
+      });
   }
   return sorted;
 }

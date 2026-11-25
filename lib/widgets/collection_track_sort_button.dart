@@ -71,6 +71,16 @@ class CollectionTrackSortButton extends ConsumerWidget {
               Icons.schedule,
               l10n.libraryFilterSortLatest,
             ),
+            action(
+              CollectionTrackSort.releaseAlbumNewest,
+              Icons.event_outlined,
+              l10n.libraryFilterSortReleaseAlbumNewest,
+            ),
+            action(
+              CollectionTrackSort.releaseAlbumOldest,
+              Icons.event_outlined,
+              l10n.libraryFilterSortReleaseAlbumOldest,
+            ),
           ],
         ],
       ),

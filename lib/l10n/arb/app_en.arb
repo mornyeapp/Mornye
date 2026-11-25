@@ -3982,6 +3982,14 @@
   "@libraryFilterSortYearDesc": {
     "description": "Library sort option - release year descending"
   },
+  "libraryFilterSortReleaseAlbumNewest": "Release date, then album (Newest first)",
+  "@libraryFilterSortReleaseAlbumNewest": {
+    "description": "Library sort option - release date, then album, newest first"
+  },
+  "libraryFilterSortReleaseAlbumOldest": "Release date, then album (Oldest first)",
+  "@libraryFilterSortReleaseAlbumOldest": {
+    "description": "Library sort option - release date, then album, oldest first"
+  },
   "libraryFilterSortGenreAsc": "Genre (A-Z)",
   "@libraryFilterSortGenreAsc": {
     "description": "Sort option - genre ascending"

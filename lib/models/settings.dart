@@ -123,6 +123,8 @@ const librarySortModes = [
   'year-desc',
   'release-newest',
   'release-oldest',
+  'release-album-newest',
+  'release-album-oldest',
   'genre-asc',
   'genre-desc',
 ];

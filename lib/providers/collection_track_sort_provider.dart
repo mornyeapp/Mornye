@@ -12,7 +12,31 @@ final _log = AppLogger('CollectionTrackSort');
 
 /// How a playlist, Liked Songs or the Wishlist lists its songs. [custom] is
 /// the saved order, the one Edit order changes.
-enum CollectionTrackSort { custom, title, artist, album, latest }
+enum CollectionTrackSort {
+  custom,
+  title,
+  artist,
+  album,
+  latest,
+  releaseAlbumNewest,
+  releaseAlbumOldest,
+}
+
+/// Release dates for the release-album sorts, in the chosen direction. A
+/// song without a release date always sorts last, in both directions.
+int _compareReleaseDates(
+  String? first,
+  String? second, {
+  required bool newest,
+}) {
+  final firstDate = (first ?? '').trim();
+  final secondDate = (second ?? '').trim();
+  if (firstDate.isEmpty && secondDate.isEmpty) return 0;
+  if (firstDate.isEmpty) return 1;
+  if (secondDate.isEmpty) return -1;
+  final order = firstDate.compareTo(secondDate);
+  return newest ? -order : order;
+}
 
 /// The key of a user playlist in [collectionTrackSortsProvider]; Liked Songs
 /// and the Wishlist use `loved` and `wishlist`.
@@ -45,6 +69,21 @@ List<CollectionTrackEntry> sortCollectionEntries(
         return (x.trackNumber ?? 999).compareTo(y.trackNumber ?? 999);
       case CollectionTrackSort.latest:
         return b.addedAt.compareTo(a.addedAt);
+      case CollectionTrackSort.releaseAlbumNewest:
+      case CollectionTrackSort.releaseAlbumOldest:
+        final date = _compareReleaseDates(
+          x.releaseDate,
+          y.releaseDate,
+          newest: sort == CollectionTrackSort.releaseAlbumNewest,
+        );
+        if (date != 0) return date;
+        final album = byName(x.albumName, y.albumName);
+        if (album != 0) return album;
+        final disc = (x.discNumber ?? 1).compareTo(y.discNumber ?? 1);
+        if (disc != 0) return disc;
+        final number = (x.trackNumber ?? 999).compareTo(y.trackNumber ?? 999);
+        if (number != 0) return number;
+        return byName(x.name, y.name);
     }
   }
 

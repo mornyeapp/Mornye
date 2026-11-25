@@ -39,6 +39,7 @@ const _alphabeticalSorts = {'a-z', 'z-a'};
 const _artistSorts = {'artist-asc', 'artist-desc'};
 const _albumSorts = {'album-asc', 'album-desc'};
 const _dateSorts = {'latest', 'oldest'};
+const _releaseAlbumSorts = {'release-album-newest', 'release-album-oldest'};
 
 extension _QueueTabSections on _QueueTabState {
   Iterable<String> get _availableLibrarySortModes {
@@ -67,6 +68,8 @@ extension _QueueTabSections on _QueueTabState {
       'year-desc' => l10n.libraryFilterSortYearDesc,
       'release-newest' => l10n.searchSortDateNewest,
       'release-oldest' => l10n.searchSortDateOldest,
+      'release-album-newest' => l10n.libraryFilterSortReleaseAlbumNewest,
+      'release-album-oldest' => l10n.libraryFilterSortReleaseAlbumOldest,
       'genre-asc' => l10n.libraryFilterSortGenreAsc,
       'genre-desc' => l10n.libraryFilterSortGenreDesc,
       _ => l10n.libraryFilterSortLatest,
@@ -88,7 +91,32 @@ extension _QueueTabSections on _QueueTabState {
     if (_dateSorts.contains(_sortMode)) {
       return _monthYearFormat(context).format(item.addedAt);
     }
+    if (_releaseAlbumSorts.contains(_sortMode)) {
+      return _releaseSectionLabel(context, item);
+    }
     return null;
+  }
+
+  /// Release month and year, or just the year when the release date names
+  /// no month, for the release-album sort's section headers. Undated items
+  /// have no header and fall to the end of the list.
+  String? _releaseSectionLabel(BuildContext context, UnifiedLibraryItem item) {
+    final date =
+        (item.historyItem?.releaseDate ?? item.localItem?.releaseDate)
+            ?.trim() ??
+        '';
+    if (date.length < 4) return null;
+    final year = date.substring(0, 4);
+    if (int.tryParse(year) == null) return null;
+    if (date.length >= 7 && date[4] == '-') {
+      final month = int.tryParse(date.substring(5, 7));
+      if (month != null && month >= 1 && month <= 12) {
+        return _monthYearFormat(
+          context,
+        ).format(DateTime(int.parse(year), month));
+      }
+    }
+    return year;
   }
 
   String? _albumSectionLabel(
@@ -214,7 +242,9 @@ extension _QueueTabSections on _QueueTabState {
                 'year-asc' ||
                 'year-desc' ||
                 'release-newest' ||
-                'release-oldest' => Icons.event_outlined,
+                'release-oldest' ||
+                'release-album-newest' ||
+                'release-album-oldest' => Icons.event_outlined,
                 'genre-asc' || 'genre-desc' => Icons.category_outlined,
                 'size-desc' || 'size-asc' => Icons.storage_outlined,
                 _ => Icons.schedule,
