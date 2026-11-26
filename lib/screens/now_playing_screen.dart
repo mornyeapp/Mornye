@@ -1039,6 +1039,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     artworkAspectRatio: artworkRatio,
                     fadeStart: fadeStart,
                     fullScreenArtwork: hasMotionArtwork,
+                    motionImmersive: motionImmersive,
                     artwork: showsFullArtwork
                         ? PlayerTransitionArtwork(
                             artworkKey: _motionArtworkKey,
@@ -1062,7 +1063,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             ),
             MornyeMotionGlow(
               videoUrl: motionArtwork?.source,
-              visible: showsFullArtwork && !hasMotionArtwork,
+              visible: showsFullArtwork && !motionImmersive,
               resolvingVideo: motion.resolving,
               squareArtwork: squareArtwork,
               artworkAspectRatio: artworkRatio,
@@ -1071,7 +1072,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             ValueListenableBuilder<double>(
               valueListenable: _artworkDim,
               builder: (context, dim, _) => MornyeControlsDim(
-                strength: !showsFullArtwork || hasMotionArtwork
+                strength: !showsFullArtwork || motionImmersive
                     ? 0
                     : motionArtwork != null
                     ? 1

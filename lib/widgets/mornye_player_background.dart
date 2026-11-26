@@ -55,6 +55,7 @@ class MornyePlayerBackground extends StatelessWidget {
     this.artworkAspectRatio,
     this.fadeStart = 0.58,
     this.fullScreenArtwork = false,
+    this.motionImmersive = false,
   });
 
   final Uri? artUri;
@@ -65,6 +66,7 @@ class MornyePlayerBackground extends StatelessWidget {
   /// Fraction of the artwork's height that stays sharp before fading out.
   final double fadeStart;
   final bool fullScreenArtwork;
+  final bool motionImmersive;
 
   @override
   Widget build(BuildContext context) {
@@ -117,18 +119,22 @@ class MornyePlayerBackground extends StatelessWidget {
                     ),
                   if (fullScreenArtwork)
                     Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            stops: const [0.0, 0.65, 0.85, 1.0],
-                            colors: [
-                              Colors.transparent,
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.35),
-                              Colors.black.withValues(alpha: 0.75),
-                            ],
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 280),
+                        opacity: motionImmersive ? 1.0 : 0.0,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: const [0.0, 0.65, 0.85, 1.0],
+                              colors: [
+                                Colors.transparent,
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.35),
+                                Colors.black.withValues(alpha: 0.75),
+                              ],
+                            ),
                           ),
                         ),
                       ),
