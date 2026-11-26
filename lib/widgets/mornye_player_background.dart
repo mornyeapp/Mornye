@@ -90,12 +90,15 @@ class MornyePlayerBackground extends StatelessWidget {
           );
           final size = MediaQuery.sizeOf(context);
           final artworkHeight = fullScreenArtwork
-              ? size.height
+              ? (artworkAspectRatio != null && artworkAspectRatio! > 0
+                  ? (size.width / artworkAspectRatio!).clamp(0.0, size.height)
+                  : (squareArtwork ? size.width : size.height * 0.75))
               : mornyeArtworkHeight(
                   size,
                   squareArtwork: squareArtwork,
                   aspectRatio: artworkAspectRatio,
                 );
+          final effectiveFadeStart = fullScreenArtwork ? 0.78 : fadeStart;
           return TweenAnimationBuilder<LinearGradient>(
             tween: _GradientTween(end: background),
             duration: motion.duration,
@@ -108,12 +111,13 @@ class MornyePlayerBackground extends StatelessWidget {
                   artworkLayer!,
                   // An outgoing cover fades out while the gradient leaves
                   // the full-bleed layout.
-                  if (!fullScreenArtwork &&
+                  if ((!fullScreenArtwork ||
+                          artworkHeight < size.height * 0.98) &&
                       (artwork != null || gradient.begin != background.begin))
                     CustomPaint(
                       painter: _ArtworkFade(
                         gradient,
-                        artworkHeight * fadeStart,
+                        artworkHeight * effectiveFadeStart,
                         artworkHeight,
                       ),
                     ),
