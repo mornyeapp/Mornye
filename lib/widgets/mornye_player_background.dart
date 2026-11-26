@@ -98,7 +98,7 @@ class MornyePlayerBackground extends StatelessWidget {
                   squareArtwork: squareArtwork,
                   aspectRatio: artworkAspectRatio,
                 );
-          final effectiveFadeStart = fullScreenArtwork ? 0.78 : fadeStart;
+          final effectiveFadeStart = fullScreenArtwork ? 0.92 : fadeStart;
           return TweenAnimationBuilder<LinearGradient>(
             tween: _GradientTween(end: background),
             duration: motion.duration,
