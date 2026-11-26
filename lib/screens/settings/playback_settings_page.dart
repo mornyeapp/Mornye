@@ -674,7 +674,8 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                     subtitle:
                         'Hide the top system status bar while player controls are hidden',
                     value: settings.hideStatusBarInFullScreenMotion,
-                    enabled: settings.motionArtworkEnabled &&
+                    enabled:
+                        settings.motionArtworkEnabled &&
                         settings.fullScreenMotionArtwork,
                     onChanged: (value) => ref
                         .read(settingsProvider.notifier)

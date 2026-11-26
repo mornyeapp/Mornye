@@ -79,11 +79,7 @@ class MornyeMotionGlow extends ConsumerStatefulWidget {
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     stops: [0.0, 0.35, 1.0],
-    colors: [
-      Color(0x00000000),
-      Color(0xff000000),
-      Color(0xff000000),
-    ],
+    colors: [Color(0x00000000), Color(0xff000000), Color(0xff000000)],
   );
 
   @override

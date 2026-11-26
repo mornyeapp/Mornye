@@ -878,7 +878,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                         ? Colors.white.withValues(alpha: 0.16)
                                         : Colors.transparent,
                                   ),
-                                  icon: const AppIcon(CupertinoIcons.list_bullet),
+                                  icon: const AppIcon(
+                                    CupertinoIcons.list_bullet,
+                                  ),
                                   onPressed: () =>
                                       _setMornyePage(_currentPage == 2 ? 0 : 2),
                                 ),
@@ -1343,9 +1345,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       return;
     }
     _motionIdleTimer = Timer(const Duration(seconds: 5), () {
-      if (!mounted ||
-          _currentPage != 0 ||
-          !ref.read(playbackPlayingProvider)) {
+      if (!mounted || _currentPage != 0 || !ref.read(playbackPlayingProvider)) {
         return;
       }
       setState(() => _motionControlsHidden = true);

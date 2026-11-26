@@ -497,7 +497,6 @@ class MornyePlayerLayout extends ConsumerWidget {
 
         Widget motionImmersiveView() {
           final isPlaying = ref.watch(playbackPlayingProvider);
-          final isLoading = ref.watch(playbackLoadingProvider);
           final position = ref.watch(playbackPositionProvider);
           final playback = ref.watch(playbackStateProvider).value;
           final duration = mediaItem.duration ?? Duration.zero;
@@ -548,18 +547,20 @@ class MornyePlayerLayout extends ConsumerWidget {
                                 child: PlayerArtwork(
                                   artUri: mediaItem.artUri?.toString(),
                                   colorScheme: colorScheme,
-                                  cacheWidth: (48 *
-                                          MediaQuery.devicePixelRatioOf(
-                                            context,
-                                          ))
-                                      .ceil(),
+                                  cacheWidth:
+                                      (48 *
+                                              MediaQuery.devicePixelRatioOf(
+                                                context,
+                                              ))
+                                          .ceil(),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: InkWell(
-                                onTap: () => onTrackNavigation(context, mediaItem),
+                                onTap: () =>
+                                    onTrackNavigation(context, mediaItem),
                                 borderRadius: BorderRadius.circular(4),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
@@ -579,7 +580,8 @@ class MornyePlayerLayout extends ConsumerWidget {
                                         ),
                                       ),
                                     ),
-                                    if (mediaItem.artist?.isNotEmpty ?? false) ...[
+                                    if (mediaItem.artist?.isNotEmpty ??
+                                        false) ...[
                                       const SizedBox(height: 2),
                                       OverflowMarquee(
                                         resetKey: mediaItem.id,
@@ -590,7 +592,9 @@ class MornyePlayerLayout extends ConsumerWidget {
                                           style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w400,
-                                            color: Colors.white.withValues(alpha: 0.72),
+                                            color: Colors.white.withValues(
+                                              alpha: 0.72,
+                                            ),
                                             letterSpacing: -0.1,
                                           ),
                                         ),
@@ -625,43 +629,46 @@ class MornyePlayerLayout extends ConsumerWidget {
                               valueListenable: seekPreview,
                               builder: (context, preview, _) =>
                                   PlaybackTimeBuilder(
-                                key: ValueKey('motion-time-${mediaItem.id}'),
-                                position: position,
-                                duration: duration,
-                                playback: playback,
-                                preview: preview,
-                                builder: (context, elapsedSeconds) => Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    MornyePlaybackTime(
-                                      key: ValueKey(
-                                        'motion-elapsed:${mediaItem.id}',
-                                      ),
-                                      seconds: elapsedSeconds,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.white70,
-                                      ),
+                                    key: ValueKey(
+                                      'motion-time-${mediaItem.id}',
                                     ),
-                                    MornyePlaybackTime(
-                                      key: ValueKey(
-                                        'motion-remaining:${mediaItem.id}',
-                                      ),
-                                      seconds:
-                                          (duration.inSeconds - elapsedSeconds)
-                                              .clamp(0, duration.inSeconds),
-                                      remaining: true,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.white70,
-                                      ),
+                                    position: position,
+                                    duration: duration,
+                                    playback: playback,
+                                    preview: preview,
+                                    builder: (context, elapsedSeconds) => Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        MornyePlaybackTime(
+                                          key: ValueKey(
+                                            'motion-elapsed:${mediaItem.id}',
+                                          ),
+                                          seconds: elapsedSeconds,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                        MornyePlaybackTime(
+                                          key: ValueKey(
+                                            'motion-remaining:${mediaItem.id}',
+                                          ),
+                                          seconds:
+                                              (duration.inSeconds -
+                                                      elapsedSeconds)
+                                                  .clamp(0, duration.inSeconds),
+                                          remaining: true,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
+                                  ),
                             ),
                           ],
                         ),
@@ -681,19 +688,20 @@ class MornyePlayerLayout extends ConsumerWidget {
             duration: const Duration(milliseconds: 280),
             switchInCurve: Curves.easeInOutCubic,
             switchOutCurve: Curves.easeInOutCubic,
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: child,
-            ),
+            transitionBuilder: (child, animation) =>
+                FadeTransition(opacity: animation, child: child),
             child: KeyedSubtree(
               key: ValueKey('motion-immersive-$motionControlsHidden'),
               child: motionControlsHidden
                   ? motionImmersiveView()
                   : (constraints.maxHeight < minHeight
-                      ? SingleChildScrollView(
-                          child: SizedBox(height: minHeight, child: content()),
-                        )
-                      : content()),
+                        ? SingleChildScrollView(
+                            child: SizedBox(
+                              height: minHeight,
+                              child: content(),
+                            ),
+                          )
+                        : content()),
             ),
           );
         } else {
