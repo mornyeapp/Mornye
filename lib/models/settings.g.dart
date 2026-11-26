@@ -197,6 +197,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   lockScreenLyricsKeepTitle:
       json['lockScreenLyricsKeepTitle'] as bool? ?? false,
   motionArtworkEnabled: json['motionArtworkEnabled'] as bool? ?? true,
+  fullScreenMotionArtwork: json['fullScreenMotionArtwork'] as bool? ?? true,
   saveMotionArtworkFile: json['saveMotionArtworkFile'] as bool? ?? false,
   saveFolderCover: json['saveFolderCover'] as bool? ?? false,
   folderCoverMaxDimension:
@@ -396,6 +397,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'lockScreenLyrics': instance.lockScreenLyrics,
   'lockScreenLyricsKeepTitle': instance.lockScreenLyricsKeepTitle,
   'motionArtworkEnabled': instance.motionArtworkEnabled,
+  'fullScreenMotionArtwork': instance.fullScreenMotionArtwork,
   'saveMotionArtworkFile': instance.saveMotionArtworkFile,
   'saveFolderCover': instance.saveFolderCover,
   'folderCoverMaxDimension': instance.folderCoverMaxDimension,

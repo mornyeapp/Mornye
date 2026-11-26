@@ -499,7 +499,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     // in the Material full-screen style; landscape keeps the square card,
     // and so does the whole cover setting.
     final stillFullBleed = fullBleed && motionArtwork == null;
-    final hasMotionArtwork = mornye && motionArtwork != null && !_landscape;
+    final fullScreenMotion = ref.watch(
+      settingsProvider.select((s) => s.fullScreenMotionArtwork),
+    );
+    final hasMotionArtwork =
+        mornye && motionArtwork != null && !_landscape && fullScreenMotion;
     final motionImmersive =
         hasMotionArtwork && _motionControlsHidden && _currentPage == 0;
     final artworkRatio = stillFullBleed
