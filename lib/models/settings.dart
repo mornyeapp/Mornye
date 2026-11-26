@@ -428,6 +428,7 @@ class AppSettings {
   final bool lockScreenLyricsKeepTitle;
   final bool motionArtworkEnabled;
   final bool fullScreenMotionArtwork;
+  final bool hideStatusBarInFullScreenMotion;
 
   /// Copy a download's animated cover into its album folder as `cover.mp4`.
   final bool saveMotionArtworkFile;
@@ -693,6 +694,7 @@ class AppSettings {
     this.lockScreenLyricsKeepTitle = false,
     this.motionArtworkEnabled = true,
     this.fullScreenMotionArtwork = true,
+    this.hideStatusBarInFullScreenMotion = true,
     this.saveMotionArtworkFile = false,
     this.saveFolderCover = false,
     this.folderCoverMaxDimension = 0,
@@ -905,6 +907,7 @@ class AppSettings {
     bool? lockScreenLyricsKeepTitle,
     bool? motionArtworkEnabled,
     bool? fullScreenMotionArtwork,
+    bool? hideStatusBarInFullScreenMotion,
     bool? saveMotionArtworkFile,
     bool? saveFolderCover,
     int? folderCoverMaxDimension,
@@ -1115,6 +1118,9 @@ class AppSettings {
       motionArtworkEnabled: motionArtworkEnabled ?? this.motionArtworkEnabled,
       fullScreenMotionArtwork:
           fullScreenMotionArtwork ?? this.fullScreenMotionArtwork,
+      hideStatusBarInFullScreenMotion:
+          hideStatusBarInFullScreenMotion ??
+          this.hideStatusBarInFullScreenMotion,
       saveMotionArtworkFile:
           saveMotionArtworkFile ?? this.saveMotionArtworkFile,
       saveFolderCover: saveFolderCover ?? this.saveFolderCover,

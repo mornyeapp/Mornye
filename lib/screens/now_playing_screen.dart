@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
-import 'package:flutter/services.dart' show SystemUiOverlayStyle;
+import 'package:flutter/services.dart'
+    show SystemChrome, SystemUiMode, SystemUiOverlay, SystemUiOverlayStyle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/player_track_navigation.dart';
@@ -176,6 +177,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   bool _lyricsControlsHidden = false;
   bool _lyricsControlsHiddenManually = false;
   bool _motionControlsHidden = false;
+  bool _statusBarHidden = false;
   Timer? _motionIdleTimer;
   bool _lyricsOptionsOpen = false;
   bool _audioOutputOpen = false;
@@ -368,6 +370,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _artworkRoute?.readArtwork = null;
     _lyricsIdleTimer?.cancel();
     _motionIdleTimer?.cancel();
+    if (_statusBarHidden) {
+      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    }
     _mediaItemSub?.close();
     _lyricsPlayingSub?.close();
     _lyricsAutoHideSub?.close();
@@ -506,6 +511,16 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         mornye && motionArtwork != null && !_landscape && fullScreenMotion;
     final motionImmersive =
         hasMotionArtwork && _motionControlsHidden && _currentPage == 0;
+    final hideStatusBar =
+        motionImmersive &&
+        ref.watch(
+          settingsProvider.select((s) => s.hideStatusBarInFullScreenMotion),
+        );
+    if (_statusBarHidden != hideStatusBar) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncStatusBar(hideStatusBar);
+      });
+    }
     final artworkRatio = stillFullBleed
         ? _landscape || wholeCover || screen.height <= 0
               ? 1.0
@@ -1043,7 +1058,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     squareArtwork: squareArtwork,
                     artworkAspectRatio: artworkRatio,
                     fadeStart: fadeStart,
-                    fullScreenArtwork: hasMotionArtwork,
+                    fullScreenArtwork: motionImmersive,
                     motionImmersive: motionImmersive,
                     artwork: showsFullArtwork
                         ? PlayerTransitionArtwork(
@@ -1068,23 +1083,27 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             ),
             MornyeMotionGlow(
               videoUrl: motionArtwork?.source,
-              visible: showsFullArtwork && !motionImmersive,
+              visible: showsFullArtwork,
               resolvingVideo: motion.resolving,
               squareArtwork: squareArtwork,
               artworkAspectRatio: artworkRatio,
-              fadeStart: fadeStart,
+              fadeStart: motionImmersive ? 0.60 : fadeStart,
+              fullScreen: motionImmersive,
             ),
             ValueListenableBuilder<double>(
               valueListenable: _artworkDim,
               builder: (context, dim, _) => MornyeControlsDim(
-                strength: !showsFullArtwork || motionImmersive
+                strength: !showsFullArtwork
                     ? 0
+                    : motionImmersive
+                    ? 0.55
                     : motionArtwork != null
                     ? 1
                     : dim,
                 squareArtwork: squareArtwork,
                 artworkAspectRatio: artworkRatio,
-                fadeStart: fadeStart,
+                fadeStart: motionImmersive ? 0.60 : fadeStart,
+                fullScreen: motionImmersive,
               ),
             ),
             _lyricsPointerListener(player),
@@ -1341,6 +1360,21 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       _scheduleMotionControlsHide();
     } else {
       _motionIdleTimer?.cancel();
+    }
+  }
+
+  void _syncStatusBar(bool hide) {
+    if (_statusBarHidden == hide || widget.embedded) return;
+    _statusBarHidden = hide;
+    if (hide) {
+      unawaited(
+        SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: const [SystemUiOverlay.bottom],
+        ),
+      );
+    } else {
+      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     }
   }
 

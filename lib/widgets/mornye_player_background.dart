@@ -38,7 +38,10 @@ double mornyeArtworkHeight(
   Size size, {
   required bool squareArtwork,
   required double? aspectRatio,
-}) => aspectRatio != null && aspectRatio > 0
+  bool fullScreen = false,
+}) => fullScreen
+    ? size.height
+    : aspectRatio != null && aspectRatio > 0
     ? (size.width / aspectRatio).clamp(0.0, size.height * 0.75)
     : squareArtwork
     ? size.width
@@ -89,16 +92,12 @@ class MornyePlayerBackground extends StatelessWidget {
             fullBleed: artwork != null,
           );
           final size = MediaQuery.sizeOf(context);
-          final artworkHeight = fullScreenArtwork
-              ? (artworkAspectRatio != null && artworkAspectRatio! > 0
-                  ? (size.width / artworkAspectRatio!).clamp(0.0, size.height)
-                  : (squareArtwork ? size.width : size.height * 0.75))
-              : mornyeArtworkHeight(
-                  size,
-                  squareArtwork: squareArtwork,
-                  aspectRatio: artworkAspectRatio,
-                );
-          final effectiveFadeStart = fullScreenArtwork ? 0.92 : fadeStart;
+          final artworkHeight = mornyeArtworkHeight(
+            size,
+            squareArtwork: squareArtwork,
+            aspectRatio: artworkAspectRatio,
+            fullScreen: fullScreenArtwork,
+          );
           return TweenAnimationBuilder<LinearGradient>(
             tween: _GradientTween(end: background),
             duration: motion.duration,
@@ -111,36 +110,13 @@ class MornyePlayerBackground extends StatelessWidget {
                   artworkLayer!,
                   // An outgoing cover fades out while the gradient leaves
                   // the full-bleed layout.
-                  if ((!fullScreenArtwork ||
-                          artworkHeight < size.height * 0.98) &&
+                  if (!fullScreenArtwork &&
                       (artwork != null || gradient.begin != background.begin))
                     CustomPaint(
                       painter: _ArtworkFade(
                         gradient,
-                        artworkHeight * effectiveFadeStart,
+                        artworkHeight * fadeStart,
                         artworkHeight,
-                      ),
-                    ),
-                  if (fullScreenArtwork)
-                    Positioned.fill(
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 280),
-                        opacity: motionImmersive ? 1.0 : 0.0,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              stops: const [0.0, 0.65, 0.85, 1.0],
-                              colors: [
-                                Colors.transparent,
-                                Colors.transparent,
-                                Colors.black.withValues(alpha: 0.35),
-                                Colors.black.withValues(alpha: 0.75),
-                              ],
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                 ],
@@ -207,6 +183,7 @@ class MornyeControlsDim extends StatelessWidget {
     this.squareArtwork = true,
     this.artworkAspectRatio,
     this.fadeStart = 0.58,
+    this.fullScreen = false,
   });
 
   /// From 0 (no layer) to 1 (all of it).
@@ -214,6 +191,7 @@ class MornyeControlsDim extends StatelessWidget {
   final bool squareArtwork;
   final double? artworkAspectRatio;
   final double fadeStart;
+  final bool fullScreen;
 
   @override
   Widget build(BuildContext context) {
@@ -222,6 +200,7 @@ class MornyeControlsDim extends StatelessWidget {
       size,
       squareArtwork: squareArtwork,
       aspectRatio: artworkAspectRatio,
+      fullScreen: fullScreen,
     );
     final start = (artworkHeight * fadeStart / size.height).clamp(0.0, 1.0);
     final end = ((start + artworkHeight / size.height) / 2).clamp(start, 1.0);
