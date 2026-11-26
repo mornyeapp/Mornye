@@ -1,3 +1,5 @@
+import 'package:mornye/widgets/fluid_artwork_backdrop.dart';
+
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
@@ -672,9 +674,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                   ),
                   AppIconButton(
                     color: overCover ? Colors.white : null,
-                    tooltip: MaterialLocalizations.of(
-                      context,
-                    ).moreButtonTooltip,
+                    tooltip: MaterialLocalizations.of(context)
+                        .moreButtonTooltip,
                     icon: const AppIcon(Icons.more_vert),
                     onPressed: () => _showMoreActions(
                       context: context,
@@ -893,11 +894,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                       ? Colors.white
                                       : colorScheme.primary,
                                   style: mornye
-                                      ? Theme.of(
-                                          context,
-                                        ).textTheme.labelMedium?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        )
+                                      ? Theme.of(context).textTheme.labelMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            )
                                       : Theme.of(context).textTheme.labelLarge,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,
@@ -998,29 +998,29 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  MornyePlayerBackground(
-                    artUri: mediaItem.artUri,
-                    squareArtwork: squareArtwork,
-                    artworkAspectRatio: artworkRatio,
-                    fadeStart: fadeStart,
-                    artwork: showsFullArtwork
-                        ? PlayerTransitionArtwork(
-                            artworkKey: _motionArtworkKey,
-                            child: Hero(
-                              tag: kNowPlayingArtworkHeroTag,
-                              child: artwork(),
-                            ),
-                          )
-                        : null,
-                  ),
-                  // Inside the sample: the labels sit on its colour.
-                  MornyeCoverGlow(
-                    artUri: mediaItem.artUri?.toString(),
-                    visible: showsFullArtwork && stillFullBleed,
-                    squareArtwork: squareArtwork,
-                    artworkAspectRatio: artworkRatio,
-                    fadeStart: fadeStart,
-                  ),
+                  if (!showsFullArtwork)
+                    FluidArtworkBackdrop(
+                      key: const ValueKey('fluid_artwork_backdrop'),
+                      artUri: mediaItem.artUri?.toString(),
+                      colorScheme: colorScheme,
+                      isPlaying: true,
+                      shallowBlur: _currentPage != 0,
+                      darkMode: Theme.of(context).brightness == Brightness.dark,
+                    )
+                  else
+                    MornyePlayerBackground(
+                      artUri: mediaItem.artUri,
+                      squareArtwork: squareArtwork,
+                      artworkAspectRatio: artworkRatio,
+                      fadeStart: fadeStart,
+                      artwork: PlayerTransitionArtwork(
+                        artworkKey: _motionArtworkKey,
+                        child: Hero(
+                          tag: kNowPlayingArtworkHeroTag,
+                          child: artwork(),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1513,9 +1513,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         : sleepTimerEndsAt == null
         ? null
         : context.l10n.nowPlayingSleepTimerActive(
-            MaterialLocalizations.of(
-              context,
-            ).formatTimeOfDay(TimeOfDay.fromDateTime(sleepTimerEndsAt)),
+            MaterialLocalizations.of(context)
+                .formatTimeOfDay(TimeOfDay.fromDateTime(sleepTimerEndsAt)),
           );
     final settings = ref.read(settingsProvider);
     final volumeShown = settings.playerShowVolume;
@@ -1631,9 +1630,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     trailing: AppIcon(
                       Icons.open_in_new,
                       size: 18,
-                      color: Theme.of(
-                        sheetContext,
-                      ).colorScheme.onSurfaceVariant,
+                      color: Theme.of(sheetContext)
+                          .colorScheme
+                          .onSurfaceVariant,
                     ),
                     showDivider: false,
                     onTap: () => Navigator.of(sheetContext).pop('external'),
