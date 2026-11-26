@@ -1199,6 +1199,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       _lyricsScrollDistance = 0;
     });
     _scheduleLyricsControlsHide();
+    if (_currentPage == 0) {
+      _scheduleMotionControlsHide();
+    } else {
+      _motionIdleTimer?.cancel();
+    }
     if (_currentPage == 1) {
       _logLyricsAutoHideBlockers();
       unawaited(

@@ -210,7 +210,15 @@ class MornyePlayerLayout extends ConsumerWidget {
                   left: 0,
                   right: 0,
                   height: compact ? compactHeaderHeight + 8 : stage.maxHeight,
-                  child: const PlayerTrackSwipeRegion(child: SizedBox.expand()),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: hasMotionArtwork && page == 0
+                        ? onToggleMotionControls
+                        : null,
+                    child: const PlayerTrackSwipeRegion(
+                      child: SizedBox.expand(),
+                    ),
+                  ),
                 ),
                 Positioned.fill(
                   top: 8 + compactHeaderHeight + 16,
