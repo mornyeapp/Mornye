@@ -175,6 +175,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   double? _shownMotionRatio;
   bool _lyricsControlsHidden = false;
   bool _lyricsControlsHiddenManually = false;
+  bool _motionControlsHidden = true;
+  Timer? _motionIdleTimer;
   bool _lyricsOptionsOpen = false;
   bool _audioOutputOpen = false;
   bool _sharingLyrics = false;
@@ -207,6 +209,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     super.initState();
     _lyricsTranslation = ref.read(lyricsTranslationProvider.notifier);
     if (widget.embedded) desktopInspectorPanel.addListener(_onInspectorChanged);
+    _seekPreview.addListener(() {
+      if (_seekPreview.value != null) {
+        _motionIdleTimer?.cancel();
+      } else if (!_motionControlsHidden) {
+        _scheduleMotionControlsHide();
+      }
+    });
     _mediaItemSub = ref.listenManual<AsyncValue<MediaItem?>>(
       currentMediaItemProvider,
       (previous, next) {
@@ -235,8 +244,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       previous,
       playing,
     ) {
-      if (!playing && _lyricsControlsHidden) {
-        setState(_showLyricsControls);
+      if (!playing) {
+        _motionIdleTimer?.cancel();
+        if (_lyricsControlsHidden) {
+          setState(_showLyricsControls);
+        }
+      } else if (!_motionControlsHidden) {
+        _scheduleMotionControlsHide();
       }
       _scheduleLyricsControlsHide();
     });
@@ -352,6 +366,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     }
     _artworkRoute?.readArtwork = null;
     _lyricsIdleTimer?.cancel();
+    _motionIdleTimer?.cancel();
     _mediaItemSub?.close();
     _lyricsPlayingSub?.close();
     _lyricsAutoHideSub?.close();
@@ -483,6 +498,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     // in the Material full-screen style; landscape keeps the square card,
     // and so does the whole cover setting.
     final stillFullBleed = fullBleed && motionArtwork == null;
+    final hasMotionArtwork = mornye && motionArtwork != null && !_landscape;
+    final motionImmersive =
+        hasMotionArtwork && _motionControlsHidden && _currentPage == 0;
     final artworkRatio = stillFullBleed
         ? _landscape || wholeCover || screen.height <= 0
               ? 1.0
@@ -631,15 +649,22 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               ? MediaQuery.orientationOf(context) == Orientation.landscape ||
                         widget.embedded
                     ? null
-                    : IconButton(
-                        tooltip: context.l10n.nowPlayingMinimize,
-                        onPressed: _minimize,
-                        icon: Container(
-                          width: 36,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(3),
+                    : AnimatedOpacity(
+                        duration: const Duration(milliseconds: 200),
+                        opacity: motionImmersive ? 0.0 : 1.0,
+                        child: IgnorePointer(
+                          ignoring: motionImmersive,
+                          child: IconButton(
+                            tooltip: context.l10n.nowPlayingMinimize,
+                            onPressed: _minimize,
+                            icon: Container(
+                              width: 36,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.4),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
                           ),
                         ),
                       )
@@ -714,6 +739,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                           page: _currentPage,
                           motionArtwork: artwork(),
                           artworkAspectRatio: artworkRatio,
+                          hasMotionArtwork: hasMotionArtwork,
+                          motionControlsHidden: _motionControlsHidden,
+                          onToggleMotionControls: _toggleMotionControls,
                           controlsHeadroom: reservesPlayingOnRow
                               ? _mornyeControlsHeadroom
                               : 0,
@@ -782,53 +810,60 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (mornye && !_landscape)
-                        FractionallySizedBox(
-                          widthFactor: 0.72,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              IconButton(
-                                tooltip: _currentPage == 1
-                                    ? context.l10n.nowPlayingTabPlayer
-                                    : context.l10n.nowPlayingTabLyrics,
-                                isSelected: _showsPage(1),
-                                color: Colors.white,
-                                style: IconButton.styleFrom(
-                                  backgroundColor: _showsPage(1)
-                                      ? Colors.white.withValues(alpha: 0.16)
-                                      : Colors.transparent,
+                        AnimatedCrossFade(
+                          duration: const Duration(milliseconds: 200),
+                          crossFadeState: motionImmersive
+                              ? CrossFadeState.showSecond
+                              : CrossFadeState.showFirst,
+                          secondChild: const SizedBox.shrink(),
+                          firstChild: FractionallySizedBox(
+                            widthFactor: 0.72,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                IconButton(
+                                  tooltip: _currentPage == 1
+                                      ? context.l10n.nowPlayingTabPlayer
+                                      : context.l10n.nowPlayingTabLyrics,
+                                  isSelected: _showsPage(1),
+                                  color: Colors.white,
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: _showsPage(1)
+                                        ? Colors.white.withValues(alpha: 0.16)
+                                        : Colors.transparent,
+                                  ),
+                                  icon: const AppIcon(
+                                    CupertinoIcons.quote_bubble,
+                                  ),
+                                  onPressed: _toggleMornyeLyrics,
                                 ),
-                                icon: const AppIcon(
-                                  CupertinoIcons.quote_bubble,
+                                AudioOutputButton(
+                                  color: Colors.white,
+                                  onPickerChanged: (open) {
+                                    if (!mounted) return;
+                                    setState(() => _audioOutputOpen = open);
+                                    _scheduleLyricsControlsHide();
+                                  },
                                 ),
-                                onPressed: _toggleMornyeLyrics,
-                              ),
-                              AudioOutputButton(
-                                color: Colors.white,
-                                onPickerChanged: (open) {
-                                  if (!mounted) return;
-                                  setState(() => _audioOutputOpen = open);
-                                  _scheduleLyricsControlsHide();
-                                },
-                              ),
-                              // The row spreads its buttons apart, so the
-                              // Devices entry only takes a slot when paired.
-                              if (ref.watch(linkPhoneClientProvider) != null)
-                                const LinkDevicesButton(color: Colors.white),
-                              IconButton(
-                                tooltip: context.l10n.nowPlayingUpNext,
-                                color: Colors.white,
-                                isSelected: _showsPage(2),
-                                style: IconButton.styleFrom(
-                                  backgroundColor: _showsPage(2)
-                                      ? Colors.white.withValues(alpha: 0.16)
-                                      : Colors.transparent,
+                                // The row spreads its buttons apart, so the
+                                // Devices entry only takes a slot when paired.
+                                if (ref.watch(linkPhoneClientProvider) != null)
+                                  const LinkDevicesButton(color: Colors.white),
+                                IconButton(
+                                  tooltip: context.l10n.nowPlayingUpNext,
+                                  color: Colors.white,
+                                  isSelected: _showsPage(2),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: _showsPage(2)
+                                        ? Colors.white.withValues(alpha: 0.16)
+                                        : Colors.transparent,
+                                  ),
+                                  icon: const AppIcon(CupertinoIcons.list_bullet),
+                                  onPressed: () =>
+                                      _setMornyePage(_currentPage == 2 ? 0 : 2),
                                 ),
-                                icon: const AppIcon(CupertinoIcons.list_bullet),
-                                onPressed: () =>
-                                    _setMornyePage(_currentPage == 2 ? 0 : 2),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         )
                       else if (!mornye)
@@ -1003,6 +1038,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     squareArtwork: squareArtwork,
                     artworkAspectRatio: artworkRatio,
                     fadeStart: fadeStart,
+                    fullScreenArtwork: hasMotionArtwork,
                     artwork: showsFullArtwork
                         ? PlayerTransitionArtwork(
                             artworkKey: _motionArtworkKey,
@@ -1266,6 +1302,35 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _logLyricsControlsStatus(
       'Lyrics controls auto-hide timer started: 5 seconds',
     );
+  }
+
+  void _scheduleMotionControlsHide() {
+    _motionIdleTimer?.cancel();
+    if (!mounted ||
+        _currentPage != 0 ||
+        _motionControlsHidden ||
+        !ref.read(playbackPlayingProvider)) {
+      return;
+    }
+    _motionIdleTimer = Timer(const Duration(seconds: 5), () {
+      if (!mounted ||
+          _currentPage != 0 ||
+          !ref.read(playbackPlayingProvider)) {
+        return;
+      }
+      setState(() => _motionControlsHidden = true);
+    });
+  }
+
+  void _toggleMotionControls() {
+    setState(() {
+      _motionControlsHidden = !_motionControlsHidden;
+    });
+    if (!_motionControlsHidden) {
+      _scheduleMotionControlsHide();
+    } else {
+      _motionIdleTimer?.cancel();
+    }
   }
 
   void _endLyricsInteraction(int pointer, {bool cancelled = false}) {

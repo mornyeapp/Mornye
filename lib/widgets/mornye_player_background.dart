@@ -54,6 +54,7 @@ class MornyePlayerBackground extends StatelessWidget {
     this.squareArtwork = true,
     this.artworkAspectRatio,
     this.fadeStart = 0.58,
+    this.fullScreenArtwork = false,
   });
 
   final Uri? artUri;
@@ -63,6 +64,7 @@ class MornyePlayerBackground extends StatelessWidget {
 
   /// Fraction of the artwork's height that stays sharp before fading out.
   final double fadeStart;
+  final bool fullScreenArtwork;
 
   @override
   Widget build(BuildContext context) {
@@ -84,11 +86,14 @@ class MornyePlayerBackground extends StatelessWidget {
             sourceColor,
             fullBleed: artwork != null,
           );
-          final artworkHeight = mornyeArtworkHeight(
-            MediaQuery.sizeOf(context),
-            squareArtwork: squareArtwork,
-            aspectRatio: artworkAspectRatio,
-          );
+          final size = MediaQuery.sizeOf(context);
+          final artworkHeight = fullScreenArtwork
+              ? size.height
+              : mornyeArtworkHeight(
+                  size,
+                  squareArtwork: squareArtwork,
+                  aspectRatio: artworkAspectRatio,
+                );
           return TweenAnimationBuilder<LinearGradient>(
             tween: _GradientTween(end: background),
             duration: motion.duration,
@@ -101,12 +106,31 @@ class MornyePlayerBackground extends StatelessWidget {
                   artworkLayer!,
                   // An outgoing cover fades out while the gradient leaves
                   // the full-bleed layout.
-                  if (artwork != null || gradient.begin != background.begin)
+                  if (!fullScreenArtwork &&
+                      (artwork != null || gradient.begin != background.begin))
                     CustomPaint(
                       painter: _ArtworkFade(
                         gradient,
                         artworkHeight * fadeStart,
                         artworkHeight,
+                      ),
+                    ),
+                  if (fullScreenArtwork)
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: const [0.0, 0.45, 0.7, 1.0],
+                            colors: [
+                              Colors.black.withValues(alpha: 0.25),
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.35),
+                              Colors.black.withValues(alpha: 0.8),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                 ],
