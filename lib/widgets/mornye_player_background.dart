@@ -122,12 +122,12 @@ class MornyePlayerBackground extends StatelessWidget {
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            stops: const [0.0, 0.45, 0.7, 1.0],
+                            stops: const [0.0, 0.65, 0.85, 1.0],
                             colors: [
-                              Colors.black.withValues(alpha: 0.25),
+                              Colors.transparent,
                               Colors.transparent,
                               Colors.black.withValues(alpha: 0.35),
-                              Colors.black.withValues(alpha: 0.8),
+                              Colors.black.withValues(alpha: 0.75),
                             ],
                           ),
                         ),

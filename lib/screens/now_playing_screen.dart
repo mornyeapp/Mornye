@@ -1062,7 +1062,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             ),
             MornyeMotionGlow(
               videoUrl: motionArtwork?.source,
-              visible: showsFullArtwork,
+              visible: showsFullArtwork && !hasMotionArtwork,
               resolvingVideo: motion.resolving,
               squareArtwork: squareArtwork,
               artworkAspectRatio: artworkRatio,
@@ -1071,7 +1071,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             ValueListenableBuilder<double>(
               valueListenable: _artworkDim,
               builder: (context, dim, _) => MornyeControlsDim(
-                strength: !showsFullArtwork
+                strength: !showsFullArtwork || hasMotionArtwork
                     ? 0
                     : motionArtwork != null
                     ? 1
