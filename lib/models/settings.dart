@@ -275,6 +275,12 @@ class AppSettings {
   /// Off asks the system never to spatialize them. The app renders nothing.
   final bool spatialAudio;
 
+  /// Windows: play Dolby songs (E-AC-3, AC-4) through Windows' own media
+  /// engine, which keeps Dolby Atmos, instead of libmpv. On by default;
+  /// exclusive output keeps every song on libmpv. Applies from the next
+  /// song.
+  final bool windowsDolbyEngine;
+
   /// Adding a song already coming up in the queue moves that entry instead
   /// of queueing a second copy. The current and played entries stay.
   final bool queueNoDuplicates;
@@ -620,6 +626,7 @@ class AppSettings {
     this.media3Engine = false,
     this.skipSilence = false,
     this.spatialAudio = true,
+    this.windowsDolbyEngine = true,
     this.queueNoDuplicates = false,
     this.queueLocked = false,
     this.exclusiveOutput = false,
@@ -833,6 +840,7 @@ class AppSettings {
     bool? media3Engine,
     bool? skipSilence,
     bool? spatialAudio,
+    bool? windowsDolbyEngine,
     bool? queueNoDuplicates,
     bool? queueLocked,
     bool? exclusiveOutput,
@@ -1018,6 +1026,7 @@ class AppSettings {
       media3Engine: media3Engine ?? this.media3Engine,
       skipSilence: skipSilence ?? this.skipSilence,
       spatialAudio: spatialAudio ?? this.spatialAudio,
+      windowsDolbyEngine: windowsDolbyEngine ?? this.windowsDolbyEngine,
       queueNoDuplicates: queueNoDuplicates ?? this.queueNoDuplicates,
       queueLocked: queueLocked ?? this.queueLocked,
       exclusiveOutput: exclusiveOutput ?? this.exclusiveOutput,

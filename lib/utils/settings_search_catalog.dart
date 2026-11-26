@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/services/spatial_audio.dart';
@@ -696,6 +697,23 @@ class SettingsSearchCatalog {
                  'dolby atmos',
                  '3d',
                  'spasial',
+               ],
+             ),
+           if (isDesktopPlatform &&
+               defaultTargetPlatform == TargetPlatform.windows)
+             SettingsSearchEntry(
+               icon: Icons.surround_sound_outlined,
+               title: l10n.windowsDolbyEngine,
+               subtitle: l10n.windowsDolbyEngineDescription,
+               keywords: const [
+                 'dolby',
+                 'atmos',
+                 'e-ac-3',
+                 'eac3',
+                 'ac-4',
+                 'ac4',
+                 'spatial',
+                 'surround',
                ],
              ),
            if (isDesktopPlatform)

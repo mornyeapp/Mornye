@@ -157,6 +157,38 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Windows offers Dolby Atmos through Windows',
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+    (tester) async {
+      final container = await _pumpPage(tester, mornye: false);
+      const title = 'Dolby Atmos through Windows';
+      await _scrollTo(tester, find.text(title), 300);
+      expect(_switch(tester, title).value, isTrue);
+      await tester.tap(find.text(title));
+      await tester.pumpAndSettle();
+      expect(container.read(settingsProvider).windowsDolbyEngine, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final platform in [TargetPlatform.windows, TargetPlatform.linux]) {
+    testWidgets(
+      'Dolby Atmos through Windows is searchable on Windows only ($platform)',
+      variant: TargetPlatformVariant.only(platform),
+      (tester) async {
+        await _pumpPage(tester, mornye: false);
+        final l10n = AppLocalizations.of(tester.element(find.byType(Scaffold)));
+        expect(
+          SettingsSearchCatalog(
+            l10n,
+          ).playback.any((entry) => entry.title == l10n.windowsDolbyEngine),
+          platform == TargetPlatform.windows,
+        );
+      },
+    );
+  }
+
   testWidgets('the option is desktop only', (tester) async {
     debugDesktopPlatformOverride = false;
     await _pumpPage(tester, mornye: false);

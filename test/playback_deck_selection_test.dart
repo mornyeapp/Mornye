@@ -7,6 +7,7 @@ import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/playback_deck.dart';
+import 'package:mornye/services/windows_media_playback_deck.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
 import 'support/fake_mpv_engine.dart';
@@ -78,16 +79,30 @@ void main() {
     final created = <PlaybackDeck>[];
     MediaKitPlaybackDeck.debugAvailableOverride = true;
     try {
-      for (final platform in [TargetPlatform.windows, TargetPlatform.linux]) {
-        select(platform, desktop: true);
-        created
-          ..add(dependencies.createDeck('main'))
-          ..add(dependencies.createPreviewDeck('preview'));
-        expect(
-          created.reversed.take(2),
-          everyElement(isA<MediaKitPlaybackDeck>()),
-        );
-      }
+      // Windows plays through libmpv and moves Dolby songs to its own media
+      // engine; Linux plays everything through libmpv.
+      select(TargetPlatform.windows, desktop: true);
+      created
+        ..add(dependencies.createDeck('main'))
+        ..add(dependencies.createPreviewDeck('preview'));
+      expect(
+        created.reversed.take(2),
+        everyElement(
+          isA<WindowsDolbyEngineDeck>().having(
+            (deck) => deck.activeDeck,
+            'activeDeck',
+            isA<MediaKitPlaybackDeck>(),
+          ),
+        ),
+      );
+      select(TargetPlatform.linux, desktop: true);
+      created
+        ..add(dependencies.createDeck('main'))
+        ..add(dependencies.createPreviewDeck('preview'));
+      expect(
+        created.reversed.take(2),
+        everyElement(isA<MediaKitPlaybackDeck>()),
+      );
       // macOS plays through AVPlayer and switches to libmpv only for
       // exclusive output.
       select(TargetPlatform.macOS, desktop: true);

@@ -30,6 +30,7 @@ import 'package:mornye/services/listenbrainz/listenbrainz_service.dart';
 import 'package:mornye/services/lock_screen_lyrics.dart';
 import 'package:mornye/services/media3_playback_deck.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
+import 'package:mornye/services/windows_media_playback_deck.dart';
 import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/media_session_art_cache.dart';
 import 'package:mornye/services/media_session_desktop.dart';
@@ -216,16 +217,28 @@ class PlaybackDependencies {
   bool get isMacOS => _isMacOS ?? (isDesktopPlatform && Platform.isMacOS);
 
   static int _media3Decks = 0;
+  static int _windowsMediaDecks = 0;
 
   // Windows and Linux play through libmpv. Without the library they fall
-  // back to audioplayers, which has no equalizer there. macOS plays through
-  // AVPlayer and moves to libmpv for exclusive output (hog mode). Android
-  // moves ordinary sources to media3 while its beta engine is on.
+  // back to audioplayers, which has no equalizer there. Windows moves Dolby
+  // songs (E-AC-3, AC-4) to its own media engine, which keeps Dolby Atmos.
+  // macOS plays through AVPlayer and moves to libmpv for exclusive output
+  // (hog mode). Android moves ordinary sources to media3 while its beta
+  // engine is on.
   static PlaybackDeck _createDeck(String playerId) {
     if (!kMornyeMobileBuild &&
         playbackEngine == PlaybackEngine.mediaKit &&
         MediaKitPlaybackDeck.isAvailable) {
-      return MediaKitPlaybackDeck(playerId: playerId);
+      final mpv = MediaKitPlaybackDeck(playerId: playerId);
+      if (defaultTargetPlatform != TargetPlatform.windows) return mpv;
+      return WindowsDolbyEngineDeck(
+        mpv: mpv,
+        // A fresh native id each time, so a player still being released
+        // never shares one with its successor.
+        createWindowsMedia: () => WindowsMediaPlaybackDeck(
+          playerId: '$playerId-dolby-${_windowsMediaDecks++}',
+        ),
+      );
     }
     final shared = AudioplayersPlaybackDeck(playerId: playerId);
     if (!isDesktopPlatform && defaultTargetPlatform == TargetPlatform.android) {
@@ -492,6 +505,8 @@ class MusicPlayerRuntime {
         !settings.autoMix &&
         dependencies.isAndroid;
     playbackSpatialAudio.value = settings.spatialAudio;
+    // Windows decks read it as each song loads.
+    playbackWindowsDolbyEngine.value = settings.windowsDolbyEngine;
     playbackSpeed.value = settings.playbackSpeed;
     playbackPitch.value = PlaybackPitch(
       semitones: settings.playbackPitch,

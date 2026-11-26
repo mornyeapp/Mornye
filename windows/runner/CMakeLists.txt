@@ -7,6 +7,7 @@ project(runner LANGUAGES CXX)
 #
 # Any new source files that you add to the application should be added here.
 add_executable(${BINARY_NAME} WIN32
+  "dolby_media_player.cpp"
   "flutter_window.cpp"
   "main.cpp"
   "taskbar_controls.cpp"
@@ -32,6 +33,9 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_link_libraries(${BINARY_NAME} PRIVATE
   "ole32.lib" "uuid.lib" "gdi32.lib" "advapi32.lib")
+# Media Foundation media engine for Dolby songs (dolby_media_player.cpp).
+target_link_libraries(${BINARY_NAME} PRIVATE
+  "mfplat.lib" "mfuuid.lib" "oleaut32.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
