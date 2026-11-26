@@ -175,7 +175,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   double? _shownMotionRatio;
   bool _lyricsControlsHidden = false;
   bool _lyricsControlsHiddenManually = false;
-  bool _motionControlsHidden = true;
+  bool _motionControlsHidden = false;
   Timer? _motionIdleTimer;
   bool _lyricsOptionsOpen = false;
   bool _audioOutputOpen = false;
@@ -290,6 +290,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _warmColours(ref.read(nextQueueArtUriProvider));
+      _scheduleMotionControlsHide();
       unawaited(
         _trackMetadata.load(
           ref.read(currentMediaItemProvider).value,
