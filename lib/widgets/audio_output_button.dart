@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -45,6 +48,56 @@ class AudioOutputButton extends StatefulWidget {
 class _AudioOutputButtonState extends State<AudioOutputButton> {
   static const _systemChannel = MethodChannel('com.zarz.mornye/audio_output');
   bool _opening = false;
+  StreamSubscription<Set<AudioDevice>>? _devSub;
+  String? _btName;
+  @override
+  void initState() {
+    super.initState();
+    _initAudioMonitor();
+  }
+
+  Future<void> _initAudioMonitor() async {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) {
+      return;
+    }
+    try {
+      final s = await AudioSession.instance;
+      if (!mounted) {
+        return;
+      }
+      _syncDevices(await s.getDevices());
+      _devSub = s.devicesStream.listen(_syncDevices);
+    } catch (_) {}
+  }
+
+  void _syncDevices(Set<AudioDevice> devs) {
+    if (!mounted) {
+      return;
+    }
+    String? found;
+    for (final d in devs) {
+      if (d.isOutput &&
+          (d.type == AudioDeviceType.bluetoothA2dp ||
+              d.type == AudioDeviceType.bluetoothLe ||
+              d.type == AudioDeviceType.hearingAid)) {
+        found = d.name.trim();
+        break;
+      }
+    }
+    if (found != _btName) {
+      setState(
+        () => _btName = (found != null && found.isNotEmpty) ? found : null,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _devSub?.cancel();
+    super.dispose();
+  }
 
   CastOutput get _output => widget.output ?? CastOutput.instance;
 
@@ -219,6 +272,44 @@ class _AudioOutputButtonState extends State<AudioOutputButton> {
         backgroundColor: background,
         icon: Icon(icon),
         onPressed: _showPicker,
+      );
+    }
+    final activeLabel = _output.connected ? _output.deviceName : _btName;
+    if (activeLabel != null && activeLabel.isNotEmpty) {
+      final fg = widget.color ?? Theme.of(context).colorScheme.onSurface;
+      return SizedBox(
+        width: 48,
+        height: 48,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            AppIconButton(
+              tooltip: context.l10n.nowPlayingAudioOutput,
+              color: widget.color,
+              icon: Icon(icon),
+              onPressed: _showPicker,
+            ),
+            Positioned(
+              bottom: -6,
+              width: 112,
+              child: IgnorePointer(
+                child: Text(
+                  activeLabel,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w500,
+                    height: 1.0,
+                    color: fg.withValues(alpha: 0.72),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
     return AppIconButton(
