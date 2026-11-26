@@ -11,8 +11,11 @@ import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/mornye_landscape_player.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
+import 'package:mornye/widgets/mornye_playback_time.dart';
 import 'package:mornye/widgets/mornye_player_favorite_button.dart';
 import 'package:mornye/widgets/mornye_player_queue.dart';
+import 'package:mornye/widgets/playback_seek_slider.dart';
+import 'package:mornye/widgets/playback_time_builder.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
@@ -60,6 +63,9 @@ class MornyePlayerLayout extends ConsumerWidget {
     this.showSourceLabel = true,
     this.artworkAspectRatio,
     this.controlsHeadroom = 0,
+    this.hasMotionArtwork = false,
+    this.motionControlsHidden = false,
+    this.onToggleMotionControls,
   });
 
   final MediaItem mediaItem;
@@ -81,6 +87,9 @@ class MornyePlayerLayout extends ConsumerWidget {
   final bool showSourceLabel;
   final bool lyricsControlsHidden;
   final bool lyricsOptionsOpen;
+  final bool hasMotionArtwork;
+  final bool motionControlsHidden;
+  final VoidCallback? onToggleMotionControls;
   final Widget Function(bool showOptions) lyricsBuilder;
   final Widget? lyricsOptions;
   final ValueChanged<int> onPageChanged;
@@ -201,7 +210,15 @@ class MornyePlayerLayout extends ConsumerWidget {
                   left: 0,
                   right: 0,
                   height: compact ? compactHeaderHeight + 8 : stage.maxHeight,
-                  child: const PlayerTrackSwipeRegion(child: SizedBox.expand()),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: hasMotionArtwork && page == 0
+                        ? onToggleMotionControls
+                        : null,
+                    child: const PlayerTrackSwipeRegion(
+                      child: SizedBox.expand(),
+                    ),
+                  ),
                 ),
                 Positioned.fill(
                   top: 8 + compactHeaderHeight + 16,
@@ -478,12 +495,224 @@ class MornyePlayerLayout extends ConsumerWidget {
           ),
         );
 
-        if (constraints.maxHeight < minHeight) {
-          return SingleChildScrollView(
-            child: SizedBox(height: minHeight, child: content()),
+        Widget motionImmersiveView() {
+          final isPlaying = ref.watch(playbackPlayingProvider);
+          final position = ref.watch(playbackPositionProvider);
+          final playback = ref.watch(playbackStateProvider).value;
+          final duration = mediaItem.duration ?? Duration.zero;
+          final showLyricSnippet = ref.watch(
+            settingsProvider.select((s) => s.playerShowLyricSnippet),
+          );
+
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onToggleMotionControls,
+                  child: const PlayerTrackSwipeRegion(child: SizedBox.expand()),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (showLyricSnippet)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                          ).copyWith(bottom: 12),
+                          child: PlayerLyricPreview(
+                            metadata: metadata,
+                            seekPreview: seekPreview,
+                            colorScheme: colorScheme,
+                            onTap: () => onPageChanged(1),
+                          ),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: SizedBox.square(
+                                dimension: 48,
+                                child: PlayerArtwork(
+                                  artUri: mediaItem.artUri?.toString(),
+                                  colorScheme: colorScheme,
+                                  cacheWidth:
+                                      (48 *
+                                              MediaQuery.devicePixelRatioOf(
+                                                context,
+                                              ))
+                                          .ceil(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () =>
+                                    onTrackNavigation(context, mediaItem),
+                                borderRadius: BorderRadius.circular(4),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    OverflowMarquee(
+                                      resetKey: mediaItem.id,
+                                      playing: isPlaying,
+                                      child: Text(
+                                        mediaItem.title,
+                                        maxLines: 1,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                          letterSpacing: -0.2,
+                                        ),
+                                      ),
+                                    ),
+                                    if (mediaItem.artist?.isNotEmpty ??
+                                        false) ...[
+                                      const SizedBox(height: 2),
+                                      OverflowMarquee(
+                                        resetKey: mediaItem.id,
+                                        playing: isPlaying,
+                                        child: Text(
+                                          mediaItem.artist!,
+                                          maxLines: 1,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w400,
+                                            color: Colors.white.withValues(
+                                              alpha: 0.72,
+                                            ),
+                                            letterSpacing: -0.1,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            MornyePlayerFavoriteButton(mediaItem: mediaItem),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            PlaybackSeekSlider(
+                              playing: isPlaying,
+                              position: position,
+                              duration: duration,
+                              preview: seekPreview,
+                              onSeek: (target) async {
+                                await controller.seek(target);
+                              },
+                            ),
+                            const SizedBox(height: 4),
+                            ValueListenableBuilder<Duration?>(
+                              valueListenable: seekPreview,
+                              builder: (context, preview, _) =>
+                                  PlaybackTimeBuilder(
+                                    key: ValueKey(
+                                      'motion-time-${mediaItem.id}',
+                                    ),
+                                    position: position,
+                                    duration: duration,
+                                    playback: playback,
+                                    preview: preview,
+                                    builder: (context, elapsedSeconds) => Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        MornyePlaybackTime(
+                                          key: ValueKey(
+                                            'motion-elapsed:${mediaItem.id}',
+                                          ),
+                                          seconds: elapsedSeconds,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                        MornyePlaybackTime(
+                                          key: ValueKey(
+                                            'motion-remaining:${mediaItem.id}',
+                                          ),
+                                          seconds:
+                                              (duration.inSeconds -
+                                                      elapsedSeconds)
+                                                  .clamp(0, duration.inSeconds),
+                                          remaining: true,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           );
         }
-        return RepaintBoundary(child: content());
+
+        Widget activeBody;
+        if (hasMotionArtwork && page == 0) {
+          activeBody = AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            switchInCurve: Curves.easeInOutCubic,
+            switchOutCurve: Curves.easeInOutCubic,
+            transitionBuilder: (child, animation) =>
+                FadeTransition(opacity: animation, child: child),
+            child: KeyedSubtree(
+              key: ValueKey('motion-immersive-$motionControlsHidden'),
+              child: motionControlsHidden
+                  ? motionImmersiveView()
+                  : (constraints.maxHeight < minHeight
+                        ? SingleChildScrollView(
+                            child: SizedBox(
+                              height: minHeight,
+                              child: content(),
+                            ),
+                          )
+                        : content()),
+            ),
+          );
+        } else {
+          activeBody = constraints.maxHeight < minHeight
+              ? SingleChildScrollView(
+                  child: SizedBox(height: minHeight, child: content()),
+                )
+              : content();
+        }
+
+        return RepaintBoundary(child: activeBody);
       },
     );
     // Isolate playQueueProvider and currentQueueIndexProvider here so queue

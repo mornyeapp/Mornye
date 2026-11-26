@@ -38,7 +38,10 @@ double mornyeArtworkHeight(
   Size size, {
   required bool squareArtwork,
   required double? aspectRatio,
-}) => aspectRatio != null && aspectRatio > 0
+  bool fullScreen = false,
+}) => fullScreen
+    ? size.height
+    : aspectRatio != null && aspectRatio > 0
     ? (size.width / aspectRatio).clamp(0.0, size.height * 0.75)
     : squareArtwork
     ? size.width
@@ -54,6 +57,8 @@ class MornyePlayerBackground extends StatelessWidget {
     this.squareArtwork = true,
     this.artworkAspectRatio,
     this.fadeStart = 0.58,
+    this.fullScreenArtwork = false,
+    this.motionImmersive = false,
   });
 
   final Uri? artUri;
@@ -63,6 +68,8 @@ class MornyePlayerBackground extends StatelessWidget {
 
   /// Fraction of the artwork's height that stays sharp before fading out.
   final double fadeStart;
+  final bool fullScreenArtwork;
+  final bool motionImmersive;
 
   @override
   Widget build(BuildContext context) {
@@ -84,10 +91,12 @@ class MornyePlayerBackground extends StatelessWidget {
             sourceColor,
             fullBleed: artwork != null,
           );
+          final size = MediaQuery.sizeOf(context);
           final artworkHeight = mornyeArtworkHeight(
-            MediaQuery.sizeOf(context),
+            size,
             squareArtwork: squareArtwork,
             aspectRatio: artworkAspectRatio,
+            fullScreen: fullScreenArtwork,
           );
           return TweenAnimationBuilder<LinearGradient>(
             tween: _GradientTween(end: background),
@@ -101,7 +110,8 @@ class MornyePlayerBackground extends StatelessWidget {
                   artworkLayer!,
                   // An outgoing cover fades out while the gradient leaves
                   // the full-bleed layout.
-                  if (artwork != null || gradient.begin != background.begin)
+                  if (!fullScreenArtwork &&
+                      (artwork != null || gradient.begin != background.begin))
                     CustomPaint(
                       painter: _ArtworkFade(
                         gradient,
@@ -173,6 +183,7 @@ class MornyeControlsDim extends StatelessWidget {
     this.squareArtwork = true,
     this.artworkAspectRatio,
     this.fadeStart = 0.58,
+    this.fullScreen = false,
   });
 
   /// From 0 (no layer) to 1 (all of it).
@@ -180,6 +191,7 @@ class MornyeControlsDim extends StatelessWidget {
   final bool squareArtwork;
   final double? artworkAspectRatio;
   final double fadeStart;
+  final bool fullScreen;
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +200,7 @@ class MornyeControlsDim extends StatelessWidget {
       size,
       squareArtwork: squareArtwork,
       aspectRatio: artworkAspectRatio,
+      fullScreen: fullScreen,
     );
     final start = (artworkHeight * fadeStart / size.height).clamp(0.0, 1.0);
     final end = ((start + artworkHeight / size.height) / 2).clamp(start, 1.0);

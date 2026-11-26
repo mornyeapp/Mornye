@@ -653,8 +653,36 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                   onChanged: (value) => ref
                       .read(settingsProvider.notifier)
                       .setMotionArtworkEnabled(value),
-                  showDivider: false,
+                  showDivider: context.isMornye,
                 ),
+                if (context.isMornye) ...[
+                  SettingsSwitchItem(
+                    icon: Icons.fullscreen_rounded,
+                    title: 'Full-screen animated player',
+                    subtitle:
+                        'Expand animated artwork full screen and auto-hide controls after 5s',
+                    value: settings.fullScreenMotionArtwork,
+                    enabled: settings.motionArtworkEnabled,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setFullScreenMotionArtwork(value),
+                    showDivider: true,
+                  ),
+                  SettingsSwitchItem(
+                    icon: Icons.visibility_off_outlined,
+                    title: 'Hide status bar in full screen',
+                    subtitle:
+                        'Hide the top system status bar while player controls are hidden',
+                    value: settings.hideStatusBarInFullScreenMotion,
+                    enabled:
+                        settings.motionArtworkEnabled &&
+                        settings.fullScreenMotionArtwork,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setHideStatusBarInFullScreenMotion(value),
+                    showDivider: false,
+                  ),
+                ],
               ],
             ),
             if (Platform.isAndroid || Platform.isIOS || isDesktopPlatform) ...[

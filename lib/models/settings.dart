@@ -427,6 +427,8 @@ class AppSettings {
   /// The lock screen line takes the artist's place and the title stays.
   final bool lockScreenLyricsKeepTitle;
   final bool motionArtworkEnabled;
+  final bool fullScreenMotionArtwork;
+  final bool hideStatusBarInFullScreenMotion;
 
   /// Copy a download's animated cover into its album folder as `cover.mp4`.
   final bool saveMotionArtworkFile;
@@ -691,6 +693,8 @@ class AppSettings {
     this.lockScreenLyrics = false,
     this.lockScreenLyricsKeepTitle = false,
     this.motionArtworkEnabled = true,
+    this.fullScreenMotionArtwork = true,
+    this.hideStatusBarInFullScreenMotion = true,
     this.saveMotionArtworkFile = false,
     this.saveFolderCover = false,
     this.folderCoverMaxDimension = 0,
@@ -902,6 +906,8 @@ class AppSettings {
     bool? lockScreenLyrics,
     bool? lockScreenLyricsKeepTitle,
     bool? motionArtworkEnabled,
+    bool? fullScreenMotionArtwork,
+    bool? hideStatusBarInFullScreenMotion,
     bool? saveMotionArtworkFile,
     bool? saveFolderCover,
     int? folderCoverMaxDimension,
@@ -1110,6 +1116,11 @@ class AppSettings {
       lockScreenLyricsKeepTitle:
           lockScreenLyricsKeepTitle ?? this.lockScreenLyricsKeepTitle,
       motionArtworkEnabled: motionArtworkEnabled ?? this.motionArtworkEnabled,
+      fullScreenMotionArtwork:
+          fullScreenMotionArtwork ?? this.fullScreenMotionArtwork,
+      hideStatusBarInFullScreenMotion:
+          hideStatusBarInFullScreenMotion ??
+          this.hideStatusBarInFullScreenMotion,
       saveMotionArtworkFile:
           saveMotionArtworkFile ?? this.saveMotionArtworkFile,
       saveFolderCover: saveFolderCover ?? this.saveFolderCover,

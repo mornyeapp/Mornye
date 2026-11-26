@@ -27,6 +27,7 @@ class MornyeMotionGlow extends ConsumerStatefulWidget {
     this.squareArtwork = true,
     this.artworkAspectRatio,
     this.fadeStart = 0.58,
+    this.fullScreen = false,
   });
 
   /// The motion artwork of the current track, if it has one.
@@ -42,6 +43,7 @@ class MornyeMotionGlow extends ConsumerStatefulWidget {
   final bool squareArtwork;
   final double? artworkAspectRatio;
   final double fadeStart;
+  final bool fullScreen;
 
   /// How far the soft copy of the video is blurred, in logical pixels.
   static const softSigma = 24.0;
@@ -69,6 +71,15 @@ class MornyeMotionGlow extends ConsumerStatefulWidget {
       Color(0xff000000),
       Color(0x00000000),
     ],
+  );
+
+  /// The soft copy in full-screen immersive mode: comes in smoothly behind the
+  /// lyrics preview and stays softly blurred behind the bottom metadata.
+  static const softImmersiveMask = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    stops: [0.0, 0.35, 1.0],
+    colors: [Color(0x00000000), Color(0xff000000), Color(0xff000000)],
   );
 
   @override
@@ -106,6 +117,7 @@ class _MornyeMotionGlowState extends ConsumerState<MornyeMotionGlow> {
       size,
       squareArtwork: widget.squareArtwork,
       aspectRatio: widget.artworkAspectRatio,
+      fullScreen: widget.fullScreen,
     );
     final fadeTop = artworkHeight * widget.fadeStart;
     final fade = artworkHeight - fadeTop;
@@ -127,13 +139,14 @@ class _MornyeMotionGlowState extends ConsumerState<MornyeMotionGlow> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      top: fadeTop + fade * MornyeMotionGlow.colourStart,
-                      bottom: 0,
-                      child: _OneColour(controller: controller),
-                    ),
+                    if (!widget.fullScreen)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        top: fadeTop + fade * MornyeMotionGlow.colourStart,
+                        bottom: 0,
+                        child: _OneColour(controller: controller),
+                      ),
                     Positioned(
                       left: 0,
                       right: 0,
@@ -143,6 +156,7 @@ class _MornyeMotionGlowState extends ConsumerState<MornyeMotionGlow> {
                         controller: controller,
                         videoSize: videoSize,
                         artworkHeight: artworkHeight,
+                        immersive: widget.fullScreen,
                       ),
                     ),
                   ],
@@ -233,11 +247,13 @@ class _SoftVideo extends StatelessWidget {
     required this.controller,
     required this.videoSize,
     required this.artworkHeight,
+    this.immersive = false,
   });
 
   final VideoPlayerController controller;
   final Size videoSize;
   final double artworkHeight;
+  final bool immersive;
 
   static final _softBlur = ui.ImageFilter.blur(
     sigmaX: MornyeMotionGlow.softSigma,
@@ -248,7 +264,11 @@ class _SoftVideo extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ShaderMask(
     blendMode: BlendMode.dstIn,
-    shaderCallback: MornyeMotionGlow.softMask.createShader,
+    shaderCallback:
+        (immersive
+                ? MornyeMotionGlow.softImmersiveMask
+                : MornyeMotionGlow.softMask)
+            .createShader,
     // The blur spreads past its box, where the mask would not reach it.
     child: ClipRect(
       child: ImageFiltered(

@@ -899,6 +899,12 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setMotionArtworkEnabled(bool enabled) =>
       _commit(state.copyWith(motionArtworkEnabled: enabled));
 
+  void setFullScreenMotionArtwork(bool enabled) =>
+      _commit(state.copyWith(fullScreenMotionArtwork: enabled));
+
+  void setHideStatusBarInFullScreenMotion(bool enabled) =>
+      _commit(state.copyWith(hideStatusBarInFullScreenMotion: enabled));
+
   void setSaveMotionArtworkFile(bool enabled) =>
       _commit(state.copyWith(saveMotionArtworkFile: enabled));
 
