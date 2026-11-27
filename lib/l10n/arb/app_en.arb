@@ -521,6 +521,42 @@
   "exclusiveOutputDevice": "Output device",
   "exclusiveOutputDeviceFirst": "First sound card",
   "exclusiveOutputNoDevices": "No ALSA playback devices found",
+  "windowsDolbyEngine": "Dolby Atmos through Windows",
+  "@windowsDolbyEngine": {
+    "description": "Title of the Windows switch that plays Dolby songs (E-AC-3, AC-4) through Windows' own media engine so Dolby Atmos is kept"
+  },
+  "windowsDolbyEngineDescription": "Play Dolby songs (E-AC-3 and AC-4) through Windows' own Dolby decoders, which keep Dolby Atmos for the spatial sound format chosen in the Windows sound settings. Windows includes the E-AC-3 decoder; the AC-4 decoder comes only on PCs whose maker installed it. The equalizer, speed and pitch do not apply to those songs. Applies from the next song.",
+  "@windowsDolbyEngineDescription": {
+    "description": "Subtitle of the Dolby Atmos through Windows switch"
+  },
+  "windowsDolbyEngineExclusive": "Exclusive output is on, so Dolby songs play through the app's own engine without Atmos.",
+  "windowsDolbyEac3Supported": "E-AC-3: supported on this PC.",
+  "@windowsDolbyEac3Supported": {
+    "description": "Status under the Dolby Atmos through Windows switch: Windows has a Dolby Digital Plus (E-AC-3) decoder"
+  },
+  "windowsDolbyEac3Missing": "E-AC-3: no decoder on this PC. Windows N editions need the Media Feature Pack.",
+  "@windowsDolbyEac3Missing": {
+    "description": "Status under the Dolby Atmos through Windows switch: Windows has no Dolby Digital Plus decoder"
+  },
+  "windowsDolbyAc4Supported": "AC-4: supported on this PC.",
+  "@windowsDolbyAc4Supported": {
+    "description": "Status under the Dolby Atmos through Windows switch: the PC maker installed Dolby's AC-4 decoder"
+  },
+  "windowsDolbyAc4Missing": "AC-4: no decoder on this PC. Only PC makers can install it, so AC-4 songs cannot play here.",
+  "@windowsDolbyAc4Missing": {
+    "description": "Status under the Dolby Atmos through Windows switch: the PC has no AC-4 decoder"
+  },
+  "windowsDolbySpatialOn": "Spatial sound: on, so Atmos plays in 3D.",
+  "@windowsDolbySpatialOn": {
+    "description": "Status under the Dolby Atmos through Windows switch: a spatial sound format (Dolby Atmos or Windows Sonic) is on"
+  },
+  "windowsDolbySpatialOff": "Spatial sound: off, so Dolby songs play without Atmos. Turn on a spatial sound format in the Windows sound settings.",
+  "@windowsDolbySpatialOff": {
+    "description": "Status under the Dolby Atmos through Windows switch: no spatial sound format is on"
+  },
+  "@windowsDolbyEngineExclusive": {
+    "description": "Added to the Dolby Atmos through Windows subtitle while exclusive output is on"
+  },
   "usbDirect": "Direct USB driver",
   "usbDirectDescription": "Use exclusive USB audio with Android USB permission. FLAC, WAV, ALAC, DSF/DFF and WavPack DSD stay bit-perfect; AAC, MP3, Opus and Vorbis are decoded by the phone and sent directly. Native DSD requires a recognized compatible DAC. Applies from the next track.",
   "usbDsdOverPcm": "DSD over PCM (DoP)",

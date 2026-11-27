@@ -103,6 +103,8 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  dolby_media_players_ = std::make_unique<DolbyMediaPlayers>(
+      flutter_controller_->engine()->messenger());
   audio_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(), "com.zarz.mornye/open_audio",
@@ -196,6 +198,7 @@ void FlutterWindow::OpenAudioFiles(const std::vector<std::string>& paths) {
 }
 
 void FlutterWindow::OnDestroy() {
+  dolby_media_players_ = nullptr;
   taskbar_controls_ = nullptr;
   taskbar_channel_ = nullptr;
   audio_channel_ = nullptr;

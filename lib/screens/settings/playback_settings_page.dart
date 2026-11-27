@@ -22,6 +22,7 @@ import 'package:mornye/services/spatial_audio.dart';
 import 'package:mornye/services/suggestion_outcomes.dart';
 import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
+import 'package:mornye/screens/settings/windows_dolby_setting_item.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/android_tv.dart';
@@ -692,6 +693,8 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
               ...settingsSectionSlivers(
                 title: context.l10n.sectionAudioOutput,
                 children: [
+                  if (defaultTargetPlatform == TargetPlatform.windows)
+                    const WindowsDolbySettingItem(),
                   ValueListenableBuilder<ExclusiveOutputStatus>(
                     valueListenable: playbackExclusiveStatus,
                     builder: (context, status, _) {

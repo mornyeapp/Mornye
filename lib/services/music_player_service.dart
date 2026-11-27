@@ -271,7 +271,9 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
     // A prepared or queued next song must not keep the engine it was
     // prepared on; it prepares again on the new one.
-    final engineChanged = previous.media3Engine != settings.media3Engine;
+    final engineChanged =
+        previous.media3Engine != settings.media3Engine ||
+        previous.windowsDolbyEngine != settings.windowsDolbyEngine;
     if (previous.autoMix != settings.autoMix ||
         previous.autoMixOptions != settings.autoMixOptions ||
         previous.usbBitPerfect != settings.usbBitPerfect ||

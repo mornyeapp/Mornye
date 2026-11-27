@@ -118,6 +118,14 @@ void main() {
     expect(off.copyWith(locale: 'id').linkHideDisconnectedSongs, isFalse);
   });
 
+  test('Dolby Atmos through Windows is on by default and remembers off', () {
+    expect(const AppSettings().windowsDolbyEngine, isTrue);
+    expect(AppSettings.fromJson({}).windowsDolbyEngine, isTrue);
+    final off = const AppSettings().copyWith(windowsDolbyEngine: false);
+    expect(AppSettings.fromJson(off.toJson()).windowsDolbyEngine, isFalse);
+    expect(off.copyWith(locale: 'id').windowsDolbyEngine, isFalse);
+  });
+
   test('Swipe to queue is on by default and remembers off', () {
     expect(const AppSettings().swipeToQueue, isTrue);
     expect(AppSettings.fromJson({}).swipeToQueue, isTrue);

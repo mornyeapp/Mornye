@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "dolby_media_player.h"
 #include "taskbar_controls.h"
 #include "win32_window.h"
 
@@ -60,6 +61,9 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> audio_channel_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> taskbar_channel_;
   std::unique_ptr<TaskbarControls> taskbar_controls_;
+  // Windows media engine players for Dolby songs
+  // (lib/services/windows_media_playback_deck.dart).
+  std::unique_ptr<DolbyMediaPlayers> dolby_media_players_;
   flutter::EncodableList pending_audio_;
   bool audio_ready_ = false;
 
